@@ -1,12 +1,21 @@
-import { Button } from "@workspace/ui/components/button";
+import type { Metadata } from "next";
+import { AppSidebar } from "@workspace/ui/components/layout";
+import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
+import { BigCalendar } from "@workspace/ui/components/calendar";
+
+export const metadata: Metadata = {
+  title: "Calendar App - Crafted.is",
+};
 
 export default function Page() {
   return (
-    <div className="flex items-center justify-center min-h-svh">
-      <div className="flex flex-col items-center justify-center gap-4">
-        <h1 className="text-2xl font-bold">Hello World</h1>
-        <Button size="sm">Button</Button>
-      </div>
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <div className="flex flex-1 flex-col gap-4 p-2 pt-0">
+          <BigCalendar />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
