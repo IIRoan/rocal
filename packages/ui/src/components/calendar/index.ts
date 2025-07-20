@@ -10,6 +10,11 @@ export { EventsPopup } from "./events-popup";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
 export { default as BigCalendar } from "./big-calendar";
+export {
+  CalendarSkeleton,
+  EventDialogSkeleton,
+  SidebarCalendarSkeleton,
+} from "./calendar-skeleton";
 
 // Context providers
 export { CalendarDndProvider, useCalendarDnd } from "./calendar-dnd-context";
