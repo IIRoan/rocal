@@ -12,4 +12,3 @@ Follow these steps to run [Elysia.js](https://elysiajs.com) under [Bun](https://
    ```bash
    bun run main.ts
    ```
-
