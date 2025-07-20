@@ -22,22 +22,22 @@ import {
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 
-const data = {
-  user: {
-    name: "Sofia Safier",
-    email: "sofia@safier.com",
-    avatar:
-      "https://raw.githubusercontent.com/origin-space/origin-images/refs/heads/main/exp6/user-01_l4if9t.png",
-  },
-};
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user?: {
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  onLogout?: () => void;
+}
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
   const { isColorVisible, toggleColorVisibility } = useCalendarContext();
   return (
     <Sidebar
       variant="inset"
       {...props}
-      className="dark scheme-only-dark max-lg:p-3 lg:pe-1"
+      className="max-lg:p-3 lg:pe-1"
     >
       <SidebarHeader>
         <div className="flex justify-between items-center gap-2">
@@ -117,7 +117,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser 
+          user={user || {
+            name: "Guest User",
+            email: "guest@example.com",
+            avatar: "",
+          }} 
+          onLogout={onLogout}
+        />
       </SidebarFooter>
     </Sidebar>
   );
