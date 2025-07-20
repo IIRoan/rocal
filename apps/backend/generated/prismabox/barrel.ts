@@ -2,5 +2,8 @@ export * from "./User";
 export * from "./Session";
 export * from "./Account";
 export * from "./Verification";
+export * from "./EventCategory";
+export * from "./CalendarEvent";
+export * from "./EventParticipant";
 export * from "./__nullable__";
 export * from "./__transformDate__";
