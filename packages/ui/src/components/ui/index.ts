@@ -24,6 +24,11 @@ export {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
+export {
+  ErrorBoundary,
+  withErrorBoundary,
+  useErrorBoundary,
+} from "./error-boundary";
 export { Input } from "./input";
 export { Label } from "./label";
 export { Popover, PopoverContent, PopoverTrigger } from "./popover";

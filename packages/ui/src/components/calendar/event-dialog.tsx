@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RiCalendarLine, RiDeleteBinLine } from "@remixicon/react";
+import { RiCalendarLine, RiDeleteBinLine, RiAddLine } from "@remixicon/react";
 import { format, isBefore } from "date-fns";
 
 import type { CalendarEvent, EventColor } from "./types";
@@ -29,12 +29,39 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Textarea } from "../ui/textarea";
+import { Skeleton } from "../ui/skeleton";
+import { Loader2 } from "lucide-react";
 import {
   StartHour,
   EndHour,
   DefaultStartHour,
   DefaultEndHour,
 } from "./constants";
+import { EventDialogSkeleton } from "./calendar-skeleton";
+
+// Extended types for real data operations
+export interface EventCategory {
+  id: string;
+  name: string;
+  color: string;
+  isActive: boolean;
+  userId: string;
+  usageCount?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface ApiError {
+  error: string;
+  message: string;
+  statusCode: number;
+  details?: ValidationError[];
+}
 
 interface EventDialogProps {
   event: CalendarEvent | null;
@@ -42,6 +69,13 @@ interface EventDialogProps {
   onClose: () => void;
   onSave: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
+  categories?: EventCategory[];
+  onCreateCategory?: (category: {
+    name: string;
+    color: EventColor;
+  }) => Promise<EventCategory>;
+  loading?: boolean;
+  error?: ApiError | null;
 }
 
 export function EventDialog({
@@ -50,6 +84,10 @@ export function EventDialog({
   onClose,
   onSave,
   onDelete,
+  categories = [],
+  onCreateCategory,
+  loading = false,
+  error: apiError = null,
 }: EventDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -60,9 +98,19 @@ export function EventDialog({
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
   const [color, setColor] = useState<EventColor>("blue");
-  const [error, setError] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
+    []
+  );
+  const [localError, setLocalError] = useState<string | null>(null);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
+  const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState<EventColor>("blue");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Debug log to check what event is being passed
   useEffect(() => {
@@ -83,8 +131,11 @@ export function EventDialog({
       setEndTime(formatTimeForInput(end));
       setAllDay(event.allDay || false);
       setLocation(event.location || "");
-      setColor((event.color as EventColor) || "sky");
-      setError(null); // Reset error when opening dialog
+      setColor((event.color as EventColor) || "blue");
+      // Set categoryId from event if it exists
+      setCategoryId((event as any).categoryId || "none");
+      setValidationErrors([]);
+      setLocalError(null);
     } else {
       resetForm();
     }
@@ -100,7 +151,12 @@ export function EventDialog({
     setAllDay(false);
     setLocation("");
     setColor("blue");
-    setError(null);
+    setCategoryId("none");
+    setValidationErrors([]);
+    setLocalError(null);
+    setShowNewCategoryForm(false);
+    setNewCategoryName("");
+    setNewCategoryColor("blue");
   };
 
   const formatTimeForInput = (date: Date) => {
@@ -126,7 +182,16 @@ export function EventDialog({
     return options;
   }, []); // Empty dependency array ensures this only runs once
 
-  const handleSave = () => {
+  // Validation function
+  const validateForm = (): ValidationError[] => {
+    const errors: ValidationError[] = [];
+
+    // Title validation (required)
+    if (!title.trim()) {
+      errors.push({ field: "title", message: "Title is required" });
+    }
+
+    // Date validation
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -142,10 +207,10 @@ export function EventDialog({
         endHours < StartHour ||
         endHours > EndHour
       ) {
-        setError(
-          `Selected time must be between ${StartHour}:00 and ${EndHour}:00`,
-        );
-        return;
+        errors.push({
+          field: "time",
+          message: `Selected time must be between ${StartHour}:00 and ${EndHour}:00`,
+        });
       }
 
       start.setHours(startHours, startMinutes, 0);
@@ -157,28 +222,78 @@ export function EventDialog({
 
     // Validate that end date is not before start date
     if (isBefore(end, start)) {
-      setError("End date cannot be before start date");
+      errors.push({
+        field: "endDate",
+        message: "End date cannot be before start date",
+      });
+    }
+
+    return errors;
+  };
+
+  const handleSave = async () => {
+    // Clear previous errors
+    setValidationErrors([]);
+    setLocalError(null);
+
+    // Validate form
+    const errors = validateForm();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
       return;
     }
 
-    // Use generic title if empty
-    const eventTitle = title.trim() ? title : "(no title)";
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-    onSave({
+    if (!allDay) {
+      const [startHours = 0, startMinutes = 0] = startTime
+        .split(":")
+        .map(Number);
+      const [endHours = 0, endMinutes = 0] = endTime.split(":").map(Number);
+
+      start.setHours(startHours, startMinutes, 0);
+      end.setHours(endHours, endMinutes, 0);
+    } else {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    // Create event object with all necessary fields
+    const eventData: CalendarEvent = {
       id: event?.id || "",
-      title: eventTitle,
-      description,
+      title: title.trim(),
+      description: description.trim() || undefined,
       start,
       end,
       allDay,
-      location,
+      location: location.trim() || undefined,
       color,
-    });
+      ...(categoryId && categoryId !== "none" && { categoryId }),
+    };
+
+    setSaving(true);
+    try {
+      await onSave(eventData);
+    } catch (error) {
+      // Error handling is done in the parent component
+      console.error("Save failed:", error);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (event?.id) {
-      onDelete(event.id);
+      setDeleting(true);
+      try {
+        await onDelete(event.id);
+      } catch (error) {
+        // Error handling is done in the parent component
+        console.error("Delete failed:", error);
+      } finally {
+        setDeleting(false);
+      }
     }
   };
 
@@ -232,9 +347,22 @@ export function EventDialog({
               : "Add a new event to your calendar"}
           </DialogDescription>
         </DialogHeader>
-        {error && (
-          <div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm">
-            {error}
+        {(apiError || localError || validationErrors.length > 0) && (
+          <div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm space-y-1">
+            {apiError && <div>{apiError.message}</div>}
+            {localError && <div>{localError}</div>}
+            {validationErrors.map((error, index) => (
+              <div key={index}>{error.message}</div>
+            ))}
+            {apiError?.details && apiError.details.length > 0 && (
+              <div className="mt-2">
+                {apiError.details.map((detail, index) => (
+                  <div key={index} className="text-xs">
+                    {detail.field}: {detail.message}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div className="grid gap-4 py-4">
@@ -267,13 +395,13 @@ export function EventDialog({
                     variant={"outline"}
                     className={cn(
                       "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
-                      !startDate && "text-muted-foreground",
+                      !startDate && "text-muted-foreground"
                     )}
                   >
                     <span
                       className={cn(
                         "truncate",
-                        !startDate && "text-muted-foreground",
+                        !startDate && "text-muted-foreground"
                       )}
                     >
                       {startDate ? format(startDate, "PPP") : "Pick a date"}
@@ -297,7 +425,7 @@ export function EventDialog({
                         if (isBefore(endDate, date)) {
                           setEndDate(date);
                         }
-                        setError(null);
+                        setLocalError(null);
                         setStartDateOpen(false);
                       }
                     }}
@@ -335,13 +463,13 @@ export function EventDialog({
                     variant={"outline"}
                     className={cn(
                       "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
-                      !endDate && "text-muted-foreground",
+                      !endDate && "text-muted-foreground"
                     )}
                   >
                     <span
                       className={cn(
                         "truncate",
-                        !endDate && "text-muted-foreground",
+                        !endDate && "text-muted-foreground"
                       )}
                     >
                       {endDate ? format(endDate, "PPP") : "Pick a date"}
@@ -362,7 +490,7 @@ export function EventDialog({
                     onSelect={(date) => {
                       if (date) {
                         setEndDate(date);
-                        setError(null);
+                        setLocalError(null);
                         setEndDateOpen(false);
                       }
                     }}
@@ -407,6 +535,123 @@ export function EventDialog({
               onChange={(e) => setLocation(e.target.value)}
             />
           </div>
+
+          <div className="*:not-first:mt-1.5">
+            <Label htmlFor="category">Category</Label>
+            <div className="flex gap-2">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger id="category" className="flex-1">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories
+                    .filter((cat) => cat.isActive)
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          {category.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {onCreateCategory && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowNewCategoryForm(true)}
+                  aria-label="Add new category"
+                >
+                  <RiAddLine size={16} />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {showNewCategoryForm && (
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">New Category</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowNewCategoryForm(false);
+                    setNewCategoryName("");
+                    setNewCategoryColor("blue");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <div className="*:not-first:mt-1.5">
+                <Label htmlFor="new-category-name">Name</Label>
+                <Input
+                  id="new-category-name"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Enter category name"
+                />
+              </div>
+              <div className="*:not-first:mt-1.5">
+                <Label>Color</Label>
+                <RadioGroup
+                  className="flex gap-1.5"
+                  value={newCategoryColor}
+                  onValueChange={(value: EventColor) =>
+                    setNewCategoryColor(value)
+                  }
+                >
+                  {colorOptions.map((colorOption) => (
+                    <RadioGroupItem
+                      key={colorOption.value}
+                      id={`new-category-color-${colorOption.value}`}
+                      value={colorOption.value}
+                      aria-label={colorOption.label}
+                      className={cn(
+                        "size-6 shadow-none",
+                        colorOption.bgClass,
+                        colorOption.borderClass
+                      )}
+                    />
+                  ))}
+                </RadioGroup>
+              </div>
+              <Button
+                type="button"
+                onClick={async () => {
+                  if (!newCategoryName.trim() || !onCreateCategory) return;
+
+                  setCreatingCategory(true);
+                  try {
+                    const newCategory = await onCreateCategory({
+                      name: newCategoryName.trim(),
+                      color: newCategoryColor,
+                    });
+                    setCategoryId(newCategory.id);
+                    setShowNewCategoryForm(false);
+                    setNewCategoryName("");
+                    setNewCategoryColor("blue");
+                  } catch (error) {
+                    console.error("Failed to create category:", error);
+                  } finally {
+                    setCreatingCategory(false);
+                  }
+                }}
+                disabled={!newCategoryName.trim() || creatingCategory}
+                className="w-full"
+              >
+                {creatingCategory ? "Creating..." : "Create Category"}
+              </Button>
+            </div>
+          )}
           <fieldset className="space-y-4">
             <legend className="text-foreground text-sm leading-none font-medium">
               Etiquette
@@ -426,7 +671,7 @@ export function EventDialog({
                   className={cn(
                     "size-6 shadow-none",
                     colorOption.bgClass,
-                    colorOption.borderClass,
+                    colorOption.borderClass
                   )}
                 />
               ))}
@@ -440,16 +685,34 @@ export function EventDialog({
               className="text-destructive hover:text-destructive"
               size="icon"
               onClick={handleDelete}
+              disabled={deleting || saving}
               aria-label="Delete event"
             >
-              <RiDeleteBinLine size={16} aria-hidden="true" />
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RiDeleteBinLine size={16} aria-hidden="true" />
+              )}
             </Button>
           )}
           <div className="flex flex-1 justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={saving || deleting}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave}>Save</Button>
+            <Button onClick={handleSave} disabled={saving || deleting}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
