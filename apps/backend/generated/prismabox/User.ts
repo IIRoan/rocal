@@ -56,6 +56,59 @@ export const UserRelations = t.Object(
       ),
       { additionalProperties: false },
     ),
+    events: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          title: t.String(),
+          description: __nullable__(t.String()),
+          start: t.Date(),
+          end: t.Date(),
+          allDay: t.Boolean(),
+          location: __nullable__(t.String()),
+          color: __nullable__(t.String()),
+          isPrivate: t.Boolean(),
+          reminder: __nullable__(t.Integer()),
+          recurrence: __nullable__(t.String()),
+          userId: t.String(),
+          categoryId: __nullable__(t.String()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    categories: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          name: t.String(),
+          color: t.String(),
+          isActive: t.Boolean(),
+          userId: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    participations: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          eventId: t.String(),
+          userId: t.String(),
+          status: t.String(),
+          role: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
   },
   { additionalProperties: false },
 );
@@ -114,6 +167,54 @@ export const UserRelationsInputCreate = t.Object(
         { additionalProperties: false },
       ),
     ),
+    events: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    categories: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    participations: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -147,6 +248,81 @@ export const UserRelationsInputUpdate = t.Partial(
         ),
       ),
       accounts: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      events: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      categories: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      participations: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -259,6 +435,9 @@ export const UserSelect = t.Partial(
       updatedAt: t.Boolean(),
       sessions: t.Boolean(),
       accounts: t.Boolean(),
+      events: t.Boolean(),
+      categories: t.Boolean(),
+      participations: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -267,7 +446,14 @@ export const UserSelect = t.Partial(
 
 export const UserInclude = t.Partial(
   t.Object(
-    { sessions: t.Boolean(), accounts: t.Boolean(), _count: t.Boolean() },
+    {
+      sessions: t.Boolean(),
+      accounts: t.Boolean(),
+      events: t.Boolean(),
+      categories: t.Boolean(),
+      participations: t.Boolean(),
+      _count: t.Boolean(),
+    },
     { additionalProperties: false },
   ),
 );
