@@ -69,7 +69,7 @@ export function EventCalendar({
   const [view, setView] = useState<CalendarView>(initialView);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
+    null,
   );
   const { open } = useSidebar();
 
@@ -278,7 +278,7 @@ export function EventCalendar({
         <div
           className={cn(
             "flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
-            className
+            className,
           )}
         >
           <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">

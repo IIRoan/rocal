@@ -9,7 +9,7 @@ export const UserPlain = t.Object(
     id: t.String(),
     name: t.String(),
     email: t.String(),
-    emailVerified: __nullable__(t.Date()),
+    emailVerified: t.Boolean(),
     image: __nullable__(t.String()),
     createdAt: t.Date(),
     updatedAt: t.Date(),
@@ -19,35 +19,38 @@ export const UserPlain = t.Object(
 
 export const UserRelations = t.Object(
   {
-    accounts: t.Array(
+    sessions: t.Array(
       t.Object(
         {
           id: t.String(),
+          expiresAt: t.Date(),
+          token: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+          ipAddress: __nullable__(t.String()),
+          userAgent: __nullable__(t.String()),
           userId: t.String(),
-          type: t.String(),
-          provider: t.String(),
-          providerAccountId: t.String(),
-          refresh_token: __nullable__(t.String()),
-          access_token: __nullable__(t.String()),
-          expires_at: __nullable__(t.Integer()),
-          token_type: __nullable__(t.String()),
-          scope: __nullable__(t.String()),
-          id_token: __nullable__(t.String()),
-          session_state: __nullable__(t.String()),
         },
         { additionalProperties: false },
       ),
       { additionalProperties: false },
     ),
-    sessions: t.Array(
+    accounts: t.Array(
       t.Object(
         {
           id: t.String(),
-          sessionToken: t.String(),
+          accountId: t.String(),
+          providerId: t.String(),
           userId: t.String(),
-          expires: t.Date(),
-          ipAddress: __nullable__(t.String()),
-          userAgent: __nullable__(t.String()),
+          accessToken: __nullable__(t.String()),
+          refreshToken: __nullable__(t.String()),
+          idToken: __nullable__(t.String()),
+          accessTokenExpiresAt: __nullable__(t.Date()),
+          refreshTokenExpiresAt: __nullable__(t.Date()),
+          scope: __nullable__(t.String()),
+          password: __nullable__(t.String()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
         },
         { additionalProperties: false },
       ),
@@ -61,7 +64,7 @@ export const UserPlainInputCreate = t.Object(
   {
     name: t.String(),
     email: t.String(),
-    emailVerified: t.Optional(__nullable__(t.Date())),
+    emailVerified: t.Optional(t.Boolean()),
     image: t.Optional(__nullable__(t.String())),
   },
   { additionalProperties: false },
@@ -71,7 +74,7 @@ export const UserPlainInputUpdate = t.Object(
   {
     name: t.Optional(t.String()),
     email: t.Optional(t.String()),
-    emailVerified: t.Optional(__nullable__(t.Date())),
+    emailVerified: t.Optional(t.Boolean()),
     image: t.Optional(__nullable__(t.String())),
   },
   { additionalProperties: false },
@@ -79,7 +82,7 @@ export const UserPlainInputUpdate = t.Object(
 
 export const UserRelationsInputCreate = t.Object(
   {
-    accounts: t.Optional(
+    sessions: t.Optional(
       t.Object(
         {
           connect: t.Array(
@@ -95,7 +98,7 @@ export const UserRelationsInputCreate = t.Object(
         { additionalProperties: false },
       ),
     ),
-    sessions: t.Optional(
+    accounts: t.Optional(
       t.Object(
         {
           connect: t.Array(
@@ -118,7 +121,7 @@ export const UserRelationsInputCreate = t.Object(
 export const UserRelationsInputUpdate = t.Partial(
   t.Object(
     {
-      accounts: t.Partial(
+      sessions: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -143,7 +146,7 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
-      sessions: t.Partial(
+      accounts: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -184,7 +187,7 @@ export const UserWhere = t.Partial(
           id: t.String(),
           name: t.String(),
           email: t.String(),
-          emailVerified: t.Date(),
+          emailVerified: t.Boolean(),
           image: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
@@ -230,7 +233,7 @@ export const UserWhereUnique = t.Recursive(
               id: t.String(),
               name: t.String(),
               email: t.String(),
-              emailVerified: t.Date(),
+              emailVerified: t.Boolean(),
               image: t.String(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
@@ -254,8 +257,8 @@ export const UserSelect = t.Partial(
       image: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
-      accounts: t.Boolean(),
       sessions: t.Boolean(),
+      accounts: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -264,7 +267,7 @@ export const UserSelect = t.Partial(
 
 export const UserInclude = t.Partial(
   t.Object(
-    { accounts: t.Boolean(), sessions: t.Boolean(), _count: t.Boolean() },
+    { sessions: t.Boolean(), accounts: t.Boolean(), _count: t.Boolean() },
     { additionalProperties: false },
   ),
 );

@@ -7,11 +7,13 @@ import { __nullable__ } from "./__nullable__";
 export const SessionPlain = t.Object(
   {
     id: t.String(),
-    sessionToken: t.String(),
-    userId: t.String(),
-    expires: t.Date(),
+    expiresAt: t.Date(),
+    token: t.String(),
+    createdAt: t.Date(),
+    updatedAt: t.Date(),
     ipAddress: __nullable__(t.String()),
     userAgent: __nullable__(t.String()),
+    userId: t.String(),
   },
   { additionalProperties: false },
 );
@@ -23,7 +25,7 @@ export const SessionRelations = t.Object(
         id: t.String(),
         name: t.String(),
         email: t.String(),
-        emailVerified: __nullable__(t.Date()),
+        emailVerified: t.Boolean(),
         image: __nullable__(t.String()),
         createdAt: t.Date(),
         updatedAt: t.Date(),
@@ -36,8 +38,8 @@ export const SessionRelations = t.Object(
 
 export const SessionPlainInputCreate = t.Object(
   {
-    sessionToken: t.String(),
-    expires: t.Date(),
+    expiresAt: t.Date(),
+    token: t.String(),
     ipAddress: t.Optional(__nullable__(t.String())),
     userAgent: t.Optional(__nullable__(t.String())),
   },
@@ -46,8 +48,8 @@ export const SessionPlainInputCreate = t.Object(
 
 export const SessionPlainInputUpdate = t.Object(
   {
-    sessionToken: t.Optional(t.String()),
-    expires: t.Optional(t.Date()),
+    expiresAt: t.Optional(t.Date()),
+    token: t.Optional(t.String()),
     ipAddress: t.Optional(__nullable__(t.String())),
     userAgent: t.Optional(__nullable__(t.String())),
   },
@@ -99,11 +101,13 @@ export const SessionWhere = t.Partial(
           NOT: t.Union([Self, t.Array(Self, { additionalProperties: false })]),
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
-          sessionToken: t.String(),
-          userId: t.String(),
-          expires: t.Date(),
+          expiresAt: t.Date(),
+          token: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
           ipAddress: t.String(),
           userAgent: t.String(),
+          userId: t.String(),
         },
         { additionalProperties: false },
       ),
@@ -117,16 +121,13 @@ export const SessionWhereUnique = t.Recursive(
       [
         t.Partial(
           t.Object(
-            { id: t.String(), sessionToken: t.String() },
+            { id: t.String(), token: t.String() },
             { additionalProperties: false },
           ),
           { additionalProperties: false },
         ),
         t.Union(
-          [
-            t.Object({ id: t.String() }),
-            t.Object({ sessionToken: t.String() }),
-          ],
+          [t.Object({ id: t.String() }), t.Object({ token: t.String() })],
           { additionalProperties: false },
         ),
         t.Partial(
@@ -147,11 +148,13 @@ export const SessionWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
-              sessionToken: t.String(),
-              userId: t.String(),
-              expires: t.Date(),
+              expiresAt: t.Date(),
+              token: t.String(),
+              createdAt: t.Date(),
+              updatedAt: t.Date(),
               ipAddress: t.String(),
               userAgent: t.String(),
+              userId: t.String(),
             },
             { additionalProperties: false },
           ),
@@ -166,11 +169,13 @@ export const SessionSelect = t.Partial(
   t.Object(
     {
       id: t.Boolean(),
-      sessionToken: t.Boolean(),
-      userId: t.Boolean(),
-      expires: t.Boolean(),
+      expiresAt: t.Boolean(),
+      token: t.Boolean(),
+      createdAt: t.Boolean(),
+      updatedAt: t.Boolean(),
       ipAddress: t.Boolean(),
       userAgent: t.Boolean(),
+      userId: t.Boolean(),
       user: t.Boolean(),
       _count: t.Boolean(),
     },
@@ -191,19 +196,25 @@ export const SessionOrderBy = t.Partial(
       id: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      sessionToken: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      expiresAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      userId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      token: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      expires: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      updatedAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       ipAddress: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       userAgent: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      userId: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
     },
