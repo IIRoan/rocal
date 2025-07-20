@@ -4,45 +4,47 @@ import { __transformDate__ } from "./__transformDate__";
 
 import { __nullable__ } from "./__nullable__";
 
-export const VerificationTokenPlain = t.Object(
+export const VerificationPlain = t.Object(
   {
     id: t.String(),
     identifier: t.String(),
-    token: t.String(),
-    expires: t.Date(),
+    value: t.String(),
+    expiresAt: t.Date(),
+    createdAt: __nullable__(t.Date()),
+    updatedAt: __nullable__(t.Date()),
   },
   { additionalProperties: false },
 );
 
-export const VerificationTokenRelations = t.Object(
+export const VerificationRelations = t.Object(
   {},
   { additionalProperties: false },
 );
 
-export const VerificationTokenPlainInputCreate = t.Object(
-  { identifier: t.String(), token: t.String(), expires: t.Date() },
+export const VerificationPlainInputCreate = t.Object(
+  { identifier: t.String(), value: t.String(), expiresAt: t.Date() },
   { additionalProperties: false },
 );
 
-export const VerificationTokenPlainInputUpdate = t.Object(
+export const VerificationPlainInputUpdate = t.Object(
   {
     identifier: t.Optional(t.String()),
-    token: t.Optional(t.String()),
-    expires: t.Optional(t.Date()),
+    value: t.Optional(t.String()),
+    expiresAt: t.Optional(t.Date()),
   },
   { additionalProperties: false },
 );
 
-export const VerificationTokenRelationsInputCreate = t.Object(
+export const VerificationRelationsInputCreate = t.Object(
   {},
   { additionalProperties: false },
 );
 
-export const VerificationTokenRelationsInputUpdate = t.Partial(
+export const VerificationRelationsInputUpdate = t.Partial(
   t.Object({}, { additionalProperties: false }),
 );
 
-export const VerificationTokenWhere = t.Partial(
+export const VerificationWhere = t.Partial(
   t.Recursive(
     (Self) =>
       t.Object(
@@ -52,44 +54,28 @@ export const VerificationTokenWhere = t.Partial(
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
           identifier: t.String(),
-          token: t.String(),
-          expires: t.Date(),
+          value: t.String(),
+          expiresAt: t.Date(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
         },
         { additionalProperties: false },
       ),
-    { $id: "VerificationToken" },
+    { $id: "Verification" },
   ),
 );
 
-export const VerificationTokenWhereUnique = t.Recursive(
+export const VerificationWhereUnique = t.Recursive(
   (Self) =>
     t.Intersect(
       [
         t.Partial(
-          t.Object(
-            {
-              id: t.String(),
-              identifier_token: t.Object(
-                { identifier: t.String(), token: t.String() },
-                { additionalProperties: false },
-              ),
-            },
-            { additionalProperties: false },
-          ),
+          t.Object({ id: t.String() }, { additionalProperties: false }),
           { additionalProperties: false },
         ),
-        t.Union(
-          [
-            t.Object({ id: t.String() }),
-            t.Object({
-              identifier_token: t.Object(
-                { identifier: t.String(), token: t.String() },
-                { additionalProperties: false },
-              ),
-            }),
-          ],
-          { additionalProperties: false },
-        ),
+        t.Union([t.Object({ id: t.String() })], {
+          additionalProperties: false,
+        }),
         t.Partial(
           t.Object({
             AND: t.Union([
@@ -109,8 +95,10 @@ export const VerificationTokenWhereUnique = t.Recursive(
             {
               id: t.String(),
               identifier: t.String(),
-              token: t.String(),
-              expires: t.Date(),
+              value: t.String(),
+              expiresAt: t.Date(),
+              createdAt: t.Date(),
+              updatedAt: t.Date(),
             },
             { additionalProperties: false },
           ),
@@ -118,27 +106,29 @@ export const VerificationTokenWhereUnique = t.Recursive(
       ],
       { additionalProperties: false },
     ),
-  { $id: "VerificationToken" },
+  { $id: "Verification" },
 );
 
-export const VerificationTokenSelect = t.Partial(
+export const VerificationSelect = t.Partial(
   t.Object(
     {
       id: t.Boolean(),
       identifier: t.Boolean(),
-      token: t.Boolean(),
-      expires: t.Boolean(),
+      value: t.Boolean(),
+      expiresAt: t.Boolean(),
+      createdAt: t.Boolean(),
+      updatedAt: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
   ),
 );
 
-export const VerificationTokenInclude = t.Partial(
+export const VerificationInclude = t.Partial(
   t.Object({ _count: t.Boolean() }, { additionalProperties: false }),
 );
 
-export const VerificationTokenOrderBy = t.Partial(
+export const VerificationOrderBy = t.Partial(
   t.Object(
     {
       id: t.Union([t.Literal("asc"), t.Literal("desc")], {
@@ -147,10 +137,16 @@ export const VerificationTokenOrderBy = t.Partial(
       identifier: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      token: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      value: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      expires: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      expiresAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      updatedAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
     },
@@ -158,17 +154,17 @@ export const VerificationTokenOrderBy = t.Partial(
   ),
 );
 
-export const VerificationToken = t.Composite(
-  [VerificationTokenPlain, VerificationTokenRelations],
+export const Verification = t.Composite(
+  [VerificationPlain, VerificationRelations],
   { additionalProperties: false },
 );
 
-export const VerificationTokenInputCreate = t.Composite(
-  [VerificationTokenPlainInputCreate, VerificationTokenRelationsInputCreate],
+export const VerificationInputCreate = t.Composite(
+  [VerificationPlainInputCreate, VerificationRelationsInputCreate],
   { additionalProperties: false },
 );
 
-export const VerificationTokenInputUpdate = t.Composite(
-  [VerificationTokenPlainInputUpdate, VerificationTokenRelationsInputUpdate],
+export const VerificationInputUpdate = t.Composite(
+  [VerificationPlainInputUpdate, VerificationRelationsInputUpdate],
   { additionalProperties: false },
 );

@@ -61,11 +61,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Quarterly review with executive team",
     start: setMinutes(
       setHours(addDays(currentDate, -13 + daysUntilNextSunday), 9),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -13 + daysUntilNextSunday), 11),
-      30
+      30,
     ),
     color: "blue",
     location: "Executive Boardroom",
@@ -76,11 +76,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Update investors on company progress",
     start: setMinutes(
       setHours(addDays(currentDate, -13 + daysUntilNextSunday), 14),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -13 + daysUntilNextSunday), 15),
-      0
+      0,
     ),
     color: "violet",
     location: "Conference Room A",
@@ -91,11 +91,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Annual strategy planning session",
     start: setMinutes(
       setHours(addDays(currentDate, -12 + daysUntilNextSunday), 8),
-      30
+      30,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -12 + daysUntilNextSunday), 10),
-      0
+      0,
     ),
     color: "violet",
     location: "Innovation Lab",
@@ -106,11 +106,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Present quarterly results",
     start: setMinutes(
       setHours(addDays(currentDate, -12 + daysUntilNextSunday), 13),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -12 + daysUntilNextSunday), 14),
-      30
+      30,
     ),
     color: "emerald",
     location: "Client HQ",
@@ -121,11 +121,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Review department budgets",
     start: setMinutes(
       setHours(addDays(currentDate, -11 + daysUntilNextSunday), 9),
-      15
+      15,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -11 + daysUntilNextSunday), 11),
-      0
+      0,
     ),
     color: "blue",
     location: "Finance Room",
@@ -136,11 +136,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Quarterly team lunch",
     start: setMinutes(
       setHours(addDays(currentDate, -11 + daysUntilNextSunday), 12),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -11 + daysUntilNextSunday), 13),
-      30
+      30,
     ),
     color: "orange",
     location: "Bistro Garden",
@@ -151,11 +151,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Launch new marketing campaign",
     start: setMinutes(
       setHours(addDays(currentDate, -10 + daysUntilNextSunday), 10),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -10 + daysUntilNextSunday), 12),
-      0
+      0,
     ),
     color: "orange",
     location: "Marketing Suite",
@@ -166,11 +166,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "First round interview",
     start: setMinutes(
       setHours(addDays(currentDate, -10 + daysUntilNextSunday), 14),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -10 + daysUntilNextSunday), 15),
-      0
+      0,
     ),
     color: "violet",
     location: "HR Office",
@@ -181,11 +181,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Monthly company update",
     start: setMinutes(
       setHours(addDays(currentDate, -9 + daysUntilNextSunday), 9),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -9 + daysUntilNextSunday), 10),
-      30
+      30,
     ),
     color: "emerald",
     location: "Main Auditorium",
@@ -196,11 +196,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Demo new features to stakeholders",
     start: setMinutes(
       setHours(addDays(currentDate, -9 + daysUntilNextSunday), 13),
-      45
+      45,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -9 + daysUntilNextSunday), 15),
-      0
+      0,
     ),
     color: "blue",
     location: "Demo Room",
@@ -211,11 +211,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Morning routine with kids",
     start: setMinutes(
       setHours(addDays(currentDate, -8 + daysUntilNextSunday), 7),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -8 + daysUntilNextSunday), 7),
-      30
+      30,
     ),
     color: "rose",
   },
@@ -225,11 +225,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Breakfast with family",
     start: setMinutes(
       setHours(addDays(currentDate, -8 + daysUntilNextSunday), 10),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -8 + daysUntilNextSunday), 10),
-      30
+      30,
     ),
     color: "rose",
   },
@@ -239,11 +239,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Some time to spend with family",
     start: setMinutes(
       setHours(addDays(currentDate, -7 + daysUntilNextSunday), 10),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -7 + daysUntilNextSunday), 13),
-      30
+      30,
     ),
     color: "rose",
   },
@@ -253,11 +253,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Strategic planning for next year",
     start: setMinutes(
       setHours(addDays(currentDate, -6 + daysUntilNextSunday), 7),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -6 + daysUntilNextSunday), 8),
-      0
+      0,
     ),
     color: "orange",
     location: "Main Conference Hall",
@@ -268,11 +268,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Weekly team sync",
     start: setMinutes(
       setHours(addDays(currentDate, -6 + daysUntilNextSunday), 8),
-      15
+      15,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -6 + daysUntilNextSunday), 11),
-      0
+      0,
     ),
     color: "blue",
     location: "Main Conference Hall",
@@ -283,11 +283,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Coordinate operations",
     start: setMinutes(
       setHours(addDays(currentDate, -6 + daysUntilNextSunday), 15),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -6 + daysUntilNextSunday), 16),
-      0
+      0,
     ),
     color: "blue",
     location: "Main Conference Hall",
@@ -298,11 +298,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Introduce team members",
     start: setMinutes(
       setHours(addDays(currentDate, -5 + daysUntilNextSunday), 8),
-      15
+      15,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -5 + daysUntilNextSunday), 9),
-      30
+      30,
     ),
     color: "emerald",
     location: "Main Conference Hall",
@@ -313,11 +313,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Present tasks",
     start: setMinutes(
       setHours(addDays(currentDate, -5 + daysUntilNextSunday), 10),
-      45
+      45,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -5 + daysUntilNextSunday), 13),
-      30
+      30,
     ),
     color: "emerald",
     location: "Main Conference Hall",
@@ -328,11 +328,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Discuss product requirements",
     start: setMinutes(
       setHours(addDays(currentDate, -4 + daysUntilNextSunday), 9),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -4 + daysUntilNextSunday), 11),
-      30
+      30,
     ),
     color: "orange",
     location: "Downtown Cafe",
@@ -343,11 +343,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Discuss new project requirements",
     start: setMinutes(
       setHours(addDays(currentDate, -4 + daysUntilNextSunday), 13),
-      30
+      30,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -4 + daysUntilNextSunday), 14),
-      0
+      0,
     ),
     color: "violet",
     location: "Downtown Cafe",
@@ -358,11 +358,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Talent review",
     start: setMinutes(
       setHours(addDays(currentDate, -3 + daysUntilNextSunday), 9),
-      45
+      45,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -3 + daysUntilNextSunday), 10),
-      45
+      45,
     ),
     color: "violet",
     location: "Abbey Road Room",
@@ -373,11 +373,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Ultra fast call with Sonia",
     start: setMinutes(
       setHours(addDays(currentDate, -3 + daysUntilNextSunday), 11),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -3 + daysUntilNextSunday), 11),
-      30
+      30,
     ),
     color: "violet",
     location: "Abbey Road Room",
@@ -388,11 +388,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Manual process review",
     start: setMinutes(
       setHours(addDays(currentDate, -2 + daysUntilNextSunday), 8),
-      45
+      45,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -2 + daysUntilNextSunday), 9),
-      45
+      45,
     ),
     color: "blue",
   },
@@ -402,11 +402,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Explore new ideas",
     start: setMinutes(
       setHours(addDays(currentDate, -2 + daysUntilNextSunday), 14),
-      30
+      30,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -2 + daysUntilNextSunday), 15),
-      30
+      30,
     ),
     color: "orange",
     location: "Main Conference Hall",
@@ -417,11 +417,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Some time to spend with family",
     start: setMinutes(
       setHours(addDays(currentDate, -1 + daysUntilNextSunday), 7),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, -1 + daysUntilNextSunday), 7),
-      30
+      30,
     ),
     color: "rose",
   },
@@ -431,7 +431,7 @@ const sampleEvents: CalendarEvent[] = [
     description: "Plan next quarter objectives",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday), 9),
-      30
+      30,
     ),
     end: setMinutes(setHours(addDays(currentDate, daysUntilNextSunday), 12), 0),
     color: "blue",
@@ -443,11 +443,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Review vendor proposals",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 1), 7),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 1), 8),
-      30
+      30,
     ),
     color: "violet",
     location: "Meeting Room B",
@@ -458,11 +458,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Brainstorming session for new UI",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 1), 10),
-      15
+      15,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 1), 12),
-      45
+      45,
     ),
     color: "emerald",
     location: "Design Studio",
@@ -473,11 +473,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Informal discussion about company vision",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 1), 13),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 1), 14),
-      30
+      30,
     ),
     color: "orange",
     location: "Executive Dining Room",
@@ -488,11 +488,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Code review with engineering team",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 2), 11),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 2), 12),
-      30
+      30,
     ),
     color: "blue",
     location: "Engineering Lab",
@@ -503,11 +503,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Follow-up with key customer",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 2), 15),
-      15
+      15,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 2), 16),
-      0
+      0,
     ),
     color: "violet",
     location: "Call Center",
@@ -518,11 +518,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Offsite team building activity",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 3), 9),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 3), 17),
-      0
+      0,
     ),
     color: "emerald",
     location: "Adventure Park",
@@ -534,11 +534,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Review campaign performance",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 4), 8),
-      45
+      45,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 4), 10),
-      15
+      15,
     ),
     color: "orange",
     location: "Marketing Room",
@@ -549,11 +549,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Discuss product roadmap for next quarter",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 5), 14),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 5), 16),
-      30
+      30,
     ),
     color: "blue",
     location: "Strategy Room",
@@ -564,11 +564,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Morning walk with family",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 6), 7),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 6), 7),
-      30
+      30,
     ),
     color: "rose",
   },
@@ -578,11 +578,11 @@ const sampleEvents: CalendarEvent[] = [
     description: "Brunch with family",
     start: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 6), 10),
-      0
+      0,
     ),
     end: setMinutes(
       setHours(addDays(currentDate, daysUntilNextSunday + 6), 10),
-      30
+      30,
     ),
     color: "rose",
   },
@@ -604,8 +604,8 @@ export default function Component() {
   const handleEventUpdate = (updatedEvent: CalendarEvent) => {
     setEvents(
       events.map((event) =>
-        event.id === updatedEvent.id ? updatedEvent : event
-      )
+        event.id === updatedEvent.id ? updatedEvent : event,
+      ),
     );
   };
 

@@ -11,7 +11,7 @@ export function ThemeToggle() {
 
   const smartToggle = () => {
     const prefersDarkScheme = window.matchMedia(
-      "(prefers-color-scheme: dark)"
+      "(prefers-color-scheme: dark)",
     ).matches;
     if (theme === "system") {
       setTheme(prefersDarkScheme ? "light" : "dark");

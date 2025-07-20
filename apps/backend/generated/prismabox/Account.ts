@@ -7,17 +7,18 @@ import { __nullable__ } from "./__nullable__";
 export const AccountPlain = t.Object(
   {
     id: t.String(),
+    accountId: t.String(),
+    providerId: t.String(),
     userId: t.String(),
-    type: t.String(),
-    provider: t.String(),
-    providerAccountId: t.String(),
-    refresh_token: __nullable__(t.String()),
-    access_token: __nullable__(t.String()),
-    expires_at: __nullable__(t.Integer()),
-    token_type: __nullable__(t.String()),
+    accessToken: __nullable__(t.String()),
+    refreshToken: __nullable__(t.String()),
+    idToken: __nullable__(t.String()),
+    accessTokenExpiresAt: __nullable__(t.Date()),
+    refreshTokenExpiresAt: __nullable__(t.Date()),
     scope: __nullable__(t.String()),
-    id_token: __nullable__(t.String()),
-    session_state: __nullable__(t.String()),
+    password: __nullable__(t.String()),
+    createdAt: t.Date(),
+    updatedAt: t.Date(),
   },
   { additionalProperties: false },
 );
@@ -29,7 +30,7 @@ export const AccountRelations = t.Object(
         id: t.String(),
         name: t.String(),
         email: t.String(),
-        emailVerified: __nullable__(t.Date()),
+        emailVerified: t.Boolean(),
         image: __nullable__(t.String()),
         createdAt: t.Date(),
         updatedAt: t.Date(),
@@ -42,30 +43,26 @@ export const AccountRelations = t.Object(
 
 export const AccountPlainInputCreate = t.Object(
   {
-    type: t.String(),
-    provider: t.String(),
-    refresh_token: t.Optional(__nullable__(t.String())),
-    access_token: t.Optional(__nullable__(t.String())),
-    expires_at: t.Optional(__nullable__(t.Integer())),
-    token_type: t.Optional(__nullable__(t.String())),
+    accessToken: t.Optional(__nullable__(t.String())),
+    refreshToken: t.Optional(__nullable__(t.String())),
+    idToken: t.Optional(__nullable__(t.String())),
+    accessTokenExpiresAt: t.Optional(__nullable__(t.Date())),
+    refreshTokenExpiresAt: t.Optional(__nullable__(t.Date())),
     scope: t.Optional(__nullable__(t.String())),
-    id_token: t.Optional(__nullable__(t.String())),
-    session_state: t.Optional(__nullable__(t.String())),
+    password: t.Optional(__nullable__(t.String())),
   },
   { additionalProperties: false },
 );
 
 export const AccountPlainInputUpdate = t.Object(
   {
-    type: t.Optional(t.String()),
-    provider: t.Optional(t.String()),
-    refresh_token: t.Optional(__nullable__(t.String())),
-    access_token: t.Optional(__nullable__(t.String())),
-    expires_at: t.Optional(__nullable__(t.Integer())),
-    token_type: t.Optional(__nullable__(t.String())),
+    accessToken: t.Optional(__nullable__(t.String())),
+    refreshToken: t.Optional(__nullable__(t.String())),
+    idToken: t.Optional(__nullable__(t.String())),
+    accessTokenExpiresAt: t.Optional(__nullable__(t.Date())),
+    refreshTokenExpiresAt: t.Optional(__nullable__(t.Date())),
     scope: t.Optional(__nullable__(t.String())),
-    id_token: t.Optional(__nullable__(t.String())),
-    session_state: t.Optional(__nullable__(t.String())),
+    password: t.Optional(__nullable__(t.String())),
   },
   { additionalProperties: false },
 );
@@ -115,17 +112,18 @@ export const AccountWhere = t.Partial(
           NOT: t.Union([Self, t.Array(Self, { additionalProperties: false })]),
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
+          accountId: t.String(),
+          providerId: t.String(),
           userId: t.String(),
-          type: t.String(),
-          provider: t.String(),
-          providerAccountId: t.String(),
-          refresh_token: t.String(),
-          access_token: t.String(),
-          expires_at: t.Integer(),
-          token_type: t.String(),
+          accessToken: t.String(),
+          refreshToken: t.String(),
+          idToken: t.String(),
+          accessTokenExpiresAt: t.Date(),
+          refreshTokenExpiresAt: t.Date(),
           scope: t.String(),
-          id_token: t.String(),
-          session_state: t.String(),
+          password: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
         },
         { additionalProperties: false },
       ),
@@ -141,8 +139,8 @@ export const AccountWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
-              provider_providerAccountId: t.Object(
-                { provider: t.String(), providerAccountId: t.String() },
+              providerId_accountId: t.Object(
+                { providerId: t.String(), accountId: t.String() },
                 { additionalProperties: false },
               ),
             },
@@ -154,8 +152,8 @@ export const AccountWhereUnique = t.Recursive(
           [
             t.Object({ id: t.String() }),
             t.Object({
-              provider_providerAccountId: t.Object(
-                { provider: t.String(), providerAccountId: t.String() },
+              providerId_accountId: t.Object(
+                { providerId: t.String(), accountId: t.String() },
                 { additionalProperties: false },
               ),
             }),
@@ -180,17 +178,18 @@ export const AccountWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
+              accountId: t.String(),
+              providerId: t.String(),
               userId: t.String(),
-              type: t.String(),
-              provider: t.String(),
-              providerAccountId: t.String(),
-              refresh_token: t.String(),
-              access_token: t.String(),
-              expires_at: t.Integer(),
-              token_type: t.String(),
+              accessToken: t.String(),
+              refreshToken: t.String(),
+              idToken: t.String(),
+              accessTokenExpiresAt: t.Date(),
+              refreshTokenExpiresAt: t.Date(),
               scope: t.String(),
-              id_token: t.String(),
-              session_state: t.String(),
+              password: t.String(),
+              createdAt: t.Date(),
+              updatedAt: t.Date(),
             },
             { additionalProperties: false },
           ),
@@ -205,18 +204,19 @@ export const AccountSelect = t.Partial(
   t.Object(
     {
       id: t.Boolean(),
+      accountId: t.Boolean(),
+      providerId: t.Boolean(),
       userId: t.Boolean(),
-      type: t.Boolean(),
-      provider: t.Boolean(),
-      providerAccountId: t.Boolean(),
-      refresh_token: t.Boolean(),
-      access_token: t.Boolean(),
-      expires_at: t.Boolean(),
-      token_type: t.Boolean(),
-      scope: t.Boolean(),
-      id_token: t.Boolean(),
-      session_state: t.Boolean(),
       user: t.Boolean(),
+      accessToken: t.Boolean(),
+      refreshToken: t.Boolean(),
+      idToken: t.Boolean(),
+      accessTokenExpiresAt: t.Boolean(),
+      refreshTokenExpiresAt: t.Boolean(),
+      scope: t.Boolean(),
+      password: t.Boolean(),
+      createdAt: t.Boolean(),
+      updatedAt: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -236,37 +236,40 @@ export const AccountOrderBy = t.Partial(
       id: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
+      accountId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      providerId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
       userId: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      type: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      accessToken: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      provider: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      refreshToken: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      providerAccountId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      idToken: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      refresh_token: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      accessTokenExpiresAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      access_token: t.Union([t.Literal("asc"), t.Literal("desc")], {
-        additionalProperties: false,
-      }),
-      expires_at: t.Union([t.Literal("asc"), t.Literal("desc")], {
-        additionalProperties: false,
-      }),
-      token_type: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      refreshTokenExpiresAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       scope: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      id_token: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      password: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      session_state: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      updatedAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
     },
