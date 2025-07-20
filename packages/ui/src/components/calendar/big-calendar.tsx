@@ -616,9 +616,44 @@ export default function Component() {
   return (
     <EventCalendar
       events={visibleEvents}
-      onEventAdd={handleEventAdd}
-      onEventUpdate={handleEventUpdate}
-      onEventDelete={handleEventDelete}
+      categories={[]} // BigCalendar doesn't use categories yet
+      loading={false}
+      eventsLoading={false}
+      error={null}
+      onCreateEvent={async (eventData) => {
+        const newEvent: CalendarEvent = {
+          ...eventData,
+          id: `new-${Date.now()}`,
+          start: new Date(eventData.start),
+          end: new Date(eventData.end),
+          userId: "demo-user",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        handleEventAdd(newEvent);
+        return newEvent;
+      }}
+      onUpdateEvent={async (id, eventData) => {
+        const existingEvent = events.find(e => e.id === id);
+        if (!existingEvent) throw new Error("Event not found");
+        
+        const updatedEvent: CalendarEvent = {
+          ...existingEvent,
+          ...eventData,
+          start: eventData.start ? new Date(eventData.start) : existingEvent.start,
+          end: eventData.end ? new Date(eventData.end) : existingEvent.end,
+          updatedAt: new Date(),
+        };
+        handleEventUpdate(updatedEvent);
+        return updatedEvent;
+      }}
+      onDeleteEvent={async (id) => {
+        handleEventDelete(id);
+      }}
+      onCreateCategory={async () => {
+        // BigCalendar doesn't support categories yet
+        throw new Error("Categories not supported in demo mode");
+      }}
       initialView="week"
     />
   );

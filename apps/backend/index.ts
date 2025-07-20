@@ -34,24 +34,24 @@ export const createAPI = (prefix = "") =>
           info: {
             title: "Rocani API",
             version: "1.0.0",
-            description: "Calendar and event management API"
+            description: "Calendar and event management API",
           },
           tags: [
             { name: "Health", description: "Health check endpoints" },
             { name: "Auth", description: "Authentication endpoints" },
             { name: "Events", description: "Event management endpoints" },
-            { name: "Categories", description: "Event category endpoints" }
+            { name: "Categories", description: "Event category endpoints" },
           ],
           components: {
             securitySchemes: {
               bearerAuth: {
                 type: "http",
                 scheme: "bearer",
-                bearerFormat: "JWT"
-              }
-            }
-          }
-        }
+                bearerFormat: "JWT",
+              },
+            },
+          },
+        },
       })
     )
     .use(
@@ -65,41 +65,43 @@ export const createAPI = (prefix = "") =>
     .use(errorHandler)
     .use(betterAuth)
     .get("/", () => ({ message: "API is running" }), {
-      detail: { tags: ["Health"] }
+      detail: { tags: ["Health"] },
     })
     .get("/health", () => ({ status: "ok" }), {
-      detail: { tags: ["Health"] }
+      detail: { tags: ["Health"] },
     })
-    .get("/me", async ({ request }) => {
-      try {
-        const session = await auth.api.getSession({
-          headers: request.headers as Headers,
-        });
-        return session ? { user: session.user } : { user: null };
-      } catch {
-        return { user: null };
+    .get(
+      "/me",
+      async ({ request }) => {
+        try {
+          const session = await auth.api.getSession({
+            headers: request.headers as Headers,
+          });
+          return session ? { user: session.user } : { user: null };
+        } catch {
+          return { user: null };
+        }
+      },
+      {
+        detail: { tags: ["Auth"] },
       }
-    }, {
-      detail: { tags: ["Auth"] }
-    })
+    )
     .get("/user", ({ user }) => user, {
       auth: true,
-      detail: { 
+      detail: {
         tags: ["Auth"],
-        security: [{ bearerAuth: [] }]
+        security: [{ bearerAuth: [] }],
+      },
+    })
+    .get(
+      "/test",
+      () => ({
+        message: "Backend connection working",
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        detail: { tags: ["Health"] },
       }
-    })
-    .get("/test", () => ({
-      message: "Backend connection working",
-      timestamp: new Date().toISOString(),
-    }), {
-      detail: { tags: ["Health"] }
-    })
+    )
     .use(eventsRoutes)
     .use(categoriesRoutes);
-
-// For standalone development
-if (import.meta.main) {
-  const app = createAPI().listen(8080);
-  console.log(`🚀 Backend server running at http://localhost:8080`);
-}

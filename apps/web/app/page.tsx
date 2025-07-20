@@ -10,10 +10,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <BigCalendar />
-      </SidebarInset>
+      <SidebarInset>Landing Page!</SidebarInset>
     </SidebarProvider>
   );
 }
