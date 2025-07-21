@@ -15,7 +15,7 @@ export const auth = betterAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
     },
   },
-  baseURL: "http://localhost:3000",
+  baseURL: process.env.NEXT_PUBLIC_APP_URL,
   basePath: "/api/auth",
   plugins: [nextCookies()],
 }) as any;
