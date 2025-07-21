@@ -56,29 +56,67 @@ export function CalendarProvider({
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const hasInitialized = useRef(false);
 
-  // Performance optimization: Local visibility state with debounced sync
+  // Performance optimization: Local visibility state with debounced sync and localStorage persistence
   const [localVisibilityState, setLocalVisibilityState] = useState<Record<string, boolean>>({});
   const pendingUpdatesRef = useRef<Set<string>>(new Set());
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // localStorage key for calendar visibility state
+  const VISIBILITY_STORAGE_KEY = 'rocani-calendar-visibility';
+
   // Legacy color visibility for backward compatibility
   const [visibleColors, setVisibleColors] = useState<string[]>([]);
+
+  // Load visibility state from localStorage
+  const loadVisibilityFromStorage = (): Record<string, boolean> => {
+    if (typeof window === 'undefined') return {};
+    
+    try {
+      const stored = localStorage.getItem(VISIBILITY_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch (error) {
+      console.warn('Failed to load calendar visibility from localStorage:', error);
+      return {};
+    }
+  };
+
+  // Save visibility state to localStorage
+  const saveVisibilityToStorage = (state: Record<string, boolean>) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save calendar visibility to localStorage:', error);
+    }
+  };
 
   // Initialize calendars and local visibility state
   useEffect(() => {
     if (initialCalendars.length > 0 && !hasInitialized.current) {
       setCalendars(initialCalendars);
       
-      // Initialize local visibility state from calendar data
+      // Load visibility state from localStorage first
+      const storedVisibility = loadVisibilityFromStorage();
+      
+      // Initialize local visibility state, prioritizing stored values but defaulting to server state
       const initialVisibility: Record<string, boolean> = {};
       initialCalendars.forEach(calendar => {
-        initialVisibility[calendar.id] = calendar.isVisible;
+        // Use stored value if available, otherwise use server state (defaults to true)
+        initialVisibility[calendar.id] = storedVisibility[calendar.id] ?? calendar.isVisible;
       });
       setLocalVisibilityState(initialVisibility);
       
       hasInitialized.current = true;
     }
   }, [initialCalendars]);
+
+  // Persist visibility state to localStorage whenever it changes
+  useEffect(() => {
+    if (Object.keys(localVisibilityState).length > 0) {
+      saveVisibilityToStorage(localVisibilityState);
+    }
+  }, [localVisibilityState]);
 
   // Update visible colors based on local visibility state for performance
   useEffect(() => {
