@@ -491,7 +491,11 @@ export function EventDialog({
             >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving || deleting || !calendarId}>
+            <Button 
+              onClick={handleSave} 
+              disabled={saving || deleting || !calendarId}
+              className="bg-accent hover:bg-accent/80 text-accent-foreground"
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
