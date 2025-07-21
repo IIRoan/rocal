@@ -4,6 +4,7 @@ import * as React from "react";
 import { RiCheckLine, RiAddLine } from "@remixicon/react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CreateCalendarData, EventColor } from "../calendar/types";
+import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
 import {
@@ -23,8 +24,21 @@ import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/dialog";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -36,10 +50,16 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
-  const { calendars, addCalendar, toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
+  const {
+    calendars,
+    addCalendar,
+    toggleCalendarVisibility,
+    isCalendarVisible,
+  } = useCalendarContext();
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [newCalendarName, setNewCalendarName] = React.useState("");
-  const [newCalendarColor, setNewCalendarColor] = React.useState<EventColor>("blue");
+  const [newCalendarColor, setNewCalendarColor] =
+    React.useState<EventColor>("blue");
 
   const handleCreateCalendar = () => {
     if (newCalendarName.trim()) {
@@ -63,30 +83,11 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
   ];
 
   return (
-    <Sidebar
-      variant="inset"
-      {...props}
-      className="max-lg:p-3 lg:pe-1"
-    >
+    <Sidebar variant="inset" {...props} className="max-lg:p-3 lg:pe-1">
       <SidebarHeader>
         <div className="flex justify-between items-center gap-2">
           <a className="inline-flex" href="/">
-            <span className="sr-only">Logo</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="32"
-              height="32"
-              viewBox="0 0 32 32"
-            >
-              <path
-                fill="#52525C"
-                d="m10.661.863-2.339 1.04 5.251 11.794L1.521 9.072l-.918 2.39 12.053 4.627-11.794 5.25 1.041 2.34 11.794-5.252L9.071 30.48l2.39.917 4.626-12.052 5.251 11.793 2.339-1.04-5.251-11.795 12.052 4.627.917-2.39-12.052-4.627 11.794-5.25-1.041-2.34-11.794 5.252L22.928 1.52l-2.39-.917-4.626 12.052L10.662.863Z"
-              />
-              <path
-                fill="#F4F4F5"
-                d="M17.28 0h-2.56v12.91L5.591 3.78l-1.81 1.81 9.129 9.129H0v2.56h12.91L3.78 26.409l1.81 1.81 9.129-9.129V32h2.56V19.09l9.128 9.129 1.81-1.81-9.128-9.129H32v-2.56H19.09l9.129-9.129-1.81-1.81-9.129 9.129V0Z"
-              />
-            </svg>
+            <LogoSvg width="32" height="32" className="text-foreground/80" />
           </a>
           <SidebarTrigger className="text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent!" />
         </div>
@@ -115,7 +116,10 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <label htmlFor="calendar-name" className="text-sm font-medium">
+                    <label
+                      htmlFor="calendar-name"
+                      className="text-sm font-medium"
+                    >
                       Calendar Name
                     </label>
                     <Input
@@ -126,10 +130,18 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label htmlFor="calendar-color" className="text-sm font-medium">
+                    <label
+                      htmlFor="calendar-color"
+                      className="text-sm font-medium"
+                    >
                       Color
                     </label>
-                    <Select value={newCalendarColor} onValueChange={(value: EventColor) => setNewCalendarColor(value)}>
+                    <Select
+                      value={newCalendarColor}
+                      onValueChange={(value: EventColor) =>
+                        setNewCalendarColor(value)
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -151,7 +163,10 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
                     </Select>
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDialogOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button onClick={handleCreateCalendar}>
@@ -209,12 +224,14 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser 
-          user={user || {
-            name: "Guest User",
-            email: "guest@example.com",
-            avatar: "",
-          }} 
+        <NavUser
+          user={
+            user || {
+              name: "Guest User",
+              email: "guest@example.com",
+              avatar: "",
+            }
+          }
           onLogout={onLogout}
         />
       </SidebarFooter>
