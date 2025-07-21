@@ -27,9 +27,12 @@ const betterAuth = new Elysia({ name: "better-auth" })
     },
   });
 
-export const createAPI = (prefix = "") =>
-  new Elysia({ prefix })
-    .use(
+export const createAPI = (prefix = "") => {
+  const app = new Elysia({ prefix });
+
+  // Only add Swagger in development
+  if (process.env.NODE_ENV !== "production") {
+    app.use(
       swagger({
         documentation: {
           info: {
@@ -55,7 +58,10 @@ export const createAPI = (prefix = "") =>
           },
         },
       })
-    )
+    );
+  }
+
+  return app
     .use(
       cors({
         origin: process.env.NEXT_PUBLIC_APP_URL,
@@ -108,3 +114,4 @@ export const createAPI = (prefix = "") =>
     .use(eventsRoutes)
     .use(categoriesRoutes)
     .use(calendarsRoutes);
+};
