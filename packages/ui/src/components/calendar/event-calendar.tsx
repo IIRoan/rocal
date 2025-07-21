@@ -538,7 +538,7 @@ export function EventCalendar({
                   </Button>
                 </div>
                 <Button
-                  className="max-sm:h-8 max-sm:px-2.5!"
+                  className="max-sm:h-8 max-sm:px-2.5! bg-accent hover:bg-accent/80 text-accent-foreground"
                   onClick={handleToday}
                   disabled={loading}
                 >
