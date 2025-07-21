@@ -71,6 +71,7 @@ export const UserRelations = t.Object(
           reminder: __nullable__(t.Integer()),
           recurrence: __nullable__(t.String()),
           userId: t.String(),
+          calendarId: t.String(),
           categoryId: __nullable__(t.String()),
           createdAt: t.Date(),
           updatedAt: t.Date(),
@@ -86,6 +87,22 @@ export const UserRelations = t.Object(
           name: t.String(),
           color: t.String(),
           isActive: t.Boolean(),
+          userId: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    calendars: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          name: t.String(),
+          color: t.String(),
+          isVisible: t.Boolean(),
+          isDefault: t.Boolean(),
           userId: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
@@ -184,6 +201,22 @@ export const UserRelationsInputCreate = t.Object(
       ),
     ),
     categories: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    calendars: t.Optional(
       t.Object(
         {
           connect: t.Array(
@@ -298,6 +331,31 @@ export const UserRelationsInputUpdate = t.Partial(
         ),
       ),
       categories: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      calendars: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -437,6 +495,7 @@ export const UserSelect = t.Partial(
       accounts: t.Boolean(),
       events: t.Boolean(),
       categories: t.Boolean(),
+      calendars: t.Boolean(),
       participations: t.Boolean(),
       _count: t.Boolean(),
     },
@@ -451,6 +510,7 @@ export const UserInclude = t.Partial(
       accounts: t.Boolean(),
       events: t.Boolean(),
       categories: t.Boolean(),
+      calendars: t.Boolean(),
       participations: t.Boolean(),
       _count: t.Boolean(),
     },

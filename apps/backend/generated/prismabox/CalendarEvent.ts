@@ -18,6 +18,7 @@ export const CalendarEventPlain = t.Object(
     reminder: __nullable__(t.Integer()),
     recurrence: __nullable__(t.String()),
     userId: t.String(),
+    calendarId: t.String(),
     categoryId: __nullable__(t.String()),
     createdAt: t.Date(),
     updatedAt: t.Date(),
@@ -34,6 +35,19 @@ export const CalendarEventRelations = t.Object(
         email: t.String(),
         emailVerified: t.Boolean(),
         image: __nullable__(t.String()),
+        createdAt: t.Date(),
+        updatedAt: t.Date(),
+      },
+      { additionalProperties: false },
+    ),
+    calendar: t.Object(
+      {
+        id: t.String(),
+        name: t.String(),
+        color: t.String(),
+        isVisible: t.Boolean(),
+        isDefault: t.Boolean(),
+        userId: t.String(),
         createdAt: t.Date(),
         updatedAt: t.Date(),
       },
@@ -117,6 +131,17 @@ export const CalendarEventRelationsInputCreate = t.Object(
       },
       { additionalProperties: false },
     ),
+    calendar: t.Object(
+      {
+        connect: t.Object(
+          {
+            id: t.String({ additionalProperties: false }),
+          },
+          { additionalProperties: false },
+        ),
+      },
+      { additionalProperties: false },
+    ),
     category: t.Optional(
       t.Object(
         {
@@ -154,6 +179,17 @@ export const CalendarEventRelationsInputUpdate = t.Partial(
   t.Object(
     {
       user: t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+      calendar: t.Object(
         {
           connect: t.Object(
             {
@@ -228,6 +264,7 @@ export const CalendarEventWhere = t.Partial(
           reminder: t.Integer(),
           recurrence: t.String(),
           userId: t.String(),
+          calendarId: t.String(),
           categoryId: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
@@ -278,6 +315,7 @@ export const CalendarEventWhereUnique = t.Recursive(
               reminder: t.Integer(),
               recurrence: t.String(),
               userId: t.String(),
+              calendarId: t.String(),
               categoryId: t.String(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
@@ -307,6 +345,8 @@ export const CalendarEventSelect = t.Partial(
       recurrence: t.Boolean(),
       userId: t.Boolean(),
       user: t.Boolean(),
+      calendarId: t.Boolean(),
+      calendar: t.Boolean(),
       categoryId: t.Boolean(),
       category: t.Boolean(),
       participants: t.Boolean(),
@@ -322,6 +362,7 @@ export const CalendarEventInclude = t.Partial(
   t.Object(
     {
       user: t.Boolean(),
+      calendar: t.Boolean(),
       category: t.Boolean(),
       participants: t.Boolean(),
       _count: t.Boolean(),
@@ -367,6 +408,9 @@ export const CalendarEventOrderBy = t.Partial(
         additionalProperties: false,
       }),
       userId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      calendarId: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       categoryId: t.Union([t.Literal("asc"), t.Literal("desc")], {

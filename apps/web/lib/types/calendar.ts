@@ -2,6 +2,17 @@
 
 export type EventColor = "blue" | "orange" | "violet" | "rose" | "emerald";
 
+export interface Calendar {
+  id: string;
+  name: string;
+  color: EventColor;
+  isVisible: boolean;
+  isDefault: boolean;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -11,6 +22,8 @@ export interface CalendarEvent {
   allDay?: boolean;
   location?: string | null;
   color?: string | null;
+  calendarId: string;
+  calendar?: Calendar | null;
   categoryId?: string | null;
   category?: EventCategory | null;
   userId: string;
@@ -33,6 +46,11 @@ export interface EventCategory {
 export interface EventsResponse {
   events: CalendarEvent[];
   categories: EventCategory[];
+  calendars: Calendar[];
+}
+
+export interface CalendarsResponse {
+  calendars: Calendar[];
 }
 
 export interface CategoriesResponse {
@@ -47,7 +65,18 @@ export interface CreateEventRequest {
   allDay?: boolean;
   location?: string;
   color?: EventColor;
+  calendarId: string;
   categoryId?: string;
+}
+
+export interface CreateCalendarRequest {
+  name: string;
+  color: EventColor;
+  isDefault?: boolean;
+}
+
+export interface UpdateCalendarRequest extends Partial<CreateCalendarRequest> {
+  isVisible?: boolean;
 }
 
 export interface UpdateEventRequest extends Partial<CreateEventRequest> {}

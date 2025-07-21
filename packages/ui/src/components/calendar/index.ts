@@ -9,7 +9,6 @@ export { EventItem } from "./event-item";
 export { EventsPopup } from "./events-popup";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
-export { default as BigCalendar } from "./big-calendar";
 export {
   CalendarSkeleton,
   EventDialogSkeleton,

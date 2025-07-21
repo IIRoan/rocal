@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { 
   EventCalendar,
   CalendarView,
-  AgendaDaysToShow
+  AgendaDaysToShow,
+  useCalendarContext
 } from "@workspace/ui/components/calendar";
 import { 
   addDays,
@@ -24,6 +25,7 @@ export function CalendarWithData({
   className, 
   initialView = "month" 
 }: CalendarWithDataProps) {
+  const { isCalendarVisible } = useCalendarContext();
   // Calculate default date range for initial load
   const defaultDateRange = useMemo(() => {
     const now = new Date();
@@ -64,16 +66,25 @@ export function CalendarWithData({
     autoRefetch: true,
   });
 
-  // Transform events to match UI component type expectations
-  const transformedEvents = useMemo(() => 
-    calendarData.events.map(event => ({
-      ...event,
-      description: event.description ?? undefined,
-      color: (event.color ?? undefined) as any,
-      location: event.location ?? undefined,
-      categoryId: event.categoryId ?? undefined,
-    })), [calendarData.events]
-  );
+  // Optimized event filtering with memoized visibility check
+  const transformedEvents = useMemo(() => {
+    // Pre-compute visible calendar IDs once for better performance
+    const visibleCalendarIds = new Set(
+      calendarData.calendars
+        .filter(cal => isCalendarVisible(cal.id))
+        .map(cal => cal.id)
+    );
+    
+    return calendarData.events
+      .filter(event => visibleCalendarIds.has(event.calendarId)) // O(1) lookup instead of function call per event
+      .map(event => ({
+        ...event,
+        description: event.description ?? undefined,
+        color: (event.color ?? undefined) as any,
+        location: event.location ?? undefined,
+        categoryId: event.categoryId ?? undefined,
+      }));
+  }, [calendarData.events, calendarData.calendars, isCalendarVisible]);
 
   return (
     <EventCalendar

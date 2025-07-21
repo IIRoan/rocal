@@ -1,12 +1,16 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
+import { ensureUserCalendars } from "../lib/user-setup";
 
 export const eventsRoutes = new Elysia({ prefix: "/events" })
   .get(
     "/",
     async ({ query, user }: any) => {
       const { start, end } = query;
+
+      // Ensure user has default calendars
+      await ensureUserCalendars(user.id);
 
       // Validate required parameters
       if (!start || !end) {
@@ -55,6 +59,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         },
         include: {
           category: true,
+          calendar: true,
         },
         orderBy: { start: "asc" },
       });
@@ -68,9 +73,21 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         orderBy: { name: "asc" },
       });
 
+      // Fetch user's calendars for efficient frontend rendering
+      const calendars = await prisma.calendar.findMany({
+        where: {
+          userId: user.id,
+        },
+        orderBy: [
+          { isDefault: "desc" },
+          { name: "asc" },
+        ],
+      });
+
       return {
         events,
         categories,
+        calendars,
       };
     },
     {
@@ -249,6 +266,28 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         );
       }
 
+      // Validate calendar exists and belongs to user
+      if (!body.calendarId) {
+        throw new ValidationError(
+          "Calendar ID is required",
+          "calendarId"
+        );
+      }
+
+      const calendar = await prisma.calendar.findFirst({
+        where: {
+          id: body.calendarId,
+          userId: user.id,
+        },
+      });
+
+      if (!calendar) {
+        throw new ValidationError(
+          "Invalid calendar or calendar does not belong to user",
+          "calendarId"
+        );
+      }
+
       // Create the event
       const event = await prisma.calendarEvent.create({
         data: {
@@ -259,11 +298,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           allDay: body.allDay || false,
           location: body.location?.trim() || null,
           color: body.color || null,
+          calendarId: body.calendarId,
           categoryId: body.categoryId || null,
           userId: user.id,
         },
         include: {
           category: true,
+          calendar: true,
         },
       });
 
@@ -307,6 +348,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             description: "Event color (blue, orange, violet, rose, emerald)",
           })
         ),
+        calendarId: t.String({
+          description: "ID of the calendar (required, must belong to user)",
+        }),
         categoryId: t.Optional(
           t.String({
             description: "ID of the event category (must belong to user)",
@@ -465,6 +509,23 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         }
       }
 
+      // Validate calendar exists and belongs to user if provided
+      if (body.calendarId !== undefined) {
+        const calendar = await prisma.calendar.findFirst({
+          where: {
+            id: body.calendarId,
+            userId: user.id,
+          },
+        });
+
+        if (!calendar) {
+          throw new ValidationError(
+            "Invalid calendar or calendar does not belong to user",
+            "calendarId"
+          );
+        }
+      }
+
       // Validate category exists and belongs to user if provided
       if (body.categoryId !== undefined && body.categoryId) {
         const category = await prisma.eventCategory.findFirst({
@@ -507,6 +568,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       if (body.color !== undefined) {
         updateData.color = body.color || null;
       }
+      if (body.calendarId !== undefined) {
+        updateData.calendarId = body.calendarId;
+      }
       if (body.categoryId !== undefined) {
         updateData.categoryId = body.categoryId || null;
       }
@@ -525,6 +589,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           data: updateData,
           include: {
             category: true,
+            calendar: true,
           },
         });
 
@@ -587,6 +652,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         color: t.Optional(
           t.String({
             description: "Event color (blue, orange, violet, rose, emerald)",
+          })
+        ),
+        calendarId: t.Optional(
+          t.String({
+            description: "ID of the calendar (must belong to user)",
           })
         ),
         categoryId: t.Optional(

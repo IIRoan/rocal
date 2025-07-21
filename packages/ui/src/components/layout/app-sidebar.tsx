@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { RiCheckLine } from "@remixicon/react";
+import { RiCheckLine, RiAddLine } from "@remixicon/react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { etiquettes } from "../calendar/big-calendar";
+import { CreateCalendarData, EventColor } from "../calendar/types";
 
 import { NavUser } from "../navigation/nav-user";
 import {
@@ -21,6 +21,10 @@ import {
 } from "../ui/sidebar";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -32,7 +36,32 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
-  const { isColorVisible, toggleColorVisibility } = useCalendarContext();
+  const { calendars, addCalendar, toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [newCalendarName, setNewCalendarName] = React.useState("");
+  const [newCalendarColor, setNewCalendarColor] = React.useState<EventColor>("blue");
+
+  const handleCreateCalendar = () => {
+    if (newCalendarName.trim()) {
+      const calendarData: CreateCalendarData = {
+        name: newCalendarName.trim(),
+        color: newCalendarColor,
+      };
+      addCalendar(calendarData);
+      setNewCalendarName("");
+      setNewCalendarColor("blue");
+      setIsDialogOpen(false);
+    }
+  };
+
+  const colorOptions: { value: EventColor; label: string }[] = [
+    { value: "blue", label: "Blue" },
+    { value: "emerald", label: "Green" },
+    { value: "orange", label: "Orange" },
+    { value: "violet", label: "Purple" },
+    { value: "rose", label: "Pink" },
+  ];
+
   return (
     <Sidebar
       variant="inset"
@@ -67,13 +96,76 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
           <SidebarCalendar />
         </SidebarGroup>
         <SidebarGroup className="px-1 mt-3 pt-4 border-t">
-          <SidebarGroupLabel className="uppercase text-muted-foreground/65">
-            Calendars
-          </SidebarGroupLabel>
+          <div className="flex items-center justify-between">
+            <SidebarGroupLabel className="uppercase text-muted-foreground/65">
+              Calendars
+            </SidebarGroupLabel>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <RiAddLine size={14} />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Calendar</DialogTitle>
+                  <DialogDescription>
+                    Add a new calendar to organize your events.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <label htmlFor="calendar-name" className="text-sm font-medium">
+                      Calendar Name
+                    </label>
+                    <Input
+                      id="calendar-name"
+                      value={newCalendarName}
+                      onChange={(e) => setNewCalendarName(e.target.value)}
+                      placeholder="Enter calendar name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label htmlFor="calendar-color" className="text-sm font-medium">
+                      Color
+                    </label>
+                    <Select value={newCalendarColor} onValueChange={(value: EventColor) => setNewCalendarColor(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {colorOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="size-3 rounded-full"
+                                style={{
+                                  backgroundColor: `var(--color-${option.value}-400)`,
+                                }}
+                              />
+                              {option.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateCalendar}>
+                      Create Calendar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
-              {etiquettes.map((item) => (
-                <SidebarMenuItem key={item.id}>
+              {calendars.map((calendar) => (
+                <SidebarMenuItem key={calendar.id}>
                   <SidebarMenuButton
                     asChild
                     className="relative rounded-md [&>svg]:size-auto justify-between has-focus-visible:border-ring has-focus-visible:ring-ring/50 has-focus-visible:ring-[3px]"
@@ -81,11 +173,11 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
                     <span>
                       <span className="font-medium flex items-center justify-between gap-3">
                         <Checkbox
-                          id={item.id}
+                          id={calendar.id}
                           className="sr-only peer"
-                          checked={isColorVisible(item.color)}
+                          checked={isCalendarVisible(calendar.id)}
                           onCheckedChange={() =>
-                            toggleColorVisibility(item.color)
+                            toggleCalendarVisibility(calendar.id)
                           }
                         />
                         <RiCheckLine
@@ -94,17 +186,17 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
                           aria-hidden="true"
                         />
                         <label
-                          htmlFor={item.id}
+                          htmlFor={calendar.id}
                           className="peer-not-data-[state=checked]:line-through peer-not-data-[state=checked]:text-muted-foreground/65 after:absolute after:inset-0"
                         >
-                          {item.name}
+                          {calendar.name}
                         </label>
                       </span>
                       <span
                         className="size-1.5 rounded-full bg-(--event-color)"
                         style={
                           {
-                            "--event-color": `var(--color-${item.color}-400)`,
+                            "--event-color": `var(--color-${calendar.color}-400)`,
                           } as React.CSSProperties
                         }
                       ></span>

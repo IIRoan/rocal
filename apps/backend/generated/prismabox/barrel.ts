@@ -2,6 +2,7 @@ export * from "./User";
 export * from "./Session";
 export * from "./Account";
 export * from "./Verification";
+export * from "./Calendar";
 export * from "./EventCategory";
 export * from "./CalendarEvent";
 export * from "./EventParticipant";
