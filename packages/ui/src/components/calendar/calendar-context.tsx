@@ -143,7 +143,7 @@ export function CalendarProvider({
   };
 
   // Optimized toggle calendar visibility with immediate local update
-  const toggleCalendarVisibility = useCallback((calendarId: string) => {
+  const toggleCalendarVisibility = useCallback(async (calendarId: string) => {
     const currentVisibility = localVisibilityState[calendarId] ?? 
                                calendars.find(cal => cal.id === calendarId)?.isVisible ?? 
                                false;
