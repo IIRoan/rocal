@@ -1,0 +1,12 @@
+{
+  "name": "Quick Bun + pnpm + Claude Code",
+  "image": "ghcr.io/nhaef/devcontainer-bun:latest",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "nodeGypDependencies": true
+    }
+  },
+
+  // one-liner to get Claude Code globally
+  "postCreateCommand": "sudo npm i -g claude-code"
+}
