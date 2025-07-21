@@ -19,7 +19,7 @@ export class HttpClient {
   private retryDelay: number;
 
   constructor(options: HttpClientOptions = {}) {
-    this.baseURL = options.baseURL || "http://localhost:3000";
+    this.baseURL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     this.timeout = options.timeout || 10000; // 10 seconds
     this.retries = options.retries || 3;
     this.retryDelay = options.retryDelay || 1000; // 1 second
