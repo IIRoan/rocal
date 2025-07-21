@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { calendarApiService } from "../lib/calendar-api-service";
 import {
   CalendarEvent,
+  Calendar,
   EventCategory,
   CreateEventRequest,
   UpdateEventRequest,
+  CreateCalendarRequest,
+  UpdateCalendarRequest,
   CreateCategoryRequest,
   UpdateCategoryRequest,
   ApiError,
@@ -39,21 +42,25 @@ interface UseCalendarDataOptions {
 interface UseCalendarDataReturn {
   // Data
   events: CalendarEvent[];
+  calendars: Calendar[];
   categories: EventCategory[];
 
   // Loading states
   loading: boolean;
   eventsLoading: boolean;
+  calendarsLoading: boolean;
   categoriesLoading: boolean;
 
   // Error states
   error: ApiError | null;
   eventsError: ApiError | null;
+  calendarsError: ApiError | null;
   categoriesError: ApiError | null;
 
   // Actions
   refetch: () => Promise<void>;
   refetchEvents: (dateRange?: DateRange) => Promise<void>;
+  refetchCalendars: () => Promise<void>;
   refetchCategories: () => Promise<void>;
 
   // CRUD operations
@@ -63,6 +70,12 @@ interface UseCalendarDataReturn {
     event: UpdateEventRequest
   ) => Promise<CalendarEvent>;
   deleteEvent: (id: string) => Promise<void>;
+  createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
+  updateCalendar: (
+    id: string,
+    calendar: UpdateCalendarRequest
+  ) => Promise<Calendar>;
+  deleteCalendar: (id: string) => Promise<void>;
   createCategory: (category: CreateCategoryRequest) => Promise<EventCategory>;
   updateCategory: (
     id: string,
@@ -88,6 +101,7 @@ export function useCalendarData(
 
   // State
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [currentDateRange, setCurrentDateRange] = useState<DateRange | null>(
     initialDateRange || null
@@ -95,14 +109,20 @@ export function useCalendarData(
 
   // Loading states
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [calendarsLoading, setCalendarsLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   // Error states
   const [eventsError, setEventsError] = useState<ApiError | null>(null);
+  const [calendarsError, setCalendarsError] = useState<ApiError | null>(null);
   const [categoriesError, setCategoriesError] = useState<ApiError | null>(null);
 
   // Cache
   const eventsCache = useRef<Map<string, CacheEntry>>(new Map());
+  const calendarsCache = useRef<{
+    data: Calendar[];
+    timestamp: number;
+  } | null>(null);
   const categoriesCache = useRef<{
     data: EventCategory[];
     timestamp: number;
@@ -130,6 +150,8 @@ export function useCalendarData(
         allDay: event.allDay || false,
         location: event.location || null,
         color: event.color || null,
+        calendarId: event.calendarId,
+        calendar: calendars.find((c) => c.id === event.calendarId) || null,
         categoryId: event.categoryId || null,
         category: event.categoryId
           ? categories.find((c) => c.id === event.categoryId) || null
@@ -139,7 +161,7 @@ export function useCalendarData(
         updatedAt: new Date(),
       };
     },
-    [generateOptimisticId, categories]
+    [generateOptimisticId, calendars, categories]
   );
 
   const createOptimisticCategory = useCallback(
@@ -256,6 +278,15 @@ export function useCalendarData(
             timestamp: Date.now(),
           };
         }
+
+        // Update calendars if included in response
+        if (response.calendars) {
+          setCalendars(response.calendars);
+          calendarsCache.current = {
+            data: response.calendars,
+            timestamp: Date.now(),
+          };
+        }
       } catch (error) {
         setEventsError(error as ApiError);
         setEvents([]);
@@ -265,6 +296,41 @@ export function useCalendarData(
     },
     [findCachedEvents, getCacheKey]
   );
+
+  // Fetch calendars with caching
+  const fetchCalendars = useCallback(async (): Promise<void> => {
+    setCalendarsLoading(true);
+    setCalendarsError(null);
+
+    try {
+      // Check cache first
+      if (
+        calendarsCache.current &&
+        isCacheValid(calendarsCache.current.timestamp)
+      ) {
+        setCalendars(calendarsCache.current.data);
+        setCalendarsLoading(false);
+        return;
+      }
+
+      // Fetch from API
+      const fetchedCalendars = await calendarApiService.getCalendars();
+
+      // Update cache
+      calendarsCache.current = {
+        data: fetchedCalendars,
+        timestamp: Date.now(),
+      };
+
+      // Update state
+      setCalendars(fetchedCalendars);
+    } catch (error) {
+      setCalendarsError(error as ApiError);
+      setCalendars([]);
+    } finally {
+      setCalendarsLoading(false);
+    }
+  }, [isCacheValid]);
 
   // Fetch categories with caching
   const fetchCategories = useCallback(async (): Promise<void> => {
@@ -316,6 +382,12 @@ export function useCalendarData(
     [currentDateRange, getCacheKey, fetchEvents]
   );
 
+  const refetchCalendars = useCallback(async (): Promise<void> => {
+    // Clear cache
+    calendarsCache.current = null;
+    await fetchCalendars();
+  }, [fetchCalendars]);
+
   const refetchCategories = useCallback(async (): Promise<void> => {
     // Clear cache
     categoriesCache.current = null;
@@ -323,8 +395,8 @@ export function useCalendarData(
   }, [fetchCategories]);
 
   const refetch = useCallback(async (): Promise<void> => {
-    await Promise.all([refetchEvents(), refetchCategories()]);
-  }, [refetchEvents, refetchCategories]);
+    await Promise.all([refetchEvents(), refetchCalendars(), refetchCategories()]);
+  }, [refetchEvents, refetchCalendars, refetchCategories]);
 
   // CRUD operations with optimistic updates
   const createEvent = useCallback(
@@ -654,6 +726,51 @@ export function useCalendarData(
     ]
   );
 
+  // Calendar CRUD operations
+  const createCalendar = useCallback(
+    async (calendar: CreateCalendarRequest): Promise<Calendar> => {
+      try {
+        const newCalendar = await calendarApiService.createCalendar(calendar);
+        setCalendars((prev) => [...prev, newCalendar]);
+        calendarsCache.current = null; // Invalidate cache
+        return newCalendar;
+      } catch (error) {
+        throw error as ApiError;
+      }
+    },
+    []
+  );
+
+  const updateCalendar = useCallback(
+    async (id: string, calendar: UpdateCalendarRequest): Promise<Calendar> => {
+      try {
+        const updatedCalendar = await calendarApiService.updateCalendar(id, calendar);
+        setCalendars((prev) => prev.map((c) => (c.id === id ? updatedCalendar : c)));
+        calendarsCache.current = null; // Invalidate cache
+        return updatedCalendar;
+      } catch (error) {
+        throw error as ApiError;
+      }
+    },
+    []
+  );
+
+  const deleteCalendar = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        await calendarApiService.deleteCalendar(id);
+        setCalendars((prev) => prev.filter((c) => c.id !== id));
+        // Also remove events from this calendar
+        setEvents((prev) => prev.filter((e) => e.calendarId !== id));
+        calendarsCache.current = null; // Invalidate cache
+        eventsCache.current.clear(); // Invalidate events cache
+      } catch (error) {
+        throw error as ApiError;
+      }
+    },
+    []
+  );
+
   // Utility functions
   const setDateRange = useCallback(
     (dateRange: DateRange): void => {
@@ -673,41 +790,53 @@ export function useCalendarData(
   // Initial data fetch
   useEffect(() => {
     if (autoRefetch) {
+      fetchCalendars();
       fetchCategories();
-      if (currentDateRange) {
-        fetchEvents(currentDateRange);
-      }
     }
-  }, [autoRefetch, currentDateRange, fetchCategories, fetchEvents]);
+  }, [autoRefetch]); // Remove function dependencies to prevent infinite loops
+
+  // Fetch events when date range changes
+  useEffect(() => {
+    if (autoRefetch && currentDateRange) {
+      fetchEvents(currentDateRange);
+    }
+  }, [autoRefetch, currentDateRange]);
 
   // Computed values
-  const loading = eventsLoading || categoriesLoading;
-  const error = eventsError || categoriesError;
+  const loading = eventsLoading || calendarsLoading || categoriesLoading;
+  const error = eventsError || calendarsError || categoriesError;
 
   return {
     // Data
     events,
+    calendars,
     categories,
 
     // Loading states
     loading,
     eventsLoading,
+    calendarsLoading,
     categoriesLoading,
 
     // Error states
     error,
     eventsError,
+    calendarsError,
     categoriesError,
 
     // Actions
     refetch,
     refetchEvents,
+    refetchCalendars,
     refetchCategories,
 
     // CRUD operations
     createEvent,
     updateEvent,
     deleteEvent,
+    createCalendar,
+    updateCalendar,
+    deleteCalendar,
     createCategory,
     updateCategory,
     deleteCategory,

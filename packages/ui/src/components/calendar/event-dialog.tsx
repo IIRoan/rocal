@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RiCalendarLine, RiDeleteBinLine, RiAddLine } from "@remixicon/react";
+import { RiCalendarLine, RiDeleteBinLine } from "@remixicon/react";
 import { format, isBefore } from "date-fns";
 
-import type { CalendarEvent, EventColor } from "./types";
+import type { CalendarEvent } from "./types";
+import { useCalendarContext } from "./calendar-context";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Calendar } from "../ui/calendar";
@@ -20,7 +21,6 @@ import {
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Textarea } from "../ui/textarea";
-import { Skeleton } from "../ui/skeleton";
 import { Loader2 } from "lucide-react";
 import {
   StartHour,
@@ -37,19 +36,6 @@ import {
   DefaultStartHour,
   DefaultEndHour,
 } from "./constants";
-import { EventDialogSkeleton } from "./calendar-skeleton";
-
-// Extended types for real data operations
-export interface EventCategory {
-  id: string;
-  name: string;
-  color: string;
-  isActive: boolean;
-  userId: string;
-  usageCount?: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 export interface ValidationError {
   field: string;
@@ -69,11 +55,6 @@ interface EventDialogProps {
   onClose: () => void;
   onSave: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
-  categories?: EventCategory[];
-  onCreateCategory?: (category: {
-    name: string;
-    color: EventColor;
-  }) => Promise<EventCategory>;
   loading?: boolean;
   error?: ApiError | null;
 }
@@ -84,11 +65,12 @@ export function EventDialog({
   onClose,
   onSave,
   onDelete,
-  categories = [],
-  onCreateCategory,
   loading = false,
   error: apiError = null,
 }: EventDialogProps) {
+  const { calendars } = useCalendarContext();
+  
+  // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -97,49 +79,43 @@ export function EventDialog({
   const [endTime, setEndTime] = useState(`${DefaultEndHour}:00`);
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
-  const [color, setColor] = useState<EventColor>("blue");
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
-    []
-  );
+  const [calendarId, setCalendarId] = useState<string>("");
+  
+  // UI state
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
-  const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryColor, setNewCategoryColor] = useState<EventColor>("blue");
-  const [creatingCategory, setCreatingCategory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Debug log to check what event is being passed
+  // Get default calendar
+  const defaultCalendar = useMemo(() => {
+    return calendars.find(cal => cal.isDefault) || calendars[0];
+  }, [calendars]);
+
+  // Initialize form when dialog opens or event changes
   useEffect(() => {
-    console.log("EventDialog received event:", event);
-  }, [event]);
-
-  useEffect(() => {
-    if (event) {
-      setTitle(event.title || "");
-      setDescription(event.description || "");
-
-      const start = new Date(event.start);
-      const end = new Date(event.end);
-
-      setStartDate(start);
-      setEndDate(end);
-      setStartTime(formatTimeForInput(start));
-      setEndTime(formatTimeForInput(end));
-      setAllDay(event.allDay || false);
-      setLocation(event.location || "");
-      setColor((event.color as EventColor) || "blue");
-      // Set categoryId from event if it exists
-      setCategoryId((event as any).categoryId || "none");
+    if (isOpen) {
+      if (event) {
+        // Editing existing event
+        setTitle(event.title || "");
+        setDescription(event.description || "");
+        setStartDate(new Date(event.start));
+        setEndDate(new Date(event.end));
+        setStartTime(formatTimeForInput(new Date(event.start)));
+        setEndTime(formatTimeForInput(new Date(event.end)));
+        setAllDay(event.allDay || false);
+        setLocation(event.location || "");
+        setCalendarId(event.calendarId || defaultCalendar?.id || "");
+      } else {
+        // Creating new event
+        resetForm();
+      }
       setValidationErrors([]);
       setLocalError(null);
-    } else {
-      resetForm();
     }
-  }, [event]);
+  }, [isOpen, event, defaultCalendar?.id]);
 
   const resetForm = () => {
     setTitle("");
@@ -150,13 +126,7 @@ export function EventDialog({
     setEndTime(`${DefaultEndHour}:00`);
     setAllDay(false);
     setLocation("");
-    setColor("blue");
-    setCategoryId("none");
-    setValidationErrors([]);
-    setLocalError(null);
-    setShowNewCategoryForm(false);
-    setNewCategoryName("");
-    setNewCategoryColor("blue");
+    setCalendarId(defaultCalendar?.id || "");
   };
 
   const formatTimeForInput = (date: Date) => {
@@ -165,7 +135,7 @@ export function EventDialog({
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   };
 
-  // Memoize time options so they're only calculated once
+  // Memoize time options
   const timeOptions = useMemo(() => {
     const options = [];
     for (let hour = StartHour; hour <= EndHour; hour++) {
@@ -173,32 +143,31 @@ export function EventDialog({
         const formattedHour = hour.toString().padStart(2, "0");
         const formattedMinute = minute.toString().padStart(2, "0");
         const value = `${formattedHour}:${formattedMinute}`;
-        // Use a fixed date to avoid unnecessary date object creations
         const date = new Date(2000, 0, 1, hour, minute);
         const label = format(date, "h:mm a");
         options.push({ value, label });
       }
     }
     return options;
-  }, []); // Empty dependency array ensures this only runs once
+  }, []);
 
   // Validation function
   const validateForm = (): ValidationError[] => {
     const errors: ValidationError[] = [];
 
-    // Title validation (required)
     if (!title.trim()) {
       errors.push({ field: "title", message: "Title is required" });
     }
 
-    // Date validation
+    if (!calendarId) {
+      errors.push({ field: "calendar", message: "Please select a calendar" });
+    }
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
     if (!allDay) {
-      const [startHours = 0, startMinutes = 0] = startTime
-        .split(":")
-        .map(Number);
+      const [startHours = 0, startMinutes = 0] = startTime.split(":").map(Number);
       const [endHours = 0, endMinutes = 0] = endTime.split(":").map(Number);
 
       if (
@@ -220,7 +189,6 @@ export function EventDialog({
       end.setHours(23, 59, 59, 999);
     }
 
-    // Validate that end date is not before start date
     if (isBefore(end, start)) {
       errors.push({
         field: "endDate",
@@ -232,11 +200,9 @@ export function EventDialog({
   };
 
   const handleSave = async () => {
-    // Clear previous errors
     setValidationErrors([]);
     setLocalError(null);
 
-    // Validate form
     const errors = validateForm();
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -247,11 +213,8 @@ export function EventDialog({
     const end = new Date(endDate);
 
     if (!allDay) {
-      const [startHours = 0, startMinutes = 0] = startTime
-        .split(":")
-        .map(Number);
+      const [startHours = 0, startMinutes = 0] = startTime.split(":").map(Number);
       const [endHours = 0, endMinutes = 0] = endTime.split(":").map(Number);
-
       start.setHours(startHours, startMinutes, 0);
       end.setHours(endHours, endMinutes, 0);
     } else {
@@ -259,7 +222,10 @@ export function EventDialog({
       end.setHours(23, 59, 59, 999);
     }
 
-    // Create event object with all necessary fields
+    // Get the color from the selected calendar
+    const selectedCalendar = calendars.find(cal => cal.id === calendarId);
+    const calendarColor = selectedCalendar?.color || "blue";
+
     const eventData: CalendarEvent = {
       id: event?.id || "",
       title: title.trim(),
@@ -268,15 +234,17 @@ export function EventDialog({
       end,
       allDay,
       location: location.trim() || undefined,
-      color,
-      ...(categoryId && categoryId !== "none" && { categoryId }),
+      color: calendarColor as any,
+      calendarId,
+      userId: event?.userId || "demo-user",
+      createdAt: event?.createdAt || new Date(),
+      updatedAt: new Date(),
     };
 
     setSaving(true);
     try {
       await onSave(eventData);
     } catch (error) {
-      // Error handling is done in the parent component
       console.error("Save failed:", error);
     } finally {
       setSaving(false);
@@ -289,7 +257,6 @@ export function EventDialog({
       try {
         await onDelete(event.id);
       } catch (error) {
-        // Error handling is done in the parent component
         console.error("Delete failed:", error);
       } finally {
         setDeleting(false);
@@ -297,44 +264,6 @@ export function EventDialog({
     }
   };
 
-  // Updated color options to match types.ts
-  const colorOptions: Array<{
-    value: EventColor;
-    label: string;
-    bgClass: string;
-    borderClass: string;
-  }> = [
-    {
-      value: "blue",
-      label: "Blue",
-      bgClass: "bg-blue-400 data-[state=checked]:bg-blue-400",
-      borderClass: "border-blue-400 data-[state=checked]:border-blue-400",
-    },
-    {
-      value: "violet",
-      label: "Violet",
-      bgClass: "bg-violet-400 data-[state=checked]:bg-violet-400",
-      borderClass: "border-violet-400 data-[state=checked]:border-violet-400",
-    },
-    {
-      value: "rose",
-      label: "Rose",
-      bgClass: "bg-rose-400 data-[state=checked]:bg-rose-400",
-      borderClass: "border-rose-400 data-[state=checked]:border-rose-400",
-    },
-    {
-      value: "emerald",
-      label: "Emerald",
-      bgClass: "bg-emerald-400 data-[state=checked]:bg-emerald-400",
-      borderClass: "border-emerald-400 data-[state=checked]:border-emerald-400",
-    },
-    {
-      value: "orange",
-      label: "Orange",
-      bgClass: "bg-orange-400 data-[state=checked]:bg-orange-400",
-      borderClass: "border-orange-400 data-[state=checked]:border-orange-400",
-    },
-  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -347,6 +276,7 @@ export function EventDialog({
               : "Add a new event to your calendar"}
           </DialogDescription>
         </DialogHeader>
+        
         {(apiError || localError || validationErrors.length > 0) && (
           <div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm space-y-1">
             {apiError && <div>{apiError.message}</div>}
@@ -354,17 +284,9 @@ export function EventDialog({
             {validationErrors.map((error, index) => (
               <div key={index}>{error.message}</div>
             ))}
-            {apiError?.details && apiError.details.length > 0 && (
-              <div className="mt-2">
-                {apiError.details.map((detail, index) => (
-                  <div key={index} className="text-xs">
-                    {detail.field}: {detail.message}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
+
         <div className="grid gap-4 py-4">
           <div className="*:not-first:mt-1.5">
             <Label htmlFor="title">Title</Label>
@@ -372,6 +294,7 @@ export function EventDialog({
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter event title"
             />
           </div>
 
@@ -382,7 +305,32 @@ export function EventDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              placeholder="Enter event description"
             />
+          </div>
+
+          <div className="*:not-first:mt-1.5">
+            <Label htmlFor="calendar">Calendar</Label>
+            <Select value={calendarId} onValueChange={setCalendarId}>
+              <SelectTrigger id="calendar">
+                <SelectValue placeholder="Select a calendar" />
+              </SelectTrigger>
+              <SelectContent>
+                {calendars.map((calendar) => (
+                  <SelectItem key={calendar.id} value={calendar.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="size-3 rounded-full"
+                        style={{
+                          backgroundColor: `var(--color-${calendar.color}-400)`,
+                        }}
+                      />
+                      {calendar.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex gap-4">
@@ -394,23 +342,14 @@ export function EventDialog({
                     id="start-date"
                     variant={"outline"}
                     className={cn(
-                      "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
+                      "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal",
                       !startDate && "text-muted-foreground"
                     )}
                   >
-                    <span
-                      className={cn(
-                        "truncate",
-                        !startDate && "text-muted-foreground"
-                      )}
-                    >
+                    <span className="truncate">
                       {startDate ? format(startDate, "PPP") : "Pick a date"}
                     </span>
-                    <RiCalendarLine
-                      size={16}
-                      className="text-muted-foreground/80 shrink-0"
-                      aria-hidden="true"
-                    />
+                    <RiCalendarLine size={16} className="text-muted-foreground/80 shrink-0" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2" align="start">
@@ -421,11 +360,9 @@ export function EventDialog({
                     onSelect={(date) => {
                       if (date) {
                         setStartDate(date);
-                        // If end date is before the new start date, update it to match the start date
                         if (isBefore(endDate, date)) {
                           setEndDate(date);
                         }
-                        setLocalError(null);
                         setStartDateOpen(false);
                       }
                     }}
@@ -462,23 +399,14 @@ export function EventDialog({
                     id="end-date"
                     variant={"outline"}
                     className={cn(
-                      "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
+                      "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal",
                       !endDate && "text-muted-foreground"
                     )}
                   >
-                    <span
-                      className={cn(
-                        "truncate",
-                        !endDate && "text-muted-foreground"
-                      )}
-                    >
+                    <span className="truncate">
                       {endDate ? format(endDate, "PPP") : "Pick a date"}
                     </span>
-                    <RiCalendarLine
-                      size={16}
-                      className="text-muted-foreground/80 shrink-0"
-                      aria-hidden="true"
-                    />
+                    <RiCalendarLine size={16} className="text-muted-foreground/80 shrink-0" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2" align="start">
@@ -490,7 +418,6 @@ export function EventDialog({
                     onSelect={(date) => {
                       if (date) {
                         setEndDate(date);
-                        setLocalError(null);
                         setEndDateOpen(false);
                       }
                     }}
@@ -533,151 +460,12 @@ export function EventDialog({
               id="location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
+              placeholder="Enter event location"
             />
           </div>
 
-          <div className="*:not-first:mt-1.5">
-            <Label htmlFor="category">Category</Label>
-            <div className="flex gap-2">
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger id="category" className="flex-1">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories
-                    .filter((cat) => cat.isActive)
-                    .map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: category.color }}
-                          />
-                          {category.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {onCreateCategory && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowNewCategoryForm(true)}
-                  aria-label="Add new category"
-                >
-                  <RiAddLine size={16} />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {showNewCategoryForm && (
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">New Category</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowNewCategoryForm(false);
-                    setNewCategoryName("");
-                    setNewCategoryColor("blue");
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-              <div className="*:not-first:mt-1.5">
-                <Label htmlFor="new-category-name">Name</Label>
-                <Input
-                  id="new-category-name"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Enter category name"
-                />
-              </div>
-              <div className="*:not-first:mt-1.5">
-                <Label>Color</Label>
-                <RadioGroup
-                  className="flex gap-1.5"
-                  value={newCategoryColor}
-                  onValueChange={(value: EventColor) =>
-                    setNewCategoryColor(value)
-                  }
-                >
-                  {colorOptions.map((colorOption) => (
-                    <RadioGroupItem
-                      key={colorOption.value}
-                      id={`new-category-color-${colorOption.value}`}
-                      value={colorOption.value}
-                      aria-label={colorOption.label}
-                      className={cn(
-                        "size-6 shadow-none",
-                        colorOption.bgClass,
-                        colorOption.borderClass
-                      )}
-                    />
-                  ))}
-                </RadioGroup>
-              </div>
-              <Button
-                type="button"
-                onClick={async () => {
-                  if (!newCategoryName.trim() || !onCreateCategory) return;
-
-                  setCreatingCategory(true);
-                  try {
-                    const newCategory = await onCreateCategory({
-                      name: newCategoryName.trim(),
-                      color: newCategoryColor,
-                    });
-                    setCategoryId(newCategory.id);
-                    setShowNewCategoryForm(false);
-                    setNewCategoryName("");
-                    setNewCategoryColor("blue");
-                  } catch (error) {
-                    console.error("Failed to create category:", error);
-                  } finally {
-                    setCreatingCategory(false);
-                  }
-                }}
-                disabled={!newCategoryName.trim() || creatingCategory}
-                className="w-full"
-              >
-                {creatingCategory ? "Creating..." : "Create Category"}
-              </Button>
-            </div>
-          )}
-          <fieldset className="space-y-4">
-            <legend className="text-foreground text-sm leading-none font-medium">
-              Etiquette
-            </legend>
-            <RadioGroup
-              className="flex gap-1.5"
-              defaultValue={colorOptions[0]?.value}
-              value={color}
-              onValueChange={(value: EventColor) => setColor(value)}
-            >
-              {colorOptions.map((colorOption) => (
-                <RadioGroupItem
-                  key={colorOption.value}
-                  id={`color-${colorOption.value}`}
-                  value={colorOption.value}
-                  aria-label={colorOption.label}
-                  className={cn(
-                    "size-6 shadow-none",
-                    colorOption.bgClass,
-                    colorOption.borderClass
-                  )}
-                />
-              ))}
-            </RadioGroup>
-          </fieldset>
         </div>
+
         <DialogFooter className="flex-row sm:justify-between">
           {event?.id && (
             <Button
@@ -691,7 +479,7 @@ export function EventDialog({
               {deleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <RiDeleteBinLine size={16} aria-hidden="true" />
+                <RiDeleteBinLine size={16} />
               )}
             </Button>
           )}
@@ -703,7 +491,7 @@ export function EventDialog({
             >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving || deleting}>
+            <Button onClick={handleSave} disabled={saving || deleting || !calendarId}>
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

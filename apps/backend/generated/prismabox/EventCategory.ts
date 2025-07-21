@@ -46,6 +46,7 @@ export const EventCategoryRelations = t.Object(
           reminder: __nullable__(t.Integer()),
           recurrence: __nullable__(t.String()),
           userId: t.String(),
+          calendarId: t.String(),
           categoryId: __nullable__(t.String()),
           createdAt: t.Date(),
           updatedAt: t.Date(),

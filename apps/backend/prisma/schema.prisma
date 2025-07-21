@@ -31,6 +31,7 @@ model User {
   // Calendar relationships
   events        CalendarEvent[]
   categories    EventCategory[]
+  calendars     Calendar[]
   participations EventParticipant[]
 
   @@map("user")
@@ -82,6 +83,22 @@ model Verification {
 }
 
 // Calendar Models
+model Calendar {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   // blue, orange, violet, rose, emerald
+  isVisible Boolean  @default(true) @map("is_visible")
+  isDefault Boolean  @default(false) @map("is_default")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events    CalendarEvent[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, name])
+  @@map("calendar")
+}
+
 model EventCategory {
   id        String   @id @default(cuid())
   name      String
@@ -115,6 +132,9 @@ model CalendarEvent {
   // Relationships
   userId      String    @map("user_id")
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  calendarId  String    @map("calendar_id")
+  calendar    Calendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
   
   categoryId  String?   @map("category_id")
   category    EventCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)

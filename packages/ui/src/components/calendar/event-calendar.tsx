@@ -219,6 +219,10 @@ export function EventCalendar({
       start: startTime,
       end: addHoursToDate(startTime, 1),
       allDay: false,
+      calendarId: "",
+      userId: "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     setSelectedEvent(newEvent);
     setIsEventDialogOpen(true);
@@ -226,21 +230,22 @@ export function EventCalendar({
 
   const handleEventSave = async (event: CalendarEvent) => {
     try {
+      const eventData = {
+        title: event.title,
+        description: event.description,
+        start: event.start.toISOString(),
+        end: event.end.toISOString(),
+        allDay: event.allDay || false,
+        location: event.location,
+        color: event.color, // This now comes from the calendar color
+        calendarId: event.calendarId,
+        categoryId: (event as any).categoryId || undefined,
+      };
+
       if (event.id) {
         // Update existing event
-        const eventData = {
-          title: event.title,
-          description: event.description,
-          start: event.start.toISOString(),
-          end: event.end.toISOString(),
-          allDay: event.allDay,
-          location: event.location,
-          color: event.color,
-          categoryId: (event as any).categoryId || undefined,
-        };
-
         await updateEvent(event.id, eventData);
-
+        
         // Show success toast notification when an event is updated
         toast.success(`Event "${event.title}" updated`, {
           description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
@@ -248,20 +253,9 @@ export function EventCalendar({
         });
       } else {
         // Create new event
-        const eventData = {
-          title: event.title,
-          description: event.description,
-          start: event.start.toISOString(),
-          end: event.end.toISOString(),
-          allDay: event.allDay || false,
-          location: event.location,
-          color: event.color,
-          categoryId: (event as any).categoryId || undefined,
-        };
-
         await createEvent(eventData);
 
-        // Show success toast notification when an event is added
+        // Show success toast notification when an event is created
         toast.success(`Event "${event.title}" created`, {
           description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
           position: "bottom-left",
@@ -652,8 +646,6 @@ export function EventCalendar({
             }}
             onSave={handleEventSave}
             onDelete={handleEventDelete}
-            categories={categories}
-            onCreateCategory={createCategory}
             loading={loading}
             error={error}
           />

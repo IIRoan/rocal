@@ -166,6 +166,17 @@ exports.Prisma.VerificationScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.CalendarScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  color: 'color',
+  isVisible: 'isVisible',
+  isDefault: 'isDefault',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.EventCategoryScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -189,6 +200,7 @@ exports.Prisma.CalendarEventScalarFieldEnum = {
   reminder: 'reminder',
   recurrence: 'recurrence',
   userId: 'userId',
+  calendarId: 'calendarId',
   categoryId: 'categoryId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -225,6 +237,7 @@ exports.Prisma.ModelName = {
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
+  Calendar: 'Calendar',
   EventCategory: 'EventCategory',
   CalendarEvent: 'CalendarEvent',
   EventParticipant: 'EventParticipant'
