@@ -4,6 +4,7 @@ import { swagger } from "@elysiajs/swagger";
 import { auth } from "./lib/auth";
 import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
+import { calendarsRoutes } from "./routes/calendars";
 import { errorHandler } from "./lib/errors";
 
 // Better Auth middleware following the documentation pattern
@@ -41,6 +42,7 @@ export const createAPI = (prefix = "") =>
             { name: "Auth", description: "Authentication endpoints" },
             { name: "Events", description: "Event management endpoints" },
             { name: "Categories", description: "Event category endpoints" },
+            { name: "Calendars", description: "Calendar management endpoints" },
           ],
           components: {
             securitySchemes: {
@@ -104,4 +106,5 @@ export const createAPI = (prefix = "") =>
       }
     )
     .use(eventsRoutes)
-    .use(categoriesRoutes);
+    .use(categoriesRoutes)
+    .use(calendarsRoutes);

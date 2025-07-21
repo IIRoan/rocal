@@ -4,42 +4,22 @@ import { __transformDate__ } from "./__transformDate__";
 
 import { __nullable__ } from "./__nullable__";
 
-export const EventParticipantPlain = t.Object(
+export const CalendarPlain = t.Object(
   {
     id: t.String(),
-    eventId: t.String(),
+    name: t.String(),
+    color: t.String(),
+    isVisible: t.Boolean(),
+    isDefault: t.Boolean(),
     userId: t.String(),
-    status: t.String(),
-    role: t.String(),
     createdAt: t.Date(),
     updatedAt: t.Date(),
   },
   { additionalProperties: false },
 );
 
-export const EventParticipantRelations = t.Object(
+export const CalendarRelations = t.Object(
   {
-    event: t.Object(
-      {
-        id: t.String(),
-        title: t.String(),
-        description: __nullable__(t.String()),
-        start: t.Date(),
-        end: t.Date(),
-        allDay: t.Boolean(),
-        location: __nullable__(t.String()),
-        color: __nullable__(t.String()),
-        isPrivate: t.Boolean(),
-        reminder: __nullable__(t.Integer()),
-        recurrence: __nullable__(t.String()),
-        userId: t.String(),
-        calendarId: t.String(),
-        categoryId: __nullable__(t.String()),
-        createdAt: t.Date(),
-        updatedAt: t.Date(),
-      },
-      { additionalProperties: false },
-    ),
     user: t.Object(
       {
         id: t.String(),
@@ -52,33 +32,56 @@ export const EventParticipantRelations = t.Object(
       },
       { additionalProperties: false },
     ),
+    events: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          title: t.String(),
+          description: __nullable__(t.String()),
+          start: t.Date(),
+          end: t.Date(),
+          allDay: t.Boolean(),
+          location: __nullable__(t.String()),
+          color: __nullable__(t.String()),
+          isPrivate: t.Boolean(),
+          reminder: __nullable__(t.Integer()),
+          recurrence: __nullable__(t.String()),
+          userId: t.String(),
+          calendarId: t.String(),
+          categoryId: __nullable__(t.String()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
   },
   { additionalProperties: false },
 );
 
-export const EventParticipantPlainInputCreate = t.Object(
-  { status: t.Optional(t.String()), role: t.Optional(t.String()) },
-  { additionalProperties: false },
-);
-
-export const EventParticipantPlainInputUpdate = t.Object(
-  { status: t.Optional(t.String()), role: t.Optional(t.String()) },
-  { additionalProperties: false },
-);
-
-export const EventParticipantRelationsInputCreate = t.Object(
+export const CalendarPlainInputCreate = t.Object(
   {
-    event: t.Object(
-      {
-        connect: t.Object(
-          {
-            id: t.String({ additionalProperties: false }),
-          },
-          { additionalProperties: false },
-        ),
-      },
-      { additionalProperties: false },
-    ),
+    name: t.String(),
+    color: t.String(),
+    isVisible: t.Optional(t.Boolean()),
+    isDefault: t.Optional(t.Boolean()),
+  },
+  { additionalProperties: false },
+);
+
+export const CalendarPlainInputUpdate = t.Object(
+  {
+    name: t.Optional(t.String()),
+    color: t.Optional(t.String()),
+    isVisible: t.Optional(t.Boolean()),
+    isDefault: t.Optional(t.Boolean()),
+  },
+  { additionalProperties: false },
+);
+
+export const CalendarRelationsInputCreate = t.Object(
+  {
     user: t.Object(
       {
         connect: t.Object(
@@ -90,24 +93,29 @@ export const EventParticipantRelationsInputCreate = t.Object(
       },
       { additionalProperties: false },
     ),
-  },
-  { additionalProperties: false },
-);
-
-export const EventParticipantRelationsInputUpdate = t.Partial(
-  t.Object(
-    {
-      event: t.Object(
+    events: t.Optional(
+      t.Object(
         {
-          connect: t.Object(
-            {
-              id: t.String({ additionalProperties: false }),
-            },
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
             { additionalProperties: false },
           ),
         },
         { additionalProperties: false },
       ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+export const CalendarRelationsInputUpdate = t.Partial(
+  t.Object(
+    {
       user: t.Object(
         {
           connect: t.Object(
@@ -119,12 +127,37 @@ export const EventParticipantRelationsInputUpdate = t.Partial(
         },
         { additionalProperties: false },
       ),
+      events: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
     },
     { additionalProperties: false },
   ),
 );
 
-export const EventParticipantWhere = t.Partial(
+export const CalendarWhere = t.Partial(
   t.Recursive(
     (Self) =>
       t.Object(
@@ -133,20 +166,21 @@ export const EventParticipantWhere = t.Partial(
           NOT: t.Union([Self, t.Array(Self, { additionalProperties: false })]),
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
-          eventId: t.String(),
+          name: t.String(),
+          color: t.String(),
+          isVisible: t.Boolean(),
+          isDefault: t.Boolean(),
           userId: t.String(),
-          status: t.String(),
-          role: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
         { additionalProperties: false },
       ),
-    { $id: "EventParticipant" },
+    { $id: "Calendar" },
   ),
 );
 
-export const EventParticipantWhereUnique = t.Recursive(
+export const CalendarWhereUnique = t.Recursive(
   (Self) =>
     t.Intersect(
       [
@@ -154,8 +188,8 @@ export const EventParticipantWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
-              eventId_userId: t.Object(
-                { eventId: t.String(), userId: t.String() },
+              userId_name: t.Object(
+                { userId: t.String(), name: t.String() },
                 { additionalProperties: false },
               ),
             },
@@ -167,8 +201,8 @@ export const EventParticipantWhereUnique = t.Recursive(
           [
             t.Object({ id: t.String() }),
             t.Object({
-              eventId_userId: t.Object(
-                { eventId: t.String(), userId: t.String() },
+              userId_name: t.Object(
+                { userId: t.String(), name: t.String() },
                 { additionalProperties: false },
               ),
             }),
@@ -193,10 +227,11 @@ export const EventParticipantWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
-              eventId: t.String(),
+              name: t.String(),
+              color: t.String(),
+              isVisible: t.Boolean(),
+              isDefault: t.Boolean(),
               userId: t.String(),
-              status: t.String(),
-              role: t.String(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
             },
@@ -206,19 +241,20 @@ export const EventParticipantWhereUnique = t.Recursive(
       ],
       { additionalProperties: false },
     ),
-  { $id: "EventParticipant" },
+  { $id: "Calendar" },
 );
 
-export const EventParticipantSelect = t.Partial(
+export const CalendarSelect = t.Partial(
   t.Object(
     {
       id: t.Boolean(),
-      eventId: t.Boolean(),
-      event: t.Boolean(),
+      name: t.Boolean(),
+      color: t.Boolean(),
+      isVisible: t.Boolean(),
+      isDefault: t.Boolean(),
       userId: t.Boolean(),
       user: t.Boolean(),
-      status: t.Boolean(),
-      role: t.Boolean(),
+      events: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       _count: t.Boolean(),
@@ -227,29 +263,32 @@ export const EventParticipantSelect = t.Partial(
   ),
 );
 
-export const EventParticipantInclude = t.Partial(
+export const CalendarInclude = t.Partial(
   t.Object(
-    { event: t.Boolean(), user: t.Boolean(), _count: t.Boolean() },
+    { user: t.Boolean(), events: t.Boolean(), _count: t.Boolean() },
     { additionalProperties: false },
   ),
 );
 
-export const EventParticipantOrderBy = t.Partial(
+export const CalendarOrderBy = t.Partial(
   t.Object(
     {
       id: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      eventId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      name: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      color: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      isVisible: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      isDefault: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       userId: t.Union([t.Literal("asc"), t.Literal("desc")], {
-        additionalProperties: false,
-      }),
-      status: t.Union([t.Literal("asc"), t.Literal("desc")], {
-        additionalProperties: false,
-      }),
-      role: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
@@ -263,17 +302,16 @@ export const EventParticipantOrderBy = t.Partial(
   ),
 );
 
-export const EventParticipant = t.Composite(
-  [EventParticipantPlain, EventParticipantRelations],
+export const Calendar = t.Composite([CalendarPlain, CalendarRelations], {
+  additionalProperties: false,
+});
+
+export const CalendarInputCreate = t.Composite(
+  [CalendarPlainInputCreate, CalendarRelationsInputCreate],
   { additionalProperties: false },
 );
 
-export const EventParticipantInputCreate = t.Composite(
-  [EventParticipantPlainInputCreate, EventParticipantRelationsInputCreate],
-  { additionalProperties: false },
-);
-
-export const EventParticipantInputUpdate = t.Composite(
-  [EventParticipantPlainInputUpdate, EventParticipantRelationsInputUpdate],
+export const CalendarInputUpdate = t.Composite(
+  [CalendarPlainInputUpdate, CalendarRelationsInputUpdate],
   { additionalProperties: false },
 );

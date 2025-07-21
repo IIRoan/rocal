@@ -1,11 +1,15 @@
 import { httpClient, HttpClient } from "./http-client";
 import {
   CalendarEvent,
+  Calendar,
   EventCategory,
   EventsResponse,
+  CalendarsResponse,
   CategoriesResponse,
   CreateEventRequest,
   UpdateEventRequest,
+  CreateCalendarRequest,
+  UpdateCalendarRequest,
   CreateCategoryRequest,
   UpdateCategoryRequest,
   DeleteResponse,
@@ -70,6 +74,54 @@ export class CalendarApiService {
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to delete event");
+    }
+  }
+
+  // Calendars API methods
+  async getCalendars(): Promise<Calendar[]> {
+    try {
+      const response = await this.client.get<CalendarsResponse>("/api/calendars");
+      return response.calendars;
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch calendars");
+    }
+  }
+
+  async createCalendar(calendar: CreateCalendarRequest): Promise<Calendar> {
+    try {
+      const response = await this.client.post<Calendar>(
+        "/api/calendars",
+        calendar
+      );
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to create calendar");
+    }
+  }
+
+  async updateCalendar(
+    id: string,
+    calendar: UpdateCalendarRequest
+  ): Promise<Calendar> {
+    try {
+      const response = await this.client.put<Calendar>(
+        `/api/calendars/${id}`,
+        calendar
+      );
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to update calendar");
+    }
+  }
+
+  async deleteCalendar(id: string): Promise<DeleteResponse> {
+    try {
+      const response = await this.client.delete<DeleteResponse>(
+        `/api/calendars/${id}`
+      );
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete calendar");
     }
   }
 
@@ -171,6 +223,10 @@ export class CalendarApiService {
 
     if ("title" in event && (!event.title || !event.title.trim())) {
       errors.push("Title is required");
+    }
+
+    if ("calendarId" in event && !event.calendarId) {
+      errors.push("Calendar is required");
     }
 
     if ("title" in event && event.title && event.title.length > 255) {
