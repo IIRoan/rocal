@@ -29,7 +29,7 @@ import {
   EventHeight,
   WeekCellsHeight,
 } from "./constants";
-import { addHoursToDate } from "./utils";
+import { addHoursToDate, addMinutesToDate } from "./utils";
 import { CalendarEvent, CalendarView } from "./types";
 import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
@@ -217,7 +217,7 @@ export function EventCalendar({
       id: "",
       title: "",
       start: startTime,
-      end: addHoursToDate(startTime, 1),
+      end: addMinutesToDate(startTime, 15), // 15-minute duration for new events
       allDay: false,
       calendarId: "",
       userId: "",
@@ -550,13 +550,20 @@ export function EventCalendar({
                   variant="outline"
                   className="max-sm:h-8 max-sm:px-2.5!"
                   onClick={() => {
-                    // Create a new event starting now or at the current date
+                    // Create a new event starting at current time or selected date
                     const startTime = new Date(currentDate);
                     const now = new Date();
 
-                    // If the current date is today, start at the current time (rounded to next hour)
+                    // If the current date is today, start at the current time (rounded to next 15-min interval)
                     if (startTime.toDateString() === now.toDateString()) {
-                      startTime.setHours(now.getHours() + 1, 0, 0, 0);
+                      // Use current time and round to next 15-minute interval
+                      startTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
+                      const minutes = startTime.getMinutes();
+                      const remainder = minutes % 15;
+                      if (remainder !== 0) {
+                        // Round up to next 15-minute interval
+                        startTime.setMinutes(minutes + (15 - remainder));
+                      }
                     } else {
                       // Otherwise start at 9 AM
                       startTime.setHours(9, 0, 0, 0);
