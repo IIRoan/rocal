@@ -18,4 +18,4 @@ export const auth = betterAuth({
   baseURL: "http://localhost:3000",
   basePath: "/api/auth",
   plugins: [nextCookies()],
-});
+}) as any;
