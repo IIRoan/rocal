@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { 
   EventCalendar,
   CalendarView,
@@ -14,7 +14,7 @@ import {
   startOfMonth,
   endOfMonth
 } from "date-fns";
-import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useCalendarData } from "@/hooks/use-calendar-data-v2";
 
 interface CalendarWithDataProps {
   className?: string;
@@ -63,8 +63,12 @@ export function CalendarWithData({
   // Use the calendar data hook with the calculated date range
   const calendarData = useCalendarData({
     initialDateRange: defaultDateRange,
-    autoRefetch: true,
   });
+
+  // Update date range when calendar view changes
+  useEffect(() => {
+    calendarData.setDateRange(defaultDateRange);
+  }, [defaultDateRange, calendarData]);
 
   // Optimized event filtering with memoized visibility check
   const transformedEvents = useMemo(() => {

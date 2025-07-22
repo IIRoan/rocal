@@ -5,11 +5,11 @@ import { AppSidebar } from "@workspace/ui/components/layout";
 import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { CalendarWithData } from "@/components/calendar-with-data";
-import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useCalendarData } from "@/hooks/use-calendar-data-v2";
 
 function DashboardContent() {
   const { data: session, isPending } = useSession();
-  const calendarData = useCalendarData({ autoRefetch: true });
+  const calendarData = useCalendarData();
 
   const handleLogout = async () => {
     try {
