@@ -33,6 +33,7 @@ model User {
   categories    EventCategory[]
   calendars     Calendar[]
   participations EventParticipant[]
+  settings      UserSettings?
 
   @@map("user")
 }
@@ -92,6 +93,7 @@ model Calendar {
   userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   events    CalendarEvent[]
+  sharedCalendars CalendarSharing[]
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -128,6 +130,7 @@ model CalendarEvent {
   isPrivate   Boolean   @default(false) @map("is_private")
   reminder    Int?      // minutes before event to remind
   recurrence  String?   // JSON string for recurrence rules (daily, weekly, monthly, etc.)
+  parentEventId String? @map("parent_event_id") // For recurring event instances
   
   // Relationships
   userId      String    @map("user_id")
@@ -140,6 +143,8 @@ model CalendarEvent {
   category    EventCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   
   participants EventParticipant[]
+  recurrenceExceptions RecurrenceException[]
+  notifications EventNotification[]
   
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -160,4 +165,104 @@ model EventParticipant {
 
   @@unique([eventId, userId])
   @@map("event_participant")
+}
+
+model UserSettings {
+  id                    String    @id @default(cuid())
+  userId                String    @unique @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Display preferences
+  theme                 String    @default("light") // light, dark, system
+  defaultView           String    @default("month") // month, week, day, agenda
+  weekStartDay          Int       @default(0) // 0 = Sunday, 1 = Monday
+  
+  // Time & Timezone
+  timezone              String    @default("UTC") // IANA timezone identifier
+  timeFormat            String    @default("12h") // 12h, 24h
+  
+  // Working hours (in minutes from midnight)
+  workingHoursStart     Int       @default(540) // 9:00 AM = 540 minutes
+  workingHoursEnd       Int       @default(1020) // 5:00 PM = 1020 minutes
+  workingDays           String    @default("[1,2,3,4,5]") // JSON array of weekdays
+  
+  // Notification preferences
+  emailNotifications    Boolean   @default(true)
+  browserNotifications  Boolean   @default(true)
+  reminderSound         Boolean   @default(true)
+  
+  // Default event settings
+  defaultReminder       Int?      // Default reminder in minutes
+  defaultEventDuration  Int       @default(60) // Default event duration in minutes
+  defaultCalendarId     String?   @map("default_calendar_id")
+  
+  // UI preferences
+  compactView           Boolean   @default(false)
+  showWeekNumbers       Boolean   @default(false)
+  showDeclinedEvents    Boolean   @default(false)
+  
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_settings")
+}
+
+model CalendarSharing {
+  id          String    @id @default(cuid())
+  calendarId  String    @map("calendar_id")
+  calendar    Calendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  sharedWith  String    @map("shared_with") // User ID
+  sharedBy    String    @map("shared_by") // User ID
+  permission  String    @default("read") // read, write, admin
+  accepted    Boolean   @default(false) // Whether the invitation was accepted
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([calendarId, sharedWith])
+  @@map("calendar_sharing")
+}
+
+model RecurrenceException {
+  id              String        @id @default(cuid())
+  parentEventId   String        @map("parent_event_id") // ID of the original recurring event
+  exceptionDate   DateTime      @map("exception_date") // The date this exception applies to
+  modifiedEventId String?       @map("modified_event_id") // ID of the modified event (null if deleted)
+  modifiedEvent   CalendarEvent? @relation(fields: [modifiedEventId], references: [id], onDelete: SetNull)
+  type           String        @default("modified") // modified, deleted
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@unique([parentEventId, exceptionDate])
+  @@map("recurrence_exception")
+}
+
+model EventNotification {
+  id               String        @id @default(cuid())
+  eventId          String        @map("event_id")
+  event            CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  notificationType String        @map("notification_type") // 'browser', 'email'
+  minutesBefore    Int           @map("minutes_before")
+  isEnabled        Boolean       @default(true) @map("is_enabled")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@index([eventId])
+  @@index([notificationType])
+  @@map("event_notification")
+}
+
+model NotificationLog {
+  id               String   @id @default(cuid())
+  eventId          String   @map("event_id")
+  userId           String   @map("user_id")
+  notificationType String   @map("notification_type") // 'browser', 'email'
+  minutesBefore    Int      @map("minutes_before")
+  sentAt           DateTime @map("sent_at")
+  status           String   @default("sent") @map("status") // 'sent', 'failed', 'pending'
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([eventId, userId])
+  @@index([sentAt])
+  @@index([status])
+  @@map("notification_log")
 }

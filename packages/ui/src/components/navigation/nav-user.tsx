@@ -19,6 +19,7 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 export function NavUser({
   user,
   onLogout,
+  onOpenSettings,
 }: {
   user: {
     name: string;
@@ -26,6 +27,7 @@ export function NavUser({
     avatar?: string;
   };
   onLogout?: () => void;
+  onOpenSettings?: () => void;
 }) {
   const initials = user.name
     .split(' ')
@@ -58,7 +60,10 @@ export function NavUser({
             sideOffset={4}
           >
             <DropdownMenuGroup>
-              <DropdownMenuItem className="gap-3 focus:bg-sidebar-accent">
+              <DropdownMenuItem 
+                className="gap-3 focus:bg-sidebar-accent"
+                onClick={onOpenSettings}
+              >
                 <RiGroupLine
                   size={20}
                   className="size-5 text-muted-foreground/80"

@@ -2,6 +2,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider } from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
+import { SettingsProvider } from "@/components/settings-provider";
+import { NotificationProvider } from "@/components/notification-provider";
 import "@workspace/ui/globals.css";
 
 const fontSans = Geist({
@@ -30,8 +32,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <CalendarProvider>{children}</CalendarProvider>
-          <Toaster />
+          <SettingsProvider>
+            <NotificationProvider>
+              <CalendarProvider>{children}</CalendarProvider>
+              <Toaster />
+            </NotificationProvider>
+          </SettingsProvider>
         </ThemeProvider>
       </body>
     </html>

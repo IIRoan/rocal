@@ -199,6 +199,7 @@ exports.Prisma.CalendarEventScalarFieldEnum = {
   isPrivate: 'isPrivate',
   reminder: 'reminder',
   recurrence: 'recurrence',
+  parentEventId: 'parentEventId',
   userId: 'userId',
   calendarId: 'calendarId',
   categoryId: 'categoryId',
@@ -214,6 +215,72 @@ exports.Prisma.EventParticipantScalarFieldEnum = {
   role: 'role',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserSettingsScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  theme: 'theme',
+  defaultView: 'defaultView',
+  weekStartDay: 'weekStartDay',
+  timezone: 'timezone',
+  timeFormat: 'timeFormat',
+  workingHoursStart: 'workingHoursStart',
+  workingHoursEnd: 'workingHoursEnd',
+  workingDays: 'workingDays',
+  emailNotifications: 'emailNotifications',
+  browserNotifications: 'browserNotifications',
+  reminderSound: 'reminderSound',
+  defaultReminder: 'defaultReminder',
+  defaultEventDuration: 'defaultEventDuration',
+  defaultCalendarId: 'defaultCalendarId',
+  compactView: 'compactView',
+  showWeekNumbers: 'showWeekNumbers',
+  showDeclinedEvents: 'showDeclinedEvents',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CalendarSharingScalarFieldEnum = {
+  id: 'id',
+  calendarId: 'calendarId',
+  sharedWith: 'sharedWith',
+  sharedBy: 'sharedBy',
+  permission: 'permission',
+  accepted: 'accepted',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.RecurrenceExceptionScalarFieldEnum = {
+  id: 'id',
+  parentEventId: 'parentEventId',
+  exceptionDate: 'exceptionDate',
+  modifiedEventId: 'modifiedEventId',
+  type: 'type',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EventNotificationScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  notificationType: 'notificationType',
+  minutesBefore: 'minutesBefore',
+  isEnabled: 'isEnabled',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.NotificationLogScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  userId: 'userId',
+  notificationType: 'notificationType',
+  minutesBefore: 'minutesBefore',
+  sentAt: 'sentAt',
+  status: 'status',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -240,7 +307,12 @@ exports.Prisma.ModelName = {
   Calendar: 'Calendar',
   EventCategory: 'EventCategory',
   CalendarEvent: 'CalendarEvent',
-  EventParticipant: 'EventParticipant'
+  EventParticipant: 'EventParticipant',
+  UserSettings: 'UserSettings',
+  CalendarSharing: 'CalendarSharing',
+  RecurrenceException: 'RecurrenceException',
+  EventNotification: 'EventNotification',
+  NotificationLog: 'NotificationLog'
 };
 
 /**

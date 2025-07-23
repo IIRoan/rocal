@@ -27,6 +27,9 @@ interface DayViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
+  compactView?: boolean;
+  timeFormat?: "12h" | "24h";
+  timezone?: string;
 }
 
 interface PositionedEvent {
@@ -43,12 +46,15 @@ export function DayView({
   events,
   onEventSelect,
   onEventCreate,
+  compactView = false,
+  timeFormat = "12h",
+  timezone,
 }: DayViewProps) {
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
       start: addHours(dayStart, StartHour),
-      end: addHours(dayStart, EndHour - 1),
+      end: addHours(dayStart, EndHour),
     });
   }, [currentDate]);
 
@@ -183,6 +189,7 @@ export function DayView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "day",
+    timezone,
   );
 
   return (
@@ -258,6 +265,7 @@ export function DayView({
                   onClick={(e) => handleEventClick(positionedEvent.event, e)}
                   showTime
                   height={positionedEvent.height}
+                  timeFormat={timeFormat}
                 />
               </div>
             </div>

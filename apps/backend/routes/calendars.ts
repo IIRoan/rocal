@@ -345,8 +345,9 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
 
   .delete(
     "/:id",
-    async ({ params, user }: any) => {
+    async ({ params, query, user }: any) => {
       const { id } = params;
+      const { action = "prevent", targetCalendarId } = query;
 
       // Verify calendar exists and belongs to user
       const existingCalendar = await prisma.calendar.findFirst({
@@ -360,18 +361,108 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         throw new ValidationError("Calendar not found or access denied");
       }
 
+      // Prevent deleting the last calendar
+      const calendarCount = await prisma.calendar.count({
+        where: {
+          userId: user.id,
+        },
+      });
+
+      if (calendarCount <= 1) {
+        throw new ValidationError(
+          "Cannot delete the last calendar. Create another calendar first.",
+          "calendarId"
+        );
+      }
+
       // Check if calendar has events
-      const eventCount = await prisma.calendarEvent.count({
+      const events = await prisma.calendarEvent.findMany({
         where: {
           calendarId: id,
         },
       });
 
-      if (eventCount > 0) {
-        throw new ValidationError(
-          "Cannot delete calendar that contains events. Please move or delete all events first.",
-          "calendarId"
-        );
+      if (events.length > 0) {
+        if (action === "prevent") {
+          throw new ValidationError(
+            `Cannot delete calendar that contains ${events.length} events. Use action=delete_events or action=move_events&targetCalendarId=<id>.`,
+            "calendarId"
+          );
+        }
+
+        if (action === "move_events") {
+          if (!targetCalendarId) {
+            throw new ValidationError(
+              "Target calendar ID is required when moving events",
+              "targetCalendarId"
+            );
+          }
+
+          // Verify target calendar exists and belongs to user
+          const targetCalendar = await prisma.calendar.findFirst({
+            where: {
+              id: targetCalendarId,
+              userId: user.id,
+            },
+          });
+
+          if (!targetCalendar) {
+            throw new ValidationError(
+              "Target calendar not found or access denied",
+              "targetCalendarId"
+            );
+          }
+
+          if (targetCalendarId === id) {
+            throw new ValidationError(
+              "Cannot move events to the same calendar being deleted",
+              "targetCalendarId"
+            );
+          }
+
+          // Move all events to target calendar
+          await prisma.calendarEvent.updateMany({
+            where: {
+              calendarId: id,
+            },
+            data: {
+              calendarId: targetCalendarId,
+              updatedAt: new Date(),
+            },
+          });
+        } else if (action === "delete_events") {
+          // Delete all events in the calendar
+          await prisma.calendarEvent.deleteMany({
+            where: {
+              calendarId: id,
+            },
+          });
+        } else {
+          throw new ValidationError(
+            "Invalid action. Use 'prevent', 'delete_events', or 'move_events'",
+            "action"
+          );
+        }
+      }
+
+      // If this was the default calendar, set another calendar as default
+      if (existingCalendar.isDefault) {
+        const nextCalendar = await prisma.calendar.findFirst({
+          where: {
+            userId: user.id,
+            id: { not: id },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        });
+
+        if (nextCalendar) {
+          await prisma.calendar.update({
+            where: { id: nextCalendar.id },
+            data: { isDefault: true },
+          });
+        }
       }
 
       // Delete the calendar
@@ -381,8 +472,14 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
 
       return {
         success: true,
-        message: "Calendar deleted successfully",
+        message: action === "move_events" 
+          ? `Calendar deleted successfully. ${events.length} events moved to target calendar.`
+          : action === "delete_events"
+          ? `Calendar deleted successfully. ${events.length} events were also deleted.`
+          : "Calendar deleted successfully.",
         deletedCalendarId: id,
+        eventsAffected: events.length,
+        action,
       };
     },
     {
@@ -392,17 +489,50 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           description: "Calendar ID to delete",
         }),
       }),
+      query: t.Object({
+        action: t.Optional(
+          t.Union([
+            t.Literal("prevent"),
+            t.Literal("delete_events"),
+            t.Literal("move_events")
+          ], {
+            description: "What to do with events: prevent (default), delete_events, or move_events"
+          })
+        ),
+        targetCalendarId: t.Optional(
+          t.String({
+            description: "Target calendar ID when using move_events action"
+          })
+        ),
+      }),
       detail: {
         tags: ["Calendars"],
-        summary: "Delete a calendar",
-        description: "Deletes a calendar with proper user ownership verification. Calendar must be empty (no events).",
+        summary: "Delete a calendar with event migration options",
+        description: `Deletes a calendar with options for handling existing events:
+        - prevent: (default) Prevent deletion if events exist
+        - delete_events: Delete calendar and all its events
+        - move_events: Move all events to another calendar (requires targetCalendarId)`,
         security: [{ bearerAuth: [] }],
         responses: {
           200: {
             description: "Calendar deleted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    message: { type: "string" },
+                    deletedCalendarId: { type: "string" },
+                    eventsAffected: { type: "number" },
+                    action: { type: "string" },
+                  },
+                },
+              },
+            },
           },
           400: {
-            description: "Validation error (e.g., calendar contains events)",
+            description: "Validation error",
           },
           401: {
             description: "Unauthorized",

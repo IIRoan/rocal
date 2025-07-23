@@ -17,6 +17,7 @@ export const CalendarEventPlain = t.Object(
     isPrivate: t.Boolean(),
     reminder: __nullable__(t.Integer()),
     recurrence: __nullable__(t.String()),
+    parentEventId: __nullable__(t.String()),
     userId: t.String(),
     calendarId: t.String(),
     categoryId: __nullable__(t.String()),
@@ -75,6 +76,36 @@ export const CalendarEventRelations = t.Object(
           userId: t.String(),
           status: t.String(),
           role: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    recurrenceExceptions: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          parentEventId: t.String(),
+          exceptionDate: t.Date(),
+          modifiedEventId: __nullable__(t.String()),
+          type: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    notifications: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          eventId: t.String(),
+          notificationType: t.String(),
+          minutesBefore: t.Integer(),
+          isEnabled: t.Boolean(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
@@ -171,6 +202,38 @@ export const CalendarEventRelationsInputCreate = t.Object(
         { additionalProperties: false },
       ),
     ),
+    recurrenceExceptions: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    notifications: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -239,6 +302,56 @@ export const CalendarEventRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      recurrenceExceptions: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      notifications: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
     },
     { additionalProperties: false },
   ),
@@ -263,6 +376,7 @@ export const CalendarEventWhere = t.Partial(
           isPrivate: t.Boolean(),
           reminder: t.Integer(),
           recurrence: t.String(),
+          parentEventId: t.String(),
           userId: t.String(),
           calendarId: t.String(),
           categoryId: t.String(),
@@ -314,6 +428,7 @@ export const CalendarEventWhereUnique = t.Recursive(
               isPrivate: t.Boolean(),
               reminder: t.Integer(),
               recurrence: t.String(),
+              parentEventId: t.String(),
               userId: t.String(),
               calendarId: t.String(),
               categoryId: t.String(),
@@ -343,6 +458,7 @@ export const CalendarEventSelect = t.Partial(
       isPrivate: t.Boolean(),
       reminder: t.Boolean(),
       recurrence: t.Boolean(),
+      parentEventId: t.Boolean(),
       userId: t.Boolean(),
       user: t.Boolean(),
       calendarId: t.Boolean(),
@@ -350,6 +466,8 @@ export const CalendarEventSelect = t.Partial(
       categoryId: t.Boolean(),
       category: t.Boolean(),
       participants: t.Boolean(),
+      recurrenceExceptions: t.Boolean(),
+      notifications: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       _count: t.Boolean(),
@@ -365,6 +483,8 @@ export const CalendarEventInclude = t.Partial(
       calendar: t.Boolean(),
       category: t.Boolean(),
       participants: t.Boolean(),
+      recurrenceExceptions: t.Boolean(),
+      notifications: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -405,6 +525,9 @@ export const CalendarEventOrderBy = t.Partial(
         additionalProperties: false,
       }),
       recurrence: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      parentEventId: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       userId: t.Union([t.Literal("asc"), t.Literal("desc")], {

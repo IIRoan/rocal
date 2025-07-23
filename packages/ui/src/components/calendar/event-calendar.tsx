@@ -36,6 +36,7 @@ import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
 import { WeekView } from "./week-view";
 import { EventDialog } from "./event-dialog";
+import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
 import { cn } from "../../lib/utils";
@@ -65,6 +66,25 @@ export interface EventCalendarProps {
   onUpdateEvent?: (id: string, event: any) => Promise<any>;
   onDeleteEvent?: (id: string) => Promise<void>;
   onCreateCategory?: (category: any) => Promise<any>;
+  // Settings
+  showWeekNumbers?: boolean;
+  compactView?: boolean;
+  timeFormat?: "12h" | "24h";
+  defaultReminder?: number | null;
+  defaultEventDuration?: number;
+  defaultCalendarId?: string | null;
+  weekStartDay?: number;
+  workingDays?: number[];
+  timezone?: string;
+  // Theme settings
+  themeSettings?: {
+    currentTheme: "light" | "dark" | "system";
+    updateTheme: (theme: "light" | "dark" | "system") => Promise<void>;
+  };
+  // Notification handlers
+  onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
+  onUpdateNotifications?: (eventId: string, notifications: EventNotification[]) => Promise<void>;
+  onTestEmail?: (eventId: string) => Promise<void>;
 }
 
 export function EventCalendar({
@@ -79,10 +99,28 @@ export function EventCalendar({
   onUpdateEvent,
   onDeleteEvent,
   onCreateCategory,
+  showWeekNumbers = false,
+  compactView = false,
+  timeFormat = "12h",
+  defaultReminder = null,
+  defaultEventDuration = 60,
+  defaultCalendarId = null,
+  weekStartDay = 0,
+  workingDays = [1, 2, 3, 4, 5],
+  timezone,
+  themeSettings,
+  onLoadNotifications,
+  onUpdateNotifications,
+  onTestEmail,
 }: EventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
   const [view, setView] = useState<CalendarView>(initialView);
+  
+  // Update view when initialView changes (from settings)
+  useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null
@@ -98,8 +136,8 @@ export function EventCalendar({
       start = startOfMonth(currentDate);
       end = endOfMonth(currentDate);
     } else if (view === "week") {
-      start = startOfWeek(currentDate, { weekStartsOn: 0 });
-      end = endOfWeek(currentDate, { weekStartsOn: 0 });
+      start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
     } else if (view === "day") {
       start = new Date(currentDate);
       start.setHours(0, 0, 0, 0);
@@ -217,7 +255,7 @@ export function EventCalendar({
       id: "",
       title: "",
       start: startTime,
-      end: addMinutesToDate(startTime, 15), // 15-minute duration for new events
+      end: addMinutesToDate(startTime, defaultEventDuration), // Use default duration from settings
       allDay: false,
       calendarId: "",
       userId: "",
@@ -228,7 +266,7 @@ export function EventCalendar({
     setIsEventDialogOpen(true);
   };
 
-  const handleEventSave = async (event: CalendarEvent) => {
+  const handleEventSave = async (event: CalendarEvent): Promise<CalendarEvent> => {
     try {
       const eventData = {
         title: event.title,
@@ -240,11 +278,13 @@ export function EventCalendar({
         color: event.color, // This now comes from the calendar color
         calendarId: event.calendarId,
         categoryId: (event as any).categoryId || undefined,
+        reminder: event.reminder,
       };
 
+      let savedEvent: any;
       if (event.id) {
         // Update existing event
-        await updateEvent(event.id, eventData);
+        savedEvent = await updateEvent(event.id, eventData);
         
         // Show success toast notification when an event is updated
         toast.success(`Event "${event.title}" updated`, {
@@ -253,7 +293,7 @@ export function EventCalendar({
         });
       } else {
         // Create new event
-        await createEvent(eventData);
+        savedEvent = await createEvent(eventData);
 
         // Show success toast notification when an event is created
         toast.success(`Event "${event.title}" created`, {
@@ -264,6 +304,9 @@ export function EventCalendar({
 
       setIsEventDialogOpen(false);
       setSelectedEvent(null);
+      
+      // Return the saved event, or the original event if savedEvent is undefined
+      return savedEvent || event;
     } catch (error: any) {
       console.error("Failed to save event:", error);
 
@@ -298,6 +341,8 @@ export function EventCalendar({
           position: "bottom-left",
         });
       }
+      
+      throw error;
     }
   };
 
@@ -412,8 +457,8 @@ export function EventCalendar({
     if (view === "month") {
       return format(currentDate, "MMMM yyyy");
     } else if (view === "week") {
-      const start = startOfWeek(currentDate, { weekStartsOn: 0 });
-      const end = endOfWeek(currentDate, { weekStartsOn: 0 });
+      const start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      const end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
       if (isSameMonth(start, end)) {
         return format(start, "MMMM yyyy");
       } else {
@@ -488,9 +533,9 @@ export function EventCalendar({
         className="flex has-data-[slot=month-view]:flex-1 flex-col rounded-lg"
         style={
           {
-            "--event-height": `${EventHeight}px`,
-            "--event-gap": `${EventGap}px`,
-            "--week-cells-height": `${WeekCellsHeight}px`,
+            "--event-height": `${compactView ? Math.round(EventHeight * 0.75) : EventHeight}px`,
+            "--event-gap": `${compactView ? Math.round(EventGap * 0.5) : EventGap}px`,
+            "--week-cells-height": `${compactView ? Math.round(WeekCellsHeight * 0.85) : WeekCellsHeight}px`,
           } as React.CSSProperties
         }
       >
@@ -605,7 +650,7 @@ export function EventCalendar({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <ThemeToggle />
+                <ThemeToggle useSettingsTheme={themeSettings} />
               </div>
             </div>
           </div>
@@ -617,6 +662,11 @@ export function EventCalendar({
                 events={events}
                 onEventSelect={handleEventSelect}
                 onEventCreate={handleEventCreate}
+                showWeekNumbers={showWeekNumbers}
+                compactView={compactView}
+                timeFormat={timeFormat}
+                weekStartDay={weekStartDay}
+                workingDays={workingDays}
               />
             )}
             {view === "week" && (
@@ -625,6 +675,11 @@ export function EventCalendar({
                 events={events}
                 onEventSelect={handleEventSelect}
                 onEventCreate={handleEventCreate}
+                compactView={compactView}
+                timeFormat={timeFormat}
+                weekStartDay={weekStartDay}
+                workingDays={workingDays}
+                timezone={timezone}
               />
             )}
             {view === "day" && (
@@ -633,6 +688,9 @@ export function EventCalendar({
                 events={events}
                 onEventSelect={handleEventSelect}
                 onEventCreate={handleEventCreate}
+                compactView={compactView}
+                timeFormat={timeFormat}
+                timezone={timezone}
               />
             )}
             {view === "agenda" && (
@@ -640,6 +698,7 @@ export function EventCalendar({
                 currentDate={currentDate}
                 events={events}
                 onEventSelect={handleEventSelect}
+                timeFormat={timeFormat}
               />
             )}
           </div>
@@ -655,6 +714,13 @@ export function EventCalendar({
             onDelete={handleEventDelete}
             loading={loading}
             error={error}
+            timeFormat={timeFormat}
+            defaultReminder={defaultReminder}
+            defaultEventDuration={defaultEventDuration}
+            defaultCalendarId={defaultCalendarId}
+            onLoadNotifications={onLoadNotifications}
+            onUpdateNotifications={onUpdateNotifications}
+            onTestEmail={onTestEmail}
           />
         </CalendarDndProvider>
       </div>
