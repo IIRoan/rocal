@@ -46,9 +46,26 @@ export const CalendarRelations = t.Object(
           isPrivate: t.Boolean(),
           reminder: __nullable__(t.Integer()),
           recurrence: __nullable__(t.String()),
+          parentEventId: __nullable__(t.String()),
           userId: t.String(),
           calendarId: t.String(),
           categoryId: __nullable__(t.String()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    sharedCalendars: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          calendarId: t.String(),
+          sharedWith: t.String(),
+          sharedBy: t.String(),
+          permission: t.String(),
+          accepted: t.Boolean(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
@@ -109,6 +126,22 @@ export const CalendarRelationsInputCreate = t.Object(
         { additionalProperties: false },
       ),
     ),
+    sharedCalendars: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -128,6 +161,31 @@ export const CalendarRelationsInputUpdate = t.Partial(
         { additionalProperties: false },
       ),
       events: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      sharedCalendars: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -255,6 +313,7 @@ export const CalendarSelect = t.Partial(
       userId: t.Boolean(),
       user: t.Boolean(),
       events: t.Boolean(),
+      sharedCalendars: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       _count: t.Boolean(),
@@ -265,7 +324,12 @@ export const CalendarSelect = t.Partial(
 
 export const CalendarInclude = t.Partial(
   t.Object(
-    { user: t.Boolean(), events: t.Boolean(), _count: t.Boolean() },
+    {
+      user: t.Boolean(),
+      events: t.Boolean(),
+      sharedCalendars: t.Boolean(),
+      _count: t.Boolean(),
+    },
     { additionalProperties: false },
   ),
 );

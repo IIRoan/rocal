@@ -14,7 +14,24 @@ import {
   UpdateCategoryRequest,
   DeleteResponse,
   ApiError,
+  UserSettings,
+  UpdateSettingsRequest,
+  RecurrenceValidation,
+  RecurrencePreview,
+  RecurrencePatterns,
+  EditRecurringEventRequest,
+  DeleteRecurringEventRequest,
+  CalendarDeleteResponse,
+  BulkEventRequest,
+  BulkEventResponse,
+  NotificationTestRequest,
+  NotificationStatus,
+  EventNotification,
+  CreateNotificationRequest,
 } from "./types/calendar";
+import { 
+  BrowserNotificationData 
+} from "./browser-notifications";
 
 export class CalendarApiService {
   private client: HttpClient;
@@ -282,6 +299,195 @@ export class CalendarApiService {
     }
 
     return errors;
+  }
+
+  // User Settings API methods
+  async getUserSettings(): Promise<UserSettings> {
+    try {
+      const response = await this.client.get<UserSettings>("/api/settings");
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch user settings");
+    }
+  }
+
+  async updateUserSettings(settings: UpdateSettingsRequest): Promise<UserSettings> {
+    try {
+      const response = await this.client.put<UserSettings>("/api/settings", settings);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to update user settings");
+    }
+  }
+
+  async resetUserSettings(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.delete<{ success: boolean; message: string }>("/api/settings");
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to reset user settings");
+    }
+  }
+
+  // Recurring Events API methods
+  async validateRecurrence(rule: string | object): Promise<RecurrenceValidation> {
+    try {
+      const response = await this.client.post<RecurrenceValidation>("/api/recurring/validate", { rule });
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to validate recurrence rule");
+    }
+  }
+
+  async previewRecurrence(eventStart: string, eventEnd: string, recurrenceRule: string | object, previewDays?: number): Promise<RecurrencePreview> {
+    try {
+      const response = await this.client.post<RecurrencePreview>("/api/recurring/preview", {
+        eventStart,
+        eventEnd,
+        recurrenceRule,
+        previewDays,
+      });
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to generate recurrence preview");
+    }
+  }
+
+  async getRecurrencePatterns(): Promise<RecurrencePatterns> {
+    try {
+      const response = await this.client.get<{ patterns: RecurrencePatterns }>("/api/recurring/patterns");
+      return response.patterns;
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch recurrence patterns");
+    }
+  }
+
+  async editRecurringEvent(id: string, request: EditRecurringEventRequest): Promise<CalendarEvent> {
+    try {
+      const response = await this.client.put<CalendarEvent>(`/api/recurring/event/${id}`, request);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to edit recurring event");
+    }
+  }
+
+  async deleteRecurringEvent(id: string, deleteScope: string, occurrenceDate?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const params = new URLSearchParams({ deleteScope });
+      if (occurrenceDate) params.append("occurrenceDate", occurrenceDate);
+      
+      const response = await this.client.delete<{ success: boolean; message: string }>(`/api/recurring/event/${id}?${params}`);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete recurring event");
+    }
+  }
+
+  // Enhanced Calendar Deletion
+  async deleteCalendarAdvanced(id: string, action?: string, targetCalendarId?: string): Promise<CalendarDeleteResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (action) params.append("action", action);
+      if (targetCalendarId) params.append("targetCalendarId", targetCalendarId);
+      
+      const response = await this.client.delete<CalendarDeleteResponse>(`/api/calendars/${id}?${params}`);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete calendar");
+    }
+  }
+
+  // Bulk Event Operations
+  async bulkEventOperation(request: BulkEventRequest): Promise<BulkEventResponse> {
+    try {
+      const response = await this.client.post<BulkEventResponse>("/api/events/bulk", request);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to perform bulk event operation");
+    }
+  }
+
+  // Notification API methods
+  async testNotification(eventId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.post<{ success: boolean; message: string }>("/api/notifications/test", { eventId });
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to send test notification");
+    }
+  }
+
+  async triggerReminderCheck(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.post<{ success: boolean; message: string }>("/api/notifications/trigger-check", {});
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to trigger reminder check");
+    }
+  }
+
+  async getNotificationStatus(): Promise<NotificationStatus> {
+    try {
+      const response = await this.client.get<NotificationStatus>("/api/notifications/status");
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to get notification status");
+    }
+  }
+
+  async getEventNotifications(eventId: string): Promise<{ success: boolean; notifications: EventNotification[] }> {
+    try {
+      const response = await this.client.get<{ success: boolean; notifications: EventNotification[] }>(`/api/notifications/event/${eventId}`);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to get event notifications");
+    }
+  }
+
+  async updateEventNotifications(eventId: string, notifications: CreateNotificationRequest['notifications']): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.put<{ success: boolean; message: string }>(`/api/notifications/event/${eventId}`, { notifications });
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to update event notifications");
+    }
+  }
+
+  async getPendingBrowserNotifications(): Promise<{ success: boolean; notifications: BrowserNotificationData[] }> {
+    try {
+      const response = await this.client.get<{ success: boolean; notifications: BrowserNotificationData[] }>("/api/notifications/browser/pending");
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to get pending browser notifications");
+    }
+  }
+
+  // New email notification methods
+  async testEmailNotification(eventId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.post<{ success: boolean; message: string }>("/api/notifications/test-email", { eventId });
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to send test email notification");
+    }
+  }
+
+  async getPendingEmailNotifications(): Promise<{ success: boolean; emails: any[]; count: number }> {
+    try {
+      const response = await this.client.get<{ success: boolean; emails: any[]; count: number }>("/api/notifications/email/pending");
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to get pending email notifications");
+    }
+  }
+
+  async createMultipleNotifications(eventId: string, notificationTimes: number[]): Promise<{ success: boolean; message: string; notificationTimes: number[] }> {
+    try {
+      const response = await this.client.post<{ success: boolean; message: string; notificationTimes: number[] }>(`/api/notifications/event/${eventId}/multiple`, { notificationTimes });
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to create multiple notifications");
+    }
   }
 }
 

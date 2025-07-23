@@ -15,22 +15,29 @@ import {
   endOfMonth
 } from "date-fns";
 import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useSettings } from "@/hooks/use-settings";
 
 interface CalendarWithDataProps {
   className?: string;
-  initialView?: CalendarView;
 }
 
 export function CalendarWithData({ 
-  className, 
-  initialView = "month" 
+  className
 }: CalendarWithDataProps) {
   const { isCalendarVisible } = useCalendarContext();
+  const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  
+  // Get the initial view from settings, fallback to month
+  const initialView = settings?.defaultView || "month";
+  
   // Calculate default date range for initial load
   const defaultDateRange = useMemo(() => {
     const now = new Date();
     let start: Date;
     let end: Date;
+    
+    // Use weekStartDay from settings, fallback to 0 (Sunday)
+    const weekStartsOn = settings?.weekStartDay ?? 0;
 
     switch (initialView) {
       case "month":
@@ -38,8 +45,8 @@ export function CalendarWithData({
         end = endOfMonth(now);
         break;
       case "week":
-        start = startOfWeek(now, { weekStartsOn: 0 });
-        end = endOfWeek(now, { weekStartsOn: 0 });
+        start = startOfWeek(now, { weekStartsOn });
+        end = endOfWeek(now, { weekStartsOn });
         break;
       case "day":
         start = new Date(now);
@@ -58,13 +65,21 @@ export function CalendarWithData({
     }
 
     return { start, end };
-  }, [initialView]);
+  }, [initialView, settings?.weekStartDay]);
 
   // Use the calendar data hook with the calculated date range
   const calendarData = useCalendarData({
     initialDateRange: defaultDateRange,
     autoRefetch: true,
   });
+
+  // Create theme settings for the calendar
+  const themeSettings = useMemo(() => ({
+    currentTheme: (settings?.theme || "system") as "light" | "dark" | "system",
+    updateTheme: async (theme: "light" | "dark" | "system") => {
+      await updateSettings({ theme });
+    }
+  }), [settings?.theme, updateSettings]);
 
   // Optimized event filtering with memoized visibility check
   const transformedEvents = useMemo(() => {
@@ -75,16 +90,37 @@ export function CalendarWithData({
         .map(cal => cal.id)
     );
     
-    return calendarData.events
+    const transformedEventsList = calendarData.events
       .filter(event => visibleCalendarIds.has(event.calendarId)) // O(1) lookup instead of function call per event
-      .map(event => ({
-        ...event,
-        description: event.description ?? undefined,
-        color: (event.color ?? undefined) as any,
-        location: event.location ?? undefined,
-        categoryId: event.categoryId ?? undefined,
-      }));
+      .map(event => {
+        const transformed = {
+          ...event,
+          description: event.description ?? undefined,
+          color: (event.color ?? undefined) as any,
+          location: event.location ?? undefined,
+          categoryId: event.categoryId ?? undefined,
+          reminder: (event as any).reminder ?? undefined,
+        };
+        
+        // Debug logging
+        if (event.id && (event as any).reminder !== undefined) {
+          console.log('Event with reminder:', event.id, 'reminder value:', (event as any).reminder, 'transformed:', transformed.reminder);
+        }
+        
+        return transformed;
+      });
+    
+    return transformedEventsList;
   }, [calendarData.events, calendarData.calendars, isCalendarVisible]);
+
+  // Don't render until settings are loaded to ensure proper initial view
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading calendar...</div>
+      </div>
+    );
+  }
 
   return (
     <EventCalendar
@@ -99,6 +135,19 @@ export function CalendarWithData({
       onUpdateEvent={calendarData.updateEvent}
       onDeleteEvent={calendarData.deleteEvent}
       onCreateCategory={calendarData.createCategory}
+      showWeekNumbers={settings?.showWeekNumbers}
+      compactView={settings?.compactView}
+      timeFormat={settings?.timeFormat}
+      defaultReminder={settings?.defaultReminder}
+      defaultEventDuration={settings?.defaultEventDuration}
+      defaultCalendarId={settings?.defaultCalendarId}
+      weekStartDay={settings?.weekStartDay}
+      workingDays={settings?.workingDays ? JSON.parse(settings.workingDays) : [1, 2, 3, 4, 5]}
+      timezone={settings?.timezone}
+      themeSettings={themeSettings}
+      onLoadNotifications={calendarData.loadNotifications}
+      onUpdateNotifications={calendarData.updateNotifications}
+      onTestEmail={calendarData.testEmail}
     />
   );
 }

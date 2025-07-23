@@ -47,9 +47,10 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
     avatar?: string;
   };
   onLogout?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
+export function AppSidebar({ user, onLogout, onOpenSettings, ...props }: AppSidebarProps) {
   const {
     calendars,
     addCalendar,
@@ -233,6 +234,7 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
             }
           }
           onLogout={onLogout}
+          onOpenSettings={onOpenSettings}
         />
       </SidebarFooter>
     </Sidebar>

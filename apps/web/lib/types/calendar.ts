@@ -29,6 +29,11 @@ export interface CalendarEvent {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  // New fields for enhanced functionality
+  reminder?: number | null; // minutes before event
+  recurrence?: string | null; // JSON string of recurrence rule
+  parentEventId?: string | null; // For recurring event instances
+  isRecurringInstance?: boolean; // Frontend helper field
 }
 
 export interface EventCategory {
@@ -67,6 +72,8 @@ export interface CreateEventRequest {
   color?: EventColor;
   calendarId: string;
   categoryId?: string;
+  reminder?: number; // minutes before event
+  recurrence?: string; // JSON string of recurrence rule
 }
 
 export interface CreateCalendarRequest {
@@ -100,4 +107,150 @@ export interface ApiError {
   message: string;
   statusCode: number;
   details?: any;
+}
+
+// User Settings Types
+export interface UserSettings {
+  id: string;
+  userId: string;
+  theme: "light" | "dark" | "system";
+  defaultView: "month" | "week" | "day" | "agenda";
+  weekStartDay: number; // 0 = Sunday, 1 = Monday
+  timezone: string; // IANA timezone identifier
+  timeFormat: "12h" | "24h";
+  workingHoursStart: number; // minutes from midnight
+  workingHoursEnd: number; // minutes from midnight
+  workingDays: string; // JSON array of weekdays
+  emailNotifications: boolean;
+  browserNotifications: boolean;
+  reminderSound: boolean;
+  defaultReminder?: number | null; // default reminder in minutes
+  defaultEventDuration: number; // default event duration in minutes
+  defaultCalendarId?: string | null;
+  compactView: boolean;
+  showWeekNumbers: boolean;
+  showDeclinedEvents: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UpdateSettingsRequest extends Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> {}
+
+// Recurring Events Types
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface RecurrenceRule {
+  frequency: RecurrenceFrequency;
+  interval: number;
+  count?: number;
+  until?: string; // ISO date string
+  byWeekDay?: number[]; // 0-6 (Sunday-Saturday)
+  byMonthDay?: number[]; // 1-31
+  byMonth?: number[]; // 1-12
+}
+
+export interface RecurrencePreview {
+  instances: Array<{
+    date: string;
+    isOriginal: boolean;
+  }>;
+  description: string;
+  totalInstances: number;
+}
+
+export interface RecurrenceValidation {
+  valid: boolean;
+  errors: string[];
+  description?: string;
+  rule?: RecurrenceRule;
+}
+
+export interface RecurrencePatterns {
+  [key: string]: {
+    rule: RecurrenceRule;
+    description: string;
+  };
+}
+
+// Recurring Event Operations
+export type RecurrenceEditScope = "this_only" | "this_and_future" | "all";
+export type RecurrenceDeleteScope = "this_only" | "this_and_future" | "all";
+
+export interface EditRecurringEventRequest {
+  editScope: RecurrenceEditScope;
+  occurrenceDate?: string; // ISO date string
+  updates: UpdateEventRequest;
+}
+
+export interface DeleteRecurringEventRequest {
+  deleteScope: RecurrenceDeleteScope;
+  occurrenceDate?: string; // ISO date string
+}
+
+// Calendar Deletion Types
+export type CalendarDeleteAction = "prevent" | "delete_events" | "move_events";
+
+export interface DeleteCalendarRequest {
+  action?: CalendarDeleteAction;
+  targetCalendarId?: string; // required if action is move_events
+}
+
+export interface CalendarDeleteResponse {
+  success: boolean;
+  message: string;
+  deletedCalendarId: string;
+  eventsAffected: number;
+  action: string;
+}
+
+// Bulk Operations Types
+export type BulkEventAction = "move" | "delete" | "duplicate";
+
+export interface BulkEventRequest {
+  action: BulkEventAction;
+  eventIds: string[];
+  targetCalendarId?: string; // required for move, optional for duplicate
+}
+
+export interface BulkEventResponse {
+  success: boolean;
+  message: string;
+  eventsProcessed: number;
+  action: string;
+  createdEvents?: CalendarEvent[]; // for duplicate action
+}
+
+// Event Notification Types
+export interface EventNotification {
+  id?: string;
+  eventId?: string;
+  notificationType: 'browser' | 'email';
+  minutesBefore: number;
+  isEnabled: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface CreateNotificationRequest {
+  notifications: Array<{
+    notificationType: 'browser' | 'email';
+    minutesBefore: number;
+    isEnabled: boolean;
+  }>;
+}
+
+export interface NotificationTestRequest {
+  eventId: string;
+}
+
+export interface NotificationStatus {
+  status: string;
+  message: string;
+  features: {
+    email: boolean;
+    browser: boolean;
+    reminders: boolean;
+  };
+  checkInterval: string;
+  queueProcessInterval: string;
 }
