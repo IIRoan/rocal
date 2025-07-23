@@ -29,13 +29,26 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Textarea } from "../ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, Bell } from "lucide-react";
 import {
   StartHour,
   EndHour,
   DefaultStartHour,
   DefaultEndHour,
 } from "./constants";
+import { NotificationManager, EventNotification } from "./notification-manager";
+
+const REMINDER_OPTIONS = [
+  { value: null, label: "No reminder" },
+  { value: 5, label: "5 minutes before" },
+  { value: 10, label: "10 minutes before" },
+  { value: 15, label: "15 minutes before" },
+  { value: 30, label: "30 minutes before" },
+  { value: 60, label: "1 hour before" },
+  { value: 120, label: "2 hours before" },
+  { value: 1440, label: "1 day before" },
+  { value: 10080, label: "1 week before" },
+];
 
 export interface ValidationError {
   field: string;
@@ -53,10 +66,18 @@ interface EventDialogProps {
   event: CalendarEvent | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (event: CalendarEvent) => void;
+  onSave: (event: CalendarEvent) => Promise<CalendarEvent>;
   onDelete: (eventId: string) => void;
   loading?: boolean;
   error?: ApiError | null;
+  timeFormat?: "12h" | "24h";
+  defaultReminder?: number | null;
+  defaultEventDuration?: number;
+  defaultCalendarId?: string | null;
+  // Notification handlers
+  onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
+  onUpdateNotifications?: (eventId: string, notifications: EventNotification[]) => Promise<void>;
+  onTestEmail?: (eventId: string) => Promise<void>;
 }
 
 export function EventDialog({
@@ -67,6 +88,13 @@ export function EventDialog({
   onDelete,
   loading = false,
   error: apiError = null,
+  timeFormat = "12h",
+  defaultReminder = null,
+  defaultEventDuration = 60,
+  defaultCalendarId = null,
+  onLoadNotifications,
+  onUpdateNotifications,
+  onTestEmail,
 }: EventDialogProps) {
   const { calendars } = useCalendarContext();
   
@@ -80,6 +108,8 @@ export function EventDialog({
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
   const [calendarId, setCalendarId] = useState<string>("");
+  const [reminder, setReminder] = useState<number | null>(null);
+  const [notifications, setNotifications] = useState<EventNotification[]>([]);
   
   // UI state
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
@@ -91,8 +121,13 @@ export function EventDialog({
 
   // Get default calendar
   const defaultCalendar = useMemo(() => {
+    // Use the provided defaultCalendarId first, then fallback to isDefault, then first calendar
+    if (defaultCalendarId) {
+      const specificCalendar = calendars.find(cal => cal.id === defaultCalendarId);
+      if (specificCalendar) return specificCalendar;
+    }
     return calendars.find(cal => cal.isDefault) || calendars[0];
-  }, [calendars]);
+  }, [calendars, defaultCalendarId]);
 
   // Initialize form when dialog opens or event changes
   useEffect(() => {
@@ -108,6 +143,15 @@ export function EventDialog({
         setAllDay(event.allDay || false);
         setLocation(event.location || "");
         setCalendarId(event.calendarId || defaultCalendar?.id || "");
+        console.log('Event reminder value:', event.reminder, 'Event data:', event);
+        setReminder(event.reminder ?? null);
+        
+        // Load notifications for existing event
+        if (event.id && onLoadNotifications) {
+          loadEventNotifications(event.id);
+        } else {
+          setNotifications([]);
+        }
       } else {
         // Creating new event
         resetForm();
@@ -115,24 +159,84 @@ export function EventDialog({
       setValidationErrors([]);
       setLocalError(null);
     }
-  }, [isOpen, event, defaultCalendar?.id]);
+  }, [isOpen, event, defaultCalendar?.id, defaultReminder, defaultEventDuration]);
+
+  const loadEventNotifications = async (eventId: string) => {
+    if (!onLoadNotifications) return;
+    
+    try {
+      const eventNotifications = await onLoadNotifications(eventId);
+      setNotifications(eventNotifications);
+    } catch (error) {
+      console.error('Failed to load event notifications:', error);
+      setNotifications([]);
+    }
+  };
 
   const resetForm = () => {
+    const startDate = new Date();
+    const endDate = new Date();
+    
+    // Calculate end time based on default duration
+    endDate.setMinutes(startDate.getMinutes() + defaultEventDuration);
+    
     setTitle("");
     setDescription("");
-    setStartDate(new Date());
-    setEndDate(new Date());
+    setStartDate(startDate);
+    setEndDate(endDate);
     setStartTime(`${DefaultStartHour}:00`);
-    setEndTime(`${DefaultEndHour}:00`);
+    
+    // Set end time based on default duration
+    const durationHours = Math.floor(defaultEventDuration / 60);
+    const durationMinutes = defaultEventDuration % 60;
+    const defaultEndHour = DefaultStartHour + durationHours;
+    const defaultEndMinute = durationMinutes;
+    setEndTime(`${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute.toString().padStart(2, "0")}`);
+    
     setAllDay(false);
     setLocation("");
     setCalendarId(defaultCalendar?.id || "");
+    setReminder(defaultReminder); // Use settings default
+    setNotifications([]);
   };
 
   const formatTimeForInput = (date: Date) => {
     const hours = date.getHours().toString().padStart(2, "0");
     const minutes = Math.floor(date.getMinutes() / 15) * 15;
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
+  };
+
+  // Validate and format time input
+  const validateTimeInput = (timeString: string): string | null => {
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
+    const match = timeString.match(timeRegex);
+    
+    if (!match) return null;
+    
+    const hours = parseInt(match[1]!, 10);
+    const minutes = parseInt(match[2]!, 10);
+    
+    if (hours < StartHour || hours > EndHour) return null;
+    
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  };
+
+  // Handle manual time input
+  const handleTimeInputChange = (value: string, setter: (time: string) => void) => {
+    // Allow partial input while typing
+    if (value === "" || /^([0-2]?[0-9]?:?[0-5]?[0-9]?)$/.test(value)) {
+      setter(value);
+    }
+  };
+
+  const handleTimeInputBlur = (value: string, setter: (time: string) => void) => {
+    const validatedTime = validateTimeInput(value);
+    if (validatedTime) {
+      setter(validatedTime);
+    } else if (value !== "") {
+      // Reset to previous valid time or default
+      setter(setter === setStartTime ? startTime : endTime);
+    }
   };
 
   // Memoize time options
@@ -144,12 +248,14 @@ export function EventDialog({
         const formattedMinute = minute.toString().padStart(2, "0");
         const value = `${formattedHour}:${formattedMinute}`;
         const date = new Date(2000, 0, 1, hour, minute);
-        const label = format(date, "h:mm a");
+        const label = timeFormat === "24h" 
+          ? `${formattedHour}:${formattedMinute}`
+          : format(date, "h:mm a");
         options.push({ value, label });
       }
     }
     return options;
-  }, []);
+  }, [timeFormat]);
 
   // Validation function
   const validateForm = (): ValidationError[] => {
@@ -178,7 +284,7 @@ export function EventDialog({
       ) {
         errors.push({
           field: "time",
-          message: `Selected time must be between ${StartHour}:00 and ${EndHour}:00`,
+          message: `Selected time must be between ${StartHour.toString().padStart(2, '0')}:00 and ${EndHour.toString().padStart(2, '0')}:00`,
         });
       }
 
@@ -239,11 +345,24 @@ export function EventDialog({
       userId: event?.userId || "demo-user",
       createdAt: event?.createdAt || new Date(),
       updatedAt: new Date(),
+      reminder: reminder,
     };
 
     setSaving(true);
     try {
-      await onSave(eventData);
+      const savedEvent = await onSave(eventData);
+      
+      // After saving the event, update notifications if there are any
+      if (notifications.length > 0 && (savedEvent?.id || eventData?.id) && onUpdateNotifications) {
+        const eventId = savedEvent?.id || eventData?.id;
+        try {
+          await onUpdateNotifications(eventId, notifications);
+          console.log('✅ Notifications updated successfully');
+        } catch (notificationError) {
+          console.error('Failed to update notifications:', notificationError);
+          // Don't fail the whole save for notification errors
+        }
+      }
     } catch (error) {
       console.error("Save failed:", error);
     } finally {
@@ -261,6 +380,18 @@ export function EventDialog({
       } finally {
         setDeleting(false);
       }
+    }
+  };
+
+  const handleTestEmail = async (eventId: string) => {
+    if (!onTestEmail) return;
+    
+    try {
+      await onTestEmail(eventId);
+      console.log('✅ Test email sent successfully');
+    } catch (error) {
+      console.error('Failed to send test email:', error);
+      throw error;
     }
   };
 
@@ -374,18 +505,42 @@ export function EventDialog({
             {!allDay && (
               <div className="min-w-28 *:not-first:mt-1.5">
                 <Label htmlFor="start-time">Start Time</Label>
-                <Select value={startTime} onValueChange={setStartTime}>
-                  <SelectTrigger id="start-time">
-                    <SelectValue placeholder="Select time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    id="start-time"
+                    value={startTime}
+                    onChange={(e) => handleTimeInputChange(e.target.value, setStartTime)}
+                    onBlur={(e) => handleTimeInputBlur(e.target.value, setStartTime)}
+                    placeholder="HH:MM"
+                    className="pr-8"
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        type="button"
+                      >
+                        ▼
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-32 p-1" align="end">
+                      <div className="max-h-40 overflow-y-auto">
+                        {timeOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className="w-full text-left px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
+                            onClick={() => setStartTime(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             )}
           </div>
@@ -429,18 +584,42 @@ export function EventDialog({
             {!allDay && (
               <div className="min-w-28 *:not-first:mt-1.5">
                 <Label htmlFor="end-time">End Time</Label>
-                <Select value={endTime} onValueChange={setEndTime}>
-                  <SelectTrigger id="end-time">
-                    <SelectValue placeholder="Select time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    id="end-time"
+                    value={endTime}
+                    onChange={(e) => handleTimeInputChange(e.target.value, setEndTime)}
+                    onBlur={(e) => handleTimeInputBlur(e.target.value, setEndTime)}
+                    placeholder="HH:MM"
+                    className="pr-8"
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        type="button"
+                      >
+                        ▼
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-32 p-1" align="end">
+                      <div className="max-h-40 overflow-y-auto">
+                        {timeOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className="w-full text-left px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
+                            onClick={() => setEndTime(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             )}
           </div>
@@ -463,6 +642,44 @@ export function EventDialog({
               placeholder="Enter event location"
             />
           </div>
+
+          {onLoadNotifications && onUpdateNotifications && (
+            <NotificationManager
+              eventId={event?.id}
+              notifications={notifications}
+              onChange={setNotifications}
+              onTestEmail={onTestEmail ? handleTestEmail : undefined}
+              loading={saving}
+            />
+          )}
+
+          {/* Fallback to legacy reminder if notification handlers aren't provided */}
+          {(!onLoadNotifications || !onUpdateNotifications) && (
+            <div className="*:not-first:mt-1.5">
+              <Label htmlFor="reminder" className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Reminder
+              </Label>
+              <Select 
+                value={reminder?.toString() || "none"} 
+                onValueChange={(value) => setReminder(value === "none" ? null : parseInt(value))}
+              >
+                <SelectTrigger id="reminder">
+                  <SelectValue placeholder="Select reminder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map((option) => (
+                    <SelectItem
+                      key={option.value?.toString() || "none"}
+                      value={option.value?.toString() || "none"}
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
         </div>
 

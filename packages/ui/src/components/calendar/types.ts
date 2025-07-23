@@ -26,6 +26,7 @@ export interface CalendarEvent {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  reminder?: number | null;
 }
 
 export interface CreateCalendarData {
@@ -44,6 +45,7 @@ export interface CreateEventData {
   location?: string;
   calendarId: string;
   categoryId?: string;
+  reminder?: number | null;
 }
 
 export type EventColor = "blue" | "orange" | "violet" | "rose" | "emerald";

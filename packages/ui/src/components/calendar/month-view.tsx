@@ -7,6 +7,7 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  getWeek,
   isSameDay,
   isSameMonth,
   isToday,
@@ -33,6 +34,11 @@ interface MonthViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
+  showWeekNumbers?: boolean;
+  compactView?: boolean;
+  timeFormat?: "12h" | "24h";
+  weekStartDay?: number;
+  workingDays?: number[];
 }
 
 export function MonthView({
@@ -40,22 +46,27 @@ export function MonthView({
   events,
   onEventSelect,
   onEventCreate,
+  showWeekNumbers = false,
+  compactView = false,
+  timeFormat = "12h",
+  weekStartDay = 0,
+  workingDays = [1, 2, 3, 4, 5],
 }: MonthViewProps) {
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
-    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
 
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-  }, [currentDate]);
+  }, [currentDate, weekStartDay]);
 
   const weekdays = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = addDays(startOfWeek(new Date()), i);
+      const date = addDays(startOfWeek(new Date(), { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 }), i);
       return format(date, "EEE");
     });
-  }, []);
+  }, [weekStartDay]);
 
   const weeks = useMemo(() => {
     const result = [];
@@ -79,8 +90,8 @@ export function MonthView({
 
   const [isMounted, setIsMounted] = useState(false);
   const { contentRef, getVisibleEventCount } = useEventVisibility({
-    eventHeight: EventHeight,
-    eventGap: EventGap,
+    eventHeight: compactView ? Math.round(EventHeight * 0.75) : EventHeight,
+    eventGap: compactView ? Math.round(EventGap * 0.5) : EventGap,
   });
 
   useEffect(() => {
@@ -89,7 +100,12 @@ export function MonthView({
 
   return (
     <div data-slot="month-view" className="contents">
-      <div className="border-border/70 grid grid-cols-7 border-y uppercase">
+      <div className={`border-border/70 grid ${showWeekNumbers ? 'grid-cols-8' : 'grid-cols-7'} border-y uppercase`}>
+        {showWeekNumbers && (
+          <div className="text-muted-foreground/70 py-2 text-center text-xs font-medium">
+            W
+          </div>
+        )}
         {weekdays.map((day) => (
           <div
             key={day}
@@ -103,8 +119,15 @@ export function MonthView({
         {weeks.map((week, weekIndex) => (
           <div
             key={`week-${weekIndex}`}
-            className="grid grid-cols-7 [&:last-child>*]:border-b-0"
+            className={`grid ${showWeekNumbers ? 'grid-cols-8' : 'grid-cols-7'} [&:last-child>*]:border-b-0`}
           >
+            {showWeekNumbers && (
+              <div className="border-border/70 border-r border-b bg-muted/10 flex items-center justify-center">
+                <span className="text-muted-foreground/60 text-xs font-medium">
+                  {week[0] ? getWeek(week[0]) : ''}
+                </span>
+              </div>
+            )}
             {week.map((day, dayIndex) => {
               if (!day) return null; // Skip if day is undefined
 
@@ -129,7 +152,11 @@ export function MonthView({
               return (
                 <div
                   key={day.toString()}
-                  className="group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0"
+                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 ${
+                    workingDays.includes(day.getDay()) && isCurrentMonth 
+                      ? "bg-blue-50/50 dark:bg-blue-950/20" 
+                      : ""
+                  }`}
                   data-today={isToday(day) || undefined}
                   data-outside-cell={!isCurrentMonth || undefined}
                 >
@@ -147,7 +174,11 @@ export function MonthView({
                     </div>
                     <div
                       ref={isReferenceCell ? contentRef : null}
-                      className="min-h-[calc((var(--event-height)+var(--event-gap))*2)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*3)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*4)]"
+                      className={`${
+                        compactView 
+                          ? "min-h-[calc((var(--event-height)+var(--event-gap))*3)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*4)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*5)]"
+                          : "min-h-[calc((var(--event-height)+var(--event-gap))*2)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*3)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*4)]"
+                      }`}
                     >
                       {sortEvents(allDayEvents).map((event, index) => {
                         const eventStart = new Date(event.start);
@@ -173,6 +204,7 @@ export function MonthView({
                                 view="month"
                                 isFirstDay={isFirstDay}
                                 isLastDay={isLastDay}
+                                timeFormat={timeFormat}
                               >
                                 <div className="invisible" aria-hidden={true}>
                                   {!event.allDay && (
@@ -202,6 +234,7 @@ export function MonthView({
                               onClick={(e) => handleEventClick(event, e)}
                               isFirstDay={isFirstDay}
                               isLastDay={isLastDay}
+                              timeFormat={timeFormat}
                             />
                           </div>
                         );
@@ -250,6 +283,7 @@ export function MonthView({
                                       view="month"
                                       isFirstDay={isFirstDay}
                                       isLastDay={isLastDay}
+                                      timeFormat={timeFormat}
                                     />
                                   );
                                 })}

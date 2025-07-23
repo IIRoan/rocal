@@ -2,6 +2,8 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
 import { ensureUserCalendars } from "../lib/user-setup";
+import { RecurrenceEngine } from "../lib/recurrence";
+import { notificationService } from "../lib/notification-service";
 
 export const eventsRoutes = new Elysia({ prefix: "/events" })
   .get(
@@ -37,20 +39,18 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         throw new ValidationError("End date must be after start date");
       }
 
-      // Fetch events within date range
-      const events = await prisma.calendarEvent.findMany({
+      // Fetch regular (non-recurring) events within date range
+      const regularEvents = await prisma.calendarEvent.findMany({
         where: {
           userId: user.id,
+          recurrence: null,
           OR: [
-            // Events that start within the range
             {
               start: { gte: startDate, lte: endDate },
             },
-            // Events that end within the range
             {
               end: { gte: startDate, lte: endDate },
             },
-            // Events that span the entire range
             {
               start: { lte: startDate },
               end: { gte: endDate },
@@ -61,8 +61,91 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           category: true,
           calendar: true,
         },
-        orderBy: { start: "asc" },
       });
+
+      // Fetch recurring events (parent events)
+      const recurringEvents = await prisma.calendarEvent.findMany({
+        where: {
+          userId: user.id,
+          recurrence: { not: null },
+          parentEventId: null, // Only get parent events, not instances
+        },
+        include: {
+          category: true,
+          calendar: true,
+          recurrenceExceptions: true,
+        },
+      });
+
+      // Generate recurring event instances
+      const recurringInstances = [];
+      for (const recurringEvent of recurringEvents) {
+        try {
+          const exceptions = recurringEvent.recurrenceExceptions.map(ex => ({
+            exceptionDate: ex.exceptionDate,
+            type: ex.type as 'modified' | 'deleted',
+          }));
+
+          const instances = RecurrenceEngine.generateInstances(
+            {
+              id: recurringEvent.id,
+              start: recurringEvent.start,
+              end: recurringEvent.end,
+              recurrence: recurringEvent.recurrence!,
+            },
+            startDate,
+            endDate,
+            exceptions
+          );
+
+          // Convert instances to events
+          for (const instance of instances) {
+            if (!instance.isOriginal) {
+              const duration = recurringEvent.end.getTime() - recurringEvent.start.getTime();
+              recurringInstances.push({
+                ...recurringEvent,
+                id: `${recurringEvent.id}_${instance.date.toISOString()}`,
+                start: instance.date,
+                end: new Date(instance.date.getTime() + duration),
+                parentEventId: recurringEvent.id,
+                isRecurringInstance: true,
+              });
+            } else if (instance.isOriginal && instance.date >= startDate && instance.date <= endDate) {
+              // Include original event if it falls within range
+              recurringInstances.push({
+                ...recurringEvent,
+                isRecurringInstance: false,
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error generating instances for event ${recurringEvent.id}:`, error);
+          // If recurrence generation fails, include the original event
+          if (recurringEvent.start >= startDate && recurringEvent.start <= endDate) {
+            recurringInstances.push({
+              ...recurringEvent,
+              isRecurringInstance: false,
+            });
+          }
+        }
+      }
+
+      // Fetch modified recurring event instances
+      const modifiedInstances = await prisma.calendarEvent.findMany({
+        where: {
+          userId: user.id,
+          parentEventId: { not: null },
+          start: { gte: startDate, lte: endDate },
+        },
+        include: {
+          category: true,
+          calendar: true,
+        },
+      });
+
+      // Combine all events
+      const events = [...regularEvents, ...recurringInstances, ...modifiedInstances]
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
 
       // Fetch user's categories for efficient frontend rendering
       const categories = await prisma.eventCategory.findMany({
@@ -224,6 +307,25 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         }
       }
 
+      // Validate recurrence rule if provided
+      if (body.recurrence) {
+        const rule = RecurrenceEngine.parseRecurrenceRule(body.recurrence);
+        if (!rule) {
+          throw new ValidationError(
+            "Invalid recurrence rule format",
+            "recurrence"
+          );
+        }
+        
+        const errors = RecurrenceEngine.validateRecurrenceRule(rule);
+        if (errors.length > 0) {
+          throw new ValidationError(
+            `Recurrence rule validation failed: ${errors.join(", ")}`,
+            "recurrence"
+          );
+        }
+      }
+
       // Validate category exists and belongs to user if provided
       if (body.categoryId) {
         const category = await prisma.eventCategory.findFirst({
@@ -300,6 +402,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           color: body.color || null,
           calendarId: body.calendarId,
           categoryId: body.categoryId || null,
+          reminder: body.reminder || null,
+          recurrence: body.recurrence || null,
           userId: user.id,
         },
         include: {
@@ -307,6 +411,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           calendar: true,
         },
       });
+
+      // Create default notifications for the new event
+      await notificationService.createDefaultNotificationsForEvent(
+        event.id,
+        user.id,
+        body.reminder
+      );
 
       return event;
     },
@@ -354,6 +465,18 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         categoryId: t.Optional(
           t.String({
             description: "ID of the event category (must belong to user)",
+          })
+        ),
+        reminder: t.Optional(
+          t.Number({
+            minimum: 1,
+            maximum: 43200, // 30 days in minutes
+            description: "Reminder time in minutes before event (1-43200)",
+          })
+        ),
+        recurrence: t.Optional(
+          t.String({
+            description: "JSON string of recurrence rule for recurring events",
           })
         ),
       }),
@@ -574,6 +697,29 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       if (body.categoryId !== undefined) {
         updateData.categoryId = body.categoryId || null;
       }
+      if (body.reminder !== undefined) {
+        updateData.reminder = body.reminder || null;
+      }
+      if (body.recurrence !== undefined) {
+        if (body.recurrence) {
+          const rule = RecurrenceEngine.parseRecurrenceRule(body.recurrence);
+          if (!rule) {
+            throw new ValidationError(
+              "Invalid recurrence rule format",
+              "recurrence"
+            );
+          }
+          
+          const errors = RecurrenceEngine.validateRecurrenceRule(rule);
+          if (errors.length > 0) {
+            throw new ValidationError(
+              `Recurrence rule validation failed: ${errors.join(", ")}`,
+              "recurrence"
+            );
+          }
+        }
+        updateData.recurrence = body.recurrence || null;
+      }
 
       // Add updatedAt for optimistic locking check
       updateData.updatedAt = new Date();
@@ -662,6 +808,18 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         categoryId: t.Optional(
           t.String({
             description: "ID of the event category (must belong to user)",
+          })
+        ),
+        reminder: t.Optional(
+          t.Number({
+            minimum: 1,
+            maximum: 43200, // 30 days in minutes
+            description: "Reminder time in minutes before event (1-43200)",
+          })
+        ),
+        recurrence: t.Optional(
+          t.String({
+            description: "JSON string of recurrence rule for recurring events",
           })
         ),
       }),
@@ -783,6 +941,201 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
           404: {
             description: "Event not found",
+          },
+        },
+      },
+    }
+  )
+
+  .post(
+    "/bulk",
+    async ({ body, user }: any) => {
+      const { action, eventIds, targetCalendarId } = body;
+
+      // Validate event IDs
+      if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+        throw new ValidationError("Event IDs array is required", "eventIds");
+      }
+
+      // Verify all events exist and belong to user
+      const events = await prisma.calendarEvent.findMany({
+        where: {
+          id: { in: eventIds },
+          userId: user.id,
+        },
+      });
+
+      if (events.length !== eventIds.length) {
+        throw new ValidationError(
+          "Some events not found or access denied",
+          "eventIds"
+        );
+      }
+
+      let result;
+
+      switch (action) {
+        case "move":
+          if (!targetCalendarId) {
+            throw new ValidationError(
+              "Target calendar ID is required for move operation",
+              "targetCalendarId"
+            );
+          }
+
+          // Verify target calendar exists and belongs to user
+          const targetCalendar = await prisma.calendar.findFirst({
+            where: {
+              id: targetCalendarId,
+              userId: user.id,
+            },
+          });
+
+          if (!targetCalendar) {
+            throw new ValidationError(
+              "Target calendar not found or access denied",
+              "targetCalendarId"
+            );
+          }
+
+          // Move events to target calendar
+          result = await prisma.calendarEvent.updateMany({
+            where: {
+              id: { in: eventIds },
+              userId: user.id,
+            },
+            data: {
+              calendarId: targetCalendarId,
+              updatedAt: new Date(),
+            },
+          });
+
+          return {
+            success: true,
+            message: `Successfully moved ${result.count} events to ${targetCalendar.name}`,
+            eventsProcessed: result.count,
+            action: "move",
+          };
+
+        case "delete":
+          // Delete all specified events
+          result = await prisma.calendarEvent.deleteMany({
+            where: {
+              id: { in: eventIds },
+              userId: user.id,
+            },
+          });
+
+          return {
+            success: true,
+            message: `Successfully deleted ${result.count} events`,
+            eventsProcessed: result.count,
+            action: "delete",
+          };
+
+        case "duplicate":
+          // Duplicate events
+          const duplicatedEvents = [];
+          for (const event of events) {
+            const duplicated = await prisma.calendarEvent.create({
+              data: {
+                title: `${event.title} (Copy)`,
+                description: event.description,
+                start: event.start,
+                end: event.end,
+                allDay: event.allDay,
+                location: event.location,
+                color: event.color,
+                isPrivate: event.isPrivate,
+                reminder: event.reminder,
+                recurrence: null, // Don't copy recurrence
+                calendarId: targetCalendarId || event.calendarId,
+                categoryId: event.categoryId,
+                userId: user.id,
+              },
+              include: {
+                category: true,
+                calendar: true,
+              },
+            });
+
+            // Create default notifications for the duplicated event
+            await notificationService.createDefaultNotificationsForEvent(
+              duplicated.id,
+              user.id,
+              event.reminder
+            );
+
+            duplicatedEvents.push(duplicated);
+          }
+
+          return {
+            success: true,
+            message: `Successfully duplicated ${duplicatedEvents.length} events`,
+            eventsProcessed: duplicatedEvents.length,
+            action: "duplicate",
+            createdEvents: duplicatedEvents,
+          };
+
+        default:
+          throw new ValidationError(
+            "Invalid action. Use 'move', 'delete', or 'duplicate'",
+            "action"
+          );
+      }
+    },
+    {
+      auth: true,
+      body: t.Object({
+        action: t.Union([
+          t.Literal("move"),
+          t.Literal("delete"),
+          t.Literal("duplicate")
+        ], {
+          description: "Bulk operation to perform: move, delete, or duplicate"
+        }),
+        eventIds: t.Array(t.String(), {
+          description: "Array of event IDs to process",
+          minItems: 1,
+        }),
+        targetCalendarId: t.Optional(t.String({
+          description: "Target calendar ID (required for move, optional for duplicate)"
+        })),
+      }),
+      detail: {
+        tags: ["Events"],
+        summary: "Perform bulk operations on events",
+        description: "Move, delete, or duplicate multiple events at once",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Bulk operation completed successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    message: { type: "string" },
+                    eventsProcessed: { type: "number" },
+                    action: { type: "string" },
+                    createdEvents: {
+                      type: "array",
+                      description: "New events created (for duplicate action)",
+                      items: {
+                        type: "object",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Validation error",
+          },
+          401: {
+            description: "Unauthorized",
           },
         },
       },

@@ -2,29 +2,47 @@
 
 import { RiMoonClearLine, RiSunLine } from "@remixicon/react";
 import { useTheme } from "next-themes";
-import { useId, useState } from "react";
+import { useId } from "react";
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  useSettingsTheme?: {
+    currentTheme: "light" | "dark" | "system";
+    updateTheme: (theme: "light" | "dark" | "system") => Promise<void>;
+  };
+}
+
+export function ThemeToggle({ useSettingsTheme }: ThemeToggleProps = {}) {
   const id = useId();
-  const { theme, setTheme } = useTheme();
-  const [system, setSystem] = useState(false);
+  const { theme: nextTheme, setTheme: setNextTheme } = useTheme();
+  
+  const currentTheme = useSettingsTheme?.currentTheme || nextTheme || "system";
+  const updateTheme = useSettingsTheme?.updateTheme || ((theme: string) => {
+    setNextTheme(theme);
+    return Promise.resolve();
+  });
 
-  const smartToggle = () => {
+  const smartToggle = async () => {
     const prefersDarkScheme = window.matchMedia(
       "(prefers-color-scheme: dark)",
     ).matches;
-    if (theme === "system") {
-      setTheme(prefersDarkScheme ? "light" : "dark");
-      setSystem(false);
+    
+    let newTheme: "light" | "dark" | "system";
+    
+    if (currentTheme === "system") {
+      newTheme = prefersDarkScheme ? "light" : "dark";
     } else if (
-      (theme === "light" && !prefersDarkScheme) ||
-      (theme === "dark" && prefersDarkScheme)
+      (currentTheme === "light" && !prefersDarkScheme) ||
+      (currentTheme === "dark" && prefersDarkScheme)
     ) {
-      setTheme(theme === "light" ? "dark" : "light");
-      setSystem(false);
+      newTheme = currentTheme === "light" ? "dark" : "light";
     } else {
-      setTheme("system");
-      setSystem(true);
+      newTheme = "system";
+    }
+    
+    try {
+      await updateTheme(newTheme);
+    } catch (error) {
+      console.error("Failed to update theme:", error);
     }
   };
 
@@ -35,7 +53,7 @@ export function ThemeToggle() {
         name="theme-toggle"
         id={id}
         className="peer sr-only"
-        checked={system}
+        checked={currentTheme === "system"}
         onChange={smartToggle}
         aria-label="Toggle dark mode"
       />

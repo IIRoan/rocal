@@ -2,18 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { endOfWeek, isSameDay, isWithinInterval, startOfWeek } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { StartHour, EndHour } from "../components/calendar/constants";
 
 export function useCurrentTimeIndicator(
   currentDate: Date,
   view: "day" | "week",
+  timezone?: string,
 ) {
   const [currentTimePosition, setCurrentTimePosition] = useState<number>(0);
   const [currentTimeVisible, setCurrentTimeVisible] = useState<boolean>(false);
 
   useEffect(() => {
     const calculateTimePosition = () => {
-      const now = new Date();
+      // Get the current time in the specified timezone, default to local time
+      const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
       const totalMinutes = (hours - StartHour) * 60 + minutes;
@@ -50,7 +53,7 @@ export function useCurrentTimeIndicator(
     const interval = setInterval(calculateTimePosition, 60000);
 
     return () => clearInterval(interval);
-  }, [currentDate, view]);
+  }, [currentDate, view, timezone]);
 
   return { currentTimePosition, currentTimeVisible };
 }

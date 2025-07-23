@@ -34,6 +34,11 @@ interface WeekViewProps {
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
   onEventCreate: (startTime: Date) => void;
+  compactView?: boolean;
+  timeFormat?: "12h" | "24h";
+  weekStartDay?: number;
+  workingDays?: number[];
+  timezone?: string;
 }
 
 interface PositionedEvent {
@@ -50,23 +55,28 @@ export function WeekView({
   events,
   onEventSelect,
   onEventCreate,
+  compactView = false,
+  timeFormat = "12h",
+  weekStartDay = 0,
+  workingDays = [1, 2, 3, 4, 5],
+  timezone,
 }: WeekViewProps) {
   const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
     return eachDayOfInterval({ start: weekStart, end: weekEnd });
-  }, [currentDate]);
+  }, [currentDate, weekStartDay]);
 
   const weekStart = useMemo(
-    () => startOfWeek(currentDate, { weekStartsOn: 0 }),
-    [currentDate],
+    () => startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 }),
+    [currentDate, weekStartDay],
   );
 
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
       start: addHours(dayStart, StartHour),
-      end: addHours(dayStart, EndHour - 1),
+      end: addHours(dayStart, EndHour),
     });
   }, [currentDate]);
 
@@ -214,6 +224,7 @@ export function WeekView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "week",
+    timezone,
   );
 
   return (
@@ -225,7 +236,11 @@ export function WeekView({
         {days.map((day) => (
           <div
             key={day.toString()}
-            className="data-today:text-accent-foreground data-today:bg-accent/20 data-today:rounded text-muted-foreground/70 py-2 text-center text-xs data-today:font-medium"
+            className={`data-today:text-accent-foreground data-today:bg-accent/20 data-today:rounded text-muted-foreground/70 py-2 text-center text-xs data-today:font-medium ${
+              workingDays.includes(day.getDay()) 
+                ? "bg-blue-50/30 dark:bg-blue-950/15" 
+                : ""
+            }`}
             data-today={isToday(day) || undefined}
           >
             <span className="sm:hidden" aria-hidden="true">
@@ -258,7 +273,11 @@ export function WeekView({
               return (
                 <div
                   key={day.toString()}
-                  className="border-border/70 relative border-r p-1 last:border-r-0"
+                  className={`border-border/70 relative border-r p-1 last:border-r-0 ${
+                    workingDays.includes(day.getDay()) 
+                      ? "bg-blue-50/30 dark:bg-blue-950/15" 
+                      : ""
+                  }`}
                   data-today={isToday(day) || undefined}
                 >
                   {dayAllDayEvents.map((event) => {
@@ -320,7 +339,11 @@ export function WeekView({
         {days.map((day, dayIndex) => (
           <div
             key={day.toString()}
-            className="border-border/70 relative border-r last:border-r-0 grid auto-cols-fr"
+            className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
+              workingDays.includes(day.getDay()) 
+                ? "bg-blue-50/20 dark:bg-blue-950/10" 
+                : ""
+            }`}
             data-today={isToday(day) || undefined}
           >
             {/* Positioned events */}
@@ -344,6 +367,7 @@ export function WeekView({
                     onClick={(e) => handleEventClick(positionedEvent.event, e)}
                     showTime
                     height={positionedEvent.height}
+                    timeFormat={timeFormat}
                   />
                 </div>
               </div>

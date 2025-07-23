@@ -13,12 +13,14 @@ interface AgendaViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
+  timeFormat?: "12h" | "24h";
 }
 
 export function AgendaView({
   currentDate,
   events,
   onEventSelect,
+  timeFormat = "12h",
 }: AgendaViewProps) {
   // Show events for the next days based on constant
   const days = useMemo(() => {
@@ -76,6 +78,7 @@ export function AgendaView({
                     event={event}
                     view="agenda"
                     onClick={(e) => handleEventClick(event, e)}
+                    timeFormat={timeFormat}
                   />
                 ))}
               </div>
