@@ -1,43 +1,48 @@
 "use client";
 
 import { useMemo } from "react";
-import { 
+import {
   EventCalendar,
   CalendarView,
   AgendaDaysToShow,
-  useCalendarContext
+  useCalendarContext,
 } from "@workspace/ui/components/calendar";
-import { 
+import {
   addDays,
   startOfWeek,
   endOfWeek,
   startOfMonth,
-  endOfMonth
+  endOfMonth,
 } from "date-fns";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useSettings } from "@/hooks/use-settings";
+
+// Define the Day type as expected by date-fns
+// This type is often implicitly defined by date-fns, but explicitly defining it
+// or importing it if available from date-fns might resolve the issue directly.
+// For now, we'll define it as a union of literals.
+type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 interface CalendarWithDataProps {
   className?: string;
 }
 
-export function CalendarWithData({ 
-  className
-}: CalendarWithDataProps) {
+export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
-  
+
   // Get the initial view from settings, fallback to month
   const initialView = settings?.defaultView || "month";
-  
+
   // Calculate default date range for initial load
   const defaultDateRange = useMemo(() => {
     const now = new Date();
     let start: Date;
     let end: Date;
-    
+
     // Use weekStartDay from settings, fallback to 0 (Sunday)
-    const weekStartsOn = settings?.weekStartDay ?? 0;
+    // Cast the weekStartsOn to the Day type to satisfy date-fns
+    const weekStartsOn = (settings?.weekStartDay ?? 0) as Day;
 
     switch (initialView) {
       case "month":
@@ -74,25 +79,31 @@ export function CalendarWithData({
   });
 
   // Create theme settings for the calendar
-  const themeSettings = useMemo(() => ({
-    currentTheme: (settings?.theme || "system") as "light" | "dark" | "system",
-    updateTheme: async (theme: "light" | "dark" | "system") => {
-      await updateSettings({ theme });
-    }
-  }), [settings?.theme, updateSettings]);
+  const themeSettings = useMemo(
+    () => ({
+      currentTheme: (settings?.theme || "system") as
+        | "light"
+        | "dark"
+        | "system",
+      updateTheme: async (theme: "light" | "dark" | "system") => {
+        await updateSettings({ theme });
+      },
+    }),
+    [settings?.theme, updateSettings]
+  );
 
   // Optimized event filtering with memoized visibility check
   const transformedEvents = useMemo(() => {
     // Pre-compute visible calendar IDs once for better performance
     const visibleCalendarIds = new Set(
       calendarData.calendars
-        .filter(cal => isCalendarVisible(cal.id))
-        .map(cal => cal.id)
+        .filter((cal) => isCalendarVisible(cal.id))
+        .map((cal) => cal.id)
     );
-    
+
     const transformedEventsList = calendarData.events
-      .filter(event => visibleCalendarIds.has(event.calendarId)) // O(1) lookup instead of function call per event
-      .map(event => {
+      .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup instead of function call per event
+      .map((event) => {
         const transformed = {
           ...event,
           description: event.description ?? undefined,
@@ -101,15 +112,22 @@ export function CalendarWithData({
           categoryId: event.categoryId ?? undefined,
           reminder: (event as any).reminder ?? undefined,
         };
-        
+
         // Debug logging
         if (event.id && (event as any).reminder !== undefined) {
-          console.log('Event with reminder:', event.id, 'reminder value:', (event as any).reminder, 'transformed:', transformed.reminder);
+          console.log(
+            "Event with reminder:",
+            event.id,
+            "reminder value:",
+            (event as any).reminder,
+            "transformed:",
+            transformed.reminder
+          );
         }
-        
+
         return transformed;
       });
-    
+
     return transformedEventsList;
   }, [calendarData.events, calendarData.calendars, isCalendarVisible]);
 
@@ -142,7 +160,11 @@ export function CalendarWithData({
       defaultEventDuration={settings?.defaultEventDuration}
       defaultCalendarId={settings?.defaultCalendarId}
       weekStartDay={settings?.weekStartDay}
-      workingDays={settings?.workingDays ? JSON.parse(settings.workingDays) : [1, 2, 3, 4, 5]}
+      workingDays={
+        settings?.workingDays
+          ? JSON.parse(settings.workingDays)
+          : [1, 2, 3, 4, 5]
+      }
       timezone={settings?.timezone}
       themeSettings={themeSettings}
       onLoadNotifications={calendarData.loadNotifications}
