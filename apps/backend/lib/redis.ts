@@ -1,11 +1,11 @@
-import { createClient } from "redis";
+import { createClient, RedisClientType } from "redis";
 
 if (!process.env.REDIS_URL) {
   throw new Error("REDIS_URL environment variable is required");
 }
 
 // Create Redis client configuration for Railway cloud instance
-const redisClient = createClient({
+const redisClient: RedisClientType = createClient({
   url: process.env.REDIS_URL,
   socket: {
     connectTimeout: 10000,
@@ -13,14 +13,14 @@ const redisClient = createClient({
 });
 
 // Create a separate client for pub/sub (Redis requires separate connections)
-const redisPubClient = createClient({
+const redisPubClient: RedisClientType = createClient({
   url: process.env.REDIS_URL,
   socket: {
     connectTimeout: 10000,
   },
 });
 
-const redisSubClient = createClient({
+const redisSubClient: RedisClientType = createClient({
   url: process.env.REDIS_URL,
   socket: {
     connectTimeout: 10000,
