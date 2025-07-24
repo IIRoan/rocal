@@ -5,7 +5,7 @@ if (!process.env.REDIS_URL) {
 }
 
 // Create Redis client configuration for Railway cloud instance
-const redisClient: RedisClientType = createClient({
+const redisClient = createClient({
   url: process.env.REDIS_URL,
   socket: {
     connectTimeout: 10000,
@@ -13,14 +13,14 @@ const redisClient: RedisClientType = createClient({
 });
 
 // Create a separate client for pub/sub (Redis requires separate connections)
-const redisPubClient: RedisClientType = createClient({
+const redisPubClient = createClient({
   url: process.env.REDIS_URL,
   socket: {
     connectTimeout: 10000,
   },
 });
 
-const redisSubClient: RedisClientType = createClient({
+const redisSubClient = createClient({
   url: process.env.REDIS_URL,
   socket: {
     connectTimeout: 10000,
