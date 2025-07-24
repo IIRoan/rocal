@@ -86,14 +86,18 @@ export interface UpdateCalendarRequest extends Partial<CreateCalendarRequest> {
   isVisible?: boolean;
 }
 
-export interface UpdateEventRequest extends Partial<CreateEventRequest> {}
+export interface UpdateEventRequest extends Partial<CreateEventRequest> {
+  id?: string;
+}
 
 export interface CreateCategoryRequest {
   name: string;
   color: EventColor;
 }
 
-export interface UpdateCategoryRequest extends Partial<CreateCategoryRequest> {}
+export interface UpdateCategoryRequest extends Partial<CreateCategoryRequest> {
+  id?: string;
+}
 
 export interface DeleteResponse {
   success: boolean;
@@ -106,7 +110,7 @@ export interface ApiError {
   error: string;
   message: string;
   statusCode: number;
-  details?: any;
+  details?: unknown;
 }
 
 // User Settings Types
@@ -134,7 +138,9 @@ export interface UserSettings {
   updatedAt: Date;
 }
 
-export interface UpdateSettingsRequest extends Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> {}
+export interface UpdateSettingsRequest extends Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> {
+  userId?: string;
+}
 
 // Recurring Events Types
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
