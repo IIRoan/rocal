@@ -236,9 +236,11 @@ export function WeekView({
         {days.map((day) => (
           <div
             key={day.toString()}
-            className={`data-today:text-accent-foreground data-today:bg-accent/20 data-today:rounded text-muted-foreground/70 py-2 text-center text-xs data-today:font-medium ${
+            className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 py-2 text-center text-xs hover:bg-[var(--warm-accent-1)] hover:text-foreground transition-colors duration-200 ${
               workingDays.includes(day.getDay()) 
-                ? "bg-blue-50/30 dark:bg-blue-950/15" 
+                ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
+                : !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay())
+                ? "bg-[var(--warm-accent-1)]/30"
                 : ""
             }`}
             data-today={isToday(day) || undefined}
@@ -273,9 +275,9 @@ export function WeekView({
               return (
                 <div
                   key={day.toString()}
-                  className={`border-border/70 relative border-r p-1 last:border-r-0 ${
+                  className={`border-border/70 relative border-r p-1 last:border-r-0 hover:bg-[var(--warm-accent-1)]/20 transition-colors duration-150 ${
                     workingDays.includes(day.getDay()) 
-                      ? "bg-blue-50/30 dark:bg-blue-950/15" 
+                      ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
                       : ""
                   }`}
                   data-today={isToday(day) || undefined}
@@ -339,9 +341,11 @@ export function WeekView({
         {days.map((day, dayIndex) => (
           <div
             key={day.toString()}
-            className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
+            className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr hover:bg-[var(--warm-accent-1)]/10 transition-colors duration-200 ${
               workingDays.includes(day.getDay()) 
-                ? "bg-blue-50/20 dark:bg-blue-950/10" 
+                ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
+                : !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay())
+                ? "bg-[var(--warm-accent-1)]/20"
                 : ""
             }`}
             data-today={isToday(day) || undefined}
@@ -380,8 +384,8 @@ export function WeekView({
                 style={{ top: `${currentTimePosition}%` }}
               >
                 <div className="relative flex items-center">
-                  <div className="bg-red-500 absolute -left-1 h-2 w-2 rounded-full"></div>
-                  <div className="bg-red-500 h-[2px] w-full"></div>
+                  <div className="bg-[var(--calendar-accent)] absolute -left-1 h-2 w-2 rounded-full"></div>
+                  <div className="bg-[var(--calendar-accent)] h-[2px] w-full"></div>
                 </div>
               </div>
             )}

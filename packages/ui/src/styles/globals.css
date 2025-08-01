@@ -8,77 +8,136 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.995 0.005 85.2);
-  --foreground: oklch(0.334 0.022 55.4);
-  --card: oklch(0.995 0.005 85.2);
-  --card-foreground: oklch(0.334 0.022 55.4);
-  --popover: oklch(0.995 0.005 85.2);
-  --popover-foreground: oklch(0.334 0.022 55.4);
-  --primary: oklch(0.334 0.022 55.4);
-  --primary-foreground: oklch(0.988 0.012 85.2);
-  --secondary: oklch(0.955 0.022 85.2);
-  --secondary-foreground: oklch(0.334 0.022 55.4);
-  --muted: oklch(0.955 0.022 85.2);
-  --muted-foreground: oklch(0.732 0.04 120.5);
-  --accent: oklch(0.732 0.04 120.5);
-  --accent-foreground: oklch(0.988 0.012 85.2);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.988 0.012 85.2);
-  --border: oklch(0.955 0.022 85.2);
-  --input: oklch(0.955 0.022 85.2);
-  --ring: oklch(0.732 0.04 120.5);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: oklch(0.955 0.022 85.2);
-  --sidebar-foreground: oklch(0.334 0.022 55.4);
-  --sidebar-primary: oklch(0.334 0.022 55.4);
-  --sidebar-primary-foreground: oklch(0.988 0.012 85.2);
-  --sidebar-accent: oklch(0.732 0.04 120.5);
-  --sidebar-accent-foreground: oklch(0.988 0.012 85.2);
-  --sidebar-border: oklch(0.9 0.025 85.2);
-  --sidebar-ring: oklch(0.732 0.04 120.5);
+
+  /* Base colors - improved contrast */
+  --background: oklch(0.99 0.002 286);
+  --foreground: oklch(0.15 0.008 285.8);
+  --card: oklch(0.99 0.002 286);
+  --card-foreground: oklch(0.15 0.008 285.8);
+  --popover: oklch(0.99 0.002 286);
+  --popover-foreground: oklch(0.15 0.008 285.8);
+
+  /* Primary colors - strong purple theme */
+  --primary: oklch(0.22 0.012 285.9);
+  --primary-foreground: oklch(0.99 0.002 286);
+  --secondary: oklch(0.955 0.005 286.2);
+  --secondary-foreground: oklch(0.22 0.012 285.9);
+
+  /* Muted colors - subtle backgrounds */
+  --muted: oklch(0.955 0.005 286.2);
+  --muted-foreground: oklch(0.5 0.015 285.95);
+  --accent: oklch(0.92 0.025 65);  /* Warm beige accent */
+  --accent-foreground: oklch(0.22 0.012 285.9);
+
+  /* Utility colors */
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.99 0.002 286);
+  --border: oklch(0.88 0.02 65);             /* Subtle beige borders */
+  --input: oklch(0.91 0.025 65);             /* Beige input backgrounds */
+  --ring: oklch(0.7 0.06 55);                /* Beige focus ring */
+
+  /* Chart colors - cohesive palette */
+  --chart-1: oklch(0.55 0.18 285.9); /* Purple */
+  --chart-2: oklch(0.6 0.15 320); /* Magenta */
+  --chart-3: oklch(0.65 0.12 250); /* Blue */
+  --chart-4: oklch(0.7 0.1 200); /* Cyan */
+  --chart-5: oklch(0.75 0.08 150); /* Teal */
+
+  /* Sidebar colors - warm beige theme */
+  --sidebar: oklch(0.98 0.01 65);            /* Warm white sidebar */
+  --sidebar-foreground: oklch(0.15 0.008 285.8);
+  --sidebar-primary: oklch(0.22 0.012 285.9);
+  --sidebar-primary-foreground: oklch(0.99 0.002 286);
+  --sidebar-accent: oklch(0.9 0.03 65);      /* Beige sidebar accent */
+  --sidebar-accent-foreground: oklch(0.22 0.012 285.9);
+  --sidebar-border: oklch(0.86 0.025 65);    /* Beige sidebar borders */
+  --sidebar-ring: oklch(0.7 0.06 55);
+
+  /* Working days - integrated theme colors */
+  --working-day: oklch(0.965 0.015 65);  /* Light beige working days */
+  --working-day-dark: oklch(0.25 0.008 285.85);
+  
+  /* Beige accent colors for calendar highlights */
+  --calendar-accent: oklch(0.6 0.08 55);     /* Rich beige accent */
+  --calendar-accent-bg: oklch(0.94 0.03 65); /* Light beige background */
+  
+  /* Additional warm accent colors for app-wide use */
+  --warm-accent-1: oklch(0.85 0.05 70);      /* Light warm beige */
+  --warm-accent-2: oklch(0.75 0.06 60);      /* Medium warm beige */
+  --warm-accent-3: oklch(0.65 0.07 50);      /* Darker warm beige */
 }
 
 .dark {
-  --background: oklch(0.3 0.018 55.4);
-  --foreground: oklch(0.955 0.022 85.2);
-  --card: oklch(0.3 0.018 55.4);
-  --card-foreground: oklch(0.955 0.022 85.2);
-  --popover: oklch(0.3 0.018 55.4);
-  --popover-foreground: oklch(0.955 0.022 85.2);
-  --primary: oklch(0.855 0.022 85.2);
-  --primary-foreground: oklch(0.334 0.022 55.4);
-  --secondary: oklch(0.4 0.02 55.4);
-  --secondary-foreground: oklch(0.955 0.022 85.2);
-  --muted: oklch(0.4 0.02 55.4);
-  --muted-foreground: oklch(0.732 0.04 120.5);
-  --accent: oklch(0.732 0.04 120.5);
-  --accent-foreground: oklch(0.25 0.015 55.4);
+  /* Base colors - deep purple theme */
+  --background: oklch(0.12 0.008 285.8);
+  --foreground: oklch(0.95 0.003 286);
+  --card: oklch(0.16 0.01 285.85);
+  --card-foreground: oklch(0.95 0.003 286);
+  --popover: oklch(0.12 0.008 285.8);
+  --popover-foreground: oklch(0.95 0.003 286);
+
+  /* Primary colors - bright accent on dark */
+  --primary: oklch(0.75 0.035 285.95);
+  --primary-foreground: oklch(0.12 0.008 285.8);
+  --secondary: oklch(0.25 0.015 285.85);
+  --secondary-foreground: oklch(0.95 0.003 286);
+
+  /* Muted colors - subtle backgrounds */
+  --muted: oklch(0.25 0.015 285.85);
+  --muted-foreground: oklch(0.68 0.02 286);
+  --accent: oklch(0.35 0.04 55);   /* Warm beige accent for dark mode */
+  --accent-foreground: oklch(0.95 0.003 286);
+
+  /* Utility colors */
   --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.955 0.022 85.2);
-  --border: oklch(0.4 0.02 55.4);
-  --input: oklch(0.4 0.02 55.4);
-  --ring: oklch(0.732 0.04 120.5);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.25 0.015 55.4);
-  --sidebar-foreground: oklch(0.855 0.022 85.2);
-  --sidebar-primary: oklch(0.732 0.04 120.5);
-  --sidebar-primary-foreground: oklch(0.25 0.015 55.4);
-  --sidebar-accent: oklch(0.35 0.018 55.4);
-  --sidebar-accent-foreground: oklch(0.855 0.022 85.2);
-  --sidebar-border: oklch(0.35 0.018 55.4);
-  --sidebar-ring: oklch(0.732 0.04 120.5);
+  --destructive-foreground: oklch(0.95 0.003 286);
+  --border: oklch(0.35 0.03 55);             /* Subtle beige borders */
+  --input: oklch(0.3 0.025 55);              /* Beige input backgrounds */
+  --ring: oklch(0.75 0.08 60);               /* Beige focus ring */
+
+  /* Chart colors - vibrant dark theme palette */
+  --chart-1: oklch(0.65 0.25 285.9); /* Bright purple */
+  --chart-2: oklch(0.7 0.2 320); /* Bright magenta */
+  --chart-3: oklch(0.75 0.18 250); /* Bright blue */
+  --chart-4: oklch(0.8 0.15 200); /* Bright cyan */
+  --chart-5: oklch(0.85 0.12 150); /* Bright teal */
+
+  /* Sidebar colors - warm beige dark theme */
+  --sidebar: oklch(0.12 0.015 55);           /* Dark warm sidebar */
+  --sidebar-foreground: oklch(0.9 0.005 286);
+  --sidebar-primary: oklch(0.75 0.035 285.95);
+  --sidebar-primary-foreground: oklch(0.1 0.006 285.8);
+  --sidebar-accent: oklch(0.3 0.04 55);      /* Dark beige sidebar accent */
+  --sidebar-accent-foreground: oklch(0.9 0.005 286);
+  --sidebar-border: oklch(0.35 0.03 55);     /* Dark beige borders */
+  --sidebar-ring: oklch(0.75 0.08 60);
+
+  /* Working days - dark theme version */
+  --working-day: oklch(0.22 0.025 55);      /* Subtle beige working days */
+  --working-day-dark: oklch(0.22 0.025 55);
+  
+  /* Beige accent colors for calendar highlights - dark theme */
+  --calendar-accent: oklch(0.75 0.1 60);     /* Bright beige accent */
+  --calendar-accent-bg: oklch(0.25 0.03 55); /* Dark beige background */
+  
+  /* Additional warm accent colors for app-wide use - dark theme */
+  --warm-accent-1: oklch(0.4 0.05 60);       /* Dark warm beige */
+  --warm-accent-2: oklch(0.5 0.06 55);       /* Medium warm beige */
+  --warm-accent-3: oklch(0.6 0.07 50);       /* Light warm beige */
 }
 
 @theme inline {
+  --font-sans:
+    var(--font-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono:
+    var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -103,10 +162,6 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -117,11 +172,62 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-zinc-200, currentColor);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(circle at 25% 25%, var(--warm-accent-1) 0%, transparent 50%),
+                      radial-gradient(circle at 75% 75%, var(--warm-accent-1) 0%, transparent 50%);
+    background-size: 100% 100%;
+    background-attachment: fixed;
+  }
+  
+  /* Subtle beige accents for interactive elements */
+  button:hover, [role="button"]:hover {
+    background-color: color-mix(in oklch, var(--warm-accent-1) 15%, transparent);
+  }
+  
+  /* Enhanced focus states with beige */
+  *:focus-visible {
+    outline: 2px solid var(--warm-accent-2);
+    outline-offset: 2px;
+  }
+  
+  /* Subtle scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--warm-accent-1);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--warm-accent-2);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--warm-accent-3);
   }
 }
