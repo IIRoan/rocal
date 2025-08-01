@@ -9,7 +9,7 @@ import { settingsRoutes } from "./routes/settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { errorHandler } from "./lib/errors";
-import { redisNotificationService } from "./lib/redis-notification-service";
+import { simpleNotificationService } from "./lib/simple-notification-service";
 
 // Better Auth middleware following the documentation pattern
 const betterAuth = new Elysia({ name: "better-auth" })
@@ -34,8 +34,8 @@ const betterAuth = new Elysia({ name: "better-auth" })
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix });
 
-  // Initialize Redis notification service
-  redisNotificationService.initialize().catch(console.error);
+  // Initialize Simple notification service
+  simpleNotificationService.start();
 
   // Only add Swagger in development
   if (process.env.NODE_ENV !== "production") {
@@ -54,7 +54,10 @@ export const createAPI = (prefix = "") => {
             { name: "Categories", description: "Event category endpoints" },
             { name: "Calendars", description: "Calendar management endpoints" },
             { name: "Settings", description: "User settings endpoints" },
-            { name: "Notifications", description: "Notification system endpoints" },
+            {
+              name: "Notifications",
+              description: "Notification system endpoints",
+            },
             { name: "Recurring", description: "Recurring events endpoints" },
           ],
           components: {

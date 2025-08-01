@@ -664,10 +664,5 @@ export class NotificationService {
 // Initialize the notification service
 export const notificationService = NotificationService.getInstance();
 
-// Start the reminder checking process
-setInterval(
-  () => {
-    notificationService.checkForReminders().catch(console.error);
-  },
-  5 * 60 * 1000
-); // Check every 5 minutes
+// NOTE: Reminder checking is now handled by simple-notification-service.ts
+// This service is kept for backward compatibility and CRUD operations only

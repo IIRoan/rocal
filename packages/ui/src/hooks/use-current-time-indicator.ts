@@ -15,8 +15,8 @@ export function useCurrentTimeIndicator(
 
   useEffect(() => {
     const calculateTimePosition = () => {
-      // Get the current time in the specified timezone, default to local time
-      const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
+      // Get the current time - always use local browser time for display
+      const now = new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
       const totalMinutes = (hours - StartHour) * 60 + minutes;

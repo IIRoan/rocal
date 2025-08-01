@@ -10,7 +10,9 @@ export const EventNotificationPlain = t.Object(
     eventId: t.String(),
     notificationType: t.String(),
     minutesBefore: t.Integer(),
+    notificationTime: t.Date(),
     isEnabled: t.Boolean(),
+    isSent: t.Boolean(),
     createdAt: t.Date(),
     updatedAt: t.Date(),
   },
@@ -49,7 +51,9 @@ export const EventNotificationPlainInputCreate = t.Object(
   {
     notificationType: t.String(),
     minutesBefore: t.Integer(),
+    notificationTime: t.Date(),
     isEnabled: t.Optional(t.Boolean()),
+    isSent: t.Optional(t.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -58,7 +62,9 @@ export const EventNotificationPlainInputUpdate = t.Object(
   {
     notificationType: t.Optional(t.String()),
     minutesBefore: t.Optional(t.Integer()),
+    notificationTime: t.Optional(t.Date()),
     isEnabled: t.Optional(t.Boolean()),
+    isSent: t.Optional(t.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -111,7 +117,9 @@ export const EventNotificationWhere = t.Partial(
           eventId: t.String(),
           notificationType: t.String(),
           minutesBefore: t.Integer(),
+          notificationTime: t.Date(),
           isEnabled: t.Boolean(),
+          isSent: t.Boolean(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
@@ -153,7 +161,9 @@ export const EventNotificationWhereUnique = t.Recursive(
               eventId: t.String(),
               notificationType: t.String(),
               minutesBefore: t.Integer(),
+              notificationTime: t.Date(),
               isEnabled: t.Boolean(),
+              isSent: t.Boolean(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
             },
@@ -174,7 +184,9 @@ export const EventNotificationSelect = t.Partial(
       event: t.Boolean(),
       notificationType: t.Boolean(),
       minutesBefore: t.Boolean(),
+      notificationTime: t.Boolean(),
       isEnabled: t.Boolean(),
+      isSent: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       _count: t.Boolean(),
@@ -205,7 +217,13 @@ export const EventNotificationOrderBy = t.Partial(
       minutesBefore: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
+      notificationTime: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
       isEnabled: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      isSent: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {

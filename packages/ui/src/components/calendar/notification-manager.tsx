@@ -17,7 +17,9 @@ export interface EventNotification {
   id?: string;
   notificationType: "email";
   minutesBefore: number;
+  notificationTime?: string;
   isEnabled: boolean;
+  isSent?: boolean;
 }
 
 const NOTIFICATION_OPTIONS = [
