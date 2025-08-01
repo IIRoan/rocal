@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, X, Bell, Mail, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
@@ -15,7 +15,7 @@ import { Badge } from "../ui/badge";
 
 export interface EventNotification {
   id?: string;
-  notificationType: 'email';
+  notificationType: "email";
   minutesBefore: number;
   isEnabled: boolean;
 }
@@ -41,6 +41,7 @@ interface NotificationManagerProps {
   onChange: (notifications: EventNotification[]) => void;
   onTestEmail?: (eventId: string) => Promise<void>;
   loading?: boolean;
+  defaultReminder?: number | null; // User's default reminder setting
 }
 
 export function NotificationManager({
@@ -49,12 +50,13 @@ export function NotificationManager({
   onChange,
   onTestEmail,
   loading = false,
+  defaultReminder = null,
 }: NotificationManagerProps) {
   const [testingEmail, setTestingEmail] = useState(false);
 
   const handleAddNotification = () => {
     const newNotification: EventNotification = {
-      notificationType: 'email',
+      notificationType: "email",
       minutesBefore: 15, // Default to 15 minutes
       isEnabled: true,
     };
@@ -66,8 +68,12 @@ export function NotificationManager({
     onChange(updated);
   };
 
-  const handleUpdateNotification = (index: number, field: keyof EventNotification, value: any) => {
-    const updated = notifications.map((notification, i) => 
+  const handleUpdateNotification = (
+    index: number,
+    field: keyof EventNotification,
+    value: any
+  ) => {
+    const updated = notifications.map((notification, i) =>
       i === index ? { ...notification, [field]: value } : notification
     );
     onChange(updated);
@@ -75,12 +81,12 @@ export function NotificationManager({
 
   const handleTestEmail = async () => {
     if (!eventId || !onTestEmail) return;
-    
+
     setTestingEmail(true);
     try {
       await onTestEmail(eventId);
     } catch (error) {
-      console.error('Failed to send test email:', error);
+      console.error("Failed to send test email:", error);
     } finally {
       setTestingEmail(false);
     }
@@ -92,7 +98,9 @@ export function NotificationManager({
     } else if (minutes < 1440) {
       const hours = Math.floor(minutes / 60);
       const remainingMinutes = minutes % 60;
-      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
+      return remainingMinutes > 0
+        ? `${hours}h ${remainingMinutes}min`
+        : `${hours}h`;
     } else {
       const days = Math.floor(minutes / 1440);
       const remainingHours = Math.floor((minutes % 1440) / 60);
@@ -130,9 +138,32 @@ export function NotificationManager({
         )}
       </div>
 
+      {/* Default notification indicator */}
+      {defaultReminder && (
+        <div className="flex items-center gap-2 p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+          <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="flex-1">
+            <div className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Default Email Reminder
+            </div>
+            <div className="text-xs text-blue-700 dark:text-blue-300">
+              {formatMinutesToReadable(defaultReminder)} before the event
+            </div>
+          </div>
+          <Badge
+            variant="outline"
+            className="text-xs border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
+          >
+            Auto
+          </Badge>
+        </div>
+      )}
+
       {notifications.length === 0 ? (
         <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 text-center">
-          No email notifications configured. Add one below to get reminded about this event.
+          {defaultReminder
+            ? "Your default email reminder is already configured above. Add additional notifications below if needed."
+            : "No email notifications configured. Add one below to get reminded about this event."}
         </div>
       ) : (
         <div className="space-y-2">
@@ -142,12 +173,16 @@ export function NotificationManager({
               className="flex items-center gap-2 p-3 border rounded-lg bg-card"
             >
               <Mail className="h-4 w-4 text-muted-foreground" />
-              
+
               <div className="flex-1">
                 <Select
                   value={notification.minutesBefore.toString()}
-                  onValueChange={(value) => 
-                    handleUpdateNotification(index, 'minutesBefore', parseInt(value))
+                  onValueChange={(value) =>
+                    handleUpdateNotification(
+                      index,
+                      "minutesBefore",
+                      parseInt(value)
+                    )
                   }
                 >
                   <SelectTrigger className="h-8">
@@ -194,17 +229,32 @@ export function NotificationManager({
         Add Email Notification
       </Button>
 
-      {notifications.length > 0 && (
+      {(defaultReminder || notifications.length > 0) && (
         <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-          <div className="font-medium mb-1">📧 Email notifications will be sent:</div>
+          <div className="font-medium mb-1">
+            📧 Email notifications will be sent:
+          </div>
           <ul className="space-y-1">
+            {defaultReminder && (
+              <li className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                <span className="flex items-center gap-1">
+                  {formatMinutesToReadable(defaultReminder)} before the event
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1 py-0 h-4 border-blue-300 text-blue-700"
+                  >
+                    Default
+                  </Badge>
+                </span>
+              </li>
+            )}
             {notifications.map((notification, index) => (
               <li key={index} className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-blue-500 rounded-full" />
-                {notification.minutesBefore === 0 
-                  ? "Immediately (for testing)" 
-                  : `${formatMinutesToReadable(notification.minutesBefore)} before the event`
-                }
+                <span className="w-2 h-2 bg-green-500 rounded-full" />
+                {notification.minutesBefore === 0
+                  ? "Immediately (for testing)"
+                  : `${formatMinutesToReadable(notification.minutesBefore)} before the event`}
               </li>
             ))}
           </ul>
