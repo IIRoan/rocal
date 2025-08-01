@@ -227,7 +227,7 @@ export class NotificationService {
 
   private async queueEmailNotification(
     event: NotificationEvent & {
-      user: User;
+      user: User & { settings?: UserSettings | null };
       calendar: any;
       category?: any;
     },
@@ -238,7 +238,7 @@ export class NotificationService {
     const emailData: EmailNotificationData = {
       to: event.user.email,
       subject: `Reminder: ${event.title}`,
-      body: this.generateEmailBody(event, timeUntilEvent),
+      body: await this.generateEmailBody(event, timeUntilEvent),
       eventId: event.id,
       userId: event.userId,
     };
@@ -296,40 +296,322 @@ export class NotificationService {
 
   // Browser notification methods removed
 
-  private generateEmailBody(
+  private async generateEmailBody(
     event: NotificationEvent & {
-      user: User;
+      user: User & { settings?: UserSettings | null };
       calendar: any;
       category?: any;
     },
     timeUntilEvent: string
-  ): string {
+  ): Promise<string> {
     const eventDate = event.start.toLocaleDateString();
     const eventTime = event.allDay
       ? "All Day"
       : event.start.toLocaleTimeString();
 
+    // Get user's theme preference, default to light
+    const userTheme = event.user.settings?.theme || "light";
+    const isDark = userTheme === "dark" || (userTheme === "system" && this.getSystemThemePreference());
+
+    // Define color schemes based on the app's CSS variables
+    const colors = isDark ? {
+      // Dark theme colors (converted from OKLCH to hex approximations)
+      background: "#2A2A2A",
+      foreground: "#F0F0F0", 
+      card: "#2A2A2A",
+      cardForeground: "#F0F0F0",
+      primary: "#E0E0E0",
+      primaryForeground: "#2A2A2A",
+      secondary: "#3A3A3A",
+      secondaryForeground: "#F0F0F0",
+      muted: "#3A3A3A",
+      mutedForeground: "#A0A0A0",
+      accent: "#A0A0A0",
+      accentForeground: "#1A1A1A",
+      border: "#3A3A3A",
+      ring: "#A0A0A0"
+    } : {
+      // Light theme colors (converted from OKLCH to hex approximations)
+      background: "#FEFEFE",
+      foreground: "#1A1A1A",
+      card: "#FEFEFE", 
+      cardForeground: "#1A1A1A",
+      primary: "#1A1A1A",
+      primaryForeground: "#FAFAFA",
+      secondary: "#F0F0F0",
+      secondaryForeground: "#1A1A1A",
+      muted: "#F0F0F0",
+      mutedForeground: "#808080",
+      accent: "#808080",
+      accentForeground: "#FAFAFA",
+      border: "#F0F0F0",
+      ring: "#808080"
+    };
+
+    const categoryColor = event.category?.color || event.calendar?.color || "primary";
+    const getCategoryAccentColor = (color: string) => {
+      const colorMap: Record<string, string> = {
+        blue: isDark ? "#3B82F6" : "#2563EB",
+        orange: isDark ? "#F97316" : "#EA580C", 
+        violet: isDark ? "#8B5CF6" : "#7C3AED",
+        rose: isDark ? "#F43F5E" : "#E11D48",
+        emerald: isDark ? "#10B981" : "#059669"
+      };
+      return colorMap[color] || colors.accent;
+    };
+
     return `
-      <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Event Reminder</h2>
-          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin: 0 0 10px 0; color: #2563eb;">${event.title}</h3>
-            <p style="margin: 5px 0;"><strong>Date:</strong> ${eventDate}</p>
-            <p style="margin: 5px 0;"><strong>Time:</strong> ${eventTime}</p>
-            ${event.location ? `<p style="margin: 5px 0;"><strong>Location:</strong> ${event.location}</p>` : ""}
-            ${event.description ? `<p style="margin: 10px 0;"><strong>Description:</strong><br>${event.description}</p>` : ""}
-            <p style="margin: 15px 0 5px 0; color: #666;">
-              <em>Starting ${timeUntilEvent}</em>
-            </p>
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Event Reminder - ${event.title}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+            
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
+            body {
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+              line-height: 1.5;
+              color: ${colors.foreground};
+              background-color: ${colors.background};
+            }
+            
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: ${colors.background};
+            }
+            
+            .header {
+              text-align: center;
+              padding: 32px 24px 24px;
+              border-bottom: 1px solid ${colors.border};
+            }
+            
+            .logo {
+              font-size: 24px;
+              font-weight: 600;
+              color: ${colors.primary};
+              margin-bottom: 8px;
+            }
+            
+            .subtitle {
+              color: ${colors.mutedForeground};
+              font-size: 14px;
+            }
+            
+            .content {
+              padding: 32px 24px;
+            }
+            
+            .event-card {
+              background-color: ${colors.card};
+              border: 1px solid ${colors.border};
+              border-radius: 12px;
+              padding: 24px;
+              margin-bottom: 24px;
+              box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            }
+            
+            .event-header {
+              display: flex;
+              align-items: flex-start;
+              gap: 12px;
+              margin-bottom: 16px;
+            }
+            
+            .event-indicator {
+              width: 4px;
+              height: 48px;
+              background-color: ${getCategoryAccentColor(categoryColor)};
+              border-radius: 2px;
+              flex-shrink: 0;
+            }
+            
+            .event-title {
+              font-size: 20px;
+              font-weight: 600;
+              color: ${colors.cardForeground};
+              margin-bottom: 4px;
+            }
+            
+            .event-time-badge {
+              display: inline-block;
+              background-color: ${colors.accent}20;
+              color: ${colors.accent};
+              padding: 4px 8px;
+              border-radius: 6px;
+              font-size: 12px;
+              font-weight: 500;
+              text-transform: uppercase;
+              letter-spacing: 0.025em;
+            }
+            
+            .event-details {
+              margin-top: 16px;
+            }
+            
+            .detail-row {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 8px;
+              font-size: 14px;
+            }
+            
+            .detail-icon {
+              width: 16px;
+              height: 16px;
+              color: ${colors.mutedForeground};
+              flex-shrink: 0;
+            }
+            
+            .detail-label {
+              font-weight: 500;
+              color: ${colors.cardForeground};
+              min-width: 60px;
+            }
+            
+            .detail-value {
+              color: ${colors.mutedForeground};
+            }
+            
+            .description {
+              background-color: ${colors.muted};
+              padding: 12px;
+              border-radius: 8px;
+              margin-top: 12px;
+              font-size: 14px;
+              color: ${colors.mutedForeground};
+              line-height: 1.4;
+            }
+            
+            .footer {
+              padding: 24px;
+              border-top: 1px solid ${colors.border};
+              text-align: center;
+            }
+            
+            .footer-text {
+              font-size: 12px;
+              color: ${colors.mutedForeground};
+              line-height: 1.4;
+            }
+            
+            .footer-link {
+              color: ${colors.accent};
+              text-decoration: none;
+            }
+            
+            .footer-link:hover {
+              text-decoration: underline;
+            }
+            
+            @media (max-width: 640px) {
+              .container {
+                margin: 0 16px;
+              }
+              
+              .content, .header, .footer {
+                padding-left: 16px;
+                padding-right: 16px;
+              }
+              
+              .event-card {
+                padding: 20px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">📅 Rocani</div>
+              <div class="subtitle">Event Reminder</div>
+            </div>
+            
+            <div class="content">
+              <div class="event-card">
+                <div class="event-header">
+                  <div class="event-indicator"></div>
+                  <div>
+                    <h1 class="event-title">${event.title}</h1>
+                    <span class="event-time-badge">Starting ${timeUntilEvent}</span>
+                  </div>
+                </div>
+                
+                <div class="event-details">
+                  <div class="detail-row">
+                    <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">${eventDate}</span>
+                  </div>
+                  
+                  <div class="detail-row">
+                    <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="detail-label">Time:</span>
+                    <span class="detail-value">${eventTime}</span>
+                  </div>
+                  
+                  ${event.location ? `
+                    <div class="detail-row">
+                      <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                      </svg>
+                      <span class="detail-label">Location:</span>
+                      <span class="detail-value">${event.location}</span>
+                    </div>
+                  ` : ""}
+                  
+                  ${event.category ? `
+                    <div class="detail-row">
+                      <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                      </svg>
+                      <span class="detail-label">Category:</span>
+                      <span class="detail-value">${event.category.name}</span>
+                    </div>
+                  ` : ""}
+                </div>
+                
+                ${event.description ? `
+                  <div class="description">
+                    ${event.description.replace(/\n/g, '<br/>')}
+                  </div>
+                ` : ""}
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p class="footer-text">
+                This reminder was sent because you have email notifications enabled.<br/>
+                You can manage your notification preferences in your 
+                <a href="#" class="footer-link">calendar settings</a>.
+              </p>
+            </div>
           </div>
-          <p style="color: #666; font-size: 12px;">
-            This reminder was sent because you have notifications enabled for your calendar events.
-            You can change your notification preferences in your calendar settings.
-          </p>
         </body>
       </html>
     `;
+  }
+
+  private getSystemThemePreference(): boolean {
+    // This is a server-side approximation - in a real implementation,
+    // you might want to store the user's actual system preference
+    // or use a more sophisticated detection method
+    return false; // Default to light theme if system preference is unknown
   }
 
   private formatTimeUntilEvent(eventStart: Date): string {
