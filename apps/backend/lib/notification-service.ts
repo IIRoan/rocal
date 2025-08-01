@@ -19,23 +19,11 @@ export interface EmailNotificationData {
   userId: string;
 }
 
-export interface BrowserNotificationData {
-  title: string;
-  body: string;
-  icon?: string;
-  badge?: string;
-  tag: string;
-  data: {
-    eventId: string;
-    userId: string;
-    type: "reminder";
-  };
-}
+// Browser notification interface removed
 
 export class NotificationService {
   private static instance: NotificationService;
   private emailQueue: EmailNotificationData[] = [];
-  private browserQueue: BrowserNotificationData[] = [];
   private isProcessing = false;
 
   private constructor() {
@@ -139,10 +127,7 @@ export class NotificationService {
           await this.queueEmailNotification(event, event.reminder);
         }
 
-        // Send browser notification if enabled
-        if (userSettings?.browserNotifications !== false) {
-          await this.queueBrowserNotification(event, event.reminder);
-        }
+        // Browser notifications removed
 
         // Record that notification was sent
         await this.recordNotificationSent(
@@ -179,12 +164,7 @@ export class NotificationService {
           );
         }
 
-        if (userSettings?.browserNotifications !== false) {
-          await this.queueBrowserNotification(
-            event,
-            userSettings.defaultReminder
-          );
-        }
+        // Browser notifications removed
 
         await this.recordNotificationSent(
           event.id,
@@ -231,12 +211,8 @@ export class NotificationService {
         userSettings?.emailNotifications !== false
       ) {
         await this.queueEmailNotification(event, notification.minutesBefore);
-      } else if (
-        notification.notificationType === "browser" &&
-        userSettings?.browserNotifications !== false
-      ) {
-        await this.queueBrowserNotification(event, notification.minutesBefore);
       }
+      // Browser notifications removed
 
       // Record that notification was sent
       await this.recordNotificationSent(
@@ -270,26 +246,7 @@ export class NotificationService {
     this.emailQueue.push(emailData);
   }
 
-  private async queueBrowserNotification(
-    event: NotificationEvent,
-    _minutesBefore: number
-  ): Promise<void> {
-    const timeUntilEvent = this.formatTimeUntilEvent(event.start);
-
-    const notificationData: BrowserNotificationData = {
-      title: `Reminder: ${event.title}`,
-      body: `Starting ${timeUntilEvent}${event.location ? ` at ${event.location}` : ""}`,
-      icon: "/calendar-icon.png",
-      tag: `reminder-${event.id}`,
-      data: {
-        eventId: event.id,
-        userId: event.userId,
-        type: "reminder",
-      },
-    };
-
-    this.browserQueue.push(notificationData);
-  }
+  // Browser notification method removed
 
   private async processQueues(): Promise<void> {
     if (this.isProcessing) return;
@@ -304,13 +261,7 @@ export class NotificationService {
         }
       }
 
-      // Process browser notification queue
-      while (this.browserQueue.length > 0) {
-        const notification = this.browserQueue.shift();
-        if (notification) {
-          await this.sendBrowserNotification(notification);
-        }
-      }
+      // Browser notification queue processing removed
     } finally {
       this.isProcessing = false;
     }
@@ -343,60 +294,7 @@ export class NotificationService {
     }
   }
 
-  private async sendBrowserNotification(
-    notificationData: BrowserNotificationData
-  ): Promise<void> {
-    console.log("Browser notification:", {
-      title: notificationData.title,
-      body: notificationData.body,
-      userId: notificationData.data.userId,
-      eventId: notificationData.data.eventId,
-    });
-
-    // Store notification for potential delivery to client
-    // In a real implementation, you would:
-    // 1. Store notification in database for offline users
-    // 2. Send via WebSocket to online users
-    // 3. Use push notifications for mobile apps
-
-    try {
-      // For now, we'll store the notification in a simple in-memory queue
-      // that could be polled by the frontend or sent via WebSocket
-      this.storeBrowserNotificationForDelivery(notificationData);
-
-      console.log(
-        `✓ Browser notification queued for delivery to user ${notificationData.data.userId}`
-      );
-    } catch (error) {
-      console.error("Failed to queue browser notification:", error);
-    }
-  }
-
-  // Simple storage for browser notifications (in production, use a proper queue/database)
-  private browserNotificationQueue: Map<string, BrowserNotificationData[]> =
-    new Map();
-
-  private storeBrowserNotificationForDelivery(
-    notificationData: BrowserNotificationData
-  ): void {
-    const userId = notificationData.data.userId;
-    const userNotifications = this.browserNotificationQueue.get(userId) || [];
-    userNotifications.push(notificationData);
-    this.browserNotificationQueue.set(userId, userNotifications);
-
-    // Clean up old notifications (keep only last 10 per user)
-    if (userNotifications.length > 10) {
-      this.browserNotificationQueue.set(userId, userNotifications.slice(-10));
-    }
-  }
-
-  // Method to get pending browser notifications for a user (for polling)
-  getPendingBrowserNotifications(userId: string): BrowserNotificationData[] {
-    const notifications = this.browserNotificationQueue.get(userId) || [];
-    // Clear the queue after retrieval
-    this.browserNotificationQueue.delete(userId);
-    return notifications;
-  }
+  // Browser notification methods removed
 
   private generateEmailBody(
     event: NotificationEvent & {
@@ -547,15 +445,8 @@ export class NotificationService {
               event as any,
               notification.minutesBefore
             );
-          } else if (
-            notification.notificationType === "browser" &&
-            userSettings?.browserNotifications !== false
-          ) {
-            await this.queueBrowserNotification(
-              event as any,
-              notification.minutesBefore
-            );
           }
+          // Browser notifications removed
         }
       } else {
         // Fallback to default 15-minute reminder for testing
@@ -563,9 +454,7 @@ export class NotificationService {
         if (userSettings?.emailNotifications !== false) {
           await this.queueEmailNotification(event as any, testMinutes);
         }
-        if (userSettings?.browserNotifications !== false) {
-          await this.queueBrowserNotification(event as any, testMinutes);
-        }
+        // Browser notifications removed
       }
 
       await this.processQueues();
