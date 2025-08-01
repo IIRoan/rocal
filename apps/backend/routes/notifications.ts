@@ -926,8 +926,14 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
                     environment: { type: "object" },
                     user: { type: "object" },
                     userSettings: { type: "object" },
-                    recentEvents: { type: "array" },
-                    recentNotificationLogs: { type: "array" },
+                    recentEvents: {
+                      type: "array",
+                      items: { type: "object" },
+                    },
+                    recentNotificationLogs: {
+                      type: "array",
+                      items: { type: "object" },
+                    },
                     emailQueue: { type: "object" },
                     timestamp: { type: "string" },
                   },

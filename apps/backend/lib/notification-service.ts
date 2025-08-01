@@ -601,7 +601,12 @@ export class NotificationService {
 
         if (notifications.length > 0) {
           await prisma.eventNotification.createMany({
-            data: notifications,
+            data: notifications.map((n) => ({
+              ...n,
+              notificationTime: new Date(
+                Date.now() + n.minutesBefore * 60 * 1000
+              ),
+            })),
           });
 
           console.log(
@@ -647,6 +652,9 @@ export class NotificationService {
             notificationType: n.notificationType,
             minutesBefore: n.minutesBefore,
             isEnabled: n.isEnabled,
+            notificationTime: new Date(
+              event.start.getTime() - n.minutesBefore * 60 * 1000
+            ),
           })),
         });
       }
