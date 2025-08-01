@@ -267,7 +267,9 @@ exports.Prisma.EventNotificationScalarFieldEnum = {
   eventId: 'eventId',
   notificationType: 'notificationType',
   minutesBefore: 'minutesBefore',
+  notificationTime: 'notificationTime',
   isEnabled: 'isEnabled',
+  isSent: 'isSent',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

@@ -14953,7 +14953,9 @@ export namespace Prisma {
     eventId: string | null
     notificationType: string | null
     minutesBefore: number | null
+    notificationTime: Date | null
     isEnabled: boolean | null
+    isSent: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -14963,7 +14965,9 @@ export namespace Prisma {
     eventId: string | null
     notificationType: string | null
     minutesBefore: number | null
+    notificationTime: Date | null
     isEnabled: boolean | null
+    isSent: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -14973,7 +14977,9 @@ export namespace Prisma {
     eventId: number
     notificationType: number
     minutesBefore: number
+    notificationTime: number
     isEnabled: number
+    isSent: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -14993,7 +14999,9 @@ export namespace Prisma {
     eventId?: true
     notificationType?: true
     minutesBefore?: true
+    notificationTime?: true
     isEnabled?: true
+    isSent?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -15003,7 +15011,9 @@ export namespace Prisma {
     eventId?: true
     notificationType?: true
     minutesBefore?: true
+    notificationTime?: true
     isEnabled?: true
+    isSent?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -15013,7 +15023,9 @@ export namespace Prisma {
     eventId?: true
     notificationType?: true
     minutesBefore?: true
+    notificationTime?: true
     isEnabled?: true
+    isSent?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -15110,7 +15122,9 @@ export namespace Prisma {
     eventId: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date
     isEnabled: boolean
+    isSent: boolean
     createdAt: Date
     updatedAt: Date
     _count: EventNotificationCountAggregateOutputType | null
@@ -15139,7 +15153,9 @@ export namespace Prisma {
     eventId?: boolean
     notificationType?: boolean
     minutesBefore?: boolean
+    notificationTime?: boolean
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     event?: boolean | CalendarEventDefaultArgs<ExtArgs>
@@ -15150,7 +15166,9 @@ export namespace Prisma {
     eventId?: boolean
     notificationType?: boolean
     minutesBefore?: boolean
+    notificationTime?: boolean
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     event?: boolean | CalendarEventDefaultArgs<ExtArgs>
@@ -15161,7 +15179,9 @@ export namespace Prisma {
     eventId?: boolean
     notificationType?: boolean
     minutesBefore?: boolean
+    notificationTime?: boolean
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     event?: boolean | CalendarEventDefaultArgs<ExtArgs>
@@ -15172,12 +15192,14 @@ export namespace Prisma {
     eventId?: boolean
     notificationType?: boolean
     minutesBefore?: boolean
+    notificationTime?: boolean
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type EventNotificationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "eventId" | "notificationType" | "minutesBefore" | "isEnabled" | "createdAt" | "updatedAt", ExtArgs["result"]["eventNotification"]>
+  export type EventNotificationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "eventId" | "notificationType" | "minutesBefore" | "notificationTime" | "isEnabled" | "isSent" | "createdAt" | "updatedAt", ExtArgs["result"]["eventNotification"]>
   export type EventNotificationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     event?: boolean | CalendarEventDefaultArgs<ExtArgs>
   }
@@ -15198,7 +15220,9 @@ export namespace Prisma {
       eventId: string
       notificationType: string
       minutesBefore: number
+      notificationTime: Date
       isEnabled: boolean
+      isSent: boolean
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["eventNotification"]>
@@ -15629,7 +15653,9 @@ export namespace Prisma {
     readonly eventId: FieldRef<"EventNotification", 'String'>
     readonly notificationType: FieldRef<"EventNotification", 'String'>
     readonly minutesBefore: FieldRef<"EventNotification", 'Int'>
+    readonly notificationTime: FieldRef<"EventNotification", 'DateTime'>
     readonly isEnabled: FieldRef<"EventNotification", 'Boolean'>
+    readonly isSent: FieldRef<"EventNotification", 'Boolean'>
     readonly createdAt: FieldRef<"EventNotification", 'DateTime'>
     readonly updatedAt: FieldRef<"EventNotification", 'DateTime'>
   }
@@ -17308,7 +17334,9 @@ export namespace Prisma {
     eventId: 'eventId',
     notificationType: 'notificationType',
     minutesBefore: 'minutesBefore',
+    notificationTime: 'notificationTime',
     isEnabled: 'isEnabled',
+    isSent: 'isSent',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -18360,7 +18388,9 @@ export namespace Prisma {
     eventId?: StringFilter<"EventNotification"> | string
     notificationType?: StringFilter<"EventNotification"> | string
     minutesBefore?: IntFilter<"EventNotification"> | number
+    notificationTime?: DateTimeFilter<"EventNotification"> | Date | string
     isEnabled?: BoolFilter<"EventNotification"> | boolean
+    isSent?: BoolFilter<"EventNotification"> | boolean
     createdAt?: DateTimeFilter<"EventNotification"> | Date | string
     updatedAt?: DateTimeFilter<"EventNotification"> | Date | string
     event?: XOR<CalendarEventScalarRelationFilter, CalendarEventWhereInput>
@@ -18371,7 +18401,9 @@ export namespace Prisma {
     eventId?: SortOrder
     notificationType?: SortOrder
     minutesBefore?: SortOrder
+    notificationTime?: SortOrder
     isEnabled?: SortOrder
+    isSent?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     event?: CalendarEventOrderByWithRelationInput
@@ -18385,7 +18417,9 @@ export namespace Prisma {
     eventId?: StringFilter<"EventNotification"> | string
     notificationType?: StringFilter<"EventNotification"> | string
     minutesBefore?: IntFilter<"EventNotification"> | number
+    notificationTime?: DateTimeFilter<"EventNotification"> | Date | string
     isEnabled?: BoolFilter<"EventNotification"> | boolean
+    isSent?: BoolFilter<"EventNotification"> | boolean
     createdAt?: DateTimeFilter<"EventNotification"> | Date | string
     updatedAt?: DateTimeFilter<"EventNotification"> | Date | string
     event?: XOR<CalendarEventScalarRelationFilter, CalendarEventWhereInput>
@@ -18396,7 +18430,9 @@ export namespace Prisma {
     eventId?: SortOrder
     notificationType?: SortOrder
     minutesBefore?: SortOrder
+    notificationTime?: SortOrder
     isEnabled?: SortOrder
+    isSent?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: EventNotificationCountOrderByAggregateInput
@@ -18414,7 +18450,9 @@ export namespace Prisma {
     eventId?: StringWithAggregatesFilter<"EventNotification"> | string
     notificationType?: StringWithAggregatesFilter<"EventNotification"> | string
     minutesBefore?: IntWithAggregatesFilter<"EventNotification"> | number
+    notificationTime?: DateTimeWithAggregatesFilter<"EventNotification"> | Date | string
     isEnabled?: BoolWithAggregatesFilter<"EventNotification"> | boolean
+    isSent?: BoolWithAggregatesFilter<"EventNotification"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"EventNotification"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"EventNotification"> | Date | string
   }
@@ -19526,7 +19564,9 @@ export namespace Prisma {
     id?: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date | string
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     event: CalendarEventCreateNestedOneWithoutNotificationsInput
@@ -19537,7 +19577,9 @@ export namespace Prisma {
     eventId: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date | string
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -19546,7 +19588,9 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     event?: CalendarEventUpdateOneRequiredWithoutNotificationsNestedInput
@@ -19557,7 +19601,9 @@ export namespace Prisma {
     eventId?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -19567,7 +19613,9 @@ export namespace Prisma {
     eventId: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date | string
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -19576,7 +19624,9 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -19586,7 +19636,9 @@ export namespace Prisma {
     eventId?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -20461,7 +20513,9 @@ export namespace Prisma {
     eventId?: SortOrder
     notificationType?: SortOrder
     minutesBefore?: SortOrder
+    notificationTime?: SortOrder
     isEnabled?: SortOrder
+    isSent?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -20475,7 +20529,9 @@ export namespace Prisma {
     eventId?: SortOrder
     notificationType?: SortOrder
     minutesBefore?: SortOrder
+    notificationTime?: SortOrder
     isEnabled?: SortOrder
+    isSent?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -20485,7 +20541,9 @@ export namespace Prisma {
     eventId?: SortOrder
     notificationType?: SortOrder
     minutesBefore?: SortOrder
+    notificationTime?: SortOrder
     isEnabled?: SortOrder
+    isSent?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -22681,7 +22739,9 @@ export namespace Prisma {
     id?: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date | string
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -22690,7 +22750,9 @@ export namespace Prisma {
     id?: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date | string
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -22883,7 +22945,9 @@ export namespace Prisma {
     eventId?: StringFilter<"EventNotification"> | string
     notificationType?: StringFilter<"EventNotification"> | string
     minutesBefore?: IntFilter<"EventNotification"> | number
+    notificationTime?: DateTimeFilter<"EventNotification"> | Date | string
     isEnabled?: BoolFilter<"EventNotification"> | boolean
+    isSent?: BoolFilter<"EventNotification"> | boolean
     createdAt?: DateTimeFilter<"EventNotification"> | Date | string
     updatedAt?: DateTimeFilter<"EventNotification"> | Date | string
   }
@@ -23950,7 +24014,9 @@ export namespace Prisma {
     id?: string
     notificationType: string
     minutesBefore: number
+    notificationTime: Date | string
     isEnabled?: boolean
+    isSent?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -24013,7 +24079,9 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -24022,7 +24090,9 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -24031,7 +24101,9 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     notificationType?: StringFieldUpdateOperationsInput | string
     minutesBefore?: IntFieldUpdateOperationsInput | number
+    notificationTime?: DateTimeFieldUpdateOperationsInput | Date | string
     isEnabled?: BoolFieldUpdateOperationsInput | boolean
+    isSent?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
