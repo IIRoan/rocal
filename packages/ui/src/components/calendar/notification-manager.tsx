@@ -203,10 +203,6 @@ export function NotificationManager({
                 </Select>
               </div>
 
-              <Badge variant="secondary" className="text-xs">
-                {formatMinutesToReadable(notification.minutesBefore)}
-              </Badge>
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -230,38 +226,6 @@ export function NotificationManager({
         <Plus className="h-4 w-4 mr-2" />
         Add Email Notification
       </Button>
-
-      {(defaultReminder || notifications.length > 0) && (
-        <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-          <div className="font-medium mb-1">
-            📧 Email notifications will be sent:
-          </div>
-          <ul className="space-y-1">
-            {defaultReminder && (
-              <li className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="flex items-center gap-1">
-                  {formatMinutesToReadable(defaultReminder)} before the event
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1 py-0 h-4 border-blue-300 text-blue-700"
-                  >
-                    Default
-                  </Badge>
-                </span>
-              </li>
-            )}
-            {notifications.map((notification, index) => (
-              <li key={index} className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full" />
-                {notification.minutesBefore === 0
-                  ? "Immediately (for testing)"
-                  : `${formatMinutesToReadable(notification.minutesBefore)} before the event`}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

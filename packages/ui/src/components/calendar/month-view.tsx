@@ -152,9 +152,11 @@ export function MonthView({
               return (
                 <div
                   key={day.toString()}
-                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 ${
+                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 hover:bg-[var(--warm-accent-1)]/30 hover:border-[var(--warm-accent-2)]/40 transition-all duration-200 ${
                     workingDays.includes(day.getDay()) && isCurrentMonth 
-                      ? "bg-blue-50/50 dark:bg-blue-950/20" 
+                      ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
+                      : !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay()) && isCurrentMonth
+                      ? "bg-[var(--warm-accent-1)]/20"
                       : ""
                   }`}
                   data-today={isToday(day) || undefined}
@@ -169,7 +171,7 @@ export function MonthView({
                       onEventCreate(startTime);
                     }}
                   >
-                    <div className="group-data-today:bg-accent group-data-today:text-accent-foreground mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm">
+                    <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm">
                       {format(day, "d")}
                     </div>
                     <div
