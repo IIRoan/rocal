@@ -20,17 +20,18 @@ export class HttpClient {
 
   constructor(options: HttpClientOptions = {}) {
     const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-    
+
     // Debug logging
-    if (typeof window !== 'undefined') {
-      console.log('NEXT_PUBLIC_APP_URL in browser:', envUrl);
+    if (typeof window !== "undefined") {
+      console.log("NEXT_PUBLIC_APP_URL in browser:", envUrl);
     }
-    
+
     // Use current window location as fallback in browser
-    const fallbackUrl = typeof window !== 'undefined' 
-      ? `${window.location.protocol}//${window.location.host}`
-      : "http://localhost:3000";
-    
+    const fallbackUrl =
+      typeof window !== "undefined"
+        ? `${window.location.protocol}//${window.location.host}`
+        : "http://localhost:3000";
+
     this.baseURL = envUrl || fallbackUrl;
     this.timeout = options.timeout || 10000; // 10 seconds
     this.retries = options.retries || 3;
@@ -61,14 +62,34 @@ export class HttpClient {
 
   private async parseErrorResponse(response: Response): Promise<ApiError> {
     try {
-      const errorData = await response.json();
-      return {
-        error: errorData.error || "Unknown error",
-        message: errorData.message || response.statusText,
+      const errorText = await response.text();
+      console.error(`HTTP ${response.status} Error Response:`, errorText);
+
+      // Try to parse as JSON
+      let errorData: any;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        // If not JSON, create a structured error
+        errorData = {
+          error: "HTTP Error",
+          message:
+            errorText || response.statusText || `HTTP ${response.status}`,
+        };
+      }
+
+      const apiError: ApiError = {
+        error: errorData.error || "HTTP Error",
+        message:
+          errorData.message || response.statusText || `HTTP ${response.status}`,
         statusCode: response.status,
-        details: errorData.details,
+        details: errorData.details || [],
       };
-    } catch {
+
+      console.error(`API Error [${response.url}]:`, apiError);
+      return apiError;
+    } catch (parseError) {
+      console.error("Failed to parse error response:", parseError);
       return {
         error: "HTTP Error",
         message: response.statusText || `HTTP ${response.status}`,

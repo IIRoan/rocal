@@ -83,7 +83,10 @@ export interface EventCalendarProps {
   };
   // Notification handlers
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
-  onUpdateNotifications?: (eventId: string, notifications: EventNotification[]) => Promise<void>;
+  onUpdateNotifications?: (
+    eventId: string,
+    notifications: EventNotification[]
+  ) => Promise<void>;
   onTestEmail?: (eventId: string) => Promise<void>;
 }
 
@@ -116,7 +119,7 @@ export function EventCalendar({
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
   const [view, setView] = useState<CalendarView>(initialView);
-  
+
   // Update view when initialView changes (from settings)
   useEffect(() => {
     setView(initialView);
@@ -136,8 +139,12 @@ export function EventCalendar({
       start = startOfMonth(currentDate);
       end = endOfMonth(currentDate);
     } else if (view === "week") {
-      start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      start = startOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      end = endOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
     } else if (view === "day") {
       start = new Date(currentDate);
       start.setHours(0, 0, 0, 0);
@@ -266,7 +273,9 @@ export function EventCalendar({
     setIsEventDialogOpen(true);
   };
 
-  const handleEventSave = async (event: CalendarEvent): Promise<CalendarEvent> => {
+  const handleEventSave = async (
+    event: CalendarEvent
+  ): Promise<CalendarEvent> => {
     try {
       const eventData = {
         title: event.title,
@@ -285,7 +294,7 @@ export function EventCalendar({
       if (event.id) {
         // Update existing event
         savedEvent = await updateEvent(event.id, eventData);
-        
+
         // Show success toast notification when an event is updated
         toast.success(`Event "${event.title}" updated`, {
           description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
@@ -304,7 +313,7 @@ export function EventCalendar({
 
       setIsEventDialogOpen(false);
       setSelectedEvent(null);
-      
+
       // Return the saved event, or the original event if savedEvent is undefined
       return savedEvent || event;
     } catch (error: any) {
@@ -313,7 +322,9 @@ export function EventCalendar({
       // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to save event";
       const isNetworkError =
-        error?.code === "NETWORK_ERROR" || !navigator.onLine;
+        error?.error === "Network Error" ||
+        error?.statusCode === 0 ||
+        !navigator.onLine;
 
       if (isNetworkError) {
         toast.error("Network error", {
@@ -335,13 +346,18 @@ export function EventCalendar({
           description: error.details.map((d: any) => d.message).join(", "),
           position: "bottom-left",
         });
+      } else if (error?.statusCode === 400) {
+        toast.error("Invalid data", {
+          description: errorMessage,
+          position: "bottom-left",
+        });
       } else {
         toast.error("Failed to save event", {
           description: errorMessage,
           position: "bottom-left",
         });
       }
-      
+
       throw error;
     }
   };
@@ -368,7 +384,9 @@ export function EventCalendar({
       // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to delete event";
       const isNetworkError =
-        error?.code === "NETWORK_ERROR" || !navigator.onLine;
+        error?.error === "Network Error" ||
+        error?.statusCode === 0 ||
+        !navigator.onLine;
 
       if (isNetworkError) {
         toast.error("Network error", {
@@ -388,6 +406,11 @@ export function EventCalendar({
       } else if (error?.statusCode === 404) {
         toast.error("Event not found", {
           description: "This event may have already been deleted",
+          position: "bottom-left",
+        });
+      } else if (error?.statusCode === 400) {
+        toast.error("Invalid request", {
+          description: errorMessage,
           position: "bottom-left",
         });
       } else {
@@ -427,7 +450,9 @@ export function EventCalendar({
       // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to move event";
       const isNetworkError =
-        error?.code === "NETWORK_ERROR" || !navigator.onLine;
+        error?.error === "Network Error" ||
+        error?.statusCode === 0 ||
+        !navigator.onLine;
 
       if (isNetworkError) {
         toast.error("Network error", {
@@ -444,6 +469,11 @@ export function EventCalendar({
           description: "You don't have permission to move this event",
           position: "bottom-left",
         });
+      } else if (error?.statusCode === 400) {
+        toast.error("Invalid request", {
+          description: errorMessage,
+          position: "bottom-left",
+        });
       } else {
         toast.error("Failed to move event", {
           description: errorMessage,
@@ -457,8 +487,12 @@ export function EventCalendar({
     if (view === "month") {
       return format(currentDate, "MMMM yyyy");
     } else if (view === "week") {
-      const start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      const end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      const start = startOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      const end = endOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
       if (isSameMonth(start, end)) {
         return format(start, "MMMM yyyy");
       } else {
@@ -602,7 +636,12 @@ export function EventCalendar({
                     // If the current date is today, start at the current time (rounded to next 15-min interval)
                     if (startTime.toDateString() === now.toDateString()) {
                       // Use current time and round to next 15-minute interval
-                      startTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
+                      startTime.setHours(
+                        now.getHours(),
+                        now.getMinutes(),
+                        0,
+                        0
+                      );
                       const minutes = startTime.getMinutes();
                       const remainder = minutes % 15;
                       if (remainder !== 0) {

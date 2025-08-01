@@ -64,23 +64,65 @@ export class RedisNotificationService {
 
       // Start the reminder checking process
       this.startReminderChecker();
+
+      // Start cleanup process for old notification logs
+      this.startCleanupProcess();
     } catch (error) {
       console.error("Failed to initialize Redis Notification Service:", error);
       throw error;
     }
   }
 
-  private startReminderChecker(): void {
-    // Check for reminders every 1 minute
-    setInterval(async () => {
-      try {
-        await this.checkForReminders();
-      } catch (error) {
-        console.error("Error in reminder checker:", error);
-      }
-    }, 60 * 1000); // Every 60 seconds
+  private startCleanupProcess(): void {
+    // Clean up old notification logs every 24 hours
+    setInterval(
+      async () => {
+        try {
+          await this.cleanupOldNotificationLogs();
+        } catch (error) {
+          console.error("❌ Error in cleanup process:", error);
+        }
+      },
+      24 * 60 * 60 * 1000
+    ); // Every 24 hours
 
-    console.log("✓ Reminder checker started (60s intervals)");
+    console.log("✓ Cleanup process started (24h intervals)");
+  }
+
+  private async cleanupOldNotificationLogs(): Promise<void> {
+    try {
+      // Delete notification logs older than 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      const result = await prisma.notificationLog.deleteMany({
+        where: {
+          createdAt: {
+            lt: thirtyDaysAgo,
+          },
+        },
+      });
+
+      console.log(`🧹 Cleaned up ${result.count} old notification logs`);
+    } catch (error) {
+      console.error("Failed to cleanup old notification logs:", error);
+    }
+  }
+
+  private startReminderChecker(): void {
+    // Check for reminders every 2 minutes to reduce load
+    setInterval(
+      async () => {
+        try {
+          await this.checkForReminders();
+        } catch (error) {
+          console.error("❌ Error in reminder checker:", error);
+          // Continue running even if there's an error
+        }
+      },
+      2 * 60 * 1000
+    ); // Every 2 minutes
+
+    console.log("✓ Reminder checker started (2min intervals)");
   }
 
   // Check for events that need reminders
@@ -285,7 +327,6 @@ export class RedisNotificationService {
       );
     }
   }
-
 
   private async sendEmailNotification(
     event: NotificationEvent,

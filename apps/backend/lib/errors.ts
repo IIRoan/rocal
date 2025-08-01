@@ -32,6 +32,26 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public originalError?: any
+  ) {
+    super(message);
+    this.name = "DatabaseError";
+  }
+}
+
+export class NotificationError extends Error {
+  constructor(
+    message: string,
+    public originalError?: any
+  ) {
+    super(message);
+    this.name = "NotificationError";
+  }
+}
+
 // Error response interface
 export interface ApiErrorResponse {
   error: string;
@@ -121,6 +141,32 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
             error: "Forbidden",
             message: error.message,
             statusCode: 403,
+            timestamp,
+          } as ApiErrorResponse;
+        }
+
+        if (error instanceof DatabaseError) {
+          set.status = 500;
+          return {
+            error: "Database Error",
+            message: error.message,
+            statusCode: 500,
+            details: error.originalError
+              ? { originalError: error.originalError.message }
+              : undefined,
+            timestamp,
+          } as ApiErrorResponse;
+        }
+
+        if (error instanceof NotificationError) {
+          set.status = 500;
+          return {
+            error: "Notification Error",
+            message: error.message,
+            statusCode: 500,
+            details: error.originalError
+              ? { originalError: error.originalError.message }
+              : undefined,
             timestamp,
           } as ApiErrorResponse;
         }

@@ -76,7 +76,10 @@ interface EventDialogProps {
   defaultCalendarId?: string | null;
   // Notification handlers
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
-  onUpdateNotifications?: (eventId: string, notifications: EventNotification[]) => Promise<void>;
+  onUpdateNotifications?: (
+    eventId: string,
+    notifications: EventNotification[]
+  ) => Promise<void>;
   onTestEmail?: (eventId: string) => Promise<void>;
 }
 
@@ -97,7 +100,7 @@ export function EventDialog({
   onTestEmail,
 }: EventDialogProps) {
   const { calendars } = useCalendarContext();
-  
+
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -110,9 +113,11 @@ export function EventDialog({
   const [calendarId, setCalendarId] = useState<string>("");
   const [reminder, setReminder] = useState<number | null>(null);
   const [notifications, setNotifications] = useState<EventNotification[]>([]);
-  
+
   // UI state
-  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
+    []
+  );
   const [localError, setLocalError] = useState<string | null>(null);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
@@ -123,10 +128,12 @@ export function EventDialog({
   const defaultCalendar = useMemo(() => {
     // Use the provided defaultCalendarId first, then fallback to isDefault, then first calendar
     if (defaultCalendarId) {
-      const specificCalendar = calendars.find(cal => cal.id === defaultCalendarId);
+      const specificCalendar = calendars.find(
+        (cal) => cal.id === defaultCalendarId
+      );
       if (specificCalendar) return specificCalendar;
     }
-    return calendars.find(cal => cal.isDefault) || calendars[0];
+    return calendars.find((cal) => cal.isDefault) || calendars[0];
   }, [calendars, defaultCalendarId]);
 
   // Initialize form when dialog opens or event changes
@@ -143,9 +150,14 @@ export function EventDialog({
         setAllDay(event.allDay || false);
         setLocation(event.location || "");
         setCalendarId(event.calendarId || defaultCalendar?.id || "");
-        console.log('Event reminder value:', event.reminder, 'Event data:', event);
+        console.log(
+          "Event reminder value:",
+          event.reminder,
+          "Event data:",
+          event
+        );
         setReminder(event.reminder ?? null);
-        
+
         // Load notifications for existing event
         if (event.id && onLoadNotifications) {
           loadEventNotifications(event.id);
@@ -159,16 +171,22 @@ export function EventDialog({
       setValidationErrors([]);
       setLocalError(null);
     }
-  }, [isOpen, event, defaultCalendar?.id, defaultReminder, defaultEventDuration]);
+  }, [
+    isOpen,
+    event,
+    defaultCalendar?.id,
+    defaultReminder,
+    defaultEventDuration,
+  ]);
 
   const loadEventNotifications = async (eventId: string) => {
     if (!onLoadNotifications) return;
-    
+
     try {
       const eventNotifications = await onLoadNotifications(eventId);
       setNotifications(eventNotifications);
     } catch (error) {
-      console.error('Failed to load event notifications:', error);
+      console.error("Failed to load event notifications:", error);
       setNotifications([]);
     }
   };
@@ -176,23 +194,25 @@ export function EventDialog({
   const resetForm = () => {
     const startDate = new Date();
     const endDate = new Date();
-    
+
     // Calculate end time based on default duration
     endDate.setMinutes(startDate.getMinutes() + defaultEventDuration);
-    
+
     setTitle("");
     setDescription("");
     setStartDate(startDate);
     setEndDate(endDate);
     setStartTime(`${DefaultStartHour}:00`);
-    
+
     // Set end time based on default duration
     const durationHours = Math.floor(defaultEventDuration / 60);
     const durationMinutes = defaultEventDuration % 60;
     const defaultEndHour = DefaultStartHour + durationHours;
     const defaultEndMinute = durationMinutes;
-    setEndTime(`${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute.toString().padStart(2, "0")}`);
-    
+    setEndTime(
+      `${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute.toString().padStart(2, "0")}`
+    );
+
     setAllDay(false);
     setLocation("");
     setCalendarId(defaultCalendar?.id || "");
@@ -210,26 +230,32 @@ export function EventDialog({
   const validateTimeInput = (timeString: string): string | null => {
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
     const match = timeString.match(timeRegex);
-    
+
     if (!match) return null;
-    
+
     const hours = parseInt(match[1]!, 10);
     const minutes = parseInt(match[2]!, 10);
-    
+
     if (hours < StartHour || hours > EndHour) return null;
-    
+
     return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
   };
 
   // Handle manual time input
-  const handleTimeInputChange = (value: string, setter: (time: string) => void) => {
+  const handleTimeInputChange = (
+    value: string,
+    setter: (time: string) => void
+  ) => {
     // Allow partial input while typing
     if (value === "" || /^([0-2]?[0-9]?:?[0-5]?[0-9]?)$/.test(value)) {
       setter(value);
     }
   };
 
-  const handleTimeInputBlur = (value: string, setter: (time: string) => void) => {
+  const handleTimeInputBlur = (
+    value: string,
+    setter: (time: string) => void
+  ) => {
     const validatedTime = validateTimeInput(value);
     if (validatedTime) {
       setter(validatedTime);
@@ -248,9 +274,10 @@ export function EventDialog({
         const formattedMinute = minute.toString().padStart(2, "0");
         const value = `${formattedHour}:${formattedMinute}`;
         const date = new Date(2000, 0, 1, hour, minute);
-        const label = timeFormat === "24h" 
-          ? `${formattedHour}:${formattedMinute}`
-          : format(date, "h:mm a");
+        const label =
+          timeFormat === "24h"
+            ? `${formattedHour}:${formattedMinute}`
+            : format(date, "h:mm a");
         options.push({ value, label });
       }
     }
@@ -273,7 +300,9 @@ export function EventDialog({
     const end = new Date(endDate);
 
     if (!allDay) {
-      const [startHours = 0, startMinutes = 0] = startTime.split(":").map(Number);
+      const [startHours = 0, startMinutes = 0] = startTime
+        .split(":")
+        .map(Number);
       const [endHours = 0, endMinutes = 0] = endTime.split(":").map(Number);
 
       if (
@@ -284,7 +313,7 @@ export function EventDialog({
       ) {
         errors.push({
           field: "time",
-          message: `Selected time must be between ${StartHour.toString().padStart(2, '0')}:00 and ${EndHour.toString().padStart(2, '0')}:00`,
+          message: `Selected time must be between ${StartHour.toString().padStart(2, "0")}:00 and ${EndHour.toString().padStart(2, "0")}:00`,
         });
       }
 
@@ -319,7 +348,9 @@ export function EventDialog({
     const end = new Date(endDate);
 
     if (!allDay) {
-      const [startHours = 0, startMinutes = 0] = startTime.split(":").map(Number);
+      const [startHours = 0, startMinutes = 0] = startTime
+        .split(":")
+        .map(Number);
       const [endHours = 0, endMinutes = 0] = endTime.split(":").map(Number);
       start.setHours(startHours, startMinutes, 0);
       end.setHours(endHours, endMinutes, 0);
@@ -329,7 +360,7 @@ export function EventDialog({
     }
 
     // Get the color from the selected calendar
-    const selectedCalendar = calendars.find(cal => cal.id === calendarId);
+    const selectedCalendar = calendars.find((cal) => cal.id === calendarId);
     const calendarColor = selectedCalendar?.color || "blue";
 
     const eventData: CalendarEvent = {
@@ -351,15 +382,19 @@ export function EventDialog({
     setSaving(true);
     try {
       const savedEvent = await onSave(eventData);
-      
+
       // After saving the event, update notifications if there are any
-      if (notifications.length > 0 && (savedEvent?.id || eventData?.id) && onUpdateNotifications) {
+      if (
+        notifications.length > 0 &&
+        (savedEvent?.id || eventData?.id) &&
+        onUpdateNotifications
+      ) {
         const eventId = savedEvent?.id || eventData?.id;
         try {
           await onUpdateNotifications(eventId, notifications);
-          console.log('✅ Notifications updated successfully');
+          console.log("✅ Notifications updated successfully");
         } catch (notificationError) {
-          console.error('Failed to update notifications:', notificationError);
+          console.error("Failed to update notifications:", notificationError);
           // Don't fail the whole save for notification errors
         }
       }
@@ -385,16 +420,15 @@ export function EventDialog({
 
   const handleTestEmail = async (eventId: string) => {
     if (!onTestEmail) return;
-    
+
     try {
       await onTestEmail(eventId);
-      console.log('✅ Test email sent successfully');
+      console.log("✅ Test email sent successfully");
     } catch (error) {
-      console.error('Failed to send test email:', error);
+      console.error("Failed to send test email:", error);
       throw error;
     }
   };
-
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -407,7 +441,7 @@ export function EventDialog({
               : "Add a new event to your calendar"}
           </DialogDescription>
         </DialogHeader>
-        
+
         {(apiError || localError || validationErrors.length > 0) && (
           <div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm space-y-1">
             {apiError && <div>{apiError.message}</div>}
@@ -480,7 +514,10 @@ export function EventDialog({
                     <span className="truncate">
                       {startDate ? format(startDate, "PPP") : "Pick a date"}
                     </span>
-                    <RiCalendarLine size={16} className="text-muted-foreground/80 shrink-0" />
+                    <RiCalendarLine
+                      size={16}
+                      className="text-muted-foreground/80 shrink-0"
+                    />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2" align="start">
@@ -509,8 +546,12 @@ export function EventDialog({
                   <Input
                     id="start-time"
                     value={startTime}
-                    onChange={(e) => handleTimeInputChange(e.target.value, setStartTime)}
-                    onBlur={(e) => handleTimeInputBlur(e.target.value, setStartTime)}
+                    onChange={(e) =>
+                      handleTimeInputChange(e.target.value, setStartTime)
+                    }
+                    onBlur={(e) =>
+                      handleTimeInputBlur(e.target.value, setStartTime)
+                    }
                     placeholder="HH:MM"
                     className="pr-8"
                   />
@@ -561,7 +602,10 @@ export function EventDialog({
                     <span className="truncate">
                       {endDate ? format(endDate, "PPP") : "Pick a date"}
                     </span>
-                    <RiCalendarLine size={16} className="text-muted-foreground/80 shrink-0" />
+                    <RiCalendarLine
+                      size={16}
+                      className="text-muted-foreground/80 shrink-0"
+                    />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2" align="start">
@@ -588,8 +632,12 @@ export function EventDialog({
                   <Input
                     id="end-time"
                     value={endTime}
-                    onChange={(e) => handleTimeInputChange(e.target.value, setEndTime)}
-                    onBlur={(e) => handleTimeInputBlur(e.target.value, setEndTime)}
+                    onChange={(e) =>
+                      handleTimeInputChange(e.target.value, setEndTime)
+                    }
+                    onBlur={(e) =>
+                      handleTimeInputBlur(e.target.value, setEndTime)
+                    }
                     placeholder="HH:MM"
                     className="pr-8"
                   />
@@ -650,6 +698,7 @@ export function EventDialog({
               onChange={setNotifications}
               onTestEmail={onTestEmail ? handleTestEmail : undefined}
               loading={saving}
+              defaultReminder={defaultReminder}
             />
           )}
 
@@ -660,9 +709,11 @@ export function EventDialog({
                 <Bell className="h-4 w-4" />
                 Reminder
               </Label>
-              <Select 
-                value={reminder?.toString() || "none"} 
-                onValueChange={(value) => setReminder(value === "none" ? null : parseInt(value))}
+              <Select
+                value={reminder?.toString() || "none"}
+                onValueChange={(value) =>
+                  setReminder(value === "none" ? null : parseInt(value))
+                }
               >
                 <SelectTrigger id="reminder">
                   <SelectValue placeholder="Select reminder" />
@@ -680,7 +731,6 @@ export function EventDialog({
               </Select>
             </div>
           )}
-
         </div>
 
         <DialogFooter className="flex-row sm:justify-between">
@@ -708,8 +758,8 @@ export function EventDialog({
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleSave} 
+            <Button
+              onClick={handleSave}
               disabled={saving || deleting || !calendarId}
               className="bg-accent hover:bg-accent/80 text-accent-foreground"
             >
