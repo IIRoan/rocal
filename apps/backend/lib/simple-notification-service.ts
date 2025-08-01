@@ -2,11 +2,7 @@ import { prisma } from "./prisma";
 import { Resend } from "resend";
 import type { CalendarEvent, User, UserSettings } from "../generated/prisma";
 
-if (!process.env.RESEND_API_KEY) {
-  throw new Error("RESEND_API_KEY environment variable is required");
-}
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export interface NotificationEvent extends CalendarEvent {
   user: User;
@@ -199,6 +195,11 @@ export class SimpleNotificationService {
     user: User,
     minutesBefore: number
   ): Promise<void> {
+    if (!resend) {
+      console.log(`⚠️ Resend not configured - skipping email notification for ${user.email}`);
+      return;
+    }
+
     const timeUntilEvent = this.formatTimeUntilEvent(event.start);
     const eventDate = event.start.toLocaleDateString("en-US", {
       weekday: "long",
