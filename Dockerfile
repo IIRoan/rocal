@@ -25,17 +25,6 @@ FROM base AS builder
 RUN npm install -g pnpm
 WORKDIR /app
 
-# Accept build arguments for environment variables
-ARG BETTER_AUTH_SECRET
-ARG GITHUB_CLIENT_ID
-ARG GITHUB_CLIENT_SECRET
-ARG RESEND_API_KEY
-
-# Set environment variables for build
-ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
-ENV GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID
-ENV GITHUB_CLIENT_SECRET=$GITHUB_CLIENT_SECRET
-ENV RESEND_API_KEY=$RESEND_API_KEY
 
 # Copy source code (excluding node_modules via .dockerignore)
 COPY . .
