@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { redisNotificationService } from "../lib/redis-notification-service";
+import { simpleNotificationService } from "../lib/simple-notification-service";
 import { ValidationError } from "../lib/errors";
 import { prisma } from "../lib/prisma";
 
@@ -14,7 +14,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
 
       try {
-        await redisNotificationService.sendTestNotification(user.id, eventId);
+        await simpleNotificationService.sendTestNotification(user.id, eventId);
         return {
           success: true,
           message: "Test notification sent successfully",
@@ -87,10 +87,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         }
 
         // Send immediate email test for specific event
-        await redisNotificationService.sendTestEmailNotification(
-          user.id,
-          eventId
-        );
+        await simpleNotificationService.sendTestNotification(user.id, eventId);
         return {
           success: true,
           message: "Test email notification sent successfully",
@@ -148,12 +145,16 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
     "/email/pending",
     async ({ user }: any) => {
       try {
-        const pendingEmails =
-          await redisNotificationService.getPendingEmailNotifications(user.id);
+        // Get pending notifications from the new service
+        const status = await simpleNotificationService.getNotificationStatus();
+        const userNotifications = status.pendingNotifications.filter(
+          (n: any) => n.userEmail === user.email
+        );
+
         return {
           success: true,
-          emails: pendingEmails,
-          count: pendingEmails.length,
+          emails: userNotifications,
+          count: userNotifications.length,
         };
       } catch (error) {
         throw new ValidationError("Failed to get pending email notifications");
@@ -207,10 +208,12 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
     "/trigger-check",
     async ({ user }: any) => {
       try {
-        await redisNotificationService.triggerReminderCheck();
+        // Manually trigger a notification check
+        const status = await simpleNotificationService.getNotificationStatus();
         return {
           success: true,
-          message: "Reminder check triggered successfully",
+          message: "Notification status retrieved successfully",
+          pendingCount: status.pendingNotifications.length,
         };
       } catch (error) {
         throw new ValidationError("Failed to trigger reminder check");
@@ -333,14 +336,19 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       const { notifications } = body;
 
       try {
-        // We'll keep using the old notification service for CRUD operations on event notifications
-        // since that's just database operations, not the actual notification sending
-        const { notificationService } = await import(
-          "../lib/notification-service"
-        );
-        await notificationService.updateEventNotifications(
+        // Get the event to get its start time
+        const event = await prisma.calendarEvent.findFirst({
+          where: { id: eventId, userId: user.id },
+        });
+
+        if (!event) {
+          throw new ValidationError("Event not found or access denied");
+        }
+
+        // Use the new simple notification service to update notifications
+        await simpleNotificationService.updateNotificationsForEvent(
           eventId,
-          user.id,
+          event.start,
           notifications
         );
 
@@ -418,33 +426,13 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
     "/browser/pending",
     async ({ user }: any) => {
       try {
-        // Get stored notifications from Redis backup queue
-        const { redisClient } = await import("../lib/redis");
-        const backupKey = `pending_notifications:${user.id}`;
-
-        // Get all notifications and clear the list
-        const notificationStrings = await redisClient.lRange(backupKey, 0, -1);
-        if (notificationStrings.length > 0) {
-          await redisClient.del(backupKey);
-        }
-
-        const notifications = notificationStrings
-          .map((str) => {
-            try {
-              return JSON.parse(str);
-            } catch {
-              return null;
-            }
-          })
-          .filter(Boolean);
-
+        // Browser notifications are not implemented in the simple service yet
+        // Return empty array for now
         return {
           success: true,
-          notifications,
+          notifications: [],
           message:
-            notifications.length > 0
-              ? `Retrieved ${notifications.length} pending notifications`
-              : "No pending notifications. Connect to /api/notifications/stream for real-time delivery",
+            "Browser notifications not implemented in simple service yet",
         };
       } catch (error) {
         console.error("Failed to get pending notifications:", error);
@@ -507,16 +495,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
     "/status",
     async ({ user }: any) => {
       try {
-        // Check if Redis is available
-        let redisStatus = "❌ Unavailable";
-        try {
-          const { redisClient } = await import("../lib/redis");
-          await redisClient.ping();
-          redisStatus = "✅ Connected";
-        } catch (redisError) {
-          console.error("Redis health check failed:", redisError);
-        }
-
         // Check if email service is configured
         const emailStatus = process.env.RESEND_API_KEY
           ? "✅ Configured"
@@ -531,25 +509,31 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           console.error("Database health check failed:", dbError);
         }
 
+        // Get notification service status
+        const notificationStatus =
+          await simpleNotificationService.getNotificationStatus();
+
         return {
           status:
-            redisStatus === "✅ Connected" && dbStatus === "✅ Connected"
+            dbStatus === "✅ Connected" && emailStatus === "✅ Configured"
               ? "operational"
               : "degraded",
-          message: "Notification service status",
+          message: "Simple notification service status",
           services: {
-            redis: redisStatus,
             database: dbStatus,
             email: emailStatus,
+            notificationService: notificationStatus.isRunning
+              ? "✅ Running"
+              : "❌ Stopped",
           },
           features: {
             email: emailStatus === "✅ Configured",
-            browser: redisStatus === "✅ Connected",
             reminders:
-              redisStatus === "✅ Connected" && dbStatus === "✅ Connected",
+              dbStatus === "✅ Connected" && emailStatus === "✅ Configured",
           },
-          checkInterval: "2 minutes",
-          queueProcessInterval: "30 seconds",
+          checkInterval: "1 minute",
+          pendingNotifications: notificationStatus.pendingNotifications.length,
+          recentLogs: notificationStatus.recentLogs.length,
           timestamp: new Date().toISOString(),
         };
       } catch (error) {
@@ -624,15 +608,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
               `data: ${JSON.stringify({ type: "connected", message: "Connected to notifications" })}\n\n`
             );
 
-            // Subscribe to user's notifications
-            redisNotificationService.subscribeToUserNotifications(
-              user.id,
-              (notification) => {
-                const sseData = `data: ${JSON.stringify({ type: "notification", data: notification })}\n\n`;
-                controller.enqueue(sseData);
-              }
-            );
-
             // Send keepalive every 30 seconds
             const keepAlive = setInterval(() => {
               controller.enqueue(
@@ -643,9 +618,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
             // Cleanup on close
             return () => {
               clearInterval(keepAlive);
-              redisNotificationService.unsubscribeFromUserNotifications(
-                user.id
-              );
             };
           },
         });
@@ -690,10 +662,26 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       const { notificationTimes } = body;
 
       try {
-        await redisNotificationService.createMultipleNotificationsForEvent(
+        // Get the event to get its start time
+        const event = await prisma.calendarEvent.findFirst({
+          where: { id: eventId, userId: user.id },
+        });
+
+        if (!event) {
+          throw new ValidationError("Event not found or access denied");
+        }
+
+        // Create notifications using the simple service
+        const notifications = notificationTimes.map((minutes: number) => ({
+          notificationType: "email" as const,
+          minutesBefore: minutes,
+          isEnabled: true,
+        }));
+
+        await simpleNotificationService.createNotificationsForEvent(
           eventId,
-          user.id,
-          notificationTimes
+          event.start,
+          notifications
         );
 
         return {
@@ -763,20 +751,161 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
     }
   )
 
+  .post(
+    "/create-test-event",
+    async ({ body, user }: any) => {
+      const { minutesFromNow = 5 } = body;
+
+      try {
+        const result = await simpleNotificationService.createTestEvent(
+          user.id,
+          minutesFromNow
+        );
+        return {
+          success: true,
+          ...result,
+        };
+      } catch (error: any) {
+        throw new ValidationError(
+          error.message || "Failed to create test event"
+        );
+      }
+    },
+    {
+      auth: true,
+      body: t.Object({
+        minutesFromNow: t.Optional(
+          t.Integer({
+            description: "Minutes from now when the event should start",
+            minimum: 1,
+            maximum: 60,
+            default: 5,
+          })
+        ),
+      }),
+      detail: {
+        tags: ["Notifications"],
+        summary: "Create test event with notifications",
+        description:
+          "Creates a test event with email notifications for debugging purposes",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Test event created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    eventId: { type: "string" },
+                    message: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: "Validation error",
+          },
+          401: {
+            description: "Unauthorized",
+          },
+        },
+      },
+    }
+  )
+
   .get(
     "/debug",
     async ({ user }: any) => {
-      return {
-        environment: {
-          REDIS_URL: process.env.REDIS_URL ? "✅ Set" : "❌ Missing",
-          RESEND_API_KEY: process.env.RESEND_API_KEY ? "✅ Set" : "❌ Missing",
-        },
-        user: {
-          id: user.id,
-          email: user.email,
-        },
-        timestamp: new Date().toISOString(),
-      };
+      try {
+        // Get recent events with notifications for this user
+        const recentEvents = await prisma.calendarEvent.findMany({
+          where: {
+            userId: user.id,
+            start: {
+              gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+            },
+          },
+          include: {
+            notifications: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 5,
+        });
+
+        // Get recent notification logs
+        const recentLogs = await prisma.notificationLog.findMany({
+          where: {
+            userId: user.id,
+            createdAt: {
+              gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 10,
+        });
+
+        // Get user settings
+        const userSettings = await prisma.userSettings.findUnique({
+          where: { userId: user.id },
+        });
+
+        // Get notification service status
+        const notificationStatus =
+          await simpleNotificationService.getNotificationStatus();
+
+        return {
+          environment: {
+            RESEND_API_KEY: process.env.RESEND_API_KEY
+              ? "✅ Set"
+              : "❌ Missing",
+            NODE_ENV: process.env.NODE_ENV,
+          },
+          user: {
+            id: user.id,
+            email: user.email,
+          },
+          userSettings: {
+            emailNotifications: userSettings?.emailNotifications ?? true,
+            browserNotifications: userSettings?.browserNotifications ?? true,
+            defaultReminder: userSettings?.defaultReminder,
+          },
+          recentEvents: recentEvents.map((event) => ({
+            id: event.id,
+            title: event.title,
+            start: event.start.toISOString(),
+            notificationCount: event.notifications.length,
+            notifications: event.notifications.map((n) => ({
+              type: n.notificationType,
+              minutesBefore: n.minutesBefore,
+              enabled: n.isEnabled,
+            })),
+          })),
+          recentNotificationLogs: recentLogs.map((log) => ({
+            eventId: log.eventId,
+            type: log.notificationType,
+            minutesBefore: log.minutesBefore,
+            sentAt: log.sentAt.toISOString(),
+            status: log.status,
+          })),
+          notificationService: {
+            isRunning: notificationStatus.isRunning,
+            pendingNotifications:
+              notificationStatus.pendingNotifications.length,
+            recentLogs: notificationStatus.recentLogs.length,
+          },
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        console.error("Debug endpoint error:", error);
+        throw new ValidationError("Failed to get debug information");
+      }
     },
     {
       auth: true,
@@ -784,7 +913,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         tags: ["Notifications"],
         summary: "Debug notification configuration",
         description:
-          "Returns debug information about notification configuration",
+          "Returns comprehensive debug information about notification configuration and recent activity",
         security: [{ bearerAuth: [] }],
         responses: {
           200: {
@@ -796,6 +925,10 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
                   properties: {
                     environment: { type: "object" },
                     user: { type: "object" },
+                    userSettings: { type: "object" },
+                    recentEvents: { type: "array" },
+                    recentNotificationLogs: { type: "array" },
+                    emailQueue: { type: "object" },
                     timestamp: { type: "string" },
                   },
                 },

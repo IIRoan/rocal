@@ -241,12 +241,16 @@ model EventNotification {
   event            CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   notificationType String        @map("notification_type") // 'browser', 'email'
   minutesBefore    Int           @map("minutes_before")
+  notificationTime DateTime      @map("notification_time") // Exact time to send notification
   isEnabled        Boolean       @default(true) @map("is_enabled")
+  isSent           Boolean       @default(false) @map("is_sent")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
   @@index([eventId])
   @@index([notificationType])
+  @@index([notificationTime])
+  @@index([isEnabled, isSent])
   @@map("event_notification")
 }
 
