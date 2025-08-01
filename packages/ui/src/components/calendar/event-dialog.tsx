@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { RiCalendarLine, RiDeleteBinLine } from "@remixicon/react";
 import { format, isBefore } from "date-fns";
-
 import type { CalendarEvent } from "./types";
 import { useCalendarContext } from "./calendar-context";
 import { cn } from "../../lib/utils";
@@ -29,14 +28,26 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Textarea } from "../ui/textarea";
-import { Loader2, Bell } from "lucide-react";
+import {
+  Loader2,
+  Bell,
+  CalendarIcon,
+  Clock,
+  User,
+  FileText,
+  MapPin,
+  Palette,
+} from "lucide-react";
 import {
   StartHour,
   EndHour,
   DefaultStartHour,
   DefaultEndHour,
 } from "./constants";
-import { NotificationManager, EventNotification } from "./notification-manager";
+import {
+  NotificationManager,
+  type EventNotification,
+} from "./notification-manager";
 
 const REMINDER_OPTIONS = [
   { value: null, label: "No reminder" },
@@ -181,7 +192,6 @@ export function EventDialog({
 
   const loadEventNotifications = async (eventId: string) => {
     if (!onLoadNotifications) return;
-
     try {
       const eventNotifications = await onLoadNotifications(eventId);
       setNotifications(eventNotifications);
@@ -194,7 +204,6 @@ export function EventDialog({
   const resetForm = () => {
     const startDate = new Date();
     const endDate = new Date();
-
     // Calculate end time based on default duration
     endDate.setMinutes(startDate.getMinutes() + defaultEventDuration);
 
@@ -209,10 +218,10 @@ export function EventDialog({
     const durationMinutes = defaultEventDuration % 60;
     const defaultEndHour = DefaultStartHour + durationHours;
     const defaultEndMinute = durationMinutes;
+
     setEndTime(
       `${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute.toString().padStart(2, "0")}`
     );
-
     setAllDay(false);
     setLocation("");
     setCalendarId(defaultCalendar?.id || "");
@@ -230,11 +239,10 @@ export function EventDialog({
   const validateTimeInput = (timeString: string): string | null => {
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
     const match = timeString.match(timeRegex);
-
     if (!match) return null;
 
-    const hours = parseInt(match[1]!, 10);
-    const minutes = parseInt(match[2]!, 10);
+    const hours = Number.parseInt(match[1]!, 10);
+    const minutes = Number.parseInt(match[2]!, 10);
 
     if (hours < StartHour || hours > EndHour) return null;
 
@@ -313,7 +321,10 @@ export function EventDialog({
       ) {
         errors.push({
           field: "time",
-          message: `Selected time must be between ${StartHour.toString().padStart(2, "0")}:00 and ${EndHour.toString().padStart(2, "0")}:00`,
+          message: `Selected time must be between ${StartHour.toString().padStart(
+            2,
+            "0"
+          )}:00 and ${EndHour.toString().padStart(2, "0")}:00`,
         });
       }
 
@@ -352,6 +363,7 @@ export function EventDialog({
         .split(":")
         .map(Number);
       const [endHours = 0, endMinutes = 0] = endTime.split(":").map(Number);
+
       start.setHours(startHours, startMinutes, 0);
       end.setHours(endHours, endMinutes, 0);
     } else {
@@ -420,7 +432,6 @@ export function EventDialog({
 
   const handleTestEmail = async (eventId: string) => {
     if (!onTestEmail) return;
-
     try {
       await onTestEmail(eventId);
       console.log("✅ Test email sent successfully");
@@ -432,9 +443,12 @@ export function EventDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{event?.id ? "Edit Event" : "Create Event"}</DialogTitle>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            {event?.id ? "Edit Event" : "Create Event"}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             {event?.id
               ? "Edit the details of this event"
@@ -442,6 +456,7 @@ export function EventDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Error Display */}
         {(apiError || localError || validationErrors.length > 0) && (
           <div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm space-y-1">
             {apiError && <div>{apiError.message}</div>}
@@ -452,292 +467,304 @@ export function EventDialog({
           </div>
         )}
 
-        <div className="grid gap-4 py-4">
-          <div className="*:not-first:mt-1.5">
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter event title"
-            />
-          </div>
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-4">
+            {/* Left Section - Basic Event Details */}
+            <div className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    Title
+                  </Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter event title"
+                    className="text-base"
+                  />
+                </div>
 
-          <div className="*:not-first:mt-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="Enter event description"
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="description"
+                    className="flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                    placeholder="Enter event description"
+                    className="resize-none"
+                  />
+                </div>
 
-          <div className="*:not-first:mt-1.5">
-            <Label htmlFor="calendar">Calendar</Label>
-            <Select value={calendarId} onValueChange={setCalendarId}>
-              <SelectTrigger id="calendar">
-                <SelectValue placeholder="Select a calendar" />
-              </SelectTrigger>
-              <SelectContent>
-                {calendars.map((calendar) => (
-                  <SelectItem key={calendar.id} value={calendar.id}>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="size-3 rounded-full"
-                        style={{
-                          backgroundColor: `var(--color-${calendar.color}-400)`,
+                <div className="space-y-2">
+                  <Label htmlFor="calendar" className="flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-muted-foreground" />
+                    Calendar
+                  </Label>
+                  <Select value={calendarId} onValueChange={setCalendarId}>
+                    <SelectTrigger id="calendar">
+                      <SelectValue placeholder="Select a calendar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {calendars.map((calendar) => (
+                        <SelectItem key={calendar.id} value={calendar.id}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="size-3 rounded-full"
+                              style={{
+                                backgroundColor: `var(--color-${calendar.color}-400)`,
+                              }}
+                            />
+                            {calendar.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="location" className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    Location
+                  </Label>
+                  <Input
+                    id="location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Enter event location"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Section - Date, Time & Settings */}
+            <div className="space-y-4">
+              {/* Start Date and Time Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <RiCalendarLine className="h-4 w-4 text-muted-foreground" />
+                    Start Date
+                  </Label>
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-between px-3 font-normal",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <span className="truncate">
+                          {startDate ? format(startDate, "PPP") : "Pick a date"}
+                        </span>
+                        <RiCalendarLine
+                          size={16}
+                          className="text-muted-foreground/80 shrink-0"
+                        />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        defaultMonth={startDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setStartDate(date);
+                            if (isBefore(endDate, date)) {
+                              setEndDate(date);
+                            }
+                            setStartDateOpen(false);
+                          }
                         }}
                       />
-                      {calendar.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-          <div className="flex gap-4">
-            <div className="flex-1 *:not-first:mt-1.5">
-              <Label htmlFor="start-date">Start Date</Label>
-              <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="start-date"
-                    variant={"outline"}
-                    className={cn(
-                      "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal",
-                      !startDate && "text-muted-foreground"
-                    )}
-                  >
-                    <span className="truncate">
-                      {startDate ? format(startDate, "PPP") : "Pick a date"}
-                    </span>
-                    <RiCalendarLine
-                      size={16}
-                      className="text-muted-foreground/80 shrink-0"
-                    />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    defaultMonth={startDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setStartDate(date);
-                        if (isBefore(endDate, date)) {
-                          setEndDate(date);
+                {!allDay && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      Start Time
+                    </Label>
+                    <Select
+                      value={startTime}
+                      onValueChange={(value) => {
+                        setStartTime(value);
+                        // Auto-adjust end time by adding 1 hour
+                        const [hours, minutes] = value.split(":").map(Number);
+                        if (hours !== undefined && minutes !== undefined) {
+                          const endHour = hours + 1;
+                          const endTimeValue = `${endHour.toString().padStart(2, "0")}:${minutes
+                            .toString()
+                            .padStart(2, "0")}`;
+                          if (endHour <= EndHour) {
+                            setEndTime(endTimeValue);
+                          }
                         }
-                        setStartDateOpen(false);
-                      }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {!allDay && (
-              <div className="min-w-28 *:not-first:mt-1.5">
-                <Label htmlFor="start-time">Start Time</Label>
-                <div className="relative">
-                  <Input
-                    id="start-time"
-                    value={startTime}
-                    onChange={(e) =>
-                      handleTimeInputChange(e.target.value, setStartTime)
-                    }
-                    onBlur={(e) =>
-                      handleTimeInputBlur(e.target.value, setStartTime)
-                    }
-                    placeholder="HH:MM"
-                    className="pr-8"
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                        type="button"
-                      >
-                        ▼
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-32 p-1" align="end">
-                      <div className="max-h-40 overflow-y-auto">
-                        {timeOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className="w-full text-left px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
-                            onClick={() => setStartTime(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1 *:not-first:mt-1.5">
-              <Label htmlFor="end-date">End Date</Label>
-              <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    id="end-date"
-                    variant={"outline"}
-                    className={cn(
-                      "group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal",
-                      !endDate && "text-muted-foreground"
-                    )}
-                  >
-                    <span className="truncate">
-                      {endDate ? format(endDate, "PPP") : "Pick a date"}
-                    </span>
-                    <RiCalendarLine
-                      size={16}
-                      className="text-muted-foreground/80 shrink-0"
-                    />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    defaultMonth={endDate}
-                    disabled={{ before: startDate }}
-                    onSelect={(date) => {
-                      if (date) {
-                        setEndDate(date);
-                        setEndDateOpen(false);
-                      }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {!allDay && (
-              <div className="min-w-28 *:not-first:mt-1.5">
-                <Label htmlFor="end-time">End Time</Label>
-                <div className="relative">
-                  <Input
-                    id="end-time"
-                    value={endTime}
-                    onChange={(e) =>
-                      handleTimeInputChange(e.target.value, setEndTime)
-                    }
-                    onBlur={(e) =>
-                      handleTimeInputBlur(e.target.value, setEndTime)
-                    }
-                    placeholder="HH:MM"
-                    className="pr-8"
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                        type="button"
-                      >
-                        ▼
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-32 p-1" align="end">
-                      <div className="max-h-40 overflow-y-auto">
-                        {timeOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className="w-full text-left px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
-                            onClick={() => setEndTime(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="all-day"
-              checked={allDay}
-              onCheckedChange={(checked) => setAllDay(checked === true)}
-            />
-            <Label htmlFor="all-day">All day</Label>
-          </div>
-
-          <div className="*:not-first:mt-1.5">
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Enter event location"
-            />
-          </div>
-
-          {onLoadNotifications && onUpdateNotifications && (
-            <NotificationManager
-              eventId={event?.id}
-              notifications={notifications}
-              onChange={setNotifications}
-              onTestEmail={onTestEmail ? handleTestEmail : undefined}
-              loading={saving}
-              defaultReminder={defaultReminder}
-            />
-          )}
-
-          {/* Fallback to legacy reminder if notification handlers aren't provided */}
-          {(!onLoadNotifications || !onUpdateNotifications) && (
-            <div className="*:not-first:mt-1.5">
-              <Label htmlFor="reminder" className="flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                Reminder
-              </Label>
-              <Select
-                value={reminder?.toString() || "none"}
-                onValueChange={(value) =>
-                  setReminder(value === "none" ? null : parseInt(value))
-                }
-              >
-                <SelectTrigger id="reminder">
-                  <SelectValue placeholder="Select reminder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REMINDER_OPTIONS.map((option) => (
-                    <SelectItem
-                      key={option.value?.toString() || "none"}
-                      value={option.value?.toString() || "none"}
+                      }}
                     >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* End Date and Time Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <RiCalendarLine className="h-4 w-4 text-muted-foreground" />
+                    End Date
+                  </Label>
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-between px-3 font-normal",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <span className="truncate">
+                          {endDate ? format(endDate, "PPP") : "Pick a date"}
+                        </span>
+                        <RiCalendarLine
+                          size={16}
+                          className="text-muted-foreground/80 shrink-0"
+                        />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        defaultMonth={endDate}
+                        disabled={{ before: startDate }}
+                        onSelect={(date) => {
+                          if (date) {
+                            setEndDate(date);
+                            setEndDateOpen(false);
+                          }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {!allDay && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      End Time
+                    </Label>
+                    <Select value={endTime} onValueChange={setEndTime}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* All Day Toggle */}
+              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md border">
+                <Checkbox
+                  id="all-day"
+                  checked={allDay}
+                  onCheckedChange={(checked) => setAllDay(checked === true)}
+                />
+                <Label
+                  htmlFor="all-day"
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  All day event
+                </Label>
+              </div>
+
+              {/* Notifications Section */}
+              {onLoadNotifications && onUpdateNotifications && (
+                <div className="border-t border-border/50 pt-4">
+                  <NotificationManager
+                    eventId={event?.id}
+                    notifications={notifications}
+                    onChange={setNotifications}
+                    onTestEmail={onTestEmail ? handleTestEmail : undefined}
+                    loading={saving}
+                    defaultReminder={defaultReminder}
+                  />
+                </div>
+              )}
+
+              {/* Fallback to legacy reminder if notification handlers aren't provided */}
+              {(!onLoadNotifications || !onUpdateNotifications) && (
+                <div className="space-y-2">
+                  <Label htmlFor="reminder" className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-muted-foreground" />
+                    Reminder
+                  </Label>
+                  <Select
+                    value={reminder?.toString() || "none"}
+                    onValueChange={(value) =>
+                      setReminder(
+                        value === "none" ? null : Number.parseInt(value)
+                      )
+                    }
+                  >
+                    <SelectTrigger id="reminder">
+                      <SelectValue placeholder="Select reminder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REMINDER_OPTIONS.map((option) => (
+                        <SelectItem
+                          key={option.value?.toString() || "none"}
+                          value={option.value?.toString() || "none"}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         <DialogFooter className="flex-row sm:justify-between">
           {event?.id && (
             <Button
               variant="outline"
-              className="text-destructive hover:text-destructive"
+              className="text-destructive hover:text-destructive bg-transparent"
               size="icon"
               onClick={handleDelete}
               disabled={deleting || saving}
