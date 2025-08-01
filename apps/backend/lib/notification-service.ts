@@ -1,5 +1,10 @@
 import { prisma } from "./prisma";
-import type { CalendarEvent, User, UserSettings, EventNotification } from "../generated/prisma";
+import type {
+  CalendarEvent,
+  User,
+  UserSettings,
+  EventNotification,
+} from "../generated/prisma";
 
 export interface NotificationEvent extends CalendarEvent {
   user: User;
@@ -23,7 +28,7 @@ export interface BrowserNotificationData {
   data: {
     eventId: string;
     userId: string;
-    type: 'reminder';
+    type: "reminder";
   };
 }
 
@@ -93,11 +98,13 @@ export class NotificationService {
     }
   }
 
-  private async processEventReminder(event: NotificationEvent & {
-    user: User & { settings?: UserSettings | null };
-    calendar: any;
-    category: any;
-  }): Promise<void> {
+  private async processEventReminder(
+    event: NotificationEvent & {
+      user: User & { settings?: UserSettings | null };
+      calendar: any;
+      category: any;
+    }
+  ): Promise<void> {
     const now = new Date();
     const userSettings = event.user.settings;
 
@@ -106,16 +113,24 @@ export class NotificationService {
       for (const notification of event.notifications) {
         await this.processSingleNotification(event, notification, userSettings);
       }
-    } 
+    }
     // Fallback to legacy reminder system for backward compatibility
     else if (event.reminder) {
-      const reminderTime = new Date(event.start.getTime() - event.reminder * 60 * 1000);
-      
+      const reminderTime = new Date(
+        event.start.getTime() - event.reminder * 60 * 1000
+      );
+
       // Check if it's time for the reminder (within 1-minute window)
-      if (reminderTime <= now && reminderTime > new Date(now.getTime() - 60 * 1000)) {
+      if (
+        reminderTime <= now &&
+        reminderTime > new Date(now.getTime() - 60 * 1000)
+      ) {
         // Check if we've already sent this reminder
         const existingNotification = await this.checkIfNotificationSent(
-          event.id, event.userId, 'legacy', event.reminder
+          event.id,
+          event.userId,
+          "legacy",
+          event.reminder
         );
         if (existingNotification) return;
 
@@ -130,28 +145,54 @@ export class NotificationService {
         }
 
         // Record that notification was sent
-        await this.recordNotificationSent(event.id, event.userId, 'legacy', event.reminder, reminderTime);
+        await this.recordNotificationSent(
+          event.id,
+          event.userId,
+          "legacy",
+          event.reminder,
+          reminderTime
+        );
       }
     }
     // If no notifications configured, use user's default reminder setting
     else if (userSettings?.defaultReminder) {
-      const reminderTime = new Date(event.start.getTime() - userSettings.defaultReminder * 60 * 1000);
-      
-      if (reminderTime <= now && reminderTime > new Date(now.getTime() - 60 * 1000)) {
+      const reminderTime = new Date(
+        event.start.getTime() - userSettings.defaultReminder * 60 * 1000
+      );
+
+      if (
+        reminderTime <= now &&
+        reminderTime > new Date(now.getTime() - 60 * 1000)
+      ) {
         const existingNotification = await this.checkIfNotificationSent(
-          event.id, event.userId, 'default', userSettings.defaultReminder
+          event.id,
+          event.userId,
+          "default",
+          userSettings.defaultReminder
         );
         if (existingNotification) return;
 
         if (userSettings?.emailNotifications !== false) {
-          await this.queueEmailNotification(event, userSettings.defaultReminder);
+          await this.queueEmailNotification(
+            event,
+            userSettings.defaultReminder
+          );
         }
 
         if (userSettings?.browserNotifications !== false) {
-          await this.queueBrowserNotification(event, userSettings.defaultReminder);
+          await this.queueBrowserNotification(
+            event,
+            userSettings.defaultReminder
+          );
         }
 
-        await this.recordNotificationSent(event.id, event.userId, 'default', userSettings.defaultReminder, reminderTime);
+        await this.recordNotificationSent(
+          event.id,
+          event.userId,
+          "default",
+          userSettings.defaultReminder,
+          reminderTime
+        );
       }
     }
   }
@@ -166,41 +207,58 @@ export class NotificationService {
     userSettings: UserSettings | null | undefined
   ): Promise<void> {
     const now = new Date();
-    const reminderTime = new Date(event.start.getTime() - notification.minutesBefore * 60 * 1000);
-    
+    const reminderTime = new Date(
+      event.start.getTime() - notification.minutesBefore * 60 * 1000
+    );
+
     // Check if it's time for this specific notification (within 1-minute window)
-    if (reminderTime <= now && reminderTime > new Date(now.getTime() - 60 * 1000)) {
+    if (
+      reminderTime <= now &&
+      reminderTime > new Date(now.getTime() - 60 * 1000)
+    ) {
       // Check if we've already sent this specific notification
       const existingNotification = await this.checkIfNotificationSent(
-        event.id, event.userId, notification.notificationType, notification.minutesBefore
+        event.id,
+        event.userId,
+        notification.notificationType,
+        notification.minutesBefore
       );
       if (existingNotification) return;
 
       // Send notification based on type and user preferences
-      if (notification.notificationType === 'email' && userSettings?.emailNotifications !== false) {
+      if (
+        notification.notificationType === "email" &&
+        userSettings?.emailNotifications !== false
+      ) {
         await this.queueEmailNotification(event, notification.minutesBefore);
-      } else if (notification.notificationType === 'browser' && userSettings?.browserNotifications !== false) {
+      } else if (
+        notification.notificationType === "browser" &&
+        userSettings?.browserNotifications !== false
+      ) {
         await this.queueBrowserNotification(event, notification.minutesBefore);
       }
 
       // Record that notification was sent
       await this.recordNotificationSent(
-        event.id, 
-        event.userId, 
-        notification.notificationType, 
-        notification.minutesBefore, 
+        event.id,
+        event.userId,
+        notification.notificationType,
+        notification.minutesBefore,
         reminderTime
       );
     }
   }
 
-  private async queueEmailNotification(event: NotificationEvent & {
-    user: User;
-    calendar: any;
-    category?: any;
-  }, _minutesBefore: number): Promise<void> {
+  private async queueEmailNotification(
+    event: NotificationEvent & {
+      user: User;
+      calendar: any;
+      category?: any;
+    },
+    _minutesBefore: number
+  ): Promise<void> {
     const timeUntilEvent = this.formatTimeUntilEvent(event.start);
-    
+
     const emailData: EmailNotificationData = {
       to: event.user.email,
       subject: `Reminder: ${event.title}`,
@@ -212,18 +270,21 @@ export class NotificationService {
     this.emailQueue.push(emailData);
   }
 
-  private async queueBrowserNotification(event: NotificationEvent, _minutesBefore: number): Promise<void> {
+  private async queueBrowserNotification(
+    event: NotificationEvent,
+    _minutesBefore: number
+  ): Promise<void> {
     const timeUntilEvent = this.formatTimeUntilEvent(event.start);
-    
+
     const notificationData: BrowserNotificationData = {
       title: `Reminder: ${event.title}`,
-      body: `Starting ${timeUntilEvent}${event.location ? ` at ${event.location}` : ''}`,
-      icon: '/calendar-icon.png',
+      body: `Starting ${timeUntilEvent}${event.location ? ` at ${event.location}` : ""}`,
+      icon: "/calendar-icon.png",
       tag: `reminder-${event.id}`,
       data: {
         eventId: event.id,
         userId: event.userId,
-        type: 'reminder',
+        type: "reminder",
       },
     };
 
@@ -258,7 +319,7 @@ export class NotificationService {
   private async sendEmail(emailData: EmailNotificationData): Promise<void> {
     // In a real implementation, you would integrate with an email service
     // like SendGrid, AWS SES, Nodemailer, etc.
-    console.log('Email notification:', {
+    console.log("Email notification:", {
       to: emailData.to,
       subject: emailData.subject,
       eventId: emailData.eventId,
@@ -273,15 +334,19 @@ export class NotificationService {
       //   subject: emailData.subject,
       //   html: emailData.body,
       // });
-      
-      console.log(`✓ Email reminder sent to ${emailData.to} for event ${emailData.eventId}`);
+
+      console.log(
+        `✓ Email reminder sent to ${emailData.to} for event ${emailData.eventId}`
+      );
     } catch (error) {
-      console.error('Failed to send email notification:', error);
+      console.error("Failed to send email notification:", error);
     }
   }
 
-  private async sendBrowserNotification(notificationData: BrowserNotificationData): Promise<void> {
-    console.log('Browser notification:', {
+  private async sendBrowserNotification(
+    notificationData: BrowserNotificationData
+  ): Promise<void> {
+    console.log("Browser notification:", {
       title: notificationData.title,
       body: notificationData.body,
       userId: notificationData.data.userId,
@@ -293,27 +358,32 @@ export class NotificationService {
     // 1. Store notification in database for offline users
     // 2. Send via WebSocket to online users
     // 3. Use push notifications for mobile apps
-    
+
     try {
       // For now, we'll store the notification in a simple in-memory queue
       // that could be polled by the frontend or sent via WebSocket
       this.storeBrowserNotificationForDelivery(notificationData);
-      
-      console.log(`✓ Browser notification queued for delivery to user ${notificationData.data.userId}`);
+
+      console.log(
+        `✓ Browser notification queued for delivery to user ${notificationData.data.userId}`
+      );
     } catch (error) {
-      console.error('Failed to queue browser notification:', error);
+      console.error("Failed to queue browser notification:", error);
     }
   }
 
   // Simple storage for browser notifications (in production, use a proper queue/database)
-  private browserNotificationQueue: Map<string, BrowserNotificationData[]> = new Map();
+  private browserNotificationQueue: Map<string, BrowserNotificationData[]> =
+    new Map();
 
-  private storeBrowserNotificationForDelivery(notificationData: BrowserNotificationData): void {
+  private storeBrowserNotificationForDelivery(
+    notificationData: BrowserNotificationData
+  ): void {
     const userId = notificationData.data.userId;
     const userNotifications = this.browserNotificationQueue.get(userId) || [];
     userNotifications.push(notificationData);
     this.browserNotificationQueue.set(userId, userNotifications);
-    
+
     // Clean up old notifications (keep only last 10 per user)
     if (userNotifications.length > 10) {
       this.browserNotificationQueue.set(userId, userNotifications.slice(-10));
@@ -328,14 +398,19 @@ export class NotificationService {
     return notifications;
   }
 
-  private generateEmailBody(event: NotificationEvent & {
-    user: User;
-    calendar: any;
-    category?: any;
-  }, timeUntilEvent: string): string {
+  private generateEmailBody(
+    event: NotificationEvent & {
+      user: User;
+      calendar: any;
+      category?: any;
+    },
+    timeUntilEvent: string
+  ): string {
     const eventDate = event.start.toLocaleDateString();
-    const eventTime = event.allDay ? 'All Day' : event.start.toLocaleTimeString();
-    
+    const eventTime = event.allDay
+      ? "All Day"
+      : event.start.toLocaleTimeString();
+
     return `
       <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -344,8 +419,8 @@ export class NotificationService {
             <h3 style="margin: 0 0 10px 0; color: #2563eb;">${event.title}</h3>
             <p style="margin: 5px 0;"><strong>Date:</strong> ${eventDate}</p>
             <p style="margin: 5px 0;"><strong>Time:</strong> ${eventTime}</p>
-            ${event.location ? `<p style="margin: 5px 0;"><strong>Location:</strong> ${event.location}</p>` : ''}
-            ${event.description ? `<p style="margin: 10px 0;"><strong>Description:</strong><br>${event.description}</p>` : ''}
+            ${event.location ? `<p style="margin: 5px 0;"><strong>Location:</strong> ${event.location}</p>` : ""}
+            ${event.description ? `<p style="margin: 10px 0;"><strong>Description:</strong><br>${event.description}</p>` : ""}
             <p style="margin: 15px 0 5px 0; color: #666;">
               <em>Starting ${timeUntilEvent}</em>
             </p>
@@ -367,25 +442,25 @@ export class NotificationService {
     const daysUntil = Math.floor(hoursUntil / 24);
 
     if (daysUntil > 0) {
-      return `in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`;
+      return `in ${daysUntil} day${daysUntil > 1 ? "s" : ""}`;
     } else if (hoursUntil > 0) {
       const remainingMinutes = minutesUntil % 60;
       if (remainingMinutes > 0) {
         return `in ${hoursUntil}h ${remainingMinutes}m`;
       } else {
-        return `in ${hoursUntil} hour${hoursUntil > 1 ? 's' : ''}`;
+        return `in ${hoursUntil} hour${hoursUntil > 1 ? "s" : ""}`;
       }
     } else if (minutesUntil > 0) {
-      return `in ${minutesUntil} minute${minutesUntil > 1 ? 's' : ''}`;
+      return `in ${minutesUntil} minute${minutesUntil > 1 ? "s" : ""}`;
     } else {
-      return 'now';
+      return "now";
     }
   }
 
   private async checkIfNotificationSent(
-    eventId: string, 
-    userId: string, 
-    notificationType: string, 
+    eventId: string,
+    userId: string,
+    notificationType: string,
     minutesBefore: number
   ): Promise<boolean> {
     const notification = await prisma.notificationLog.findFirst({
@@ -399,15 +474,15 @@ export class NotificationService {
         },
       },
     });
-    
+
     return notification !== null;
   }
 
   private async recordNotificationSent(
-    eventId: string, 
-    userId: string, 
-    notificationType: string, 
-    minutesBefore: number, 
+    eventId: string,
+    userId: string,
+    notificationType: string,
+    minutesBefore: number,
     sentAt: Date
   ): Promise<void> {
     try {
@@ -418,13 +493,15 @@ export class NotificationService {
           notificationType,
           minutesBefore,
           sentAt,
-          status: 'sent',
+          status: "sent",
         },
       });
-      
-      console.log(`✓ Recorded ${notificationType} notification sent for event ${eventId}, user ${userId} (${minutesBefore}min before) at ${sentAt.toISOString()}`);
+
+      console.log(
+        `✓ Recorded ${notificationType} notification sent for event ${eventId}, user ${userId} (${minutesBefore}min before) at ${sentAt.toISOString()}`
+      );
     } catch (error) {
-      console.error('Failed to record notification:', error);
+      console.error("Failed to record notification:", error);
     }
   }
 
@@ -458,14 +535,26 @@ export class NotificationService {
 
     if (event) {
       const userSettings = event.user.settings;
-      
+
       // Test notifications based on event's notification settings
       if (event.notifications && event.notifications.length > 0) {
         for (const notification of event.notifications) {
-          if (notification.notificationType === 'email' && userSettings?.emailNotifications !== false) {
-            await this.queueEmailNotification(event as any, notification.minutesBefore);
-          } else if (notification.notificationType === 'browser' && userSettings?.browserNotifications !== false) {
-            await this.queueBrowserNotification(event as any, notification.minutesBefore);
+          if (
+            notification.notificationType === "email" &&
+            userSettings?.emailNotifications !== false
+          ) {
+            await this.queueEmailNotification(
+              event as any,
+              notification.minutesBefore
+            );
+          } else if (
+            notification.notificationType === "browser" &&
+            userSettings?.browserNotifications !== false
+          ) {
+            await this.queueBrowserNotification(
+              event as any,
+              notification.minutesBefore
+            );
           }
         }
       } else {
@@ -478,15 +567,15 @@ export class NotificationService {
           await this.queueBrowserNotification(event as any, testMinutes);
         }
       }
-      
+
       await this.processQueues();
     }
   }
 
   // Helper method to create default notifications for new events
   async createDefaultNotificationsForEvent(
-    eventId: string, 
-    userId: string, 
+    eventId: string,
+    userId: string,
     customReminderMinutes?: number | null
   ): Promise<void> {
     try {
@@ -494,49 +583,43 @@ export class NotificationService {
         where: { userId },
       });
 
-      const reminderMinutes = customReminderMinutes || userSettings?.defaultReminder;
-      
+      const reminderMinutes =
+        customReminderMinutes || userSettings?.defaultReminder;
+
       if (reminderMinutes) {
-        // Create both browser and email notifications by default
+        // Only create email notifications (browser notifications are no longer used)
         const notifications = [];
-        
-        if (userSettings?.browserNotifications !== false) {
-          notifications.push({
-            eventId,
-            notificationType: 'browser' as const,
-            minutesBefore: reminderMinutes,
-            isEnabled: true,
-          });
-        }
-        
+
         if (userSettings?.emailNotifications !== false) {
           notifications.push({
             eventId,
-            notificationType: 'email' as const,
+            notificationType: "email" as const,
             minutesBefore: reminderMinutes,
             isEnabled: true,
           });
         }
-        
+
         if (notifications.length > 0) {
           await prisma.eventNotification.createMany({
             data: notifications,
           });
-          
-          console.log(`✓ Created ${notifications.length} default notifications for event ${eventId}`);
+
+          console.log(
+            `✓ Created ${notifications.length} default notifications for event ${eventId}`
+          );
         }
       }
     } catch (error) {
-      console.error('Failed to create default notifications:', error);
+      console.error("Failed to create default notifications:", error);
     }
   }
 
   // Helper method to update event notifications
   async updateEventNotifications(
-    eventId: string, 
-    userId: string, 
+    eventId: string,
+    userId: string,
     notifications: Array<{
-      notificationType: 'browser' | 'email';
+      notificationType: "browser" | "email";
       minutesBefore: number;
       isEnabled: boolean;
     }>
@@ -546,9 +629,9 @@ export class NotificationService {
       const event = await prisma.calendarEvent.findFirst({
         where: { id: eventId, userId },
       });
-      
+
       if (!event) {
-        throw new Error('Event not found or access denied');
+        throw new Error("Event not found or access denied");
       }
 
       // Delete existing notifications for this event
@@ -559,7 +642,7 @@ export class NotificationService {
       // Create new notifications
       if (notifications.length > 0) {
         await prisma.eventNotification.createMany({
-          data: notifications.map(n => ({
+          data: notifications.map((n) => ({
             eventId,
             notificationType: n.notificationType,
             minutesBefore: n.minutesBefore,
@@ -567,10 +650,12 @@ export class NotificationService {
           })),
         });
       }
-      
-      console.log(`✓ Updated ${notifications.length} notifications for event ${eventId}`);
+
+      console.log(
+        `✓ Updated ${notifications.length} notifications for event ${eventId}`
+      );
     } catch (error) {
-      console.error('Failed to update event notifications:', error);
+      console.error("Failed to update event notifications:", error);
       throw error;
     }
   }
@@ -580,6 +665,9 @@ export class NotificationService {
 export const notificationService = NotificationService.getInstance();
 
 // Start the reminder checking process
-setInterval(() => {
-  notificationService.checkForReminders().catch(console.error);
-}, 5 * 60 * 1000); // Check every 5 minutes
+setInterval(
+  () => {
+    notificationService.checkForReminders().catch(console.error);
+  },
+  5 * 60 * 1000
+); // Check every 5 minutes

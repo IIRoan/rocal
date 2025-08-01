@@ -81,9 +81,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       const recurringInstances = [];
       for (const recurringEvent of recurringEvents) {
         try {
-          const exceptions = recurringEvent.recurrenceExceptions.map(ex => ({
+          const exceptions = recurringEvent.recurrenceExceptions.map((ex) => ({
             exceptionDate: ex.exceptionDate,
-            type: ex.type as 'modified' | 'deleted',
+            type: ex.type as "modified" | "deleted",
           }));
 
           const instances = RecurrenceEngine.generateInstances(
@@ -101,7 +101,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           // Convert instances to events
           for (const instance of instances) {
             if (!instance.isOriginal) {
-              const duration = recurringEvent.end.getTime() - recurringEvent.start.getTime();
+              const duration =
+                recurringEvent.end.getTime() - recurringEvent.start.getTime();
               recurringInstances.push({
                 ...recurringEvent,
                 id: `${recurringEvent.id}_${instance.date.toISOString()}`,
@@ -110,7 +111,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                 parentEventId: recurringEvent.id,
                 isRecurringInstance: true,
               });
-            } else if (instance.isOriginal && instance.date >= startDate && instance.date <= endDate) {
+            } else if (
+              instance.isOriginal &&
+              instance.date >= startDate &&
+              instance.date <= endDate
+            ) {
               // Include original event if it falls within range
               recurringInstances.push({
                 ...recurringEvent,
@@ -119,9 +124,15 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             }
           }
         } catch (error) {
-          console.error(`Error generating instances for event ${recurringEvent.id}:`, error);
+          console.error(
+            `Error generating instances for event ${recurringEvent.id}:`,
+            error
+          );
           // If recurrence generation fails, include the original event
-          if (recurringEvent.start >= startDate && recurringEvent.start <= endDate) {
+          if (
+            recurringEvent.start >= startDate &&
+            recurringEvent.start <= endDate
+          ) {
             recurringInstances.push({
               ...recurringEvent,
               isRecurringInstance: false,
@@ -144,8 +155,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       });
 
       // Combine all events
-      const events = [...regularEvents, ...recurringInstances, ...modifiedInstances]
-        .sort((a, b) => a.start.getTime() - b.start.getTime());
+      const events = [
+        ...regularEvents,
+        ...recurringInstances,
+        ...modifiedInstances,
+      ].sort((a, b) => a.start.getTime() - b.start.getTime());
 
       // Fetch user's categories for efficient frontend rendering
       const categories = await prisma.eventCategory.findMany({
@@ -161,10 +175,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         where: {
           userId: user.id,
         },
-        orderBy: [
-          { isDefault: "desc" },
-          { name: "asc" },
-        ],
+        orderBy: [{ isDefault: "desc" }, { name: "asc" }],
       });
 
       return {
@@ -256,170 +267,204 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   .post(
     "/",
     async ({ body, user }: any) => {
-      const { title, start, end } = body;
+      try {
+        const { title, start, end } = body;
 
-      // Validate required fields
-      if (!title?.trim()) {
-        throw new ValidationError(
-          "Title is required and cannot be empty",
-          "title"
-        );
-      }
-
-      if (!start) {
-        throw new ValidationError("Start date is required", "start");
-      }
-
-      if (!end) {
-        throw new ValidationError("End date is required", "end");
-      }
-
-      // Parse and validate dates
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-
-      if (isNaN(startDate.getTime())) {
-        throw new ValidationError(
-          "Invalid start date format. Use ISO 8601 format",
-          "start"
-        );
-      }
-
-      if (isNaN(endDate.getTime())) {
-        throw new ValidationError(
-          "Invalid end date format. Use ISO 8601 format",
-          "end"
-        );
-      }
-
-      if (startDate >= endDate) {
-        throw new ValidationError("End time must be after start time", "end");
-      }
-
-      // Validate color if provided
-      if (body.color) {
-        const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-        if (!allowedColors.includes(body.color)) {
+        // Validate required fields
+        if (!title?.trim()) {
           throw new ValidationError(
-            `Color must be one of: ${allowedColors.join(", ")}`,
-            "color"
+            "Title is required and cannot be empty",
+            "title"
           );
         }
-      }
 
-      // Validate recurrence rule if provided
-      if (body.recurrence) {
-        const rule = RecurrenceEngine.parseRecurrenceRule(body.recurrence);
-        if (!rule) {
+        if (!start) {
+          throw new ValidationError("Start date is required", "start");
+        }
+
+        if (!end) {
+          throw new ValidationError("End date is required", "end");
+        }
+
+        // Parse and validate dates
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+
+        if (isNaN(startDate.getTime())) {
           throw new ValidationError(
-            "Invalid recurrence rule format",
-            "recurrence"
+            "Invalid start date format. Use ISO 8601 format",
+            "start"
           );
         }
-        
-        const errors = RecurrenceEngine.validateRecurrenceRule(rule);
-        if (errors.length > 0) {
+
+        if (isNaN(endDate.getTime())) {
           throw new ValidationError(
-            `Recurrence rule validation failed: ${errors.join(", ")}`,
-            "recurrence"
+            "Invalid end date format. Use ISO 8601 format",
+            "end"
           );
         }
-      }
 
-      // Validate category exists and belongs to user if provided
-      if (body.categoryId) {
-        const category = await prisma.eventCategory.findFirst({
+        if (startDate >= endDate) {
+          throw new ValidationError("End time must be after start time", "end");
+        }
+
+        // Validate color if provided
+        if (body.color) {
+          const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
+          if (!allowedColors.includes(body.color)) {
+            throw new ValidationError(
+              `Color must be one of: ${allowedColors.join(", ")}`,
+              "color"
+            );
+          }
+        }
+
+        // Validate recurrence rule if provided
+        if (body.recurrence) {
+          try {
+            const rule = RecurrenceEngine.parseRecurrenceRule(body.recurrence);
+            if (!rule) {
+              throw new ValidationError(
+                "Invalid recurrence rule format",
+                "recurrence"
+              );
+            }
+
+            const errors = RecurrenceEngine.validateRecurrenceRule(rule);
+            if (errors.length > 0) {
+              throw new ValidationError(
+                `Recurrence rule validation failed: ${errors.join(", ")}`,
+                "recurrence"
+              );
+            }
+          } catch (recurrenceError) {
+            console.error("Recurrence validation error:", recurrenceError);
+            throw new ValidationError(
+              "Invalid recurrence rule format",
+              "recurrence"
+            );
+          }
+        }
+
+        // Validate category exists and belongs to user if provided
+        if (body.categoryId) {
+          const category = await prisma.eventCategory.findFirst({
+            where: {
+              id: body.categoryId,
+              userId: user.id,
+              isActive: true,
+            },
+          });
+
+          if (!category) {
+            throw new ValidationError(
+              "Invalid category or category does not belong to user",
+              "categoryId"
+            );
+          }
+        }
+
+        // Validate title length
+        if (title.trim().length > 255) {
+          throw new ValidationError(
+            "Title cannot exceed 255 characters",
+            "title"
+          );
+        }
+
+        // Validate description length if provided
+        if (body.description && body.description.length > 1000) {
+          throw new ValidationError(
+            "Description cannot exceed 1000 characters",
+            "description"
+          );
+        }
+
+        // Validate location length if provided
+        if (body.location && body.location.length > 255) {
+          throw new ValidationError(
+            "Location cannot exceed 255 characters",
+            "location"
+          );
+        }
+
+        // Validate calendar exists and belongs to user
+        if (!body.calendarId) {
+          throw new ValidationError("Calendar ID is required", "calendarId");
+        }
+
+        const calendar = await prisma.calendar.findFirst({
           where: {
-            id: body.categoryId,
+            id: body.calendarId,
             userId: user.id,
-            isActive: true,
           },
         });
 
-        if (!category) {
+        if (!calendar) {
           throw new ValidationError(
-            "Invalid category or category does not belong to user",
-            "categoryId"
+            "Invalid calendar or calendar does not belong to user",
+            "calendarId"
           );
         }
+
+        // Validate reminder if provided (must be a non-negative number)
+        if (body.reminder !== undefined && body.reminder !== null) {
+          const reminderValue = Number(body.reminder);
+          if (
+            isNaN(reminderValue) ||
+            reminderValue < 0 ||
+            reminderValue > 43200
+          ) {
+            throw new ValidationError(
+              "Reminder must be a number between 0 and 43200 minutes",
+              "reminder"
+            );
+          }
+          body.reminder = reminderValue;
+        }
+
+        // Create the event
+        const event = await prisma.calendarEvent.create({
+          data: {
+            title: title.trim(),
+            description: body.description?.trim() || null,
+            start: startDate,
+            end: endDate,
+            allDay: body.allDay || false,
+            location: body.location?.trim() || null,
+            color: body.color || null,
+            calendarId: body.calendarId,
+            categoryId: body.categoryId || null,
+            reminder: body.reminder || null,
+            recurrence: body.recurrence || null,
+            userId: user.id,
+          },
+          include: {
+            category: true,
+            calendar: true,
+          },
+        });
+
+        // Create default notifications for the new event
+        try {
+          await notificationService.createDefaultNotificationsForEvent(
+            event.id,
+            user.id,
+            body.reminder
+          );
+        } catch (notificationError) {
+          console.error(
+            "Failed to create default notifications:",
+            notificationError
+          );
+          // Don't fail the event creation if notifications fail
+        }
+
+        return event;
+      } catch (error) {
+        console.error("Event creation error:", error);
+        throw error;
       }
-
-      // Validate title length
-      if (title.trim().length > 255) {
-        throw new ValidationError(
-          "Title cannot exceed 255 characters",
-          "title"
-        );
-      }
-
-      // Validate description length if provided
-      if (body.description && body.description.length > 1000) {
-        throw new ValidationError(
-          "Description cannot exceed 1000 characters",
-          "description"
-        );
-      }
-
-      // Validate location length if provided
-      if (body.location && body.location.length > 255) {
-        throw new ValidationError(
-          "Location cannot exceed 255 characters",
-          "location"
-        );
-      }
-
-      // Validate calendar exists and belongs to user
-      if (!body.calendarId) {
-        throw new ValidationError(
-          "Calendar ID is required",
-          "calendarId"
-        );
-      }
-
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          id: body.calendarId,
-          userId: user.id,
-        },
-      });
-
-      if (!calendar) {
-        throw new ValidationError(
-          "Invalid calendar or calendar does not belong to user",
-          "calendarId"
-        );
-      }
-
-      // Create the event
-      const event = await prisma.calendarEvent.create({
-        data: {
-          title: title.trim(),
-          description: body.description?.trim() || null,
-          start: startDate,
-          end: endDate,
-          allDay: body.allDay || false,
-          location: body.location?.trim() || null,
-          color: body.color || null,
-          calendarId: body.calendarId,
-          categoryId: body.categoryId || null,
-          reminder: body.reminder || null,
-          recurrence: body.recurrence || null,
-          userId: user.id,
-        },
-        include: {
-          category: true,
-          calendar: true,
-        },
-      });
-
-      // Create default notifications for the new event
-      await notificationService.createDefaultNotificationsForEvent(
-        event.id,
-        user.id,
-        body.reminder
-      );
-
-      return event;
     },
     {
       auth: true,
@@ -468,11 +513,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           })
         ),
         reminder: t.Optional(
-          t.Number({
-            minimum: 1,
-            maximum: 43200, // 30 days in minutes
-            description: "Reminder time in minutes before event (1-43200)",
-          })
+          t.Union([
+            t.Number({
+              minimum: 0,
+              maximum: 43200, // 30 days in minutes
+              description: "Reminder time in minutes before event (0-43200)",
+            }),
+            t.Null(),
+          ])
         ),
         recurrence: t.Optional(
           t.String({
@@ -533,199 +581,225 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   .put(
     "/:id",
     async ({ params, body, user }: any) => {
-      const { id } = params;
-
-      // Verify event exists and belongs to user
-      const existingEvent = await prisma.calendarEvent.findFirst({
-        where: {
-          id,
-          userId: user.id,
-        },
-        include: { category: true },
-      });
-
-      if (!existingEvent) {
-        throw new ValidationError("Event not found or access denied");
-      }
-
-      // Validate dates if provided
-      let startDate: Date | undefined;
-      let endDate: Date | undefined;
-
-      if (body.start) {
-        startDate = new Date(body.start);
-        if (isNaN(startDate.getTime())) {
-          throw new ValidationError(
-            "Invalid start date format. Use ISO 8601 format",
-            "start"
-          );
-        }
-      }
-
-      if (body.end) {
-        endDate = new Date(body.end);
-        if (isNaN(endDate.getTime())) {
-          throw new ValidationError(
-            "Invalid end date format. Use ISO 8601 format",
-            "end"
-          );
-        }
-      }
-
-      // Use existing dates if not provided in update
-      const finalStartDate = startDate || existingEvent.start;
-      const finalEndDate = endDate || existingEvent.end;
-
-      // Validate date logic
-      if (finalStartDate >= finalEndDate) {
-        throw new ValidationError("End time must be after start time", "end");
-      }
-
-      // Validate title if provided
-      if (body.title !== undefined) {
-        if (!body.title?.trim()) {
-          throw new ValidationError(
-            "Title is required and cannot be empty",
-            "title"
-          );
-        }
-        if (body.title.trim().length > 255) {
-          throw new ValidationError(
-            "Title cannot exceed 255 characters",
-            "title"
-          );
-        }
-      }
-
-      // Validate description length if provided
-      if (
-        body.description !== undefined &&
-        body.description &&
-        body.description.length > 1000
-      ) {
-        throw new ValidationError(
-          "Description cannot exceed 1000 characters",
-          "description"
-        );
-      }
-
-      // Validate location length if provided
-      if (
-        body.location !== undefined &&
-        body.location &&
-        body.location.length > 255
-      ) {
-        throw new ValidationError(
-          "Location cannot exceed 255 characters",
-          "location"
-        );
-      }
-
-      // Validate color if provided
-      if (body.color !== undefined && body.color) {
-        const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-        if (!allowedColors.includes(body.color)) {
-          throw new ValidationError(
-            `Color must be one of: ${allowedColors.join(", ")}`,
-            "color"
-          );
-        }
-      }
-
-      // Validate calendar exists and belongs to user if provided
-      if (body.calendarId !== undefined) {
-        const calendar = await prisma.calendar.findFirst({
-          where: {
-            id: body.calendarId,
-            userId: user.id,
-          },
-        });
-
-        if (!calendar) {
-          throw new ValidationError(
-            "Invalid calendar or calendar does not belong to user",
-            "calendarId"
-          );
-        }
-      }
-
-      // Validate category exists and belongs to user if provided
-      if (body.categoryId !== undefined && body.categoryId) {
-        const category = await prisma.eventCategory.findFirst({
-          where: {
-            id: body.categoryId,
-            userId: user.id,
-            isActive: true,
-          },
-        });
-
-        if (!category) {
-          throw new ValidationError(
-            "Invalid category or category does not belong to user",
-            "categoryId"
-          );
-        }
-      }
-
-      // Prepare update data (only include fields that are provided)
-      const updateData: any = {};
-
-      if (body.title !== undefined) {
-        updateData.title = body.title.trim();
-      }
-      if (body.description !== undefined) {
-        updateData.description = body.description?.trim() || null;
-      }
-      if (startDate) {
-        updateData.start = startDate;
-      }
-      if (endDate) {
-        updateData.end = endDate;
-      }
-      if (body.allDay !== undefined) {
-        updateData.allDay = body.allDay;
-      }
-      if (body.location !== undefined) {
-        updateData.location = body.location?.trim() || null;
-      }
-      if (body.color !== undefined) {
-        updateData.color = body.color || null;
-      }
-      if (body.calendarId !== undefined) {
-        updateData.calendarId = body.calendarId;
-      }
-      if (body.categoryId !== undefined) {
-        updateData.categoryId = body.categoryId || null;
-      }
-      if (body.reminder !== undefined) {
-        updateData.reminder = body.reminder || null;
-      }
-      if (body.recurrence !== undefined) {
-        if (body.recurrence) {
-          const rule = RecurrenceEngine.parseRecurrenceRule(body.recurrence);
-          if (!rule) {
-            throw new ValidationError(
-              "Invalid recurrence rule format",
-              "recurrence"
-            );
-          }
-          
-          const errors = RecurrenceEngine.validateRecurrenceRule(rule);
-          if (errors.length > 0) {
-            throw new ValidationError(
-              `Recurrence rule validation failed: ${errors.join(", ")}`,
-              "recurrence"
-            );
-          }
-        }
-        updateData.recurrence = body.recurrence || null;
-      }
-
-      // Add updatedAt for optimistic locking check
-      updateData.updatedAt = new Date();
-
-      // Update the event with optimistic locking
       try {
+        const { id } = params;
+
+        // Verify event exists and belongs to user
+        const existingEvent = await prisma.calendarEvent.findFirst({
+          where: {
+            id,
+            userId: user.id,
+          },
+          include: { category: true },
+        });
+
+        if (!existingEvent) {
+          throw new ValidationError("Event not found or access denied");
+        }
+
+        // Validate dates if provided
+        let startDate: Date | undefined;
+        let endDate: Date | undefined;
+
+        if (body.start) {
+          startDate = new Date(body.start);
+          if (isNaN(startDate.getTime())) {
+            throw new ValidationError(
+              "Invalid start date format. Use ISO 8601 format",
+              "start"
+            );
+          }
+        }
+
+        if (body.end) {
+          endDate = new Date(body.end);
+          if (isNaN(endDate.getTime())) {
+            throw new ValidationError(
+              "Invalid end date format. Use ISO 8601 format",
+              "end"
+            );
+          }
+        }
+
+        // Use existing dates if not provided in update
+        const finalStartDate = startDate || existingEvent.start;
+        const finalEndDate = endDate || existingEvent.end;
+
+        // Validate date logic
+        if (finalStartDate >= finalEndDate) {
+          throw new ValidationError("End time must be after start time", "end");
+        }
+
+        // Validate title if provided
+        if (body.title !== undefined) {
+          if (!body.title?.trim()) {
+            throw new ValidationError(
+              "Title is required and cannot be empty",
+              "title"
+            );
+          }
+          if (body.title.trim().length > 255) {
+            throw new ValidationError(
+              "Title cannot exceed 255 characters",
+              "title"
+            );
+          }
+        }
+
+        // Validate description length if provided
+        if (
+          body.description !== undefined &&
+          body.description &&
+          body.description.length > 1000
+        ) {
+          throw new ValidationError(
+            "Description cannot exceed 1000 characters",
+            "description"
+          );
+        }
+
+        // Validate location length if provided
+        if (
+          body.location !== undefined &&
+          body.location &&
+          body.location.length > 255
+        ) {
+          throw new ValidationError(
+            "Location cannot exceed 255 characters",
+            "location"
+          );
+        }
+
+        // Validate color if provided
+        if (body.color !== undefined && body.color) {
+          const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
+          if (!allowedColors.includes(body.color)) {
+            throw new ValidationError(
+              `Color must be one of: ${allowedColors.join(", ")}`,
+              "color"
+            );
+          }
+        }
+
+        // Validate calendar exists and belongs to user if provided
+        if (body.calendarId !== undefined) {
+          const calendar = await prisma.calendar.findFirst({
+            where: {
+              id: body.calendarId,
+              userId: user.id,
+            },
+          });
+
+          if (!calendar) {
+            throw new ValidationError(
+              "Invalid calendar or calendar does not belong to user",
+              "calendarId"
+            );
+          }
+        }
+
+        // Validate category exists and belongs to user if provided
+        if (body.categoryId !== undefined && body.categoryId) {
+          const category = await prisma.eventCategory.findFirst({
+            where: {
+              id: body.categoryId,
+              userId: user.id,
+              isActive: true,
+            },
+          });
+
+          if (!category) {
+            throw new ValidationError(
+              "Invalid category or category does not belong to user",
+              "categoryId"
+            );
+          }
+        }
+
+        // Validate reminder if provided
+        if (body.reminder !== undefined && body.reminder !== null) {
+          const reminderValue = Number(body.reminder);
+          if (
+            isNaN(reminderValue) ||
+            reminderValue < 0 ||
+            reminderValue > 43200
+          ) {
+            throw new ValidationError(
+              "Reminder must be a number between 0 and 43200 minutes",
+              "reminder"
+            );
+          }
+          body.reminder = reminderValue;
+        }
+
+        // Prepare update data (only include fields that are provided)
+        const updateData: any = {};
+
+        if (body.title !== undefined) {
+          updateData.title = body.title.trim();
+        }
+        if (body.description !== undefined) {
+          updateData.description = body.description?.trim() || null;
+        }
+        if (startDate) {
+          updateData.start = startDate;
+        }
+        if (endDate) {
+          updateData.end = endDate;
+        }
+        if (body.allDay !== undefined) {
+          updateData.allDay = body.allDay;
+        }
+        if (body.location !== undefined) {
+          updateData.location = body.location?.trim() || null;
+        }
+        if (body.color !== undefined) {
+          updateData.color = body.color || null;
+        }
+        if (body.calendarId !== undefined) {
+          updateData.calendarId = body.calendarId;
+        }
+        if (body.categoryId !== undefined) {
+          updateData.categoryId = body.categoryId || null;
+        }
+        if (body.reminder !== undefined) {
+          updateData.reminder = body.reminder || null;
+        }
+        if (body.recurrence !== undefined) {
+          if (body.recurrence) {
+            try {
+              const rule = RecurrenceEngine.parseRecurrenceRule(
+                body.recurrence
+              );
+              if (!rule) {
+                throw new ValidationError(
+                  "Invalid recurrence rule format",
+                  "recurrence"
+                );
+              }
+
+              const errors = RecurrenceEngine.validateRecurrenceRule(rule);
+              if (errors.length > 0) {
+                throw new ValidationError(
+                  `Recurrence rule validation failed: ${errors.join(", ")}`,
+                  "recurrence"
+                );
+              }
+            } catch (recurrenceError) {
+              console.error("Recurrence validation error:", recurrenceError);
+              throw new ValidationError(
+                "Invalid recurrence rule format",
+                "recurrence"
+              );
+            }
+          }
+          updateData.recurrence = body.recurrence || null;
+        }
+
+        // Add updatedAt for optimistic locking check
+        updateData.updatedAt = new Date();
+
+        // Update the event with optimistic locking
         const updatedEvent = await prisma.calendarEvent.update({
           where: {
             id,
@@ -741,6 +815,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         return updatedEvent;
       } catch (error: any) {
+        console.error("Event update error:", error);
+
         // Handle optimistic locking conflict
         if (
           error.code === "P2025" ||
@@ -811,11 +887,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           })
         ),
         reminder: t.Optional(
-          t.Number({
-            minimum: 1,
-            maximum: 43200, // 30 days in minutes
-            description: "Reminder time in minutes before event (1-43200)",
-          })
+          t.Union([
+            t.Number({
+              minimum: 0,
+              maximum: 43200, // 30 days in minutes
+              description: "Reminder time in minutes before event (0-43200)",
+            }),
+            t.Null(),
+          ])
         ),
         recurrence: t.Optional(
           t.String({
@@ -878,31 +957,45 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   .delete(
     "/:id",
     async ({ params, user }: any) => {
-      const { id } = params;
+      try {
+        const { id } = params;
 
-      // Verify event exists and belongs to user
-      const existingEvent = await prisma.calendarEvent.findFirst({
-        where: {
-          id,
-          userId: user.id,
-        },
-      });
+        // Verify event exists and belongs to user
+        const existingEvent = await prisma.calendarEvent.findFirst({
+          where: {
+            id,
+            userId: user.id,
+          },
+        });
 
-      if (!existingEvent) {
-        throw new ValidationError("Event not found or access denied");
+        if (!existingEvent) {
+          throw new ValidationError("Event not found or access denied");
+        }
+
+        // Clean up associated notifications and logs before deleting the event
+        await prisma.eventNotification.deleteMany({
+          where: { eventId: id },
+        });
+
+        await prisma.notificationLog.deleteMany({
+          where: { eventId: id },
+        });
+
+        // For now, we'll do hard delete, but we could implement soft delete
+        // by adding a 'deletedAt' field to the schema for future audit requirements
+        await prisma.calendarEvent.delete({
+          where: { id },
+        });
+
+        return {
+          success: true,
+          message: "Event deleted successfully",
+          deletedEventId: id,
+        };
+      } catch (error) {
+        console.error("Event deletion error:", error);
+        throw error;
       }
-
-      // For now, we'll do hard delete, but we could implement soft delete
-      // by adding a 'deletedAt' field to the schema for future audit requirements
-      await prisma.calendarEvent.delete({
-        where: { id },
-      });
-
-      return {
-        success: true,
-        message: "Event deleted successfully",
-        deletedEventId: id,
-      };
     },
     {
       auth: true,
@@ -950,157 +1043,182 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   .post(
     "/bulk",
     async ({ body, user }: any) => {
-      const { action, eventIds, targetCalendarId } = body;
+      try {
+        const { action, eventIds, targetCalendarId } = body;
 
-      // Validate event IDs
-      if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
-        throw new ValidationError("Event IDs array is required", "eventIds");
-      }
+        // Validate event IDs
+        if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+          throw new ValidationError("Event IDs array is required", "eventIds");
+        }
 
-      // Verify all events exist and belong to user
-      const events = await prisma.calendarEvent.findMany({
-        where: {
-          id: { in: eventIds },
-          userId: user.id,
-        },
-      });
+        // Verify all events exist and belong to user
+        const events = await prisma.calendarEvent.findMany({
+          where: {
+            id: { in: eventIds },
+            userId: user.id,
+          },
+        });
 
-      if (events.length !== eventIds.length) {
-        throw new ValidationError(
-          "Some events not found or access denied",
-          "eventIds"
-        );
-      }
+        if (events.length !== eventIds.length) {
+          throw new ValidationError(
+            "Some events not found or access denied",
+            "eventIds"
+          );
+        }
 
-      let result;
+        let result;
 
-      switch (action) {
-        case "move":
-          if (!targetCalendarId) {
-            throw new ValidationError(
-              "Target calendar ID is required for move operation",
-              "targetCalendarId"
-            );
-          }
+        switch (action) {
+          case "move":
+            if (!targetCalendarId) {
+              throw new ValidationError(
+                "Target calendar ID is required for move operation",
+                "targetCalendarId"
+              );
+            }
 
-          // Verify target calendar exists and belongs to user
-          const targetCalendar = await prisma.calendar.findFirst({
-            where: {
-              id: targetCalendarId,
-              userId: user.id,
-            },
-          });
-
-          if (!targetCalendar) {
-            throw new ValidationError(
-              "Target calendar not found or access denied",
-              "targetCalendarId"
-            );
-          }
-
-          // Move events to target calendar
-          result = await prisma.calendarEvent.updateMany({
-            where: {
-              id: { in: eventIds },
-              userId: user.id,
-            },
-            data: {
-              calendarId: targetCalendarId,
-              updatedAt: new Date(),
-            },
-          });
-
-          return {
-            success: true,
-            message: `Successfully moved ${result.count} events to ${targetCalendar.name}`,
-            eventsProcessed: result.count,
-            action: "move",
-          };
-
-        case "delete":
-          // Delete all specified events
-          result = await prisma.calendarEvent.deleteMany({
-            where: {
-              id: { in: eventIds },
-              userId: user.id,
-            },
-          });
-
-          return {
-            success: true,
-            message: `Successfully deleted ${result.count} events`,
-            eventsProcessed: result.count,
-            action: "delete",
-          };
-
-        case "duplicate":
-          // Duplicate events
-          const duplicatedEvents = [];
-          for (const event of events) {
-            const duplicated = await prisma.calendarEvent.create({
-              data: {
-                title: `${event.title} (Copy)`,
-                description: event.description,
-                start: event.start,
-                end: event.end,
-                allDay: event.allDay,
-                location: event.location,
-                color: event.color,
-                isPrivate: event.isPrivate,
-                reminder: event.reminder,
-                recurrence: null, // Don't copy recurrence
-                calendarId: targetCalendarId || event.calendarId,
-                categoryId: event.categoryId,
+            // Verify target calendar exists and belongs to user
+            const targetCalendar = await prisma.calendar.findFirst({
+              where: {
+                id: targetCalendarId,
                 userId: user.id,
-              },
-              include: {
-                category: true,
-                calendar: true,
               },
             });
 
-            // Create default notifications for the duplicated event
-            await notificationService.createDefaultNotificationsForEvent(
-              duplicated.id,
-              user.id,
-              event.reminder
+            if (!targetCalendar) {
+              throw new ValidationError(
+                "Target calendar not found or access denied",
+                "targetCalendarId"
+              );
+            }
+
+            // Move events to target calendar
+            result = await prisma.calendarEvent.updateMany({
+              where: {
+                id: { in: eventIds },
+                userId: user.id,
+              },
+              data: {
+                calendarId: targetCalendarId,
+                updatedAt: new Date(),
+              },
+            });
+
+            return {
+              success: true,
+              message: `Successfully moved ${result.count} events to ${targetCalendar.name}`,
+              eventsProcessed: result.count,
+              action: "move",
+            };
+
+          case "delete":
+            // Clean up associated notifications and logs before deleting events
+            await prisma.eventNotification.deleteMany({
+              where: { eventId: { in: eventIds } },
+            });
+
+            await prisma.notificationLog.deleteMany({
+              where: { eventId: { in: eventIds } },
+            });
+
+            // Delete all specified events
+            result = await prisma.calendarEvent.deleteMany({
+              where: {
+                id: { in: eventIds },
+                userId: user.id,
+              },
+            });
+
+            return {
+              success: true,
+              message: `Successfully deleted ${result.count} events`,
+              eventsProcessed: result.count,
+              action: "delete",
+            };
+
+          case "duplicate":
+            // Duplicate events
+            const duplicatedEvents = [];
+            for (const event of events) {
+              const duplicated = await prisma.calendarEvent.create({
+                data: {
+                  title: `${event.title} (Copy)`,
+                  description: event.description,
+                  start: event.start,
+                  end: event.end,
+                  allDay: event.allDay,
+                  location: event.location,
+                  color: event.color,
+                  isPrivate: event.isPrivate,
+                  reminder: event.reminder,
+                  recurrence: null, // Don't copy recurrence
+                  calendarId: targetCalendarId || event.calendarId,
+                  categoryId: event.categoryId,
+                  userId: user.id,
+                },
+                include: {
+                  category: true,
+                  calendar: true,
+                },
+              });
+
+              // Create default notifications for the duplicated event
+              try {
+                await notificationService.createDefaultNotificationsForEvent(
+                  duplicated.id,
+                  user.id,
+                  event.reminder
+                );
+              } catch (notificationError) {
+                console.error(
+                  "Failed to create notifications for duplicated event:",
+                  notificationError
+                );
+                // Don't fail the duplication if notifications fail
+              }
+
+              duplicatedEvents.push(duplicated);
+            }
+
+            return {
+              success: true,
+              message: `Successfully duplicated ${duplicatedEvents.length} events`,
+              eventsProcessed: duplicatedEvents.length,
+              action: "duplicate",
+              createdEvents: duplicatedEvents,
+            };
+
+          default:
+            throw new ValidationError(
+              "Invalid action. Use 'move', 'delete', or 'duplicate'",
+              "action"
             );
-
-            duplicatedEvents.push(duplicated);
-          }
-
-          return {
-            success: true,
-            message: `Successfully duplicated ${duplicatedEvents.length} events`,
-            eventsProcessed: duplicatedEvents.length,
-            action: "duplicate",
-            createdEvents: duplicatedEvents,
-          };
-
-        default:
-          throw new ValidationError(
-            "Invalid action. Use 'move', 'delete', or 'duplicate'",
-            "action"
-          );
+        }
+      } catch (error) {
+        console.error("Bulk operation error:", error);
+        throw error;
       }
     },
     {
       auth: true,
       body: t.Object({
-        action: t.Union([
-          t.Literal("move"),
-          t.Literal("delete"),
-          t.Literal("duplicate")
-        ], {
-          description: "Bulk operation to perform: move, delete, or duplicate"
-        }),
+        action: t.Union(
+          [t.Literal("move"), t.Literal("delete"), t.Literal("duplicate")],
+          {
+            description:
+              "Bulk operation to perform: move, delete, or duplicate",
+          }
+        ),
         eventIds: t.Array(t.String(), {
           description: "Array of event IDs to process",
           minItems: 1,
         }),
-        targetCalendarId: t.Optional(t.String({
-          description: "Target calendar ID (required for move, optional for duplicate)"
-        })),
+        targetCalendarId: t.Optional(
+          t.String({
+            description:
+              "Target calendar ID (required for move, optional for duplicate)",
+          })
+        ),
       }),
       detail: {
         tags: ["Events"],
