@@ -37,19 +37,74 @@ import {
   X,
 } from "lucide-react";
 
-const TIMEZONES = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-  "Asia/Shanghai",
-  "Australia/Sydney",
-];
+const TIMEZONE_GROUPS = {
+  "Popular": [
+    { value: "UTC", label: "UTC (Coordinated Universal Time)" },
+    { value: "America/New_York", label: "Eastern Time (New York)" },
+    { value: "America/Chicago", label: "Central Time (Chicago)" },
+    { value: "America/Denver", label: "Mountain Time (Denver)" },
+    { value: "America/Los_Angeles", label: "Pacific Time (Los Angeles)" },
+    { value: "Europe/London", label: "London" },
+    { value: "Asia/Tokyo", label: "Tokyo" },
+  ],
+  "Americas": [
+    { value: "America/Anchorage", label: "Anchorage" },
+    { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires" },
+    { value: "America/Bogota", label: "Bogotá" },
+    { value: "America/Caracas", label: "Caracas" },
+    { value: "America/Guatemala", label: "Guatemala City" },
+    { value: "America/Havana", label: "Havana" },
+    { value: "America/Lima", label: "Lima" },
+    { value: "America/Mexico_City", label: "Mexico City" },
+    { value: "America/Montevideo", label: "Montevideo" },
+    { value: "America/Santiago", label: "Santiago" },
+    { value: "America/Sao_Paulo", label: "São Paulo" },
+    { value: "America/Toronto", label: "Toronto" },
+    { value: "America/Vancouver", label: "Vancouver" },
+  ],
+  "Europe & Africa": [
+    { value: "Europe/Amsterdam", label: "Amsterdam" },
+    { value: "Europe/Berlin", label: "Berlin" },
+    { value: "Europe/Brussels", label: "Brussels" },
+    { value: "Europe/Dublin", label: "Dublin" },
+    { value: "Europe/Helsinki", label: "Helsinki" },
+    { value: "Europe/Istanbul", label: "Istanbul" },
+    { value: "Europe/Madrid", label: "Madrid" },
+    { value: "Europe/Moscow", label: "Moscow" },
+    { value: "Europe/Paris", label: "Paris" },
+    { value: "Europe/Rome", label: "Rome" },
+    { value: "Europe/Stockholm", label: "Stockholm" },
+    { value: "Europe/Vienna", label: "Vienna" },
+    { value: "Europe/Zurich", label: "Zurich" },
+    { value: "Africa/Cairo", label: "Cairo" },
+    { value: "Africa/Johannesburg", label: "Johannesburg" },
+    { value: "Africa/Lagos", label: "Lagos" },
+  ],
+  "Asia & Pacific": [
+    { value: "Asia/Bangkok", label: "Bangkok" },
+    { value: "Asia/Beijing", label: "Beijing" },
+    { value: "Asia/Calcutta", label: "Mumbai" },
+    { value: "Asia/Dubai", label: "Dubai" },
+    { value: "Asia/Hong_Kong", label: "Hong Kong" },
+    { value: "Asia/Jakarta", label: "Jakarta" },
+    { value: "Asia/Karachi", label: "Karachi" },
+    { value: "Asia/Seoul", label: "Seoul" },
+    { value: "Asia/Shanghai", label: "Shanghai" },
+    { value: "Asia/Singapore", label: "Singapore" },
+    { value: "Asia/Taipei", label: "Taipei" },
+    { value: "Asia/Tehran", label: "Tehran" },
+    { value: "Australia/Adelaide", label: "Adelaide" },
+    { value: "Australia/Brisbane", label: "Brisbane" },
+    { value: "Australia/Melbourne", label: "Melbourne" },
+    { value: "Australia/Perth", label: "Perth" },
+    { value: "Australia/Sydney", label: "Sydney" },
+    { value: "Pacific/Auckland", label: "Auckland" },
+    { value: "Pacific/Fiji", label: "Fiji" },
+    { value: "Pacific/Honolulu", label: "Honolulu" },
+  ],
+};
+
+const ALL_TIMEZONES = Object.values(TIMEZONE_GROUPS).flat();
 
 const WORKING_DAYS = [
   { value: 0, label: "Sunday" },
@@ -70,6 +125,7 @@ type PaletteView =
   | "main" 
   | "appearance" 
   | "time-region" 
+  | "timezone" 
   | "notifications" 
   | "calendar-defaults" 
   | "account" 
@@ -88,6 +144,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [timezoneSearch, setTimezoneSearch] = useState("");
 
   useEffect(() => {
     if (settings) setLocalSettings(settings);
@@ -102,6 +159,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   useEffect(() => {
     setShowResetConfirm(false);
+    setTimezoneSearch("");
   }, [currentView]);
 
   const updateSetting = async <K extends keyof UserSettings>(
@@ -378,17 +436,19 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         </div>
         <CommandList>
           <CommandGroup heading="Timezone">
-            {TIMEZONES.slice(0, 5).map((tz) => (
-              <CommandItem
-                key={tz}
-                onSelect={() => updateSetting("timezone", tz)}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{tz}</span>
-                {localSettings.timezone === tz && <Check className="ml-auto h-4 w-4 text-primary" />}
-              </CommandItem>
-            ))}
+            <CommandItem 
+              onSelect={() => setCurrentView("timezone")}
+              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+            >
+              <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-col">
+                <span className="text-foreground">Timezone</span>
+                <span className="text-xs text-muted-foreground">
+                  {ALL_TIMEZONES.find(tz => tz.value === localSettings.timezone)?.label || localSettings.timezone}
+                </span>
+              </div>
+              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+            </CommandItem>
           </CommandGroup>
 
           <CommandGroup heading="Time Format">
@@ -410,6 +470,84 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             </CommandItem>
           </CommandGroup>
 
+        </CommandList>
+      </CommandDialog>
+    );
+  }
+
+  if (currentView === "timezone") {
+    return (
+      <CommandDialog open={open} onOpenChange={onOpenChange}>
+        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+          <button 
+            onClick={() => setCurrentView("time-region")}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <h2 className="text-lg font-semibold text-foreground">Timezone</h2>
+        </div>
+        <div className="bg-muted/30 border-b border-border focus-within:ring-0">
+          <input
+            type="text"
+            placeholder="Search timezones..."
+            value={timezoneSearch}
+            onChange={(e) => setTimezoneSearch(e.target.value)}
+            className="w-full px-4 py-3 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-foreground placeholder:text-muted-foreground"
+          />
+        </div>
+        <CommandList>
+          {timezoneSearch ? (
+            <CommandGroup heading="Search Results">
+              {ALL_TIMEZONES
+                .filter((tz) => 
+                  tz.label.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
+                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
+                )
+                .slice(0, 20)
+                .map((tz) => (
+                  <CommandItem
+                    key={tz.value}
+                    onSelect={() => {
+                      updateSetting("timezone", tz.value);
+                      setTimezoneSearch("");
+                      setCurrentView("time-region");
+                    }}
+                    className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                  >
+                    <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span className="text-foreground">{tz.label}</span>
+                      <span className="text-xs text-muted-foreground">{tz.value}</span>
+                    </div>
+                    {localSettings.timezone === tz.value && <Check className="ml-auto h-4 w-4 text-primary" />}
+                  </CommandItem>
+                ))
+              }
+            </CommandGroup>
+          ) : (
+            Object.entries(TIMEZONE_GROUPS).map(([groupName, timezones]) => (
+              <CommandGroup key={groupName} heading={groupName}>
+                {timezones.map((tz) => (
+                  <CommandItem
+                    key={tz.value}
+                    onSelect={() => {
+                      updateSetting("timezone", tz.value);
+                      setCurrentView("time-region");
+                    }}
+                    className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                  >
+                    <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span className="text-foreground">{tz.label}</span>
+                      <span className="text-xs text-muted-foreground">{tz.value}</span>
+                    </div>
+                    {localSettings.timezone === tz.value && <Check className="ml-auto h-4 w-4 text-primary" />}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))
+          )}
         </CommandList>
       </CommandDialog>
     );
