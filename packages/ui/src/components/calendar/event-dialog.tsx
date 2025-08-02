@@ -449,7 +449,7 @@ export function EventDialog({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Enter event title"
-                    className="text-base bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
+                    className="text-base"
                   />
                 </div>
 
@@ -467,7 +467,7 @@ export function EventDialog({
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
                     placeholder="Enter event description"
-                    className="resize-none bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
+                    className="resize-none"
                   />
                 </div>
 
@@ -477,10 +477,7 @@ export function EventDialog({
                     Calendar
                   </Label>
                   <Select value={calendarId} onValueChange={setCalendarId}>
-                    <SelectTrigger
-                      id="calendar"
-                      className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
-                    >
+                    <SelectTrigger id="calendar">
                       <SelectValue placeholder="Select a calendar" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">
@@ -509,7 +506,6 @@ export function EventDialog({
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Enter event location"
-                    className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                   />
                 </div>
               </div>
@@ -582,7 +578,7 @@ export function EventDialog({
                         }
                       }}
                     >
-                      <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select time" />
                       </SelectTrigger>
                       <SelectContent className="bg-card border border-border">
@@ -649,7 +645,7 @@ export function EventDialog({
                       End Time
                     </Label>
                     <Select value={endTime} onValueChange={setEndTime}>
-                      <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select time" />
                       </SelectTrigger>
                       <SelectContent className="bg-card border border-border">
@@ -708,10 +704,7 @@ export function EventDialog({
                       )
                     }
                   >
-                    <SelectTrigger
-                      id="reminder"
-                      className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
-                    >
+                    <SelectTrigger id="reminder">
                       <SelectValue placeholder="Select reminder" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">

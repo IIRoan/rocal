@@ -15,7 +15,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": [
-      "bun-types" // add Bun global
+      "bun-types", // add Bun global
+      "@types/react"
     ]
   }
 }
