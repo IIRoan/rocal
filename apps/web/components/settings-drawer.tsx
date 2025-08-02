@@ -274,7 +274,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       updateSetting("theme", value)
                     }
                   >
-                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">
@@ -293,7 +293,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       value: "month" | "week" | "day" | "agenda"
                     ) => updateSetting("defaultView", value)}
                   >
-                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select default view" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">
@@ -313,7 +313,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       updateSetting("weekStartDay", parseInt(value))
                     }
                   >
-                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select week start" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">
@@ -394,7 +394,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     value={localSettings.timezone}
                     onValueChange={(value) => updateSetting("timezone", value)}
                   >
-                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">
@@ -415,7 +415,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       updateSetting("timeFormat", value)
                     }
                   >
-                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select time format" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">
@@ -439,7 +439,6 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       <Label htmlFor="workStart">Start Time</Label>
                       <Input
                         type="time"
-                        className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                         value={formatTimeFromMinutes(
                           localSettings.workingHoursStart
                         )}
@@ -455,7 +454,6 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       <Label htmlFor="workEnd">End Time</Label>
                       <Input
                         type="time"
-                        className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                         value={formatTimeFromMinutes(
                           localSettings.workingHoursEnd
                         )}
@@ -485,7 +483,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                           className={
                             active
                               ? "cursor-pointer text-xs bg-accent text-accent-foreground hover:bg-accent/90"
-                              : "cursor-pointer text-xs border-border hover:bg-input/40"
+                              : "cursor-pointer text-xs border-border hover:bg-muted/60"
                           }
                           onClick={() => {
                             const newWorkingDays = active
@@ -587,7 +585,6 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   </Label>
                   <Input
                     type="number"
-                    className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                     value={localSettings.defaultReminder || ""}
                     onChange={(e) =>
                       updateSetting(
@@ -610,7 +607,6 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   </Label>
                   <Input
                     type="number"
-                    className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                     value={localSettings.defaultEventDuration}
                     onChange={(e) =>
                       updateSetting(
@@ -633,7 +629,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       )
                     }
                   >
-                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                    <SelectTrigger>
                       <SelectValue placeholder="No default calendar" />
                     </SelectTrigger>
                     <SelectContent className="bg-card border border-border">

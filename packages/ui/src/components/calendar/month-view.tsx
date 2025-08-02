@@ -55,15 +55,24 @@ export function MonthView({
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
-    const calendarStart = startOfWeek(monthStart, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const calendarStart = startOfWeek(monthStart, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    const calendarEnd = endOfWeek(monthEnd, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
 
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentDate, weekStartDay]);
 
   const weekdays = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = addDays(startOfWeek(new Date(), { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 }), i);
+      const date = addDays(
+        startOfWeek(new Date(), {
+          weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+        }),
+        i
+      );
       return format(date, "EEE");
     });
   }, [weekStartDay]);
@@ -100,7 +109,9 @@ export function MonthView({
 
   return (
     <div data-slot="month-view" className="contents">
-      <div className={`border-border/70 grid ${showWeekNumbers ? 'grid-cols-8' : 'grid-cols-7'} border-y uppercase`}>
+      <div
+        className={`border-border/70 grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} border-y uppercase`}
+      >
         {showWeekNumbers && (
           <div className="text-muted-foreground/70 py-2 text-center text-xs font-medium">
             W
@@ -119,12 +130,12 @@ export function MonthView({
         {weeks.map((week, weekIndex) => (
           <div
             key={`week-${weekIndex}`}
-            className={`grid ${showWeekNumbers ? 'grid-cols-8' : 'grid-cols-7'} [&:last-child>*]:border-b-0`}
+            className={`grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} [&:last-child>*]:border-b-0`}
           >
             {showWeekNumbers && (
               <div className="border-border/70 border-r border-b bg-muted/10 flex items-center justify-center">
                 <span className="text-muted-foreground/60 text-xs font-medium">
-                  {week[0] ? getWeek(week[0]) : ''}
+                  {week[0] ? getWeek(week[0]) : ""}
                 </span>
               </div>
             )}
@@ -152,12 +163,14 @@ export function MonthView({
               return (
                 <div
                   key={day.toString()}
-                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 hover:bg-[var(--warm-accent-1)]/30 hover:border-[var(--warm-accent-2)]/40 transition-all duration-200 ${
-                    workingDays.includes(day.getDay()) && isCurrentMonth 
-                      ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
-                      : !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay()) && isCurrentMonth
-                      ? "bg-[var(--warm-accent-1)]/20"
-                      : ""
+                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 ${
+                    workingDays.includes(day.getDay()) && isCurrentMonth
+                      ? "bg-[var(--calendar-workday)]"
+                      : !workingDays.includes(day.getDay()) &&
+                          [0, 6].includes(day.getDay()) &&
+                          isCurrentMonth
+                        ? "bg-[var(--calendar-weekend)]"
+                        : ""
                   }`}
                   data-today={isToday(day) || undefined}
                   data-outside-cell={!isCurrentMonth || undefined}
@@ -177,7 +190,7 @@ export function MonthView({
                     <div
                       ref={isReferenceCell ? contentRef : null}
                       className={`${
-                        compactView 
+                        compactView
                           ? "min-h-[calc((var(--event-height)+var(--event-gap))*3)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*4)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*5)]"
                           : "min-h-[calc((var(--event-height)+var(--event-gap))*2)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*3)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*4)]"
                       }`}
@@ -213,7 +226,7 @@ export function MonthView({
                                     <span>
                                       {format(
                                         new Date(event.start),
-                                        "h:mm",
+                                        "h:mm"
                                       )}{" "}
                                     </span>
                                   )}
