@@ -5,6 +5,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { authClient } from "@/lib/auth-client";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
+import { PasskeySettings } from "./passkey-settings";
 import {
   CommandDialog,
   CommandList,
@@ -37,12 +38,6 @@ import {
   ArrowLeft,
   X,
   Key,
-  Plus,
-  Trash2,
-  Edit2,
-  Smartphone,
-  Usb,
-  AlertCircle,
 } from "lucide-react";
 
 const TIMEZONE_GROUPS = {
@@ -155,14 +150,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [timezoneSearch, setTimezoneSearch] = useState("");
 
-  // Passkey-related state
-  const [passkeys, setPasskeys] = useState<any[]>([]);
-  const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [passkeyError, setPasskeyError] = useState<string | null>(null);
-  const [passkeySuccess, setPasskeySuccess] = useState<string | null>(null);
-  const [showAddPasskey, setShowAddPasskey] = useState(false);
-  const [passkeyName, setPasskeyName] = useState("");
-  const [passkeyType, setPasskeyType] = useState<"platform" | "cross-platform" | undefined>(undefined);
 
   useEffect(() => {
     if (settings) setLocalSettings(settings);
@@ -180,12 +167,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     setTimezoneSearch("");
   }, [currentView]);
 
-  // Load passkeys when security view is opened
-  useEffect(() => {
-    if (currentView === "security" || currentView === "passkeys") {
-      loadPasskeys();
-    }
-  }, [currentView]);
 
   const updateSetting = async <K extends keyof UserSettings>(
     key: K,
@@ -297,103 +278,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const workingDaysList = JSON.parse(localSettings.workingDays) as number[];
 
-  // Passkey utility functions
-  const getDeviceIcon = (deviceType: string) => {
-    switch (deviceType) {
-      case "platform":
-        return Smartphone;
-      case "cross-platform":
-        return Usb;
-      default:
-        return Key;
-    }
-  };
-
-  const getDeviceLabel = (deviceType: string) => {
-    switch (deviceType) {
-      case "platform":
-        return "Platform";
-      case "cross-platform":
-        return "Security Key";
-      default:
-        return "Unknown";
-    }
-  };
-
-  const loadPasskeys = async () => {
-    try {
-      setPasskeyLoading(true);
-      setPasskeyError(null);
-      const { data, error } = await authClient.passkey.listUserPasskeys();
-      if (error) {
-        throw new Error(error.message || "Failed to load passkeys");
-      }
-      setPasskeys(data || []);
-    } catch (err: any) {
-      setPasskeyError(err.message || "Failed to load passkeys");
-    } finally {
-      setPasskeyLoading(false);
-    }
-  };
-
-  const addPasskey = async () => {
-    if (!passkeyName.trim()) {
-      setPasskeyError("Please enter a name for your passkey");
-      return;
-    }
-
-    try {
-      setPasskeyLoading(true);
-      setPasskeyError(null);
-      setPasskeySuccess(null);
-
-      const addOptions: any = {
-        name: passkeyName.trim(),
-      };
-
-      if (passkeyType) {
-        addOptions.authenticatorAttachment = passkeyType;
-      }
-
-      const { data, error } = await authClient.passkey.addPasskey(addOptions);
-      
-      if (error) {
-        throw new Error(error.message || "Failed to add passkey");
-      }
-
-      setPasskeySuccess("Passkey added successfully!");
-      setShowAddPasskey(false);
-      setPasskeyName("");
-      setPasskeyType(undefined);
-      await loadPasskeys();
-      
-      setTimeout(() => setPasskeySuccess(null), 3000);
-    } catch (err: any) {
-      setPasskeyError(err.message || "Failed to add passkey");
-    } finally {
-      setPasskeyLoading(false);
-    }
-  };
-
-  const deletePasskey = async (id: string) => {
-    try {
-      setPasskeyError(null);
-      setPasskeySuccess(null);
-
-      const { error } = await authClient.passkey.deletePasskey({ id });
-      
-      if (error) {
-        throw new Error(error.message || "Failed to delete passkey");
-      }
-
-      setPasskeySuccess("Passkey deleted successfully!");
-      await loadPasskeys();
-      
-      setTimeout(() => setPasskeySuccess(null), 3000);
-    } catch (err: any) {
-      setPasskeyError(err.message || "Failed to delete passkey");
-    }
-  };
 
   if (currentView === "main") {
     return (
@@ -819,161 +703,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   if (currentView === "passkeys") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button 
-            onClick={() => setCurrentView("security")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">Passkeys</h2>
-        </div>
-        <CommandList>
-          {passkeyError && (
-            <div className="px-4 py-3 mb-2">
-              <div className="flex items-center gap-2 text-destructive text-sm">
-                <AlertCircle className="h-4 w-4" />
-                <span>{passkeyError}</span>
-              </div>
-            </div>
-          )}
-
-          {passkeySuccess && (
-            <div className="px-4 py-3 mb-2">
-              <div className="flex items-center gap-2 text-green-600 text-sm">
-                <Check className="h-4 w-4" />
-                <span>{passkeySuccess}</span>
-              </div>
-            </div>
-          )}
-
-          {!showAddPasskey ? (
-            <CommandGroup heading="Actions">
-              <CommandItem 
-                onSelect={() => setShowAddPasskey(true)}
-                disabled={passkeyLoading}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Add New Passkey</span>
-              </CommandItem>
-            </CommandGroup>
-          ) : (
-            <CommandGroup heading="Add New Passkey">
-              <div className="px-4 py-3 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Passkey Name
-                  </label>
-                  <input
-                    type="text"
-                    value={passkeyName}
-                    onChange={(e) => setPasskeyName(e.target.value)}
-                    placeholder="e.g., iPhone Face ID, YubiKey"
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Authenticator Type (Optional)
-                  </label>
-                  <select
-                    value={passkeyType || ""}
-                    onChange={(e) => setPasskeyType(e.target.value as "platform" | "cross-platform" | undefined || undefined)}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="">Any (Recommended)</option>
-                    <option value="platform">Platform (Face ID, Touch ID)</option>
-                    <option value="cross-platform">Security Key (YubiKey, etc.)</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={addPasskey}
-                    disabled={passkeyLoading || !passkeyName.trim()}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
-                  >
-                    {passkeyLoading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin inline" />
-                        Adding...
-                      </>
-                    ) : (
-                      "Create Passkey"
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAddPasskey(false);
-                      setPasskeyName("");
-                      setPasskeyType(undefined);
-                      setPasskeyError(null);
-                    }}
-                    disabled={passkeyLoading}
-                    className="px-4 py-2 border border-border rounded-md text-sm font-medium hover:bg-muted transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </CommandGroup>
-          )}
-
-          {passkeyLoading && passkeys.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading passkeys...</p>
-            </div>
-          ) : passkeys.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <Key className="h-8 w-8 mx-auto mb-3 text-muted-foreground opacity-50" />
-              <p className="text-sm text-muted-foreground mb-2">No passkeys found</p>
-              <p className="text-xs text-muted-foreground">
-                Add your first passkey to enable passwordless authentication
-              </p>
-            </div>
-          ) : (
-            <CommandGroup heading="Your Passkeys">
-              {passkeys.map((passkey) => {
-                const DeviceIcon = getDeviceIcon(passkey.deviceType);
-                return (
-                  <div key={passkey.id} className="px-4 py-3 border-b border-border/30 last:border-b-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-md bg-muted">
-                          <DeviceIcon className="h-3 w-3 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">
-                              {passkey.name}
-                            </span>
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                              {getDeviceLabel(passkey.deviceType)}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Added {new Date(passkey.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => deletePasskey(passkey.id)}
-                        className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </CommandGroup>
-          )}
-        </CommandList>
-      </CommandDialog>
+      <PasskeySettings 
+        open={open} 
+        onOpenChange={onOpenChange} 
+        onBack={() => setCurrentView("security")}
+      />
     );
   }
 
