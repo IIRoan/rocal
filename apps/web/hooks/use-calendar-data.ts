@@ -91,7 +91,6 @@ interface UseCalendarDataReturn {
   // Notification handlers
   loadNotifications: (eventId: string) => Promise<EventNotification[]>;
   updateNotifications: (eventId: string, notifications: EventNotification[]) => Promise<void>;
-  testEmail: (eventId: string) => Promise<void>;
 }
 
 const DEFAULT_CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -823,19 +822,6 @@ export function useCalendarData(
     }
   }, []);
 
-  const testEmail = useCallback(async (eventId: string): Promise<void> => {
-    try {
-      const response = await calendarApiService.testEmailNotification(eventId);
-      console.log('✅ Test email response:', response);
-    } catch (error) {
-      console.error('❌ Failed to send test email:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        eventId,
-      });
-      throw error;
-    }
-  }, []);
 
   // Initial data fetch
   useEffect(() => {
@@ -898,6 +884,5 @@ export function useCalendarData(
     // Notification handlers
     loadNotifications,
     updateNotifications,
-    testEmail,
   };
 }
