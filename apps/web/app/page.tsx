@@ -1,15 +1,27 @@
 import type { Metadata } from "next";
-import { AppSidebar } from "@workspace/ui/components/layout";
-import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
+import { 
+  Navbar, 
+  HeroSection, 
+  FeaturesSection, 
+  PricingSection, 
+  Footer 
+} from "@workspace/ui/components/landing";
 
 export const metadata: Metadata = {
-  title: "Calendar App - Crafted.is",
+  title: "Rocani - Smart Calendar for Modern Teams",
+  description: "Experience the future of scheduling with intelligent automation, seamless collaboration, and calendar insights that adapt to your workflow.",
 };
 
 export default function Page() {
   return (
-    <SidebarProvider>
-      <SidebarInset>Landing Page!</SidebarInset>
-    </SidebarProvider>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main>
+        <HeroSection />
+        <FeaturesSection />
+        <PricingSection />
+      </main>
+      <Footer />
+    </div>
   );
 }
