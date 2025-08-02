@@ -169,7 +169,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       themeSettings={themeSettings}
       onLoadNotifications={calendarData.loadNotifications}
       onUpdateNotifications={calendarData.updateNotifications}
-      onTestEmail={calendarData.testEmail}
     />
   );
 }

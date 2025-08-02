@@ -87,7 +87,6 @@ export interface EventCalendarProps {
     eventId: string,
     notifications: EventNotification[]
   ) => Promise<void>;
-  onTestEmail?: (eventId: string) => Promise<void>;
 }
 
 export function EventCalendar({
@@ -114,7 +113,6 @@ export function EventCalendar({
   themeSettings,
   onLoadNotifications,
   onUpdateNotifications,
-  onTestEmail,
 }: EventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
@@ -759,7 +757,6 @@ export function EventCalendar({
             defaultCalendarId={defaultCalendarId}
             onLoadNotifications={onLoadNotifications}
             onUpdateNotifications={onUpdateNotifications}
-            onTestEmail={onTestEmail}
           />
         </CalendarDndProvider>
       </div>

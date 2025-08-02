@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, Bell, Mail, Loader2 } from "lucide-react";
+import { Plus, X, Bell, Mail } from "lucide-react";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import {
@@ -41,7 +41,6 @@ interface NotificationManagerProps {
   eventId?: string;
   notifications: EventNotification[];
   onChange: (notifications: EventNotification[]) => void;
-  onTestEmail?: (eventId: string) => Promise<void>;
   loading?: boolean;
   defaultReminder?: number | null; // User's default reminder setting
 }
@@ -50,11 +49,9 @@ export function NotificationManager({
   eventId,
   notifications,
   onChange,
-  onTestEmail,
   loading = false,
   defaultReminder = null,
 }: NotificationManagerProps) {
-  const [testingEmail, setTestingEmail] = useState(false);
 
   const handleAddNotification = () => {
     const newNotification: EventNotification = {
@@ -81,18 +78,6 @@ export function NotificationManager({
     onChange(updated);
   };
 
-  const handleTestEmail = async () => {
-    if (!eventId || !onTestEmail) return;
-
-    setTestingEmail(true);
-    try {
-      await onTestEmail(eventId);
-    } catch (error) {
-      console.error("Failed to send test email:", error);
-    } finally {
-      setTestingEmail(false);
-    }
-  };
 
   const formatMinutesToReadable = (minutes: number): string => {
     if (minutes < 60) {
@@ -117,27 +102,6 @@ export function NotificationManager({
           <Bell className="h-4 w-4" />
           Email Notifications
         </Label>
-        {eventId && onTestEmail && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTestEmail}
-            disabled={testingEmail || loading}
-            className="text-xs"
-          >
-            {testingEmail ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Mail className="h-3 w-3 mr-1" />
-                Test Email
-              </>
-            )}
-          </Button>
-        )}
       </div>
 
       {/* Default notification indicator */}

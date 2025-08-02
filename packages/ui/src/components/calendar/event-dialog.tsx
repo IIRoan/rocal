@@ -91,7 +91,6 @@ interface EventDialogProps {
     eventId: string,
     notifications: EventNotification[]
   ) => Promise<void>;
-  onTestEmail?: (eventId: string) => Promise<void>;
 }
 
 export function EventDialog({
@@ -108,7 +107,6 @@ export function EventDialog({
   defaultCalendarId = null,
   onLoadNotifications,
   onUpdateNotifications,
-  onTestEmail,
 }: EventDialogProps) {
   const { calendars } = useCalendarContext();
 
@@ -430,16 +428,6 @@ export function EventDialog({
     }
   };
 
-  const handleTestEmail = async (eventId: string) => {
-    if (!onTestEmail) return;
-    try {
-      await onTestEmail(eventId);
-      console.log("✅ Test email sent successfully");
-    } catch (error) {
-      console.error("Failed to send test email:", error);
-      throw error;
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -718,7 +706,6 @@ export function EventDialog({
                     eventId={event?.id}
                     notifications={notifications}
                     onChange={setNotifications}
-                    onTestEmail={onTestEmail ? handleTestEmail : undefined}
                     loading={saving}
                     defaultReminder={defaultReminder}
                   />

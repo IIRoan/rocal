@@ -24,7 +24,6 @@ import {
   CalendarDeleteResponse,
   BulkEventRequest,
   BulkEventResponse,
-  NotificationTestRequest,
   NotificationStatus,
   EventNotification,
   CreateNotificationRequest,
@@ -457,19 +456,6 @@ export class CalendarApiService {
   }
 
   // Notification API methods
-  async testNotification(
-    eventId: string
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await this.client.post<{
-        success: boolean;
-        message: string;
-      }>("/api/notifications/test", { eventId });
-      return response;
-    } catch (error) {
-      throw this.transformError(error, "Failed to send test notification");
-    }
-  }
 
   async triggerReminderCheck(): Promise<{ success: boolean; message: string }> {
     try {
@@ -526,42 +512,7 @@ export class CalendarApiService {
   // Browser notification methods removed
 
   // New email notification methods
-  async testEmailNotification(
-    eventId: string
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await this.client.post<{
-        success: boolean;
-        message: string;
-      }>("/api/notifications/test-email", { eventId });
-      return response;
-    } catch (error) {
-      throw this.transformError(
-        error,
-        "Failed to send test email notification"
-      );
-    }
-  }
 
-  async getPendingEmailNotifications(): Promise<{
-    success: boolean;
-    emails: any[];
-    count: number;
-  }> {
-    try {
-      const response = await this.client.get<{
-        success: boolean;
-        emails: any[];
-        count: number;
-      }>("/api/notifications/email/pending");
-      return response;
-    } catch (error) {
-      throw this.transformError(
-        error,
-        "Failed to get pending email notifications"
-      );
-    }
-  }
 
   async createMultipleNotifications(
     eventId: string,
