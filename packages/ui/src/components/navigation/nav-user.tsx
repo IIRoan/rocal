@@ -30,9 +30,9 @@ export function NavUser({
   onOpenSettings?: () => void;
 }) {
   const initials = user.name
-    .split(' ')
-    .map(name => name.charAt(0).toUpperCase())
-    .join('')
+    .split(" ")
+    .map((name) => name.charAt(0).toUpperCase())
+    .join("")
     .slice(0, 2);
   return (
     <SidebarMenu>
@@ -45,7 +45,9 @@ export function NavUser({
             >
               <Avatar className="size-8">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -60,7 +62,7 @@ export function NavUser({
             sideOffset={4}
           >
             <DropdownMenuGroup>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="gap-3 focus:bg-sidebar-accent"
                 onClick={onOpenSettings}
               >
@@ -70,7 +72,7 @@ export function NavUser({
                 />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="gap-3 focus:bg-sidebar-accent"
                 onClick={onLogout}
               >

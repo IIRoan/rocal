@@ -70,7 +70,7 @@ export function DayView({
         );
       })
       .sort(
-        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
       );
   }, [currentDate, events]);
 
@@ -147,8 +147,8 @@ export function DayView({
           const overlaps = col.some((c) =>
             areIntervalsOverlapping(
               { start: adjustedStart, end: adjustedEnd },
-              { start: new Date(c.event.start), end: new Date(c.event.end) }
-            )
+              { start: new Date(c.event.start), end: new Date(c.event.end) },
+            ),
           );
           if (!overlaps) {
             placed = true;
@@ -189,7 +189,7 @@ export function DayView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "day",
-    timezone
+    timezone,
   );
 
   return (
@@ -309,7 +309,7 @@ export function DayView({
                         quarter === 2 &&
                           "top-[calc(var(--week-cells-height)/4*2)]",
                         quarter === 3 &&
-                          "top-[calc(var(--week-cells-height)/4*3)]"
+                          "top-[calc(var(--week-cells-height)/4*3)]",
                       )}
                       onClick={() => {
                         const startTime = new Date(currentDate);

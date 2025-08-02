@@ -89,7 +89,7 @@ interface EventDialogProps {
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
   onUpdateNotifications?: (
     eventId: string,
-    notifications: EventNotification[]
+    notifications: EventNotification[],
   ) => Promise<void>;
 }
 
@@ -125,7 +125,7 @@ export function EventDialog({
 
   // UI state
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
-    []
+    [],
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [startDateOpen, setStartDateOpen] = useState(false);
@@ -137,7 +137,7 @@ export function EventDialog({
   const defaultCalendar = useMemo(() => {
     if (defaultCalendarId) {
       const specificCalendar = calendars.find(
-        (cal) => cal.id === defaultCalendarId
+        (cal) => cal.id === defaultCalendarId,
       );
       if (specificCalendar) return specificCalendar;
     }
@@ -208,7 +208,7 @@ export function EventDialog({
     setEndTime(
       `${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute
         .toString()
-        .padStart(2, "0")}`
+        .padStart(2, "0")}`,
     );
     setAllDay(false);
     setLocation("");
@@ -240,7 +240,7 @@ export function EventDialog({
 
   const handleTimeInputChange = (
     value: string,
-    setter: (time: string) => void
+    setter: (time: string) => void,
   ) => {
     if (value === "" || /^([0-2]?[0-9]?:?[0-5]?[0-9]?)$/.test(value)) {
       setter(value);
@@ -249,7 +249,7 @@ export function EventDialog({
 
   const handleTimeInputBlur = (
     value: string,
-    setter: (time: string) => void
+    setter: (time: string) => void,
   ) => {
     const validatedTime = validateTimeInput(value);
     if (validatedTime) {
@@ -307,7 +307,7 @@ export function EventDialog({
           field: "time",
           message: `Selected time must be between ${StartHour.toString().padStart(
             2,
-            "0"
+            "0",
           )}:00 and ${EndHour.toString().padStart(2, "0")}:00`,
         });
       }
@@ -526,7 +526,7 @@ export function EventDialog({
                         variant="outline"
                         className={cn(
                           "w-full justify-between px-3 font-normal border-border bg-card/30 hover:bg-card/40",
-                          !startDate && "text-muted-foreground"
+                          !startDate && "text-muted-foreground",
                         )}
                       >
                         <span className="truncate">
@@ -606,7 +606,7 @@ export function EventDialog({
                         variant="outline"
                         className={cn(
                           "w-full justify-between px-3 font-normal border-border bg-card/30 hover:bg-card/40",
-                          !endDate && "text-muted-foreground"
+                          !endDate && "text-muted-foreground",
                         )}
                       >
                         <span className="truncate">
@@ -700,7 +700,7 @@ export function EventDialog({
                     value={reminder?.toString() || "none"}
                     onValueChange={(value) =>
                       setReminder(
-                        value === "none" ? null : Number.parseInt(value)
+                        value === "none" ? null : Number.parseInt(value),
                       )
                     }
                   >

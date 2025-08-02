@@ -71,7 +71,7 @@ export function MonthView({
         startOfWeek(new Date(), {
           weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
         }),
-        i
+        i,
       );
       return format(date, "EEE");
     });
@@ -226,7 +226,7 @@ export function MonthView({
                                     <span>
                                       {format(
                                         new Date(event.start),
-                                        "h:mm"
+                                        "h:mm",
                                       )}{" "}
                                     </span>
                                   )}

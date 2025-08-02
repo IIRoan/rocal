@@ -28,7 +28,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         // Search input specific styling
         type === "search" &&
           "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
-        className
+        className,
       )}
       {...props}
     />

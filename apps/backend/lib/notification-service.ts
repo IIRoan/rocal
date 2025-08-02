@@ -93,7 +93,7 @@ export class NotificationService {
       user: User & { settings?: UserSettings | null };
       calendar: any;
       category: any;
-    }
+    },
   ): Promise<void> {
     const now = new Date();
     const userSettings = event.user.settings;
@@ -107,7 +107,7 @@ export class NotificationService {
     // Fallback to legacy reminder system for backward compatibility
     else if (event.reminder) {
       const reminderTime = new Date(
-        event.start.getTime() - event.reminder * 60 * 1000
+        event.start.getTime() - event.reminder * 60 * 1000,
       );
 
       // Check if it's time for the reminder (within 1-minute window)
@@ -120,7 +120,7 @@ export class NotificationService {
           event.id,
           event.userId,
           "legacy",
-          event.reminder
+          event.reminder,
         );
         if (existingNotification) return;
 
@@ -137,14 +137,14 @@ export class NotificationService {
           event.userId,
           "legacy",
           event.reminder,
-          reminderTime
+          reminderTime,
         );
       }
     }
     // If no notifications configured, use user's default reminder setting
     else if (userSettings?.defaultReminder) {
       const reminderTime = new Date(
-        event.start.getTime() - userSettings.defaultReminder * 60 * 1000
+        event.start.getTime() - userSettings.defaultReminder * 60 * 1000,
       );
 
       if (
@@ -155,14 +155,14 @@ export class NotificationService {
           event.id,
           event.userId,
           "default",
-          userSettings.defaultReminder
+          userSettings.defaultReminder,
         );
         if (existingNotification) return;
 
         if (userSettings?.emailNotifications !== false) {
           await this.queueEmailNotification(
             event,
-            userSettings.defaultReminder
+            userSettings.defaultReminder,
           );
         }
 
@@ -173,7 +173,7 @@ export class NotificationService {
           event.userId,
           "default",
           userSettings.defaultReminder,
-          reminderTime
+          reminderTime,
         );
       }
     }
@@ -186,11 +186,11 @@ export class NotificationService {
       category: any;
     },
     notification: EventNotification,
-    userSettings: UserSettings | null | undefined
+    userSettings: UserSettings | null | undefined,
   ): Promise<void> {
     const now = new Date();
     const reminderTime = new Date(
-      event.start.getTime() - notification.minutesBefore * 60 * 1000
+      event.start.getTime() - notification.minutesBefore * 60 * 1000,
     );
 
     // Check if it's time for this specific notification (within 1-minute window)
@@ -203,7 +203,7 @@ export class NotificationService {
         event.id,
         event.userId,
         notification.notificationType,
-        notification.minutesBefore
+        notification.minutesBefore,
       );
       if (existingNotification) return;
 
@@ -222,7 +222,7 @@ export class NotificationService {
         event.userId,
         notification.notificationType,
         notification.minutesBefore,
-        reminderTime
+        reminderTime,
       );
     }
   }
@@ -233,7 +233,7 @@ export class NotificationService {
       calendar: any;
       category?: any;
     },
-    _minutesBefore: number
+    _minutesBefore: number,
   ): Promise<void> {
     const timeUntilEvent = this.formatTimeUntilEvent(event.start);
 
@@ -289,7 +289,7 @@ export class NotificationService {
       // });
 
       console.log(
-        `✓ Email reminder sent to ${emailData.to} for event ${emailData.eventId}`
+        `✓ Email reminder sent to ${emailData.to} for event ${emailData.eventId}`,
       );
     } catch (error) {
       console.error("Failed to send email notification:", error);
@@ -304,7 +304,7 @@ export class NotificationService {
       calendar: any;
       category?: any;
     },
-    timeUntilEvent: string
+    timeUntilEvent: string,
   ): Promise<string> {
     const eventDate = event.start.toLocaleDateString();
     const eventTime = event.allDay
@@ -313,25 +313,28 @@ export class NotificationService {
 
     // Get user's theme preference, default to light
     const userTheme = event.user.settings?.theme || "light";
-    const categoryColor = event.category?.color || event.calendar?.color || "blue";
+    const categoryColor =
+      event.category?.color || event.calendar?.color || "blue";
 
     try {
-      const emailHtml = await render(EventReminderEmail({
-        eventTitle: event.title,
-        eventDate,
-        eventTime,
-        eventLocation: event.location || undefined,
-        categoryName: event.category?.name || undefined,
-        categoryColor,
-        description: event.description || undefined,
-        timeUntilEvent,
-        userTheme: userTheme as "light" | "dark" | "system",
-      }));
+      const emailHtml = await render(
+        EventReminderEmail({
+          eventTitle: event.title,
+          eventDate,
+          eventTime,
+          eventLocation: event.location || undefined,
+          categoryName: event.category?.name || undefined,
+          categoryColor,
+          description: event.description || undefined,
+          timeUntilEvent,
+          userTheme: userTheme as "light" | "dark" | "system",
+        }),
+      );
 
       return emailHtml;
     } catch (error) {
       console.error("Failed to render React Email template:", error);
-      
+
       // Fallback to a simple HTML template if React Email fails
       return `
         <html>
@@ -342,13 +345,12 @@ export class NotificationService {
             <p><strong>Date:</strong> ${eventDate}</p>
             <p><strong>Time:</strong> ${eventTime}</p>
             ${event.location ? `<p><strong>Location:</strong> ${event.location}</p>` : ""}
-            ${event.description ? `<p><strong>Description:</strong></p><p>${event.description.replace(/\n/g, '<br/>')}</p>` : ""}
+            ${event.description ? `<p><strong>Description:</strong></p><p>${event.description.replace(/\n/g, "<br/>")}</p>` : ""}
           </body>
         </html>
       `;
     }
   }
-
 
   private formatTimeUntilEvent(eventStart: Date): string {
     const now = new Date();
@@ -377,7 +379,7 @@ export class NotificationService {
     eventId: string,
     userId: string,
     notificationType: string,
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<boolean> {
     const notification = await prisma.notificationLog.findFirst({
       where: {
@@ -399,7 +401,7 @@ export class NotificationService {
     userId: string,
     notificationType: string,
     minutesBefore: number,
-    sentAt: Date
+    sentAt: Date,
   ): Promise<void> {
     try {
       await prisma.notificationLog.create({
@@ -414,7 +416,7 @@ export class NotificationService {
       });
 
       console.log(
-        `✓ Recorded ${notificationType} notification sent for event ${eventId}, user ${userId} (${minutesBefore}min before) at ${sentAt.toISOString()}`
+        `✓ Recorded ${notificationType} notification sent for event ${eventId}, user ${userId} (${minutesBefore}min before) at ${sentAt.toISOString()}`,
       );
     } catch (error) {
       console.error("Failed to record notification:", error);
@@ -461,7 +463,7 @@ export class NotificationService {
           ) {
             await this.queueEmailNotification(
               event as any,
-              notification.minutesBefore
+              notification.minutesBefore,
             );
           }
           // Browser notifications removed
@@ -483,7 +485,7 @@ export class NotificationService {
   async createDefaultNotificationsForEvent(
     eventId: string,
     userId: string,
-    customReminderMinutes?: number | null
+    customReminderMinutes?: number | null,
   ): Promise<void> {
     try {
       const userSettings = await prisma.userSettings.findUnique({
@@ -511,13 +513,13 @@ export class NotificationService {
             data: notifications.map((n) => ({
               ...n,
               notificationTime: new Date(
-                Date.now() + n.minutesBefore * 60 * 1000
+                Date.now() + n.minutesBefore * 60 * 1000,
               ),
             })),
           });
 
           console.log(
-            `✓ Created ${notifications.length} default notifications for event ${eventId}`
+            `✓ Created ${notifications.length} default notifications for event ${eventId}`,
           );
         }
       }
@@ -534,7 +536,7 @@ export class NotificationService {
       notificationType: "browser" | "email";
       minutesBefore: number;
       isEnabled: boolean;
-    }>
+    }>,
   ): Promise<void> {
     try {
       // Verify the event belongs to the user
@@ -560,14 +562,14 @@ export class NotificationService {
             minutesBefore: n.minutesBefore,
             isEnabled: n.isEnabled,
             notificationTime: new Date(
-              event.start.getTime() - n.minutesBefore * 60 * 1000
+              event.start.getTime() - n.minutesBefore * 60 * 1000,
             ),
           })),
         });
       }
 
       console.log(
-        `✓ Updated ${notifications.length} notifications for event ${eventId}`
+        `✓ Updated ${notifications.length} notifications for event ${eventId}`,
       );
     } catch (error) {
       console.error("Failed to update event notifications:", error);

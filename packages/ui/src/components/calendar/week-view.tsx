@@ -76,7 +76,7 @@ export function WeekView({
       startOfWeek(currentDate, {
         weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
       }),
-    [currentDate, weekStartDay]
+    [currentDate, weekStartDay],
   );
 
   const hours = useMemo(() => {
@@ -101,7 +101,7 @@ export function WeekView({
           (day) =>
             isSameDay(day, eventStart) ||
             isSameDay(day, eventEnd) ||
-            (day > eventStart && day < eventEnd)
+            (day > eventStart && day < eventEnd),
         );
       });
   }, [events, days]);
@@ -186,8 +186,8 @@ export function WeekView({
                 {
                   start: new Date(c.event.start),
                   end: new Date(c.event.end),
-                }
-              )
+                },
+              ),
             );
             if (!overlaps) {
               placed = true;
@@ -231,7 +231,7 @@ export function WeekView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "week",
-    timezone
+    timezone,
   );
 
   return (
@@ -317,7 +317,7 @@ export function WeekView({
                         <div
                           className={cn(
                             "truncate",
-                            !shouldShowTitle && "invisible"
+                            !shouldShowTitle && "invisible",
                           )}
                           aria-hidden={!shouldShowTitle}
                         >
@@ -425,7 +425,7 @@ export function WeekView({
                           quarter === 2 &&
                             "top-[calc(var(--week-cells-height)/4*2)]",
                           quarter === 3 &&
-                            "top-[calc(var(--week-cells-height)/4*3)]"
+                            "top-[calc(var(--week-cells-height)/4*3)]",
                         )}
                         onClick={() => {
                           const startTime = new Date(day);

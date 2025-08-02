@@ -14,20 +14,22 @@ interface ThemeToggleProps {
 export function ThemeToggle({ useSettingsTheme }: ThemeToggleProps = {}) {
   const id = useId();
   const { theme: nextTheme, setTheme: setNextTheme } = useTheme();
-  
+
   const currentTheme = useSettingsTheme?.currentTheme || nextTheme || "system";
-  const updateTheme = useSettingsTheme?.updateTheme || ((theme: string) => {
-    setNextTheme(theme);
-    return Promise.resolve();
-  });
+  const updateTheme =
+    useSettingsTheme?.updateTheme ||
+    ((theme: string) => {
+      setNextTheme(theme);
+      return Promise.resolve();
+    });
 
   const smartToggle = async () => {
     const prefersDarkScheme = window.matchMedia(
       "(prefers-color-scheme: dark)",
     ).matches;
-    
+
     let newTheme: "light" | "dark" | "system";
-    
+
     if (currentTheme === "system") {
       newTheme = prefersDarkScheme ? "light" : "dark";
     } else if (
@@ -38,7 +40,7 @@ export function ThemeToggle({ useSettingsTheme }: ThemeToggleProps = {}) {
     } else {
       newTheme = "system";
     }
-    
+
     try {
       await updateTheme(newTheme);
     } catch (error) {

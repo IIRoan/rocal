@@ -85,7 +85,7 @@ export interface EventCalendarProps {
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
   onUpdateNotifications?: (
     eventId: string,
-    notifications: EventNotification[]
+    notifications: EventNotification[],
   ) => Promise<void>;
 }
 
@@ -124,7 +124,7 @@ export function EventCalendar({
   }, [initialView]);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
+    null,
   );
   const { open } = useSidebar();
 
@@ -272,7 +272,7 @@ export function EventCalendar({
   };
 
   const handleEventSave = async (
-    event: CalendarEvent
+    event: CalendarEvent,
   ): Promise<CalendarEvent> => {
     try {
       const eventData = {
@@ -438,7 +438,7 @@ export function EventCalendar({
       toast.success(`Event "${updatedEvent.title}" moved`, {
         description: format(
           new Date(updatedEvent.start),
-          "MMM d, yyyy 'at' h:mm a"
+          "MMM d, yyyy 'at' h:mm a",
         ),
         position: "bottom-left",
       });
@@ -575,7 +575,7 @@ export function EventCalendar({
           <div
             className={cn(
               "flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
-              className
+              className,
             )}
           >
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
@@ -638,7 +638,7 @@ export function EventCalendar({
                         now.getHours(),
                         now.getMinutes(),
                         0,
-                        0
+                        0,
                       );
                       const minutes = startTime.getMinutes();
                       const remainder = minutes % 15;

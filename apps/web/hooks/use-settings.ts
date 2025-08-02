@@ -43,9 +43,10 @@ export function useSettingsState(): SettingsContextValue {
   const updateSettings = async (updates: UpdateSettingsRequest) => {
     try {
       setError(null);
-      const updatedSettings = await calendarApiService.updateUserSettings(updates);
+      const updatedSettings =
+        await calendarApiService.updateUserSettings(updates);
       setSettings(updatedSettings);
-      
+
       // Apply theme immediately
       applyTheme(updatedSettings.theme);
     } catch (err: any) {
@@ -93,21 +94,27 @@ export function useSettingsState(): SettingsContextValue {
 
 function applyTheme(theme: "light" | "dark" | "system") {
   const root = document.documentElement;
-  
+
   if (theme === "system") {
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const systemPrefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
     root.classList.toggle("dark", systemPrefersDark);
   } else {
     root.classList.toggle("dark", theme === "dark");
   }
-  
+
   // Store theme preference
   localStorage.setItem("theme", theme);
 }
 
 // Initialize theme on page load
 if (typeof window !== "undefined") {
-  const storedTheme = localStorage.getItem("theme") as "light" | "dark" | "system" | null;
+  const storedTheme = localStorage.getItem("theme") as
+    | "light"
+    | "dark"
+    | "system"
+    | null;
   if (storedTheme) {
     applyTheme(storedTheme);
   } else {
