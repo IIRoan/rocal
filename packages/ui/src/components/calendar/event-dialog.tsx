@@ -135,7 +135,6 @@ export function EventDialog({
 
   // Get default calendar
   const defaultCalendar = useMemo(() => {
-    // Use the provided defaultCalendarId first, then fallback to isDefault, then first calendar
     if (defaultCalendarId) {
       const specificCalendar = calendars.find(
         (cal) => cal.id === defaultCalendarId
@@ -149,7 +148,6 @@ export function EventDialog({
   useEffect(() => {
     if (isOpen) {
       if (event) {
-        // Editing existing event
         setTitle(event.title || "");
         setDescription(event.description || "");
         setStartDate(new Date(event.start));
@@ -159,22 +157,14 @@ export function EventDialog({
         setAllDay(event.allDay || false);
         setLocation(event.location || "");
         setCalendarId(event.calendarId || defaultCalendar?.id || "");
-        console.log(
-          "Event reminder value:",
-          event.reminder,
-          "Event data:",
-          event
-        );
         setReminder(event.reminder ?? null);
 
-        // Load notifications for existing event
         if (event.id && onLoadNotifications) {
           loadEventNotifications(event.id);
         } else {
           setNotifications([]);
         }
       } else {
-        // Creating new event
         resetForm();
       }
       setValidationErrors([]);
@@ -202,7 +192,6 @@ export function EventDialog({
   const resetForm = () => {
     const startDate = new Date();
     const endDate = new Date();
-    // Calculate end time based on default duration
     endDate.setMinutes(startDate.getMinutes() + defaultEventDuration);
 
     setTitle("");
@@ -211,19 +200,20 @@ export function EventDialog({
     setEndDate(endDate);
     setStartTime(`${DefaultStartHour}:00`);
 
-    // Set end time based on default duration
     const durationHours = Math.floor(defaultEventDuration / 60);
     const durationMinutes = defaultEventDuration % 60;
     const defaultEndHour = DefaultStartHour + durationHours;
     const defaultEndMinute = durationMinutes;
 
     setEndTime(
-      `${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute.toString().padStart(2, "0")}`
+      `${defaultEndHour.toString().padStart(2, "0")}:${defaultEndMinute
+        .toString()
+        .padStart(2, "0")}`
     );
     setAllDay(false);
     setLocation("");
     setCalendarId(defaultCalendar?.id || "");
-    setReminder(defaultReminder); // Use settings default
+    setReminder(defaultReminder);
     setNotifications([]);
   };
 
@@ -233,7 +223,6 @@ export function EventDialog({
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   };
 
-  // Validate and format time input
   const validateTimeInput = (timeString: string): string | null => {
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
     const match = timeString.match(timeRegex);
@@ -244,15 +233,15 @@ export function EventDialog({
 
     if (hours < StartHour || hours > EndHour) return null;
 
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}`;
   };
 
-  // Handle manual time input
   const handleTimeInputChange = (
     value: string,
     setter: (time: string) => void
   ) => {
-    // Allow partial input while typing
     if (value === "" || /^([0-2]?[0-9]?:?[0-5]?[0-9]?)$/.test(value)) {
       setter(value);
     }
@@ -266,12 +255,10 @@ export function EventDialog({
     if (validatedTime) {
       setter(validatedTime);
     } else if (value !== "") {
-      // Reset to previous valid time or default
       setter(setter === setStartTime ? startTime : endTime);
     }
   };
 
-  // Memoize time options
   const timeOptions = useMemo(() => {
     const options = [];
     for (let hour = StartHour; hour <= EndHour; hour++) {
@@ -290,7 +277,6 @@ export function EventDialog({
     return options;
   }, [timeFormat]);
 
-  // Validation function
   const validateForm = (): ValidationError[] => {
     const errors: ValidationError[] = [];
 
@@ -369,7 +355,6 @@ export function EventDialog({
       end.setHours(23, 59, 59, 999);
     }
 
-    // Get the color from the selected calendar
     const selectedCalendar = calendars.find((cal) => cal.id === calendarId);
     const calendarColor = selectedCalendar?.color || "blue";
 
@@ -392,8 +377,6 @@ export function EventDialog({
     setSaving(true);
     try {
       const savedEvent = await onSave(eventData);
-
-      // After saving the event, update notifications if there are any
       if (
         notifications.length > 0 &&
         (savedEvent?.id || eventData?.id) &&
@@ -402,10 +385,8 @@ export function EventDialog({
         const eventId = savedEvent?.id || eventData?.id;
         try {
           await onUpdateNotifications(eventId, notifications);
-          console.log("✅ Notifications updated successfully");
         } catch (notificationError) {
           console.error("Failed to update notifications:", notificationError);
-          // Don't fail the whole save for notification errors
         }
       }
     } catch (error) {
@@ -428,13 +409,12 @@ export function EventDialog({
     }
   };
 
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="pb-4">
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col bg-popover text-popover-foreground border border-border">
+        <DialogHeader className="pb-3 border-b border-border bg-card/20">
+          <DialogTitle className="flex items-center gap-2 text-foreground">
+            <CalendarIcon className="h-5 w-5 text-muted-foreground" />
             {event?.id ? "Edit Event" : "Create Event"}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -444,9 +424,8 @@ export function EventDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Error Display */}
         {(apiError || localError || validationErrors.length > 0) && (
-          <div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm space-y-1">
+          <div className="mx-1 mt-3 rounded-md px-3 py-2 text-sm space-y-1 border border-destructive/30 bg-destructive/10 text-destructive">
             {apiError && <div>{apiError.message}</div>}
             {localError && <div>{localError}</div>}
             {validationErrors.map((error, index) => (
@@ -455,13 +434,12 @@ export function EventDialog({
           </div>
         )}
 
-        {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-4">
-            {/* Left Section - Basic Event Details */}
+            {/* Left Section */}
             <div className="space-y-4">
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="title" className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     Title
@@ -471,11 +449,11 @@ export function EventDialog({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Enter event title"
-                    className="text-base"
+                    className="text-base bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label
                     htmlFor="description"
                     className="flex items-center gap-2"
@@ -489,28 +467,29 @@ export function EventDialog({
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
                     placeholder="Enter event description"
-                    className="resize-none"
+                    className="resize-none bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="calendar" className="flex items-center gap-2">
                     <Palette className="h-4 w-4 text-muted-foreground" />
                     Calendar
                   </Label>
                   <Select value={calendarId} onValueChange={setCalendarId}>
-                    <SelectTrigger id="calendar">
+                    <SelectTrigger
+                      id="calendar"
+                      className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
+                    >
                       <SelectValue placeholder="Select a calendar" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       {calendars.map((calendar) => (
                         <SelectItem key={calendar.id} value={calendar.id}>
                           <div className="flex items-center gap-2">
                             <span
                               className="size-3 rounded-full"
-                              style={{
-                                backgroundColor: `var(--color-${calendar.color}-400)`,
-                              }}
+                              style={{ backgroundColor: calendar.color }}
                             />
                             {calendar.name}
                           </div>
@@ -520,7 +499,7 @@ export function EventDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="location" className="flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                     Location
@@ -530,16 +509,17 @@ export function EventDialog({
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Enter event location"
+                    className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Right Section - Date, Time & Settings */}
+            {/* Right Section */}
             <div className="space-y-4">
-              {/* Start Date and Time Row */}
+              {/* Start Date and Time */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label className="flex items-center gap-2">
                     <RiCalendarLine className="h-4 w-4 text-muted-foreground" />
                     Start Date
@@ -549,7 +529,7 @@ export function EventDialog({
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-between px-3 font-normal",
+                          "w-full justify-between px-3 font-normal border-border bg-card/30 hover:bg-card/40",
                           !startDate && "text-muted-foreground"
                         )}
                       >
@@ -562,7 +542,10 @@ export function EventDialog({
                         />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-2" align="start">
+                    <PopoverContent
+                      className="w-auto p-2 bg-card border border-border"
+                      align="start"
+                    >
                       <Calendar
                         mode="single"
                         selected={startDate}
@@ -570,9 +553,7 @@ export function EventDialog({
                         onSelect={(date) => {
                           if (date) {
                             setStartDate(date);
-                            if (isBefore(endDate, date)) {
-                              setEndDate(date);
-                            }
+                            if (isBefore(endDate, date)) setEndDate(date);
                             setStartDateOpen(false);
                           }
                         }}
@@ -582,7 +563,7 @@ export function EventDialog({
                 </div>
 
                 {!allDay && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       Start Time
@@ -591,23 +572,20 @@ export function EventDialog({
                       value={startTime}
                       onValueChange={(value) => {
                         setStartTime(value);
-                        // Auto-adjust end time by adding 1 hour
                         const [hours, minutes] = value.split(":").map(Number);
                         if (hours !== undefined && minutes !== undefined) {
                           const endHour = hours + 1;
                           const endTimeValue = `${endHour.toString().padStart(2, "0")}:${minutes
                             .toString()
                             .padStart(2, "0")}`;
-                          if (endHour <= EndHour) {
-                            setEndTime(endTimeValue);
-                          }
+                          if (endHour <= EndHour) setEndTime(endTimeValue);
                         }
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
                         <SelectValue placeholder="Select time" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-card border border-border">
                         {timeOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -619,9 +597,9 @@ export function EventDialog({
                 )}
               </div>
 
-              {/* End Date and Time Row */}
+              {/* End Date and Time */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label className="flex items-center gap-2">
                     <RiCalendarLine className="h-4 w-4 text-muted-foreground" />
                     End Date
@@ -631,7 +609,7 @@ export function EventDialog({
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-between px-3 font-normal",
+                          "w-full justify-between px-3 font-normal border-border bg-card/30 hover:bg-card/40",
                           !endDate && "text-muted-foreground"
                         )}
                       >
@@ -644,7 +622,10 @@ export function EventDialog({
                         />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-2" align="start">
+                    <PopoverContent
+                      className="w-auto p-2 bg-card border border-border"
+                      align="start"
+                    >
                       <Calendar
                         mode="single"
                         selected={endDate}
@@ -662,16 +643,16 @@ export function EventDialog({
                 </div>
 
                 {!allDay && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       End Time
                     </Label>
                     <Select value={endTime} onValueChange={setEndTime}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
                         <SelectValue placeholder="Select time" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-card border border-border">
                         {timeOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -684,7 +665,7 @@ export function EventDialog({
               </div>
 
               {/* All Day Toggle */}
-              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md border">
+              <div className="flex items-center gap-3 p-3 rounded-md border border-border bg-muted/20">
                 <Checkbox
                   id="all-day"
                   checked={allDay}
@@ -701,7 +682,7 @@ export function EventDialog({
 
               {/* Notifications Section */}
               {onLoadNotifications && onUpdateNotifications && (
-                <div className="border-t border-border/50 pt-4">
+                <div className="border-t border-border/60 pt-4">
                   <NotificationManager
                     eventId={event?.id}
                     notifications={notifications}
@@ -712,9 +693,9 @@ export function EventDialog({
                 </div>
               )}
 
-              {/* Fallback to legacy reminder if notification handlers aren't provided */}
+              {/* Fallback Reminder */}
               {(!onLoadNotifications || !onUpdateNotifications) && (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="reminder" className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-muted-foreground" />
                     Reminder
@@ -727,10 +708,13 @@ export function EventDialog({
                       )
                     }
                   >
-                    <SelectTrigger id="reminder">
+                    <SelectTrigger
+                      id="reminder"
+                      className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
+                    >
                       <SelectValue placeholder="Select reminder" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       {REMINDER_OPTIONS.map((option) => (
                         <SelectItem
                           key={option.value?.toString() || "none"}
@@ -747,11 +731,11 @@ export function EventDialog({
           </div>
         </div>
 
-        <DialogFooter className="flex-row sm:justify-between">
+        <DialogFooter className="flex-row sm:justify-between border-t border-border bg-card/20">
           {event?.id && (
             <Button
               variant="outline"
-              className="text-destructive hover:text-destructive bg-transparent"
+              className="text-destructive hover:text-destructive bg-transparent border-border"
               size="icon"
               onClick={handleDelete}
               disabled={deleting || saving}
@@ -769,13 +753,14 @@ export function EventDialog({
               variant="outline"
               onClick={onClose}
               disabled={saving || deleting}
+              className="border-border"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving || deleting || !calendarId}
-              className="bg-accent hover:bg-accent/80 text-accent-foreground"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
               {saving ? (
                 <>
