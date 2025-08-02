@@ -3,7 +3,6 @@ import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider } from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
-import { NotificationProvider } from "@/components/notification-provider";
 import "@workspace/ui/globals.css";
 
 const fontSans = Geist({
@@ -33,10 +32,8 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SettingsProvider>
-            <NotificationProvider>
-              <CalendarProvider>{children}</CalendarProvider>
-              <Toaster />
-            </NotificationProvider>
+            <CalendarProvider>{children}</CalendarProvider>
+            <Toaster />
           </SettingsProvider>
         </ThemeProvider>
       </body>

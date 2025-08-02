@@ -6,11 +6,11 @@ generator client {
 }
 
 generator prismabox {
-  provider = "prismabox"
+  provider                    = "prismabox"
   typeboxImportDependencyName = "elysia"
-  typeboxImportVariableName = "t"
-  inputModel = true
-  output   = "../generated/prismabox"
+  typeboxImportVariableName   = "t"
+  inputModel                  = true
+  output                      = "../generated/prismabox"
 }
 
 datasource db {
@@ -19,22 +19,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false) @map("email_verified")
-  image         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  sessions      Session[]
-  accounts      Account[]
-  
+  id             String             @id @default(cuid())
+  name           String
+  email          String             @unique
+  emailVerified  Boolean            @default(false) @map("email_verified")
+  image          String?
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  sessions       Session[]
+  accounts       Account[]
   // Calendar relationships
-  events        CalendarEvent[]
-  categories    EventCategory[]
-  calendars     Calendar[]
+  events         CalendarEvent[]
+  categories     EventCategory[]
+  calendars      Calendar[]
   participations EventParticipant[]
-  settings      UserSettings?
+  settings       UserSettings?
+
+  passkeys Passkey[]
 
   @@map("user")
 }
@@ -85,153 +86,141 @@ model Verification {
 }
 
 // Calendar Models
+
 model Calendar {
-  id        String   @id @default(cuid())
-  name      String
-  color     String   // blue, orange, violet, rose, emerald
-  isVisible Boolean  @default(true) @map("is_visible")
-  isDefault Boolean  @default(false) @map("is_default")
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events    CalendarEvent[]
+  id              String            @id @default(cuid())
+  name            String
+  color           String // blue, orange, violet, rose, emerald
+  isVisible       Boolean           @default(true) @map("is_visible")
+  isDefault       Boolean           @default(false) @map("is_default")
+  userId          String            @map("user_id")
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events          CalendarEvent[]
   sharedCalendars CalendarSharing[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
 
   @@unique([userId, name])
   @@map("calendar")
 }
 
 model EventCategory {
-  id        String   @id @default(cuid())
+  id        String          @id @default(cuid())
   name      String
-  color     String   // blue, orange, violet, rose, emerald
-  isActive  Boolean  @default(true) @map("is_active")
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  color     String // blue, orange, violet, rose, emerald
+  isActive  Boolean         @default(true) @map("is_active")
+  userId    String          @map("user_id")
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   events    CalendarEvent[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
 
   @@unique([userId, name])
   @@map("event_category")
 }
 
 model CalendarEvent {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  start       DateTime
-  end         DateTime
-  allDay      Boolean   @default(false) @map("all_day")
-  location    String?
-  color       String?   // blue, orange, violet, rose, emerald
-  
+  id                   String                @id @default(cuid())
+  title                String
+  description          String?
+  start                DateTime
+  end                  DateTime
+  allDay               Boolean               @default(false) @map("all_day")
+  location             String?
+  color                String? // blue, orange, violet, rose, emerald
   // Additional fields for a complete calendar app
-  isPrivate   Boolean   @default(false) @map("is_private")
-  reminder    Int?      // minutes before event to remind
-  recurrence  String?   // JSON string for recurrence rules (daily, weekly, monthly, etc.)
-  parentEventId String? @map("parent_event_id") // For recurring event instances
-  
+  isPrivate            Boolean               @default(false) @map("is_private")
+  reminder             Int? // minutes before event to remind
+  recurrence           String? // JSON string for recurrence rules (daily, weekly, monthly, etc.)
+  parentEventId        String?               @map("parent_event_id") // For recurring event instances
   // Relationships
-  userId      String    @map("user_id")
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  calendarId  String    @map("calendar_id")
-  calendar    Calendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  
-  categoryId  String?   @map("category_id")
-  category    EventCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  
-  participants EventParticipant[]
+  userId               String                @map("user_id")
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarId           String                @map("calendar_id")
+  calendar             Calendar              @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  categoryId           String?               @map("category_id")
+  category             EventCategory?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  participants         EventParticipant[]
   recurrenceExceptions RecurrenceException[]
-  notifications EventNotification[]
-  
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  notifications        EventNotification[]
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
 
   @@map("calendar_event")
 }
 
 model EventParticipant {
-  id        String   @id @default(cuid())
-  eventId   String   @map("event_id")
+  id        String        @id @default(cuid())
+  eventId   String        @map("event_id")
   event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String   @default("pending") // pending, accepted, declined
-  role      String   @default("attendee") // organizer, attendee
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  userId    String        @map("user_id")
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String        @default("pending") // pending, accepted, declined
+  role      String        @default("attendee") // organizer, attendee
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
 
   @@unique([eventId, userId])
   @@map("event_participant")
 }
 
 model UserSettings {
-  id                    String    @id @default(cuid())
-  userId                String    @unique @map("user_id")
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Display preferences
-  theme                 String    @default("light") // light, dark, system
-  defaultView           String    @default("month") // month, week, day, agenda
-  weekStartDay          Int       @default(0) // 0 = Sunday, 1 = Monday
-  
+  theme                String   @default("light") // light, dark, system
+  defaultView          String   @default("month") // month, week, day, agenda
+  weekStartDay         Int      @default(0) // 0 = Sunday, 1 = Monday
   // Time & Timezone
-  timezone              String    @default("UTC") // IANA timezone identifier
-  timeFormat            String    @default("12h") // 12h, 24h
-  
+  timezone             String   @default("UTC") // IANA timezone identifier
+  timeFormat           String   @default("12h") // 12h, 24h
   // Working hours (in minutes from midnight)
-  workingHoursStart     Int       @default(540) // 9:00 AM = 540 minutes
-  workingHoursEnd       Int       @default(1020) // 5:00 PM = 1020 minutes
-  workingDays           String    @default("[1,2,3,4,5]") // JSON array of weekdays
-  
+  workingHoursStart    Int      @default(540) // 9:00 AM = 540 minutes
+  workingHoursEnd      Int      @default(1020) // 5:00 PM = 1020 minutes
+  workingDays          String   @default("[1,2,3,4,5]") // JSON array of weekdays
   // Notification preferences
-  emailNotifications    Boolean   @default(true)
-  browserNotifications  Boolean   @default(true)
-  reminderSound         Boolean   @default(true)
-  
+  emailNotifications   Boolean  @default(true)
+  browserNotifications Boolean  @default(true)
+  reminderSound        Boolean  @default(true)
   // Default event settings
-  defaultReminder       Int?      // Default reminder in minutes
-  defaultEventDuration  Int       @default(60) // Default event duration in minutes
-  defaultCalendarId     String?   @map("default_calendar_id")
-  
+  defaultReminder      Int? // Default reminder in minutes
+  defaultEventDuration Int      @default(60) // Default event duration in minutes
+  defaultCalendarId    String?  @map("default_calendar_id")
   // UI preferences
-  compactView           Boolean   @default(false)
-  showWeekNumbers       Boolean   @default(false)
-  showDeclinedEvents    Boolean   @default(false)
-  
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
+  compactView          Boolean  @default(false)
+  showWeekNumbers      Boolean  @default(false)
+  showDeclinedEvents   Boolean  @default(false)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("user_settings")
 }
 
 model CalendarSharing {
-  id          String    @id @default(cuid())
-  calendarId  String    @map("calendar_id")
-  calendar    Calendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  sharedWith  String    @map("shared_with") // User ID
-  sharedBy    String    @map("shared_by") // User ID
-  permission  String    @default("read") // read, write, admin
-  accepted    Boolean   @default(false) // Whether the invitation was accepted
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  calendarId String   @map("calendar_id")
+  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  sharedWith String   @map("shared_with") // User ID
+  sharedBy   String   @map("shared_by") // User ID
+  permission String   @default("read") // read, write, admin
+  accepted   Boolean  @default(false) // Whether the invitation was accepted
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@unique([calendarId, sharedWith])
   @@map("calendar_sharing")
 }
 
 model RecurrenceException {
-  id              String        @id @default(cuid())
-  parentEventId   String        @map("parent_event_id") // ID of the original recurring event
-  exceptionDate   DateTime      @map("exception_date") // The date this exception applies to
-  modifiedEventId String?       @map("modified_event_id") // ID of the modified event (null if deleted)
+  id              String         @id @default(cuid())
+  parentEventId   String         @map("parent_event_id") // ID of the original recurring event
+  exceptionDate   DateTime       @map("exception_date") // The date this exception applies to
+  modifiedEventId String?        @map("modified_event_id") // ID of the modified event (null if deleted)
   modifiedEvent   CalendarEvent? @relation(fields: [modifiedEventId], references: [id], onDelete: SetNull)
-  type           String        @default("modified") // modified, deleted
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  type            String         @default("modified") // modified, deleted
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@unique([parentEventId, exceptionDate])
   @@map("recurrence_exception")
@@ -270,4 +259,21 @@ model NotificationLog {
   @@index([sentAt])
   @@index([status])
   @@map("notification_log")
+}
+
+model Passkey {
+  id           String    @id
+  name         String?
+  publicKey    String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime?
+  aaguid       String?
+
+  @@map("passkey")
 }

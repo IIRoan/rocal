@@ -1,13 +1,18 @@
 import { createAuthClient } from "better-auth/react";
+import { passkeyClient } from "better-auth/client/plugins";
 
-export const authClient: ReturnType<typeof createAuthClient> = createAuthClient(
-  {
-    baseURL: process.env.NEXT_PUBLIC_APP_URL,
-    basePath: "/api/auth",
-  },
-);
+// Define a specific type for the auth client
+const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_APP_URL,
+  basePath: "/api/auth",
+  plugins: [passkeyClient()],
+}) as any;
 
-export const signIn: typeof authClient.signIn = authClient.signIn;
-export const signOut: typeof authClient.signOut = authClient.signOut;
-export const signUp: typeof authClient.signUp = authClient.signUp;
-export const useSession: typeof authClient.useSession = authClient.useSession;
+// Export the full client
+export { authClient };
+
+// Export convenience methods
+export const signIn = authClient.signIn;
+export const signOut = authClient.signOut;
+export const signUp = authClient.signUp;
+export const useSession = authClient.useSession;

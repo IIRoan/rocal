@@ -155,6 +155,25 @@ export const UserRelations = t.Object(
         { additionalProperties: false },
       ),
     ),
+    passkeys: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          name: __nullable__(t.String()),
+          publicKey: t.String(),
+          userId: t.String(),
+          credentialID: t.String(),
+          counter: t.Integer(),
+          deviceType: t.String(),
+          backedUp: t.Boolean(),
+          transports: __nullable__(t.String()),
+          createdAt: __nullable__(t.Date()),
+          aaguid: __nullable__(t.String()),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
   },
   { additionalProperties: false },
 );
@@ -284,6 +303,22 @@ export const UserRelationsInputCreate = t.Object(
             {
               id: t.String({ additionalProperties: false }),
             },
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    passkeys: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
             { additionalProperties: false },
           ),
         },
@@ -461,6 +496,31 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      passkeys: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
     },
     { additionalProperties: false },
   ),
@@ -554,6 +614,7 @@ export const UserSelect = t.Partial(
       calendars: t.Boolean(),
       participations: t.Boolean(),
       settings: t.Boolean(),
+      passkeys: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -570,6 +631,7 @@ export const UserInclude = t.Partial(
       calendars: t.Boolean(),
       participations: t.Boolean(),
       settings: t.Boolean(),
+      passkeys: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },

@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { passkey } from "better-auth/plugins/passkey";
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
@@ -22,5 +23,14 @@ export const auth = betterAuth({
       : {},
   baseURL: process.env.NEXT_PUBLIC_APP_URL,
   basePath: "/api/auth",
-  plugins: [nextCookies()],
+  plugins: [
+    nextCookies(),
+    passkey({
+      rpID: process.env.NODE_ENV === "production" ? "your-domain.com" : "localhost",
+      rpName: "Rocani",
+      origin: process.env.NODE_ENV === "production" 
+        ? "https://your-domain.com" 
+        : "http://localhost:3000",
+    }),
+  ],
 }) as any;
