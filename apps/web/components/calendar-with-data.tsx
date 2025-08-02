@@ -89,7 +89,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         await updateSettings({ theme });
       },
     }),
-    [settings?.theme, updateSettings]
+    [settings?.theme, updateSettings],
   );
 
   // Optimized event filtering with memoized visibility check
@@ -98,7 +98,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     const visibleCalendarIds = new Set(
       calendarData.calendars
         .filter((cal) => isCalendarVisible(cal.id))
-        .map((cal) => cal.id)
+        .map((cal) => cal.id),
     );
 
     const transformedEventsList = calendarData.events
@@ -121,7 +121,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
             "reminder value:",
             (event as any).reminder,
             "transformed:",
-            transformed.reminder
+            transformed.reminder,
           );
         }
 

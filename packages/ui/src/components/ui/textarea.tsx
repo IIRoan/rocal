@@ -19,7 +19,7 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
         "aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
         // Disabled states
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted",
-        className
+        className,
       )}
       {...props}
     />

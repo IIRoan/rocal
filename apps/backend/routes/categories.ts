@@ -34,7 +34,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
     },
     {
       auth: true,
-    }
+    },
   )
 
   .post(
@@ -82,7 +82,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.String(),
         color: t.String(),
       }),
-    }
+    },
   )
 
   .put(
@@ -146,7 +146,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   .delete(
@@ -189,5 +189,5 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       params: t.Object({
         id: t.String(),
       }),
-    }
+    },
   );

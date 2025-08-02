@@ -69,10 +69,10 @@ export function NotificationManager({
   const handleUpdateNotification = (
     index: number,
     field: keyof EventNotification,
-    value: any
+    value: any,
   ) => {
     const updated = notifications.map((notification, i) =>
-      i === index ? { ...notification, [field]: value } : notification
+      i === index ? { ...notification, [field]: value } : notification,
     );
     onChange(updated);
   };
@@ -145,7 +145,7 @@ export function NotificationManager({
                     handleUpdateNotification(
                       index,
                       "minutesBefore",
-                      parseInt(value)
+                      parseInt(value),
                     )
                   }
                 >

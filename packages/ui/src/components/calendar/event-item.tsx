@@ -13,7 +13,10 @@ import { cn } from "../../lib/utils";
 // 12h format: 'h' - hours (1-12), 'a' - am/pm
 // 24h format: 'H' - hours (0-23)
 // ':mm' - minutes with leading zero (only if the token 'mm' is present)
-const formatTimeWithOptionalMinutes = (date: Date, timeFormat: "12h" | "24h" = "12h") => {
+const formatTimeWithOptionalMinutes = (
+  date: Date,
+  timeFormat: "12h" | "24h" = "12h",
+) => {
   if (timeFormat === "24h") {
     return format(date, getMinutes(date) === 0 ? "H" : "H:mm");
   } else {

@@ -47,7 +47,7 @@ function SelectTrigger({
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted",
         // Icon and content styling
         "*:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&>span]:line-clamp-1",
-        className
+        className,
       )}
       {...props}
     >
@@ -80,7 +80,7 @@ function SelectContent({
           // Popper positioning
           position === "popper" &&
             "w-full min-w-[var(--radix-select-trigger-width)] data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-          className
+          className,
         )}
         position={position}
         {...props}
@@ -89,7 +89,7 @@ function SelectContent({
         <SelectPrimitive.Viewport
           className={cn(
             "p-1",
-            position === "popper" && "h-[var(--radix-select-trigger-height)]"
+            position === "popper" && "h-[var(--radix-select-trigger-height)]",
           )}
         >
           {children}
@@ -109,7 +109,7 @@ function SelectLabel({
       data-slot="select-label"
       className={cn(
         "text-muted-foreground py-1.5 ps-8 pe-2 text-xs font-medium",
-        className
+        className,
       )}
       {...props}
     />
@@ -126,7 +126,7 @@ function SelectItem({
       data-slot="select-item"
       className={cn(
         "focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center rounded py-1.5 ps-8 pe-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50",
-        className
+        className,
       )}
       {...props}
     >
@@ -162,7 +162,7 @@ function SelectScrollUpButton({
       data-slot="select-scroll-up-button"
       className={cn(
         "text-muted-foreground/80 flex cursor-default items-center justify-center py-1",
-        className
+        className,
       )}
       {...props}
     >
@@ -180,7 +180,7 @@ function SelectScrollDownButton({
       data-slot="select-scroll-down-button"
       className={cn(
         "text-muted-foreground/80 flex cursor-default items-center justify-center py-1",
-        className
+        className,
       )}
       {...props}
     >

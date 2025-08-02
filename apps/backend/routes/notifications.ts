@@ -51,7 +51,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           },
         },
       },
-    }
+    },
   )
 
   .get(
@@ -127,7 +127,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           },
         },
       },
-    }
+    },
   )
 
   .put(
@@ -150,7 +150,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         await simpleNotificationService.updateNotificationsForEvent(
           eventId,
           event.start,
-          notifications
+          notifications,
         );
 
         return {
@@ -159,7 +159,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         };
       } catch (error: any) {
         throw new ValidationError(
-          error.message || "Failed to update event notifications"
+          error.message || "Failed to update event notifications",
         );
       }
     },
@@ -177,7 +177,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
               [t.Literal("browser"), t.Literal("email")],
               {
                 description: "Type of notification",
-              }
+              },
             ),
             minutesBefore: t.Integer({
               description: "Minutes before event to send notification",
@@ -189,7 +189,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           }),
           {
             description: "Array of notification settings",
-          }
+          },
         ),
       }),
       detail: {
@@ -220,7 +220,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           },
         },
       },
-    }
+    },
   )
 
   .get(
@@ -316,7 +316,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           },
         },
       },
-    }
+    },
   )
 
   .post(
@@ -345,7 +345,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         await simpleNotificationService.createNotificationsForEvent(
           eventId,
           event.start,
-          notifications
+          notifications,
         );
 
         return {
@@ -355,7 +355,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         };
       } catch (error: any) {
         throw new ValidationError(
-          error.message || "Failed to create multiple notifications"
+          error.message || "Failed to create multiple notifications",
         );
       }
     },
@@ -376,7 +376,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
             description:
               "Array of minutes before event (e.g., [5, 60, 1440] for 5min, 1hr, 1day)",
             minItems: 1,
-          }
+          },
         ),
       }),
       detail: {
@@ -412,7 +412,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           },
         },
       },
-    }
+    },
   )
 
   .get(
@@ -545,5 +545,5 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           },
         },
       },
-    }
+    },
   );

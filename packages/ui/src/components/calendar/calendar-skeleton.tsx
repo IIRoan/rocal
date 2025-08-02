@@ -145,7 +145,7 @@ export function CalendarSkeleton({
                       <Skeleton className="h-4 w-4 rounded-full" />
                       <Skeleton className="h-4 flex-1" />
                     </div>
-                  )
+                  ),
                 )}
               </div>
             </div>

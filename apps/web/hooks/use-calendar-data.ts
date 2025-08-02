@@ -68,19 +68,19 @@ interface UseCalendarDataReturn {
   createEvent: (event: CreateEventRequest) => Promise<CalendarEvent>;
   updateEvent: (
     id: string,
-    event: UpdateEventRequest
+    event: UpdateEventRequest,
   ) => Promise<CalendarEvent>;
   deleteEvent: (id: string) => Promise<void>;
   createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
   updateCalendar: (
     id: string,
-    calendar: UpdateCalendarRequest
+    calendar: UpdateCalendarRequest,
   ) => Promise<Calendar>;
   deleteCalendar: (id: string) => Promise<void>;
   createCategory: (category: CreateCategoryRequest) => Promise<EventCategory>;
   updateCategory: (
     id: string,
-    category: UpdateCategoryRequest
+    category: UpdateCategoryRequest,
   ) => Promise<EventCategory>;
   deleteCategory: (id: string) => Promise<void>;
 
@@ -90,13 +90,16 @@ interface UseCalendarDataReturn {
 
   // Notification handlers
   loadNotifications: (eventId: string) => Promise<EventNotification[]>;
-  updateNotifications: (eventId: string, notifications: EventNotification[]) => Promise<void>;
+  updateNotifications: (
+    eventId: string,
+    notifications: EventNotification[],
+  ) => Promise<void>;
 }
 
 const DEFAULT_CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 export function useCalendarData(
-  options: UseCalendarDataOptions = {}
+  options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
   const {
     initialDateRange,
@@ -109,7 +112,7 @@ export function useCalendarData(
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [currentDateRange, setCurrentDateRange] = useState<DateRange | null>(
-    initialDateRange || null
+    initialDateRange || null,
   );
 
   // Loading states
@@ -135,7 +138,7 @@ export function useCalendarData(
 
   // Optimistic operations tracking
   const optimisticOperations = useRef<Map<string, OptimisticOperation>>(
-    new Map()
+    new Map(),
   );
   const operationCounter = useRef<number>(0);
 
@@ -166,7 +169,7 @@ export function useCalendarData(
         updatedAt: new Date(),
       };
     },
-    [generateOptimisticId, calendars, categories]
+    [generateOptimisticId, calendars, categories],
   );
 
   const createOptimisticCategory = useCallback(
@@ -182,7 +185,7 @@ export function useCalendarData(
         updatedAt: new Date(),
       };
     },
-    [generateOptimisticId]
+    [generateOptimisticId],
   );
 
   const rollbackOperation = useCallback((operationId: string): void => {
@@ -207,7 +210,7 @@ export function useCalendarData(
     (timestamp: number): boolean => {
       return Date.now() - timestamp < cacheTimeout;
     },
-    [cacheTimeout]
+    [cacheTimeout],
   );
 
   // Check if date range overlaps with cached range
@@ -218,7 +221,7 @@ export function useCalendarData(
         requestedRange.end >= cachedRange.start
       );
     },
-    []
+    [],
   );
 
   // Find cached data that covers the requested date range
@@ -234,13 +237,13 @@ export function useCalendarData(
           // Filter events to the requested range
           return entry.data.filter(
             (event) =>
-              event.start >= dateRange.start && event.start <= dateRange.end
+              event.start >= dateRange.start && event.start <= dateRange.end,
           );
         }
       }
       return null;
     },
-    [isCacheValid, isDateRangeOverlapping]
+    [isCacheValid, isDateRangeOverlapping],
   );
 
   // Fetch events with caching
@@ -261,7 +264,7 @@ export function useCalendarData(
         // Fetch from API
         const response = await calendarApiService.getEvents(
           dateRange.start,
-          dateRange.end
+          dateRange.end,
         );
 
         // Update cache
@@ -299,7 +302,7 @@ export function useCalendarData(
         setEventsLoading(false);
       }
     },
-    [findCachedEvents, getCacheKey]
+    [findCachedEvents, getCacheKey],
   );
 
   // Fetch calendars with caching
@@ -384,7 +387,7 @@ export function useCalendarData(
 
       await fetchEvents(rangeToUse);
     },
-    [currentDateRange, getCacheKey, fetchEvents]
+    [currentDateRange, getCacheKey, fetchEvents],
   );
 
   const refetchCalendars = useCallback(async (): Promise<void> => {
@@ -400,7 +403,11 @@ export function useCalendarData(
   }, [fetchCategories]);
 
   const refetch = useCallback(async (): Promise<void> => {
-    await Promise.all([refetchEvents(), refetchCalendars(), refetchCategories()]);
+    await Promise.all([
+      refetchEvents(),
+      refetchCalendars(),
+      refetchCategories(),
+    ]);
   }, [refetchEvents, refetchCalendars, refetchCategories]);
 
   // CRUD operations with optimistic updates
@@ -431,7 +438,7 @@ export function useCalendarData(
 
         // Replace optimistic event with real event
         setEvents((prev) =>
-          prev.map((e) => (e.id === operationId ? newEvent : e))
+          prev.map((e) => (e.id === operationId ? newEvent : e)),
         );
 
         // Invalidate relevant cache entries
@@ -447,7 +454,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [createOptimisticEvent, rollbackOperation, cleanupOperation]
+    [createOptimisticEvent, rollbackOperation, cleanupOperation],
   );
 
   const updateEvent = useCallback(
@@ -505,7 +512,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [events, generateOptimisticId, rollbackOperation, cleanupOperation]
+    [events, generateOptimisticId, rollbackOperation, cleanupOperation],
   );
 
   const deleteEvent = useCallback(
@@ -549,7 +556,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [events, generateOptimisticId, rollbackOperation, cleanupOperation]
+    [events, generateOptimisticId, rollbackOperation, cleanupOperation],
   );
 
   const createCategory = useCallback(
@@ -579,7 +586,7 @@ export function useCalendarData(
 
         // Replace optimistic category with real category
         setCategories((prev) =>
-          prev.map((c) => (c.id === operationId ? newCategory : c))
+          prev.map((c) => (c.id === operationId ? newCategory : c)),
         );
 
         // Invalidate cache
@@ -595,13 +602,13 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [createOptimisticCategory, rollbackOperation, cleanupOperation]
+    [createOptimisticCategory, rollbackOperation, cleanupOperation],
   );
 
   const updateCategory = useCallback(
     async (
       id: string,
-      category: UpdateCategoryRequest
+      category: UpdateCategoryRequest,
     ): Promise<EventCategory> => {
       // Store original category for rollback
       const originalCategory = categories.find((c) => c.id === id);
@@ -620,13 +627,13 @@ export function useCalendarData(
 
       // Apply optimistic update immediately
       setCategories((prev) =>
-        prev.map((c) => (c.id === id ? optimisticCategory : c))
+        prev.map((c) => (c.id === id ? optimisticCategory : c)),
       );
 
       // Store rollback function
       const rollback = () => {
         setCategories((prev) =>
-          prev.map((c) => (c.id === id ? originalCategory : c))
+          prev.map((c) => (c.id === id ? originalCategory : c)),
         );
       };
 
@@ -642,12 +649,12 @@ export function useCalendarData(
         // Make API call
         const updatedCategory = await calendarApiService.updateCategory(
           id,
-          category
+          category,
         );
 
         // Replace optimistic category with real category
         setCategories((prev) =>
-          prev.map((c) => (c.id === id ? updatedCategory : c))
+          prev.map((c) => (c.id === id ? updatedCategory : c)),
         );
 
         // Invalidate cache
@@ -663,7 +670,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [categories, generateOptimisticId, rollbackOperation, cleanupOperation]
+    [categories, generateOptimisticId, rollbackOperation, cleanupOperation],
   );
 
   const deleteCategory = useCallback(
@@ -683,8 +690,8 @@ export function useCalendarData(
       // Update events that used this category
       setEvents((prev) =>
         prev.map((e) =>
-          e.categoryId === id ? { ...e, categoryId: null, category: null } : e
-        )
+          e.categoryId === id ? { ...e, categoryId: null, category: null } : e,
+        ),
       );
 
       // Store rollback function
@@ -694,7 +701,7 @@ export function useCalendarData(
           prev.map((e) => {
             const affectedEvent = affectedEvents.find((ae) => ae.id === e.id);
             return affectedEvent ? affectedEvent : e;
-          })
+          }),
         );
       };
 
@@ -728,7 +735,7 @@ export function useCalendarData(
       generateOptimisticId,
       rollbackOperation,
       cleanupOperation,
-    ]
+    ],
   );
 
   // Calendar CRUD operations
@@ -743,38 +750,40 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    []
+    [],
   );
 
   const updateCalendar = useCallback(
     async (id: string, calendar: UpdateCalendarRequest): Promise<Calendar> => {
       try {
-        const updatedCalendar = await calendarApiService.updateCalendar(id, calendar);
-        setCalendars((prev) => prev.map((c) => (c.id === id ? updatedCalendar : c)));
+        const updatedCalendar = await calendarApiService.updateCalendar(
+          id,
+          calendar,
+        );
+        setCalendars((prev) =>
+          prev.map((c) => (c.id === id ? updatedCalendar : c)),
+        );
         calendarsCache.current = null; // Invalidate cache
         return updatedCalendar;
       } catch (error) {
         throw error as ApiError;
       }
     },
-    []
+    [],
   );
 
-  const deleteCalendar = useCallback(
-    async (id: string): Promise<void> => {
-      try {
-        await calendarApiService.deleteCalendar(id);
-        setCalendars((prev) => prev.filter((c) => c.id !== id));
-        // Also remove events from this calendar
-        setEvents((prev) => prev.filter((e) => e.calendarId !== id));
-        calendarsCache.current = null; // Invalidate cache
-        eventsCache.current.clear(); // Invalidate events cache
-      } catch (error) {
-        throw error as ApiError;
-      }
-    },
-    []
-  );
+  const deleteCalendar = useCallback(async (id: string): Promise<void> => {
+    try {
+      await calendarApiService.deleteCalendar(id);
+      setCalendars((prev) => prev.filter((c) => c.id !== id));
+      // Also remove events from this calendar
+      setEvents((prev) => prev.filter((e) => e.calendarId !== id));
+      calendarsCache.current = null; // Invalidate cache
+      eventsCache.current.clear(); // Invalidate events cache
+    } catch (error) {
+      throw error as ApiError;
+    }
+  }, []);
 
   // Utility functions
   const setDateRange = useCallback(
@@ -784,7 +793,7 @@ export function useCalendarData(
         fetchEvents(dateRange);
       }
     },
-    [autoRefetch, fetchEvents]
+    [autoRefetch, fetchEvents],
   );
 
   const clearCache = useCallback((): void => {
@@ -793,35 +802,47 @@ export function useCalendarData(
   }, []);
 
   // Notification handlers
-  const loadNotifications = useCallback(async (eventId: string): Promise<EventNotification[]> => {
-    try {
-      const response = await calendarApiService.getEventNotifications(eventId);
-      return response.notifications.map(n => ({
-        id: n.id,
-        notificationType: 'email',
-        minutesBefore: n.minutesBefore,
-        isEnabled: n.isEnabled,
-      }));
-    } catch (error) {
-      console.error('Failed to load event notifications:', error);
-      return [];
-    }
-  }, []);
+  const loadNotifications = useCallback(
+    async (eventId: string): Promise<EventNotification[]> => {
+      try {
+        const response =
+          await calendarApiService.getEventNotifications(eventId);
+        return response.notifications.map((n) => ({
+          id: n.id,
+          notificationType: "email",
+          minutesBefore: n.minutesBefore,
+          isEnabled: n.isEnabled,
+        }));
+      } catch (error) {
+        console.error("Failed to load event notifications:", error);
+        return [];
+      }
+    },
+    [],
+  );
 
-  const updateNotifications = useCallback(async (eventId: string, notifications: EventNotification[]): Promise<void> => {
-    try {
-      const notificationData = notifications.map(n => ({
-        notificationType: n.notificationType,
-        minutesBefore: n.minutesBefore,
-        isEnabled: n.isEnabled,
-      }));
-      await calendarApiService.updateEventNotifications(eventId, notificationData);
-    } catch (error) {
-      console.error('Failed to update event notifications:', error);
-      throw error;
-    }
-  }, []);
-
+  const updateNotifications = useCallback(
+    async (
+      eventId: string,
+      notifications: EventNotification[],
+    ): Promise<void> => {
+      try {
+        const notificationData = notifications.map((n) => ({
+          notificationType: n.notificationType,
+          minutesBefore: n.minutesBefore,
+          isEnabled: n.isEnabled,
+        }));
+        await calendarApiService.updateEventNotifications(
+          eventId,
+          notificationData,
+        );
+      } catch (error) {
+        console.error("Failed to update event notifications:", error);
+        throw error;
+      }
+    },
+    [],
+  );
 
   // Initial data fetch
   useEffect(() => {

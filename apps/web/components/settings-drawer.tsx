@@ -169,7 +169,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
   const updateSetting = <K extends keyof UserSettings>(
     key: K,
-    value: UserSettings[K]
+    value: UserSettings[K],
   ) => {
     if (localSettings) setLocalSettings({ ...localSettings, [key]: value });
   };
@@ -290,7 +290,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   <Select
                     value={localSettings.defaultView}
                     onValueChange={(
-                      value: "month" | "week" | "day" | "agenda"
+                      value: "month" | "week" | "day" | "agenda",
                     ) => updateSetting("defaultView", value)}
                   >
                     <SelectTrigger>
@@ -440,12 +440,12 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       <Input
                         type="time"
                         value={formatTimeFromMinutes(
-                          localSettings.workingHoursStart
+                          localSettings.workingHoursStart,
                         )}
                         onChange={(e) =>
                           updateSetting(
                             "workingHoursStart",
-                            parseTimeToMinutes(e.target.value)
+                            parseTimeToMinutes(e.target.value),
                           )
                         }
                       />
@@ -455,12 +455,12 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       <Input
                         type="time"
                         value={formatTimeFromMinutes(
-                          localSettings.workingHoursEnd
+                          localSettings.workingHoursEnd,
                         )}
                         onChange={(e) =>
                           updateSetting(
                             "workingHoursEnd",
-                            parseTimeToMinutes(e.target.value)
+                            parseTimeToMinutes(e.target.value),
                           )
                         }
                       />
@@ -491,7 +491,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                               : [...workingDaysList, day.value].sort();
                             updateSetting(
                               "workingDays",
-                              JSON.stringify(newWorkingDays)
+                              JSON.stringify(newWorkingDays),
                             );
                           }}
                         >
@@ -589,7 +589,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     onChange={(e) =>
                       updateSetting(
                         "defaultReminder",
-                        e.target.value ? parseInt(e.target.value) : null
+                        e.target.value ? parseInt(e.target.value) : null,
                       )
                     }
                     placeholder="No default reminder"
@@ -611,7 +611,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     onChange={(e) =>
                       updateSetting(
                         "defaultEventDuration",
-                        parseInt(e.target.value) || 60
+                        parseInt(e.target.value) || 60,
                       )
                     }
                     min={1}
@@ -625,7 +625,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                     onValueChange={(value) =>
                       updateSetting(
                         "defaultCalendarId",
-                        value === "none" ? null : value
+                        value === "none" ? null : value,
                       )
                     }
                   >

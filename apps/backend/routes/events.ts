@@ -25,13 +25,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
       if (isNaN(startDate.getTime())) {
         throw new ValidationError(
-          "Invalid start date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)"
+          "Invalid start date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
         );
       }
 
       if (isNaN(endDate.getTime())) {
         throw new ValidationError(
-          "Invalid end date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)"
+          "Invalid end date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
         );
       }
 
@@ -95,7 +95,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             },
             startDate,
             endDate,
-            exceptions
+            exceptions,
           );
 
           // Convert instances to events
@@ -126,7 +126,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         } catch (error) {
           console.error(
             `Error generating instances for event ${recurringEvent.id}:`,
-            error
+            error,
           );
           // If recurrence generation fails, include the original event
           if (
@@ -261,7 +261,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
         },
       },
-    }
+    },
   )
 
   .post(
@@ -274,7 +274,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (!title?.trim()) {
           throw new ValidationError(
             "Title is required and cannot be empty",
-            "title"
+            "title",
           );
         }
 
@@ -293,14 +293,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (isNaN(startDate.getTime())) {
           throw new ValidationError(
             "Invalid start date format. Use ISO 8601 format",
-            "start"
+            "start",
           );
         }
 
         if (isNaN(endDate.getTime())) {
           throw new ValidationError(
             "Invalid end date format. Use ISO 8601 format",
-            "end"
+            "end",
           );
         }
 
@@ -314,7 +314,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (!allowedColors.includes(body.color)) {
             throw new ValidationError(
               `Color must be one of: ${allowedColors.join(", ")}`,
-              "color"
+              "color",
             );
           }
         }
@@ -326,7 +326,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             if (!rule) {
               throw new ValidationError(
                 "Invalid recurrence rule format",
-                "recurrence"
+                "recurrence",
               );
             }
 
@@ -334,14 +334,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             if (errors.length > 0) {
               throw new ValidationError(
                 `Recurrence rule validation failed: ${errors.join(", ")}`,
-                "recurrence"
+                "recurrence",
               );
             }
           } catch (recurrenceError) {
             console.error("Recurrence validation error:", recurrenceError);
             throw new ValidationError(
               "Invalid recurrence rule format",
-              "recurrence"
+              "recurrence",
             );
           }
         }
@@ -359,7 +359,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (!category) {
             throw new ValidationError(
               "Invalid category or category does not belong to user",
-              "categoryId"
+              "categoryId",
             );
           }
         }
@@ -368,7 +368,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (title.trim().length > 255) {
           throw new ValidationError(
             "Title cannot exceed 255 characters",
-            "title"
+            "title",
           );
         }
 
@@ -376,7 +376,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (body.description && body.description.length > 1000) {
           throw new ValidationError(
             "Description cannot exceed 1000 characters",
-            "description"
+            "description",
           );
         }
 
@@ -384,7 +384,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (body.location && body.location.length > 255) {
           throw new ValidationError(
             "Location cannot exceed 255 characters",
-            "location"
+            "location",
           );
         }
 
@@ -403,7 +403,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (!calendar) {
           throw new ValidationError(
             "Invalid calendar or calendar does not belong to user",
-            "calendarId"
+            "calendarId",
           );
         }
 
@@ -417,7 +417,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           ) {
             throw new ValidationError(
               "Reminder must be a number between 0 and 43200 minutes",
-              "reminder"
+              "reminder",
             );
           }
           body.reminder = reminderValue;
@@ -450,12 +450,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           await notificationService.createDefaultNotificationsForEvent(
             event.id,
             user.id,
-            body.reminder
+            body.reminder,
           );
         } catch (notificationError) {
           console.error(
             "Failed to create default notifications:",
-            notificationError
+            notificationError,
           );
           // Don't fail the event creation if notifications fail
         }
@@ -478,7 +478,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           t.String({
             maxLength: 1000,
             description: "Event description (optional, max 1000 characters)",
-          })
+          }),
         ),
         start: t.String({
           description: "Start date in ISO 8601 format",
@@ -491,18 +491,18 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         allDay: t.Optional(
           t.Boolean({
             description: "Whether the event is all-day (default: false)",
-          })
+          }),
         ),
         location: t.Optional(
           t.String({
             maxLength: 255,
             description: "Event location (optional, max 255 characters)",
-          })
+          }),
         ),
         color: t.Optional(
           t.String({
             description: "Event color (blue, orange, violet, rose, emerald)",
-          })
+          }),
         ),
         calendarId: t.String({
           description: "ID of the calendar (required, must belong to user)",
@@ -510,7 +510,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         categoryId: t.Optional(
           t.String({
             description: "ID of the event category (must belong to user)",
-          })
+          }),
         ),
         reminder: t.Optional(
           t.Union([
@@ -520,12 +520,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               description: "Reminder time in minutes before event (0-43200)",
             }),
             t.Null(),
-          ])
+          ]),
         ),
         recurrence: t.Optional(
           t.String({
             description: "JSON string of recurrence rule for recurring events",
-          })
+          }),
         ),
       }),
       detail: {
@@ -575,7 +575,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
         },
       },
-    }
+    },
   )
 
   .put(
@@ -606,7 +606,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (isNaN(startDate.getTime())) {
             throw new ValidationError(
               "Invalid start date format. Use ISO 8601 format",
-              "start"
+              "start",
             );
           }
         }
@@ -616,7 +616,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (isNaN(endDate.getTime())) {
             throw new ValidationError(
               "Invalid end date format. Use ISO 8601 format",
-              "end"
+              "end",
             );
           }
         }
@@ -635,13 +635,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (!body.title?.trim()) {
             throw new ValidationError(
               "Title is required and cannot be empty",
-              "title"
+              "title",
             );
           }
           if (body.title.trim().length > 255) {
             throw new ValidationError(
               "Title cannot exceed 255 characters",
-              "title"
+              "title",
             );
           }
         }
@@ -654,7 +654,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         ) {
           throw new ValidationError(
             "Description cannot exceed 1000 characters",
-            "description"
+            "description",
           );
         }
 
@@ -666,7 +666,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         ) {
           throw new ValidationError(
             "Location cannot exceed 255 characters",
-            "location"
+            "location",
           );
         }
 
@@ -676,7 +676,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (!allowedColors.includes(body.color)) {
             throw new ValidationError(
               `Color must be one of: ${allowedColors.join(", ")}`,
-              "color"
+              "color",
             );
           }
         }
@@ -693,7 +693,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (!calendar) {
             throw new ValidationError(
               "Invalid calendar or calendar does not belong to user",
-              "calendarId"
+              "calendarId",
             );
           }
         }
@@ -711,7 +711,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (!category) {
             throw new ValidationError(
               "Invalid category or category does not belong to user",
-              "categoryId"
+              "categoryId",
             );
           }
         }
@@ -726,7 +726,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           ) {
             throw new ValidationError(
               "Reminder must be a number between 0 and 43200 minutes",
-              "reminder"
+              "reminder",
             );
           }
           body.reminder = reminderValue;
@@ -769,12 +769,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (body.recurrence) {
             try {
               const rule = RecurrenceEngine.parseRecurrenceRule(
-                body.recurrence
+                body.recurrence,
               );
               if (!rule) {
                 throw new ValidationError(
                   "Invalid recurrence rule format",
-                  "recurrence"
+                  "recurrence",
                 );
               }
 
@@ -782,14 +782,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               if (errors.length > 0) {
                 throw new ValidationError(
                   `Recurrence rule validation failed: ${errors.join(", ")}`,
-                  "recurrence"
+                  "recurrence",
                 );
               }
             } catch (recurrenceError) {
               console.error("Recurrence validation error:", recurrenceError);
               throw new ValidationError(
                 "Invalid recurrence rule format",
-                "recurrence"
+                "recurrence",
               );
             }
           }
@@ -823,7 +823,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           error.message.includes("Record to update not found")
         ) {
           throw new ValidationError(
-            "Event was modified by another process. Please refresh and try again."
+            "Event was modified by another process. Please refresh and try again.",
           );
         }
         throw error;
@@ -842,49 +842,49 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             minLength: 1,
             maxLength: 255,
             description: "Event title (1-255 characters)",
-          })
+          }),
         ),
         description: t.Optional(
           t.String({
             maxLength: 1000,
             description: "Event description (max 1000 characters)",
-          })
+          }),
         ),
         start: t.Optional(
           t.String({
             description: "Start date in ISO 8601 format",
-          })
+          }),
         ),
         end: t.Optional(
           t.String({
             description: "End date in ISO 8601 format",
-          })
+          }),
         ),
         allDay: t.Optional(
           t.Boolean({
             description: "Whether the event is all-day",
-          })
+          }),
         ),
         location: t.Optional(
           t.String({
             maxLength: 255,
             description: "Event location (max 255 characters)",
-          })
+          }),
         ),
         color: t.Optional(
           t.String({
             description: "Event color (blue, orange, violet, rose, emerald)",
-          })
+          }),
         ),
         calendarId: t.Optional(
           t.String({
             description: "ID of the calendar (must belong to user)",
-          })
+          }),
         ),
         categoryId: t.Optional(
           t.String({
             description: "ID of the event category (must belong to user)",
-          })
+          }),
         ),
         reminder: t.Optional(
           t.Union([
@@ -894,12 +894,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               description: "Reminder time in minutes before event (0-43200)",
             }),
             t.Null(),
-          ])
+          ]),
         ),
         recurrence: t.Optional(
           t.String({
             description: "JSON string of recurrence rule for recurring events",
-          })
+          }),
         ),
       }),
       detail: {
@@ -951,7 +951,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
         },
       },
-    }
+    },
   )
 
   .delete(
@@ -1037,7 +1037,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
         },
       },
-    }
+    },
   )
 
   .post(
@@ -1062,7 +1062,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (events.length !== eventIds.length) {
           throw new ValidationError(
             "Some events not found or access denied",
-            "eventIds"
+            "eventIds",
           );
         }
 
@@ -1073,7 +1073,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             if (!targetCalendarId) {
               throw new ValidationError(
                 "Target calendar ID is required for move operation",
-                "targetCalendarId"
+                "targetCalendarId",
               );
             }
 
@@ -1088,7 +1088,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             if (!targetCalendar) {
               throw new ValidationError(
                 "Target calendar not found or access denied",
-                "targetCalendarId"
+                "targetCalendarId",
               );
             }
 
@@ -1167,12 +1167,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                 await notificationService.createDefaultNotificationsForEvent(
                   duplicated.id,
                   user.id,
-                  event.reminder
+                  event.reminder,
                 );
               } catch (notificationError) {
                 console.error(
                   "Failed to create notifications for duplicated event:",
-                  notificationError
+                  notificationError,
                 );
                 // Don't fail the duplication if notifications fail
               }
@@ -1191,7 +1191,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           default:
             throw new ValidationError(
               "Invalid action. Use 'move', 'delete', or 'duplicate'",
-              "action"
+              "action",
             );
         }
       } catch (error) {
@@ -1207,7 +1207,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           {
             description:
               "Bulk operation to perform: move, delete, or duplicate",
-          }
+          },
         ),
         eventIds: t.Array(t.String(), {
           description: "Array of event IDs to process",
@@ -1217,7 +1217,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           t.String({
             description:
               "Target calendar ID (required for move, optional for duplicate)",
-          })
+          }),
         ),
       }),
       detail: {
@@ -1257,5 +1257,5 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
         },
       },
-    }
+    },
   );

@@ -14,7 +14,7 @@ export async function ensureUserCalendars(userId: string) {
     // If user has no calendars, create default ones
     if (existingCalendars.length === 0) {
       console.log(`Creating default calendars for user ${userId}`);
-      
+
       await prisma.calendar.createMany({
         data: [
           {

@@ -70,7 +70,7 @@ export const createAPI = (prefix = "") => {
             },
           },
         },
-      })
+      }),
     );
   }
 
@@ -81,7 +81,7 @@ export const createAPI = (prefix = "") => {
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-      })
+      }),
     )
     .use(errorHandler)
     .use(betterAuth)
@@ -105,7 +105,7 @@ export const createAPI = (prefix = "") => {
       },
       {
         detail: { tags: ["Auth"] },
-      }
+      },
     )
     .get("/user", ({ user }) => user, {
       auth: true,
@@ -122,7 +122,7 @@ export const createAPI = (prefix = "") => {
       }),
       {
         detail: { tags: ["Health"] },
-      }
+      },
     )
     .use(eventsRoutes)
     .use(categoriesRoutes)

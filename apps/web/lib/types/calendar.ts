@@ -138,7 +138,10 @@ export interface UserSettings {
   updatedAt: Date;
 }
 
-export interface UpdateSettingsRequest extends Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> {
+export interface UpdateSettingsRequest
+  extends Partial<
+    Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
+  > {
   userId?: string;
 }
 
@@ -230,7 +233,7 @@ export interface BulkEventResponse {
 export interface EventNotification {
   id?: string;
   eventId?: string;
-  notificationType: 'browser' | 'email';
+  notificationType: "browser" | "email";
   minutesBefore: number;
   isEnabled: boolean;
   createdAt?: Date;
@@ -239,7 +242,7 @@ export interface EventNotification {
 
 export interface CreateNotificationRequest {
   notifications: Array<{
-    notificationType: 'browser' | 'email';
+    notificationType: "browser" | "email";
     minutesBefore: number;
     isEnabled: boolean;
   }>;

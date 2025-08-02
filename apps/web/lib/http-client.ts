@@ -100,7 +100,7 @@ export class HttpClient {
 
   private async makeRequest<T>(
     url: string,
-    options: RequestOptions = {}
+    options: RequestOptions = {},
   ): Promise<T> {
     const {
       timeout = this.timeout,
