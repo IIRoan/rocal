@@ -90,30 +90,29 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   const { data: session } = useSession();
   const { calendars } = useCalendarData({ autoRefetch: true });
 
-  const { settings, loading, error: settingsError, updateSettings, resetSettings } = useSettings();
-  
+  const {
+    settings,
+    loading,
+    error: settingsError,
+    updateSettings,
+    resetSettings,
+  } = useSettings();
+
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Sync settings to local state for editing
   useEffect(() => {
-    if (settings) {
-      setLocalSettings(settings);
-    }
+    if (settings) setLocalSettings(settings);
   }, [settings]);
 
-  // Show settings error if any
   useEffect(() => {
-    if (settingsError) {
-      setError(settingsError);
-    }
+    if (settingsError) setError(settingsError);
   }, [settingsError]);
 
   const handleSave = async () => {
     if (!localSettings) return;
-
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -150,9 +149,8 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
   };
 
   const handleReset = async () => {
-    if (!confirm("Are you sure you want to reset all settings to defaults?")) {
+    if (!confirm("Are you sure you want to reset all settings to defaults?"))
       return;
-    }
 
     setSaving(true);
     setError(null);
@@ -173,19 +171,19 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
     key: K,
     value: UserSettings[K]
   ) => {
-    if (localSettings) {
-      setLocalSettings({ ...localSettings, [key]: value });
-    }
+    if (localSettings) setLocalSettings({ ...localSettings, [key]: value });
   };
 
   if (loading) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent>
+      <Drawer open={open} onOpenChange={onOpenChange} direction="right">
+        <DrawerContent className="max-w-lg w-full bg-popover text-popover-foreground border border-border">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
-              <p>Loading settings...</p>
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Loading settings...
+              </p>
             </div>
           </div>
         </DrawerContent>
@@ -195,12 +193,12 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
   if (!localSettings) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent>
+      <Drawer open={open} onOpenChange={onOpenChange} direction="right">
+        <DrawerContent className="max-w-lg w-full bg-popover text-popover-foreground border border-border">
           <div className="flex items-center justify-center min-h-[400px] p-4">
-            <Alert className="max-w-md">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="max-w-md border-destructive/30 bg-destructive/10">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-foreground">
                 Failed to load settings. Please try refreshing the page.
               </AlertDescription>
             </Alert>
@@ -214,49 +212,61 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction="right">
-      <DrawerContent className="max-w-lg w-full overflow-y-auto">
-        <DrawerHeader className="flex flex-row items-center justify-between">
+      <DrawerContent className="max-w-lg w-full overflow-y-auto bg-popover text-popover-foreground border border-border">
+        <DrawerHeader className="flex flex-row items-center justify-between border-b border-border bg-card/20">
           <div>
-            <DrawerTitle>Settings</DrawerTitle>
-            <DrawerDescription>
+            <DrawerTitle className="text-lg">Settings</DrawerTitle>
+            <DrawerDescription className="text-sm text-muted-foreground">
               Customize your calendar preferences
             </DrawerDescription>
           </div>
           <DrawerClose asChild>
-            <Button variant="ghost" size="icon">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground"
+            >
               <X className="h-4 w-4" />
             </Button>
           </DrawerClose>
         </DrawerHeader>
 
-        <div className="px-4 space-y-6">
+        <div className="px-4 py-4 space-y-6">
           {error && (
-            <Alert variant="destructive">
+            <Alert
+              variant="destructive"
+              className="border-destructive/30 bg-destructive/10"
+            >
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="text-foreground">
+                {error}
+              </AlertDescription>
             </Alert>
           )}
 
           {success && (
-            <Alert className="border-green-200 bg-green-50">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
+            <Alert className="border border-green-400/30 bg-green-400/10">
+              <Check className="h-4 w-4 text-green-400" />
+              <AlertDescription className="text-green-300">
                 {success}
               </AlertDescription>
             </Alert>
           )}
 
           {/* Appearance Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Eye className="h-4 w-4" />
+          <Card className="bg-card border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                <Eye className="h-4 w-4 text-muted-foreground" />
                 Appearance
               </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                Theme and layout options
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="theme">Theme</Label>
                   <Select
                     value={localSettings.theme}
@@ -264,10 +274,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       updateSetting("theme", value)
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       <SelectItem value="light">Light</SelectItem>
                       <SelectItem value="dark">Dark</SelectItem>
                       <SelectItem value="system">System</SelectItem>
@@ -275,18 +285,18 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="defaultView">Default View</Label>
                   <Select
                     value={localSettings.defaultView}
-                    onValueChange={(value: "month" | "week" | "day" | "agenda") =>
-                      updateSetting("defaultView", value)
-                    }
+                    onValueChange={(
+                      value: "month" | "week" | "day" | "agenda"
+                    ) => updateSetting("defaultView", value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectValue placeholder="Select default view" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       <SelectItem value="month">Month</SelectItem>
                       <SelectItem value="week">Week</SelectItem>
                       <SelectItem value="day">Day</SelectItem>
@@ -295,7 +305,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="weekStartDay">Week Starts On</Label>
                   <Select
                     value={localSettings.weekStartDay.toString()}
@@ -303,10 +313,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       updateSetting("weekStartDay", parseInt(value))
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectValue placeholder="Select week start" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       <SelectItem value="0">Sunday</SelectItem>
                       <SelectItem value="1">Monday</SelectItem>
                     </SelectContent>
@@ -314,10 +324,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/60" />
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label>Compact View</Label>
                     <p className="text-xs text-muted-foreground">
@@ -332,7 +342,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label>Show Week Numbers</Label>
                     <p className="text-xs text-muted-foreground">
@@ -347,7 +357,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label>Show Declined Events</Label>
                     <p className="text-xs text-muted-foreground">
@@ -366,25 +376,28 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </Card>
 
           {/* Time & Regional Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-4 w-4" />
+          <Card className="bg-card border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                <Clock className="h-4 w-4 text-muted-foreground" />
                 Time & Region
               </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                Timezone and format preferences
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="timezone">Timezone</Label>
                   <Select
                     value={localSettings.timezone}
                     onValueChange={(value) => updateSetting("timezone", value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       {TIMEZONES.map((tz) => (
                         <SelectItem key={tz} value={tz}>
                           {tz}
@@ -394,7 +407,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="timeFormat">Time Format</Label>
                   <Select
                     value={localSettings.timeFormat}
@@ -402,10 +415,10 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       updateSetting("timeFormat", value)
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
+                      <SelectValue placeholder="Select time format" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       <SelectItem value="12h">12 Hour (1:00 PM)</SelectItem>
                       <SelectItem value="24h">24 Hour (13:00)</SelectItem>
                     </SelectContent>
@@ -413,7 +426,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/60" />
 
               <div className="space-y-4">
                 <div>
@@ -421,12 +434,15 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   <p className="text-xs text-muted-foreground mb-3">
                     Set your typical working hours
                   </p>
-                  <div className="space-y-3">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
                       <Label htmlFor="workStart">Start Time</Label>
                       <Input
                         type="time"
-                        value={formatTimeFromMinutes(localSettings.workingHoursStart)}
+                        className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
+                        value={formatTimeFromMinutes(
+                          localSettings.workingHoursStart
+                        )}
                         onChange={(e) =>
                           updateSetting(
                             "workingHoursStart",
@@ -435,11 +451,14 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                         }
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="workEnd">End Time</Label>
                       <Input
                         type="time"
-                        value={formatTimeFromMinutes(localSettings.workingHoursEnd)}
+                        className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
+                        value={formatTimeFromMinutes(
+                          localSettings.workingHoursEnd
+                        )}
                         onChange={(e) =>
                           updateSetting(
                             "workingHoursEnd",
@@ -456,31 +475,32 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   <p className="text-xs text-muted-foreground mb-3">
                     Select your typical working days
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                    {WORKING_DAYS.map((day) => (
-                      <Badge
-                        key={day.value}
-                        variant={
-                          workingDaysList.includes(day.value)
-                            ? "default"
-                            : "outline"
-                        }
-                        className="cursor-pointer text-xs"
-                        onClick={() => {
-                          const newWorkingDays = workingDaysList.includes(
-                            day.value
-                          )
-                            ? workingDaysList.filter((d) => d !== day.value)
-                            : [...workingDaysList, day.value].sort();
-                          updateSetting(
-                            "workingDays",
-                            JSON.stringify(newWorkingDays)
-                          );
-                        }}
-                      >
-                        {day.label}
-                      </Badge>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5">
+                    {WORKING_DAYS.map((day) => {
+                      const active = workingDaysList.includes(day.value);
+                      return (
+                        <Badge
+                          key={day.value}
+                          variant={active ? "default" : "outline"}
+                          className={
+                            active
+                              ? "cursor-pointer text-xs bg-accent text-accent-foreground hover:bg-accent/90"
+                              : "cursor-pointer text-xs border-border hover:bg-input/40"
+                          }
+                          onClick={() => {
+                            const newWorkingDays = active
+                              ? workingDaysList.filter((d) => d !== day.value)
+                              : [...workingDaysList, day.value].sort();
+                            updateSetting(
+                              "workingDays",
+                              JSON.stringify(newWorkingDays)
+                            );
+                          }}
+                        >
+                          {day.label}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -488,16 +508,19 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </Card>
 
           {/* Notification Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Bell className="h-4 w-4" />
+          <Card className="bg-card border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                <Bell className="h-4 w-4 text-muted-foreground" />
                 Notifications
               </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                Control how and when you're notified
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label>Email Notifications</Label>
                     <p className="text-xs text-muted-foreground">
@@ -512,7 +535,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label>Browser Notifications</Label>
                     <p className="text-xs text-muted-foreground">
@@ -527,7 +550,7 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
                     <Label>Notification Sound</Label>
                     <p className="text-xs text-muted-foreground">
@@ -546,21 +569,25 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </Card>
 
           {/* Default Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Calendar className="h-4 w-4" />
+          <Card className="bg-card border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 Event Defaults
               </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                Default times and calendar
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="defaultReminder">
                     Default Reminder (minutes)
                   </Label>
                   <Input
                     type="number"
+                    className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                     value={localSettings.defaultReminder || ""}
                     onChange={(e) =>
                       updateSetting(
@@ -569,20 +596,21 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                       )
                     }
                     placeholder="No default reminder"
-                    min="1"
-                    max="43200"
+                    min={1}
+                    max={43200}
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty for no default reminder
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="defaultDuration">
                     Default Event Duration (minutes)
                   </Label>
                   <Input
                     type="number"
+                    className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring"
                     value={localSettings.defaultEventDuration}
                     onChange={(e) =>
                       updateSetting(
@@ -590,22 +618,25 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
                         parseInt(e.target.value) || 60
                       )
                     }
-                    min="1"
+                    min={1}
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="defaultCalendar">Default Calendar</Label>
                   <Select
                     value={localSettings.defaultCalendarId || "none"}
                     onValueChange={(value) =>
-                      updateSetting("defaultCalendarId", value === "none" ? null : value)
+                      updateSetting(
+                        "defaultCalendarId",
+                        value === "none" ? null : value
+                      )
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-input/50 hover:bg-input border-border focus-visible:ring-ring">
                       <SelectValue placeholder="No default calendar" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-card border border-border">
                       <SelectItem value="none">No default calendar</SelectItem>
                       {calendars.map((calendar) => (
                         <SelectItem key={calendar.id} value={calendar.id}>
@@ -626,8 +657,14 @@ export function SettingsDrawer({ open, onOpenChange }: SettingsDrawerProps) {
           </Card>
         </div>
 
-        <DrawerFooter className="flex flex-row gap-2">
-          <Button variant="outline" onClick={handleReset} disabled={saving} size="sm">
+        <DrawerFooter className="flex flex-row gap-2 border-t border-border bg-card/20">
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            disabled={saving}
+            size="sm"
+            className="border-border"
+          >
             Reset
           </Button>
           <Button onClick={handleSave} disabled={saving} className="flex-1">
