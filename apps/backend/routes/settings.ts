@@ -29,7 +29,8 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       detail: {
         tags: ["Settings"],
         summary: "Get user settings",
-        description: "Fetches the authenticated user's settings, creating defaults if none exist",
+        description:
+          "Fetches the authenticated user's settings, creating defaults if none exist",
         security: [{ bearerAuth: [] }],
         responses: {
           200: {
@@ -41,8 +42,14 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
                   properties: {
                     id: { type: "string" },
                     userId: { type: "string" },
-                    theme: { type: "string", enum: ["light", "dark", "system"] },
-                    defaultView: { type: "string", enum: ["month", "week", "day", "agenda"] },
+                    theme: {
+                      type: "string",
+                      enum: ["light", "dark", "system"],
+                    },
+                    defaultView: {
+                      type: "string",
+                      enum: ["month", "week", "day", "agenda"],
+                    },
                     weekStartDay: { type: "number", minimum: 0, maximum: 6 },
                     timezone: { type: "string" },
                     timeFormat: { type: "string", enum: ["12h", "24h"] },
@@ -68,7 +75,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           },
         },
       },
-    }
+    },
   )
 
   .put(
@@ -79,19 +86,19 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
         try {
           Intl.DateTimeFormat(undefined, { timeZone: body.timezone });
         } catch (error) {
-          throw new ValidationError(
-            "Invalid timezone identifier",
-            "timezone"
-          );
+          throw new ValidationError("Invalid timezone identifier", "timezone");
         }
       }
 
       // Validate working hours
-      if (body.workingHoursStart !== undefined && body.workingHoursEnd !== undefined) {
+      if (
+        body.workingHoursStart !== undefined &&
+        body.workingHoursEnd !== undefined
+      ) {
         if (body.workingHoursStart >= body.workingHoursEnd) {
           throw new ValidationError(
             "Working hours start must be before working hours end",
-            "workingHoursStart"
+            "workingHoursStart",
           );
         }
       }
@@ -100,17 +107,21 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       if (body.workingDays) {
         try {
           const workingDays = JSON.parse(body.workingDays);
-          if (!Array.isArray(workingDays) || !workingDays.every(day => 
-            typeof day === 'number' && day >= 0 && day <= 6)) {
+          if (
+            !Array.isArray(workingDays) ||
+            !workingDays.every(
+              (day) => typeof day === "number" && day >= 0 && day <= 6,
+            )
+          ) {
             throw new ValidationError(
               "Working days must be a JSON array of numbers 0-6",
-              "workingDays"
+              "workingDays",
             );
           }
         } catch (error) {
           throw new ValidationError(
             "Invalid working days format - must be valid JSON array",
-            "workingDays"
+            "workingDays",
           );
         }
       }
@@ -127,7 +138,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
         if (!calendar) {
           throw new ValidationError(
             "Invalid default calendar or calendar does not belong to user",
-            "defaultCalendarId"
+            "defaultCalendarId",
           );
         }
       }
@@ -152,30 +163,29 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
     {
       auth: true,
       body: t.Object({
-        theme: t.Optional(t.Union([
-          t.Literal("light"),
-          t.Literal("dark"),
-          t.Literal("system")
-        ])),
-        defaultView: t.Optional(t.Union([
-          t.Literal("month"),
-          t.Literal("week"),
-          t.Literal("day"),
-          t.Literal("agenda")
-        ])),
+        theme: t.Optional(
+          t.Union([t.Literal("light"), t.Literal("dark"), t.Literal("system")]),
+        ),
+        defaultView: t.Optional(
+          t.Union([
+            t.Literal("month"),
+            t.Literal("week"),
+            t.Literal("day"),
+            t.Literal("agenda"),
+          ]),
+        ),
         weekStartDay: t.Optional(t.Number({ minimum: 0, maximum: 6 })),
         timezone: t.Optional(t.String()),
-        timeFormat: t.Optional(t.Union([
-          t.Literal("12h"),
-          t.Literal("24h")
-        ])),
+        timeFormat: t.Optional(t.Union([t.Literal("12h"), t.Literal("24h")])),
         workingHoursStart: t.Optional(t.Number({ minimum: 0, maximum: 1440 })),
         workingHoursEnd: t.Optional(t.Number({ minimum: 0, maximum: 1440 })),
         workingDays: t.Optional(t.String()),
         emailNotifications: t.Optional(t.Boolean()),
         browserNotifications: t.Optional(t.Boolean()),
         reminderSound: t.Optional(t.Boolean()),
-        defaultReminder: t.Optional(t.Union([t.Number({ minimum: 1 }), t.Null()])),
+        defaultReminder: t.Optional(
+          t.Union([t.Number({ minimum: 1 }), t.Null()]),
+        ),
         defaultEventDuration: t.Optional(t.Number({ minimum: 1 })),
         defaultCalendarId: t.Optional(t.Union([t.String(), t.Null()])),
         compactView: t.Optional(t.Boolean()),
@@ -185,7 +195,8 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       detail: {
         tags: ["Settings"],
         summary: "Update user settings",
-        description: "Updates the authenticated user's settings with validation",
+        description:
+          "Updates the authenticated user's settings with validation",
         security: [{ bearerAuth: [] }],
         requestBody: {
           description: "User settings to update",
@@ -195,18 +206,45 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
                 type: "object",
                 properties: {
                   theme: { type: "string", enum: ["light", "dark", "system"] },
-                  defaultView: { type: "string", enum: ["month", "week", "day", "agenda"] },
+                  defaultView: {
+                    type: "string",
+                    enum: ["month", "week", "day", "agenda"],
+                  },
                   weekStartDay: { type: "number", minimum: 0, maximum: 6 },
-                  timezone: { type: "string", description: "IANA timezone identifier" },
+                  timezone: {
+                    type: "string",
+                    description: "IANA timezone identifier",
+                  },
                   timeFormat: { type: "string", enum: ["12h", "24h"] },
-                  workingHoursStart: { type: "number", minimum: 0, maximum: 1440, description: "Minutes from midnight" },
-                  workingHoursEnd: { type: "number", minimum: 0, maximum: 1440, description: "Minutes from midnight" },
-                  workingDays: { type: "string", description: "JSON array of weekdays (0-6)" },
+                  workingHoursStart: {
+                    type: "number",
+                    minimum: 0,
+                    maximum: 1440,
+                    description: "Minutes from midnight",
+                  },
+                  workingHoursEnd: {
+                    type: "number",
+                    minimum: 0,
+                    maximum: 1440,
+                    description: "Minutes from midnight",
+                  },
+                  workingDays: {
+                    type: "string",
+                    description: "JSON array of weekdays (0-6)",
+                  },
                   emailNotifications: { type: "boolean" },
                   browserNotifications: { type: "boolean" },
                   reminderSound: { type: "boolean" },
-                  defaultReminder: { type: "number", minimum: 1, description: "Default reminder in minutes" },
-                  defaultEventDuration: { type: "number", minimum: 1, description: "Default event duration in minutes" },
+                  defaultReminder: {
+                    type: "number",
+                    minimum: 1,
+                    description: "Default reminder in minutes",
+                  },
+                  defaultEventDuration: {
+                    type: "number",
+                    minimum: 1,
+                    description: "Default event duration in minutes",
+                  },
                   defaultCalendarId: { type: "string" },
                   compactView: { type: "boolean" },
                   showWeekNumbers: { type: "boolean" },
@@ -228,7 +266,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           },
         },
       },
-    }
+    },
   )
 
   .delete(
@@ -273,5 +311,5 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           },
         },
       },
-    }
+    },
   );

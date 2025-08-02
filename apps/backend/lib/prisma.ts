@@ -61,7 +61,7 @@ export const db = {
   // Safe query wrapper with error handling
   async safeQuery<T>(
     queryFn: () => Promise<T>,
-    fallback?: T
+    fallback?: T,
   ): Promise<T | null> {
     try {
       return await queryFn();

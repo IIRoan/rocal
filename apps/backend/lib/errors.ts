@@ -4,7 +4,7 @@ import { Elysia } from "elysia";
 export class ValidationError extends Error {
   constructor(
     message: string,
-    public field?: string
+    public field?: string,
   ) {
     super(message);
     this.name = "ValidationError";
@@ -35,7 +35,7 @@ export class ForbiddenError extends Error {
 export class DatabaseError extends Error {
   constructor(
     message: string,
-    public originalError?: any
+    public originalError?: any,
   ) {
     super(message);
     this.name = "DatabaseError";
@@ -45,7 +45,7 @@ export class DatabaseError extends Error {
 export class NotificationError extends Error {
   constructor(
     message: string,
-    public originalError?: any
+    public originalError?: any,
   ) {
     super(message);
     this.name = "NotificationError";
@@ -207,5 +207,5 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
           timestamp,
         } as ApiErrorResponse;
     }
-  }
+  },
 );

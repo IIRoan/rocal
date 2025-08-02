@@ -44,7 +44,7 @@ export class CalendarApiService {
       const endISO = end.toISOString();
 
       const response = await this.client.get<EventsResponse>(
-        `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`
+        `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
       );
 
       return response;
@@ -57,7 +57,7 @@ export class CalendarApiService {
     try {
       const response = await this.client.post<CalendarEvent>(
         "/api/events",
-        event
+        event,
       );
       return response;
     } catch (error) {
@@ -67,12 +67,12 @@ export class CalendarApiService {
 
   async updateEvent(
     id: string,
-    event: UpdateEventRequest
+    event: UpdateEventRequest,
   ): Promise<CalendarEvent> {
     try {
       const response = await this.client.put<CalendarEvent>(
         `/api/events/${id}`,
-        event
+        event,
       );
       return response;
     } catch (error) {
@@ -83,7 +83,7 @@ export class CalendarApiService {
   async deleteEvent(id: string): Promise<DeleteResponse> {
     try {
       const response = await this.client.delete<DeleteResponse>(
-        `/api/events/${id}`
+        `/api/events/${id}`,
       );
       return response;
     } catch (error) {
@@ -106,7 +106,7 @@ export class CalendarApiService {
     try {
       const response = await this.client.post<Calendar>(
         "/api/calendars",
-        calendar
+        calendar,
       );
       return response;
     } catch (error) {
@@ -116,12 +116,12 @@ export class CalendarApiService {
 
   async updateCalendar(
     id: string,
-    calendar: UpdateCalendarRequest
+    calendar: UpdateCalendarRequest,
   ): Promise<Calendar> {
     try {
       const response = await this.client.put<Calendar>(
         `/api/calendars/${id}`,
-        calendar
+        calendar,
       );
       return response;
     } catch (error) {
@@ -132,7 +132,7 @@ export class CalendarApiService {
   async deleteCalendar(id: string): Promise<DeleteResponse> {
     try {
       const response = await this.client.delete<DeleteResponse>(
-        `/api/calendars/${id}`
+        `/api/calendars/${id}`,
       );
       return response;
     } catch (error) {
@@ -152,12 +152,12 @@ export class CalendarApiService {
   }
 
   async createCategory(
-    category: CreateCategoryRequest
+    category: CreateCategoryRequest,
   ): Promise<EventCategory> {
     try {
       const response = await this.client.post<EventCategory>(
         "/api/categories",
-        category
+        category,
       );
       return response;
     } catch (error) {
@@ -167,12 +167,12 @@ export class CalendarApiService {
 
   async updateCategory(
     id: string,
-    category: UpdateCategoryRequest
+    category: UpdateCategoryRequest,
   ): Promise<EventCategory> {
     try {
       const response = await this.client.put<EventCategory>(
         `/api/categories/${id}`,
-        category
+        category,
       );
       return response;
     } catch (error) {
@@ -183,7 +183,7 @@ export class CalendarApiService {
   async deleteCategory(id: string): Promise<DeleteResponse> {
     try {
       const response = await this.client.delete<DeleteResponse>(
-        `/api/categories/${id}`
+        `/api/categories/${id}`,
       );
       return response;
     } catch (error) {
@@ -232,7 +232,7 @@ export class CalendarApiService {
 
   // Helper method to validate event data before sending to API
   static validateEventData(
-    event: CreateEventRequest | UpdateEventRequest
+    event: CreateEventRequest | UpdateEventRequest,
   ): string[] {
     const errors: string[] = [];
 
@@ -281,7 +281,7 @@ export class CalendarApiService {
 
   // Helper method to validate category data before sending to API
   static validateCategoryData(
-    category: CreateCategoryRequest | UpdateCategoryRequest
+    category: CreateCategoryRequest | UpdateCategoryRequest,
   ): string[] {
     const errors: string[] = [];
 
@@ -310,12 +310,12 @@ export class CalendarApiService {
   }
 
   async updateUserSettings(
-    settings: UpdateSettingsRequest
+    settings: UpdateSettingsRequest,
   ): Promise<UserSettings> {
     try {
       const response = await this.client.put<UserSettings>(
         "/api/settings",
-        settings
+        settings,
       );
       return response;
     } catch (error) {
@@ -337,12 +337,12 @@ export class CalendarApiService {
 
   // Recurring Events API methods
   async validateRecurrence(
-    rule: string | object
+    rule: string | object,
   ): Promise<RecurrenceValidation> {
     try {
       const response = await this.client.post<RecurrenceValidation>(
         "/api/recurring/validate",
-        { rule }
+        { rule },
       );
       return response;
     } catch (error) {
@@ -354,7 +354,7 @@ export class CalendarApiService {
     eventStart: string,
     eventEnd: string,
     recurrenceRule: string | object,
-    previewDays?: number
+    previewDays?: number,
   ): Promise<RecurrencePreview> {
     try {
       const response = await this.client.post<RecurrencePreview>(
@@ -364,7 +364,7 @@ export class CalendarApiService {
           eventEnd,
           recurrenceRule,
           previewDays,
-        }
+        },
       );
       return response;
     } catch (error) {
@@ -375,7 +375,7 @@ export class CalendarApiService {
   async getRecurrencePatterns(): Promise<RecurrencePatterns> {
     try {
       const response = await this.client.get<{ patterns: RecurrencePatterns }>(
-        "/api/recurring/patterns"
+        "/api/recurring/patterns",
       );
       return response.patterns;
     } catch (error) {
@@ -385,12 +385,12 @@ export class CalendarApiService {
 
   async editRecurringEvent(
     id: string,
-    request: EditRecurringEventRequest
+    request: EditRecurringEventRequest,
   ): Promise<CalendarEvent> {
     try {
       const response = await this.client.put<CalendarEvent>(
         `/api/recurring/event/${id}`,
-        request
+        request,
       );
       return response;
     } catch (error) {
@@ -401,7 +401,7 @@ export class CalendarApiService {
   async deleteRecurringEvent(
     id: string,
     deleteScope: string,
-    occurrenceDate?: string
+    occurrenceDate?: string,
   ): Promise<{ success: boolean; message: string }> {
     try {
       const params = new URLSearchParams({ deleteScope });
@@ -421,7 +421,7 @@ export class CalendarApiService {
   async deleteCalendarAdvanced(
     id: string,
     action?: string,
-    targetCalendarId?: string
+    targetCalendarId?: string,
   ): Promise<CalendarDeleteResponse> {
     try {
       const params = new URLSearchParams();
@@ -429,7 +429,7 @@ export class CalendarApiService {
       if (targetCalendarId) params.append("targetCalendarId", targetCalendarId);
 
       const response = await this.client.delete<CalendarDeleteResponse>(
-        `/api/calendars/${id}?${params}`
+        `/api/calendars/${id}?${params}`,
       );
       return response;
     } catch (error) {
@@ -439,18 +439,18 @@ export class CalendarApiService {
 
   // Bulk Event Operations
   async bulkEventOperation(
-    request: BulkEventRequest
+    request: BulkEventRequest,
   ): Promise<BulkEventResponse> {
     try {
       const response = await this.client.post<BulkEventResponse>(
         "/api/events/bulk",
-        request
+        request,
       );
       return response;
     } catch (error) {
       throw this.transformError(
         error,
-        "Failed to perform bulk event operation"
+        "Failed to perform bulk event operation",
       );
     }
   }
@@ -472,7 +472,7 @@ export class CalendarApiService {
   async getNotificationStatus(): Promise<NotificationStatus> {
     try {
       const response = await this.client.get<NotificationStatus>(
-        "/api/notifications/status"
+        "/api/notifications/status",
       );
       return response;
     } catch (error) {
@@ -481,7 +481,7 @@ export class CalendarApiService {
   }
 
   async getEventNotifications(
-    eventId: string
+    eventId: string,
   ): Promise<{ success: boolean; notifications: EventNotification[] }> {
     try {
       const response = await this.client.get<{
@@ -496,7 +496,7 @@ export class CalendarApiService {
 
   async updateEventNotifications(
     eventId: string,
-    notifications: CreateNotificationRequest["notifications"]
+    notifications: CreateNotificationRequest["notifications"],
   ): Promise<{ success: boolean; message: string }> {
     try {
       const response = await this.client.put<{
@@ -513,10 +513,9 @@ export class CalendarApiService {
 
   // New email notification methods
 
-
   async createMultipleNotifications(
     eventId: string,
-    notificationTimes: number[]
+    notificationTimes: number[],
   ): Promise<{
     success: boolean;
     message: string;
@@ -532,7 +531,7 @@ export class CalendarApiService {
     } catch (error) {
       throw this.transformError(
         error,
-        "Failed to create multiple notifications"
+        "Failed to create multiple notifications",
       );
     }
   }

@@ -2,7 +2,9 @@ import { prisma } from "./prisma";
 import { Resend } from "resend";
 import type { CalendarEvent, User, UserSettings } from "../generated/prisma";
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 export interface NotificationEvent extends CalendarEvent {
   user: User;
@@ -41,7 +43,7 @@ export class SimpleNotificationService {
     }, 60 * 1000); // Every 60 seconds
 
     console.log(
-      "✅ Simple Notification Service started (checking every minute)"
+      "✅ Simple Notification Service started (checking every minute)",
     );
   }
 
@@ -57,11 +59,11 @@ export class SimpleNotificationService {
       now.getHours(),
       now.getMinutes(),
       0,
-      0
+      0,
     );
 
     console.log(
-      `🔍 Checking for notifications at ${currentMinute.toISOString()}`
+      `🔍 Checking for notifications at ${currentMinute.toISOString()}`,
     );
 
     try {
@@ -91,7 +93,7 @@ export class SimpleNotificationService {
       });
 
       console.log(
-        `📋 Found ${notificationsToSend.length} notifications to send`
+        `📋 Found ${notificationsToSend.length} notifications to send`,
       );
 
       for (const notification of notificationsToSend) {
@@ -115,7 +117,7 @@ export class SimpleNotificationService {
     const userSettings = user.settings;
 
     console.log(
-      `📧 Sending ${notification.notificationType} notification for event "${event.title}" to ${user.email}`
+      `📧 Sending ${notification.notificationType} notification for event "${event.title}" to ${user.email}`,
     );
 
     try {
@@ -125,7 +127,7 @@ export class SimpleNotificationService {
         userSettings?.emailNotifications === false
       ) {
         console.log(
-          `⏭️ Skipping email notification - user has email notifications disabled`
+          `⏭️ Skipping email notification - user has email notifications disabled`,
         );
         await this.markNotificationAsSent(notification.id, "skipped");
         return;
@@ -136,7 +138,7 @@ export class SimpleNotificationService {
         userSettings?.browserNotifications === false
       ) {
         console.log(
-          `⏭️ Skipping browser notification - user has browser notifications disabled`
+          `⏭️ Skipping browser notification - user has browser notifications disabled`,
         );
         await this.markNotificationAsSent(notification.id, "skipped");
         return;
@@ -147,13 +149,13 @@ export class SimpleNotificationService {
         await this.sendEmailNotification(
           event,
           user,
-          notification.minutesBefore
+          notification.minutesBefore,
         );
       } else if (notification.notificationType === "browser") {
         await this.sendBrowserNotification(
           event,
           user,
-          notification.minutesBefore
+          notification.minutesBefore,
         );
       }
 
@@ -166,16 +168,16 @@ export class SimpleNotificationService {
         user.id,
         notification.notificationType,
         notification.minutesBefore,
-        "sent"
+        "sent",
       );
 
       console.log(
-        `✅ Successfully sent ${notification.notificationType} notification for event "${event.title}"`
+        `✅ Successfully sent ${notification.notificationType} notification for event "${event.title}"`,
       );
     } catch (error) {
       console.error(
         `❌ Failed to send notification for event "${event.title}":`,
-        error
+        error,
       );
 
       // Mark as failed but don't set isSent to true so it can be retried
@@ -184,7 +186,7 @@ export class SimpleNotificationService {
         user.id,
         notification.notificationType,
         notification.minutesBefore,
-        "failed"
+        "failed",
       );
     }
   }
@@ -197,10 +199,12 @@ export class SimpleNotificationService {
       category?: any;
     },
     user: User & { settings?: UserSettings | null },
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<void> {
     if (!resend) {
-      console.log(`⚠️ Resend not configured - skipping email notification for ${user.email}`);
+      console.log(
+        `⚠️ Resend not configured - skipping email notification for ${user.email}`,
+      );
       return;
     }
 
@@ -223,7 +227,7 @@ export class SimpleNotificationService {
       { ...event, user },
       timeUntilEvent,
       eventDate,
-      eventTime
+      eventTime,
     );
 
     const result = await resend.emails.send({
@@ -240,19 +244,19 @@ export class SimpleNotificationService {
   private async sendBrowserNotification(
     event: CalendarEvent,
     user: User,
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<void> {
     // For now, just log browser notifications
     // In a real implementation, you would send this via WebSocket or push notification
     console.log(
-      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}"`
+      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}"`,
     );
   }
 
   // Mark notification as sent
   private async markNotificationAsSent(
     notificationId: string,
-    status: string
+    status: string,
   ): Promise<void> {
     await prisma.eventNotification.update({
       where: { id: notificationId },
@@ -269,7 +273,7 @@ export class SimpleNotificationService {
     userId: string,
     notificationType: string,
     minutesBefore: number,
-    status: string
+    status: string,
   ): Promise<void> {
     try {
       await prisma.notificationLog.create({
@@ -317,13 +321,13 @@ export class SimpleNotificationService {
       notificationType: "email" | "browser";
       minutesBefore: number;
       isEnabled: boolean;
-    }>
+    }>,
   ): Promise<void> {
     try {
       const notificationData = notifications.map((notif) => {
         // Calculate the exact notification time
         const notificationTime = new Date(
-          eventStart.getTime() - notif.minutesBefore * 60 * 1000
+          eventStart.getTime() - notif.minutesBefore * 60 * 1000,
         );
 
         // Round down to the minute (no seconds)
@@ -334,7 +338,7 @@ export class SimpleNotificationService {
           notificationTime.getHours(),
           notificationTime.getMinutes(),
           0,
-          0
+          0,
         );
 
         return {
@@ -352,11 +356,11 @@ export class SimpleNotificationService {
       });
 
       console.log(
-        `✅ Created ${notificationData.length} notifications for event ${eventId}`
+        `✅ Created ${notificationData.length} notifications for event ${eventId}`,
       );
       notificationData.forEach((notif) => {
         console.log(
-          `   • ${notif.notificationType} notification ${notif.minutesBefore}min before at ${notif.notificationTime.toISOString()}`
+          `   • ${notif.notificationType} notification ${notif.minutesBefore}min before at ${notif.notificationTime.toISOString()}`,
         );
       });
     } catch (error) {
@@ -373,7 +377,7 @@ export class SimpleNotificationService {
       notificationType: "email" | "browser";
       minutesBefore: number;
       isEnabled: boolean;
-    }>
+    }>,
   ): Promise<void> {
     try {
       // Delete existing notifications for this event
@@ -386,7 +390,7 @@ export class SimpleNotificationService {
         await this.createNotificationsForEvent(
           eventId,
           eventStart,
-          notifications
+          notifications,
         );
       }
 
@@ -433,7 +437,7 @@ export class SimpleNotificationService {
   // Create a test event with notifications
   async createTestEvent(
     userId: string,
-    minutesFromNow: number = 3
+    minutesFromNow: number = 3,
   ): Promise<{ eventId: string; message: string }> {
     try {
       // Get user's default calendar
@@ -488,7 +492,7 @@ export class SimpleNotificationService {
         now.getHours(),
         now.getMinutes(),
         0,
-        0
+        0,
       );
 
       // Get pending notifications for the next hour
@@ -568,55 +572,60 @@ export class SimpleNotificationService {
     },
     timeUntilEvent: string,
     eventDate: string,
-    eventTime: string
+    eventTime: string,
   ): Promise<string> {
     // Get user's theme preference, default to light
     const userTheme = event.user.settings?.theme || "light";
-    const isDark = userTheme === "dark" || (userTheme === "system" && this.getSystemThemePreference());
+    const isDark =
+      userTheme === "dark" ||
+      (userTheme === "system" && this.getSystemThemePreference());
 
     // Define color schemes based on the app's CSS variables
-    const colors = isDark ? {
-      // Dark theme colors (converted from OKLCH to hex approximations)
-      background: "#2A2A2A",
-      foreground: "#F0F0F0", 
-      card: "#2A2A2A",
-      cardForeground: "#F0F0F0",
-      primary: "#E0E0E0",
-      primaryForeground: "#2A2A2A",
-      secondary: "#3A3A3A",
-      secondaryForeground: "#F0F0F0",
-      muted: "#3A3A3A",
-      mutedForeground: "#A0A0A0",
-      accent: "#A0A0A0",
-      accentForeground: "#1A1A1A",
-      border: "#3A3A3A",
-      ring: "#A0A0A0"
-    } : {
-      // Light theme colors (converted from OKLCH to hex approximations)
-      background: "#FEFEFE",
-      foreground: "#1A1A1A",
-      card: "#FEFEFE", 
-      cardForeground: "#1A1A1A",
-      primary: "#1A1A1A",
-      primaryForeground: "#FAFAFA",
-      secondary: "#F0F0F0",
-      secondaryForeground: "#1A1A1A",
-      muted: "#F0F0F0",
-      mutedForeground: "#808080",
-      accent: "#808080",
-      accentForeground: "#FAFAFA",
-      border: "#F0F0F0",
-      ring: "#808080"
-    };
+    const colors = isDark
+      ? {
+          // Dark theme colors (converted from OKLCH to hex approximations)
+          background: "#2A2A2A",
+          foreground: "#F0F0F0",
+          card: "#2A2A2A",
+          cardForeground: "#F0F0F0",
+          primary: "#E0E0E0",
+          primaryForeground: "#2A2A2A",
+          secondary: "#3A3A3A",
+          secondaryForeground: "#F0F0F0",
+          muted: "#3A3A3A",
+          mutedForeground: "#A0A0A0",
+          accent: "#A0A0A0",
+          accentForeground: "#1A1A1A",
+          border: "#3A3A3A",
+          ring: "#A0A0A0",
+        }
+      : {
+          // Light theme colors (converted from OKLCH to hex approximations)
+          background: "#FEFEFE",
+          foreground: "#1A1A1A",
+          card: "#FEFEFE",
+          cardForeground: "#1A1A1A",
+          primary: "#1A1A1A",
+          primaryForeground: "#FAFAFA",
+          secondary: "#F0F0F0",
+          secondaryForeground: "#1A1A1A",
+          muted: "#F0F0F0",
+          mutedForeground: "#808080",
+          accent: "#808080",
+          accentForeground: "#FAFAFA",
+          border: "#F0F0F0",
+          ring: "#808080",
+        };
 
-    const categoryColor = event.category?.color || event.calendar?.color || "primary";
+    const categoryColor =
+      event.category?.color || event.calendar?.color || "primary";
     const getCategoryAccentColor = (color: string) => {
       const colorMap: Record<string, string> = {
         blue: isDark ? "#3B82F6" : "#2563EB",
-        orange: isDark ? "#F97316" : "#EA580C", 
+        orange: isDark ? "#F97316" : "#EA580C",
         violet: isDark ? "#8B5CF6" : "#7C3AED",
         rose: isDark ? "#F43F5E" : "#E11D48",
-        emerald: isDark ? "#10B981" : "#059669"
+        emerald: isDark ? "#10B981" : "#059669",
       };
       return colorMap[color] || colors.accent;
     };
@@ -825,7 +834,9 @@ export class SimpleNotificationService {
                     <span class="detail-value">${eventTime}</span>
                   </div>
                   
-                  ${event.location ? `
+                  ${
+                    event.location
+                      ? `
                     <div class="detail-row">
                       <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
@@ -834,9 +845,13 @@ export class SimpleNotificationService {
                       <span class="detail-label">Location:</span>
                       <span class="detail-value">${event.location}</span>
                     </div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                   
-                  ${event.category ? `
+                  ${
+                    event.category
+                      ? `
                     <div class="detail-row">
                       <svg class="detail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
@@ -844,14 +859,20 @@ export class SimpleNotificationService {
                       <span class="detail-label">Category:</span>
                       <span class="detail-value">${event.category.name}</span>
                     </div>
-                  ` : ""}
+                  `
+                      : ""
+                  }
                 </div>
                 
-                ${event.description ? `
+                ${
+                  event.description
+                    ? `
                   <div class="description">
-                    ${event.description.replace(/\n/g, '<br/>')}
+                    ${event.description.replace(/\n/g, "<br/>")}
                   </div>
-                ` : ""}
+                `
+                    : ""
+                }
               </div>
             </div>
             
