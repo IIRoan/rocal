@@ -2,6 +2,7 @@
 export * from "./ui";
 export * from "./layout";
 export * from "./navigation";
+export * from "./landing";
 
 // Calendar exports (avoiding conflicts)
 export { AgendaView } from "./calendar/agenda-view";
