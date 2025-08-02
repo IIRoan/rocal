@@ -6,7 +6,6 @@ import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { CommandPalette } from "@/components/command-palette";
-import { NotificationBanner } from "@/components/notification-banner";
 import { SettingsProvider } from "@/components/settings-provider";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/hooks/use-command-palette";
@@ -14,7 +13,8 @@ import { useCommandPalette } from "@/hooks/use-command-palette";
 function DashboardContent() {
   const { data: session, isPending } = useSession();
   const calendarData = useCalendarData({ autoRefetch: true });
-  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
+  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
+    useCommandPalette();
 
   const handleLogout = async () => {
     try {
@@ -68,11 +68,13 @@ function DashboardContent() {
             onOpenSettings={() => setCommandPaletteOpen(true)}
           />
           <SidebarInset className="overflow-hidden">
-            <NotificationBanner />
             <CalendarWithData />
           </SidebarInset>
         </SidebarProvider>
-        <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+        <CommandPalette
+          open={commandPaletteOpen}
+          onOpenChange={setCommandPaletteOpen}
+        />
       </CalendarProvider>
     </SettingsProvider>
   );
