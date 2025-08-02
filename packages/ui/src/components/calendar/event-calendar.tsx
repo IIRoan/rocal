@@ -539,8 +539,8 @@ export function EventCalendar({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <p className="text-red-600 mb-2">Failed to load calendar</p>
-          <p className="text-sm text-gray-500">{error.message}</p>
+          <p className="text-destructive mb-2">Failed to load calendar</p>
+          <p className="text-sm text-muted-foreground">{error.message}</p>
           <Button
             variant="outline"
             className="mt-4"

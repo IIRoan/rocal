@@ -52,7 +52,6 @@ export function NotificationManager({
   loading = false,
   defaultReminder = null,
 }: NotificationManagerProps) {
-
   const handleAddNotification = () => {
     const newNotification: EventNotification = {
       notificationType: "email",
@@ -77,7 +76,6 @@ export function NotificationManager({
     );
     onChange(updated);
   };
-
 
   const formatMinutesToReadable = (minutes: number): string => {
     if (minutes < 60) {
@@ -106,19 +104,19 @@ export function NotificationManager({
 
       {/* Default notification indicator */}
       {defaultReminder && (
-        <div className="flex items-center gap-2 p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-          <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <div className="flex items-center gap-2 p-3 border rounded-lg bg-info-bg border-info-border">
+          <Mail className="h-4 w-4 text-info" />
           <div className="flex-1">
-            <div className="text-sm font-medium text-blue-900 dark:text-blue-100">
+            <div className="text-sm font-medium text-info-foreground">
               Default Email Reminder
             </div>
-            <div className="text-xs text-blue-700 dark:text-blue-300">
+            <div className="text-xs text-info">
               {formatMinutesToReadable(defaultReminder)} before the event
             </div>
           </div>
           <Badge
             variant="outline"
-            className="text-xs border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
+            className="text-xs border-info-border text-info"
           >
             Auto
           </Badge>

@@ -50,7 +50,12 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onOpenSettings?: () => void;
 }
 
-export function AppSidebar({ user, onLogout, onOpenSettings, ...props }: AppSidebarProps) {
+export function AppSidebar({
+  user,
+  onLogout,
+  onOpenSettings,
+  ...props
+}: AppSidebarProps) {
   const {
     calendars,
     addCalendar,
@@ -209,10 +214,10 @@ export function AppSidebar({ user, onLogout, onOpenSettings, ...props }: AppSide
                         </label>
                       </span>
                       <span
-                        className="size-1.5 rounded-full bg-(--event-color)"
+                        className="size-1.5 rounded-full"
                         style={
                           {
-                            "--event-color": `var(--color-${calendar.color}-400)`,
+                            backgroundColor: `var(--color-event-${calendar.color || "default"})`,
                           } as React.CSSProperties
                         }
                       ></span>

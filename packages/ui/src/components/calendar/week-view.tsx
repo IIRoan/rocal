@@ -62,14 +62,21 @@ export function WeekView({
   timezone,
 }: WeekViewProps) {
   const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const weekStart = startOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    const weekEnd = endOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
     return eachDayOfInterval({ start: weekStart, end: weekEnd });
   }, [currentDate, weekStartDay]);
 
   const weekStart = useMemo(
-    () => startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 }),
-    [currentDate, weekStartDay],
+    () =>
+      startOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      }),
+    [currentDate, weekStartDay]
   );
 
   const hours = useMemo(() => {
@@ -94,7 +101,7 @@ export function WeekView({
           (day) =>
             isSameDay(day, eventStart) ||
             isSameDay(day, eventEnd) ||
-            (day > eventStart && day < eventEnd),
+            (day > eventStart && day < eventEnd)
         );
       });
   }, [events, days]);
@@ -179,8 +186,8 @@ export function WeekView({
                 {
                   start: new Date(c.event.start),
                   end: new Date(c.event.end),
-                },
-              ),
+                }
+              )
             );
             if (!overlaps) {
               placed = true;
@@ -224,7 +231,7 @@ export function WeekView({
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "week",
-    timezone,
+    timezone
   );
 
   return (
@@ -236,12 +243,13 @@ export function WeekView({
         {days.map((day) => (
           <div
             key={day.toString()}
-            className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 py-2 text-center text-xs hover:bg-[var(--warm-accent-1)] hover:text-foreground transition-colors duration-200 ${
-              workingDays.includes(day.getDay()) 
-                ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
-                : !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay())
-                ? "bg-[var(--warm-accent-1)]/30"
-                : ""
+            className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 py-2 text-center text-xs ${
+              workingDays.includes(day.getDay())
+                ? "bg-[var(--calendar-workday)]"
+                : !workingDays.includes(day.getDay()) &&
+                    [0, 6].includes(day.getDay())
+                  ? "bg-[var(--calendar-weekend)]"
+                  : ""
             }`}
             data-today={isToday(day) || undefined}
           >
@@ -275,10 +283,13 @@ export function WeekView({
               return (
                 <div
                   key={day.toString()}
-                  className={`border-border/70 relative border-r p-1 last:border-r-0 hover:bg-[var(--warm-accent-1)]/20 transition-colors duration-150 ${
-                    workingDays.includes(day.getDay()) 
-                      ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
-                      : ""
+                  className={`border-border/70 relative border-r p-1 last:border-r-0 ${
+                    workingDays.includes(day.getDay())
+                      ? "bg-[var(--calendar-workday)]"
+                      : !workingDays.includes(day.getDay()) &&
+                          [0, 6].includes(day.getDay())
+                        ? "bg-[var(--calendar-weekend)]"
+                        : ""
                   }`}
                   data-today={isToday(day) || undefined}
                 >
@@ -306,7 +317,7 @@ export function WeekView({
                         <div
                           className={cn(
                             "truncate",
-                            !shouldShowTitle && "invisible",
+                            !shouldShowTitle && "invisible"
                           )}
                           aria-hidden={!shouldShowTitle}
                         >
@@ -341,12 +352,13 @@ export function WeekView({
         {days.map((day, dayIndex) => (
           <div
             key={day.toString()}
-            className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr hover:bg-[var(--warm-accent-1)]/10 transition-colors duration-200 ${
-              workingDays.includes(day.getDay()) 
-                ? "bg-[var(--working-day)] dark:bg-[var(--working-day-dark)]" 
-                : !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay())
-                ? "bg-[var(--warm-accent-1)]/20"
-                : ""
+            className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
+              workingDays.includes(day.getDay())
+                ? "bg-[var(--calendar-workday)]"
+                : !workingDays.includes(day.getDay()) &&
+                    [0, 6].includes(day.getDay())
+                  ? "bg-[var(--calendar-weekend)]"
+                  : ""
             }`}
             data-today={isToday(day) || undefined}
           >
@@ -413,7 +425,7 @@ export function WeekView({
                           quarter === 2 &&
                             "top-[calc(var(--week-cells-height)/4*2)]",
                           quarter === 3 &&
-                            "top-[calc(var(--week-cells-height)/4*3)]",
+                            "top-[calc(var(--week-cells-height)/4*3)]"
                         )}
                         onClick={() => {
                           const startTime = new Date(day);
