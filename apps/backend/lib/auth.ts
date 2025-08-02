@@ -6,6 +6,19 @@ import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
 
+// Extract RP ID from NEXT_PUBLIC_APP_URL
+const getPasskeyConfig = () => {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const url = new URL(appUrl);
+  
+  return {
+    rpID: url.hostname,
+    origin: appUrl,
+  };
+};
+
+const passkeyConfig = getPasskeyConfig();
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -26,11 +39,9 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),
     passkey({
-      rpID: process.env.NODE_ENV === "production" ? "your-domain.com" : "localhost",
+      rpID: passkeyConfig.rpID,
       rpName: "Rocani",
-      origin: process.env.NODE_ENV === "production" 
-        ? "https://your-domain.com" 
-        : "http://localhost:3000",
+      origin: passkeyConfig.origin,
     }),
   ],
 }) as any;
