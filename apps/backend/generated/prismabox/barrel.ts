@@ -11,5 +11,6 @@ export * from "./CalendarSharing";
 export * from "./RecurrenceException";
 export * from "./EventNotification";
 export * from "./NotificationLog";
+export * from "./Passkey";
 export * from "./__nullable__";
 export * from "./__transformDate__";

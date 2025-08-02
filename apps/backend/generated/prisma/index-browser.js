@@ -285,6 +285,20 @@ exports.Prisma.NotificationLogScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.PasskeyScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  publicKey: 'publicKey',
+  userId: 'userId',
+  credentialID: 'credentialID',
+  counter: 'counter',
+  deviceType: 'deviceType',
+  backedUp: 'backedUp',
+  transports: 'transports',
+  createdAt: 'createdAt',
+  aaguid: 'aaguid'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -314,7 +328,8 @@ exports.Prisma.ModelName = {
   CalendarSharing: 'CalendarSharing',
   RecurrenceException: 'RecurrenceException',
   EventNotification: 'EventNotification',
-  NotificationLog: 'NotificationLog'
+  NotificationLog: 'NotificationLog',
+  Passkey: 'Passkey'
 };
 
 /**
