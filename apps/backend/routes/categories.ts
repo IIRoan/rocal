@@ -34,7 +34,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
     },
     {
       auth: true,
-    },
+    }
   )
 
   .post(
@@ -47,10 +47,14 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         throw new Error("Name and color are required fields");
       }
 
-      // Validate color against allowed values
+      // Validate color against allowed values (allow predefined colors or hex colors)
       const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-      if (!allowedColors.includes(color)) {
-        throw new Error(`Color must be one of: ${allowedColors.join(", ")}`);
+      const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
+
+      if (!allowedColors.includes(color) && !isHexColor) {
+        throw new Error(
+          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`
+        );
       }
 
       // Check for name uniqueness per user
@@ -82,7 +86,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.String(),
         color: t.String(),
       }),
-    },
+    }
   )
 
   .put(
@@ -103,11 +107,17 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         throw new Error("Category not found or access denied");
       }
 
-      // Validate color if provided
+      // Validate color if provided (allow predefined colors or hex colors)
       if (updates.color) {
         const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-        if (!allowedColors.includes(updates.color)) {
-          throw new Error(`Color must be one of: ${allowedColors.join(", ")}`);
+        const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
+          updates.color
+        );
+
+        if (!allowedColors.includes(updates.color) && !isHexColor) {
+          throw new Error(
+            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`
+          );
         }
       }
 
@@ -146,7 +156,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
       }),
-    },
+    }
   )
 
   .delete(
@@ -189,5 +199,5 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       params: t.Object({
         id: t.String(),
       }),
-    },
+    }
   );

@@ -61,7 +61,7 @@ export interface UseCalendarDataReturn {
   // Actions
   refetch: () => Promise<void>;
   refetchEvents: (dateRange?: DateRange) => Promise<void>;
-  refetchCalendars: () => Promise<void>;
+  refetchCalendars: () => Promise<Calendar[]>;
   refetchCategories: () => Promise<void>;
 
   // CRUD operations
@@ -406,11 +406,12 @@ export function useCalendarData(
     [currentDateRange, getCacheKey, fetchEvents],
   );
 
-  const refetchCalendars = useCallback(async (): Promise<void> => {
+  const refetchCalendars = useCallback(async (): Promise<Calendar[]> => {
     // Clear cache
     calendarsCache.current = null;
     await fetchCalendars();
-  }, [fetchCalendars]);
+    return calendars;
+  }, [fetchCalendars, calendars]);
 
   const refetchCategories = useCallback(async (): Promise<void> => {
     // Clear cache
