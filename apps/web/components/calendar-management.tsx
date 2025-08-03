@@ -80,7 +80,7 @@ export function CalendarManagement({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [deletingCalendar, setDeletingCalendar] = useState<Calendar | null>(
-    null
+    null,
   );
   const [deleteAction, setDeleteAction] =
     useState<CalendarDeleteAction>("prevent");
@@ -125,7 +125,7 @@ export function CalendarManagement({
 
   const handleUpdateCalendar = async (
     calendar: Calendar,
-    updates: Partial<UpdateCalendarRequest>
+    updates: Partial<UpdateCalendarRequest>,
   ) => {
     setLoading(true);
     setError(null);
@@ -150,7 +150,7 @@ export function CalendarManagement({
       await calendarApiService.deleteCalendarAdvanced(
         deletingCalendar.id,
         deleteAction,
-        targetCalendarId || undefined
+        targetCalendarId || undefined,
       );
 
       await refetchCalendars();
@@ -174,7 +174,7 @@ export function CalendarManagement({
   };
 
   const availableTargetCalendars = calendars.filter(
-    (c) => c.id !== deletingCalendar?.id
+    (c) => c.id !== deletingCalendar?.id,
   );
 
   return (

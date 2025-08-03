@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { 
-  Calendar, 
-  Users, 
-  Zap, 
-  Shield, 
-  Globe, 
+import {
+  Calendar,
+  Users,
+  Zap,
+  Shield,
+  Globe,
   BarChart3,
   Smartphone,
   Clock,
-  CheckCircle
+  CheckCircle,
 } from "lucide-react";
 
 import { Card, CardContent } from "../ui/card";
@@ -20,56 +20,64 @@ const features = [
   {
     icon: Calendar,
     title: "Intelligent Scheduling",
-    description: "AI-powered scheduling that learns your preferences and finds the perfect time for everyone.",
+    description:
+      "AI-powered scheduling that learns your preferences and finds the perfect time for everyone.",
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
   {
     icon: Users,
     title: "Team Collaboration",
-    description: "Share calendars, create team events, and coordinate with colleagues seamlessly.",
+    description:
+      "Share calendars, create team events, and coordinate with colleagues seamlessly.",
     color: "text-accent",
     bgColor: "bg-accent/10",
   },
   {
     icon: Zap,
     title: "Quick Actions",
-    description: "Create events, reschedule meetings, and manage your time with lightning-fast shortcuts.",
+    description:
+      "Create events, reschedule meetings, and manage your time with lightning-fast shortcuts.",
     color: "text-[var(--chart-2)]",
     bgColor: "bg-[var(--chart-2)]/10",
   },
   {
     icon: Shield,
     title: "Privacy & Security",
-    description: "Enterprise-grade security with end-to-end encryption and granular privacy controls.",
+    description:
+      "Enterprise-grade security with end-to-end encryption and granular privacy controls.",
     color: "text-success",
     bgColor: "bg-success/10",
   },
   {
     icon: Globe,
     title: "Global Time Zones",
-    description: "Automatic timezone detection and conversion for seamless international collaboration.",
+    description:
+      "Automatic timezone detection and conversion for seamless international collaboration.",
     color: "text-[var(--chart-3)]",
     bgColor: "bg-[var(--chart-3)]/10",
   },
   {
     icon: BarChart3,
     title: "Time Analytics",
-    description: "Detailed insights into how you spend your time with actionable recommendations.",
+    description:
+      "Detailed insights into how you spend your time with actionable recommendations.",
     color: "text-[var(--chart-4)]",
     bgColor: "bg-[var(--chart-4)]/10",
   },
   {
     icon: Smartphone,
     title: "Mobile First",
-    description: "Native mobile apps with full feature parity and offline synchronization.",
+    description:
+      "Native mobile apps with full feature parity and offline synchronization.",
     color: "text-[var(--chart-5)]",
     bgColor: "bg-[var(--chart-5)]/10",
   },
   {
     icon: Clock,
     title: "Smart Reminders",
-    description: "Contextual notifications that adapt to your schedule and location.",
+    description:
+      "Contextual notifications that adapt to your schedule and location.",
     color: "text-warning",
     bgColor: "bg-warning/10",
   },
@@ -92,21 +100,24 @@ export function FeaturesSection() {
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Rocani brings together powerful scheduling tools, intelligent automation, 
-            and seamless collaboration in one beautiful calendar experience.
+            Rocani brings together powerful scheduling tools, intelligent
+            automation, and seamless collaboration in one beautiful calendar
+            experience.
           </p>
         </div>
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
-            <Card 
-              key={feature.title} 
+            <Card
+              key={feature.title}
               className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card/50 backdrop-blur-sm border-border/50"
             >
               <CardContent className="p-6">
                 <div className="flex flex-col items-start gap-4">
-                  <div className={`p-3 rounded-lg ${feature.bgColor} group-hover:scale-110 transition-transform duration-300`}>
+                  <div
+                    className={`p-3 rounded-lg ${feature.bgColor} group-hover:scale-110 transition-transform duration-300`}
+                  >
                     <feature.icon className={`h-6 w-6 ${feature.color}`} />
                   </div>
                   <div className="space-y-2">

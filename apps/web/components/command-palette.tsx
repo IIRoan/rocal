@@ -186,7 +186,7 @@ export function CommandPalette({
 
   // Event editor state
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
+    null,
   );
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
@@ -250,7 +250,7 @@ export function CommandPalette({
 
   const updateSetting = async <K extends keyof UserSettings>(
     key: K,
-    value: UserSettings[K]
+    value: UserSettings[K],
   ) => {
     if (!localSettings || saving) return;
 
@@ -444,7 +444,7 @@ export function CommandPalette({
     }
 
     const selectedCalendar = calendars.find(
-      (cal) => cal.id === eventCalendarId
+      (cal) => cal.id === eventCalendarId,
     );
     const calendarColor = selectedCalendar?.color || "blue";
 
@@ -735,7 +735,7 @@ export function CommandPalette({
               onSelect={() =>
                 updateSetting(
                   "emailNotifications",
-                  !localSettings.emailNotifications
+                  !localSettings.emailNotifications,
                 )
               }
               className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
@@ -774,7 +774,7 @@ export function CommandPalette({
                   onChange={(e) =>
                     updateSetting(
                       "defaultReminder",
-                      e.target.value ? parseInt(e.target.value) : null
+                      e.target.value ? parseInt(e.target.value) : null,
                     )
                   }
                   placeholder="No default reminder"
@@ -815,7 +815,7 @@ export function CommandPalette({
                 <span className="text-foreground">Timezone</span>
                 <span className="text-xs text-muted-foreground">
                   {ALL_TIMEZONES.find(
-                    (tz) => tz.value === localSettings.timezone
+                    (tz) => tz.value === localSettings.timezone,
                   )?.label || localSettings.timezone}
                 </span>
               </div>
@@ -879,7 +879,7 @@ export function CommandPalette({
                   tz.label
                     .toLowerCase()
                     .includes(timezoneSearch.toLowerCase()) ||
-                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
+                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase()),
               )
                 .slice(0, 20)
                 .map((tz) => (
@@ -984,7 +984,7 @@ export function CommandPalette({
                   }
                   updateSetting(
                     "workingDays",
-                    JSON.stringify(currentWorkingDays.sort())
+                    JSON.stringify(currentWorkingDays.sort()),
                   );
                 }}
                 className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"

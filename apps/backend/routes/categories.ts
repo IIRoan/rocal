@@ -34,7 +34,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
     },
     {
       auth: true,
-    }
+    },
   )
 
   .post(
@@ -53,7 +53,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
 
       if (!allowedColors.includes(color) && !isHexColor) {
         throw new Error(
-          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`
+          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
         );
       }
 
@@ -86,7 +86,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.String(),
         color: t.String(),
       }),
-    }
+    },
   )
 
   .put(
@@ -111,12 +111,12 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       if (updates.color) {
         const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
         const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-          updates.color
+          updates.color,
         );
 
         if (!allowedColors.includes(updates.color) && !isHexColor) {
           throw new Error(
-            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`
+            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
           );
         }
       }
@@ -156,7 +156,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
       }),
-    }
+    },
   )
 
   .delete(
@@ -199,5 +199,5 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       params: t.Object({
         id: t.String(),
       }),
-    }
+    },
   );

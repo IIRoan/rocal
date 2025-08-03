@@ -22,7 +22,10 @@ export function HeroSection() {
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-32 text-center">
         {/* Announcement Badge */}
         <div className="flex justify-center mb-8">
-          <Badge variant="secondary" className="rounded-full px-4 py-2 text-sm font-medium">
+          <Badge
+            variant="secondary"
+            className="rounded-full px-4 py-2 text-sm font-medium"
+          >
             ✨ Now with AI-powered scheduling
           </Badge>
         </div>
@@ -38,19 +41,27 @@ export function HeroSection() {
 
         {/* Subtitle */}
         <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
-          Experience the future of scheduling with intelligent automation, 
-          seamless collaboration, and calendar insights that adapt to your workflow.
+          Experience the future of scheduling with intelligent automation,
+          seamless collaboration, and calendar insights that adapt to your
+          workflow.
         </p>
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
           <Link href="/dashboard">
-            <Button size="lg" className="rounded-full px-8 py-4 text-lg font-medium shadow-lg group">
+            <Button
+              size="lg"
+              className="rounded-full px-8 py-4 text-lg font-medium shadow-lg group"
+            >
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
-          <Button variant="outline" size="lg" className="rounded-full px-8 py-4 text-lg font-medium">
+          <Button
+            variant="outline"
+            size="lg"
+            className="rounded-full px-8 py-4 text-lg font-medium"
+          >
             View Demo
           </Button>
         </div>
@@ -71,7 +82,9 @@ export function HeroSection() {
             <div className="p-3 rounded-full bg-accent/10">
               <Users className="h-6 w-6 text-accent" />
             </div>
-            <h3 className="font-semibold text-foreground">Team Collaboration</h3>
+            <h3 className="font-semibold text-foreground">
+              Team Collaboration
+            </h3>
             <p className="text-sm text-muted-foreground text-center">
               Share calendars and coordinate with your team effortlessly
             </p>

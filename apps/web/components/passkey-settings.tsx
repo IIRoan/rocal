@@ -75,7 +75,7 @@ export function PasskeySettings({
       // Ensure data is an array and filter out any invalid entries
       const validPasskeys = Array.isArray(data)
         ? data.filter(
-            (passkey) => passkey && typeof passkey === "object" && passkey.id
+            (passkey) => passkey && typeof passkey === "object" && passkey.id,
           )
         : [];
       setPasskeys(validPasskeys);
@@ -112,13 +112,13 @@ export function PasskeySettings({
           await authClient.passkey.listUserPasskeys();
         const validPasskeys = Array.isArray(refreshedData)
           ? refreshedData.filter(
-              (passkey) => passkey && typeof passkey === "object" && passkey.id
+              (passkey) => passkey && typeof passkey === "object" && passkey.id,
             )
           : [];
 
         // Check if the passkey was actually added by looking for it in the refreshed list
         const wasAdded = validPasskeys.some(
-          (passkey) => passkey && passkey.name === passkeyNameToAdd
+          (passkey) => passkey && passkey.name === passkeyNameToAdd,
         );
 
         if (wasAdded) {
@@ -151,12 +151,12 @@ export function PasskeySettings({
           await authClient.passkey.listUserPasskeys();
         const validPasskeys = Array.isArray(refreshedData)
           ? refreshedData.filter(
-              (passkey) => passkey && typeof passkey === "object" && passkey.id
+              (passkey) => passkey && typeof passkey === "object" && passkey.id,
             )
           : [];
 
         const wasAdded = validPasskeys.some(
-          (passkey) => passkey && passkey.name === passkeyNameToAdd
+          (passkey) => passkey && passkey.name === passkeyNameToAdd,
         );
 
         if (wasAdded) {
@@ -178,7 +178,6 @@ export function PasskeySettings({
 
   const deletePasskey = async (id: string) => {
     try {
-
       const { error } = await authClient.passkey.deletePasskey({ id });
 
       if (error) {
@@ -204,7 +203,6 @@ export function PasskeySettings({
         <h2 className="text-lg font-semibold text-foreground">Passkeys</h2>
       </div>
       <CommandList>
-
         {!showAddPasskey ? (
           <CommandGroup heading="Actions">
             <CommandItem

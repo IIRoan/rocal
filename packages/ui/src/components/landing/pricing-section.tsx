@@ -20,10 +20,10 @@ const plans = [
       "Basic scheduling",
       "Mobile app access",
       "Email notifications",
-      "1GB storage"
+      "1GB storage",
     ],
     cta: "Get Started",
-    href: "/dashboard"
+    href: "/dashboard",
   },
   {
     name: "Professional",
@@ -38,10 +38,10 @@ const plans = [
       "Advanced analytics",
       "Priority support",
       "10GB storage",
-      "Custom integrations"
+      "Custom integrations",
     ],
     cta: "Start Free Trial",
-    href: "/dashboard"
+    href: "/dashboard",
   },
   {
     name: "Team",
@@ -57,11 +57,11 @@ const plans = [
       "Custom branding",
       "100GB storage",
       "24/7 phone support",
-      "SLA guarantee"
+      "SLA guarantee",
     ],
     cta: "Contact Sales",
-    href: "/contact"
-  }
+    href: "/contact",
+  },
 ];
 
 export function PricingSection() {
@@ -81,7 +81,7 @@ export function PricingSection() {
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Start free and scale as you grow. No hidden fees, no surprises. 
+            Start free and scale as you grow. No hidden fees, no surprises.
             Cancel anytime with full data export.
           </p>
         </div>
@@ -89,12 +89,12 @@ export function PricingSection() {
         {/* Pricing Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
-            <Card 
+            <Card
               key={plan.name}
               className={`relative group hover:shadow-xl transition-all duration-300 ${
-                plan.popular 
-                  ? 'ring-2 ring-primary scale-105 shadow-lg' 
-                  : 'hover:-translate-y-1'
+                plan.popular
+                  ? "ring-2 ring-primary scale-105 shadow-lg"
+                  : "hover:-translate-y-1"
               } bg-card/50 backdrop-blur-sm border-border/50`}
             >
               {plan.popular && (
@@ -105,14 +105,20 @@ export function PricingSection() {
                   </Badge>
                 </div>
               )}
-              
+
               <CardHeader className="pb-6">
                 <div className="space-y-4">
-                  <h3 className="text-2xl font-bold text-foreground">{plan.name}</h3>
+                  <h3 className="text-2xl font-bold text-foreground">
+                    {plan.name}
+                  </h3>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-foreground">{plan.price}</span>
+                    <span className="text-4xl font-bold text-foreground">
+                      {plan.price}
+                    </span>
                     {plan.price !== "Free" && (
-                      <span className="text-muted-foreground">/{plan.period}</span>
+                      <span className="text-muted-foreground">
+                        /{plan.period}
+                      </span>
                     )}
                   </div>
                   <p className="text-muted-foreground">{plan.description}</p>
@@ -124,17 +130,19 @@ export function PricingSection() {
                   {plan.features.map((feature, featureIndex) => (
                     <li key={featureIndex} className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-sm text-muted-foreground">{feature}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {feature}
+                      </span>
                     </li>
                   ))}
                 </ul>
 
                 <Link href={plan.href} className="block">
-                  <Button 
+                  <Button
                     className={`w-full rounded-lg font-medium py-3 group ${
-                      plan.popular 
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                        : ''
+                      plan.popular
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : ""
                     }`}
                     variant={plan.popular ? "default" : "outline"}
                   >

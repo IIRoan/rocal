@@ -111,15 +111,17 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
   const transformedEvents = useMemo(() => {
     // Create a map of calendar IDs to calendar objects for quick lookup
-    const calendarMap = new Map(calendarData.calendars.map(cal => [cal.id, cal]));
-    
+    const calendarMap = new Map(
+      calendarData.calendars.map((cal) => [cal.id, cal]),
+    );
+
     const transformedEventsList = calendarData.events
       .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup
       .map((event) => {
         // Use event's color if it exists, otherwise fall back to calendar color
         const calendar = calendarMap.get(event.calendarId);
         const eventColor = event.color || calendar?.color || undefined;
-        
+
         return {
           ...event,
           description: event.description ?? undefined,
@@ -143,7 +145,8 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   }
 
   // Early return optimized calendar with loading states
-  const isInitialLoad = calendarData.loading && calendarData.events.length === 0;
+  const isInitialLoad =
+    calendarData.loading && calendarData.events.length === 0;
 
   return (
     <EventCalendar
@@ -152,7 +155,9 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       events={transformedEvents}
       categories={calendarData.categories}
       loading={isInitialLoad} // Only show loading for initial load
-      eventsLoading={calendarData.eventsLoading && calendarData.events.length === 0} // Optimize loading state
+      eventsLoading={
+        calendarData.eventsLoading && calendarData.events.length === 0
+      } // Optimize loading state
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}
