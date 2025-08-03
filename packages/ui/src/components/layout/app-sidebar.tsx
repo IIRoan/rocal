@@ -24,13 +24,7 @@ import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
+import { ColorPicker } from "../ui/color-picker";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +59,7 @@ export function AppSidebar({
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [newCalendarName, setNewCalendarName] = React.useState("");
   const [newCalendarColor, setNewCalendarColor] =
-    React.useState<EventColor>("blue");
+    React.useState<string>("#3b82f6");
 
   const handleCreateCalendar = () => {
     if (newCalendarName.trim()) {
@@ -75,17 +69,24 @@ export function AppSidebar({
       };
       addCalendar(calendarData);
       setNewCalendarName("");
-      setNewCalendarColor("blue");
+      setNewCalendarColor("#3b82f6");
       setIsDialogOpen(false);
     }
   };
 
-  const colorOptions: { value: EventColor; label: string }[] = [
-    { value: "blue", label: "Blue" },
-    { value: "emerald", label: "Green" },
-    { value: "orange", label: "Orange" },
-    { value: "violet", label: "Purple" },
-    { value: "rose", label: "Pink" },
+  const presetColors = [
+    "#3b82f6", // blue
+    "#10b981", // emerald
+    "#f59e0b", // orange
+    "#8b5cf6", // violet
+    "#f43f5e", // rose
+    "#ef4444", // red
+    "#06b6d4", // cyan
+    "#84cc16", // lime
+    "#f97316", // orange-500
+    "#6366f1", // indigo
+    "#ec4899", // pink
+    "#14b8a6", // teal
   ];
 
   return (
@@ -142,31 +143,11 @@ export function AppSidebar({
                     >
                       Color
                     </label>
-                    <Select
+                    <ColorPicker
                       value={newCalendarColor}
-                      onValueChange={(value: EventColor) =>
-                        setNewCalendarColor(value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {colorOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="size-3 rounded-full"
-                                style={{
-                                  backgroundColor: `var(--color-${option.value}-400)`,
-                                }}
-                              />
-                              {option.label}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={setNewCalendarColor}
+                      presetColors={presetColors}
+                    />
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
                     <Button
@@ -215,11 +196,11 @@ export function AppSidebar({
                       </span>
                       <span
                         className="size-1.5 rounded-full"
-                        style={
-                          {
-                            backgroundColor: `var(--color-event-${calendar.color || "default"})`,
-                          } as React.CSSProperties
-                        }
+                        style={{
+                          backgroundColor: calendar.color?.startsWith("#")
+                            ? calendar.color
+                            : `var(--color-event-${calendar.color || "default"})`,
+                        }}
                       ></span>
                     </span>
                   </SidebarMenuButton>

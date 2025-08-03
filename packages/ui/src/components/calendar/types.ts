@@ -48,4 +48,10 @@ export interface CreateEventData {
   reminder?: number | null;
 }
 
-export type EventColor = "blue" | "orange" | "violet" | "rose" | "emerald";
+export type EventColor =
+  | "blue"
+  | "orange"
+  | "violet"
+  | "rose"
+  | "emerald"
+  | string;
