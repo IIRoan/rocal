@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { RiCheckLine, RiAddLine } from "@remixicon/react";
+import { RiCheckLine, RiAddLine, RiSettings3Line } from "@remixicon/react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CreateCalendarData, EventColor } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -42,12 +42,14 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   };
   onLogout?: () => void;
   onOpenSettings?: () => void;
+  onOpenCalendarManagement?: () => void;
 }
 
 export function AppSidebar({
   user,
   onLogout,
   onOpenSettings,
+  onOpenCalendarManagement,
   ...props
 }: AppSidebarProps) {
   const {
@@ -108,12 +110,22 @@ export function AppSidebar({
             <SidebarGroupLabel className="uppercase text-muted-foreground/65">
               Calendars
             </SidebarGroupLabel>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                  <RiAddLine size={14} />
-                </Button>
-              </DialogTrigger>
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 w-6 p-0"
+                onClick={onOpenCalendarManagement}
+                title="Calendar Settings"
+              >
+                <RiSettings3Line size={14} />
+              </Button>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <RiAddLine size={14} />
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Create New Calendar</DialogTitle>
@@ -162,7 +174,8 @@ export function AppSidebar({
                   </div>
                 </div>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
           <SidebarGroupContent>
             <SidebarMenu>

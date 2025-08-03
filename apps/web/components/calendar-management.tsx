@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useCommandPalette } from "@/components/command-palette-context";
 import type {
   Calendar,
   CreateCalendarRequest,
@@ -48,6 +49,7 @@ import {
   MoveRight,
   AlertCircle,
   CheckCircle,
+  Settings,
 } from "lucide-react";
 
 const PRESET_COLORS = [
@@ -76,6 +78,7 @@ export function CalendarManagement({
 }: CalendarManagementProps) {
   const { calendars, refetchCalendars, updateCalendar, createCalendar } =
     useCalendarData();
+  const { openCalendarManagement } = useCommandPalette();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
@@ -95,15 +98,55 @@ export function CalendarManagement({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    color?: string;
+    general?: string;
+  }>({});
+
+  const validateCalendarForm = () => {
+    const errors: { name?: string; color?: string; general?: string } = {};
+    
+    // Check if name is empty
+    if (!newCalendar.name.trim()) {
+      errors.name = "Calendar name is required";
+    }
+    
+    // Check name length
+    if (newCalendar.name.trim().length > 100) {
+      errors.name = "Calendar name cannot exceed 100 characters";
+    }
+    
+    // Check for duplicate names (case-insensitive)
+    const existingNames = calendars.map(cal => cal.name.toLowerCase());
+    if (existingNames.includes(newCalendar.name.trim().toLowerCase())) {
+      errors.name = "A calendar with this name already exists";
+    }
+    
+    // Validate color format
+    const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(newCalendar.color);
+    const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
+    if (!allowedColors.includes(newCalendar.color) && !isHexColor) {
+      errors.color = "Please select a valid color";
+    }
+    
+    return errors;
+  };
 
   const handleCreateCalendar = async () => {
-    if (!newCalendar.name.trim()) {
-      setError("Calendar name is required");
+    // Clear any previous errors
+    setError(null);
+    setValidationErrors({});
+    setSuccess(null);
+
+    // Validate form
+    const errors = validateCalendarForm();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       return;
     }
 
     setLoading(true);
-    setError(null);
 
     try {
       const calendarData: CreateCalendarRequest = {
@@ -115,12 +158,49 @@ export function CalendarManagement({
       await createCalendar(calendarData);
       setNewCalendar({ name: "", color: "#3b82f6", isDefault: false });
       setShowCreateForm(false);
+      setValidationErrors({});
       setSuccess("Calendar created successfully!");
     } catch (err: any) {
-      setError(err.message || "Failed to create calendar");
+      // Handle specific API errors
+      if (err.message && err.message.includes("already exists")) {
+        setValidationErrors({ name: "A calendar with this name already exists" });
+      } else if (err.message && err.message.includes("name is required")) {
+        setValidationErrors({ name: "Calendar name is required" });
+      } else if (err.message && err.message.includes("exceed 100 characters")) {
+        setValidationErrors({ name: "Calendar name cannot exceed 100 characters" });
+      } else if (err.message && err.message.includes("Color must be")) {
+        setValidationErrors({ color: "Please select a valid color" });
+      } else {
+        // Generic error fallback
+        setError(err.message || "Failed to create calendar. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const validateEditCalendarForm = (name: string, currentCalendarId: string) => {
+    const errors: { name?: string; color?: string; general?: string } = {};
+    
+    // Check if name is empty
+    if (!name.trim()) {
+      errors.name = "Calendar name is required";
+    }
+    
+    // Check name length
+    if (name.trim().length > 100) {
+      errors.name = "Calendar name cannot exceed 100 characters";
+    }
+    
+    // Check for duplicate names (excluding current calendar)
+    const existingNames = calendars
+      .filter(cal => cal.id !== currentCalendarId)
+      .map(cal => cal.name.toLowerCase());
+    if (existingNames.includes(name.trim().toLowerCase())) {
+      errors.name = "A calendar with this name already exists";
+    }
+    
+    return errors;
   };
 
   const handleUpdateCalendar = async (
@@ -129,12 +209,37 @@ export function CalendarManagement({
   ) => {
     setLoading(true);
     setError(null);
+    setValidationErrors({});
+    setSuccess(null);
+
+    // Validate if name is being updated
+    if (updates.name) {
+      const errors = validateEditCalendarForm(updates.name, calendar.id);
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       await updateCalendar(calendar.id, updates);
       setSuccess("Calendar updated successfully!");
+      return true; // Indicate success
     } catch (err: any) {
-      setError(err.message || "Failed to update calendar");
+      // Handle specific API errors
+      if (err.message && err.message.includes("already exists")) {
+        setValidationErrors({ name: "A calendar with this name already exists" });
+      } else if (err.message && err.message.includes("name is required")) {
+        setValidationErrors({ name: "Calendar name is required" });
+      } else if (err.message && err.message.includes("exceed 100 characters")) {
+        setValidationErrors({ name: "Calendar name cannot exceed 100 characters" });
+      } else if (err.message && err.message.includes("Color must be")) {
+        setValidationErrors({ color: "Please select a valid color" });
+      } else {
+        setError(err.message || "Failed to update calendar. Please try again.");
+      }
+      return false; // Indicate failure
     } finally {
       setLoading(false);
     }
@@ -210,14 +315,33 @@ export function CalendarManagement({
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Create New Calendar</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCreateForm(!showCreateForm)}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Calendar
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        onOpenChange(false);
+                        openCalendarManagement();
+                      }}
+                      title="Calendar Settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowCreateForm(!showCreateForm);
+                        // Clear errors when opening/closing form
+                        setValidationErrors({});
+                        setError(null);
+                        setSuccess(null);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      New Calendar
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               {showCreateForm && (
@@ -227,25 +351,46 @@ export function CalendarManagement({
                     <Input
                       id="newCalendarName"
                       value={newCalendar.name}
-                      onChange={(e) =>
-                        setNewCalendar({ ...newCalendar, name: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewCalendar({ ...newCalendar, name: e.target.value });
+                        // Clear name error when user starts typing
+                        if (validationErrors.name) {
+                          setValidationErrors({ ...validationErrors, name: undefined });
+                        }
+                      }}
                       placeholder="Enter calendar name"
+                      className={validationErrors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
                     />
+                    {validationErrors.name && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {validationErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label>Color</Label>
                     <ColorPicker
                       value={newCalendar.color}
-                      onChange={(color) =>
+                      onChange={(color) => {
                         setNewCalendar({
                           ...newCalendar,
                           color,
-                        })
-                      }
+                        });
+                        // Clear color error when user selects a new color
+                        if (validationErrors.color) {
+                          setValidationErrors({ ...validationErrors, color: undefined });
+                        }
+                      }}
                       presetColors={PRESET_COLORS}
                     />
+                    {validationErrors.color && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {validationErrors.color}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -339,7 +484,13 @@ export function CalendarManagement({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setEditingCalendar(calendar)}
+                            onClick={() => {
+                              setEditingCalendar(calendar);
+                              // Clear errors when opening edit dialog
+                              setValidationErrors({});
+                              setError(null);
+                              setSuccess(null);
+                            }}
                             title="Edit calendar"
                           >
                             <Edit className="h-4 w-4" />
@@ -382,43 +533,71 @@ export function CalendarManagement({
                 <Input
                   id="editCalendarName"
                   value={editingCalendar.name}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setEditingCalendar({
                       ...editingCalendar,
                       name: e.target.value,
-                    })
-                  }
+                    });
+                    // Clear name error when user starts typing
+                    if (validationErrors.name) {
+                      setValidationErrors({ ...validationErrors, name: undefined });
+                    }
+                  }}
+                  className={validationErrors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {validationErrors.name && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.name}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label>Color</Label>
                 <ColorPicker
                   value={editingCalendar.color}
-                  onChange={(color) =>
+                  onChange={(color) => {
                     setEditingCalendar({
                       ...editingCalendar,
                       color,
-                    })
-                  }
+                    });
+                    // Clear color error when user selects a new color
+                    if (validationErrors.color) {
+                      setValidationErrors({ ...validationErrors, color: undefined });
+                    }
+                  }}
                   presetColors={PRESET_COLORS}
                 />
+                {validationErrors.color && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.color}
+                  </p>
+                )}
               </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingCalendar(null)}>
+            <Button variant="outline" onClick={() => {
+              setEditingCalendar(null);
+              setValidationErrors({});
+              setError(null);
+            }}>
               Cancel
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (editingCalendar) {
-                  handleUpdateCalendar(editingCalendar, {
+                  const success = await handleUpdateCalendar(editingCalendar, {
                     name: editingCalendar.name,
                     color: editingCalendar.color,
                   });
-                  setEditingCalendar(null);
+                  // Only close dialog on successful update
+                  if (success) {
+                    setEditingCalendar(null);
+                  }
                 }
               }}
               disabled={loading}
