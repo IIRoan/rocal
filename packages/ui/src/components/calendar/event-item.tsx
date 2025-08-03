@@ -5,7 +5,11 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
 
-import { getBorderRadiusClasses, getEventColorClasses } from "./utils";
+import {
+  getBorderRadiusClasses,
+  getEventColorClasses,
+  getEventColorStyles,
+} from "./utils";
 import { CalendarEvent } from "./types";
 import { cn } from "../../lib/utils";
 
@@ -15,7 +19,7 @@ import { cn } from "../../lib/utils";
 // ':mm' - minutes with leading zero (only if the token 'mm' is present)
 const formatTimeWithOptionalMinutes = (
   date: Date,
-  timeFormat: "12h" | "24h" = "12h",
+  timeFormat: "12h" | "24h" = "12h"
 ) => {
   if (timeFormat === "24h") {
     return format(date, getMinutes(date) === 0 ? "H" : "H:mm");
@@ -58,7 +62,7 @@ function EventWrapper({
   const displayEnd = currentTime
     ? new Date(
         new Date(currentTime).getTime() +
-          (new Date(event.end).getTime() - new Date(event.start).getTime()),
+          (new Date(event.end).getTime() - new Date(event.start).getTime())
       )
     : new Date(event.end);
 
@@ -70,8 +74,9 @@ function EventWrapper({
         "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden px-1 text-left font-medium backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through sm:px-2",
         getEventColorClasses(event.color),
         getBorderRadiusClasses(isFirstDay, isLastDay),
-        className,
+        className
       )}
+      style={getEventColorStyles(event.color)}
       data-dragging={isDragging || undefined}
       data-past-event={isEventInPast || undefined}
       onClick={onClick}
@@ -131,7 +136,7 @@ export function EventItem({
     return currentTime
       ? new Date(
           new Date(currentTime).getTime() +
-            (new Date(event.end).getTime() - new Date(event.start).getTime()),
+            (new Date(event.end).getTime() - new Date(event.start).getTime())
         )
       : new Date(event.end);
   }, [currentTime, event.start, event.end]);
@@ -163,7 +168,7 @@ export function EventItem({
         onClick={onClick}
         className={cn(
           "mt-[var(--event-gap)] h-[var(--event-height)] items-center text-[10px] sm:text-[13px]",
-          className,
+          className
         )}
         currentTime={currentTime}
         dndListeners={dndListeners}
@@ -197,7 +202,7 @@ export function EventItem({
           "py-1",
           durationMinutes < 45 ? "items-center" : "flex-col",
           view === "week" ? "text-[10px] sm:text-[13px]" : "text-[13px]",
-          className,
+          className
         )}
         currentTime={currentTime}
         dndListeners={dndListeners}
@@ -234,8 +239,9 @@ export function EventItem({
       className={cn(
         "focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded p-2 text-left transition outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90",
         getEventColorClasses(eventColor),
-        className,
+        className
       )}
+      style={getEventColorStyles(eventColor)}
       data-past-event={isPast(new Date(event.end)) || undefined}
       onClick={onClick}
       onMouseDown={onMouseDown}

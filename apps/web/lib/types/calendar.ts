@@ -1,6 +1,12 @@
 // Calendar API types matching backend structure
 
-export type EventColor = "blue" | "orange" | "violet" | "rose" | "emerald";
+export type EventColor =
+  | "blue"
+  | "orange"
+  | "violet"
+  | "rose"
+  | "emerald"
+  | string;
 
 export interface Calendar {
   id: string;

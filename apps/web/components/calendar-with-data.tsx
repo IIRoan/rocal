@@ -110,19 +110,28 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   }, [calendarData.calendars, isCalendarVisible]);
 
   const transformedEvents = useMemo(() => {
+    // Create a map of calendar IDs to calendar objects for quick lookup
+    const calendarMap = new Map(calendarData.calendars.map(cal => [cal.id, cal]));
+    
     const transformedEventsList = calendarData.events
       .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup
-      .map((event) => ({
-        ...event,
-        description: event.description ?? undefined,
-        color: (event.color ?? undefined) as any,
-        location: event.location ?? undefined,
-        categoryId: event.categoryId ?? undefined,
-        reminder: (event as any).reminder ?? undefined,
-      }));
+      .map((event) => {
+        // Use event's color if it exists, otherwise fall back to calendar color
+        const calendar = calendarMap.get(event.calendarId);
+        const eventColor = event.color || calendar?.color || undefined;
+        
+        return {
+          ...event,
+          description: event.description ?? undefined,
+          color: eventColor as any,
+          location: event.location ?? undefined,
+          categoryId: event.categoryId ?? undefined,
+          reminder: (event as any).reminder ?? undefined,
+        };
+      });
 
     return transformedEventsList;
-  }, [calendarData.events, visibleCalendarIds]); // Remove isCalendarVisible from deps
+  }, [calendarData.events, calendarData.calendars, visibleCalendarIds]); // Add calendars to deps
 
   // Show loading state only for settings, render calendar with loading state for data
   if (settingsLoading) {

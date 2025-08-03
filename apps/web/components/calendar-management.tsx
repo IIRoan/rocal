@@ -36,6 +36,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/ui/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
+import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
 import {
   Plus,
   Trash2,
@@ -49,12 +50,19 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-const COLOR_OPTIONS = [
-  { value: "blue", label: "Blue", color: "#3b82f6" },
-  { value: "orange", label: "Orange", color: "#f97316" },
-  { value: "violet", label: "Violet", color: "#8b5cf6" },
-  { value: "rose", label: "Rose", color: "#f43f5e" },
-  { value: "emerald", label: "Emerald", color: "#10b981" },
+const PRESET_COLORS = [
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f59e0b", // orange
+  "#8b5cf6", // violet
+  "#f43f5e", // rose
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#84cc16", // lime
+  "#f97316", // orange-500
+  "#6366f1", // indigo
+  "#ec4899", // pink
+  "#14b8a6", // teal
 ];
 
 interface CalendarManagementProps {
@@ -72,7 +80,7 @@ export function CalendarManagement({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [deletingCalendar, setDeletingCalendar] = useState<Calendar | null>(
-    null,
+    null
   );
   const [deleteAction, setDeleteAction] =
     useState<CalendarDeleteAction>("prevent");
@@ -80,7 +88,7 @@ export function CalendarManagement({
 
   const [newCalendar, setNewCalendar] = useState({
     name: "",
-    color: "blue" as const,
+    color: "#3b82f6",
     isDefault: false,
   });
 
@@ -105,7 +113,7 @@ export function CalendarManagement({
       };
 
       await createCalendar(calendarData);
-      setNewCalendar({ name: "", color: "blue", isDefault: false });
+      setNewCalendar({ name: "", color: "#3b82f6", isDefault: false });
       setShowCreateForm(false);
       setSuccess("Calendar created successfully!");
     } catch (err: any) {
@@ -117,7 +125,7 @@ export function CalendarManagement({
 
   const handleUpdateCalendar = async (
     calendar: Calendar,
-    updates: Partial<UpdateCalendarRequest>,
+    updates: Partial<UpdateCalendarRequest>
   ) => {
     setLoading(true);
     setError(null);
@@ -142,7 +150,7 @@ export function CalendarManagement({
       await calendarApiService.deleteCalendarAdvanced(
         deletingCalendar.id,
         deleteAction,
-        targetCalendarId || undefined,
+        targetCalendarId || undefined
       );
 
       await refetchCalendars();
@@ -166,7 +174,7 @@ export function CalendarManagement({
   };
 
   const availableTargetCalendars = calendars.filter(
-    (c) => c.id !== deletingCalendar?.id,
+    (c) => c.id !== deletingCalendar?.id
   );
 
   return (
@@ -228,26 +236,16 @@ export function CalendarManagement({
 
                   <div className="space-y-2">
                     <Label>Color</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {COLOR_OPTIONS.map((colorOption) => (
-                        <button
-                          key={colorOption.value}
-                          onClick={() =>
-                            setNewCalendar({
-                              ...newCalendar,
-                              color: colorOption.value as any,
-                            })
-                          }
-                          className={`w-8 h-8 rounded-full border-2 ${
-                            newCalendar.color === colorOption.value
-                              ? "border-gray-900 ring-2 ring-gray-300"
-                              : "border-gray-300"
-                          }`}
-                          style={{ backgroundColor: colorOption.color }}
-                          title={colorOption.label}
-                        />
-                      ))}
-                    </div>
+                    <ColorPicker
+                      value={newCalendar.color}
+                      onChange={(color) =>
+                        setNewCalendar({
+                          ...newCalendar,
+                          color,
+                        })
+                      }
+                      presetColors={PRESET_COLORS}
+                    />
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -395,26 +393,16 @@ export function CalendarManagement({
 
               <div className="space-y-2">
                 <Label>Color</Label>
-                <div className="flex flex-wrap gap-2">
-                  {COLOR_OPTIONS.map((colorOption) => (
-                    <button
-                      key={colorOption.value}
-                      onClick={() =>
-                        setEditingCalendar({
-                          ...editingCalendar,
-                          color: colorOption.value as any,
-                        })
-                      }
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        editingCalendar.color === colorOption.value
-                          ? "border-gray-900 ring-2 ring-gray-300"
-                          : "border-gray-300"
-                      }`}
-                      style={{ backgroundColor: colorOption.color }}
-                      title={colorOption.label}
-                    />
-                  ))}
-                </div>
+                <ColorPicker
+                  value={editingCalendar.color}
+                  onChange={(color) =>
+                    setEditingCalendar({
+                      ...editingCalendar,
+                      color,
+                    })
+                  }
+                  presetColors={PRESET_COLORS}
+                />
               </div>
             </div>
           )}

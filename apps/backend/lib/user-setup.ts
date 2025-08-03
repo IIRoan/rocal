@@ -19,21 +19,21 @@ export async function ensureUserCalendars(userId: string) {
         data: [
           {
             name: "Personal",
-            color: "emerald",
+            color: "#10b981", // emerald
             isVisible: true,
             isDefault: true,
             userId,
           },
           {
             name: "Work",
-            color: "blue",
+            color: "#3b82f6", // blue
             isVisible: true,
             isDefault: false,
             userId,
           },
           {
             name: "Family",
-            color: "rose",
+            color: "#f43f5e", // rose
             isVisible: true,
             isDefault: false,
             userId,

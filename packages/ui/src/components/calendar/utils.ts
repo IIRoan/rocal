@@ -6,12 +6,26 @@ import type {
 } from "@workspace/ui/components/index.ts";
 
 /**
+ * Check if a string is a valid hex color
+ */
+function isHexColor(color: string): boolean {
+  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
+}
+
+/**
  * Get CSS classes for event colors
  */
 export function getEventColorClasses(color?: EventColor | string): string {
   const eventColor = color || "sky";
 
+  // Handle hex colors
+  if (isHexColor(eventColor)) {
+    return "shadow-sm";
+  }
+
+  // Handle predefined colors
   switch (eventColor) {
+    case "blue":
     case "sky":
       return "bg-event-sky hover:bg-event-sky/80 text-event-sky-foreground shadow-sm";
     case "violet":
@@ -28,11 +42,48 @@ export function getEventColorClasses(color?: EventColor | string): string {
 }
 
 /**
+ * Get inline styles for hex colors
+ */
+export function getEventColorStyles(
+  color?: EventColor | string
+): React.CSSProperties {
+  const eventColor = color || "sky";
+
+  if (isHexColor(eventColor)) {
+    return {
+      backgroundColor: eventColor,
+      color: getContrastColor(eventColor),
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Get contrasting text color for a given background color
+ */
+function getContrastColor(hexColor: string): string {
+  // Remove # if present
+  const hex = hexColor.replace("#", "");
+
+  // Convert to RGB
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Return black or white based on luminance
+  return luminance > 0.5 ? "#000000" : "#ffffff";
+}
+
+/**
  * Get CSS classes for border radius based on event position in multi-day events
  */
 export function getBorderRadiusClasses(
   isFirstDay: boolean,
-  isLastDay: boolean,
+  isLastDay: boolean
 ): string {
   if (isFirstDay && isLastDay) {
     return "rounded"; // Both ends rounded
@@ -59,7 +110,7 @@ export function isMultiDayEvent(event: CalendarEvent): boolean {
  */
 export function getEventsForDay(
   events: CalendarEvent[],
-  day: Date,
+  day: Date
 ): CalendarEvent[] {
   return events
     .filter((event) => {
@@ -89,7 +140,7 @@ export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
  */
 export function getSpanningEventsForDay(
   events: CalendarEvent[],
-  day: Date,
+  day: Date
 ): CalendarEvent[] {
   return events.filter((event) => {
     if (!isMultiDayEvent(event)) return false;
@@ -110,7 +161,7 @@ export function getSpanningEventsForDay(
  */
 export function getAllEventsForDay(
   events: CalendarEvent[],
-  day: Date,
+  day: Date
 ): CalendarEvent[] {
   return events.filter((event) => {
     const eventStart = new Date(event.start);
@@ -128,7 +179,7 @@ export function getAllEventsForDay(
  */
 export function getAgendaEventsForDay(
   events: CalendarEvent[],
-  day: Date,
+  day: Date
 ): CalendarEvent[] {
   return events
     .filter((event) => {
