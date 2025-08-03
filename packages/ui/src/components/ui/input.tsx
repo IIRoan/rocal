@@ -2,20 +2,24 @@ import * as React from "react";
 
 import { cn } from "@workspace/ui/lib/utils";
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+interface InputProps extends React.ComponentProps<"input"> {
+  animated?: boolean;
+}
+
+function Input({ className, type, animated = true, ...props }: InputProps) {
   return (
     <input
       type={type}
       data-slot="input"
       className={cn(
         // Base styling with proper input background
-        "flex h-9 w-full min-w-0 rounded-md border border-border bg-input px-3 py-1 text-sm text-input-foreground shadow-xs transition-[background-color,border-color,box-shadow] outline-none",
+        "flex h-9 w-full min-w-0 rounded-md border border-border bg-input px-3 py-1 text-sm text-input-foreground shadow-xs transition-all duration-200 ease-out outline-none",
         // Placeholder styling
         "placeholder:text-muted-foreground/70",
         // Focus states
-        "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+        "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:scale-[1.01]",
         // Hover states
-        "hover:bg-input/80",
+        "hover:bg-input/80 hover:border-border/80 hover:shadow-sm",
         // Invalid states
         "aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
         // Disabled states

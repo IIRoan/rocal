@@ -48,7 +48,7 @@ export function CommandPaletteProvider({
     setInitialView("main");
     setIsOpen(true);
   };
-  
+
   const closePalette = () => {
     setIsOpen(false);
     setEventToEdit(null);

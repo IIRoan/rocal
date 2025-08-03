@@ -108,7 +108,7 @@ export function MonthView({
   }, []);
 
   return (
-    <div data-slot="month-view" className="contents">
+    <div data-slot="month-view" className="contents animate-fade-in">
       <div
         className={`border-border/70 grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} border-y uppercase`}
       >
@@ -117,10 +117,11 @@ export function MonthView({
             W
           </div>
         )}
-        {weekdays.map((day) => (
+        {weekdays.map((day, index) => (
           <div
             key={day}
-            className="text-muted-foreground/70 py-2 text-center text-xs"
+            className="text-muted-foreground/70 py-2 text-center text-xs animate-slide-in"
+            style={{ animationDelay: `${index * 0.05}s` }}
           >
             {day}
           </div>
@@ -130,7 +131,8 @@ export function MonthView({
         {weeks.map((week, weekIndex) => (
           <div
             key={`week-${weekIndex}`}
-            className={`grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} [&:last-child>*]:border-b-0`}
+            className={`grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} [&:last-child>*]:border-b-0 animate-slide-in`}
+            style={{ animationDelay: `${weekIndex * 0.1}s` }}
           >
             {showWeekNumbers && (
               <div className="border-border/70 border-r border-b bg-muted/10 flex items-center justify-center">
@@ -163,7 +165,7 @@ export function MonthView({
               return (
                 <div
                   key={day.toString()}
-                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 ${
+                  className={`group border-border/70 data-outside-cell:bg-muted/25 data-outside-cell:text-muted-foreground/70 border-r border-b last:border-r-0 transition-all duration-200 hover:bg-accent/5 hover:shadow-sm ${
                     workingDays.includes(day.getDay()) && isCurrentMonth
                       ? "bg-[var(--calendar-workday)]"
                       : !workingDays.includes(day.getDay()) &&
@@ -184,7 +186,7 @@ export function MonthView({
                       onEventCreate(startTime);
                     }}
                   >
-                    <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm">
+                    <div className="group-data-today:bg-[var(--calendar-accent-bg)] group-data-today:text-[var(--calendar-accent)] group-data-today:font-semibold mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm transition-all duration-200 hover:scale-110 hover:bg-accent/10 group-data-today:animate-pulse">
                       {format(day, "d")}
                     </div>
                     <div
@@ -240,8 +242,9 @@ export function MonthView({
                         return (
                           <div
                             key={event.id}
-                            className="aria-hidden:hidden"
+                            className="aria-hidden:hidden animate-scale-in"
                             aria-hidden={isHidden ? "true" : undefined}
+                            style={{ animationDelay: `${index * 0.05}s` }}
                           >
                             <DraggableEvent
                               event={event}
@@ -259,7 +262,7 @@ export function MonthView({
                         <Popover modal>
                           <PopoverTrigger asChild>
                             <button
-                              className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
+                              className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:scale-[1.02] mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] backdrop-blur-md transition-all duration-200 outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs animate-fade-in"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <span>
@@ -270,7 +273,7 @@ export function MonthView({
                           </PopoverTrigger>
                           <PopoverContent
                             align="center"
-                            className="max-w-52 p-3"
+                            className="max-w-52 p-3 animate-scale-in"
                             style={
                               {
                                 "--event-height": `${EventHeight}px`,

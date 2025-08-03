@@ -172,6 +172,28 @@ type PaletteView =
   | "events"
   | "event-editor";
 
+// Transition wrapper for slide-fade
+function TransitionContainer({
+  direction,
+  children,
+}: {
+  direction: "forward" | "back";
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative overflow-hidden">
+      <div
+        className={[
+          "animate-slide-fade",
+          direction === "forward" ? "enter-left" : "enter-right",
+        ].join(" ")}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function CommandPalette({
   open,
   onOpenChange,
@@ -186,6 +208,20 @@ export function CommandPalette({
   const [currentView, setCurrentView] = useState<PaletteView>(
     initialView as PaletteView
   );
+  const [transitionDirection, setTransitionDirection] = useState<
+    "forward" | "back"
+  >("forward");
+
+  const goForward = (next: PaletteView) => {
+    setTransitionDirection("forward");
+    setCurrentView(next);
+  };
+
+  const goBack = (prev: PaletteView) => {
+    setTransitionDirection("back");
+    setCurrentView(prev);
+  };
+
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -263,6 +299,7 @@ export function CommandPalette({
       setEventLocation(eventToEdit.location || "");
       setEventCalendarId(eventToEdit.calendarId || calendars?.[0]?.id || "");
       setEventReminder(eventToEdit.reminder ?? null);
+      setTransitionDirection("forward");
       setCurrentView("event-editor");
     }
   }, [eventToEdit, open, calendars]);
@@ -381,12 +418,16 @@ export function CommandPalette({
   if (loading || !localSettings) {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="flex items-center justify-center min-h-[300px]">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Loading settings...</p>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="flex items-center justify-center min-h-[300px]">
+            <div className="text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Loading settings...
+              </p>
+            </div>
           </div>
-        </div>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -650,7 +691,7 @@ export function CommandPalette({
       toast.success(`Calendar "${calendarName}" created`);
       setCalendarName("");
       setCalendarColor("#3b82f6");
-      setCurrentView("calendars");
+      goBack("calendars");
     } catch (error: any) {
       console.error("Failed to create calendar:", error);
       if (error.message && error.message.includes("already exists")) {
@@ -705,7 +746,7 @@ export function CommandPalette({
 
       toast.success(`Calendar "${calendarName}" updated`);
       setEditingCalendar(null);
-      setCurrentView("calendars");
+      goBack("calendars");
     } catch (error: any) {
       console.error("Failed to update calendar:", error);
       if (error.message && error.message.includes("already exists")) {
@@ -725,7 +766,7 @@ export function CommandPalette({
     try {
       await calendarData.deleteCalendar(calendar.id);
       toast.success(`Calendar "${calendar.name}" deleted`);
-      setCurrentView("calendars");
+      goBack("calendars");
     } catch (error: any) {
       console.error("Failed to delete calendar:", error);
       toast.error("Failed to delete calendar");
@@ -744,37 +785,33 @@ export function CommandPalette({
   if (currentView === "main") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">Settings</h2>
-        </div>
-        <div className="bg-muted/30 border-b border-border focus-within:ring-0">
-          <CommandInput
-            placeholder="Search settings..."
-            className="border-none bg-transparent focus:ring-0 focus:outline-none"
-          />
-        </div>
-        <CommandList>
-          <CommandGroup heading="Categories">
-            {navigationItems.map((item) => (
-              <CommandItem
-                key={item.id}
-                onSelect={() => setCurrentView(item.id as PaletteView)}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30 border-b border-border/30 last:border-b-0"
-              >
-                <item.icon className="mr-3 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span className="font-medium text-foreground">
-                    {item.label}
-                  </span>
-                  <span className="text-xs text-muted-foreground/80">
-                    {item.description}
-                  </span>
-                </div>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">Settings</h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Categories">
+              {navigationItems.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  onSelect={() => goForward(item.id as PaletteView)}
+                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30 border-b border-border/30 last:border-b-0"
+                >
+                  <item.icon className="mr-3 h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-col">
+                    <span className="font-medium text-foreground">
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground/80">
+                      {item.description}
+                    </span>
+                  </div>
+                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -782,105 +819,112 @@ export function CommandPalette({
   if (currentView === "appearance") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">Appearance</h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Theme">
-            <CommandItem
-              onSelect={() => updateSetting("theme", "light")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <Sun className="mr-3 h-4 w-4 text-amber-500" />
-              <span className="text-foreground">Light Theme</span>
-              {localSettings.theme === "light" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("theme", "dark")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Moon className="mr-3 h-4 w-4 text-slate-400" />
-              <span className="text-foreground">Dark Theme</span>
-              {localSettings.theme === "dark" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("theme", "system")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Monitor className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">System Theme</span>
-              {localSettings.theme === "system" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-          </CommandGroup>
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Appearance
+            </h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Theme">
+              <CommandItem
+                onSelect={() => updateSetting("theme", "light")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Sun className="mr-3 h-4 w-4 text-amber-500" />
+                <span className="text-foreground">Light Theme</span>
+                {localSettings.theme === "light" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => updateSetting("theme", "dark")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Moon className="mr-3 h-4 w-4 text-slate-400" />
+                <span className="text-foreground">Dark Theme</span>
+                {localSettings.theme === "dark" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => updateSetting("theme", "system")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Monitor className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">System Theme</span>
+                {localSettings.theme === "system" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+            </CommandGroup>
 
-          <CommandGroup heading="Default View">
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "month")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Month View</span>
-              {localSettings.defaultView === "month" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "week")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Week View</span>
-              {localSettings.defaultView === "week" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "day")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Day View</span>
-              {localSettings.defaultView === "day" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "agenda")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Agenda View</span>
-              {localSettings.defaultView === "agenda" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-          </CommandGroup>
+            <CommandGroup heading="Default View">
+              <CommandItem
+                onSelect={() => updateSetting("defaultView", "month")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Month View</span>
+                {localSettings.defaultView === "month" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => updateSetting("defaultView", "week")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Week View</span>
+                {localSettings.defaultView === "week" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => updateSetting("defaultView", "day")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Day View</span>
+                {localSettings.defaultView === "day" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => updateSetting("defaultView", "agenda")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Agenda View</span>
+                {localSettings.defaultView === "agenda" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+            </CommandGroup>
 
-          <CommandGroup heading="Display Options">
-            <CommandItem
-              onSelect={() =>
-                updateSetting("compactView", !localSettings.compactView)
-              }
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Eye className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Compact View</span>
-              <Switch checked={localSettings.compactView} className="ml-auto" />
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
+            <CommandGroup heading="Display Options">
+              <CommandItem
+                onSelect={() =>
+                  updateSetting("compactView", !localSettings.compactView)
+                }
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Eye className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Compact View</span>
+                <Switch
+                  checked={localSettings.compactView}
+                  className="ml-auto"
+                />
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -888,74 +932,76 @@ export function CommandPalette({
   if (currentView === "notifications") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Notifications
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Notification Types">
-            <CommandItem
-              onSelect={() =>
-                updateSetting(
-                  "emailNotifications",
-                  !localSettings.emailNotifications
-                )
-              }
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <Mail className="mr-3 h-4 w-4 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span className="text-foreground">Email Notifications</span>
-                <span className="text-xs text-muted-foreground">
-                  Receive event reminders via email
-                </span>
-              </div>
-              <Switch
-                checked={localSettings.emailNotifications}
-                className="ml-auto"
-              />
-            </CommandItem>
-          </CommandGroup>
-
-          <CommandGroup heading="Default Reminder">
-            <div className="px-4 py-3">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex flex-col">
-                    <Label className="text-sm font-medium text-foreground">
-                      Default Reminder Time (minutes)
-                    </Label>
-                    <span className="text-xs text-muted-foreground">
-                      Leave empty for no default reminder
-                    </span>
-                  </div>
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Notifications
+            </h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Notification Types">
+              <CommandItem
+                onSelect={() =>
+                  updateSetting(
+                    "emailNotifications",
+                    !localSettings.emailNotifications
+                  )
+                }
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Mail className="mr-3 h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-foreground">Email Notifications</span>
+                  <span className="text-xs text-muted-foreground">
+                    Receive event reminders via email
+                  </span>
                 </div>
-                <Input
-                  type="number"
-                  value={localSettings.defaultReminder || ""}
-                  onChange={(e) =>
-                    updateSetting(
-                      "defaultReminder",
-                      e.target.value ? parseInt(e.target.value) : null
-                    )
-                  }
-                  placeholder="No default reminder"
-                  min={1}
-                  max={43200}
-                  className="w-full"
+                <Switch
+                  checked={localSettings.emailNotifications}
+                  className="ml-auto"
                 />
+              </CommandItem>
+            </CommandGroup>
+
+            <CommandGroup heading="Default Reminder">
+              <div className="px-4 py-3">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <Label className="text-sm font-medium text-foreground">
+                        Default Reminder Time (minutes)
+                      </Label>
+                      <span className="text-xs text-muted-foreground">
+                        Leave empty for no default reminder
+                      </span>
+                    </div>
+                  </div>
+                  <Input
+                    type="number"
+                    value={localSettings.defaultReminder || ""}
+                    onChange={(e) =>
+                      updateSetting(
+                        "defaultReminder",
+                        e.target.value ? parseInt(e.target.value) : null
+                      )
+                    }
+                    placeholder="No default reminder"
+                    min={1}
+                    max={43200}
+                    className="w-full"
+                  />
+                </div>
               </div>
-            </div>
-          </CommandGroup>
-        </CommandList>
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -963,59 +1009,61 @@ export function CommandPalette({
   if (currentView === "time-region") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Time & Region
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Timezone">
-            <CommandItem
-              onSelect={() => setCurrentView("timezone")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span className="text-foreground">Timezone</span>
-                <span className="text-xs text-muted-foreground">
-                  {ALL_TIMEZONES.find(
-                    (tz) => tz.value === localSettings.timezone
-                  )?.label || localSettings.timezone}
-                </span>
-              </div>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-            </CommandItem>
-          </CommandGroup>
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Time & Region
+            </h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Timezone">
+              <CommandItem
+                onSelect={() => goForward("timezone")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-foreground">Timezone</span>
+                  <span className="text-xs text-muted-foreground">
+                    {ALL_TIMEZONES.find(
+                      (tz) => tz.value === localSettings.timezone
+                    )?.label || localSettings.timezone}
+                  </span>
+                </div>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+              </CommandItem>
+            </CommandGroup>
 
-          <CommandGroup heading="Time Format">
-            <CommandItem
-              onSelect={() => updateSetting("timeFormat", "12h")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Clock className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">12 Hour (1:00 PM)</span>
-              {localSettings.timeFormat === "12h" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("timeFormat", "24h")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Clock className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">24 Hour (13:00)</span>
-              {localSettings.timeFormat === "24h" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
+            <CommandGroup heading="Time Format">
+              <CommandItem
+                onSelect={() => updateSetting("timeFormat", "12h")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Clock className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">12 Hour (1:00 PM)</span>
+                {localSettings.timeFormat === "12h" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => updateSetting("timeFormat", "24h")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Clock className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">24 Hour (13:00)</span>
+                {localSettings.timeFormat === "24h" && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1023,86 +1071,90 @@ export function CommandPalette({
   if (currentView === "timezone") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("time-region")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">Timezone</h2>
-        </div>
-        <div className="bg-muted/30 border-b border-border focus-within:ring-0">
-          <input
-            type="text"
-            placeholder="Search timezones..."
-            value={timezoneSearch}
-            onChange={(e) => setTimezoneSearch(e.target.value)}
-            className="w-full px-4 py-3 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-foreground placeholder:text-muted-foreground"
-          />
-        </div>
-        <CommandList>
-          {timezoneSearch ? (
-            <CommandGroup heading="Search Results">
-              {ALL_TIMEZONES.filter(
-                (tz) =>
-                  tz.label
-                    .toLowerCase()
-                    .includes(timezoneSearch.toLowerCase()) ||
-                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
-              )
-                .slice(0, 20)
-                .map((tz) => (
-                  <CommandItem
-                    key={tz.value}
-                    onSelect={() => {
-                      updateSetting("timezone", tz.value);
-                      setTimezoneSearch("");
-                      setCurrentView("time-region");
-                    }}
-                    className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                  >
-                    <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-                    <div className="flex flex-col">
-                      <span className="text-foreground">{tz.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {tz.value}
-                      </span>
-                    </div>
-                    {localSettings.timezone === tz.value && (
-                      <Check className="ml-auto h-4 w-4 text-primary" />
-                    )}
-                  </CommandItem>
-                ))}
-            </CommandGroup>
-          ) : (
-            Object.entries(TIMEZONE_GROUPS).map(([groupName, timezones]) => (
-              <CommandGroup key={groupName} heading={groupName}>
-                {timezones.map((tz) => (
-                  <CommandItem
-                    key={tz.value}
-                    onSelect={() => {
-                      updateSetting("timezone", tz.value);
-                      setCurrentView("time-region");
-                    }}
-                    className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                  >
-                    <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-                    <div className="flex flex-col">
-                      <span className="text-foreground">{tz.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {tz.value}
-                      </span>
-                    </div>
-                    {localSettings.timezone === tz.value && (
-                      <Check className="ml-auto h-4 w-4 text-primary" />
-                    )}
-                  </CommandItem>
-                ))}
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("time-region")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">Timezone</h2>
+          </div>
+          <div className="bg-muted/30 border-b border-border focus-within:ring-0">
+            <input
+              type="text"
+              placeholder="Search timezones..."
+              value={timezoneSearch}
+              onChange={(e) => setTimezoneSearch(e.target.value)}
+              className="w-full px-4 py-3 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-foreground placeholder:text-muted-foreground"
+            />
+          </div>
+          <CommandList>
+            {timezoneSearch ? (
+              <CommandGroup heading="Search Results">
+                {ALL_TIMEZONES.filter(
+                  (tz) =>
+                    tz.label
+                      .toLowerCase()
+                      .includes(timezoneSearch.toLowerCase()) ||
+                    tz.value
+                      .toLowerCase()
+                      .includes(timezoneSearch.toLowerCase())
+                )
+                  .slice(0, 20)
+                  .map((tz) => (
+                    <CommandItem
+                      key={tz.value}
+                      onSelect={() => {
+                        updateSetting("timezone", tz.value);
+                        setTimezoneSearch("");
+                        goBack("time-region");
+                      }}
+                      className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                    >
+                      <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+                      <div className="flex flex-col">
+                        <span className="text-foreground">{tz.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {tz.value}
+                        </span>
+                      </div>
+                      {localSettings.timezone === tz.value && (
+                        <Check className="ml-auto h-4 w-4 text-primary" />
+                      )}
+                    </CommandItem>
+                  ))}
               </CommandGroup>
-            ))
-          )}
-        </CommandList>
+            ) : (
+              Object.entries(TIMEZONE_GROUPS).map(([groupName, timezones]) => (
+                <CommandGroup key={groupName} heading={groupName}>
+                  {timezones.map((tz) => (
+                    <CommandItem
+                      key={tz.value}
+                      onSelect={() => {
+                        updateSetting("timezone", tz.value);
+                        goBack("time-region");
+                      }}
+                      className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                    >
+                      <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+                      <div className="flex flex-col">
+                        <span className="text-foreground">{tz.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {tz.value}
+                        </span>
+                      </div>
+                      {localSettings.timezone === tz.value && (
+                        <Check className="ml-auto h-4 w-4 text-primary" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))
+            )}
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1110,64 +1162,66 @@ export function CommandPalette({
   if (currentView === "calendar-defaults") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Calendar Defaults
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Week Settings">
-            {WORKING_DAYS.map((day) => (
-              <CommandItem
-                key={day.value}
-                onSelect={() => updateSetting("weekStartDay", day.value)}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">
-                  Week starts on {day.label}
-                </span>
-                {localSettings.weekStartDay === day.value && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Calendar Defaults
+            </h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Week Settings">
+              {WORKING_DAYS.map((day) => (
+                <CommandItem
+                  key={day.value}
+                  onSelect={() => updateSetting("weekStartDay", day.value)}
+                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                >
+                  <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">
+                    Week starts on {day.label}
+                  </span>
+                  {localSettings.weekStartDay === day.value && (
+                    <Check className="ml-auto h-4 w-4 text-primary" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
 
-          <CommandGroup heading="Working Days">
-            {WORKING_DAYS.map((day) => (
-              <CommandItem
-                key={day.value}
-                onSelect={() => {
-                  const currentWorkingDays = [...workingDaysList];
-                  const dayIndex = currentWorkingDays.indexOf(day.value);
-                  if (dayIndex > -1) {
-                    currentWorkingDays.splice(dayIndex, 1);
-                  } else {
-                    currentWorkingDays.push(day.value);
-                  }
-                  updateSetting(
-                    "workingDays",
-                    JSON.stringify(currentWorkingDays.sort())
-                  );
-                }}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{day.label}</span>
-                {workingDaysList.includes(day.value) && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
+            <CommandGroup heading="Working Days">
+              {WORKING_DAYS.map((day) => (
+                <CommandItem
+                  key={day.value}
+                  onSelect={() => {
+                    const currentWorkingDays = [...workingDaysList];
+                    const dayIndex = currentWorkingDays.indexOf(day.value);
+                    if (dayIndex > -1) {
+                      currentWorkingDays.splice(dayIndex, 1);
+                    } else {
+                      currentWorkingDays.push(day.value);
+                    }
+                    updateSetting(
+                      "workingDays",
+                      JSON.stringify(currentWorkingDays.sort())
+                    );
+                  }}
+                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                >
+                  <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">{day.label}</span>
+                  {workingDaysList.includes(day.value) && (
+                    <Check className="ml-auto h-4 w-4 text-primary" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1175,54 +1229,56 @@ export function CommandPalette({
   if (currentView === "account") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">Account</h2>
-        </div>
-        <CommandList>
-          {!showResetConfirm ? (
-            <CommandGroup heading="Danger Zone">
-              <CommandItem
-                onSelect={() => setShowResetConfirm(true)}
-                disabled={saving}
-                className="px-4 py-3 hover:bg-destructive/10 data-[selected=true]:bg-destructive/15 text-destructive"
-              >
-                <RotateCcw className="mr-3 h-4 w-4" />
-                <span>Reset to Defaults</span>
-              </CommandItem>
-            </CommandGroup>
-          ) : (
-            <CommandGroup heading="Confirm Reset">
-              <div className="px-4 py-3 text-sm text-muted-foreground">
-                This will reset all your settings to their default values. This
-                action cannot be undone.
-              </div>
-              <CommandItem
-                onSelect={() => {
-                  handleReset();
-                  setShowResetConfirm(false);
-                }}
-                disabled={saving}
-                className="px-4 py-3 hover:bg-destructive/20 data-[selected=true]:bg-destructive/25 text-destructive"
-              >
-                <Check className="mr-3 h-4 w-4" />
-                <span>Yes, Reset Everything</span>
-              </CommandItem>
-              <CommandItem
-                onSelect={() => setShowResetConfirm(false)}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <X className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Cancel</span>
-              </CommandItem>
-            </CommandGroup>
-          )}
-        </CommandList>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">Account</h2>
+          </div>
+          <CommandList>
+            {!showResetConfirm ? (
+              <CommandGroup heading="Danger Zone">
+                <CommandItem
+                  onSelect={() => setShowResetConfirm(true)}
+                  disabled={saving}
+                  className="px-4 py-3 hover:bg-destructive/10 data-[selected=true]:bg-destructive/15 text-destructive"
+                >
+                  <RotateCcw className="mr-3 h-4 w-4" />
+                  <span>Reset to Defaults</span>
+                </CommandItem>
+              </CommandGroup>
+            ) : (
+              <CommandGroup heading="Confirm Reset">
+                <div className="px-4 py-3 text-sm text-muted-foreground">
+                  This will reset all your settings to their default values.
+                  This action cannot be undone.
+                </div>
+                <CommandItem
+                  onSelect={() => {
+                    handleReset();
+                    setShowResetConfirm(false);
+                  }}
+                  disabled={saving}
+                  className="px-4 py-3 hover:bg-destructive/20 data-[selected=true]:bg-destructive/25 text-destructive"
+                >
+                  <Check className="mr-3 h-4 w-4" />
+                  <span>Yes, Reset Everything</span>
+                </CommandItem>
+                <CommandItem
+                  onSelect={() => setShowResetConfirm(false)}
+                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                >
+                  <X className="mr-3 h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">Cancel</span>
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1230,32 +1286,34 @@ export function CommandPalette({
   if (currentView === "security") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">Security</h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Authentication">
-            <CommandItem
-              onSelect={() => setCurrentView("passkeys")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <Key className="mr-3 h-4 w-4 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span className="text-foreground">Passkeys</span>
-                <span className="text-xs text-muted-foreground">
-                  Manage passwordless authentication
-                </span>
-              </div>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">Security</h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Authentication">
+              <CommandItem
+                onSelect={() => goForward("passkeys")}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Key className="mr-3 h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-foreground">Passkeys</span>
+                  <span className="text-xs text-muted-foreground">
+                    Manage passwordless authentication
+                  </span>
+                </div>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1265,7 +1323,7 @@ export function CommandPalette({
       <PasskeySettings
         open={open}
         onOpenChange={onOpenChange}
-        onBack={() => setCurrentView("security")}
+        onBack={() => goBack("security")}
       />
     );
   }
@@ -1288,62 +1346,64 @@ export function CommandPalette({
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Calendar Management
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Actions">
-            <CommandItem
-              onSelect={() => {
-                resetCalendarForm();
-                setCurrentView("calendar-create");
-              }}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Create New Calendar</span>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-            </CommandItem>
-          </CommandGroup>
-
-          <CommandGroup heading="Your Calendars">
-            {calendars.map((calendar) => (
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Calendar Management
+            </h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Actions">
               <CommandItem
-                key={calendar.id}
                 onSelect={() => {
-                  setEditingCalendar(calendar);
-                  setCalendarName(calendar.name);
-                  setCalendarColor(calendar.color);
-                  setCalendarValidationErrors({});
-                  setCurrentView("calendar-edit");
+                  resetCalendarForm();
+                  goForward("calendar-create");
                 }}
                 className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
               >
-                <div
-                  className="mr-3 h-4 w-4 rounded"
-                  style={{ backgroundColor: calendar.color }}
-                />
-                <div className="flex flex-col">
-                  <span className="text-foreground">{calendar.name}</span>
-                  {calendar.isDefault && (
-                    <span className="text-xs text-muted-foreground">
-                      Default calendar
-                    </span>
-                  )}
-                </div>
+                <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Create New Calendar</span>
                 <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
               </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
+            </CommandGroup>
+
+            <CommandGroup heading="Your Calendars">
+              {calendars.map((calendar) => (
+                <CommandItem
+                  key={calendar.id}
+                  onSelect={() => {
+                    setEditingCalendar(calendar);
+                    setCalendarName(calendar.name);
+                    setCalendarColor(calendar.color);
+                    setCalendarValidationErrors({});
+                    goForward("calendar-edit");
+                  }}
+                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+                >
+                  <div
+                    className="mr-3 h-4 w-4 rounded"
+                    style={{ backgroundColor: calendar.color }}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-foreground">{calendar.name}</span>
+                    {calendar.isDefault && (
+                      <span className="text-xs text-muted-foreground">
+                        Default calendar
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1366,116 +1426,118 @@ export function CommandPalette({
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("calendars")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Create Calendar
-          </h2>
-        </div>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("calendars")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Create Calendar
+            </h2>
+          </div>
 
-        <div className="max-h-[80vh] overflow-y-auto">
-          <div className="p-6 space-y-6">
-            {/* Calendar Name */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="calendar-name"
-                className="flex items-center gap-2"
-              >
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                Calendar Name
-              </Label>
-              <Input
-                id="calendar-name"
-                value={calendarName}
-                onChange={(e) => {
-                  setCalendarName(e.target.value);
-                  if (calendarValidationErrors.name) {
-                    setCalendarValidationErrors({
-                      ...calendarValidationErrors,
-                      name: undefined,
-                    });
+          <div className="max-h-[80vh] overflow-y-auto">
+            <div className="p-6 space-y-6">
+              {/* Calendar Name */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="calendar-name"
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Calendar Name
+                </Label>
+                <Input
+                  id="calendar-name"
+                  value={calendarName}
+                  onChange={(e) => {
+                    setCalendarName(e.target.value);
+                    if (calendarValidationErrors.name) {
+                      setCalendarValidationErrors({
+                        ...calendarValidationErrors,
+                        name: undefined,
+                      });
+                    }
+                  }}
+                  placeholder="Enter calendar name"
+                  className={
+                    calendarValidationErrors.name ? "border-red-500" : ""
                   }
-                }}
-                placeholder="Enter calendar name"
-                className={
-                  calendarValidationErrors.name ? "border-red-500" : ""
-                }
-              />
-              {calendarValidationErrors.name && (
-                <p className="text-sm text-red-600">
-                  {calendarValidationErrors.name}
-                </p>
-              )}
-            </div>
-
-            {/* Color Selection */}
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="grid grid-cols-6 gap-2">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setCalendarColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      calendarColor === color
-                        ? "border-foreground scale-110"
-                        : "border-transparent hover:scale-105"
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <input
-                  type="color"
-                  value={calendarColor}
-                  onChange={(e) => setCalendarColor(e.target.value)}
-                  className="w-8 h-8 rounded border cursor-pointer"
                 />
-                <span className="text-sm text-muted-foreground">
-                  Or pick a custom color
-                </span>
+                {calendarValidationErrors.name && (
+                  <p className="text-sm text-red-600">
+                    {calendarValidationErrors.name}
+                  </p>
+                )}
               </div>
-              {calendarValidationErrors.color && (
-                <p className="text-sm text-red-600">
-                  {calendarValidationErrors.color}
-                </p>
-              )}
+
+              {/* Color Selection */}
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="grid grid-cols-6 gap-2">
+                  {PRESET_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setCalendarColor(color)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${
+                        calendarColor === color
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="color"
+                    value={calendarColor}
+                    onChange={(e) => setCalendarColor(e.target.value)}
+                    className="w-8 h-8 rounded border cursor-pointer"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Or pick a custom color
+                  </span>
+                </div>
+                {calendarValidationErrors.color && (
+                  <p className="text-sm text-red-600">
+                    {calendarValidationErrors.color}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => goBack("calendars")}
+                disabled={calendarSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCalendarCreate}
+                disabled={calendarSaving || !calendarName.trim()}
+              >
+                {calendarSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Create Calendar
+                  </>
+                )}
+              </Button>
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentView("calendars")}
-              disabled={calendarSaving}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCalendarCreate}
-              disabled={calendarSaving || !calendarName.trim()}
-            >
-              {calendarSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Create Calendar
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1498,133 +1560,135 @@ export function CommandPalette({
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("calendars")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Edit Calendar
-          </h2>
-        </div>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("calendars")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              Edit Calendar
+            </h2>
+          </div>
 
-        <div className="max-h-[80vh] overflow-y-auto">
-          <div className="p-6 space-y-6">
-            {/* Calendar Name */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="calendar-name"
-                className="flex items-center gap-2"
-              >
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                Calendar Name
-              </Label>
-              <Input
-                id="calendar-name"
-                value={calendarName}
-                onChange={(e) => {
-                  setCalendarName(e.target.value);
-                  if (calendarValidationErrors.name) {
-                    setCalendarValidationErrors({
-                      ...calendarValidationErrors,
-                      name: undefined,
-                    });
+          <div className="max-h-[80vh] overflow-y-auto">
+            <div className="p-6 space-y-6">
+              {/* Calendar Name */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="calendar-name"
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Calendar Name
+                </Label>
+                <Input
+                  id="calendar-name"
+                  value={calendarName}
+                  onChange={(e) => {
+                    setCalendarName(e.target.value);
+                    if (calendarValidationErrors.name) {
+                      setCalendarValidationErrors({
+                        ...calendarValidationErrors,
+                        name: undefined,
+                      });
+                    }
+                  }}
+                  placeholder="Enter calendar name"
+                  className={
+                    calendarValidationErrors.name ? "border-red-500" : ""
                   }
-                }}
-                placeholder="Enter calendar name"
-                className={
-                  calendarValidationErrors.name ? "border-red-500" : ""
-                }
-              />
-              {calendarValidationErrors.name && (
-                <p className="text-sm text-red-600">
-                  {calendarValidationErrors.name}
-                </p>
-              )}
-            </div>
-
-            {/* Color Selection */}
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="grid grid-cols-6 gap-2">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setCalendarColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      calendarColor === color
-                        ? "border-foreground scale-110"
-                        : "border-transparent hover:scale-105"
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <input
-                  type="color"
-                  value={calendarColor}
-                  onChange={(e) => setCalendarColor(e.target.value)}
-                  className="w-8 h-8 rounded border cursor-pointer"
                 />
-                <span className="text-sm text-muted-foreground">
-                  Or pick a custom color
-                </span>
+                {calendarValidationErrors.name && (
+                  <p className="text-sm text-red-600">
+                    {calendarValidationErrors.name}
+                  </p>
+                )}
               </div>
-              {calendarValidationErrors.color && (
-                <p className="text-sm text-red-600">
-                  {calendarValidationErrors.color}
-                </p>
-              )}
-            </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-between">
-            {editingCalendar && (
-              <Button
-                variant="outline"
-                onClick={() => handleCalendarDelete(editingCalendar)}
-                disabled={calendarSaving}
-                className="text-destructive hover:text-destructive"
-              >
-                {calendarSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
+              {/* Color Selection */}
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="grid grid-cols-6 gap-2">
+                  {PRESET_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setCalendarColor(color)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${
+                        calendarColor === color
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="color"
+                    value={calendarColor}
+                    onChange={(e) => setCalendarColor(e.target.value)}
+                    className="w-8 h-8 rounded border cursor-pointer"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Or pick a custom color
+                  </span>
+                </div>
+                {calendarValidationErrors.color && (
+                  <p className="text-sm text-red-600">
+                    {calendarValidationErrors.color}
+                  </p>
                 )}
-                Delete
-              </Button>
-            )}
-            <div className="flex gap-2 ml-auto">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentView("calendars")}
-                disabled={calendarSaving}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCalendarUpdate}
-                disabled={calendarSaving || !calendarName.trim()}
-              >
-                {calendarSaving ? (
-                  <>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-between">
+              {editingCalendar && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleCalendarDelete(editingCalendar)}
+                  disabled={calendarSaving}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {calendarSaving ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Delete
+                </Button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => goBack("calendars")}
+                  disabled={calendarSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCalendarUpdate}
+                  disabled={calendarSaving || !calendarName.trim()}
+                >
+                  {calendarSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1632,30 +1696,32 @@ export function CommandPalette({
   if (currentView === "events") {
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">Events</h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Actions">
-            <CommandItem
-              onSelect={() => {
-                resetEventForm();
-                setCurrentView("event-editor");
-              }}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("main")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Create New Event</span>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">Events</h2>
+          </div>
+          <CommandList>
+            <CommandGroup heading="Actions">
+              <CommandItem
+                onSelect={() => {
+                  resetEventForm();
+                  goForward("event-editor");
+                }}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Create New Event</span>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1678,257 +1744,267 @@ export function CommandPalette({
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setCurrentView("events")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            {selectedEvent?.id ? "Edit Event" : "Create Event"}
-          </h2>
-        </div>
+        <TransitionContainer direction={transitionDirection}>
+          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+            <button
+              onClick={() => goBack("events")}
+              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <h2 className="text-lg font-semibold text-foreground">
+              {selectedEvent?.id ? "Edit Event" : "Create Event"}
+            </h2>
+          </div>
 
-        <div className="max-h-[80vh] overflow-y-auto">
-          <div className="p-6 space-y-6">
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="event-title" className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                Title
-              </Label>
-              <Input
-                id="event-title"
-                value={eventTitle}
-                onChange={(e) => setEventTitle(e.target.value)}
-                placeholder="Enter event title"
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="event-description">Description</Label>
-              <Textarea
-                id="event-description"
-                value={eventDescription}
-                onChange={(e) => setEventDescription(e.target.value)}
-                rows={3}
-                placeholder="Enter event description"
-              />
-            </div>
-
-            {/* Calendar Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="event-calendar">Calendar</Label>
-              <Select
-                value={eventCalendarId}
-                onValueChange={setEventCalendarId}
-              >
-                <SelectTrigger id="event-calendar">
-                  <SelectValue placeholder="Select a calendar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {calendars.map((calendar) => (
-                    <SelectItem key={calendar.id} value={calendar.id}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-3 rounded-full"
-                          style={{ backgroundColor: calendar.color }}
-                        />
-                        {calendar.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Date and Time */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Start Date */}
+          <div className="max-h-[80vh] overflow-y-auto">
+            <div className="p-6 space-y-6">
+              {/* Title */}
               <div className="space-y-2">
-                <Label>Start Date</Label>
-                <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between px-3 font-normal"
+                <Label
+                  htmlFor="event-title"
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Title
+                </Label>
+                <Input
+                  id="event-title"
+                  value={eventTitle}
+                  onChange={(e) => setEventTitle(e.target.value)}
+                  placeholder="Enter event title"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="event-description">Description</Label>
+                <Textarea
+                  id="event-description"
+                  value={eventDescription}
+                  onChange={(e) => setEventDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Enter event description"
+                />
+              </div>
+
+              {/* Calendar Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="event-calendar">Calendar</Label>
+                <Select
+                  value={eventCalendarId}
+                  onValueChange={setEventCalendarId}
+                >
+                  <SelectTrigger id="event-calendar">
+                    <SelectValue placeholder="Select a calendar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {calendars.map((calendar) => (
+                      <SelectItem key={calendar.id} value={calendar.id}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="size-3 rounded-full"
+                            style={{ backgroundColor: calendar.color }}
+                          />
+                          {calendar.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Start Date */}
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between px-3 font-normal"
+                      >
+                        <span>
+                          {eventStartDate
+                            ? format(eventStartDate, "PPP")
+                            : "Pick a date"}
+                        </span>
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2" align="start">
+                      <CalendarUI
+                        mode="single"
+                        selected={eventStartDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setEventStartDate(date);
+                            if (isBefore(eventEndDate, date))
+                              setEventEndDate(date);
+                            setStartDateOpen(false);
+                          }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Start Time */}
+                {!eventAllDay && (
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Select
+                      value={eventStartTime}
+                      onValueChange={setEventStartTime}
                     >
-                      <span>
-                        {eventStartDate
-                          ? format(eventStartDate, "PPP")
-                          : "Pick a date"}
-                      </span>
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-2" align="start">
-                    <CalendarUI
-                      mode="single"
-                      selected={eventStartDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setEventStartDate(date);
-                          if (isBefore(eventEndDate, date))
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select time" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* End Date */}
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between px-3 font-normal"
+                      >
+                        <span>
+                          {eventEndDate
+                            ? format(eventEndDate, "PPP")
+                            : "Pick a date"}
+                        </span>
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2" align="start">
+                      <CalendarUI
+                        mode="single"
+                        selected={eventEndDate}
+                        disabled={{ before: eventStartDate }}
+                        onSelect={(date) => {
+                          if (date) {
                             setEventEndDate(date);
-                          setStartDateOpen(false);
-                        }
-                      }}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Start Time */}
-              {!eventAllDay && (
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Select
-                    value={eventStartTime}
-                    onValueChange={setEventStartTime}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {timeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                            setEndDateOpen(false);
+                          }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
-              )}
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* End Date */}
-              <div className="space-y-2">
-                <Label>End Date</Label>
-                <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between px-3 font-normal"
+                {/* End Time */}
+                {!eventAllDay && (
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Select
+                      value={eventEndTime}
+                      onValueChange={setEventEndTime}
                     >
-                      <span>
-                        {eventEndDate
-                          ? format(eventEndDate, "PPP")
-                          : "Pick a date"}
-                      </span>
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-2" align="start">
-                    <CalendarUI
-                      mode="single"
-                      selected={eventEndDate}
-                      disabled={{ before: eventStartDate }}
-                      onSelect={(date) => {
-                        if (date) {
-                          setEventEndDate(date);
-                          setEndDateOpen(false);
-                        }
-                      }}
-                    />
-                  </PopoverContent>
-                </Popover>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select time" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {timeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
-              {/* End Time */}
-              {!eventAllDay && (
-                <div className="space-y-2">
-                  <Label>End Time</Label>
-                  <Select value={eventEndTime} onValueChange={setEventEndTime}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {timeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              {/* All Day Toggle */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="all-day"
+                  checked={eventAllDay}
+                  onCheckedChange={(checked) =>
+                    setEventAllDay(checked === true)
+                  }
+                />
+                <Label htmlFor="all-day">All day event</Label>
+              </div>
+
+              {/* Location */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="event-location"
+                  className="flex items-center gap-2"
+                >
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  Location
+                </Label>
+                <Input
+                  id="event-location"
+                  value={eventLocation}
+                  onChange={(e) => setEventLocation(e.target.value)}
+                  placeholder="Enter event location"
+                />
+              </div>
             </div>
 
-            {/* All Day Toggle */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="all-day"
-                checked={eventAllDay}
-                onCheckedChange={(checked) => setEventAllDay(checked === true)}
-              />
-              <Label htmlFor="all-day">All day event</Label>
-            </div>
-
-            {/* Location */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="event-location"
-                className="flex items-center gap-2"
-              >
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                Location
-              </Label>
-              <Input
-                id="event-location"
-                value={eventLocation}
-                onChange={(e) => setEventLocation(e.target.value)}
-                placeholder="Enter event location"
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-between">
-            {selectedEvent?.id && (
-              <Button
-                variant="outline"
-                onClick={handleEventDelete}
-                disabled={eventSaving}
-                className="text-destructive hover:text-destructive"
-              >
-                {eventSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
-                )}
-                Delete
-              </Button>
-            )}
-            <div className="flex gap-2 ml-auto">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentView("events")}
-                disabled={eventSaving}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleEventSave}
-                disabled={eventSaving || !eventCalendarId}
-              >
-                {eventSaving ? (
-                  <>
+            {/* Action Buttons */}
+            <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-between">
+              {selectedEvent?.id && (
+                <Button
+                  variant="outline"
+                  onClick={handleEventDelete}
+                  disabled={eventSaving}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {eventSaving ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </>
-                )}
-              </Button>
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Delete
+                </Button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => goBack("events")}
+                  disabled={eventSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleEventSave}
+                  disabled={eventSaving || !eventCalendarId}
+                >
+                  {eventSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </TransitionContainer>
       </CommandDialog>
     );
   }
@@ -1936,23 +2012,27 @@ export function CommandPalette({
   // Other views fallback
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-        <button
-          onClick={() => setCurrentView("main")}
-          className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </button>
-        <h2 className="text-lg font-semibold text-foreground">Settings</h2>
-      </div>
-      <CommandList>
-        <CommandGroup heading="Status">
-          <CommandItem disabled className="px-4 py-3 opacity-60">
-            <Settings className="mr-3 h-4 w-4 text-muted-foreground" />
-            <span className="text-foreground">This section is coming soon</span>
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
+      <TransitionContainer direction={transitionDirection}>
+        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+          <button
+            onClick={() => goBack("main")}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <h2 className="text-lg font-semibold text-foreground">Settings</h2>
+        </div>
+        <CommandList>
+          <CommandGroup heading="Status">
+            <CommandItem disabled className="px-4 py-3 opacity-60">
+              <Settings className="mr-3 h-4 w-4 text-muted-foreground" />
+              <span className="text-foreground">
+                This section is coming soon
+              </span>
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </TransitionContainer>
     </CommandDialog>
   );
 }
