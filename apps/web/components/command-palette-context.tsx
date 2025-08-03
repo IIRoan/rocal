@@ -28,13 +28,11 @@ interface CommandPaletteProviderProps {
     eventToEdit?: CalendarEvent | null;
     onEventSaved?: () => void;
   }>;
-  onEventSaved?: () => void;
 }
 
 export function CommandPaletteProvider({ 
   children, 
-  CommandPaletteComponent,
-  onEventSaved 
+  CommandPaletteComponent
 }: CommandPaletteProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
@@ -65,7 +63,6 @@ export function CommandPaletteProvider({
         onOpenChange={closePalette}
         eventToEdit={eventToEdit}
         onEventSaved={() => {
-          onEventSaved?.();
           setEventToEdit(null);
         }}
       />

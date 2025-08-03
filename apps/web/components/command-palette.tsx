@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSettings } from "@/hooks/use-settings";
-import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
 import { format, isBefore } from "date-fns";
 import { toast } from "sonner";
@@ -174,7 +174,7 @@ export function CommandPalette({
   eventToEdit,
   onEventSaved,
 }: CommandPaletteProps) {
-  const calendarData = useCalendarData({ autoRefetch: true });
+  const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
 

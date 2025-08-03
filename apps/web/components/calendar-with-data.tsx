@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   EventCalendar,
   CalendarView,
@@ -14,7 +14,7 @@ import {
   startOfMonth,
   endOfMonth,
 } from "date-fns";
-import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
 
@@ -74,11 +74,17 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     return { start, end };
   }, [initialView, settings?.weekStartDay]);
 
-  // Use the calendar data hook with the calculated date range
-  const calendarData = useCalendarData({
-    initialDateRange: defaultDateRange,
-    autoRefetch: true,
-  });
+  // Use the shared calendar data
+  const calendarData = useSharedCalendarData();
+
+  // Set the date range when component mounts (only once)
+  const initializedRef = useRef(false);
+  React.useEffect(() => {
+    if (!initializedRef.current) {
+      calendarData.setDateRange(defaultDateRange);
+      initializedRef.current = true;
+    }
+  }, []); // Empty dependency array - only run once
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(
@@ -94,46 +100,31 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     [settings?.theme, updateSettings],
   );
 
-  // Optimized event filtering with memoized visibility check
-  const transformedEvents = useMemo(() => {
-    // Pre-compute visible calendar IDs once for better performance
-    const visibleCalendarIds = new Set(
+  // Optimized event filtering with deep memoization
+  const visibleCalendarIds = useMemo(() => {
+    return new Set(
       calendarData.calendars
         .filter((cal) => isCalendarVisible(cal.id))
         .map((cal) => cal.id),
     );
+  }, [calendarData.calendars, isCalendarVisible]);
 
+  const transformedEvents = useMemo(() => {
     const transformedEventsList = calendarData.events
-      .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup instead of function call per event
-      .map((event) => {
-        const transformed = {
-          ...event,
-          description: event.description ?? undefined,
-          color: (event.color ?? undefined) as any,
-          location: event.location ?? undefined,
-          categoryId: event.categoryId ?? undefined,
-          reminder: (event as any).reminder ?? undefined,
-        };
-
-        // Debug logging
-        if (event.id && (event as any).reminder !== undefined) {
-          console.log(
-            "Event with reminder:",
-            event.id,
-            "reminder value:",
-            (event as any).reminder,
-            "transformed:",
-            transformed.reminder,
-          );
-        }
-
-        return transformed;
-      });
+      .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup
+      .map((event) => ({
+        ...event,
+        description: event.description ?? undefined,
+        color: (event.color ?? undefined) as any,
+        location: event.location ?? undefined,
+        categoryId: event.categoryId ?? undefined,
+        reminder: (event as any).reminder ?? undefined,
+      }));
 
     return transformedEventsList;
-  }, [calendarData.events, calendarData.calendars, isCalendarVisible]);
+  }, [calendarData.events, visibleCalendarIds]); // Remove isCalendarVisible from deps
 
-  // Don't render until settings are loaded to ensure proper initial view
+  // Show loading state only for settings, render calendar with loading state for data
   if (settingsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -142,14 +133,17 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     );
   }
 
+  // Early return optimized calendar with loading states
+  const isInitialLoad = calendarData.loading && calendarData.events.length === 0;
+
   return (
     <EventCalendar
       className={className}
       initialView={initialView}
       events={transformedEvents}
       categories={calendarData.categories}
-      loading={calendarData.loading}
-      eventsLoading={calendarData.eventsLoading}
+      loading={isInitialLoad} // Only show loading for initial load
+      eventsLoading={calendarData.eventsLoading && calendarData.events.length === 0} // Optimize loading state
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}
