@@ -35,7 +35,6 @@ import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
 import { WeekView } from "./week-view";
-import { EventDialog } from "./event-dialog";
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
@@ -85,8 +84,10 @@ export interface EventCalendarProps {
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
   onUpdateNotifications?: (
     eventId: string,
-    notifications: EventNotification[],
+    notifications: EventNotification[]
   ) => Promise<void>;
+  // Command palette integration
+  onEventEdit?: (event: CalendarEvent) => void;
 }
 
 export function EventCalendar({
@@ -113,6 +114,7 @@ export function EventCalendar({
   themeSettings,
   onLoadNotifications,
   onUpdateNotifications,
+  onEventEdit,
 }: EventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
@@ -122,10 +124,6 @@ export function EventCalendar({
   useEffect(() => {
     setView(initialView);
   }, [initialView]);
-  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null,
-  );
   const { open } = useSidebar();
 
   // Calculate date range based on current view and date
@@ -169,9 +167,7 @@ export function EventCalendar({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if user is typing in an input, textarea or contentEditable element
-      // or if the event dialog is open
       if (
-        isEventDialogOpen ||
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && e.target.isContentEditable)
@@ -200,7 +196,7 @@ export function EventCalendar({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isEventDialogOpen]);
+  }, []);
 
   const handlePrevious = () => {
     if (view === "month") {
@@ -233,9 +229,13 @@ export function EventCalendar({
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
-    console.log("Event selected:", event); // Debug log
-    setSelectedEvent(event);
-    setIsEventDialogOpen(true);
+    console.log("Event selected for editing:", {
+      id: event.id,
+      title: event.title,
+      eventObject: event,
+    });
+    // Open command palette with event to edit
+    onEventEdit?.(event);
   };
 
   const handleEventCreate = (startTime: Date) => {
@@ -257,22 +257,22 @@ export function EventCalendar({
     }
 
     const newEvent: CalendarEvent = {
-      id: "",
+      id: undefined as any, // This ensures it's treated as a new event
       title: "",
       start: startTime,
       end: addMinutesToDate(startTime, defaultEventDuration), // Use default duration from settings
       allDay: false,
-      calendarId: "",
+      calendarId: defaultCalendarId || "",
       userId: "",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    setSelectedEvent(newEvent);
-    setIsEventDialogOpen(true);
+    // Open command palette with new event
+    onEventEdit?.(newEvent);
   };
 
   const handleEventSave = async (
-    event: CalendarEvent,
+    event: CalendarEvent
   ): Promise<CalendarEvent> => {
     try {
       const eventData = {
@@ -309,8 +309,7 @@ export function EventCalendar({
         });
       }
 
-      setIsEventDialogOpen(false);
-      setSelectedEvent(null);
+      // No longer needed as we use command palette
 
       // Return the saved event, or the original event if savedEvent is undefined
       return savedEvent || event;
@@ -366,8 +365,7 @@ export function EventCalendar({
 
       await deleteEvent(eventId);
 
-      setIsEventDialogOpen(false);
-      setSelectedEvent(null);
+      // No longer needed as we use command palette
 
       // Show success toast notification when an event is deleted
       if (deletedEvent) {
@@ -438,7 +436,7 @@ export function EventCalendar({
       toast.success(`Event "${updatedEvent.title}" moved`, {
         description: format(
           new Date(updatedEvent.start),
-          "MMM d, yyyy 'at' h:mm a",
+          "MMM d, yyyy 'at' h:mm a"
         ),
         position: "bottom-left",
       });
@@ -575,7 +573,7 @@ export function EventCalendar({
           <div
             className={cn(
               "flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
-              className,
+              className
             )}
           >
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
@@ -638,7 +636,7 @@ export function EventCalendar({
                         now.getHours(),
                         now.getMinutes(),
                         0,
-                        0,
+                        0
                       );
                       const minutes = startTime.getMinutes();
                       const remainder = minutes % 15;
@@ -740,24 +738,7 @@ export function EventCalendar({
             )}
           </div>
 
-          <EventDialog
-            event={selectedEvent}
-            isOpen={isEventDialogOpen}
-            onClose={() => {
-              setIsEventDialogOpen(false);
-              setSelectedEvent(null);
-            }}
-            onSave={handleEventSave}
-            onDelete={handleEventDelete}
-            loading={loading}
-            error={error}
-            timeFormat={timeFormat}
-            defaultReminder={defaultReminder}
-            defaultEventDuration={defaultEventDuration}
-            defaultCalendarId={defaultCalendarId}
-            onLoadNotifications={onLoadNotifications}
-            onUpdateNotifications={onUpdateNotifications}
-          />
+          {/* Event editing now handled by command palette */}
         </CalendarDndProvider>
       </div>
     </ErrorBoundary>
