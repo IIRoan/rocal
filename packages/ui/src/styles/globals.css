@@ -5,199 +5,194 @@
 
 @import "tw-animate-css";
 
+/* Dark mode via class on root element */
 @custom-variant dark (&:is(.dark *));
 
+/* Design tokens: light (default) */
 :root {
-  /* Base radius for consistent rounded corners */
+  /* Spacing/radius */
   --radius: 0.625rem;
 
-  /* Light Theme - Clean and warm */
-  /* Base surfaces with clear hierarchy */
-  --background: oklch(0.99 0.002 286); /* Pure app background */
-  --foreground: oklch(0.15 0.008 285.8); /* Primary text */
+  /* Base surfaces */
+  --background: oklch(0.99 0.002 286);
+  --foreground: oklch(0.16 0.008 286);
 
-  /* Elevated surfaces - clear distinction */
-  --card: oklch(0.985 0.003 286); /* Cards elevated from background */
-  --card-foreground: oklch(0.15 0.008 285.8);
+  /* Elevation */
+  --card: oklch(0.985 0.003 286);
+  --card-foreground: var(--foreground);
 
-  --popover: oklch(
-    0.995 0.001 286
-  ); /* Highest elevation for floating elements */
-  --popover-foreground: oklch(0.15 0.008 285.8);
+  --popover: oklch(0.995 0.001 286);
+  --popover-foreground: var(--foreground);
 
-  /* Interactive colors */
-  --primary: oklch(0.22 0.012 285.9); /* Deep purple for primary actions */
-  --primary-foreground: oklch(0.99 0.002 286);
+  /* Interactive */
+  --primary: oklch(0.25 0.045 285.5); /* clearer contrast vs light bg */
+  --primary-foreground: oklch(0.995 0.002 286);
 
-  --secondary: oklch(
-    0.955 0.005 286.2
-  ); /* Light purple for secondary actions */
-  --secondary-foreground: oklch(0.22 0.012 285.9);
+  --secondary: oklch(0.97 0.006 286);
+  --secondary-foreground: oklch(0.26 0.03 286);
 
-  /* Muted elements */
-  --muted: oklch(0.96 0.004 286.2); /* Subtle background areas */
-  --muted-foreground: oklch(0.5 0.015 285.95); /* Secondary text */
+  /* Muted */
+  --muted: oklch(0.965 0.004 286);
+  --muted-foreground: oklch(0.45 0.02 286);
 
-  /* Accent system - warm highlights */
-  --accent: oklch(0.88 0.03 65); /* Warm beige for highlights */
-  --accent-foreground: oklch(0.22 0.012 285.9);
+  /* Accent (warm, subtle) */
+  --accent: oklch(0.9 0.03 65);
+  --accent-foreground: oklch(0.26 0.03 286);
 
-  /* Form elements - distinct from cards */
-  --input: oklch(0.975 0.002 286); /* Distinct input background */
-  --input-foreground: oklch(0.15 0.008 285.8);
+  /* Inputs */
+  --input: oklch(0.982 0.003 286);
+  --input-foreground: var(--foreground);
 
-  /* Utility colors */
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.99 0.002 286);
+  /* Utility */
+  --destructive: oklch(0.62 0.22 27); /* red, AA on light */
+  --destructive-foreground: oklch(0.995 0.002 286);
 
-  --border: oklch(0.92 0.008 286); /* Subtle borders */
-  --ring: oklch(0.65 0.08 55); /* Warm focus rings */
+  --border: oklch(0.9 0.01 286); /* a bit stronger for clearer separation */
+  --ring: oklch(0.65 0.09 55);
 
-  /* Chart colors - cohesive palette */
-  --chart-1: oklch(0.55 0.18 285.9); /* Purple */
-  --chart-2: oklch(0.6 0.15 320); /* Magenta */
-  --chart-3: oklch(0.65 0.12 250); /* Blue */
-  --chart-4: oklch(0.7 0.1 200); /* Cyan */
-  --chart-5: oklch(0.75 0.08 150); /* Teal */
+  /* Charts */
+  --chart-1: oklch(0.55 0.18 285.9);
+  --chart-2: oklch(0.6 0.15 320);
+  --chart-3: oklch(0.65 0.12 250);
+  --chart-4: oklch(0.7 0.1 200);
+  --chart-5: oklch(0.75 0.08 150);
 
-  /* Sidebar colors - warm navigation theme */
-  --sidebar: oklch(0.975 0.008 65); /* Warm sidebar background */
-  --sidebar-foreground: oklch(0.15 0.008 285.8);
-  --sidebar-primary: oklch(0.22 0.012 285.9);
-  --sidebar-primary-foreground: oklch(0.99 0.002 286);
-  --sidebar-accent: oklch(0.92 0.025 65); /* Warm sidebar highlights */
-  --sidebar-accent-foreground: oklch(0.22 0.012 285.9);
-  --sidebar-border: oklch(0.88 0.02 65); /* Warm sidebar borders */
-  --sidebar-ring: oklch(0.65 0.08 55);
+  /* Sidebar */
+  --sidebar: oklch(0.985 0.008 65);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.94 0.02 65);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(0.88 0.02 65);
+  --sidebar-ring: var(--ring);
 
-  /* Calendar-specific colors */
-  --calendar-accent: oklch(0.6 0.08 55); /* Rich calendar highlights */
-  --calendar-accent-bg: oklch(0.85 0.02 65); /* Light calendar backgrounds */
+  /* Calendar */
+  --calendar-accent: oklch(0.62 0.09 55);
+  --calendar-accent-bg: oklch(0.9 0.02 65);
 
-  /* Calendar day indicators */
-  --calendar-workday: oklch(0.97 0.005 45); /* barely-there beige */
-  --calendar-weekend: oklch(0.97 0.005 75); /* equally light, hint warmer */
+  --calendar-workday: oklch(0.98 0.004 45);
+  --calendar-weekend: oklch(0.975 0.006 75);
 
-  /* Event colors - semantic and accessible */
-  --event-sky: oklch(0.85 0.08 250); /* Sky blue events */
-  --event-sky-foreground: oklch(0.25 0.12 250);
-  --event-violet: oklch(0.85 0.08 285); /* Violet events */
-  --event-violet-foreground: oklch(0.25 0.12 285);
-  --event-orange: oklch(0.85 0.08 65); /* Orange events */
-  --event-orange-foreground: oklch(0.25 0.12 65);
-  --event-rose: oklch(0.85 0.08 15); /* Rose events */
-  --event-rose-foreground: oklch(0.25 0.12 15);
-  --event-emerald: oklch(0.85 0.08 150); /* Emerald events */
-  --event-emerald-foreground: oklch(0.25 0.12 150);
-  --event-default: oklch(0.85 0.08 250); /* Default event color */
-  --event-default-foreground: oklch(0.25 0.12 250);
+  /* Events */
+  --event-sky: oklch(0.86 0.09 250);
+  --event-sky-foreground: oklch(0.28 0.12 250);
+  --event-violet: oklch(0.86 0.09 285);
+  --event-violet-foreground: oklch(0.28 0.12 285);
+  --event-orange: oklch(0.86 0.09 65);
+  --event-orange-foreground: oklch(0.28 0.12 65);
+  --event-rose: oklch(0.86 0.09 15);
+  --event-rose-foreground: oklch(0.28 0.12 15);
+  --event-emerald: oklch(0.86 0.09 150);
+  --event-emerald-foreground: oklch(0.28 0.12 150);
+  --event-default: var(--event-sky);
+  --event-default-foreground: var(--event-sky-foreground);
 
-  /* Success and warning states */
-  --success: oklch(0.75 0.08 150);
-  --success-foreground: oklch(0.99 0.002 286);
-  --warning: oklch(0.8 0.1 85);
-  --warning-foreground: oklch(0.15 0.008 285.8);
+  /* Status */
+  --success: oklch(0.78 0.12 150);
+  --success-foreground: oklch(0.995 0.002 286);
+  --warning: oklch(0.84 0.14 85);
+  --warning-foreground: var(--foreground);
 
-  /* Info/notification states */
-  --info: oklch(0.7 0.12 250);
-  --info-foreground: oklch(0.99 0.002 286);
-  --info-bg: oklch(0.95 0.02 250);
-  --info-border: oklch(0.85 0.08 250);
+  /* Info */
+  --info: oklch(0.72 0.16 250);
+  --info-foreground: oklch(0.995 0.002 286);
+  --info-bg: oklch(0.95 0.03 250);
+  --info-border: oklch(0.83 0.09 250);
 }
 
+/* Design tokens: dark */
 .dark {
-  /* Dark Theme - Deep and rich */
-  /* Base surfaces with clear hierarchy */
-  --background: oklch(0.12 0.008 286); /* Deep app background */
-  --foreground: oklch(0.95 0.003 286); /* High contrast text */
+  /* Base */
+  --background: oklch(0.12 0.008 286);
+  --foreground: oklch(0.96 0.004 286);
 
-  /* Elevated surfaces - clear distinction */
-  --card: oklch(0.16 0.01 286); /* Cards elevated from background */
-  --card-foreground: oklch(0.95 0.003 286);
+  /* Elevation */
+  --card: oklch(0.16 0.01 286);
+  --card-foreground: var(--foreground);
 
-  --popover: oklch(0.14 0.009 286); /* Floating elements */
-  --popover-foreground: oklch(0.95 0.003 286);
+  --popover: oklch(0.14 0.009 286);
+  --popover-foreground: var(--foreground);
 
-  /* Interactive colors - bright and accessible */
-  --primary: oklch(0.72 0.04 285.95); /* Bright purple for primary actions */
-  --primary-foreground: oklch(0.12 0.008 285.8);
+  /* Interactive */
+  --primary: oklch(0.72 0.05 285.5);
+  --primary-foreground: oklch(0.13 0.01 286);
 
-  --secondary: oklch(0.25 0.015 285.85); /* Dark purple for secondary actions */
-  --secondary-foreground: oklch(0.95 0.003 286);
+  --secondary: oklch(0.22 0.012 286);
+  --secondary-foreground: var(--foreground);
 
-  /* Muted elements */
-  --muted: oklch(0.18 0.01 286); /* Subtle background areas */
-  --muted-foreground: oklch(0.75 0.02 285.9); /* Secondary text */
+  /* Muted */
+  --muted: oklch(0.18 0.01 286);
+  --muted-foreground: oklch(0.78 0.02 286);
 
-  /* Accent system - warm highlights for dark mode */
-  --accent: oklch(0.65 0.08 55); /* Warm beige highlights */
-  --accent-foreground: oklch(0.95 0.003 286);
+  /* Accent */
+  --accent: oklch(0.68 0.11 55);
+  --accent-foreground: var(--foreground);
 
-  /* Form elements - distinct warm tone */
-  --input: oklch(0.2 0.012 286); /* Distinct input background */
-  --input-foreground: oklch(0.95 0.003 286);
+  /* Inputs */
+  --input: oklch(0.2 0.012 286);
+  --input-foreground: var(--foreground);
 
-  /* Utility colors */
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.95 0.003 286);
+  /* Utility */
+  --destructive: oklch(0.7 0.19 22);
+  --destructive-foreground: var(--foreground);
 
-  --border: oklch(0.24 0.012 286); /* Subtle purple borders */
-  --ring: oklch(0.7 0.1 55); /* Warm focus rings */
+  --border: oklch(0.28 0.012 286); /* stronger than muted for separation */
+  --ring: oklch(0.73 0.12 55);
 
-  /* Chart colors - vibrant dark theme palette */
-  --chart-1: oklch(0.65 0.25 285.9); /* Bright purple */
-  --chart-2: oklch(0.7 0.2 320); /* Bright magenta */
-  --chart-3: oklch(0.75 0.18 250); /* Bright blue */
-  --chart-4: oklch(0.8 0.15 200); /* Bright cyan */
-  --chart-5: oklch(0.85 0.12 150); /* Bright teal */
+  /* Charts */
+  --chart-1: oklch(0.67 0.25 285.9);
+  --chart-2: oklch(0.72 0.22 320);
+  --chart-3: oklch(0.77 0.19 250);
+  --chart-4: oklch(0.82 0.16 200);
+  --chart-5: oklch(0.86 0.13 150);
 
-  /* Sidebar colors - consistent with main theme */
-  --sidebar: oklch(0.15 0.01 285.85); /* Dark purple sidebar */
-  --sidebar-foreground: oklch(0.9 0.005 286);
-  --sidebar-primary: oklch(0.72 0.04 285.95);
-  --sidebar-primary-foreground: oklch(0.12 0.008 285.8);
-  --sidebar-accent: oklch(0.28 0.015 285.85); /* Purple sidebar highlights */
-  --sidebar-accent-foreground: oklch(0.9 0.005 286);
-  --sidebar-border: oklch(0.22 0.012 285.85); /* Purple sidebar borders */
-  --sidebar-ring: oklch(0.7 0.1 55);
+  /* Sidebar */
+  --sidebar: oklch(0.16 0.012 286);
+  --sidebar-foreground: oklch(0.92 0.004 286);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.26 0.015 286);
+  --sidebar-accent-foreground: var(--sidebar-foreground);
+  --sidebar-border: oklch(0.24 0.012 286);
+  --sidebar-ring: var(--ring);
 
-  /* Calendar-specific colors for dark mode */
-  --calendar-accent: oklch(0.7 0.1 55); /* Rich warm calendar highlights */
-  --calendar-accent-bg: oklch(0.35 0.02 55); /* Warm calendar backgrounds */
+  /* Calendar */
+  --calendar-accent: var(--accent);
+  --calendar-accent-bg: oklch(0.34 0.02 55);
 
-  /* Calendar day indicators for dark mode */
-  --calendar-workday: oklch(0.28 0.015 45); /* gentler charcoal-beige */
-  --calendar-weekend: oklch(0.3 0.018 75); /* softer warm charcoal */
+  --calendar-workday: oklch(0.22 0.01 45);
+  --calendar-weekend: oklch(0.245 0.014 75);
 
-  /* Event colors for dark mode */
-  --event-sky: oklch(0.4 0.15 250); /* Sky blue events */
-  --event-sky-foreground: oklch(0.85 0.08 250);
-  --event-violet: oklch(0.4 0.15 285); /* Violet events */
-  --event-violet-foreground: oklch(0.85 0.08 285);
-  --event-orange: oklch(0.4 0.15 65); /* Orange events */
-  --event-orange-foreground: oklch(0.85 0.08 65);
-  --event-rose: oklch(0.4 0.15 15); /* Rose events */
-  --event-rose-foreground: oklch(0.85 0.08 15);
-  --event-emerald: oklch(0.4 0.15 150); /* Emerald events */
-  --event-emerald-foreground: oklch(0.85 0.08 150);
-  --event-default: oklch(0.4 0.15 250); /* Default event color */
-  --event-default-foreground: oklch(0.85 0.08 250);
+  /* Events */
+  --event-sky: oklch(0.45 0.15 250);
+  --event-sky-foreground: oklch(0.9 0.06 250);
+  --event-violet: oklch(0.45 0.15 285);
+  --event-violet-foreground: oklch(0.9 0.06 285);
+  --event-orange: oklch(0.45 0.15 65);
+  --event-orange-foreground: oklch(0.9 0.06 65);
+  --event-rose: oklch(0.45 0.15 15);
+  --event-rose-foreground: oklch(0.9 0.06 15);
+  --event-emerald: oklch(0.45 0.15 150);
+  --event-emerald-foreground: oklch(0.9 0.06 150);
+  --event-default: var(--event-sky);
+  --event-default-foreground: var(--event-sky-foreground);
 
-  /* Success and warning states */
-  --success: oklch(0.65 0.15 150);
-  --success-foreground: oklch(0.95 0.003 286);
-  --warning: oklch(0.7 0.15 85);
-  --warning-foreground: oklch(0.12 0.008 286);
+  /* Status */
+  --success: oklch(0.68 0.15 150);
+  --success-foreground: var(--foreground);
+  --warning: oklch(0.72 0.16 85);
+  --warning-foreground: oklch(0.12 0.01 286);
 
-  /* Info/notification states for dark mode */
-  --info: oklch(0.75 0.18 250);
-  --info-foreground: oklch(0.95 0.003 286);
-  --info-bg: oklch(0.25 0.02 250);
-  --info-border: oklch(0.35 0.08 250);
+  /* Info */
+  --info: oklch(0.78 0.18 250);
+  --info-foreground: var(--foreground);
+  --info-bg: oklch(0.26 0.03 250);
+  --info-border: oklch(0.38 0.09 250);
 }
 
+/* Tailwind color aliases */
 @theme inline {
-  /* Color mappings for Tailwind */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -218,11 +213,13 @@
   --color-input: var(--input);
   --color-input-foreground: var(--input-foreground);
   --color-ring: var(--ring);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -238,7 +235,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Sidebar colors */
+  /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -248,13 +245,13 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Calendar-specific colors */
+  /* Calendar */
   --color-calendar-accent: var(--calendar-accent);
   --color-calendar-accent-bg: var(--calendar-accent-bg);
   --color-calendar-workday: var(--calendar-workday);
   --color-calendar-weekend: var(--calendar-weekend);
 
-  /* Event colors */
+  /* Events */
   --color-event-sky: var(--event-sky);
   --color-event-sky-foreground: var(--event-sky-foreground);
   --color-event-violet: var(--event-violet);
@@ -267,105 +264,140 @@
   --color-event-emerald-foreground: var(--event-emerald-foreground);
   --color-event-default: var(--event-default);
   --color-event-default-foreground: var(--event-default-foreground);
+
+  /* Event color utility mapping used in UI controls (e.g., selects) */
+  --color-blue-400: var(--event-sky);
+  --color-emerald-400: var(--event-emerald);
+  --color-orange-400: var(--event-orange);
+  --color-violet-400: var(--event-violet);
+  --color-rose-400: var(--event-rose);
 }
 
 @layer base {
+  /* Improve contrast on borders and focus outlines globally */
   * {
     @apply border-border outline-ring/50;
   }
 
   body {
     @apply bg-background text-foreground;
-    /* Smooth transitions for theme switching */
     transition:
-      background-color 0.3s ease,
-      color 0.3s ease;
+      background-color 0.25s ease,
+      color 0.25s ease;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Enhanced form element styling */
+  /* Form fields: clearer separation from cards/background */
   input,
   textarea,
   select {
-    @apply bg-input text-input-foreground border-border;
+    @apply bg-input text-input-foreground border border-border;
+    box-shadow: inset 0 1px 0
+      color-mix(in oklch, var(--background) 70%, transparent);
     transition:
-      background-color 0.2s ease,
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: color-mix(in oklch, var(--muted-foreground) 75%, transparent);
   }
 
   input:focus,
   textarea:focus,
   select:focus {
     @apply ring-2 ring-ring border-ring;
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--ring) 25%, transparent),
+      inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
   }
 
-  /* Improved button hover states */
+  /* Buttons: consistent hover/focus feedback */
+  button {
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.06s ease;
+  }
   button:hover:not(:disabled) {
-    transition: all 0.2s ease;
+    transform: translateY(-0.5px);
+  }
+  button:active:not(:disabled) {
+    transform: translateY(0);
   }
 
-  /* Enhanced focus states for accessibility */
+  /* Focus visibility for a11y */
   *:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
-  /* Calendar-specific styling */
+  /* Calendar-specific */
+  [data-today="true"] {
+    /* strengthen contrast of today indicators when used */
+    --_accent-bg: var(--color-calendar-accent-bg);
+    --_accent-fg: var(--color-calendar-accent);
+  }
+
+  /* Fix: correct var name for working day highlight */
   [data-working-day="true"] {
-    background-color: var(--calendar-working-day);
+    background-color: var(--calendar-workday);
   }
 
-  /* Improved scrollbar styling */
+  /* Scrollbar styling */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
-
   ::-webkit-scrollbar-track {
-    background: var(--muted);
-    border-radius: 4px;
+    background: color-mix(in oklch, var(--muted) 70%, transparent);
+    border-radius: 6px;
   }
-
   ::-webkit-scrollbar-thumb {
-    background: var(--accent);
-    border-radius: 4px;
-    border: 1px solid var(--border);
+    background: color-mix(in oklch, var(--accent) 70%, var(--border));
+    border: 2px solid color-mix(in oklch, var(--muted) 70%, transparent);
+    border-radius: 6px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
   }
 
-  /* Selection styling */
+  /* Text selection */
   ::selection {
     background-color: var(--accent);
     color: var(--accent-foreground);
   }
 
-  /* State-based styling */
+  /* States */
   [aria-invalid="true"] {
     border-color: var(--destructive);
-    background-color: color-mix(in oklch, var(--destructive) 5%, var(--input));
+    background-color: color-mix(in oklch, var(--destructive) 6%, var(--input));
   }
 
   [data-state="success"] {
     border-color: var(--success);
-    background-color: color-mix(in oklch, var(--success) 5%, var(--input));
+    background-color: color-mix(in oklch, var(--success) 6%, var(--input));
   }
 
   [data-state="warning"] {
     border-color: var(--warning);
-    background-color: color-mix(in oklch, var(--warning) 5%, var(--input));
+    background-color: color-mix(in oklch, var(--warning) 6%, var(--input));
   }
 
-  /* Disabled states */
+  /* Disabled */
   :disabled,
   [aria-disabled="true"] {
-    opacity: 0.6;
+    opacity: 0.55;
     cursor: not-allowed;
   }
 
-  /* Loading states */
+  /* Loading */
   [data-loading="true"] {
     opacity: 0.7;
     pointer-events: none;
