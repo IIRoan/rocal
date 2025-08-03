@@ -106,30 +106,32 @@ export function CalendarManagement({
 
   const validateCalendarForm = () => {
     const errors: { name?: string; color?: string; general?: string } = {};
-    
+
     // Check if name is empty
     if (!newCalendar.name.trim()) {
       errors.name = "Calendar name is required";
     }
-    
+
     // Check name length
     if (newCalendar.name.trim().length > 100) {
       errors.name = "Calendar name cannot exceed 100 characters";
     }
-    
+
     // Check for duplicate names (case-insensitive)
-    const existingNames = calendars.map(cal => cal.name.toLowerCase());
+    const existingNames = calendars.map((cal) => cal.name.toLowerCase());
     if (existingNames.includes(newCalendar.name.trim().toLowerCase())) {
       errors.name = "A calendar with this name already exists";
     }
-    
+
     // Validate color format
-    const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(newCalendar.color);
+    const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
+      newCalendar.color,
+    );
     const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
     if (!allowedColors.includes(newCalendar.color) && !isHexColor) {
       errors.color = "Please select a valid color";
     }
-    
+
     return errors;
   };
 
@@ -163,11 +165,15 @@ export function CalendarManagement({
     } catch (err: any) {
       // Handle specific API errors
       if (err.message && err.message.includes("already exists")) {
-        setValidationErrors({ name: "A calendar with this name already exists" });
+        setValidationErrors({
+          name: "A calendar with this name already exists",
+        });
       } else if (err.message && err.message.includes("name is required")) {
         setValidationErrors({ name: "Calendar name is required" });
       } else if (err.message && err.message.includes("exceed 100 characters")) {
-        setValidationErrors({ name: "Calendar name cannot exceed 100 characters" });
+        setValidationErrors({
+          name: "Calendar name cannot exceed 100 characters",
+        });
       } else if (err.message && err.message.includes("Color must be")) {
         setValidationErrors({ color: "Please select a valid color" });
       } else {
@@ -179,27 +185,30 @@ export function CalendarManagement({
     }
   };
 
-  const validateEditCalendarForm = (name: string, currentCalendarId: string) => {
+  const validateEditCalendarForm = (
+    name: string,
+    currentCalendarId: string,
+  ) => {
     const errors: { name?: string; color?: string; general?: string } = {};
-    
+
     // Check if name is empty
     if (!name.trim()) {
       errors.name = "Calendar name is required";
     }
-    
+
     // Check name length
     if (name.trim().length > 100) {
       errors.name = "Calendar name cannot exceed 100 characters";
     }
-    
+
     // Check for duplicate names (excluding current calendar)
     const existingNames = calendars
-      .filter(cal => cal.id !== currentCalendarId)
-      .map(cal => cal.name.toLowerCase());
+      .filter((cal) => cal.id !== currentCalendarId)
+      .map((cal) => cal.name.toLowerCase());
     if (existingNames.includes(name.trim().toLowerCase())) {
       errors.name = "A calendar with this name already exists";
     }
-    
+
     return errors;
   };
 
@@ -229,11 +238,15 @@ export function CalendarManagement({
     } catch (err: any) {
       // Handle specific API errors
       if (err.message && err.message.includes("already exists")) {
-        setValidationErrors({ name: "A calendar with this name already exists" });
+        setValidationErrors({
+          name: "A calendar with this name already exists",
+        });
       } else if (err.message && err.message.includes("name is required")) {
         setValidationErrors({ name: "Calendar name is required" });
       } else if (err.message && err.message.includes("exceed 100 characters")) {
-        setValidationErrors({ name: "Calendar name cannot exceed 100 characters" });
+        setValidationErrors({
+          name: "Calendar name cannot exceed 100 characters",
+        });
       } else if (err.message && err.message.includes("Color must be")) {
         setValidationErrors({ color: "Please select a valid color" });
       } else {
@@ -352,14 +365,24 @@ export function CalendarManagement({
                       id="newCalendarName"
                       value={newCalendar.name}
                       onChange={(e) => {
-                        setNewCalendar({ ...newCalendar, name: e.target.value });
+                        setNewCalendar({
+                          ...newCalendar,
+                          name: e.target.value,
+                        });
                         // Clear name error when user starts typing
                         if (validationErrors.name) {
-                          setValidationErrors({ ...validationErrors, name: undefined });
+                          setValidationErrors({
+                            ...validationErrors,
+                            name: undefined,
+                          });
                         }
                       }}
                       placeholder="Enter calendar name"
-                      className={validationErrors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
+                      className={
+                        validationErrors.name
+                          ? "border-red-500 focus-visible:ring-red-500"
+                          : ""
+                      }
                     />
                     {validationErrors.name && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
@@ -380,7 +403,10 @@ export function CalendarManagement({
                         });
                         // Clear color error when user selects a new color
                         if (validationErrors.color) {
-                          setValidationErrors({ ...validationErrors, color: undefined });
+                          setValidationErrors({
+                            ...validationErrors,
+                            color: undefined,
+                          });
                         }
                       }}
                       presetColors={PRESET_COLORS}
@@ -540,10 +566,17 @@ export function CalendarManagement({
                     });
                     // Clear name error when user starts typing
                     if (validationErrors.name) {
-                      setValidationErrors({ ...validationErrors, name: undefined });
+                      setValidationErrors({
+                        ...validationErrors,
+                        name: undefined,
+                      });
                     }
                   }}
-                  className={validationErrors.name ? "border-red-500 focus-visible:ring-red-500" : ""}
+                  className={
+                    validationErrors.name
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }
                 />
                 {validationErrors.name && (
                   <p className="text-sm text-red-600 flex items-center gap-1">
@@ -564,7 +597,10 @@ export function CalendarManagement({
                     });
                     // Clear color error when user selects a new color
                     if (validationErrors.color) {
-                      setValidationErrors({ ...validationErrors, color: undefined });
+                      setValidationErrors({
+                        ...validationErrors,
+                        color: undefined,
+                      });
                     }
                   }}
                   presetColors={PRESET_COLORS}
@@ -580,11 +616,14 @@ export function CalendarManagement({
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setEditingCalendar(null);
-              setValidationErrors({});
-              setError(null);
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingCalendar(null);
+                setValidationErrors({});
+                setError(null);
+              }}
+            >
               Cancel
             </Button>
             <Button
