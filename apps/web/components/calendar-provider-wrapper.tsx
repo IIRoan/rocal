@@ -8,7 +8,9 @@ interface CalendarProviderWrapperProps {
   children: ReactNode;
 }
 
-export function CalendarProviderWrapper({ children }: CalendarProviderWrapperProps) {
+export function CalendarProviderWrapper({
+  children,
+}: CalendarProviderWrapperProps) {
   const calendarData = useSharedCalendarData();
 
   return (

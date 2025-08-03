@@ -10,12 +10,16 @@ interface CommandPaletteContextType {
   openEventEditor: (event?: CalendarEvent) => void;
 }
 
-const CommandPaletteContext = createContext<CommandPaletteContextType | undefined>(undefined);
+const CommandPaletteContext = createContext<
+  CommandPaletteContextType | undefined
+>(undefined);
 
 export function useCommandPalette() {
   const context = useContext(CommandPaletteContext);
   if (!context) {
-    throw new Error("useCommandPalette must be used within a CommandPaletteProvider");
+    throw new Error(
+      "useCommandPalette must be used within a CommandPaletteProvider",
+    );
   }
   return context;
 }
@@ -30,9 +34,9 @@ interface CommandPaletteProviderProps {
   }>;
 }
 
-export function CommandPaletteProvider({ 
-  children, 
-  CommandPaletteComponent
+export function CommandPaletteProvider({
+  children,
+  CommandPaletteComponent,
 }: CommandPaletteProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
@@ -42,7 +46,7 @@ export function CommandPaletteProvider({
     setIsOpen(false);
     setEventToEdit(null);
   };
-  
+
   const openEventEditor = (event?: CalendarEvent) => {
     setEventToEdit(event || null);
     setIsOpen(true);

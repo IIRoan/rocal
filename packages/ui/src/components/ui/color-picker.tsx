@@ -103,7 +103,7 @@ export function ColorPicker({
                       "w-8 h-8 rounded border-2 transition-all hover:scale-110",
                       value === color
                         ? "border-foreground ring-2 ring-ring"
-                        : "border-border hover:border-foreground"
+                        : "border-border hover:border-foreground",
                     )}
                     style={{ backgroundColor: color }}
                     onClick={() => handlePresetClick(color)}

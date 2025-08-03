@@ -54,9 +54,7 @@ function DashboardContent() {
     <SettingsProvider>
       <CalendarDataProvider>
         <CalendarProviderWrapper>
-          <CommandPaletteProvider
-            CommandPaletteComponent={CommandPalette}
-          >
+          <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
             <SidebarProvider>
               <AppSidebar
                 user={{
