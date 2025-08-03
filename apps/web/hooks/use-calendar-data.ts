@@ -40,7 +40,7 @@ interface UseCalendarDataOptions {
   autoRefetch?: boolean;
 }
 
-interface UseCalendarDataReturn {
+export interface UseCalendarDataReturn {
   // Data
   events: CalendarEvent[];
   calendars: Calendar[];
@@ -135,6 +135,9 @@ export function useCalendarData(
     data: EventCategory[];
     timestamp: number;
   } | null>(null);
+
+  // Request deduplication
+  const pendingRequests = useRef<Map<string, Promise<any>>>(new Map());
 
   // Optimistic operations tracking
   const optimisticOperations = useRef<Map<string, OptimisticOperation>>(
@@ -246,9 +249,17 @@ export function useCalendarData(
     [isCacheValid, isDateRangeOverlapping],
   );
 
-  // Fetch events with caching
+  // Fetch events with caching and deduplication
   const fetchEvents = useCallback(
     async (dateRange: DateRange): Promise<void> => {
+      const cacheKey = getCacheKey(dateRange);
+      
+      // Check if there's already a pending request for this range
+      if (pendingRequests.current.has(cacheKey)) {
+        await pendingRequests.current.get(cacheKey);
+        return;
+      }
+
       setEventsLoading(true);
       setEventsError(null);
 
@@ -261,14 +272,17 @@ export function useCalendarData(
           return;
         }
 
-        // Fetch from API
-        const response = await calendarApiService.getEvents(
+        // Create and store the request promise
+        const requestPromise = calendarApiService.getEvents(
           dateRange.start,
           dateRange.end,
         );
+        pendingRequests.current.set(cacheKey, requestPromise);
+
+        // Fetch from API
+        const response = await requestPromise;
 
         // Update cache
-        const cacheKey = getCacheKey(dateRange);
         eventsCache.current.set(cacheKey, {
           data: response.events,
           timestamp: Date.now(),
@@ -299,6 +313,8 @@ export function useCalendarData(
         setEventsError(error as ApiError);
         setEvents([]);
       } finally {
+        // Clean up pending request
+        pendingRequests.current.delete(cacheKey);
         setEventsLoading(false);
       }
     },
@@ -433,23 +449,44 @@ export function useCalendarData(
       });
 
       try {
-        // Make API call
-        const newEvent = await calendarApiService.createEvent(event);
+        // Make API call in the background
+        const apiPromise = calendarApiService.createEvent(event);
+        
+        // Don't await immediately - let the optimistic update show first
+        setTimeout(async () => {
+          try {
+            const newEvent = await apiPromise;
 
-        // Replace optimistic event with real event
-        setEvents((prev) =>
-          prev.map((e) => (e.id === operationId ? newEvent : e)),
-        );
+            // Replace optimistic event with real event
+            setEvents((prev) =>
+              prev.map((e) => (e.id === operationId ? newEvent : e)),
+            );
 
-        // Invalidate relevant cache entries
-        eventsCache.current.clear();
+            // Smart cache invalidation
+            const eventDate = new Date(event.start);
+            const dayStart = new Date(eventDate);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(eventDate);
+            dayEnd.setHours(23, 59, 59, 999);
+            
+            for (const [key, entry] of eventsCache.current.entries()) {
+              if (entry.dateRange.start <= dayEnd && entry.dateRange.end >= dayStart) {
+                eventsCache.current.delete(key);
+              }
+            }
 
-        // Clean up operation tracking
-        cleanupOperation(operationId);
+            // Clean up operation tracking
+            cleanupOperation(operationId);
+          } catch (error) {
+            // Rollback optimistic update on failure
+            rollbackOperation(operationId);
+          }
+        }, 50); // Small delay to ensure UI updates first
 
-        return newEvent;
+        // Return the optimistic event immediately for better UX
+        return optimisticEvent;
       } catch (error) {
-        // Rollback optimistic update on failure
+        // Rollback optimistic update on immediate failure
         rollbackOperation(operationId);
         throw error as ApiError;
       }
@@ -555,8 +592,15 @@ export function useCalendarData(
           }
         });
 
-        // Invalidate relevant cache entries
-        eventsCache.current.clear();
+        // Smart cache invalidation - only invalidate cache entries that might contain this event
+        const eventStartDate = new Date(event.start || updatedEvent.start);
+        const eventEndDate = new Date(event.end || updatedEvent.end);
+        
+        for (const [key, entry] of eventsCache.current.entries()) {
+          if (entry.dateRange.start <= eventEndDate && entry.dateRange.end >= eventStartDate) {
+            eventsCache.current.delete(key);
+          }
+        }
 
         // Clean up operation tracking
         cleanupOperation(operationId);
@@ -601,8 +645,18 @@ export function useCalendarData(
         // Make API call
         await calendarApiService.deleteEvent(id);
 
-        // Invalidate relevant cache entries
-        eventsCache.current.clear();
+        // Smart cache invalidation - only invalidate cache entries that might contain this event
+        const eventDate = new Date(originalEvent.start);
+        const dayStart = new Date(eventDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(eventDate);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        for (const [key, entry] of eventsCache.current.entries()) {
+          if (entry.dateRange.start <= dayEnd && entry.dateRange.end >= dayStart) {
+            eventsCache.current.delete(key);
+          }
+        }
 
         // Clean up operation tracking
         cleanupOperation(operationId);
@@ -900,11 +954,15 @@ export function useCalendarData(
     [],
   );
 
-  // Initial data fetch
+  // Initial data fetch - load calendars and categories in parallel
   useEffect(() => {
     if (autoRefetch) {
-      fetchCalendars();
-      fetchCategories();
+      Promise.all([
+        fetchCalendars(),
+        fetchCategories()
+      ]).catch(error => {
+        console.error("Failed to load initial calendar data:", error);
+      });
     }
   }, [autoRefetch]); // Remove function dependencies to prevent infinite loops
 

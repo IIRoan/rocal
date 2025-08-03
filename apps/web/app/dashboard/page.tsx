@@ -3,17 +3,16 @@
 import { useSession, signOut } from "@/lib/auth-client";
 import { AppSidebar } from "@workspace/ui/components/layout";
 import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
-import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { CommandPalette } from "@/components/command-palette";
 import { CommandPaletteProvider } from "@/components/command-palette-context";
+import { CalendarDataProvider } from "@/components/calendar-data-provider";
+import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
 import { SettingsProvider } from "@/components/settings-provider";
-import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/hooks/use-command-palette";
 
 function DashboardContent() {
   const { data: session, isPending } = useSession();
-  const calendarData = useCalendarData({ autoRefetch: true });
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
     useCommandPalette();
 
@@ -53,44 +52,33 @@ function DashboardContent() {
 
   return (
     <SettingsProvider>
-      <CalendarProvider
-        initialCalendars={calendarData.calendars}
-        onCreateCalendar={calendarData.createCalendar}
-        onUpdateCalendar={calendarData.updateCalendar}
-      >
-        <CommandPaletteProvider
-          CommandPaletteComponent={CommandPalette}
-          onEventSaved={() => {
-            console.log("Event saved, triggering calendar refresh");
-            // Refresh only events data for faster response (optimistic updates should handle immediate changes)
-            calendarData.refetchEvents?.().then(() => {
-              console.log("Calendar events refreshed successfully");
-            }).catch(error => {
-              console.error("Failed to refresh calendar events:", error);
-            });
-          }}
-        >
-          <SidebarProvider>
-            <AppSidebar
-              user={{
-                name: session.user.name || "Unknown User",
-                email: session.user.email || "",
-                avatar: session.user.image || undefined,
-              }}
-              onLogout={handleLogout}
-              onOpenSettings={() => setCommandPaletteOpen(true)}
-            />
-            <SidebarInset className="overflow-hidden">
-              <CalendarWithData />
-            </SidebarInset>
-          </SidebarProvider>
-        </CommandPaletteProvider>
-        {/* Keep the original command palette for settings */}
-        <CommandPalette
-          open={commandPaletteOpen}
-          onOpenChange={setCommandPaletteOpen}
-        />
-      </CalendarProvider>
+      <CalendarDataProvider>
+        <CalendarProviderWrapper>
+          <CommandPaletteProvider
+            CommandPaletteComponent={CommandPalette}
+          >
+            <SidebarProvider>
+              <AppSidebar
+                user={{
+                  name: session.user.name || "Unknown User",
+                  email: session.user.email || "",
+                  avatar: session.user.image || undefined,
+                }}
+                onLogout={handleLogout}
+                onOpenSettings={() => setCommandPaletteOpen(true)}
+              />
+              <SidebarInset className="overflow-hidden">
+                <CalendarWithData />
+              </SidebarInset>
+            </SidebarProvider>
+          </CommandPaletteProvider>
+          {/* Keep the original command palette for settings */}
+          <CommandPalette
+            open={commandPaletteOpen}
+            onOpenChange={setCommandPaletteOpen}
+          />
+        </CalendarProviderWrapper>
+      </CalendarDataProvider>
     </SettingsProvider>
   );
 }
