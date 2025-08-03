@@ -111,9 +111,9 @@ export function AppSidebar({
               Calendars
             </SidebarGroupLabel>
             <div className="flex items-center gap-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-6 w-6 p-0"
                 onClick={onOpenCalendarManagement}
                 title="Calendar Settings"
@@ -126,54 +126,54 @@ export function AppSidebar({
                     <RiAddLine size={14} />
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Calendar</DialogTitle>
-                  <DialogDescription>
-                    Add a new calendar to organize your events.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <label
-                      htmlFor="calendar-name"
-                      className="text-sm font-medium"
-                    >
-                      Calendar Name
-                    </label>
-                    <Input
-                      id="calendar-name"
-                      value={newCalendarName}
-                      onChange={(e) => setNewCalendarName(e.target.value)}
-                      placeholder="Enter calendar name"
-                    />
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Create New Calendar</DialogTitle>
+                    <DialogDescription>
+                      Add a new calendar to organize your events.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <label
+                        htmlFor="calendar-name"
+                        className="text-sm font-medium"
+                      >
+                        Calendar Name
+                      </label>
+                      <Input
+                        id="calendar-name"
+                        value={newCalendarName}
+                        onChange={(e) => setNewCalendarName(e.target.value)}
+                        placeholder="Enter calendar name"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <label
+                        htmlFor="calendar-color"
+                        className="text-sm font-medium"
+                      >
+                        Color
+                      </label>
+                      <ColorPicker
+                        value={newCalendarColor}
+                        onChange={setNewCalendarColor}
+                        presetColors={presetColors}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleCreateCalendar}>
+                        Create Calendar
+                      </Button>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <label
-                      htmlFor="calendar-color"
-                      className="text-sm font-medium"
-                    >
-                      Color
-                    </label>
-                    <ColorPicker
-                      value={newCalendarColor}
-                      onChange={setNewCalendarColor}
-                      presetColors={presetColors}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreateCalendar}>
-                      Create Calendar
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
+                </DialogContent>
               </Dialog>
             </div>
           </div>
