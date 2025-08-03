@@ -459,30 +459,72 @@ export function useCalendarData(
 
   const updateEvent = useCallback(
     async (id: string, event: UpdateEventRequest): Promise<CalendarEvent> => {
-      // Store original event for rollback
+      // Store original event for rollback if it exists in local state
       const originalEvent = events.find((e) => e.id === id);
+      
       if (!originalEvent) {
-        throw new Error("Event not found");
+        console.warn(`Event with ID "${id}" not found in local state, but proceeding with update since it exists in database.`, {
+          id,
+          availableEventIds: events.map(e => e.id),
+          eventData: event,
+          totalEvents: events.length
+        });
+        
+        // Trigger a background refresh to sync local state with server
+        refetchEvents().catch(error => 
+          console.error("Failed to refresh events after missing event detected:", error)
+        );
       }
 
       const operationId = generateOptimisticId();
 
-      // Create optimistic updated event
-      const optimisticEvent: CalendarEvent = {
-        ...originalEvent,
-        ...event,
-        start: event.start ? new Date(event.start) : originalEvent.start,
-        end: event.end ? new Date(event.end) : originalEvent.end,
-        updatedAt: new Date(),
-      };
+      // Create optimistic updated event - handle case where original event is not in local state
+      let optimisticEvent: CalendarEvent;
+      let rollback: () => void;
 
-      // Apply optimistic update immediately
-      setEvents((prev) => prev.map((e) => (e.id === id ? optimisticEvent : e)));
+      if (originalEvent) {
+        // Normal case: event exists in local state
+        optimisticEvent = {
+          ...originalEvent,
+          ...event,
+          start: event.start ? new Date(event.start) : originalEvent.start,
+          end: event.end ? new Date(event.end) : originalEvent.end,
+          updatedAt: new Date(),
+        };
 
-      // Store rollback function
-      const rollback = () => {
-        setEvents((prev) => prev.map((e) => (e.id === id ? originalEvent : e)));
-      };
+        // Apply optimistic update immediately
+        setEvents((prev) => prev.map((e) => (e.id === id ? optimisticEvent : e)));
+
+        // Store rollback function
+        rollback = () => {
+          setEvents((prev) => prev.map((e) => (e.id === id ? originalEvent : e)));
+        };
+      } else {
+        // Event not in local state - create a minimal optimistic event for the update
+        optimisticEvent = {
+          id,
+          title: event.title || "Loading...",
+          description: event.description,
+          start: event.start ? new Date(event.start) : new Date(),
+          end: event.end ? new Date(event.end) : new Date(),
+          allDay: event.allDay || false,
+          location: event.location,
+          color: "blue" as any, // Default color
+          calendarId: event.calendarId || "",
+          userId: "unknown",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          reminder: event.reminder,
+        };
+
+        // Add the optimistic event to local state
+        setEvents((prev) => [...prev, optimisticEvent]);
+
+        // Store rollback function - remove the event since it wasn't there originally
+        rollback = () => {
+          setEvents((prev) => prev.filter((e) => e.id !== id));
+        };
+      }
 
       optimisticOperations.current.set(operationId, {
         id: operationId,
@@ -496,8 +538,22 @@ export function useCalendarData(
         // Make API call
         const updatedEvent = await calendarApiService.updateEvent(id, event);
 
+        console.log(`Successfully updated event ${id} on server:`, updatedEvent);
+
         // Replace optimistic event with real event
-        setEvents((prev) => prev.map((e) => (e.id === id ? updatedEvent : e)));
+        setEvents((prev) => {
+          const eventIndex = prev.findIndex(e => e.id === id);
+          if (eventIndex >= 0) {
+            // Event found - replace it
+            const updated = prev.map((e) => (e.id === id ? updatedEvent : e));
+            console.log(`Updated existing event ${id} in local state`);
+            return updated;
+          } else {
+            // Event not found - add it (this handles the case where optimistic update failed)
+            console.log(`Event ${id} not found in local state, adding it`);
+            return [...prev, updatedEvent];
+          }
+        });
 
         // Invalidate relevant cache entries
         eventsCache.current.clear();

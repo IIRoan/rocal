@@ -16,6 +16,7 @@ import {
 } from "date-fns";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useSettings } from "@/hooks/use-settings";
+import { useCommandPalette } from "./command-palette-context";
 
 // Define the Day type as expected by date-fns
 // This type is often implicitly defined by date-fns, but explicitly defining it
@@ -30,6 +31,7 @@ interface CalendarWithDataProps {
 export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const { openEventEditor } = useCommandPalette();
 
   // Get the initial view from settings, fallback to month
   const initialView = settings?.defaultView || "month";
@@ -169,6 +171,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       themeSettings={themeSettings}
       onLoadNotifications={calendarData.loadNotifications}
       onUpdateNotifications={calendarData.updateNotifications}
+      onEventEdit={openEventEditor}
     />
   );
 }

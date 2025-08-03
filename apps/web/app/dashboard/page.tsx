@@ -6,6 +6,7 @@ import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { CommandPalette } from "@/components/command-palette";
+import { CommandPaletteProvider } from "@/components/command-palette-context";
 import { SettingsProvider } from "@/components/settings-provider";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/hooks/use-command-palette";
@@ -57,20 +58,34 @@ function DashboardContent() {
         onCreateCalendar={calendarData.createCalendar}
         onUpdateCalendar={calendarData.updateCalendar}
       >
-        <SidebarProvider>
-          <AppSidebar
-            user={{
-              name: session.user.name || "Unknown User",
-              email: session.user.email || "",
-              avatar: session.user.image || undefined,
-            }}
-            onLogout={handleLogout}
-            onOpenSettings={() => setCommandPaletteOpen(true)}
-          />
-          <SidebarInset className="overflow-hidden">
-            <CalendarWithData />
-          </SidebarInset>
-        </SidebarProvider>
+        <CommandPaletteProvider
+          CommandPaletteComponent={CommandPalette}
+          onEventSaved={() => {
+            console.log("Event saved, triggering calendar refresh");
+            // Refresh only events data for faster response (optimistic updates should handle immediate changes)
+            calendarData.refetchEvents?.().then(() => {
+              console.log("Calendar events refreshed successfully");
+            }).catch(error => {
+              console.error("Failed to refresh calendar events:", error);
+            });
+          }}
+        >
+          <SidebarProvider>
+            <AppSidebar
+              user={{
+                name: session.user.name || "Unknown User",
+                email: session.user.email || "",
+                avatar: session.user.image || undefined,
+              }}
+              onLogout={handleLogout}
+              onOpenSettings={() => setCommandPaletteOpen(true)}
+            />
+            <SidebarInset className="overflow-hidden">
+              <CalendarWithData />
+            </SidebarInset>
+          </SidebarProvider>
+        </CommandPaletteProvider>
+        {/* Keep the original command palette for settings */}
         <CommandPalette
           open={commandPaletteOpen}
           onOpenChange={setCommandPaletteOpen}
