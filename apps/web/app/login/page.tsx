@@ -59,7 +59,7 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Passkey login failed:", error);
       setError(
-        error.message || "Passkey authentication failed. Please try again."
+        error.message || "Passkey authentication failed. Please try again.",
       );
       setPasskeyLoading(false);
     }

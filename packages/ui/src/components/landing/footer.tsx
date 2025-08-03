@@ -60,10 +60,10 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-muted-foreground mb-6 max-w-sm">
-              The smart calendar for modern teams. Schedule smarter, 
-              collaborate better, and make the most of your time.
+              The smart calendar for modern teams. Schedule smarter, collaborate
+              better, and make the most of your time.
             </p>
-            
+
             {/* Social Links */}
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="rounded-full">

@@ -253,7 +253,7 @@ export function useCalendarData(
   const fetchEvents = useCallback(
     async (dateRange: DateRange): Promise<void> => {
       const cacheKey = getCacheKey(dateRange);
-      
+
       // Check if there's already a pending request for this range
       if (pendingRequests.current.has(cacheKey)) {
         await pendingRequests.current.get(cacheKey);
@@ -452,7 +452,7 @@ export function useCalendarData(
       try {
         // Make API call in the background
         const apiPromise = calendarApiService.createEvent(event);
-        
+
         // Don't await immediately - let the optimistic update show first
         setTimeout(async () => {
           try {
@@ -469,9 +469,12 @@ export function useCalendarData(
             dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(eventDate);
             dayEnd.setHours(23, 59, 59, 999);
-            
+
             for (const [key, entry] of eventsCache.current.entries()) {
-              if (entry.dateRange.start <= dayEnd && entry.dateRange.end >= dayStart) {
+              if (
+                entry.dateRange.start <= dayEnd &&
+                entry.dateRange.end >= dayStart
+              ) {
                 eventsCache.current.delete(key);
               }
             }
@@ -499,18 +502,24 @@ export function useCalendarData(
     async (id: string, event: UpdateEventRequest): Promise<CalendarEvent> => {
       // Store original event for rollback if it exists in local state
       const originalEvent = events.find((e) => e.id === id);
-      
+
       if (!originalEvent) {
-        console.warn(`Event with ID "${id}" not found in local state, but proceeding with update since it exists in database.`, {
-          id,
-          availableEventIds: events.map(e => e.id),
-          eventData: event,
-          totalEvents: events.length
-        });
-        
+        console.warn(
+          `Event with ID "${id}" not found in local state, but proceeding with update since it exists in database.`,
+          {
+            id,
+            availableEventIds: events.map((e) => e.id),
+            eventData: event,
+            totalEvents: events.length,
+          },
+        );
+
         // Trigger a background refresh to sync local state with server
-        refetchEvents().catch(error => 
-          console.error("Failed to refresh events after missing event detected:", error)
+        refetchEvents().catch((error) =>
+          console.error(
+            "Failed to refresh events after missing event detected:",
+            error,
+          ),
         );
       }
 
@@ -531,11 +540,15 @@ export function useCalendarData(
         };
 
         // Apply optimistic update immediately
-        setEvents((prev) => prev.map((e) => (e.id === id ? optimisticEvent : e)));
+        setEvents((prev) =>
+          prev.map((e) => (e.id === id ? optimisticEvent : e)),
+        );
 
         // Store rollback function
         rollback = () => {
-          setEvents((prev) => prev.map((e) => (e.id === id ? originalEvent : e)));
+          setEvents((prev) =>
+            prev.map((e) => (e.id === id ? originalEvent : e)),
+          );
         };
       } else {
         // Event not in local state - create a minimal optimistic event for the update
@@ -576,11 +589,14 @@ export function useCalendarData(
         // Make API call
         const updatedEvent = await calendarApiService.updateEvent(id, event);
 
-        console.log(`Successfully updated event ${id} on server:`, updatedEvent);
+        console.log(
+          `Successfully updated event ${id} on server:`,
+          updatedEvent,
+        );
 
         // Replace optimistic event with real event
         setEvents((prev) => {
-          const eventIndex = prev.findIndex(e => e.id === id);
+          const eventIndex = prev.findIndex((e) => e.id === id);
           if (eventIndex >= 0) {
             // Event found - replace it
             const updated = prev.map((e) => (e.id === id ? updatedEvent : e));
@@ -596,9 +612,12 @@ export function useCalendarData(
         // Smart cache invalidation - only invalidate cache entries that might contain this event
         const eventStartDate = new Date(event.start || updatedEvent.start);
         const eventEndDate = new Date(event.end || updatedEvent.end);
-        
+
         for (const [key, entry] of eventsCache.current.entries()) {
-          if (entry.dateRange.start <= eventEndDate && entry.dateRange.end >= eventStartDate) {
+          if (
+            entry.dateRange.start <= eventEndDate &&
+            entry.dateRange.end >= eventStartDate
+          ) {
             eventsCache.current.delete(key);
           }
         }
@@ -652,9 +671,12 @@ export function useCalendarData(
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(eventDate);
         dayEnd.setHours(23, 59, 59, 999);
-        
+
         for (const [key, entry] of eventsCache.current.entries()) {
-          if (entry.dateRange.start <= dayEnd && entry.dateRange.end >= dayStart) {
+          if (
+            entry.dateRange.start <= dayEnd &&
+            entry.dateRange.end >= dayStart
+          ) {
             eventsCache.current.delete(key);
           }
         }
@@ -958,10 +980,7 @@ export function useCalendarData(
   // Initial data fetch - load calendars and categories in parallel
   useEffect(() => {
     if (autoRefetch) {
-      Promise.all([
-        fetchCalendars(),
-        fetchCategories()
-      ]).catch(error => {
+      Promise.all([fetchCalendars(), fetchCategories()]).catch((error) => {
         console.error("Failed to load initial calendar data:", error);
       });
     }

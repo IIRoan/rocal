@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 const getPasskeyConfig = () => {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const url = new URL(appUrl);
-  
+
   return {
     rpID: url.hostname,
     origin: appUrl,
