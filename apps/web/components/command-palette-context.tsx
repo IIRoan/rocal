@@ -8,6 +8,7 @@ interface CommandPaletteContextType {
   openPalette: () => void;
   closePalette: () => void;
   openEventEditor: (event?: CalendarEvent) => void;
+  openCalendarManagement: () => void;
 }
 
 const CommandPaletteContext = createContext<
@@ -31,6 +32,7 @@ interface CommandPaletteProviderProps {
     onOpenChange: (open: boolean) => void;
     eventToEdit?: CalendarEvent | null;
     onEventSaved?: () => void;
+    initialView?: string;
   }>;
 }
 
@@ -40,15 +42,27 @@ export function CommandPaletteProvider({
 }: CommandPaletteProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
+  const [initialView, setInitialView] = useState<string>("main");
 
-  const openPalette = () => setIsOpen(true);
+  const openPalette = () => {
+    setInitialView("main");
+    setIsOpen(true);
+  };
+  
   const closePalette = () => {
     setIsOpen(false);
     setEventToEdit(null);
+    setInitialView("main");
   };
 
   const openEventEditor = (event?: CalendarEvent) => {
     setEventToEdit(event || null);
+    setInitialView("main");
+    setIsOpen(true);
+  };
+
+  const openCalendarManagement = () => {
+    setInitialView("calendars");
     setIsOpen(true);
   };
 
@@ -57,6 +71,7 @@ export function CommandPaletteProvider({
     openPalette,
     closePalette,
     openEventEditor,
+    openCalendarManagement,
   };
 
   return (
@@ -66,6 +81,7 @@ export function CommandPaletteProvider({
         open={isOpen}
         onOpenChange={closePalette}
         eventToEdit={eventToEdit}
+        initialView={initialView}
         onEventSaved={() => {
           setEventToEdit(null);
         }}

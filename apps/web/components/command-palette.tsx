@@ -153,6 +153,7 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   eventToEdit?: CalendarEvent | null;
   onEventSaved?: () => void;
+  initialView?: string;
 }
 
 type PaletteView =
@@ -165,6 +166,9 @@ type PaletteView =
   | "account"
   | "security"
   | "passkeys"
+  | "calendars"
+  | "calendar-create"
+  | "calendar-edit"
   | "events"
   | "event-editor";
 
@@ -173,12 +177,15 @@ export function CommandPalette({
   onOpenChange,
   eventToEdit,
   onEventSaved,
+  initialView = "main",
 }: CommandPaletteProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
 
-  const [currentView, setCurrentView] = useState<PaletteView>("main");
+  const [currentView, setCurrentView] = useState<PaletteView>(
+    initialView as PaletteView
+  );
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -186,7 +193,7 @@ export function CommandPalette({
 
   // Event editor state
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null,
+    null
   );
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
@@ -202,18 +209,35 @@ export function CommandPalette({
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
 
+  // Calendar management state
+  const [calendarName, setCalendarName] = useState("");
+  const [calendarColor, setCalendarColor] = useState("#3b82f6");
+  const [calendarSaving, setCalendarSaving] = useState(false);
+  const [editingCalendar, setEditingCalendar] = useState<any>(null);
+  const [calendarValidationErrors, setCalendarValidationErrors] = useState<{
+    name?: string;
+    color?: string;
+  }>({});
+
   useEffect(() => {
     if (settings) setLocalSettings(settings);
   }, [settings]);
 
   useEffect(() => {
     if (!open) {
-      setCurrentView("main");
+      setCurrentView(initialView as PaletteView);
       setShowResetConfirm(false);
       // Reset event editor state when dialog closes
       setSelectedEvent(null);
     }
-  }, [open]);
+  }, [open, initialView]);
+
+  // Update view when initialView changes
+  useEffect(() => {
+    if (open) {
+      setCurrentView(initialView as PaletteView);
+    }
+  }, [initialView, open]);
 
   // Handle external event to edit
   useEffect(() => {
@@ -250,7 +274,7 @@ export function CommandPalette({
 
   const updateSetting = async <K extends keyof UserSettings>(
     key: K,
-    value: UserSettings[K],
+    value: UserSettings[K]
   ) => {
     if (!localSettings || saving) return;
 
@@ -305,6 +329,18 @@ export function CommandPalette({
 
   const navigationItems = [
     {
+      id: "events",
+      label: "Events",
+      icon: CalendarIcon,
+      description: "Create and manage events",
+    },
+    {
+      id: "calendars",
+      label: "Calendar Management",
+      icon: Calendar,
+      description: "Create, edit, and delete calendars",
+    },
+    {
       id: "appearance",
       label: "Appearance",
       icon: Palette,
@@ -339,12 +375,6 @@ export function CommandPalette({
       label: "Security",
       icon: Shield,
       description: "Security settings",
-    },
-    {
-      id: "events",
-      label: "Events",
-      icon: CalendarIcon,
-      description: "Create and manage events",
     },
   ];
 
@@ -444,7 +474,7 @@ export function CommandPalette({
     }
 
     const selectedCalendar = calendars.find(
-      (cal) => cal.id === eventCalendarId,
+      (cal) => cal.id === eventCalendarId
     );
     const calendarColor = selectedCalendar?.color || "blue";
 
@@ -569,6 +599,146 @@ export function CommandPalette({
     } finally {
       setEventSaving(false);
     }
+  };
+
+  // Calendar management functions
+  const validateCalendarForm = () => {
+    const errors: { name?: string; color?: string } = {};
+
+    // Check if name is empty
+    if (!calendarName.trim()) {
+      errors.name = "Calendar name is required";
+    }
+
+    // Check name length
+    if (calendarName.trim().length > 100) {
+      errors.name = "Calendar name cannot exceed 100 characters";
+    }
+
+    // Check for duplicate names (case-insensitive)
+    const existingNames = calendars.map((cal) => cal.name.toLowerCase());
+    if (existingNames.includes(calendarName.trim().toLowerCase())) {
+      errors.name = "A calendar with this name already exists";
+    }
+
+    // Validate color format (basic hex validation)
+    const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(calendarColor);
+    if (!isHexColor) {
+      errors.color = "Please select a valid color";
+    }
+
+    return errors;
+  };
+
+  const handleCalendarCreate = async () => {
+    setCalendarValidationErrors({});
+
+    const errors = validateCalendarForm();
+    if (Object.keys(errors).length > 0) {
+      setCalendarValidationErrors(errors);
+      return;
+    }
+
+    setCalendarSaving(true);
+    try {
+      await calendarData.createCalendar({
+        name: calendarName.trim(),
+        color: calendarColor,
+        isDefault: false,
+      });
+
+      toast.success(`Calendar "${calendarName}" created`);
+      setCalendarName("");
+      setCalendarColor("#3b82f6");
+      setCurrentView("calendars");
+    } catch (error: any) {
+      console.error("Failed to create calendar:", error);
+      if (error.message && error.message.includes("already exists")) {
+        setCalendarValidationErrors({
+          name: "A calendar with this name already exists",
+        });
+      } else {
+        toast.error("Failed to create calendar");
+      }
+    } finally {
+      setCalendarSaving(false);
+    }
+  };
+
+  const handleCalendarUpdate = async () => {
+    if (!editingCalendar) return;
+
+    setCalendarValidationErrors({});
+
+    // Validate only if name changed
+    if (calendarName !== editingCalendar.name) {
+      const existingNames = calendars
+        .filter((cal) => cal.id !== editingCalendar.id)
+        .map((cal) => cal.name.toLowerCase());
+
+      if (!calendarName.trim()) {
+        setCalendarValidationErrors({ name: "Calendar name is required" });
+        return;
+      }
+
+      if (calendarName.trim().length > 100) {
+        setCalendarValidationErrors({
+          name: "Calendar name cannot exceed 100 characters",
+        });
+        return;
+      }
+
+      if (existingNames.includes(calendarName.trim().toLowerCase())) {
+        setCalendarValidationErrors({
+          name: "A calendar with this name already exists",
+        });
+        return;
+      }
+    }
+
+    setCalendarSaving(true);
+    try {
+      await calendarData.updateCalendar(editingCalendar.id, {
+        name: calendarName.trim(),
+        color: calendarColor,
+      });
+
+      toast.success(`Calendar "${calendarName}" updated`);
+      setEditingCalendar(null);
+      setCurrentView("calendars");
+    } catch (error: any) {
+      console.error("Failed to update calendar:", error);
+      if (error.message && error.message.includes("already exists")) {
+        setCalendarValidationErrors({
+          name: "A calendar with this name already exists",
+        });
+      } else {
+        toast.error("Failed to update calendar");
+      }
+    } finally {
+      setCalendarSaving(false);
+    }
+  };
+
+  const handleCalendarDelete = async (calendar: any) => {
+    setCalendarSaving(true);
+    try {
+      await calendarData.deleteCalendar(calendar.id);
+      toast.success(`Calendar "${calendar.name}" deleted`);
+      setCurrentView("calendars");
+    } catch (error: any) {
+      console.error("Failed to delete calendar:", error);
+      toast.error("Failed to delete calendar");
+    } finally {
+      setCalendarSaving(false);
+    }
+  };
+
+  const resetCalendarForm = () => {
+    setCalendarName("");
+    setCalendarColor("#3b82f6");
+    setEditingCalendar(null);
+    setCalendarValidationErrors({});
   };
 
   if (currentView === "main") {
@@ -735,7 +905,7 @@ export function CommandPalette({
               onSelect={() =>
                 updateSetting(
                   "emailNotifications",
-                  !localSettings.emailNotifications,
+                  !localSettings.emailNotifications
                 )
               }
               className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
@@ -774,7 +944,7 @@ export function CommandPalette({
                   onChange={(e) =>
                     updateSetting(
                       "defaultReminder",
-                      e.target.value ? parseInt(e.target.value) : null,
+                      e.target.value ? parseInt(e.target.value) : null
                     )
                   }
                   placeholder="No default reminder"
@@ -815,7 +985,7 @@ export function CommandPalette({
                 <span className="text-foreground">Timezone</span>
                 <span className="text-xs text-muted-foreground">
                   {ALL_TIMEZONES.find(
-                    (tz) => tz.value === localSettings.timezone,
+                    (tz) => tz.value === localSettings.timezone
                   )?.label || localSettings.timezone}
                 </span>
               </div>
@@ -879,7 +1049,7 @@ export function CommandPalette({
                   tz.label
                     .toLowerCase()
                     .includes(timezoneSearch.toLowerCase()) ||
-                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase()),
+                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
               )
                 .slice(0, 20)
                 .map((tz) => (
@@ -984,7 +1154,7 @@ export function CommandPalette({
                   }
                   updateSetting(
                     "workingDays",
-                    JSON.stringify(currentWorkingDays.sort()),
+                    JSON.stringify(currentWorkingDays.sort())
                   );
                 }}
                 className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
@@ -1097,6 +1267,365 @@ export function CommandPalette({
         onOpenChange={onOpenChange}
         onBack={() => setCurrentView("security")}
       />
+    );
+  }
+
+  if (currentView === "calendars") {
+    const PRESET_COLORS = [
+      "#3b82f6",
+      "#10b981",
+      "#f59e0b",
+      "#8b5cf6",
+      "#f43f5e",
+      "#ef4444",
+      "#06b6d4",
+      "#84cc16",
+      "#f97316",
+      "#6366f1",
+      "#ec4899",
+      "#14b8a6",
+    ];
+
+    return (
+      <CommandDialog open={open} onOpenChange={onOpenChange}>
+        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+          <button
+            onClick={() => setCurrentView("main")}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <h2 className="text-lg font-semibold text-foreground">
+            Calendar Management
+          </h2>
+        </div>
+        <CommandList>
+          <CommandGroup heading="Actions">
+            <CommandItem
+              onSelect={() => {
+                resetCalendarForm();
+                setCurrentView("calendar-create");
+              }}
+              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+            >
+              <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
+              <span className="text-foreground">Create New Calendar</span>
+              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+            </CommandItem>
+          </CommandGroup>
+
+          <CommandGroup heading="Your Calendars">
+            {calendars.map((calendar) => (
+              <CommandItem
+                key={calendar.id}
+                onSelect={() => {
+                  setEditingCalendar(calendar);
+                  setCalendarName(calendar.name);
+                  setCalendarColor(calendar.color);
+                  setCalendarValidationErrors({});
+                  setCurrentView("calendar-edit");
+                }}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <div
+                  className="mr-3 h-4 w-4 rounded"
+                  style={{ backgroundColor: calendar.color }}
+                />
+                <div className="flex flex-col">
+                  <span className="text-foreground">{calendar.name}</span>
+                  {calendar.isDefault && (
+                    <span className="text-xs text-muted-foreground">
+                      Default calendar
+                    </span>
+                  )}
+                </div>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+    );
+  }
+
+  if (currentView === "calendar-create") {
+    const PRESET_COLORS = [
+      "#3b82f6",
+      "#10b981",
+      "#f59e0b",
+      "#8b5cf6",
+      "#f43f5e",
+      "#ef4444",
+      "#06b6d4",
+      "#84cc16",
+      "#f97316",
+      "#6366f1",
+      "#ec4899",
+      "#14b8a6",
+    ];
+
+    return (
+      <CommandDialog open={open} onOpenChange={onOpenChange}>
+        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+          <button
+            onClick={() => setCurrentView("calendars")}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <h2 className="text-lg font-semibold text-foreground">
+            Create Calendar
+          </h2>
+        </div>
+
+        <div className="max-h-[80vh] overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Calendar Name */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="calendar-name"
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                Calendar Name
+              </Label>
+              <Input
+                id="calendar-name"
+                value={calendarName}
+                onChange={(e) => {
+                  setCalendarName(e.target.value);
+                  if (calendarValidationErrors.name) {
+                    setCalendarValidationErrors({
+                      ...calendarValidationErrors,
+                      name: undefined,
+                    });
+                  }
+                }}
+                placeholder="Enter calendar name"
+                className={
+                  calendarValidationErrors.name ? "border-red-500" : ""
+                }
+              />
+              {calendarValidationErrors.name && (
+                <p className="text-sm text-red-600">
+                  {calendarValidationErrors.name}
+                </p>
+              )}
+            </div>
+
+            {/* Color Selection */}
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="grid grid-cols-6 gap-2">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setCalendarColor(color)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      calendarColor === color
+                        ? "border-foreground scale-110"
+                        : "border-transparent hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="color"
+                  value={calendarColor}
+                  onChange={(e) => setCalendarColor(e.target.value)}
+                  className="w-8 h-8 rounded border cursor-pointer"
+                />
+                <span className="text-sm text-muted-foreground">
+                  Or pick a custom color
+                </span>
+              </div>
+              {calendarValidationErrors.color && (
+                <p className="text-sm text-red-600">
+                  {calendarValidationErrors.color}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentView("calendars")}
+              disabled={calendarSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCalendarCreate}
+              disabled={calendarSaving || !calendarName.trim()}
+            >
+              {calendarSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Create Calendar
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </CommandDialog>
+    );
+  }
+
+  if (currentView === "calendar-edit") {
+    const PRESET_COLORS = [
+      "#3b82f6",
+      "#10b981",
+      "#f59e0b",
+      "#8b5cf6",
+      "#f43f5e",
+      "#ef4444",
+      "#06b6d4",
+      "#84cc16",
+      "#f97316",
+      "#6366f1",
+      "#ec4899",
+      "#14b8a6",
+    ];
+
+    return (
+      <CommandDialog open={open} onOpenChange={onOpenChange}>
+        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+          <button
+            onClick={() => setCurrentView("calendars")}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <h2 className="text-lg font-semibold text-foreground">
+            Edit Calendar
+          </h2>
+        </div>
+
+        <div className="max-h-[80vh] overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Calendar Name */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="calendar-name"
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                Calendar Name
+              </Label>
+              <Input
+                id="calendar-name"
+                value={calendarName}
+                onChange={(e) => {
+                  setCalendarName(e.target.value);
+                  if (calendarValidationErrors.name) {
+                    setCalendarValidationErrors({
+                      ...calendarValidationErrors,
+                      name: undefined,
+                    });
+                  }
+                }}
+                placeholder="Enter calendar name"
+                className={
+                  calendarValidationErrors.name ? "border-red-500" : ""
+                }
+              />
+              {calendarValidationErrors.name && (
+                <p className="text-sm text-red-600">
+                  {calendarValidationErrors.name}
+                </p>
+              )}
+            </div>
+
+            {/* Color Selection */}
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="grid grid-cols-6 gap-2">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setCalendarColor(color)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      calendarColor === color
+                        ? "border-foreground scale-110"
+                        : "border-transparent hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="color"
+                  value={calendarColor}
+                  onChange={(e) => setCalendarColor(e.target.value)}
+                  className="w-8 h-8 rounded border cursor-pointer"
+                />
+                <span className="text-sm text-muted-foreground">
+                  Or pick a custom color
+                </span>
+              </div>
+              {calendarValidationErrors.color && (
+                <p className="text-sm text-red-600">
+                  {calendarValidationErrors.color}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-between">
+            {editingCalendar && (
+              <Button
+                variant="outline"
+                onClick={() => handleCalendarDelete(editingCalendar)}
+                disabled={calendarSaving}
+                className="text-destructive hover:text-destructive"
+              >
+                {calendarSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentView("calendars")}
+                disabled={calendarSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCalendarUpdate}
+                disabled={calendarSaving || !calendarName.trim()}
+              >
+                {calendarSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CommandDialog>
     );
   }
 

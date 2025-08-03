@@ -10,6 +10,35 @@ import { CalendarDataProvider } from "@/components/calendar-data-provider";
 import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
 import { SettingsProvider } from "@/components/settings-provider";
 import { useCommandPalette } from "@/hooks/use-command-palette";
+import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
+
+function SidebarWithContext() {
+  const { data: session } = useSession();
+  const { openCalendarManagement } = useCommandPaletteContext();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // Redirect to login or home page
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  return (
+    <AppSidebar
+      user={{
+        name: session?.user.name || "Unknown User",
+        email: session?.user.email || "",
+        avatar: session?.user.image || undefined,
+      }}
+      onLogout={handleLogout}
+      onOpenSettings={() => {}} // We'll handle this through the context now
+      onOpenCalendarManagement={openCalendarManagement}
+    />
+  );
+}
 
 function DashboardContent() {
   const { data: session, isPending } = useSession();
@@ -56,15 +85,7 @@ function DashboardContent() {
         <CalendarProviderWrapper>
           <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
             <SidebarProvider>
-              <AppSidebar
-                user={{
-                  name: session.user.name || "Unknown User",
-                  email: session.user.email || "",
-                  avatar: session.user.image || undefined,
-                }}
-                onLogout={handleLogout}
-                onOpenSettings={() => setCommandPaletteOpen(true)}
-              />
+              <SidebarWithContext />
               <SidebarInset className="overflow-hidden">
                 <CalendarWithData />
               </SidebarInset>
