@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
 import { PasskeySettings } from "./passkey-settings";
+import { NotificationManager, EventNotification } from "@workspace/ui/components/calendar/notification-manager";
+import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   CommandDialog,
   CommandList,
@@ -67,6 +69,8 @@ import {
   Save,
   Trash2,
   Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const TIMEZONE_GROUPS = {
@@ -245,6 +249,11 @@ export function CommandPalette({
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
 
+  // Notification state
+  const [eventNotifications, setEventNotifications] = useState<EventNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(true);
+
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
   const [calendarColor, setCalendarColor] = useState("#3b82f6");
@@ -265,6 +274,8 @@ export function CommandPalette({
       setShowResetConfirm(false);
       // Reset event editor state when dialog closes
       setSelectedEvent(null);
+      setEventNotifications([]);
+      setShowNotifications(true);
     }
   }, [open, initialView]);
 
@@ -299,6 +310,14 @@ export function CommandPalette({
       setEventLocation(eventToEdit.location || "");
       setEventCalendarId(eventToEdit.calendarId || calendars?.[0]?.id || "");
       setEventReminder(eventToEdit.reminder ?? null);
+      
+      // Load notifications for existing events
+      if (!isNewEvent && eventToEdit.id) {
+        loadEventNotifications(eventToEdit.id);
+      } else {
+        setEventNotifications([]);
+      }
+      
       setTransitionDirection("forward");
       setCurrentView("event-editor");
     }
@@ -457,7 +476,56 @@ export function CommandPalette({
     setEventLocation("");
     setEventCalendarId(calendars?.[0]?.id || "");
     setEventReminder(null);
+    setEventNotifications([]);
     console.log("Event form reset for new event creation");
+  };
+
+  // Load notifications for an existing event
+  const loadEventNotifications = async (eventId: string) => {
+    if (!eventId) {
+      setEventNotifications([]);
+      return;
+    }
+
+    setNotificationsLoading(true);
+    try {
+      const response = await calendarApiService.getEventNotifications(eventId);
+      if (response.success) {
+        // Filter only email notifications and map to the expected format
+        const emailNotifications = response.notifications
+          .filter(n => n.notificationType === "email")
+          .map(n => ({
+            id: n.id,
+            notificationType: "email" as const,
+            minutesBefore: n.minutesBefore,
+            isEnabled: n.isEnabled
+          }));
+        setEventNotifications(emailNotifications);
+      }
+    } catch (error) {
+      console.error("Failed to load event notifications:", error);
+      setEventNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  // Save notifications for an event
+  const saveEventNotifications = async (eventId: string, notifications: EventNotification[]) => {
+    if (!eventId) return;
+
+    try {
+      const notificationData = notifications.map(n => ({
+        notificationType: n.notificationType,
+        minutesBefore: n.minutesBefore,
+        isEnabled: n.isEnabled
+      }));
+
+      await calendarApiService.updateEventNotifications(eventId, notificationData);
+    } catch (error) {
+      console.error("Failed to save event notifications:", error);
+      toast.error("Failed to save notification settings");
+    }
   };
 
   const validateEventForm = () => {
@@ -551,6 +619,8 @@ export function CommandPalette({
         eventTitle,
       });
 
+      let savedEventId = selectedEvent?.id;
+
       if (isUpdate) {
         console.log("Updating existing event:", selectedEvent.id, {
           title: eventTitle,
@@ -581,7 +651,13 @@ export function CommandPalette({
           reminder: eventData.reminder ?? undefined,
         });
         console.log("Event created successfully:", newEvent.id);
+        savedEventId = newEvent.id;
         toast.success(`Event "${eventTitle}" created`);
+      }
+
+      // Save notifications if there are any
+      if (savedEventId && eventNotifications.length > 0) {
+        await saveEventNotifications(savedEventId, eventNotifications);
       }
 
       // Trigger calendar refresh
@@ -1957,6 +2033,55 @@ export function CommandPalette({
                   onChange={(e) => setEventLocation(e.target.value)}
                   placeholder="Enter event location"
                 />
+              </div>
+
+              {/* Email Notifications */}
+              <div className="space-y-2">
+                <div className="border rounded-lg overflow-hidden transition-all duration-200 hover:shadow-sm bg-gradient-to-br from-card/50 to-card/30">
+                  <button
+                    type="button"
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent/20 transition-colors duration-150"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-foreground">
+                        Email Notifications
+                      </span>
+                      {eventNotifications.length > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                          {eventNotifications.length}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {notificationsLoading && (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      )}
+                      {showNotifications ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                      )}
+                    </div>
+                  </button>
+                  
+                  <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                    showNotifications 
+                      ? 'max-h-96 opacity-100 border-t border-border/50' 
+                      : 'max-h-0 opacity-0'
+                  }`}>
+                    <div className="p-4 pt-3">
+                      <NotificationManager
+                        eventId={selectedEvent?.id}
+                        notifications={eventNotifications}
+                        onChange={setEventNotifications}
+                        loading={notificationsLoading}
+                        defaultReminder={localSettings?.defaultReminder}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
