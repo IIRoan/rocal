@@ -258,18 +258,6 @@ export function CommandPalette({
   >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(true);
-  
-  // Auto-save notifications timeout ref
-  const notificationSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (notificationSaveTimeoutRef.current) {
-        clearTimeout(notificationSaveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
@@ -332,7 +320,14 @@ export function CommandPalette({
       if (!isNewEvent && eventToEdit.id) {
         loadEventNotifications(eventToEdit.id);
       } else {
-        setEventNotifications([]);
+        // For new events, add default 15-minute email notification
+        setEventNotifications([
+          {
+            notificationType: "email",
+            minutesBefore: 15,
+            isEnabled: true,
+          }
+        ]);
       }
 
       setTransitionDirection("forward");
@@ -369,41 +364,14 @@ export function CommandPalette({
     []
   );
 
-  // Debounced auto-save for notification changes
-  const debouncedSaveNotifications = useCallback(
-    (eventId: string, notifications: EventNotification[]) => {
-      // Clear existing timeout
-      if (notificationSaveTimeoutRef.current) {
-        clearTimeout(notificationSaveTimeoutRef.current);
-      }
 
-      // Set new timeout for auto-save
-      notificationSaveTimeoutRef.current = setTimeout(async () => {
-        if (eventId && eventId !== "new") {
-          try {
-            await saveEventNotifications(eventId, notifications);
-            console.log("Notifications auto-saved successfully");
-          } catch (error) {
-            console.error("Failed to auto-save notifications:", error);
-            toast.error("Failed to save notification changes");
-          }
-        }
-      }, 1000); // 1 second debounce
-    },
-    [saveEventNotifications]
-  );
-
-  // Handle notification changes with auto-save
+  // Handle notification changes without auto-save
   const handleNotificationChange = useCallback(
     (notifications: EventNotification[]) => {
       setEventNotifications(notifications);
-      
-      // Trigger auto-save for existing events
-      if (selectedEvent?.id) {
-        debouncedSaveNotifications(selectedEvent.id, notifications);
-      }
+      // No auto-save - notifications will be saved when user saves the event
     },
-    [selectedEvent?.id, debouncedSaveNotifications]
+    []
   );
 
   const updateSetting = async <K extends keyof UserSettings>(
@@ -554,7 +522,14 @@ export function CommandPalette({
     setEventLocation("");
     setEventCalendarId(calendars?.[0]?.id || "");
     setEventReminder(null);
-    setEventNotifications([]);
+    // Add default 15-minute email notification for new events
+    setEventNotifications([
+      {
+        notificationType: "email",
+        minutesBefore: 15,
+        isEnabled: true,
+      }
+    ]);
     console.log("Event form reset for new event creation");
   };
 
@@ -623,6 +598,23 @@ export function CommandPalette({
     const validationError = validateEventForm();
     if (validationError) {
       toast.error(validationError);
+      return;
+    }
+
+    // Validate for duplicate notifications
+    const enabledNotifications = eventNotifications.filter(n => n.isEnabled);
+    const notificationTimes = enabledNotifications.map(n => n.minutesBefore);
+    const duplicateTimes = notificationTimes.filter((time, index) => 
+      notificationTimes.indexOf(time) !== index
+    );
+    
+    if (duplicateTimes.length > 0) {
+      const uniqueDuplicates = [...new Set(duplicateTimes)];
+      const timeText = uniqueDuplicates.length === 1 
+        ? `${uniqueDuplicates[0]} minutes before`
+        : uniqueDuplicates.map(time => `${time} minutes`).join(', ') + ' before';
+      
+      toast.error(`Cannot have multiple notifications for the same time: ${timeText}`);
       return;
     }
 
@@ -763,6 +755,14 @@ export function CommandPalette({
           "Network error - please check your connection and try again";
       } else if (error.message?.includes("validation")) {
         errorMessage = "Invalid event data - please check all fields";
+      } else if (error.statusCode === 422) {
+        // Handle 422 Unprocessable Entity errors
+        if (error.message?.includes("Duplicate notification") || 
+            error.message?.includes("duplicate")) {
+          errorMessage = "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
+        } else {
+          errorMessage = "Invalid data - please check all fields and try again";
+        }
       } else if (error.statusCode === 404) {
         errorMessage = "Event not found - it may have been deleted";
         setSelectedEvent(null);
