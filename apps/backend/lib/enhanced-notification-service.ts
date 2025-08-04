@@ -780,14 +780,13 @@ export class EnhancedNotificationService {
         `🔍 Processing scheduled notifications for ${currentMinute.toISOString()}`
       );
 
-      // Query for all notifications scheduled for the current minute with database retry
+      // Query for all notifications that should be sent by now (current minute or earlier)
       const notificationsToSend = await this.executeWithDatabaseRetry(
         async () => {
           return await prisma.eventNotification.findMany({
             where: {
               notificationTime: {
-                gte: currentMinute,
-                lt: new Date(currentMinute.getTime() + 60 * 1000), // Next minute
+                lte: currentMinute, // Send notifications scheduled for current minute or earlier
               },
               isEnabled: true,
               isSent: false,
