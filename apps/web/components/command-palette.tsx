@@ -257,7 +257,7 @@ export function CommandPalette({
     EventNotification[]
   >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(true);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
@@ -280,7 +280,7 @@ export function CommandPalette({
       // Reset event editor state when dialog closes
       setSelectedEvent(null);
       setEventNotifications([]);
-      setShowNotifications(true);
+      setShowNotifications(false);
     }
   }, [open, initialView]);
 
