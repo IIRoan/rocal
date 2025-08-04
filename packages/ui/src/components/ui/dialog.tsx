@@ -38,28 +38,105 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80",
-        className,
+        // Base
+        "fixed inset-0 z-50 bg-black/50",
+        // Animate opacity
+        "transition-[opacity,backdrop-filter] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+        // Subtle blur when supported
+        "supports-[backdrop-filter]:backdrop-blur-[2px]",
+        // Respect reduced motion
+        "motion-reduce:transition-none",
+        className
       )}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100vw",
+        height: "100vh",
+      }}
       {...props}
     />
   );
 }
 
+type DialogVariant = "center" | "top" | "bottom";
+
+type DialogContentProps = React.ComponentProps<
+  typeof DialogPrimitive.Content
+> & {
+  variant?: DialogVariant;
+};
+
 function DialogContent({
   className,
   children,
+  variant = "center",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: DialogContentProps) {
+  // Variant presets
+  const positionClasses =
+    variant === "center"
+      ? "left-1/2 top-1/2" // Transform handled by CSS
+      : variant === "top"
+        ? "left-1/2 top-6 -translate-x-1/2"
+        : // bottom
+          "left-1/2 bottom-6 -translate-x-1/2";
+
+  // Animation per variant - center uses CSS animation, others use Tailwind
+  const animationClasses =
+    variant === "center"
+      ? "" // Animation handled by CSS in globals.css for data-slot="dialog-content"
+      : variant === "top"
+        ? [
+            // Slide from top + fade
+            "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+            "data-[state=open]:translate-y-0 data-[state=closed]:-translate-y-4",
+          ].join(" ")
+        : [
+            // bottom: lift up + fade
+            "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+            "data-[state=open]:translate-y-0 data-[state=closed]:translate-y-4",
+          ].join(" ");
+
+  // Suggested sizing defaults per variant
+  const sizeDefaults =
+    variant === "center"
+      ? "w-[520px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]"
+      : variant === "top"
+        ? "w-[720px] max-w-[min(90vw,840px)]"
+        : "w-[720px] max-w-[min(90vw,840px)]";
+
+  // Radius per variant (command palette often slightly less rounded)
+  const radius =
+    variant === "center" ? "rounded-xl" : "rounded-lg md:rounded-xl";
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100%-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border p-6 shadow-lg duration-200 sm:max-w-100",
-          className,
+          // Base
+          "bg-background fixed z-50 grid gap-4 overflow-y-auto border p-6 shadow-lg",
+          radius,
+          sizeDefaults,
+          positionClasses,
+          // No transition classes for center variant - handled by CSS
+          variant === "center" ? "" : "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+          animationClasses,
+          // Reduce motion support
+          "motion-reduce:transition-none",
+          className
         )}
+        // Inline style for positioning without transform conflicts
+        style={{
+          maxHeight: "calc(100vh - 2rem)",
+          ...props.style,
+        }}
         {...props}
       >
         {children}
@@ -90,8 +167,8 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end",
-        className,
+        "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end fixed",
+        className
       )}
       {...props}
     />

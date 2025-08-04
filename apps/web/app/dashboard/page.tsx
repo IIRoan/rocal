@@ -86,7 +86,7 @@ function DashboardContent() {
           <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
             <SidebarProvider>
               <SidebarWithContext />
-              <SidebarInset className="overflow-hidden">
+              <SidebarInset>
                 <CalendarWithData />
               </SidebarInset>
             </SidebarProvider>
