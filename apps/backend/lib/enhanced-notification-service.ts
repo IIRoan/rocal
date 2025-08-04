@@ -87,6 +87,15 @@ export class EnhancedNotificationService {
   private lastProcessedAt?: Date;
   private resend: Resend | null;
   private retryQueue: Map<string, NotificationRetryInfo> = new Map();
+  private updateLocks?: Map<string, { locked: boolean; timestamp: number }>;
+  private templateCache?: Map<string, string>;
+  private cleanupTimer?: NodeJS.Timeout;
+  private lastCleanupStats?: {
+    timestamp: Date;
+    deletedLogs: number;
+    deletedNotifications: number;
+    duration: number;
+  };
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -104,14 +113,15 @@ export class EnhancedNotificationService {
   }
 
   /**
-   * Start the notification service lifecycle
-   * Initializes background processing timer with comprehensive error handling
+   * Start the notification service lifecycle with enhanced error handling
+   * Initializes background processing timer with comprehensive error handling and recovery
    * @param options - Optional configuration for service startup
    */
   public start(options?: {
     enableAutomaticCleanup?: boolean;
     cleanupIntervalHours?: number;
     cleanupRetentionDays?: number;
+    enableDatabaseHealthCheck?: boolean;
   }): void {
     if (this.isRunning) {
       console.log("Enhanced notification service is already running");
@@ -125,13 +135,21 @@ export class EnhancedNotificationService {
       this.errors = [];
       this.retryQueue.clear();
 
-      // Start background timer that runs every 60 seconds
+      // Perform initial database health check if enabled
+      if (options?.enableDatabaseHealthCheck !== false) {
+        this.performInitialHealthCheck().catch((error) => {
+          console.warn("⚠️ Initial database health check failed:", error);
+          // Don't fail startup, but log the issue
+        });
+      }
+
+      // Start background timer that runs every 60 seconds with enhanced error handling
       this.backgroundTimer = setInterval(() => {
         this.processScheduledNotifications().catch((error) => {
-          console.error("Background notification processing failed:", error);
+          console.error("❌ Background notification processing failed:", error);
           this.failedCount++;
 
-          // Add system error to error log with retry information
+          // Enhanced system error logging with recovery information
           this.errors.push({
             notificationId: "system",
             eventId: "system",
@@ -145,6 +163,9 @@ export class EnhancedNotificationService {
           if (this.errors.length > 50) {
             this.errors = this.errors.slice(-50);
           }
+
+          // Log critical system errors for monitoring
+          this.logCriticalSystemError(error);
         });
       }, 60000); // 60 seconds
 
@@ -161,10 +182,102 @@ export class EnhancedNotificationService {
       console.log(
         `📊 Service status: Running=${this.isRunning}, RetryQueue=${this.retryQueue.size}, AutoCleanup=${!!this.cleanupTimer}`
       );
+
+      // Log service startup for monitoring
+      this.logServiceStartup();
     } catch (error) {
       console.error("❌ Failed to start enhanced notification service:", error);
       this.isRunning = false;
       throw error;
+    }
+  }
+
+  /**
+   * Perform initial database health check
+   */
+  private async performInitialHealthCheck(): Promise<void> {
+    try {
+      console.log("🔍 Performing initial database health check...");
+
+      // Test basic database connectivity
+      await this.executeWithDatabaseRetry(async () => {
+        return await prisma.$queryRaw`SELECT 1 as health_check`;
+      });
+
+      // Check for pending notifications that might need immediate attention
+      const pendingCount = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.eventNotification.count({
+          where: {
+            isEnabled: true,
+            isSent: false,
+            notificationTime: {
+              lte: new Date(), // Overdue notifications
+            },
+          },
+        });
+      });
+
+      if (pendingCount > 0) {
+        console.log(
+          `⚠️ Found ${pendingCount} overdue notifications that will be processed`
+        );
+      }
+
+      console.log("✅ Database health check completed successfully");
+    } catch (error) {
+      console.error("❌ Database health check failed:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Log critical system errors for monitoring
+   * @param error - The critical error
+   */
+  private async logCriticalSystemError(error: unknown): Promise<void> {
+    try {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      await this.executeWithDatabaseRetry(async () => {
+        return await prisma.notificationLog.create({
+          data: {
+            eventId: "system",
+            userId: "system",
+            notificationType: "system",
+            minutesBefore: 0,
+            status: `critical_error: ${errorMessage}`,
+            sentAt: new Date(),
+          },
+        });
+      });
+    } catch (logError) {
+      console.error("Failed to log critical system error:", logError);
+      // Don't throw - we don't want logging failures to crash the service
+    }
+  }
+
+  /**
+   * Log service startup for monitoring
+   */
+  private async logServiceStartup(): Promise<void> {
+    try {
+      await this.executeWithDatabaseRetry(async () => {
+        return await prisma.notificationLog.create({
+          data: {
+            eventId: "system",
+            userId: "system",
+            notificationType: "system",
+            minutesBefore: 0,
+            status:
+              "service_started: Enhanced notification service started successfully",
+            sentAt: new Date(),
+          },
+        });
+      });
+    } catch (error) {
+      console.error("Failed to log service startup:", error);
+      // Don't throw - this is just for monitoring
     }
   }
 
@@ -217,7 +330,7 @@ export class EnhancedNotificationService {
   }
 
   /**
-   * Create notifications for an event with exact time calculation
+   * Create notifications for an event with exact time calculation and enhanced error handling
    * @param eventId - The event ID
    * @param eventStart - The event start time
    * @param notifications - Array of notification configurations
@@ -229,10 +342,12 @@ export class EnhancedNotificationService {
     notifications: NotificationConfig[]
   ): Promise<CreateNotificationResult> {
     try {
-      // Validate event exists
-      const event = await prisma.calendarEvent.findUnique({
-        where: { id: eventId },
-        select: { id: true, userId: true, start: true },
+      // Validate event exists with database retry
+      const event = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.calendarEvent.findUnique({
+          where: { id: eventId },
+          select: { id: true, userId: true, start: true },
+        });
       });
 
       if (!event) {
@@ -242,10 +357,25 @@ export class EnhancedNotificationService {
       // Use the provided eventStart or fall back to event.start
       const actualEventStart = eventStart || event.start;
 
+      // Check if event is in the past - don't create notifications
+      const now = new Date();
+      if (actualEventStart < now) {
+        console.log(
+          `⏭️ Event ${eventId} is in the past, skipping notification creation`
+        );
+        return {
+          created: [],
+          skipped: notifications.map((config) => ({
+            config,
+            reason: "Event is in the past",
+          })),
+        };
+      }
+
       const created: EventNotification[] = [];
       const skipped: Array<{ config: NotificationConfig; reason: string }> = [];
 
-      // Process each notification configuration
+      // Process each notification configuration with database retry
       for (const config of notifications) {
         try {
           // Calculate exact notification time
@@ -263,22 +393,24 @@ export class EnhancedNotificationService {
             continue;
           }
 
-          // Create notification record
-          const notification = await prisma.eventNotification.create({
-            data: {
-              eventId,
-              notificationType: config.notificationType,
-              minutesBefore: config.minutesBefore,
-              notificationTime: result.notificationTime,
-              isEnabled: config.isEnabled,
-              isSent: false,
-            },
+          // Create notification record with database retry
+          const notification = await this.executeWithDatabaseRetry(async () => {
+            return await prisma.eventNotification.create({
+              data: {
+                eventId,
+                notificationType: config.notificationType,
+                minutesBefore: config.minutesBefore,
+                notificationTime: result.notificationTime,
+                isEnabled: config.isEnabled,
+                isSent: false,
+              },
+            });
           });
 
           created.push(notification);
 
           console.log(
-            `✓ Created ${config.notificationType} notification for event ${eventId}: ` +
+            `✅ Created ${config.notificationType} notification for event ${eventId}: ` +
               `${config.minutesBefore}min before at ${result.notificationTime.toISOString()}`
           );
         } catch (error) {
@@ -290,21 +422,25 @@ export class EnhancedNotificationService {
           });
 
           console.error(
-            `Failed to create notification for event ${eventId}:`,
+            `❌ Failed to create notification for event ${eventId}:`,
             errorMessage
           );
         }
       }
 
+      console.log(
+        `✅ Created notifications for event ${eventId}: ${created.length} created, ${skipped.length} skipped`
+      );
+
       return { created, skipped };
     } catch (error) {
-      console.error("Failed to create notifications for event:", error);
+      console.error("❌ Failed to create notifications for event:", error);
       throw error;
     }
   }
 
   /**
-   * Update notifications for an event with proper cleanup
+   * Update notifications for an event with proper cleanup and concurrent update handling
    * Replaces all existing notifications with new configuration
    * @param eventId - The event ID
    * @param eventStart - The event start time
@@ -316,115 +452,197 @@ export class EnhancedNotificationService {
     eventStart: Date,
     notifications: NotificationConfig[]
   ): Promise<CreateNotificationResult> {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    // Implement retry logic for concurrent update handling
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.updateNotificationsForEventWithRetry(
+          eventId,
+          eventStart,
+          notifications,
+          attempt
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Unknown error");
+
+        // Check if this is a retryable error (database connection, deadlock, etc.)
+        if (this.isRetryableUpdateError(error) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+          console.warn(
+            `⚠️ Update attempt ${attempt} failed for event ${eventId}, retrying in ${delay}ms: ${lastError.message}`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-retryable error or max retries reached
+        console.error(
+          `❌ Failed to update notifications for event ${eventId} after ${attempt} attempts:`,
+          lastError.message
+        );
+        throw lastError;
+      }
+    }
+
+    throw lastError || new Error("Update failed after all retry attempts");
+  }
+
+  /**
+   * Internal method for updating notifications with database connection handling
+   * @param eventId - The event ID
+   * @param eventStart - The event start time
+   * @param notifications - Array of new notification configurations
+   * @param attempt - Current attempt number for logging
+   * @returns Result with created notifications and any skipped ones
+   */
+  private async updateNotificationsForEventWithRetry(
+    eventId: string,
+    eventStart: Date,
+    notifications: NotificationConfig[],
+    attempt: number
+  ): Promise<CreateNotificationResult> {
     try {
-      // Validate event exists
-      const event = await prisma.calendarEvent.findUnique({
-        where: { id: eventId },
-        select: { id: true, userId: true, start: true },
+      // Validate event exists with database connection handling
+      const event = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.calendarEvent.findUnique({
+          where: { id: eventId },
+          select: { id: true, userId: true, start: true },
+        });
       });
 
       if (!event) {
         throw new Error(`Event with ID ${eventId} not found`);
       }
 
-      // Use transaction to ensure atomicity
-      const result = await prisma.$transaction(async (tx) => {
-        // Delete all existing notifications for this event
-        const deletedCount = await tx.eventNotification.deleteMany({
-          where: { eventId },
-        });
+      // Check if event was moved to past date - clean up future notifications
+      const now = new Date();
+      const actualEventStart = eventStart || event.start;
 
+      if (actualEventStart < now) {
         console.log(
-          `✓ Deleted ${deletedCount.count} existing notifications for event ${eventId}`
+          `🧹 Event ${eventId} moved to past date, cleaning up future notifications`
         );
+        await this.handleEventMovedToPast(eventId, actualEventStart);
+        return { created: [], skipped: [] };
+      }
 
-        // Create new notifications if any provided
-        if (notifications.length === 0) {
-          return { created: [], skipped: [] };
-        }
+      // Use transaction with proper isolation level for concurrent updates
+      const result = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.$transaction(
+          async (tx) => {
+            // Use SELECT FOR UPDATE to prevent concurrent modifications
+            await tx.$executeRaw`SELECT id FROM calendar_event WHERE id = ${eventId} FOR UPDATE`;
 
-        const actualEventStart = eventStart || event.start;
-        const created: EventNotification[] = [];
-        const skipped: Array<{ config: NotificationConfig; reason: string }> =
-          [];
-
-        // Process each notification configuration
-        for (const config of notifications) {
-          try {
-            // Calculate exact notification time
-            const calcResult =
-              NotificationCalculator.calculateNotificationTimeWithValidation(
-                actualEventStart,
-                config.minutesBefore
-              );
-
-            if (!calcResult.isValid) {
-              skipped.push({
-                config,
-                reason: calcResult.error || "Invalid notification time",
-              });
-              continue;
-            }
-
-            // Create notification record
-            const notification = await tx.eventNotification.create({
-              data: {
-                eventId,
-                notificationType: config.notificationType,
-                minutesBefore: config.minutesBefore,
-                notificationTime: calcResult.notificationTime,
-                isEnabled: config.isEnabled,
-                isSent: false,
-              },
+            // Delete all existing notifications for this event
+            const deletedCount = await tx.eventNotification.deleteMany({
+              where: { eventId },
             });
-
-            created.push(notification);
 
             console.log(
-              `✓ Created ${config.notificationType} notification for event ${eventId}: ` +
-                `${config.minutesBefore}min before at ${calcResult.notificationTime.toISOString()}`
+              `✓ Deleted ${deletedCount.count} existing notifications for event ${eventId} (attempt ${attempt})`
             );
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : "Unknown error";
-            skipped.push({
-              config,
-              reason: errorMessage,
-            });
 
-            console.error(
-              `Failed to create notification for event ${eventId}:`,
-              errorMessage
-            );
+            // Create new notifications if any provided
+            if (notifications.length === 0) {
+              return { created: [], skipped: [] };
+            }
+
+            const created: EventNotification[] = [];
+            const skipped: Array<{
+              config: NotificationConfig;
+              reason: string;
+            }> = [];
+
+            // Process each notification configuration
+            for (const config of notifications) {
+              try {
+                // Calculate exact notification time
+                const calcResult =
+                  NotificationCalculator.calculateNotificationTimeWithValidation(
+                    actualEventStart,
+                    config.minutesBefore
+                  );
+
+                if (!calcResult.isValid) {
+                  skipped.push({
+                    config,
+                    reason: calcResult.error || "Invalid notification time",
+                  });
+                  continue;
+                }
+
+                // Create notification record
+                const notification = await tx.eventNotification.create({
+                  data: {
+                    eventId,
+                    notificationType: config.notificationType,
+                    minutesBefore: config.minutesBefore,
+                    notificationTime: calcResult.notificationTime,
+                    isEnabled: config.isEnabled,
+                    isSent: false,
+                  },
+                });
+
+                created.push(notification);
+
+                console.log(
+                  `✓ Created ${config.notificationType} notification for event ${eventId}: ` +
+                    `${config.minutesBefore}min before at ${calcResult.notificationTime.toISOString()}`
+                );
+              } catch (error) {
+                const errorMessage =
+                  error instanceof Error ? error.message : "Unknown error";
+                skipped.push({
+                  config,
+                  reason: errorMessage,
+                });
+
+                console.error(
+                  `Failed to create notification for event ${eventId}:`,
+                  errorMessage
+                );
+              }
+            }
+
+            return { created, skipped };
+          },
+          {
+            isolationLevel: "Serializable", // Prevent concurrent update conflicts
+            timeout: 10000, // 10 second timeout
           }
-        }
-
-        return { created, skipped };
+        );
       });
 
       console.log(
-        `✓ Updated notifications for event ${eventId}: ` +
+        `✅ Updated notifications for event ${eventId} (attempt ${attempt}): ` +
           `${result.created.length} created, ${result.skipped.length} skipped`
       );
 
       return result;
     } catch (error) {
-      console.error("Failed to update notifications for event:", error);
+      console.error(
+        `❌ Update attempt ${attempt} failed for event ${eventId}:`,
+        error
+      );
       throw error;
     }
   }
 
   /**
-   * Delete all notifications for an event
+   * Delete all notifications for an event with enhanced error handling
    * @param eventId - The event ID
    * @returns Number of deleted notifications
    */
   public async deleteNotificationsForEvent(eventId: string): Promise<number> {
     try {
       // Validate event exists (optional - we might want to clean up orphaned notifications)
-      const event = await prisma.calendarEvent.findUnique({
-        where: { id: eventId },
-        select: { id: true },
+      const event = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.calendarEvent.findUnique({
+          where: { id: eventId },
+          select: { id: true },
+        });
       });
 
       if (!event) {
@@ -433,17 +651,103 @@ export class EnhancedNotificationService {
         );
       }
 
-      // Delete all notifications for this event
-      const result = await prisma.eventNotification.deleteMany({
-        where: { eventId },
+      // Delete all notifications for this event with database retry
+      const result = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.eventNotification.deleteMany({
+          where: { eventId },
+        });
       });
 
+      // Remove from retry queue if any notifications were there
+      for (const [notificationId, retryInfo] of this.retryQueue.entries()) {
+        if (retryInfo.eventId === eventId) {
+          this.retryQueue.delete(notificationId);
+          console.log(
+            `🗑️ Removed notification ${notificationId} from retry queue`
+          );
+        }
+      }
+
       console.log(
-        `✓ Deleted ${result.count} notifications for event ${eventId}`
+        `✅ Deleted ${result.count} notifications for event ${eventId}`
       );
       return result.count;
     } catch (error) {
-      console.error("Failed to delete notifications for event:", error);
+      console.error("❌ Failed to delete notifications for event:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle events moved to past dates by cleaning up future notifications
+   * Implements Requirement 7.1
+   * @param eventId - The event ID
+   * @param eventStart - The new event start time (in the past)
+   * @returns Number of cleaned up notifications
+   */
+  public async handleEventMovedToPast(
+    eventId: string,
+    eventStart: Date
+  ): Promise<number> {
+    try {
+      const now = new Date();
+
+      if (eventStart >= now) {
+        console.log(
+          `⏭️ Event ${eventId} is not in the past, no cleanup needed`
+        );
+        return 0;
+      }
+
+      console.log(
+        `🧹 Cleaning up notifications for event ${eventId} moved to past date: ${eventStart.toISOString()}`
+      );
+
+      // Delete all future notifications for this event
+      const result = await this.executeWithDatabaseRetry(async () => {
+        return await prisma.eventNotification.deleteMany({
+          where: {
+            eventId,
+            notificationTime: {
+              gte: now, // Delete notifications scheduled for now or future
+            },
+          },
+        });
+      });
+
+      // Remove from retry queue
+      let removedFromRetryQueue = 0;
+      for (const [notificationId, retryInfo] of this.retryQueue.entries()) {
+        if (retryInfo.eventId === eventId) {
+          this.retryQueue.delete(notificationId);
+          removedFromRetryQueue++;
+        }
+      }
+
+      // Log the cleanup operation
+      await this.executeWithDatabaseRetry(async () => {
+        return await prisma.notificationLog.create({
+          data: {
+            eventId,
+            userId: "system",
+            notificationType: "system",
+            minutesBefore: 0,
+            status: `cleanup: Cleaned up ${result.count} future notifications for event moved to past`,
+            sentAt: new Date(),
+          },
+        });
+      });
+
+      console.log(
+        `✅ Cleaned up ${result.count} future notifications and ${removedFromRetryQueue} retry queue entries for past event ${eventId}`
+      );
+
+      return result.count;
+    } catch (error) {
+      console.error(
+        `❌ Failed to clean up notifications for past event ${eventId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -451,6 +755,7 @@ export class EnhancedNotificationService {
   /**
    * Process scheduled notifications (background processing method)
    * Queries for notifications due in the current minute and sends them
+   * Enhanced with database connection handling and improved error recovery
    */
   public async processScheduledNotifications(): Promise<void> {
     if (!this.isRunning) {
@@ -475,34 +780,37 @@ export class EnhancedNotificationService {
         `🔍 Processing scheduled notifications for ${currentMinute.toISOString()}`
       );
 
-      // Query for all notifications scheduled for the current minute
-      // Only consider enabled notifications that haven't been sent yet
-      const notificationsToSend = await prisma.eventNotification.findMany({
-        where: {
-          notificationTime: {
-            gte: currentMinute,
-            lt: new Date(currentMinute.getTime() + 60 * 1000), // Next minute
-          },
-          isEnabled: true,
-          isSent: false,
-        },
-        include: {
-          event: {
+      // Query for all notifications scheduled for the current minute with database retry
+      const notificationsToSend = await this.executeWithDatabaseRetry(
+        async () => {
+          return await prisma.eventNotification.findMany({
+            where: {
+              notificationTime: {
+                gte: currentMinute,
+                lt: new Date(currentMinute.getTime() + 60 * 1000), // Next minute
+              },
+              isEnabled: true,
+              isSent: false,
+            },
             include: {
-              user: {
+              event: {
                 include: {
-                  settings: true,
+                  user: {
+                    include: {
+                      settings: true,
+                    },
+                  },
+                  calendar: true,
+                  category: true,
                 },
               },
-              calendar: true,
-              category: true,
             },
-          },
-        },
-        orderBy: {
-          notificationTime: "asc",
-        },
-      });
+            orderBy: {
+              notificationTime: "asc",
+            },
+          });
+        }
+      );
 
       console.log(
         `📋 Found ${notificationsToSend.length} notifications to send`
@@ -510,10 +818,24 @@ export class EnhancedNotificationService {
 
       let processedThisRun = 0;
       let failedThisRun = 0;
+      let skippedThisRun = 0;
 
-      // Process each notification
+      // Process each notification with enhanced error handling
       for (const notification of notificationsToSend) {
         try {
+          // Check if event is still valid (not moved to past)
+          if (notification.event.start < now) {
+            console.log(
+              `⏭️ Skipping notification ${notification.id} - event moved to past`
+            );
+            await this.handleEventMovedToPast(
+              notification.eventId,
+              notification.event.start
+            );
+            skippedThisRun++;
+            continue;
+          }
+
           const result = await this.sendNotificationWithRetry(notification);
           if (result.success) {
             processedThisRun++;
@@ -525,7 +847,7 @@ export class EnhancedNotificationService {
             failedThisRun++;
             this.failedCount++;
 
-            // Handle retry logic
+            // Handle retry logic with enhanced error categorization
             await this.handleNotificationFailure(notification, result);
           }
         } catch (error) {
@@ -535,31 +857,46 @@ export class EnhancedNotificationService {
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error";
 
-          // Handle unexpected errors
+          // Enhanced error handling with better categorization
+          const shouldRetry = this.shouldRetryError(error);
+          const retryAfterMinutes = this.calculateRetryDelay(error);
+
           await this.handleNotificationFailure(notification, {
             success: false,
             error: errorMessage,
-            shouldRetry: this.shouldRetryError(error),
-            retryAfterMinutes: 5, // Default retry after 5 minutes
+            shouldRetry,
+            retryAfterMinutes,
           });
 
           console.error(
-            `❌ Unexpected error sending notification ${notification.id} for event "${notification.event.title}":`,
-            errorMessage
+            `❌ Error processing notification ${notification.id} for event "${notification.event.title}": ${errorMessage}`
           );
         }
       }
 
-      // Process retry queue
-      await this.processRetryQueue();
+      // Process retry queue with enhanced error handling
+      await this.processRetryQueueWithErrorHandling();
 
       // Update last processed time
       this.lastProcessedAt = new Date();
 
-      // Log summary
-      if (notificationsToSend.length > 0) {
+      // Enhanced logging with more details
+      if (
+        notificationsToSend.length > 0 ||
+        processedThisRun > 0 ||
+        failedThisRun > 0
+      ) {
         console.log(
-          `✅ Notification processing complete: ${processedThisRun} sent, ${failedThisRun} failed`
+          `✅ Notification processing complete: ${processedThisRun} sent, ${failedThisRun} failed, ${skippedThisRun} skipped`
+        );
+      }
+
+      // Log processing metrics for monitoring
+      if (processedThisRun > 0 || failedThisRun > 0) {
+        await this.logProcessingMetrics(
+          processedThisRun,
+          failedThisRun,
+          skippedThisRun
         );
       }
     } catch (error) {
@@ -568,25 +905,28 @@ export class EnhancedNotificationService {
         error instanceof Error ? error.message : "Unknown error";
 
       console.error(
-        "❌ Error in background notification processing:",
+        "❌ Critical error in background notification processing:",
         errorMessage
       );
 
-      // Add system error to error log
+      // Enhanced system error logging with recovery information
       this.errors.push({
         notificationId: "system",
         eventId: "system",
         userId: "system",
         error: `Background processing failed: ${errorMessage}`,
         timestamp: new Date(),
+        retryCount: 0,
       });
 
-      // Keep only last 50 errors
+      // Keep only last 50 errors to prevent memory issues
       if (this.errors.length > 50) {
         this.errors = this.errors.slice(-50);
       }
 
-      throw error;
+      // Don't throw the error to prevent service shutdown
+      // Instead, log it and continue with next processing cycle
+      console.log("🔄 Service will continue with next processing cycle");
     }
   }
 
@@ -747,9 +1087,9 @@ export class EnhancedNotificationService {
   }
 
   /**
-   * Process notifications in the retry queue
+   * Process notifications in the retry queue with enhanced error handling
    */
-  private async processRetryQueue(): Promise<void> {
+  private async processRetryQueueWithErrorHandling(): Promise<void> {
     const now = new Date();
     const retriesToProcess: string[] = [];
 
@@ -768,28 +1108,30 @@ export class EnhancedNotificationService {
       `🔄 Processing ${retriesToProcess.length} notification retries`
     );
 
-    // Process each retry
+    // Process each retry with enhanced error handling
     for (const notificationId of retriesToProcess) {
       const retryInfo = this.retryQueue.get(notificationId);
       if (!retryInfo) continue;
 
       try {
-        // Fetch the notification with full event and user data
-        const notification = await prisma.eventNotification.findUnique({
-          where: { id: notificationId },
-          include: {
-            event: {
-              include: {
-                user: {
-                  include: {
-                    settings: true,
+        // Fetch the notification with full event and user data using database retry
+        const notification = await this.executeWithDatabaseRetry(async () => {
+          return await prisma.eventNotification.findUnique({
+            where: { id: notificationId },
+            include: {
+              event: {
+                include: {
+                  user: {
+                    include: {
+                      settings: true,
+                    },
                   },
+                  calendar: true,
+                  category: true,
                 },
-                calendar: true,
-                category: true,
               },
             },
-          },
+          });
         });
 
         if (!notification) {
@@ -810,6 +1152,15 @@ export class EnhancedNotificationService {
             `⏭️ Skipping retry for notification ${notificationId} - no longer valid`
           );
           this.retryQueue.delete(notificationId);
+
+          // If event moved to past, clean up
+          if (notification.event.start < now) {
+            await this.handleEventMovedToPast(
+              notification.eventId,
+              notification.event.start
+            );
+          }
+
           continue;
         }
 
@@ -832,19 +1183,95 @@ export class EnhancedNotificationService {
           error
         );
 
-        // Update retry info with new error
+        // Enhanced retry error handling
         const updatedRetryInfo = { ...retryInfo };
         updatedRetryInfo.retryCount++;
         updatedRetryInfo.lastError =
           error instanceof Error ? error.message : "Unknown error";
 
-        if (updatedRetryInfo.retryCount <= 3) {
-          updatedRetryInfo.nextRetryAt = new Date(Date.now() + 10 * 60 * 1000); // Retry in 10 minutes
+        // Use smarter retry logic based on error type
+        const shouldContinueRetrying =
+          this.shouldRetryError(error) && updatedRetryInfo.retryCount <= 3;
+
+        if (shouldContinueRetrying) {
+          const retryDelay = this.calculateRetryDelay(error) * 60 * 1000; // Convert to milliseconds
+          updatedRetryInfo.nextRetryAt = new Date(Date.now() + retryDelay);
           this.retryQueue.set(notificationId, updatedRetryInfo);
+
+          console.log(
+            `🔄 Scheduled retry ${updatedRetryInfo.retryCount}/3 for notification ${notificationId} in ${retryDelay / 60000} minutes`
+          );
         } else {
+          console.error(
+            `❌ Permanently failed notification ${notificationId} after ${updatedRetryInfo.retryCount} attempts`
+          );
           this.retryQueue.delete(notificationId);
+
+          // Log permanent failure
+          await this.logNotificationPermanentFailure(
+            notificationId,
+            updatedRetryInfo
+          );
         }
       }
+    }
+  }
+
+  /**
+   * Log processing metrics for monitoring
+   * @param processed - Number of notifications processed successfully
+   * @param failed - Number of notifications that failed
+   * @param skipped - Number of notifications skipped
+   */
+  private async logProcessingMetrics(
+    processed: number,
+    failed: number,
+    skipped: number
+  ): Promise<void> {
+    try {
+      await this.executeWithDatabaseRetry(async () => {
+        return await prisma.notificationLog.create({
+          data: {
+            eventId: "system",
+            userId: "system",
+            notificationType: "system",
+            minutesBefore: 0,
+            status: `processing_metrics: ${processed} sent, ${failed} failed, ${skipped} skipped`,
+            sentAt: new Date(),
+          },
+        });
+      });
+    } catch (error) {
+      console.error("Failed to log processing metrics:", error);
+      // Don't throw - this is just for monitoring
+    }
+  }
+
+  /**
+   * Log permanent notification failure
+   * @param notificationId - The notification ID
+   * @param retryInfo - Retry information
+   */
+  private async logNotificationPermanentFailure(
+    notificationId: string,
+    retryInfo: NotificationRetryInfo
+  ): Promise<void> {
+    try {
+      await this.executeWithDatabaseRetry(async () => {
+        return await prisma.notificationLog.create({
+          data: {
+            eventId: retryInfo.eventId,
+            userId: retryInfo.userId,
+            notificationType: "system",
+            minutesBefore: 0,
+            status: `permanent_failure: Notification ${notificationId} permanently failed after ${retryInfo.retryCount} attempts. Last error: ${retryInfo.lastError}`,
+            sentAt: new Date(),
+          },
+        });
+      });
+    } catch (error) {
+      console.error("Failed to log permanent failure:", error);
+      // Don't throw - this is just for logging
     }
   }
 
@@ -1464,6 +1891,339 @@ export class EnhancedNotificationService {
     );
   }
 
+  /**
+   * Execute database operation with retry logic for connection issues
+   * Implements Requirement 7.4 - graceful handling of database connection issues
+   * @param operation - Database operation to execute
+   * @param maxRetries - Maximum number of retry attempts
+   * @returns Result of the database operation
+   */
+  private async executeWithDatabaseRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError =
+          error instanceof Error ? error : new Error("Unknown database error");
+
+        // Check if this is a retryable database error
+        if (this.isRetryableDatabaseError(error) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.warn(
+            `⚠️ Database operation attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-retryable error or max retries reached
+        console.error(
+          `❌ Database operation failed after ${attempt} attempts: ${lastError.message}`
+        );
+        throw lastError;
+      }
+    }
+
+    throw (
+      lastError ||
+      new Error("Database operation failed after all retry attempts")
+    );
+  }
+
+  /**
+   * Check if a database error is retryable
+   * @param error - The error to check
+   * @returns Whether the error should trigger a retry
+   */
+  private isRetryableDatabaseError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const errorMessage = error.message.toLowerCase();
+    const errorCode = (error as any).code;
+
+    // Retryable database errors
+    const retryableErrors = [
+      "connection",
+      "timeout",
+      "deadlock",
+      "lock",
+      "busy",
+      "network",
+      "econnreset",
+      "enotfound",
+      "etimedout",
+      "server has gone away",
+      "lost connection",
+      "connection refused",
+      "too many connections",
+      "connection pool",
+      "transaction",
+    ];
+
+    // Retryable error codes (Prisma/PostgreSQL specific)
+    const retryableErrorCodes = [
+      "P1001", // Can't reach database server
+      "P1002", // Database server timeout
+      "P1008", // Operations timed out
+      "P1017", // Server has closed the connection
+      "P2024", // Timed out fetching a new connection
+      "P2034", // Transaction failed due to a write conflict
+      "40001", // Serialization failure
+      "40P01", // Deadlock detected
+      "53300", // Too many connections
+      "08000", // Connection exception
+      "08003", // Connection does not exist
+      "08006", // Connection failure
+    ];
+
+    // Check error codes first
+    if (errorCode && retryableErrorCodes.includes(errorCode)) {
+      return true;
+    }
+
+    // Check error message
+    for (const retryableError of retryableErrors) {
+      if (errorMessage.includes(retryableError)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if an update error is retryable (for concurrent update handling)
+   * @param error - The error to check
+   * @returns Whether the error should trigger a retry
+   */
+  private isRetryableUpdateError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const errorMessage = error.message.toLowerCase();
+    const errorCode = (error as any).code;
+
+    // Retryable update errors (concurrent access, deadlocks, etc.)
+    const retryableUpdateErrors = [
+      "deadlock",
+      "lock",
+      "conflict",
+      "concurrent",
+      "serialization",
+      "unique constraint",
+      "foreign key constraint",
+      "transaction",
+      "could not serialize",
+      "update conflict",
+      "version mismatch",
+    ];
+
+    // Retryable update error codes
+    const retryableUpdateErrorCodes = [
+      "P2002", // Unique constraint failed
+      "P2003", // Foreign key constraint failed
+      "P2034", // Transaction failed due to a write conflict
+      "40001", // Serialization failure
+      "40P01", // Deadlock detected
+      "23505", // Unique violation
+      "23503", // Foreign key violation
+    ];
+
+    // Check error codes first
+    if (errorCode && retryableUpdateErrorCodes.includes(errorCode)) {
+      return true;
+    }
+
+    // Check error message
+    for (const retryableError of retryableUpdateErrors) {
+      if (errorMessage.includes(retryableError)) {
+        return true;
+      }
+    }
+
+    // Also check if it's a general database error
+    return this.isRetryableDatabaseError(error);
+  }
+
+  /**
+   * Handle concurrent notification updates with proper locking
+   * Implements Requirement 7.6 - handle concurrent notification updates properly
+   * @param eventId - The event ID
+   * @param updateOperation - The update operation to perform
+   * @returns Result of the update operation
+   */
+  public async handleConcurrentNotificationUpdate<T>(
+    eventId: string,
+    updateOperation: () => Promise<T>
+  ): Promise<T> {
+    const lockKey = `notification_update_${eventId}`;
+    const maxWaitTime = 30000; // 30 seconds max wait
+    const lockCheckInterval = 100; // Check every 100ms
+
+    // Simple in-memory lock mechanism (for single instance)
+    // In a multi-instance setup, you'd use Redis or database-level locking
+    if (!this.updateLocks) {
+      this.updateLocks = new Map<
+        string,
+        { locked: boolean; timestamp: number }
+      >();
+    }
+
+    const startTime = Date.now();
+
+    // Wait for lock to be available
+    while (
+      this.updateLocks.has(lockKey) &&
+      this.updateLocks.get(lockKey)!.locked
+    ) {
+      if (Date.now() - startTime > maxWaitTime) {
+        throw new Error(
+          `Timeout waiting for notification update lock for event ${eventId}`
+        );
+      }
+
+      // Check if lock is stale (older than 5 minutes)
+      const lockInfo = this.updateLocks.get(lockKey)!;
+      if (Date.now() - lockInfo.timestamp > 300000) {
+        console.warn(`⚠️ Removing stale lock for event ${eventId}`);
+        this.updateLocks.delete(lockKey);
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, lockCheckInterval));
+    }
+
+    // Acquire lock
+    this.updateLocks.set(lockKey, { locked: true, timestamp: Date.now() });
+
+    try {
+      console.log(`🔒 Acquired update lock for event ${eventId}`);
+      const result = await updateOperation();
+      console.log(`🔓 Released update lock for event ${eventId}`);
+      return result;
+    } finally {
+      // Always release lock
+      this.updateLocks.delete(lockKey);
+    }
+  }
+
+  /**
+   * Batch update notifications for multiple events (for efficiency)
+   * @param updates - Array of event updates
+   * @returns Results of all updates
+   */
+  public async batchUpdateNotifications(
+    updates: Array<{
+      eventId: string;
+      eventStart: Date;
+      notifications: NotificationConfig[];
+    }>
+  ): Promise<Array<CreateNotificationResult & { eventId: string }>> {
+    const results: Array<CreateNotificationResult & { eventId: string }> = [];
+
+    // Process updates in batches to avoid overwhelming the database
+    const batchSize = 5;
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize);
+
+      const batchPromises = batch.map(async (update) => {
+        try {
+          const result = await this.handleConcurrentNotificationUpdate(
+            update.eventId,
+            () =>
+              this.updateNotificationsForEvent(
+                update.eventId,
+                update.eventStart,
+                update.notifications
+              )
+          );
+          return { ...result, eventId: update.eventId };
+        } catch (error) {
+          console.error(
+            `❌ Failed to update notifications for event ${update.eventId}:`,
+            error
+          );
+          return {
+            eventId: update.eventId,
+            created: [],
+            skipped: [
+              {
+                config: {
+                  notificationType: "email",
+                  minutesBefore: 0,
+                  isEnabled: true,
+                } as NotificationConfig,
+                reason:
+                  error instanceof Error ? error.message : "Unknown error",
+              },
+            ],
+          };
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+
+      // Small delay between batches to prevent overwhelming the system
+      if (i + batchSize < updates.length) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Clean up notifications for events that no longer exist (orphaned notifications)
+   * @returns Number of cleaned up notifications
+   */
+  public async cleanupOrphanedNotifications(): Promise<number> {
+    try {
+      console.log("🧹 Cleaning up orphaned notifications...");
+
+      const result = await this.executeWithDatabaseRetry(async () => {
+        // Find notifications where the event no longer exists
+        return await prisma.$executeRaw`
+          DELETE FROM event_notification 
+          WHERE event_id NOT IN (SELECT id FROM calendar_event)
+        `;
+      });
+
+      const deletedCount = typeof result === "number" ? result : 0;
+
+      if (deletedCount > 0) {
+        console.log(`✅ Cleaned up ${deletedCount} orphaned notifications`);
+
+        // Log the cleanup operation
+        await this.executeWithDatabaseRetry(async () => {
+          return await prisma.notificationLog.create({
+            data: {
+              eventId: "system",
+              userId: "system",
+              notificationType: "system",
+              minutesBefore: 0,
+              status: `orphan_cleanup: Cleaned up ${deletedCount} orphaned notifications`,
+              sentAt: new Date(),
+            },
+          });
+        });
+      }
+
+      return deletedCount;
+    } catch (error) {
+      console.error("❌ Failed to clean up orphaned notifications:", error);
+      throw error;
+    }
+  }
+
   // Helper methods for enhanced email functionality
 
   /**
@@ -1697,9 +2457,6 @@ export class EnhancedNotificationService {
       console.error(`📊 Email delivery failed:`, logData);
     }
   }
-
-  // Add template cache property
-  private templateCache?: Map<string, string>;
 
   /**
    * Send browser notification (placeholder for now)
@@ -2293,7 +3050,12 @@ export class EnhancedNotificationService {
             const statusMatch = log.status.match(
               /deleted_logs=(\d+), deleted_notifications=(\d+), duration=(\d+)ms/
             );
-            if (statusMatch && statusMatch[1] && statusMatch[2] && statusMatch[3]) {
+            if (
+              statusMatch &&
+              statusMatch[1] &&
+              statusMatch[2] &&
+              statusMatch[3]
+            ) {
               return {
                 timestamp: log.sentAt,
                 deletedLogs: parseInt(statusMatch[1]),
@@ -2365,15 +3127,6 @@ export class EnhancedNotificationService {
       );
     }
   }
-
-  // Add cleanup timer property
-  private cleanupTimer?: NodeJS.Timeout;
-  private lastCleanupStats?: {
-    timestamp: Date;
-    deletedLogs: number;
-    deletedNotifications: number;
-    duration: number;
-  };
 
   /**
    * Get comprehensive notification statistics
@@ -2463,7 +3216,6 @@ export class EnhancedNotificationService {
       throw error;
     }
   }
-
 
   /**
    * Get notifications for a specific event
