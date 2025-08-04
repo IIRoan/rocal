@@ -11,6 +11,7 @@ import {
   CreateCategoryRequest,
   UpdateCategoryRequest,
   ApiError,
+  EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar/notification-manager";
 
@@ -450,45 +451,35 @@ export function useCalendarData(
       });
 
       try {
-        // Make API call in the background
-        const apiPromise = calendarApiService.createEvent(event);
+        // Make API call and await the result to get the real event ID
+        const newEvent = await calendarApiService.createEvent(event);
 
-        // Don't await immediately - let the optimistic update show first
-        setTimeout(async () => {
-          try {
-            const newEvent = await apiPromise;
+        // Replace optimistic event with real event
+        setEvents((prev) =>
+          prev.map((e) => (e.id === operationId ? newEvent : e)),
+        );
 
-            // Replace optimistic event with real event
-            setEvents((prev) =>
-              prev.map((e) => (e.id === operationId ? newEvent : e)),
-            );
+        // Smart cache invalidation
+        const eventDate = new Date(event.start);
+        const dayStart = new Date(eventDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(eventDate);
+        dayEnd.setHours(23, 59, 59, 999);
 
-            // Smart cache invalidation
-            const eventDate = new Date(event.start);
-            const dayStart = new Date(eventDate);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(eventDate);
-            dayEnd.setHours(23, 59, 59, 999);
-
-            for (const [key, entry] of eventsCache.current.entries()) {
-              if (
-                entry.dateRange.start <= dayEnd &&
-                entry.dateRange.end >= dayStart
-              ) {
-                eventsCache.current.delete(key);
-              }
-            }
-
-            // Clean up operation tracking
-            cleanupOperation(operationId);
-          } catch (error) {
-            // Rollback optimistic update on failure
-            rollbackOperation(operationId);
+        for (const [key, entry] of eventsCache.current.entries()) {
+          if (
+            entry.dateRange.start <= dayEnd &&
+            entry.dateRange.end >= dayStart
+          ) {
+            eventsCache.current.delete(key);
           }
-        }, 50); // Small delay to ensure UI updates first
+        }
 
-        // Return the optimistic event immediately for better UX
-        return optimisticEvent;
+        // Clean up operation tracking
+        cleanupOperation(operationId);
+
+        // Return the real event with the correct database ID
+        return newEvent;
       } catch (error) {
         // Rollback optimistic update on immediate failure
         rollbackOperation(operationId);
@@ -940,12 +931,14 @@ export function useCalendarData(
       try {
         const response =
           await calendarApiService.getEventNotifications(eventId);
-        return response.notifications.map((n) => ({
-          id: n.id,
-          notificationType: "email",
-          minutesBefore: n.minutesBefore,
-          isEnabled: n.isEnabled,
-        }));
+        return response.data.notifications
+          .filter((n: ApiEventNotification) => n.notificationType === "email")
+          .map((n: ApiEventNotification) => ({
+            id: n.id,
+            notificationType: "email" as const,
+            minutesBefore: n.minutesBefore,
+            isEnabled: n.isEnabled,
+          }));
       } catch (error) {
         console.error("Failed to load event notifications:", error);
         return [];
