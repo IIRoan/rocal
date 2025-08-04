@@ -22,6 +22,10 @@ interface EventReminderEmailProps {
   categoryColor?: string;
   description?: string;
   timeUntilEvent: string;
+  duration?: string;
+  reminderText?: string;
+  userName?: string;
+  userEmail?: string;
   userTheme?: "light" | "dark" | "system";
 }
 
@@ -34,6 +38,10 @@ export const EventReminderEmail = ({
   categoryColor = "blue",
   description,
   timeUntilEvent = "in 15 minutes",
+  duration,
+  reminderText,
+  userName,
+  userEmail,
   userTheme = "light",
 }: EventReminderEmailProps) => {
   const isDark = userTheme === "dark";
@@ -137,11 +145,23 @@ export const EventReminderEmail = ({
               style={{
                 color: colors.mutedForeground,
                 fontSize: "14px",
-                margin: 0,
+                margin: "0 0 4px 0",
               }}
             >
               Event Reminder
             </Text>
+            {reminderText && (
+              <Text
+                style={{
+                  color: colors.accent,
+                  fontSize: "12px",
+                  fontWeight: "500",
+                  margin: 0,
+                }}
+              >
+                {reminderText}
+              </Text>
+            )}
           </Section>
 
           {/* Content */}
@@ -279,6 +299,31 @@ export const EventReminderEmail = ({
                   </Section>
                 )}
 
+                {duration && (
+                  <Section
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "8px",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: "500",
+                        color: colors.cardForeground,
+                        minWidth: "60px",
+                      }}
+                    >
+                      Duration:
+                    </span>
+                    <span style={{ color: colors.mutedForeground }}>
+                      {duration}
+                    </span>
+                  </Section>
+                )}
+
                 {categoryName && (
                   <Section
                     style={{
@@ -334,6 +379,17 @@ export const EventReminderEmail = ({
               textAlign: "center",
             }}
           >
+            {userName && (
+              <Text
+                style={{
+                  fontSize: "14px",
+                  color: colors.cardForeground,
+                  margin: "0 0 12px 0",
+                }}
+              >
+                Hi {userName}! 👋
+              </Text>
+            )}
             <Text
               style={{
                 fontSize: "12px",
@@ -348,6 +404,18 @@ export const EventReminderEmail = ({
               You can manage your notification preferences in your calendar
               settings.
             </Text>
+            {userEmail && (
+              <Text
+                style={{
+                  fontSize: "11px",
+                  color: colors.mutedForeground,
+                  margin: "8px 0 0 0",
+                  opacity: 0.7,
+                }}
+              >
+                Sent to: {userEmail}
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>

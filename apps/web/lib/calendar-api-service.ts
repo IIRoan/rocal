@@ -482,11 +482,22 @@ export class CalendarApiService {
 
   async getEventNotifications(
     eventId: string,
-  ): Promise<{ success: boolean; notifications: EventNotification[] }> {
+  ): Promise<{ 
+    success: boolean; 
+    data: { 
+      eventId: string; 
+      notifications: EventNotification[]; 
+      count: number; 
+    } 
+  }> {
     try {
       const response = await this.client.get<{
         success: boolean;
-        notifications: EventNotification[];
+        data: {
+          eventId: string;
+          notifications: EventNotification[];
+          count: number;
+        };
       }>(`/api/notifications/event/${eventId}`);
       return response;
     } catch (error) {

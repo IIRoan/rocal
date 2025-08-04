@@ -9,7 +9,7 @@ import { settingsRoutes } from "./routes/settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { errorHandler } from "./lib/errors";
-import { simpleNotificationService } from "./lib/simple-notification-service";
+import { EnhancedNotificationService } from "./lib/enhanced-notification-service";
 
 // Better Auth middleware following the documentation pattern
 const betterAuth = new Elysia({ name: "better-auth" })
@@ -34,8 +34,9 @@ const betterAuth = new Elysia({ name: "better-auth" })
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix });
 
-  // Initialize Simple notification service
-  simpleNotificationService.start();
+  // Initialize Enhanced notification service
+  const enhancedNotificationService = EnhancedNotificationService.getInstance();
+  enhancedNotificationService.start();
 
   // Only add Swagger in development
   if (process.env.NODE_ENV !== "production") {
@@ -70,7 +71,7 @@ export const createAPI = (prefix = "") => {
             },
           },
         },
-      }),
+      })
     );
   }
 
@@ -81,7 +82,7 @@ export const createAPI = (prefix = "") => {
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-      }),
+      })
     )
     .use(errorHandler)
     .use(betterAuth)
@@ -105,7 +106,7 @@ export const createAPI = (prefix = "") => {
       },
       {
         detail: { tags: ["Auth"] },
-      },
+      }
     )
     .get("/user", ({ user }) => user, {
       auth: true,
@@ -122,7 +123,7 @@ export const createAPI = (prefix = "") => {
       }),
       {
         detail: { tags: ["Health"] },
-      },
+      }
     )
     .use(eventsRoutes)
     .use(categoriesRoutes)
