@@ -238,10 +238,10 @@ model EventNotification {
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  @@index([eventId])
-  @@index([notificationType])
-  @@index([notificationTime])
-  @@index([isEnabled, isSent])
+  // Optimized indexes for enhanced notification system
+  @@index([notificationTime, isEnabled, isSent], name: "idx_event_notification_time_enabled_sent")
+  @@index([eventId, notificationType], name: "idx_event_notification_event_type")
+  @@index([isSent, createdAt], name: "idx_event_notification_sent_created")
   @@map("event_notification")
 }
 
@@ -255,9 +255,11 @@ model NotificationLog {
   status           String   @default("sent") @map("status") // 'sent', 'failed', 'pending'
   createdAt        DateTime @default(now()) @map("created_at")
 
+  // Enhanced indexes for notification log queries
   @@index([eventId, userId])
-  @@index([sentAt])
-  @@index([status])
+  @@index([sentAt, status], name: "idx_notification_log_sent_at_status")
+  @@index([userId, sentAt], name: "idx_notification_log_user_sent")
+  @@index([status, createdAt], name: "idx_notification_log_failed")
   @@map("notification_log")
 }
 
