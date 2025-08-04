@@ -14,7 +14,7 @@ import { useCommandPalette as useCommandPaletteContext } from "@/components/comm
 
 function SidebarWithContext() {
   const { data: session } = useSession();
-  const { openCalendarManagement } = useCommandPaletteContext();
+  const { openCalendarManagement, openPalette } = useCommandPaletteContext();
 
   const handleLogout = async () => {
     try {
@@ -34,7 +34,7 @@ function SidebarWithContext() {
         avatar: session?.user.image || undefined,
       }}
       onLogout={handleLogout}
-      onOpenSettings={() => {}} // We'll handle this through the context now
+      onOpenSettings={openPalette}
       onOpenCalendarManagement={openCalendarManagement}
     />
   );
