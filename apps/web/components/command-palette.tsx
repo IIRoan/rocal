@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
@@ -9,7 +9,10 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
 import { PasskeySettings } from "./passkey-settings";
-import { NotificationManager, EventNotification } from "@workspace/ui/components/calendar/notification-manager";
+import {
+  NotificationManager,
+  EventNotification,
+} from "@workspace/ui/components/calendar/notification-manager";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   CommandDialog,
@@ -250,9 +253,23 @@ export function CommandPalette({
   const [endDateOpen, setEndDateOpen] = useState(false);
 
   // Notification state
-  const [eventNotifications, setEventNotifications] = useState<EventNotification[]>([]);
+  const [eventNotifications, setEventNotifications] = useState<
+    EventNotification[]
+  >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(true);
+  
+  // Auto-save notifications timeout ref
+  const notificationSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (notificationSaveTimeoutRef.current) {
+        clearTimeout(notificationSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
@@ -310,14 +327,14 @@ export function CommandPalette({
       setEventLocation(eventToEdit.location || "");
       setEventCalendarId(eventToEdit.calendarId || calendars?.[0]?.id || "");
       setEventReminder(eventToEdit.reminder ?? null);
-      
+
       // Load notifications for existing events
       if (!isNewEvent && eventToEdit.id) {
         loadEventNotifications(eventToEdit.id);
       } else {
         setEventNotifications([]);
       }
-      
+
       setTransitionDirection("forward");
       setCurrentView("event-editor");
     }
@@ -327,6 +344,67 @@ export function CommandPalette({
     setShowResetConfirm(false);
     setTimezoneSearch("");
   }, [currentView]);
+
+  // Save notifications for an event
+  const saveEventNotifications = useCallback(
+    async (eventId: string, notifications: EventNotification[]) => {
+      if (!eventId) return;
+
+      try {
+        const notificationData = notifications.map((n) => ({
+          notificationType: n.notificationType,
+          minutesBefore: n.minutesBefore,
+          isEnabled: n.isEnabled,
+        }));
+
+        await calendarApiService.updateEventNotifications(
+          eventId,
+          notificationData
+        );
+      } catch (error) {
+        console.error("Failed to save event notifications:", error);
+        toast.error("Failed to save notification settings");
+      }
+    },
+    []
+  );
+
+  // Debounced auto-save for notification changes
+  const debouncedSaveNotifications = useCallback(
+    (eventId: string, notifications: EventNotification[]) => {
+      // Clear existing timeout
+      if (notificationSaveTimeoutRef.current) {
+        clearTimeout(notificationSaveTimeoutRef.current);
+      }
+
+      // Set new timeout for auto-save
+      notificationSaveTimeoutRef.current = setTimeout(async () => {
+        if (eventId && eventId !== "new") {
+          try {
+            await saveEventNotifications(eventId, notifications);
+            console.log("Notifications auto-saved successfully");
+          } catch (error) {
+            console.error("Failed to auto-save notifications:", error);
+            toast.error("Failed to save notification changes");
+          }
+        }
+      }, 1000); // 1 second debounce
+    },
+    [saveEventNotifications]
+  );
+
+  // Handle notification changes with auto-save
+  const handleNotificationChange = useCallback(
+    (notifications: EventNotification[]) => {
+      setEventNotifications(notifications);
+      
+      // Trigger auto-save for existing events
+      if (selectedEvent?.id) {
+        debouncedSaveNotifications(selectedEvent.id, notifications);
+      }
+    },
+    [selectedEvent?.id, debouncedSaveNotifications]
+  );
 
   const updateSetting = async <K extends keyof UserSettings>(
     key: K,
@@ -490,15 +568,15 @@ export function CommandPalette({
     setNotificationsLoading(true);
     try {
       const response = await calendarApiService.getEventNotifications(eventId);
-      if (response.success) {
+      if (response.success && response.data && response.data.notifications) {
         // Filter only email notifications and map to the expected format
-        const emailNotifications = response.notifications
-          .filter(n => n.notificationType === "email")
-          .map(n => ({
+        const emailNotifications = response.data.notifications
+          .filter((n) => n.notificationType === "email")
+          .map((n) => ({
             id: n.id,
             notificationType: "email" as const,
             minutesBefore: n.minutesBefore,
-            isEnabled: n.isEnabled
+            isEnabled: n.isEnabled,
           }));
         setEventNotifications(emailNotifications);
       }
@@ -510,23 +588,7 @@ export function CommandPalette({
     }
   };
 
-  // Save notifications for an event
-  const saveEventNotifications = async (eventId: string, notifications: EventNotification[]) => {
-    if (!eventId) return;
 
-    try {
-      const notificationData = notifications.map(n => ({
-        notificationType: n.notificationType,
-        minutesBefore: n.minutesBefore,
-        isEnabled: n.isEnabled
-      }));
-
-      await calendarApiService.updateEventNotifications(eventId, notificationData);
-    } catch (error) {
-      console.error("Failed to save event notifications:", error);
-      toast.error("Failed to save notification settings");
-    }
-  };
 
   const validateEventForm = () => {
     if (!eventTitle.trim()) return "Title is required";
@@ -600,8 +662,30 @@ export function CommandPalette({
       userId: selectedEvent?.userId || "demo-user",
       createdAt: selectedEvent?.createdAt || new Date(),
       updatedAt: new Date(),
-      reminder: eventReminder,
+      // Don't use legacy reminder field - use new notification system instead
+      reminder: undefined,
     };
+
+    // Convert legacy reminder to notification if needed
+    let finalNotifications = [...eventNotifications];
+    if (eventReminder && eventReminder > 0) {
+      // Check if we already have a notification for this time
+      const existingNotification = finalNotifications.find(
+        (n) =>
+          n.minutesBefore === eventReminder && n.notificationType === "email"
+      );
+
+      if (!existingNotification) {
+        finalNotifications.push({
+          notificationType: "email",
+          minutesBefore: eventReminder,
+          isEnabled: true,
+        });
+        console.log(
+          `🔄 Converted legacy reminder (${eventReminder}min) to notification`
+        );
+      }
+    }
 
     setEventSaving(true);
     try {
@@ -634,7 +718,7 @@ export function CommandPalette({
           allDay: eventData.allDay,
           location: eventData.location,
           calendarId: eventData.calendarId,
-          reminder: eventData.reminder ?? undefined,
+          reminder: undefined, // Use new notification system instead
         });
         toast.success(`Event "${eventTitle}" updated`);
       } else {
@@ -648,16 +732,16 @@ export function CommandPalette({
           allDay: eventData.allDay,
           location: eventData.location,
           calendarId: eventData.calendarId,
-          reminder: eventData.reminder ?? undefined,
+          reminder: undefined, // Use new notification system instead
         });
         console.log("Event created successfully:", newEvent.id);
         savedEventId = newEvent.id;
         toast.success(`Event "${eventTitle}" created`);
       }
 
-      // Save notifications if there are any
-      if (savedEventId && eventNotifications.length > 0) {
-        await saveEventNotifications(savedEventId, eventNotifications);
+      // Save notifications using the new notification system
+      if (savedEventId && finalNotifications.length > 0) {
+        await saveEventNotifications(savedEventId, finalNotifications);
       }
 
       // Trigger calendar refresh
@@ -2065,17 +2149,19 @@ export function CommandPalette({
                       )}
                     </div>
                   </button>
-                  
-                  <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                    showNotifications 
-                      ? 'max-h-96 opacity-100 border-t border-border/50' 
-                      : 'max-h-0 opacity-0'
-                  }`}>
+
+                  <div
+                    className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                      showNotifications
+                        ? "max-h-96 opacity-100 border-t border-border/50"
+                        : "max-h-0 opacity-0"
+                    }`}
+                  >
                     <div className="p-4 pt-3">
                       <NotificationManager
                         eventId={selectedEvent?.id}
                         notifications={eventNotifications}
-                        onChange={setEventNotifications}
+                        onChange={handleNotificationChange}
                         loading={notificationsLoading}
                         defaultReminder={localSettings?.defaultReminder}
                       />
