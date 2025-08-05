@@ -506,6 +506,22 @@ export function CommandPalette({
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   };
 
+  // Helper functions for time manipulation
+  const timeToMinutes = (timeString: string) => {
+    const [hoursStr, minutesStr] = timeString.split(':');
+    const hours = parseInt(hoursStr || '0', 10) || 0;
+    const minutes = parseInt(minutesStr || '0', 10) || 0;
+    return hours * 60 + minutes;
+  };
+
+  const minutesToTime = (totalMinutes: number) => {
+    // Handle overflow past midnight
+    const normalizedMinutes = totalMinutes % (24 * 60);
+    const hours = Math.floor(normalizedMinutes / 60);
+    const minutes = normalizedMinutes % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  };
+
   const resetEventForm = () => {
     const startDate = new Date();
     const endDate = new Date();
@@ -2016,7 +2032,20 @@ export function CommandPalette({
                     <Label>Start Time</Label>
                     <Select
                       value={eventStartTime}
-                      onValueChange={setEventStartTime}
+                      onValueChange={(newStartTime) => {
+                        setEventStartTime(newStartTime);
+                        
+                        // Auto-update end time if it's before or equal to the new start time
+                        const startMinutes = timeToMinutes(newStartTime);
+                        const endMinutes = timeToMinutes(eventEndTime);
+                        
+                        if (endMinutes <= startMinutes) {
+                          // Set end time to 15 minutes after start time
+                          const newEndMinutes = startMinutes + 15;
+                          const newEndTime = minutesToTime(newEndMinutes);
+                          setEventEndTime(newEndTime);
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select time" />
@@ -2079,11 +2108,18 @@ export function CommandPalette({
                         <SelectValue placeholder="Select time" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px]">
-                        {timeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
+                        {timeOptions
+                          .filter((option) => {
+                            // Only show times after the start time
+                            const startMinutes = timeToMinutes(eventStartTime);
+                            const optionMinutes = timeToMinutes(option.value);
+                            return optionMinutes > startMinutes;
+                          })
+                          .map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
