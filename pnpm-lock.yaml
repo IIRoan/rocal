@@ -288,6 +288,9 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.1.0(react@19.1.0)
+      rooks:
+        specifier: ^8.4.0
+        version: 8.4.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       shadcn:
         specifier: ^2.9.2
         version: 2.9.2(@types/node@20.19.9)(typescript@5.8.3)

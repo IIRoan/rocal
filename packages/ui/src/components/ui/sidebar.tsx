@@ -242,15 +242,6 @@ function Sidebar({
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
           className,
         )}
-        style={{
-          position: 'fixed',
-          top: 0,
-          bottom: 0,
-          left: side === "left" ? 0 : undefined,
-          right: side === "right" ? 0 : undefined,
-          height: '100vh',
-          zIndex: 10
-        }}
         {...props}
       >
         <div
