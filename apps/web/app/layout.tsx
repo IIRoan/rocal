@@ -21,16 +21,20 @@ export const metadata: Metadata = {
   description: "Calendar application",
   manifest: "/manifest.json",
   themeColor: "#000000",
-  viewport: "width=device-width, initial-scale=1, user-scalable=no",
+  viewport: "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Rocal",
   },
   other: {
     "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-status-bar-style": "default",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
     "apple-mobile-web-app-title": "Rocal",
+    "mobile-web-app-capable": "yes",
+    "application-name": "Rocal",
+    "msapplication-TileColor": "#000000",
+    "msapplication-tap-highlight": "no",
   },
 };
 
