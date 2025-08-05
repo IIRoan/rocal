@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useDidMount } from "rooks";
 import {
   addDays,
   eachDayOfInterval,
@@ -103,9 +104,9 @@ export function MonthView({
     eventGap: compactView ? Math.round(EventGap * 0.5) : EventGap,
   });
 
-  useEffect(() => {
+  useDidMount(() => {
     setIsMounted(true);
-  }, []);
+  });
 
   return (
     <div data-slot="month-view" className="contents animate-fade-in">
