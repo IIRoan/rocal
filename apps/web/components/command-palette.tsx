@@ -251,6 +251,10 @@ export function CommandPalette({
   const [eventSaving, setEventSaving] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
+  const [startTimeOpen, setStartTimeOpen] = useState(false);
+  const [endTimeOpen, setEndTimeOpen] = useState(false);
+  const startTimeDropdownRef = useRef<HTMLDivElement>(null);
+  const endTimeDropdownRef = useRef<HTMLDivElement>(null);
 
   // Notification state
   const [eventNotifications, setEventNotifications] = useState<
@@ -326,7 +330,7 @@ export function CommandPalette({
             notificationType: "email",
             minutesBefore: 15,
             isEnabled: true,
-          }
+          },
         ]);
       }
 
@@ -339,6 +343,48 @@ export function CommandPalette({
     setShowResetConfirm(false);
     setTimezoneSearch("");
   }, [currentView]);
+
+  // Close time dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      // Check if click is outside both time input containers
+      const startTimeContainer = target.closest('[data-time-input="start"]');
+      const endTimeContainer = target.closest('[data-time-input="end"]');
+
+      if (!startTimeContainer && startTimeOpen) {
+        setStartTimeOpen(false);
+      }
+      if (!endTimeContainer && endTimeOpen) {
+        setEndTimeOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [startTimeOpen, endTimeOpen]);
+
+  // Scroll to selected time when dropdowns open
+  useEffect(() => {
+    if (startTimeOpen) {
+      // Small delay to ensure dropdown is rendered
+      setTimeout(() => {
+        scrollToSelectedTime(startTimeDropdownRef, eventStartTime);
+      }, 50);
+    }
+  }, [startTimeOpen, eventStartTime]);
+
+  useEffect(() => {
+    if (endTimeOpen) {
+      // Small delay to ensure dropdown is rendered
+      setTimeout(() => {
+        scrollToSelectedTime(endTimeDropdownRef, eventEndTime);
+      }, 50);
+    }
+  }, [endTimeOpen, eventEndTime]);
 
   // Save notifications for an event
   const saveEventNotifications = useCallback(
@@ -363,7 +409,6 @@ export function CommandPalette({
     },
     []
   );
-
 
   // Handle notification changes without auto-save
   const handleNotificationChange = useCallback(
@@ -508,9 +553,9 @@ export function CommandPalette({
 
   // Helper functions for time manipulation
   const timeToMinutes = (timeString: string) => {
-    const [hoursStr, minutesStr] = timeString.split(':');
-    const hours = parseInt(hoursStr || '0', 10) || 0;
-    const minutes = parseInt(minutesStr || '0', 10) || 0;
+    const [hoursStr, minutesStr] = timeString.split(":");
+    const hours = parseInt(hoursStr || "0", 10) || 0;
+    const minutes = parseInt(minutesStr || "0", 10) || 0;
     return hours * 60 + minutes;
   };
 
@@ -520,6 +565,91 @@ export function CommandPalette({
     const hours = Math.floor(normalizedMinutes / 60);
     const minutes = normalizedMinutes % 60;
     return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  };
+
+  // Handle start time change with auto end time update
+  const handleStartTimeChange = (newStartTime: string) => {
+    setEventStartTime(newStartTime);
+
+    // Auto-update end time if it's before or equal to the new start time
+    const startMinutes = timeToMinutes(newStartTime);
+    const endMinutes = timeToMinutes(eventEndTime);
+
+    if (endMinutes <= startMinutes) {
+      // Set end time to 15 minutes after start time
+      const newEndMinutes = startMinutes + 15;
+      const newEndTime = minutesToTime(newEndMinutes);
+      setEventEndTime(newEndTime);
+    }
+  };
+
+  // Scroll dropdown to selected time
+  const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement | null>, selectedTime: string) => {
+    if (!dropdownRef.current) return;
+    
+    const selectedButton = dropdownRef.current.querySelector(`[data-time-value="${selectedTime}"]`) as HTMLElement;
+    if (selectedButton) {
+      selectedButton.scrollIntoView({
+        block: 'center',
+        behavior: 'instant'
+      });
+    }
+  };
+
+  // Validate and format typed time input
+  const validateAndFormatTime = (input: string): string | null => {
+    // Remove any non-digit or colon characters
+    const cleaned = input.replace(/[^\d:]/g, "");
+
+    // Handle various input formats
+    let timeStr = cleaned;
+
+    // If just digits, try to format as time
+    if (/^\d{1,4}$/.test(cleaned)) {
+      if (cleaned.length <= 2) {
+        // Just hours (e.g., "9" -> "09:00")
+        const hours = parseInt(cleaned, 10);
+        if (hours >= 0 && hours <= 23) {
+          timeStr = `${hours.toString().padStart(2, "0")}:00`;
+        } else {
+          return null;
+        }
+      } else if (cleaned.length === 3) {
+        // Hours and one minute digit (e.g., "930" -> "09:30")
+        const hours = parseInt(cleaned.slice(0, 1), 10);
+        const minutes = parseInt(cleaned.slice(1), 10);
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+          timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+        } else {
+          return null;
+        }
+      } else if (cleaned.length === 4) {
+        // HHMM format (e.g., "0930" -> "09:30")
+        const hours = parseInt(cleaned.slice(0, 2), 10);
+        const minutes = parseInt(cleaned.slice(2), 10);
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+          timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+        } else {
+          return null;
+        }
+      }
+    }
+
+    // Validate HH:MM format
+    const timeRegex = /^(\d{1,2}):(\d{1,2})$/;
+    const match = timeStr.match(timeRegex);
+
+    if (match) {
+      const hours = parseInt(match[1] || "0", 10);
+      const minutes = parseInt(match[2] || "0", 10);
+
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        // Allow any minute value - no rounding
+        return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+      }
+    }
+
+    return null;
   };
 
   const resetEventForm = () => {
@@ -544,7 +674,7 @@ export function CommandPalette({
         notificationType: "email",
         minutesBefore: 15,
         isEnabled: true,
-      }
+      },
     ]);
     console.log("Event form reset for new event creation");
   };
@@ -578,8 +708,6 @@ export function CommandPalette({
       setNotificationsLoading(false);
     }
   };
-
-
 
   const validateEventForm = () => {
     if (!eventTitle.trim()) return "Title is required";
@@ -618,19 +746,23 @@ export function CommandPalette({
     }
 
     // Validate for duplicate notifications
-    const enabledNotifications = eventNotifications.filter(n => n.isEnabled);
-    const notificationTimes = enabledNotifications.map(n => n.minutesBefore);
-    const duplicateTimes = notificationTimes.filter((time, index) => 
-      notificationTimes.indexOf(time) !== index
+    const enabledNotifications = eventNotifications.filter((n) => n.isEnabled);
+    const notificationTimes = enabledNotifications.map((n) => n.minutesBefore);
+    const duplicateTimes = notificationTimes.filter(
+      (time, index) => notificationTimes.indexOf(time) !== index
     );
-    
+
     if (duplicateTimes.length > 0) {
       const uniqueDuplicates = [...new Set(duplicateTimes)];
-      const timeText = uniqueDuplicates.length === 1 
-        ? `${uniqueDuplicates[0]} minutes before`
-        : uniqueDuplicates.map(time => `${time} minutes`).join(', ') + ' before';
-      
-      toast.error(`Cannot have multiple notifications for the same time: ${timeText}`);
+      const timeText =
+        uniqueDuplicates.length === 1
+          ? `${uniqueDuplicates[0]} minutes before`
+          : uniqueDuplicates.map((time) => `${time} minutes`).join(", ") +
+            " before";
+
+      toast.error(
+        `Cannot have multiple notifications for the same time: ${timeText}`
+      );
       return;
     }
 
@@ -773,9 +905,12 @@ export function CommandPalette({
         errorMessage = "Invalid event data - please check all fields";
       } else if (error.statusCode === 422) {
         // Handle 422 Unprocessable Entity errors
-        if (error.message?.includes("Duplicate notification") || 
-            error.message?.includes("duplicate")) {
-          errorMessage = "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
+        if (
+          error.message?.includes("Duplicate notification") ||
+          error.message?.includes("duplicate")
+        ) {
+          errorMessage =
+            "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
         } else {
           errorMessage = "Invalid data - please check all fields and try again";
         }
@@ -2028,36 +2163,83 @@ export function CommandPalette({
 
                 {/* Start Time */}
                 {!eventAllDay && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative" data-time-input="start">
                     <Label>Start Time</Label>
-                    <Select
-                      value={eventStartTime}
-                      onValueChange={(newStartTime) => {
-                        setEventStartTime(newStartTime);
-                        
-                        // Auto-update end time if it's before or equal to the new start time
-                        const startMinutes = timeToMinutes(newStartTime);
-                        const endMinutes = timeToMinutes(eventEndTime);
-                        
-                        if (endMinutes <= startMinutes) {
-                          // Set end time to 15 minutes after start time
-                          const newEndMinutes = startMinutes + 15;
-                          const newEndTime = minutesToTime(newEndMinutes);
-                          setEventEndTime(newEndTime);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select time" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
+                    <div className="relative">
+                      <Input
+                        value={eventStartTime}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setEventStartTime(value);
+                        }}
+                        onFocus={() => setStartTimeOpen(true)}
+                        onBlur={(e) => {
+                          // Small delay to allow dropdown clicks to register
+                          setTimeout(() => {
+                            const value = e.target.value;
+                            const validatedTime = validateAndFormatTime(value);
+
+                            if (validatedTime) {
+                              handleStartTimeChange(validatedTime);
+                            } else {
+                              // Reset to previous valid value if invalid
+                              setEventStartTime(eventStartTime);
+                            }
+                            setStartTimeOpen(false);
+                          }, 150);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const value = e.currentTarget.value;
+                            const validatedTime = validateAndFormatTime(value);
+
+                            if (validatedTime) {
+                              handleStartTimeChange(validatedTime);
+                            } else {
+                              // Reset to previous valid value if invalid
+                              setEventStartTime(eventStartTime);
+                            }
+                            setStartTimeOpen(false);
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            setStartTimeOpen(false);
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        placeholder="09:00 or type time"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setStartTimeOpen(!startTimeOpen)}
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors"
+                      >
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                    {startTimeOpen && (
+                      <div 
+                        ref={startTimeDropdownRef}
+                        className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
+                      >
                         {timeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
+                          <button
+                            key={option.value}
+                            type="button"
+                            data-time-value={option.value}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none ${
+                              option.value === eventStartTime ? 'bg-accent text-accent-foreground' : ''
+                            }`}
+                            onClick={() => {
+                              handleStartTimeChange(option.value);
+                              setStartTimeOpen(false);
+                            }}
+                          >
                             {option.label}
-                          </SelectItem>
+                          </button>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2098,16 +2280,89 @@ export function CommandPalette({
 
                 {/* End Time */}
                 {!eventAllDay && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative" data-time-input="end">
                     <Label>End Time</Label>
-                    <Select
-                      value={eventEndTime}
-                      onValueChange={setEventEndTime}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select time" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
+                    <div className="relative">
+                      <Input
+                        value={eventEndTime}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setEventEndTime(value);
+                        }}
+                        onFocus={() => setEndTimeOpen(true)}
+                        onBlur={(e) => {
+                          // Small delay to allow dropdown clicks to register
+                          setTimeout(() => {
+                            const value = e.target.value;
+                            const validatedTime = validateAndFormatTime(value);
+
+                            if (validatedTime) {
+                              // Check if the validated time is after start time
+                              const startMinutes =
+                                timeToMinutes(eventStartTime);
+                              const endMinutes = timeToMinutes(validatedTime);
+
+                              if (endMinutes > startMinutes) {
+                                setEventEndTime(validatedTime);
+                              } else {
+                                // If not after start time, set to 15 minutes after start
+                                const newEndMinutes = startMinutes + 15;
+                                const newEndTime = minutesToTime(newEndMinutes);
+                                setEventEndTime(newEndTime);
+                              }
+                            } else {
+                              // Reset to previous valid value if invalid
+                              setEventEndTime(eventEndTime);
+                            }
+                            setEndTimeOpen(false);
+                          }, 150);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const value = e.currentTarget.value;
+                            const validatedTime = validateAndFormatTime(value);
+
+                            if (validatedTime) {
+                              // Check if the validated time is after start time
+                              const startMinutes =
+                                timeToMinutes(eventStartTime);
+                              const endMinutes = timeToMinutes(validatedTime);
+
+                              if (endMinutes > startMinutes) {
+                                setEventEndTime(validatedTime);
+                              } else {
+                                // If not after start time, set to 15 minutes after start
+                                const newEndMinutes = startMinutes + 15;
+                                const newEndTime = minutesToTime(newEndMinutes);
+                                setEventEndTime(newEndTime);
+                              }
+                            } else {
+                              // Reset to previous valid value if invalid
+                              setEventEndTime(eventEndTime);
+                            }
+                            setEndTimeOpen(false);
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            setEndTimeOpen(false);
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        placeholder="10:00 or type time"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEndTimeOpen(!endTimeOpen)}
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors"
+                      >
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                    {endTimeOpen && (
+                      <div 
+                        ref={endTimeDropdownRef}
+                        className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
+                      >
                         {timeOptions
                           .filter((option) => {
                             // Only show times after the start time
@@ -2116,12 +2371,23 @@ export function CommandPalette({
                             return optionMinutes > startMinutes;
                           })
                           .map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
+                            <button
+                              key={option.value}
+                              type="button"
+                              data-time-value={option.value}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none ${
+                                option.value === eventEndTime ? 'bg-accent text-accent-foreground' : ''
+                              }`}
+                              onClick={() => {
+                                setEventEndTime(option.value);
+                                setEndTimeOpen(false);
+                              }}
+                            >
                               {option.label}
-                            </SelectItem>
+                            </button>
                           ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
