@@ -1,12 +1,21 @@
 {
-  "name": "Quick Bun + pnpm + Claude Code",
-  "image": "ghcr.io/nhaef/devcontainer-bun:latest",
+  "name": "Bun + pnpm + Claude Code (Debian)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "nodeGypDependencies": true
+      "nodeGypDependencies": true,
+      "version": "20"
     }
   },
-
-  // one-liner to get Claude Code globally
-  "postCreateCommand": "sudo npm i -g claude-code"
+  "postCreateCommand": "bash -c 'curl -fsSL https://bun.sh/install | bash && export PATH=\"$HOME/.bun/bin:$PATH\" && npm i -g claude-code pnpm'",
+  "remoteUser": "node",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Prisma.prisma"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 5000, 8000],
+  "postStartCommand": "echo 'Container ready! Run: prisma generate' to regenerate Prisma client for Debian"
 }
