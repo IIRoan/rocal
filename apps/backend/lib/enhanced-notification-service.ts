@@ -81,6 +81,7 @@ export class EnhancedNotificationService {
   private static instance: EnhancedNotificationService;
   private isRunning = false;
   private backgroundTimer?: NodeJS.Timeout;
+  private alignmentTimer?: NodeJS.Timeout;
   private processedCount = 0;
   private failedCount = 0;
   private errors: NotificationError[] = [];
@@ -143,8 +144,36 @@ export class EnhancedNotificationService {
         });
       }
 
-      // Start background timer that runs every 60 seconds with enhanced error handling
-      this.backgroundTimer = setInterval(() => {
+      // Start background timer that runs at the start of each minute
+      // First, calculate delay to next minute boundary
+      const now = new Date();
+      const secondsUntilNextMinute = 60 - now.getSeconds();
+      const msUntilNextMinute =
+        secondsUntilNextMinute * 1000 - now.getMilliseconds();
+
+      console.log(
+        `⏰ Aligning notification timer to minute boundary. Current time: ${now.toISOString()}, delay: ${msUntilNextMinute}ms`
+      );
+
+      // Run immediately if we're at the start of a minute, otherwise wait
+      if (msUntilNextMinute < 1000) {
+        // We're very close to the minute boundary, run immediately
+        console.log(
+          "🚀 Running notification check immediately (already at minute boundary)"
+        );
+        this.processScheduledNotifications().catch((error) => {
+          console.error("❌ Initial notification processing failed:", error);
+          this.failedCount++;
+        });
+      }
+
+      // Set up timer to run at the start of each minute
+      this.alignmentTimer = setTimeout(() => {
+        console.log(
+          "🎯 Timer aligned! Starting minute-boundary notification checks"
+        );
+
+        // Run the first aligned execution
         this.processScheduledNotifications().catch((error) => {
           console.error("❌ Background notification processing failed:", error);
           this.failedCount++;
@@ -167,7 +196,36 @@ export class EnhancedNotificationService {
           // Log critical system errors for monitoring
           this.logCriticalSystemError(error);
         });
-      }, 60000); // 60 seconds
+
+        // Then set up regular interval to run every 60 seconds
+        this.backgroundTimer = setInterval(() => {
+          this.processScheduledNotifications().catch((error) => {
+            console.error(
+              "❌ Background notification processing failed:",
+              error
+            );
+            this.failedCount++;
+
+            // Enhanced system error logging with recovery information
+            this.errors.push({
+              notificationId: "system",
+              eventId: "system",
+              userId: "system",
+              error: error instanceof Error ? error.message : "Unknown error",
+              timestamp: new Date(),
+              retryCount: 0,
+            });
+
+            // Keep only last 50 errors to prevent memory issues
+            if (this.errors.length > 50) {
+              this.errors = this.errors.slice(-50);
+            }
+
+            // Log critical system errors for monitoring
+            this.logCriticalSystemError(error);
+          });
+        }, 60000); // 60 seconds
+      }, msUntilNextMinute);
 
       // Start automatic cleanup if enabled
       if (options?.enableAutomaticCleanup !== false) {
@@ -299,6 +357,11 @@ export class EnhancedNotificationService {
         this.backgroundTimer = undefined;
       }
 
+      if (this.alignmentTimer) {
+        clearTimeout(this.alignmentTimer);
+        this.alignmentTimer = undefined;
+      }
+
       // Stop automatic cleanup if running
       this.stopAutomaticCleanup();
 
@@ -320,6 +383,10 @@ export class EnhancedNotificationService {
       if (this.backgroundTimer) {
         clearInterval(this.backgroundTimer);
         this.backgroundTimer = undefined;
+      }
+      if (this.alignmentTimer) {
+        clearTimeout(this.alignmentTimer);
+        this.alignmentTimer = undefined;
       }
       // Force stop cleanup timer
       if (this.cleanupTimer) {
