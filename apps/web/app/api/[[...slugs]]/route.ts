@@ -1,4 +1,4 @@
-import { createAPI } from "@backend/api";
+import { createAPI } from "../../../../backend/api";
 
 const app = createAPI("/api");
 
