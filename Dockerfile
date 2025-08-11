@@ -51,10 +51,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Copy public files if they exist
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
-# Copy Prisma generated files if they exist
+# Copy Prisma generated files if they exist (create empty directories if source doesn't exist)
 RUN mkdir -p /app/apps/backend
-COPY --from=builder /app/apps/backend/generated ./apps/backend/generated || true
-COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma || true
+COPY --from=builder /app/apps/backend ./apps/backend
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
