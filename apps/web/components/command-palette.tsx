@@ -547,7 +547,7 @@ export function CommandPalette({
   // Helper functions for event editing
   const formatTimeForInput = (date: Date) => {
     const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = Math.floor(date.getMinutes() / 15) * 15;
+    const minutes = date.getMinutes();
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   };
 
@@ -587,9 +587,26 @@ export function CommandPalette({
   const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement | null>, selectedTime: string) => {
     if (!dropdownRef.current) return;
     
+    // Try to find exact match first
     const selectedButton = dropdownRef.current.querySelector(`[data-time-value="${selectedTime}"]`) as HTMLElement;
     if (selectedButton) {
       selectedButton.scrollIntoView({
+        block: 'center',
+        behavior: 'instant'
+      });
+      return;
+    }
+    
+    // If no exact match, find the closest time option
+    const selectedMinutes = timeToMinutes(selectedTime);
+    
+    // Find the closest time option by rounding to nearest 15 minutes
+    const roundedMinutes = Math.floor(selectedMinutes / 15) * 15;
+    const roundedTime = minutesToTime(roundedMinutes);
+    
+    const closestButton = dropdownRef.current.querySelector(`[data-time-value="${roundedTime}"]`) as HTMLElement;
+    if (closestButton) {
+      closestButton.scrollIntoView({
         block: 'center',
         behavior: 'instant'
       });
@@ -2037,8 +2054,10 @@ export function CommandPalette({
     );
   }
 
-  if (currentView === "event-editor") {
-    const timeOptions = [];
+  // Generate all time options for the dropdown (full day)
+  const generateAllTimeOptions = () => {
+    const options = [];
+    
     for (let hour = 0; hour <= 23; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
         const formattedHour = hour.toString().padStart(2, "0");
@@ -2049,9 +2068,16 @@ export function CommandPalette({
           localSettings?.timeFormat === "24h"
             ? `${formattedHour}:${formattedMinute}`
             : format(date, "h:mm a");
-        timeOptions.push({ value, label });
+        options.push({ value, label });
       }
     }
+    return options;
+  };
+  
+  // Generate all time options once
+  const allTimeOptions = generateAllTimeOptions();
+  
+  if (currentView === "event-editor") {
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -2211,7 +2237,13 @@ export function CommandPalette({
                       />
                       <button
                         type="button"
-                        onClick={() => setStartTimeOpen(!startTimeOpen)}
+                        onClick={() => {
+                          // Scroll to the selected time when opening
+                          if (!startTimeOpen) {
+                            setTimeout(() => scrollToSelectedTime(startTimeDropdownRef, eventStartTime), 0);
+                          }
+                          setStartTimeOpen(!startTimeOpen);
+                        }}
                         className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors"
                       >
                         <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -2222,7 +2254,7 @@ export function CommandPalette({
                         ref={startTimeDropdownRef}
                         className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
                       >
-                        {timeOptions.map((option) => (
+                        {allTimeOptions.map((option) => (
                           <button
                             key={option.value}
                             type="button"
@@ -2352,7 +2384,13 @@ export function CommandPalette({
                       />
                       <button
                         type="button"
-                        onClick={() => setEndTimeOpen(!endTimeOpen)}
+                        onClick={() => {
+                          // Scroll to the selected time when opening
+                          if (!endTimeOpen) {
+                            setTimeout(() => scrollToSelectedTime(endTimeDropdownRef, eventEndTime), 0);
+                          }
+                          setEndTimeOpen(!endTimeOpen);
+                        }}
                         className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors"
                       >
                         <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -2363,7 +2401,7 @@ export function CommandPalette({
                         ref={endTimeDropdownRef}
                         className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
                       >
-                        {timeOptions
+                        {allTimeOptions
                           .filter((option) => {
                             // Only show times after the start time
                             const startMinutes = timeToMinutes(eventStartTime);
