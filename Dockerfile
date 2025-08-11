@@ -35,7 +35,9 @@ RUN bun run db:generate
 
 # Build the web app
 WORKDIR /app
-RUN bunx turbo build --filter=web
+ENV npm_config_user_config=/dev/null
+ENV npm_config_cache=/tmp/.npm
+RUN TURBO_DOWNLOAD_LOCAL_ENABLED=0 bunx --bun turbo build --filter=web
 
 # Production image, copy all the files and run next
 FROM base AS runner
