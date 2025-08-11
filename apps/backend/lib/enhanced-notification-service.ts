@@ -19,7 +19,11 @@ import type {
 } from "../generated/prisma";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
-import { EventReminderEmail } from "../emails/templates/event-reminder";
+// Conditional import to avoid Next.js build issues
+let EventReminderEmail: any;
+if (!process.env.SKIP_EMAIL_TEMPLATES) {
+  EventReminderEmail = require("../emails/templates/event-reminder").EventReminderEmail;
+}
 
 export interface NotificationStatus {
   isRunning: boolean;

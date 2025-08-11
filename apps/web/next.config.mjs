@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@workspace/ui"],
-  serverExternalPackages: ['@prisma/client', '@react-email/components', '@react-email/render'],
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', '@react-email/components', '@react-email/render'],
-  },
+  serverExternalPackages: ['@prisma/client'],
   output: 'standalone',
+  env: {
+    SKIP_EMAIL_TEMPLATES: 'true',
+  },
 }
 
 export default nextConfig
