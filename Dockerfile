@@ -1,69 +1,77 @@
 # Use Bun Alpine as base image
 FROM oven/bun:1-alpine AS base
 
+# Builder stage - prune the monorepo
 FROM base AS builder
-RUN apk update
-RUN apk add --no-cache libc6-compat
-# Set working directory
+RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
-# Install turbo globally using bun
+
+# Install turbo globally
 RUN bun add -g turbo
+
+# Copy everything for pruning
 COPY . .
 
-# Generate a partial monorepo with a pruned lockfile for a target workspace.
+# Generate a partial monorepo with a pruned lockfile for the web workspace
 RUN turbo prune web --docker
 
-# Add lockfile and package.json's of isolated subworkspace
+# Installer stage - install dependencies and build
 FROM base AS installer
-RUN apk update
-RUN apk add --no-cache libc6-compat
+RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
-# First install the dependencies (as they change less often)
+# Copy the pruned workspace (package.json files and lockfile)
 COPY --from=builder /app/out/json/ .
+
+# Install dependencies using bun
 RUN bun install --frozen-lockfile
 
-# Build the project
+# Copy the pruned source code
 COPY --from=builder /app/out/full/ .
-# Install prisma CLI and generate client if schema exists
-RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
-    bun add -g prisma && \
-    cd apps/backend && \
-    prisma generate; \
-fi
-# Build the web app
-WORKDIR /app/apps/web
-RUN bun run build
 
+# Generate Prisma client if needed
+RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
+    cd apps/backend && \
+    bun run db:generate; \
+fi
+
+# Install turbo in this stage
+RUN bun add -g turbo
+
+# Build the application using turbo
+RUN turbo build --filter=web
+
+# Runtime stage
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-# Disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED=1
-
+# Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Set the correct permission for prerender cache
-RUN mkdir -p /app/apps/web/.next
-RUN chown nextjs:nodejs /app/apps/web/.next
+# Set environment variables
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
+# Copy the built application
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
-# Copy Prisma generated files and schema
-COPY --from=installer /app/apps/backend/generated ./apps/backend/generated
-COPY --from=installer /app/apps/backend/prisma ./apps/backend/prisma
+# Copy public files if they exist
+COPY --from=installer --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+
+# Copy Prisma generated files if they exist
+RUN mkdir -p /app/apps/backend
+COPY --from=installer /app/apps/backend/generated ./apps/backend/generated || true
+COPY --from=installer /app/apps/backend/prisma ./apps/backend/prisma || true
+
+# Set correct permissions
+RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
 EXPOSE 3000
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Start the application
 CMD ["node", "apps/web/server.js"]
