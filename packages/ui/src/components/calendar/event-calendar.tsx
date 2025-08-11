@@ -241,20 +241,10 @@ export function EventCalendar({
   const handleEventCreate = (startTime: Date) => {
     console.log("Creating new event at:", startTime); // Debug log
 
-    // Snap to 15-minute intervals
-    const minutes = startTime.getMinutes();
-    const remainder = minutes % 15;
-    if (remainder !== 0) {
-      if (remainder < 7.5) {
-        // Round down to nearest 15 min
-        startTime.setMinutes(minutes - remainder);
-      } else {
-        // Round up to nearest 15 min
-        startTime.setMinutes(minutes + (15 - remainder));
-      }
-      startTime.setSeconds(0);
-      startTime.setMilliseconds(0);
-    }
+    // Keep exact time without rounding to intervals
+    // Just reset seconds and milliseconds for consistency
+    startTime.setSeconds(0);
+    startTime.setMilliseconds(0);
 
     const newEvent: CalendarEvent = {
       id: undefined as any, // This ensures it's treated as a new event
@@ -629,21 +619,15 @@ export function EventCalendar({
                     const startTime = new Date(currentDate);
                     const now = new Date();
 
-                    // If the current date is today, start at the current time (rounded to next 15-min interval)
+                    // If the current date is today, start at the exact current time
                     if (startTime.toDateString() === now.toDateString()) {
-                      // Use current time and round to next 15-minute interval
+                      // Use current time without rounding
                       startTime.setHours(
                         now.getHours(),
                         now.getMinutes(),
                         0,
                         0,
                       );
-                      const minutes = startTime.getMinutes();
-                      const remainder = minutes % 15;
-                      if (remainder !== 0) {
-                        // Round up to next 15-minute interval
-                        startTime.setMinutes(minutes + (15 - remainder));
-                      }
                     } else {
                       // Otherwise start at 9 AM
                       startTime.setHours(9, 0, 0, 0);
