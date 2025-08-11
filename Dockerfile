@@ -1,43 +1,41 @@
-# Use Node.js 20 Alpine as base image
-FROM node:20-alpine AS base
+# Use Bun Alpine as base image
+FROM oven/bun:1-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
 
-# Install pnpm
-RUN npm install -g pnpm
+# Bun is already installed in the base image
 
 WORKDIR /app
 
 # Copy the entire monorepo for dependency resolution
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/ ./packages/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
-RUN npm install -g pnpm
 WORKDIR /app
 
 # Copy source code (excluding node_modules via .dockerignore)
 COPY . .
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # Generate Prisma client
 WORKDIR /app/apps/backend
-RUN pnpm db:generate
+RUN bun run db:generate
 
 # Build the web app
 WORKDIR /app
-RUN pnpm build --filter=web
+RUN bun run build --filter=web
 
 # Production image, copy all the files and run next
 FROM base AS runner
