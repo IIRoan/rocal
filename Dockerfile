@@ -23,7 +23,7 @@ COPY . .
 # Generate Prisma client if needed
 RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
     cd apps/backend && \
-    bunx prisma generate; \
+    bun run db:generate; \
 fi
 
 # Build the web app using turbo
