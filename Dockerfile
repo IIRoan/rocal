@@ -35,6 +35,7 @@ RUN bun run db:generate
 
 # Build the web app
 WORKDIR /app
+ENV TURBO_BINARY_PATH="/usr/local/bin/bun"
 RUN bun run build --filter=web
 
 # Production image, copy all the files and run next
