@@ -32,8 +32,8 @@ RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
     prisma generate; \
 fi
 # Build the web app
-WORKDIR /app
-RUN bun run turbo build --filter=web
+WORKDIR /app/apps/web
+RUN bun run build
 
 FROM base AS runner
 WORKDIR /app
