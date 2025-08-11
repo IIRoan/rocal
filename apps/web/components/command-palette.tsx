@@ -253,6 +253,7 @@ export function CommandPalette({
   const [endDateOpen, setEndDateOpen] = useState(false);
   const [startTimeOpen, setStartTimeOpen] = useState(false);
   const [endTimeOpen, setEndTimeOpen] = useState(false);
+  const [timeErrors, setTimeErrors] = useState<{ start?: string; end?: string }>({});
   const startTimeDropdownRef = useRef<HTMLDivElement>(null);
   const endTimeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -551,35 +552,134 @@ export function CommandPalette({
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   };
 
-  // Helper functions for time manipulation
-  const timeToMinutes = (timeString: string) => {
-    const [hoursStr, minutesStr] = timeString.split(":");
-    const hours = parseInt(hoursStr || "0", 10) || 0;
-    const minutes = parseInt(minutesStr || "0", 10) || 0;
+  // Google-style time validation - simple and predictable
+  interface TimeValidationResult {
+    isValid: boolean;
+    time?: string;
+    error?: string;
+  }
+
+  const validateTime = (timeString: string): TimeValidationResult => {
+    if (!timeString || timeString.trim() === '') {
+      return { isValid: false, error: 'Time is required' };
+    }
+
+    // Clean the input - remove any non-digit or colon characters
+    const cleaned = timeString.replace(/[^\d:]/g, '');
+    
+    // Handle various input formats
+    let formattedTime = cleaned;
+    
+    // Convert common formats to HH:MM
+    if (/^\d{1,2}$/.test(cleaned)) {
+      // Just hours: "9" -> "09:00"
+      const hours = parseInt(cleaned, 10);
+      if (hours >= 0 && hours <= 23) {
+        formattedTime = `${hours.toString().padStart(2, '0')}:00`;
+      } else {
+        return { isValid: false, error: 'Hours must be between 0-23' };
+      }
+    } else if (/^\d{3,4}$/.test(cleaned)) {
+      // HHMM format: "930" -> "09:30" or "1430" -> "14:30"
+      let hours, minutes;
+      if (cleaned.length === 3) {
+        hours = parseInt(cleaned.slice(0, 1), 10);
+        minutes = parseInt(cleaned.slice(1), 10);
+      } else {
+        hours = parseInt(cleaned.slice(0, 2), 10);
+        minutes = parseInt(cleaned.slice(2), 10);
+      }
+      
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      } else {
+        return { isValid: false, error: 'Invalid time format' };
+      }
+    }
+    
+    // Validate HH:MM format
+    const timeRegex = /^(\d{1,2}):(\d{1,2})$/;
+    const match = formattedTime.match(timeRegex);
+    
+    if (!match) {
+      return { isValid: false, error: 'Use HH:MM format (e.g. 09:30)' };
+    }
+    
+    const hours = parseInt(match[1] || '0', 10);
+    const minutes = parseInt(match[2] || '0', 10);
+    
+    if (hours < 0 || hours > 23) {
+      return { isValid: false, error: 'Hours must be between 0-23' };
+    }
+    
+    if (minutes < 0 || minutes > 59) {
+      return { isValid: false, error: 'Minutes must be between 0-59' };
+    }
+    
+    return {
+      isValid: true,
+      time: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    };
+  };
+
+  const timeToMinutes = (timeString: string): number => {
+    const [hoursStr, minutesStr] = timeString.split(':');
+    const hours = parseInt(hoursStr || '0', 10);
+    const minutes = parseInt(minutesStr || '0', 10);
     return hours * 60 + minutes;
   };
 
-  const minutesToTime = (totalMinutes: number) => {
-    // Handle overflow past midnight
-    const normalizedMinutes = totalMinutes % (24 * 60);
+  const minutesToTime = (totalMinutes: number): string => {
+    const normalizedMinutes = Math.max(0, totalMinutes % (24 * 60));
     const hours = Math.floor(normalizedMinutes / 60);
     const minutes = normalizedMinutes % 60;
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  // Handle start time change with auto end time update
+
+  // Handle start time change with validation
   const handleStartTimeChange = (newStartTime: string) => {
-    setEventStartTime(newStartTime);
+    const validation = validateTime(newStartTime);
+    
+    if (validation.isValid && validation.time) {
+      setEventStartTime(validation.time);
+      setTimeErrors(prev => ({ ...prev, start: undefined }));
+      
+      // Auto-update end time if it's before or equal to the new start time
+      const startMinutes = timeToMinutes(validation.time);
+      const endMinutes = timeToMinutes(eventEndTime);
+      
+      if (endMinutes <= startMinutes) {
+        // Set end time to 1 hour after start time (Google Calendar default)
+        const newEndMinutes = startMinutes + 60;
+        const newEndTime = minutesToTime(newEndMinutes);
+        setEventEndTime(newEndTime);
+        setTimeErrors(prev => ({ ...prev, end: undefined }));
+      }
+    } else {
+      setEventStartTime(newStartTime); // Keep the typed value for user feedback
+      setTimeErrors(prev => ({ ...prev, start: validation.error }));
+    }
+  };
 
-    // Auto-update end time if it's before or equal to the new start time
-    const startMinutes = timeToMinutes(newStartTime);
-    const endMinutes = timeToMinutes(eventEndTime);
-
-    if (endMinutes <= startMinutes) {
-      // Set end time to 15 minutes after start time
-      const newEndMinutes = startMinutes + 15;
-      const newEndTime = minutesToTime(newEndMinutes);
-      setEventEndTime(newEndTime);
+  // Handle end time change with validation
+  const handleEndTimeChange = (newEndTime: string) => {
+    const validation = validateTime(newEndTime);
+    
+    if (validation.isValid && validation.time) {
+      const startMinutes = timeToMinutes(eventStartTime);
+      const endMinutes = timeToMinutes(validation.time);
+      
+      if (endMinutes > startMinutes) {
+        setEventEndTime(validation.time);
+        setTimeErrors(prev => ({ ...prev, end: undefined }));
+      } else {
+        setEventEndTime(newEndTime); // Keep the typed value
+        setTimeErrors(prev => ({ ...prev, end: 'End time must be after start time' }));
+      }
+    } else {
+      setEventEndTime(newEndTime); // Keep the typed value for user feedback
+      setTimeErrors(prev => ({ ...prev, end: validation.error }));
     }
   };
 
@@ -611,62 +711,6 @@ export function CommandPalette({
         behavior: 'instant'
       });
     }
-  };
-
-  // Validate and format typed time input
-  const validateAndFormatTime = (input: string): string | null => {
-    // Remove any non-digit or colon characters
-    const cleaned = input.replace(/[^\d:]/g, "");
-
-    // Handle various input formats
-    let timeStr = cleaned;
-
-    // If just digits, try to format as time
-    if (/^\d{1,4}$/.test(cleaned)) {
-      if (cleaned.length <= 2) {
-        // Just hours (e.g., "9" -> "09:00")
-        const hours = parseInt(cleaned, 10);
-        if (hours >= 0 && hours <= 23) {
-          timeStr = `${hours.toString().padStart(2, "0")}:00`;
-        } else {
-          return null;
-        }
-      } else if (cleaned.length === 3) {
-        // Hours and one minute digit (e.g., "930" -> "09:30")
-        const hours = parseInt(cleaned.slice(0, 1), 10);
-        const minutes = parseInt(cleaned.slice(1), 10);
-        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-          timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-        } else {
-          return null;
-        }
-      } else if (cleaned.length === 4) {
-        // HHMM format (e.g., "0930" -> "09:30")
-        const hours = parseInt(cleaned.slice(0, 2), 10);
-        const minutes = parseInt(cleaned.slice(2), 10);
-        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-          timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-        } else {
-          return null;
-        }
-      }
-    }
-
-    // Validate HH:MM format
-    const timeRegex = /^(\d{1,2}):(\d{1,2})$/;
-    const match = timeStr.match(timeRegex);
-
-    if (match) {
-      const hours = parseInt(match[1] || "0", 10);
-      const minutes = parseInt(match[2] || "0", 10);
-
-      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-        // Allow any minute value - no rounding
-        return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-      }
-    }
-
-    return null;
   };
 
   const resetEventForm = () => {
@@ -2082,16 +2126,21 @@ export function CommandPalette({
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
         <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 border-b border-border/50 px-6 py-5 flex items-center gap-4">
             <button
               onClick={() => goBack("events")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+              className="p-2 rounded-full hover:bg-background/80 transition-colors shadow-sm border border-border/50"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="h-4 w-4 text-foreground" />
             </button>
-            <h2 className="text-lg font-semibold text-foreground">
-              {selectedEvent?.id ? "Edit Event" : "Create Event"}
-            </h2>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">
+                {selectedEvent?.id ? "Edit Event" : "Create New Event"}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {selectedEvent?.id ? "Make changes to your event" : "Add an event to your calendar"}
+              </p>
+            </div>
           </div>
 
           <div className="max-h-[80vh] overflow-y-auto">
@@ -2100,50 +2149,56 @@ export function CommandPalette({
               <div className="space-y-2">
                 <Label
                   htmlFor="event-title"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-sm font-medium"
                 >
                   <FileText className="h-4 w-4 text-muted-foreground" />
-                  Title
+                  Event Title
                 </Label>
                 <Input
                   id="event-title"
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
-                  placeholder="Enter event title"
+                  placeholder="What's the event about?"
+                  className="border-2 hover:border-primary/50 focus:border-primary transition-colors text-base"
+                  autoFocus
                 />
               </div>
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="event-description">Description</Label>
+                <Label htmlFor="event-description" className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <Textarea
                   id="event-description"
                   value={eventDescription}
                   onChange={(e) => setEventDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Enter event description"
+                  rows={2}
+                  placeholder="Add more details about your event..."
+                  className="border-2 hover:border-primary/50 focus:border-primary transition-colors resize-none"
                 />
               </div>
 
               {/* Calendar Selection */}
               <div className="space-y-2">
-                <Label htmlFor="event-calendar">Calendar</Label>
+                <Label htmlFor="event-calendar" className="text-sm font-medium flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: calendars.find(c => c.id === eventCalendarId)?.color || '#3b82f6' }}></div>
+                  Calendar
+                </Label>
                 <Select
                   value={eventCalendarId}
                   onValueChange={setEventCalendarId}
                 >
-                  <SelectTrigger id="event-calendar">
-                    <SelectValue placeholder="Select a calendar" />
+                  <SelectTrigger id="event-calendar" className="border-2 hover:border-primary/50 focus:border-primary transition-colors">
+                    <SelectValue placeholder="Choose which calendar to save to" />
                   </SelectTrigger>
                   <SelectContent>
                     {calendars.map((calendar) => (
-                      <SelectItem key={calendar.id} value={calendar.id}>
-                        <div className="flex items-center gap-2">
+                      <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
+                        <div className="flex items-center gap-3">
                           <span
-                            className="size-3 rounded-full"
+                            className="size-3 rounded-full border border-white/20"
                             style={{ backgroundColor: calendar.color }}
                           />
-                          {calendar.name}
+                          <span>{calendar.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -2151,313 +2206,302 @@ export function CommandPalette({
                 </Select>
               </div>
 
-              {/* Date and Time */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Start Date */}
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between px-3 font-normal"
-                      >
-                        <span>
-                          {eventStartDate
-                            ? format(eventStartDate, "PPP")
-                            : "Pick a date"}
-                        </span>
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-2" align="start">
-                      <CalendarUI
-                        mode="single"
-                        selected={eventStartDate}
-                        onSelect={(date) => {
-                          if (date) {
-                            setEventStartDate(date);
-                            if (isBefore(eventEndDate, date))
-                              setEventEndDate(date);
-                            setStartDateOpen(false);
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Start Time */}
-                {!eventAllDay && (
-                  <div className="space-y-2 relative" data-time-input="start">
-                    <Label>Start Time</Label>
-                    <div className="relative">
-                      <Input
-                        value={eventStartTime}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setEventStartTime(value);
-                        }}
-                        onFocus={() => setStartTimeOpen(true)}
-                        onBlur={(e) => {
-                          // Small delay to allow dropdown clicks to register
-                          setTimeout(() => {
-                            const value = e.target.value;
-                            const validatedTime = validateAndFormatTime(value);
-
-                            if (validatedTime) {
-                              handleStartTimeChange(validatedTime);
-                            } else {
-                              // Reset to previous valid value if invalid
-                              setEventStartTime(eventStartTime);
+              {/* Date and Time - Google Material Design Style */}
+              <div className="space-y-6">
+                {/* Date Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground">Start Date</Label>
+                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between px-3 py-2.5 font-normal border-2 hover:border-primary/50 focus:border-primary transition-colors"
+                        >
+                          <span className="text-sm">
+                            {eventStartDate
+                              ? format(eventStartDate, "EEE, MMM d")
+                              : "Pick a date"}
+                          </span>
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarUI
+                          mode="single"
+                          selected={eventStartDate}
+                          onSelect={(date) => {
+                            if (date) {
+                              setEventStartDate(date);
+                              if (isBefore(eventEndDate, date))
+                                setEventEndDate(date);
+                              setStartDateOpen(false);
                             }
-                            setStartTimeOpen(false);
-                          }, 150);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const value = e.currentTarget.value;
-                            const validatedTime = validateAndFormatTime(value);
-
-                            if (validatedTime) {
-                              handleStartTimeChange(validatedTime);
-                            } else {
-                              // Reset to previous valid value if invalid
-                              setEventStartTime(eventStartTime);
-                            }
-                            setStartTimeOpen(false);
-                            e.currentTarget.blur();
-                          } else if (e.key === "Escape") {
-                            setStartTimeOpen(false);
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        placeholder="09:00 or type time"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Scroll to the selected time when opening
-                          if (!startTimeOpen) {
-                            setTimeout(() => scrollToSelectedTime(startTimeDropdownRef, eventStartTime), 0);
-                          }
-                          setStartTimeOpen(!startTimeOpen);
-                        }}
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors"
-                      >
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                    {startTimeOpen && (
-                      <div 
-                        ref={startTimeDropdownRef}
-                        className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
-                      >
-                        {allTimeOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            data-time-value={option.value}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none ${
-                              option.value === eventStartTime ? 'bg-accent text-accent-foreground' : ''
-                            }`}
-                            onClick={() => {
-                              handleStartTimeChange(option.value);
-                              setStartTimeOpen(false);
-                            }}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                          }}
+                          className="rounded-md border shadow-md"
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                )}
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* End Date */}
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between px-3 font-normal"
-                      >
-                        <span>
-                          {eventEndDate
-                            ? format(eventEndDate, "PPP")
-                            : "Pick a date"}
-                        </span>
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-2" align="start">
-                      <CalendarUI
-                        mode="single"
-                        selected={eventEndDate}
-                        disabled={{ before: eventStartDate }}
-                        onSelect={(date) => {
-                          if (date) {
-                            setEventEndDate(date);
-                            setEndDateOpen(false);
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground">End Date</Label>
+                    <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between px-3 py-2.5 font-normal border-2 hover:border-primary/50 focus:border-primary transition-colors"
+                        >
+                          <span className="text-sm">
+                            {eventEndDate
+                              ? format(eventEndDate, "EEE, MMM d")
+                              : "Pick a date"}
+                          </span>
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarUI
+                          mode="single"
+                          selected={eventEndDate}
+                          disabled={{ before: eventStartDate }}
+                          onSelect={(date) => {
+                            if (date) {
+                              setEventEndDate(date);
+                              setEndDateOpen(false);
+                            }
+                          }}
+                          className="rounded-md border shadow-md"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
 
-                {/* End Time */}
+                {/* Time Row */}
                 {!eventAllDay && (
-                  <div className="space-y-2 relative" data-time-input="end">
-                    <Label>End Time</Label>
-                    <div className="relative">
-                      <Input
-                        value={eventEndTime}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setEventEndTime(value);
-                        }}
-                        onFocus={() => setEndTimeOpen(true)}
-                        onBlur={(e) => {
-                          // Small delay to allow dropdown clicks to register
-                          setTimeout(() => {
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 relative">
+                      <Label className="text-sm font-medium text-foreground">Start Time</Label>
+                      <div className="relative">
+                        <Input
+                          value={eventStartTime}
+                          onChange={(e) => {
                             const value = e.target.value;
-                            const validatedTime = validateAndFormatTime(value);
-
-                            if (validatedTime) {
-                              // Check if the validated time is after start time
-                              const startMinutes =
-                                timeToMinutes(eventStartTime);
-                              const endMinutes = timeToMinutes(validatedTime);
-
-                              if (endMinutes > startMinutes) {
-                                setEventEndTime(validatedTime);
-                              } else {
-                                // If not after start time, set to 15 minutes after start
-                                const newEndMinutes = startMinutes + 15;
-                                const newEndTime = minutesToTime(newEndMinutes);
-                                setEventEndTime(newEndTime);
-                              }
-                            } else {
-                              // Reset to previous valid value if invalid
-                              setEventEndTime(eventEndTime);
+                            setEventStartTime(value);
+                          }}
+                          onFocus={() => setStartTimeOpen(true)}
+                          onBlur={(e) => {
+                            // Small delay to allow dropdown clicks to register
+                            setTimeout(() => {
+                              const value = e.target.value;
+                              handleStartTimeChange(value);
+                              setStartTimeOpen(false);
+                            }, 150);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const value = e.currentTarget.value;
+                              handleStartTimeChange(value);
+                              setStartTimeOpen(false);
+                              e.currentTarget.blur();
+                            } else if (e.key === "Escape") {
+                              setStartTimeOpen(false);
+                              e.currentTarget.blur();
                             }
-                            setEndTimeOpen(false);
-                          }, 150);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const value = e.currentTarget.value;
-                            const validatedTime = validateAndFormatTime(value);
-
-                            if (validatedTime) {
-                              // Check if the validated time is after start time
-                              const startMinutes =
-                                timeToMinutes(eventStartTime);
-                              const endMinutes = timeToMinutes(validatedTime);
-
-                              if (endMinutes > startMinutes) {
-                                setEventEndTime(validatedTime);
-                              } else {
-                                // If not after start time, set to 15 minutes after start
-                                const newEndMinutes = startMinutes + 15;
-                                const newEndTime = minutesToTime(newEndMinutes);
-                                setEventEndTime(newEndTime);
-                              }
-                            } else {
-                              // Reset to previous valid value if invalid
-                              setEventEndTime(eventEndTime);
+                          }}
+                          placeholder="09:00 or type time"
+                          className={`pr-10 border-2 transition-colors ${
+                            timeErrors.start 
+                              ? 'border-destructive focus:border-destructive' 
+                              : 'hover:border-primary/50 focus:border-primary'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Scroll to the selected time when opening
+                            if (!startTimeOpen) {
+                              setTimeout(() => scrollToSelectedTime(startTimeDropdownRef, eventStartTime), 0);
                             }
-                            setEndTimeOpen(false);
-                            e.currentTarget.blur();
-                          } else if (e.key === "Escape") {
-                            setEndTimeOpen(false);
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        placeholder="10:00 or type time"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Scroll to the selected time when opening
-                          if (!endTimeOpen) {
-                            setTimeout(() => scrollToSelectedTime(endTimeDropdownRef, eventEndTime), 0);
-                          }
-                          setEndTimeOpen(!endTimeOpen);
-                        }}
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors"
-                      >
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                    {endTimeOpen && (
-                      <div 
-                        ref={endTimeDropdownRef}
-                        className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
-                      >
-                        {allTimeOptions
-                          .filter((option) => {
-                            // Only show times after the start time
-                            const startMinutes = timeToMinutes(eventStartTime);
-                            const optionMinutes = timeToMinutes(option.value);
-                            return optionMinutes > startMinutes;
-                          })
-                          .map((option) => (
+                            setStartTimeOpen(!startTimeOpen);
+                          }}
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md"
+                        >
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                      {startTimeOpen && (
+                        <div 
+                          ref={startTimeDropdownRef}
+                          className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
+                        >
+                          {allTimeOptions.map((option) => (
                             <button
                               key={option.value}
                               type="button"
                               data-time-value={option.value}
-                              className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none ${
-                                option.value === eventEndTime ? 'bg-accent text-accent-foreground' : ''
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
+                                option.value === eventStartTime ? 'bg-accent text-accent-foreground font-medium' : ''
                               }`}
                               onClick={() => {
-                                setEventEndTime(option.value);
-                                setEndTimeOpen(false);
+                                handleStartTimeChange(option.value);
+                                setStartTimeOpen(false);
                               }}
                             >
                               {option.label}
                             </button>
                           ))}
+                        </div>
+                      )}
+                      {timeErrors.start && (
+                        <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                          <span className="inline-block w-3 h-3 rounded-full bg-destructive/20 flex items-center justify-center">
+                            <span className="text-[8px] text-destructive font-bold">!</span>
+                          </span>
+                          {timeErrors.start}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 relative">
+                      <Label className="text-sm font-medium text-foreground">End Time</Label>
+                      <div className="relative">
+                        <Input
+                          value={eventEndTime}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setEventEndTime(value);
+                          }}
+                          onFocus={() => setEndTimeOpen(true)}
+                          onBlur={(e) => {
+                            // Small delay to allow dropdown clicks to register
+                            setTimeout(() => {
+                              const value = e.target.value;
+                              handleEndTimeChange(value);
+                              setEndTimeOpen(false);
+                            }, 150);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const value = e.currentTarget.value;
+                              handleEndTimeChange(value);
+                              setEndTimeOpen(false);
+                              e.currentTarget.blur();
+                            } else if (e.key === "Escape") {
+                              setEndTimeOpen(false);
+                              e.currentTarget.blur();
+                            }
+                          }}
+                          placeholder="10:00 or type time"
+                          className={`pr-10 border-2 transition-colors ${
+                            timeErrors.end 
+                              ? 'border-destructive focus:border-destructive' 
+                              : 'hover:border-primary/50 focus:border-primary'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Scroll to the selected time when opening
+                            if (!endTimeOpen) {
+                              setTimeout(() => scrollToSelectedTime(endTimeDropdownRef, eventEndTime), 0);
+                            }
+                            setEndTimeOpen(!endTimeOpen);
+                          }}
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md"
+                        >
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       </div>
-                    )}
+                      {endTimeOpen && (
+                        <div 
+                          ref={endTimeDropdownRef}
+                          className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
+                        >
+                          {allTimeOptions
+                            .filter((option) => {
+                              // Only show times after the start time
+                              const startMinutes = timeToMinutes(eventStartTime);
+                              const optionMinutes = timeToMinutes(option.value);
+                              return optionMinutes > startMinutes;
+                            })
+                            .map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                data-time-value={option.value}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
+                                  option.value === eventEndTime ? 'bg-accent text-accent-foreground font-medium' : ''
+                                }`}
+                                onClick={() => {
+                                  handleEndTimeChange(option.value);
+                                  setEndTimeOpen(false);
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                      {timeErrors.end && (
+                        <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                          <span className="inline-block w-3 h-3 rounded-full bg-destructive/20 flex items-center justify-center">
+                            <span className="text-[8px] text-destructive font-bold">!</span>
+                          </span>
+                          {timeErrors.end}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* All Day Toggle */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="all-day"
-                  checked={eventAllDay}
-                  onCheckedChange={(checked) =>
-                    setEventAllDay(checked === true)
-                  }
-                />
-                <Label htmlFor="all-day">All day event</Label>
+                {/* All Day Toggle - Simple and intuitive */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="all-day"
+                      checked={eventAllDay}
+                      onCheckedChange={(checked) => {
+                        setEventAllDay(checked === true);
+                        // Clear time errors when switching to all-day
+                        if (checked) {
+                          setTimeErrors({});
+                        }
+                      }}
+                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                    <Label htmlFor="all-day" className="text-sm font-medium cursor-pointer">
+                      All day event
+                    </Label>
+                  </div>
+                  {eventAllDay && (
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                      No specific times
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Location */}
               <div className="space-y-2">
                 <Label
                   htmlFor="event-location"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-sm font-medium"
                 >
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  Location
+                  Location <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
                 <Input
                   id="event-location"
                   value={eventLocation}
                   onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="Enter event location"
+                  placeholder="Where is this happening?"
+                  className="border-2 hover:border-primary/50 focus:border-primary transition-colors"
                 />
               </div>
+
+
 
               {/* Email Notifications */}
               <div className="space-y-2">
@@ -2512,43 +2556,45 @@ export function CommandPalette({
             </div>
 
             {/* Action Buttons */}
-            <div className="border-t border-border bg-card/20 px-6 py-4 flex items-center justify-between">
+            <div className="border-t border-border bg-gradient-to-r from-background/80 to-muted/20 px-6 py-5 flex items-center justify-between backdrop-blur-sm">
               {selectedEvent?.id && (
                 <Button
                   variant="outline"
                   onClick={handleEventDelete}
                   disabled={eventSaving}
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-all duration-200"
                 >
                   {eventSaving ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <Trash2 className="h-4 w-4 mr-2" />
                   )}
-                  Delete
+                  Delete Event
                 </Button>
               )}
-              <div className="flex gap-2 ml-auto">
+              <div className="flex gap-3 ml-auto">
                 <Button
                   variant="outline"
                   onClick={() => goBack("events")}
                   disabled={eventSaving}
+                  className="hover:bg-muted/50 transition-all duration-200"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleEventSave}
-                  disabled={eventSaving || !eventCalendarId}
+                  disabled={eventSaving || !eventCalendarId || !eventTitle.trim()}
+                  className="bg-primary hover:bg-primary/90 px-6 shadow-sm transition-all duration-200"
                 >
                   {eventSaving ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Saving...
+                      {selectedEvent?.id ? 'Updating...' : 'Creating...'}
                     </>
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Save
+                      {selectedEvent?.id ? 'Update Event' : 'Create Event'}
                     </>
                   )}
                 </Button>
