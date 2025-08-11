@@ -25,9 +25,12 @@ RUN bun install --frozen-lockfile
 
 # Build the project
 COPY --from=builder /app/out/full/ .
-# Generate Prisma client first
-WORKDIR /app/apps/backend
-RUN bun run db:generate
+# Install prisma CLI and generate client if schema exists
+RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
+    bun add -g prisma && \
+    cd apps/backend && \
+    prisma generate; \
+fi
 # Build the web app
 WORKDIR /app
 RUN bun run turbo build --filter=web
