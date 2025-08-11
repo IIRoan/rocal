@@ -23,6 +23,7 @@ COPY . .
 # Generate Prisma client if needed
 RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
     cd apps/backend && \
+    bun add -g prismabox && \
     bun run db:generate; \
 fi
 
