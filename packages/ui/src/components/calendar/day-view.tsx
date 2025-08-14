@@ -114,7 +114,9 @@ export function DayView({
 
     // Track columns for overlapping events
     const columns: { event: CalendarEvent; end: Date }[][] = [];
+    const eventColumnMapping: Map<CalendarEvent, number> = new Map();
 
+    // First pass: assign events to columns
     sortedEvents.forEach((event) => {
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
@@ -126,13 +128,6 @@ export function DayView({
       const adjustedEnd = isSameDay(currentDate, eventEnd)
         ? eventEnd
         : addHours(dayStart, 24);
-
-      // Calculate top position and height
-      const startHour =
-        getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
-      const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
-      const top = (startHour - StartHour) * WeekCellsHeight;
-      const height = (endHour - startHour) * WeekCellsHeight;
 
       // Find a column for this event
       let columnIndex = 0;
@@ -162,10 +157,67 @@ export function DayView({
       const currentColumn = columns[columnIndex] || [];
       columns[columnIndex] = currentColumn;
       currentColumn.push({ event, end: adjustedEnd });
+      eventColumnMapping.set(event, columnIndex);
+    });
 
-      // First column takes full width, others are indented by 10% and take 90% width
-      const width = columnIndex === 0 ? 1 : 0.9;
-      const left = columnIndex === 0 ? 0 : columnIndex * 0.1;
+    // Second pass: calculate positions with improved algorithm
+    sortedEvents.forEach((event) => {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+
+      // Adjust start and end times if they're outside this day
+      const adjustedStart = isSameDay(currentDate, eventStart)
+        ? eventStart
+        : dayStart;
+      const adjustedEnd = isSameDay(currentDate, eventEnd)
+        ? eventEnd
+        : addHours(dayStart, 24);
+
+      // Calculate top position and height
+      const startHour =
+        getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
+      const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
+      const top = (startHour - StartHour) * WeekCellsHeight;
+      const height = (endHour - startHour) * WeekCellsHeight;
+
+      const columnIndex = eventColumnMapping.get(event) ?? 0;
+
+      // Calculate overlapping events for this specific event's time slot
+      const overlappingEvents = sortedEvents.filter((otherEvent) => {
+        if (otherEvent.id === event.id) return false;
+        const otherStart = new Date(otherEvent.start);
+        const otherEnd = new Date(otherEvent.end);
+        
+        return areIntervalsOverlapping(
+          { start: adjustedStart, end: adjustedEnd },
+          { start: otherStart, end: otherEnd },
+        );
+      });
+
+      const overlappingColumns = overlappingEvents.length + 1;
+      
+      // Use improved width and positioning calculation
+      let width: number;
+      let left: number;
+
+      if (overlappingColumns === 1) {
+        // No overlapping events, take full width
+        width = 1;
+        left = 0;
+      } else if (overlappingColumns <= 3) {
+        // For 2-3 overlapping events, use equal distribution with small gaps
+        width = (1 / overlappingColumns) * 0.95; // 95% to leave small gap
+        left = columnIndex * (1 / overlappingColumns) + (columnIndex * 0.01); // Add small offset
+      } else {
+        // For more than 3 overlapping events, use cascading layout with better spacing
+        const baseWidth = 0.75; // Start with 75% width
+        const widthDecrement = Math.min(0.1, 0.5 / overlappingColumns); // Decrease width more gradually
+        width = baseWidth - (columnIndex * widthDecrement);
+        
+        // Stagger positioning with better spacing
+        const offsetIncrement = Math.min(0.15, 0.8 / overlappingColumns);
+        left = columnIndex * offsetIncrement;
+      }
 
       result.push({
         event,
