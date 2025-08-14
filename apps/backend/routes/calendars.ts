@@ -357,7 +357,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
     "/:id",
     async ({ params, query, user }: any) => {
       const { id } = params;
-      const { action = "prevent", targetCalendarId } = query;
+      const { action = "delete_events", targetCalendarId } = query;
 
       // Verify calendar exists and belongs to user
       const existingCalendar = await prisma.calendar.findFirst({
@@ -385,7 +385,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         );
       }
 
-      // Check if calendar has events
+      // Check if calendar has events and delete them automatically
       const events = await prisma.calendarEvent.findMany({
         where: {
           calendarId: id,
@@ -393,13 +393,6 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       });
 
       if (events.length > 0) {
-        if (action === "prevent") {
-          throw new ValidationError(
-            `Cannot delete calendar that contains ${events.length} events. Use action=delete_events or action=move_events&targetCalendarId=<id>.`,
-            "calendarId",
-          );
-        }
-
         if (action === "move_events") {
           if (!targetCalendarId) {
             throw new ValidationError(
@@ -440,18 +433,13 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
               updatedAt: new Date(),
             },
           });
-        } else if (action === "delete_events") {
-          // Delete all events in the calendar
+        } else {
+          // Default behavior: delete all events in the calendar
           await prisma.calendarEvent.deleteMany({
             where: {
               calendarId: id,
             },
           });
-        } else {
-          throw new ValidationError(
-            "Invalid action. Use 'prevent', 'delete_events', or 'move_events'",
-            "action",
-          );
         }
       }
 
@@ -485,12 +473,12 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         message:
           action === "move_events"
             ? `Calendar deleted successfully. ${events.length} events moved to target calendar.`
-            : action === "delete_events"
+            : events.length > 0
               ? `Calendar deleted successfully. ${events.length} events were also deleted.`
               : "Calendar deleted successfully.",
         deletedCalendarId: id,
         eventsAffected: events.length,
-        action,
+        action: action || "delete_events",
       };
     },
     {
@@ -504,13 +492,12 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         action: t.Optional(
           t.Union(
             [
-              t.Literal("prevent"),
               t.Literal("delete_events"),
               t.Literal("move_events"),
             ],
             {
               description:
-                "What to do with events: prevent (default), delete_events, or move_events",
+                "What to do with events: delete_events (default), or move_events",
             },
           ),
         ),
@@ -522,10 +509,9 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       }),
       detail: {
         tags: ["Calendars"],
-        summary: "Delete a calendar with event migration options",
+        summary: "Delete a calendar with event handling options",
         description: `Deletes a calendar with options for handling existing events:
-        - prevent: (default) Prevent deletion if events exist
-        - delete_events: Delete calendar and all its events
+        - delete_events: (default) Delete calendar and all its events
         - move_events: Move all events to another calendar (requires targetCalendarId)`,
         security: [{ bearerAuth: [] }],
         responses: {

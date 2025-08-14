@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
+import { Cloud } from "lucide-react";
 
 import {
   getBorderRadiusClasses,
@@ -177,13 +178,16 @@ export function EventItem({
         onTouchStart={onTouchStart}
       >
         {children || (
-          <span className="truncate">
+          <span className="truncate flex items-center gap-1">
             {!event.allDay && (
               <span className="truncate sm:text-xs font-normal opacity-70 uppercase">
                 {formatTimeWithOptionalMinutes(displayStart, timeFormat)}{" "}
               </span>
             )}
-            {event.title}
+            <span className="truncate">{event.title}</span>
+            {event.isSynced && (
+              <Cloud className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+            )}
           </span>
         )}
       </EventWrapper>
@@ -211,17 +215,25 @@ export function EventItem({
         onTouchStart={onTouchStart}
       >
         {durationMinutes < 45 ? (
-          <div className="truncate">
-            {event.title}{" "}
+          <div className="truncate flex items-center gap-1">
+            <span className="truncate">{event.title}</span>
+            {event.isSynced && (
+              <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+            )}
             {showTime && (
               <span className="opacity-70">
-                {formatTimeWithOptionalMinutes(displayStart, timeFormat)}
+                {" " + formatTimeWithOptionalMinutes(displayStart, timeFormat)}
               </span>
             )}
           </div>
         ) : (
           <>
-            <div className="truncate font-medium">{event.title}</div>
+            <div className="truncate font-medium flex items-center gap-1">
+              <span className="truncate">{event.title}</span>
+              {event.isSynced && (
+                <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+              )}
+            </div>
             {showTime && (
               <div className="truncate font-normal opacity-70 sm:text-xs uppercase">
                 {getEventTime()}
@@ -249,7 +261,12 @@ export function EventItem({
       {...dndListeners}
       {...dndAttributes}
     >
-      <div className="text-sm font-medium">{event.title}</div>
+      <div className="text-sm font-medium flex items-center gap-2">
+        <span className="truncate">{event.title}</span>
+        {event.isSynced && (
+          <Cloud className="w-4 h-4 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+        )}
+      </div>
       <div className="text-xs opacity-70">
         {event.allDay ? (
           <span>All day</span>

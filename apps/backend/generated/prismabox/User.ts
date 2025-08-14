@@ -71,6 +71,10 @@ export const UserRelations = t.Object(
           reminder: __nullable__(t.Integer()),
           recurrence: __nullable__(t.String()),
           parentEventId: __nullable__(t.String()),
+          isSynced: t.Boolean(),
+          externalId: __nullable__(t.String()),
+          subscriptionId: __nullable__(t.String()),
+          syncedAt: __nullable__(t.Date()),
           userId: t.String(),
           calendarId: t.String(),
           categoryId: __nullable__(t.String()),
@@ -154,6 +158,28 @@ export const UserRelations = t.Object(
         },
         { additionalProperties: false },
       ),
+    ),
+    subscriptions: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          name: t.String(),
+          url: t.String(),
+          isActive: t.Boolean(),
+          syncIntervalMinutes: t.Integer(),
+          lastSyncAt: __nullable__(t.Date()),
+          lastSyncStatus: t.String(),
+          lastErrorMessage: __nullable__(t.String()),
+          etag: __nullable__(t.String()),
+          lastModified: __nullable__(t.String()),
+          userId: t.String(),
+          calendarId: t.String(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
     ),
     passkeys: t.Array(
       t.Object(
@@ -303,6 +329,22 @@ export const UserRelationsInputCreate = t.Object(
             {
               id: t.String({ additionalProperties: false }),
             },
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    subscriptions: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
             { additionalProperties: false },
           ),
         },
@@ -496,6 +538,31 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      subscriptions: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       passkeys: t.Partial(
         t.Object(
           {
@@ -614,6 +681,7 @@ export const UserSelect = t.Partial(
       calendars: t.Boolean(),
       participations: t.Boolean(),
       settings: t.Boolean(),
+      subscriptions: t.Boolean(),
       passkeys: t.Boolean(),
       _count: t.Boolean(),
     },
@@ -631,6 +699,7 @@ export const UserInclude = t.Partial(
       calendars: t.Boolean(),
       participations: t.Boolean(),
       settings: t.Boolean(),
+      subscriptions: t.Boolean(),
       passkeys: t.Boolean(),
       _count: t.Boolean(),
     },

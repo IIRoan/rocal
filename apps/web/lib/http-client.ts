@@ -194,10 +194,20 @@ export class HttpClient {
           (key === "start" ||
             key === "end" ||
             key === "createdAt" ||
-            key === "updatedAt") &&
+            key === "updatedAt" ||
+            key === "syncedAt") &&
           typeof value === "string"
         ) {
-          transformed[key] = new Date(value);
+          const dateValue = new Date(value);
+          // Debug date transformation for synced events
+          if (key === "start" || key === "end") {
+            console.log(`HTTP Client - Transforming ${key}:`, {
+              original: value,
+              transformed: dateValue.toString(),
+              iso: dateValue.toISOString()
+            });
+          }
+          transformed[key] = dateValue;
         } else {
           transformed[key] = this.transformDates(value);
         }

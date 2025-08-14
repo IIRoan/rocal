@@ -27,6 +27,11 @@ export interface CalendarEvent {
   createdAt: Date;
   updatedAt: Date;
   reminder?: number | null;
+  // Sync fields for external calendar events
+  isSynced?: boolean;
+  externalId?: string | null;
+  subscriptionId?: string | null;
+  syncedAt?: Date | null;
 }
 
 export interface CreateCalendarData {

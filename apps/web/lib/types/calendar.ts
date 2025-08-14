@@ -40,6 +40,11 @@ export interface CalendarEvent {
   recurrence?: string | null; // JSON string of recurrence rule
   parentEventId?: string | null; // For recurring event instances
   isRecurringInstance?: boolean; // Frontend helper field
+  // Sync fields for external calendar events
+  isSynced?: boolean; // Whether this event came from external calendar
+  externalId?: string | null; // UID from the .ics file
+  subscriptionId?: string | null; // Which subscription this event came from
+  syncedAt?: Date | null; // When this event was last synced
 }
 
 export interface EventCategory {
@@ -203,7 +208,7 @@ export interface DeleteRecurringEventRequest {
 }
 
 // Calendar Deletion Types
-export type CalendarDeleteAction = "prevent" | "delete_events" | "move_events";
+export type CalendarDeleteAction = "delete_events" | "move_events";
 
 export interface DeleteCalendarRequest {
   action?: CalendarDeleteAction;

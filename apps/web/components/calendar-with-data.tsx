@@ -81,6 +81,11 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const initializedRef = useRef(false);
   React.useEffect(() => {
     if (!initializedRef.current) {
+      console.log('CalendarWithData - Setting initial date range:', {
+        start: defaultDateRange.start.toISOString(),
+        end: defaultDateRange.end.toISOString(),
+        view: initialView
+      });
       calendarData.setDateRange(defaultDateRange);
       initializedRef.current = true;
     }
@@ -163,6 +168,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       onUpdateEvent={calendarData.updateEvent}
       onDeleteEvent={calendarData.deleteEvent}
       onCreateCategory={calendarData.createCategory}
+      onDateRangeChange={calendarData.setDateRange}
       showWeekNumbers={settings?.showWeekNumbers}
       compactView={settings?.compactView}
       timeFormat={settings?.timeFormat}

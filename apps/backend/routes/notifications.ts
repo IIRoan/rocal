@@ -97,13 +97,23 @@ function validateNotificationConfig(config: any): void {
  * Validate event ownership
  */
 async function validateEventOwnership(eventId: string, userId: string) {
+  // Check if this is a recurring instance ID or synced event - just return null for these
+  if (eventId.includes('_') && eventId.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+    return null; // Recurring instances don't have notifications
+  }
+
   const event = await prisma.calendarEvent.findFirst({
     where: { id: eventId, userId },
-    select: { id: true, start: true, title: true },
+    select: { id: true, start: true, title: true, isSynced: true },
   });
 
   if (!event) {
     throw new NotFoundError("Event not found or access denied");
+  }
+
+  // Synced events don't have notifications either
+  if (event.isSynced) {
+    return null;
   }
 
   return event;
@@ -121,7 +131,19 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         const { eventId } = params;
 
         // Validate event ownership
-        await validateEventOwnership(eventId, user.id);
+        const event = await validateEventOwnership(eventId, user.id);
+
+        // If event is null (synced or recurring instance), return empty notifications
+        if (!event) {
+          return {
+            success: true,
+            data: {
+              eventId,
+              notifications: [],
+              count: 0,
+            },
+          };
+        }
 
         // Get notifications for the event
         const notifications = await prisma.eventNotification.findMany({
@@ -256,6 +278,14 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         // Validate event ownership
         const event = await validateEventOwnership(eventId, user.id);
 
+        // If event is null (synced or recurring instance), return success without doing anything
+        if (!event) {
+          return {
+            success: true,
+            message: "No notifications to update for this event type",
+          };
+        }
+
         // Validate notification configurations
         if (!Array.isArray(notifications)) {
           throw new ValidationError("notifications must be an array");
@@ -378,7 +408,16 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         const { eventId } = params;
 
         // Validate event ownership
-        await validateEventOwnership(eventId, user.id);
+        const event = await validateEventOwnership(eventId, user.id);
+
+        // If event is null (synced or recurring instance), return success without doing anything
+        if (!event) {
+          return {
+            success: true,
+            message: "No notifications to delete for this event type",
+            deletedCount: 0,
+          };
+        }
 
         // Use enhanced notification service to delete notifications
         const deletedCount =
@@ -617,6 +656,11 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
 
         // Validate event ownership
         const event = await validateEventOwnership(eventId, user.id);
+
+        // If event is null (synced or recurring instance), return error
+        if (!event) {
+          throw new ValidationError("Cannot create test notifications for this event type");
+        }
 
         // Create a test notification (5 minutes from now)
         const testNotificationTime = new Date(Date.now() + 5 * 60 * 1000);
