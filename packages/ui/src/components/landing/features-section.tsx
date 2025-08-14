@@ -87,58 +87,75 @@ export function FeaturesSection() {
   return (
     <section id="features" className="py-24 px-6 bg-muted/20">
       <div className="max-w-7xl mx-auto">
-        {/* Section Header */}
-        <div className="text-center mb-16">
-          <Badge variant="secondary" className="rounded-full px-4 py-2 mb-4">
-            Features
+        {/* Enhanced Section Header */}
+        <div className="text-center mb-20">
+          <Badge variant="secondary" className="rounded-full px-6 py-3 mb-6 text-sm font-medium shadow-lg">
+            ✨ Features
           </Badge>
-          <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-6">
+          <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-8 leading-tight">
             Everything you need to
             <br />
-            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-pulse">
               master your time
             </span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed">
             Rocani brings together powerful scheduling tools, intelligent
             automation, and seamless collaboration in one beautiful calendar
-            experience.
+            experience that adapts to your workflow.
           </p>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Enhanced Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
             <Card
               key={feature.title}
-              className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card/50 backdrop-blur-sm border-border/50"
+              className="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 bg-card/60 backdrop-blur-sm border border-border/50 relative overflow-hidden hover:border-primary/20"
+              style={{
+                animationDelay: `${index * 100}ms`,
+                animation: 'fadeInUp 0.6s ease-out forwards'
+              }}
             >
-              <CardContent className="p-6">
-                <div className="flex flex-col items-start gap-4">
+              {/* Hover gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              
+              <CardContent className="p-8 relative z-10">
+                <div className="flex flex-col items-start gap-6">
                   <div
-                    className={`p-3 rounded-lg ${feature.bgColor} group-hover:scale-110 transition-transform duration-300`}
+                    className={`p-4 rounded-2xl ${feature.bgColor} group-hover:scale-125 group-hover:rotate-3 transition-all duration-500 shadow-lg group-hover:shadow-xl`}
                   >
-                    <feature.icon className={`h-6 w-6 ${feature.color}`} />
+                    <feature.icon className={`h-7 w-7 ${feature.color}`} />
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors duration-300">
                       {feature.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-300">
                       {feature.description}
                     </p>
                   </div>
                 </div>
               </CardContent>
+              
+              {/* Animated border on hover */}
+              <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/50 to-accent/50 opacity-0 group-hover:opacity-20 transition-opacity duration-500 blur-sm" />
             </Card>
           ))}
         </div>
 
-        {/* Bottom CTA */}
-        <div className="mt-16 text-center">
-          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <span>Free forever for personal use</span>
+        {/* Enhanced Bottom CTA */}
+        <div className="mt-20 text-center">
+          <div className="space-y-6">
+            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-success/10 border border-success/20">
+              <CheckCircle className="h-5 w-5 text-success animate-pulse" />
+              <span className="font-medium text-success">Free forever for personal use</span>
+            </div>
+            
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Start with our generous free plan, then scale as your team grows.
+              No hidden fees, no surprises.
+            </p>
           </div>
         </div>
       </div>
