@@ -437,6 +437,105 @@ export class CalendarApiService {
     }
   }
 
+  // ICS Import
+  async importICS(request: {
+    calendarId: string;
+    icsContent: string;
+    fileName?: string;
+  }): Promise<{
+    success: boolean;
+    eventsCreated: number;
+    eventsTotal: number;
+    fileName?: string;
+    calendarName?: string;
+    errors?: string[];
+  }> {
+    try {
+      const response = await this.client.post<{
+        success: boolean;
+        eventsCreated: number;
+        eventsTotal: number;
+        fileName?: string;
+        calendarName?: string;
+        errors?: string[];
+      }>("/api/subscriptions/import-ics", request);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to import ICS file");
+    }
+  }
+
+  // Calendar Subscriptions API methods
+  async getSubscriptions(): Promise<any[]> {
+    try {
+      const response = await this.client.get<any[]>("/api/subscriptions");
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to load subscriptions");
+    }
+  }
+
+  async createSubscription(request: {
+    name?: string;
+    url: string;
+    calendarId: string;
+  }): Promise<any> {
+    try {
+      const response = await this.client.post<any>("/api/subscriptions", request);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to create subscription");
+    }
+  }
+
+  async updateSubscription(id: string, request: {
+    name?: string;
+    isActive?: boolean;
+    syncIntervalMinutes?: number;
+  }): Promise<any> {
+    try {
+      const response = await this.client.put<any>(`/api/subscriptions/${id}`, request);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to update subscription");
+    }
+  }
+
+  async deleteSubscription(id: string, deleteEvents = false): Promise<{ success: boolean }> {
+    try {
+      const params = new URLSearchParams();
+      if (deleteEvents) params.append("deleteEvents", "true");
+
+      const response = await this.client.delete<{ success: boolean }>(
+        `/api/subscriptions/${id}?${params}`,
+      );
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete subscription");
+    }
+  }
+
+  async syncSubscription(id: string): Promise<{
+    status: string;
+    eventsAdded?: number;
+    eventsUpdated?: number;
+    eventsDeleted?: number;
+    errors?: string[];
+  }> {
+    try {
+      const response = await this.client.post<{
+        status: string;
+        eventsAdded?: number;
+        eventsUpdated?: number;
+        eventsDeleted?: number;
+        errors?: string[];
+      }>(`/api/subscriptions/${id}/sync`, {});
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to sync subscription");
+    }
+  }
+
   // Bulk Event Operations
   async bulkEventOperation(
     request: BulkEventRequest,

@@ -146,7 +146,25 @@ export class RecurrenceEngine {
   ): Date {
     switch (rule.frequency) {
       case "daily":
-        return addDays(currentDate, rule.interval);
+        if (rule.byWeekDay && rule.byWeekDay.length > 0) {
+          // Daily with specific weekdays (e.g., weekdays only)
+          let nextDate = addDays(currentDate, 1);
+          const maxDays = 14; // Look ahead up to 2 weeks
+          let daysChecked = 0;
+
+          while (daysChecked < maxDays) {
+            if (rule.byWeekDay.includes(nextDate.getDay())) {
+              return nextDate;
+            }
+            nextDate = addDays(nextDate, 1);
+            daysChecked++;
+          }
+          
+          // Fallback to regular daily if no weekday found
+          return addDays(currentDate, rule.interval);
+        } else {
+          return addDays(currentDate, rule.interval);
+        }
 
       case "weekly":
         if (rule.byWeekDay && rule.byWeekDay.length > 0) {

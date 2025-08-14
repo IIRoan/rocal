@@ -1,0 +1,234 @@
+import { db } from './prisma';
+import { syncCalendarSubscription } from '../routes/subscriptions';
+
+export class CalendarSyncService {
+  private static instance: CalendarSyncService;
+  private intervalId: NodeJS.Timeout | null = null;
+  private isRunning: boolean = false;
+
+  private constructor() {}
+
+  static getInstance(): CalendarSyncService {
+    if (!CalendarSyncService.instance) {
+      CalendarSyncService.instance = new CalendarSyncService();
+    }
+    return CalendarSyncService.instance;
+  }
+
+  start() {
+    if (this.isRunning) {
+      console.log('Calendar sync service is already running');
+      return;
+    }
+
+    console.log('Starting Calendar sync service...');
+    this.isRunning = true;
+    
+    // Run initial sync after a short delay
+    setTimeout(() => {
+      this.syncAllActiveSubscriptions().catch(error => {
+        console.error('Initial sync failed:', error);
+      });
+    }, 5000);
+
+    // Schedule regular syncing every 15 minutes
+    this.intervalId = setInterval(async () => {
+      try {
+        await this.syncAllActiveSubscriptions();
+      } catch (error) {
+        console.error('Scheduled sync failed:', error);
+      }
+    }, 15 * 60 * 1000); // 15 minutes in milliseconds
+
+    console.log('Calendar sync service started - running every 15 minutes');
+  }
+
+  stop() {
+    if (!this.isRunning) {
+      return;
+    }
+
+    console.log('Stopping Calendar sync service...');
+    
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    
+    this.isRunning = false;
+    console.log('Calendar sync service stopped');
+  }
+
+  async syncAllActiveSubscriptions(): Promise<void> {
+    console.log('Starting scheduled sync of all active subscriptions...');
+    
+    try {
+      // Get all active subscriptions that are due for syncing
+      const subscriptions = await db.calendarSubscription.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            // Never synced before
+            { lastSyncAt: null },
+            // Last sync was more than the sync interval ago
+            {
+              lastSyncAt: {
+                lt: new Date(Date.now() - 15 * 60 * 1000) // 15 minutes ago
+              }
+            }
+          ]
+        },
+        include: {
+          calendar: true,
+          user: true,
+        },
+        orderBy: {
+          lastSyncAt: 'asc', // Sync oldest first
+        },
+      });
+
+      console.log(`Found ${subscriptions.length} subscriptions to sync`);
+
+      const results = {
+        total: subscriptions.length,
+        success: 0,
+        errors: 0,
+        skipped: 0,
+      };
+
+      // Process subscriptions in batches to avoid overwhelming the system
+      const batchSize = 5;
+      for (let i = 0; i < subscriptions.length; i += batchSize) {
+        const batch = subscriptions.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (subscription) => {
+          try {
+            // Check if subscription should be synced based on its individual interval
+            const timeSinceLastSync = subscription.lastSyncAt 
+              ? Date.now() - subscription.lastSyncAt.getTime()
+              : Infinity;
+            
+            const syncIntervalMs = subscription.syncIntervalMinutes * 60 * 1000;
+            
+            if (timeSinceLastSync < syncIntervalMs) {
+              results.skipped++;
+              return;
+            }
+
+            console.log(`Syncing subscription: ${subscription.name} (${subscription.url})`);
+            await syncCalendarSubscription(subscription);
+            results.success++;
+            
+          } catch (error) {
+            console.error(`Failed to sync subscription ${subscription.id} (${subscription.name}):`, error);
+            results.errors++;
+          }
+        });
+
+        await Promise.allSettled(batchPromises);
+        
+        // Small delay between batches to be gentle on external servers
+        if (i + batchSize < subscriptions.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`Sync completed: ${results.success} successful, ${results.errors} errors, ${results.skipped} skipped out of ${results.total} total`);
+
+      // Clean up old sync logs (keep last 50 per subscription)
+      await this.cleanupOldSyncLogs();
+
+    } catch (error) {
+      console.error('Error during scheduled sync:', error);
+    }
+  }
+
+  async syncSubscription(subscriptionId: string): Promise<void> {
+    const subscription = await db.calendarSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        calendar: true,
+        user: true,
+      },
+    });
+
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    if (!subscription.isActive) {
+      throw new Error('Subscription is not active');
+    }
+
+    await syncCalendarSubscription(subscription);
+  }
+
+  private async cleanupOldSyncLogs(): Promise<void> {
+    try {
+      // Get all subscriptions
+      const subscriptions = await db.calendarSubscription.findMany({
+        select: { id: true },
+      });
+
+      // For each subscription, keep only the latest 50 sync logs
+      for (const subscription of subscriptions) {
+        const logs = await db.calendarSyncLog.findMany({
+          where: { subscriptionId: subscription.id },
+          select: { id: true },
+          orderBy: { startedAt: 'desc' },
+          skip: 50, // Skip the first 50 (most recent)
+        });
+
+        if (logs.length > 0) {
+          await db.calendarSyncLog.deleteMany({
+            where: {
+              id: { in: logs.map(log => log.id) },
+            },
+          });
+          console.log(`Cleaned up ${logs.length} old sync logs for subscription ${subscription.id}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning up sync logs:', error);
+    }
+  }
+
+  getStatus(): { isRunning: boolean; nextSyncIn?: number } {
+    if (!this.isRunning) {
+      return { isRunning: false };
+    }
+
+    // Calculate rough time until next sync (this is approximate)
+    const now = Date.now();
+    const nextSyncTime = Math.floor(now / (15 * 60 * 1000)) * (15 * 60 * 1000) + (15 * 60 * 1000);
+    const nextSyncIn = nextSyncTime - now;
+
+    return {
+      isRunning: true,
+      nextSyncIn: Math.max(0, nextSyncIn),
+    };
+  }
+
+  async getSubscriptionStats(): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    withErrors: number;
+    neverSynced: number;
+  }> {
+    const [total, active, withErrors, neverSynced] = await Promise.all([
+      db.calendarSubscription.count(),
+      db.calendarSubscription.count({ where: { isActive: true } }),
+      db.calendarSubscription.count({ where: { lastSyncStatus: 'error' } }),
+      db.calendarSubscription.count({ where: { lastSyncAt: null } }),
+    ]);
+
+    return {
+      total,
+      active,
+      inactive: total - active,
+      withErrors,
+      neverSynced,
+    };
+  }
+}

@@ -48,6 +48,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 
 // Database utilities
 export const db = {
+  ...prisma,
   // Health check
   async isHealthy(): Promise<boolean> {
     return checkDatabaseConnection();
