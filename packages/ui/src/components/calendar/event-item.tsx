@@ -72,7 +72,7 @@ function EventWrapper({
   return (
     <button
       className={cn(
-        "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden px-1 text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through sm:px-2 hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98]",
+        "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden px-1 text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through sm:px-2 hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] border border-white/20 shadow-sm",
         getEventColorClasses(event.color),
         getBorderRadiusClasses(isFirstDay, isLastDay),
         className,
@@ -186,7 +186,7 @@ export function EventItem({
             )}
             <span className="truncate">{event.title}</span>
             {event.isSynced && (
-              <Cloud className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+              <Cloud className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60 flex-shrink-0" />
             )}
           </span>
         )}
@@ -218,7 +218,7 @@ export function EventItem({
           <div className="truncate flex items-center gap-1">
             <span className="truncate">{event.title}</span>
             {event.isSynced && (
-              <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+              <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" />
             )}
             {showTime && (
               <span className="opacity-70">
@@ -231,7 +231,7 @@ export function EventItem({
             <div className="truncate font-medium flex items-center gap-1">
               <span className="truncate">{event.title}</span>
               {event.isSynced && (
-                <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+                <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" />
               )}
             </div>
             {showTime && (
@@ -264,7 +264,7 @@ export function EventItem({
       <div className="text-sm font-medium flex items-center gap-2">
         <span className="truncate">{event.title}</span>
         {event.isSynced && (
-          <Cloud className="w-4 h-4 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+          <Cloud className="w-4 h-4 opacity-60 flex-shrink-0"/>
         )}
       </div>
       <div className="text-xs opacity-70">
