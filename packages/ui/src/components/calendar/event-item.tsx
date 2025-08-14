@@ -186,7 +186,7 @@ export function EventItem({
             )}
             <span className="truncate">{event.title}</span>
             {event.isSynced && (
-              <Cloud className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+              <Cloud className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60 flex-shrink-0" />
             )}
           </span>
         )}
@@ -218,7 +218,7 @@ export function EventItem({
           <div className="truncate flex items-center gap-1">
             <span className="truncate">{event.title}</span>
             {event.isSynced && (
-              <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+              <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" />
             )}
             {showTime && (
               <span className="opacity-70">
@@ -231,7 +231,7 @@ export function EventItem({
             <div className="truncate font-medium flex items-center gap-1">
               <span className="truncate">{event.title}</span>
               {event.isSynced && (
-                <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+                <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" />
               )}
             </div>
             {showTime && (
@@ -264,7 +264,7 @@ export function EventItem({
       <div className="text-sm font-medium flex items-center gap-2">
         <span className="truncate">{event.title}</span>
         {event.isSynced && (
-          <Cloud className="w-4 h-4 opacity-60 flex-shrink-0" title="Synced from external calendar" />
+          <Cloud className="w-4 h-4 opacity-60 flex-shrink-0"/>
         )}
       </div>
       <div className="text-xs opacity-70">
