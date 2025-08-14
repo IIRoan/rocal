@@ -47,6 +47,10 @@ export const CalendarRelations = t.Object(
           reminder: __nullable__(t.Integer()),
           recurrence: __nullable__(t.String()),
           parentEventId: __nullable__(t.String()),
+          isSynced: t.Boolean(),
+          externalId: __nullable__(t.String()),
+          subscriptionId: __nullable__(t.String()),
+          syncedAt: __nullable__(t.Date()),
           userId: t.String(),
           calendarId: t.String(),
           categoryId: __nullable__(t.String()),
@@ -66,6 +70,28 @@ export const CalendarRelations = t.Object(
           sharedBy: t.String(),
           permission: t.String(),
           accepted: t.Boolean(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    subscriptions: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          name: t.String(),
+          url: t.String(),
+          isActive: t.Boolean(),
+          syncIntervalMinutes: t.Integer(),
+          lastSyncAt: __nullable__(t.Date()),
+          lastSyncStatus: t.String(),
+          lastErrorMessage: __nullable__(t.String()),
+          etag: __nullable__(t.String()),
+          lastModified: __nullable__(t.String()),
+          userId: t.String(),
+          calendarId: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
@@ -142,6 +168,22 @@ export const CalendarRelationsInputCreate = t.Object(
         { additionalProperties: false },
       ),
     ),
+    subscriptions: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -186,6 +228,31 @@ export const CalendarRelationsInputUpdate = t.Partial(
         ),
       ),
       sharedCalendars: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      subscriptions: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -314,6 +381,7 @@ export const CalendarSelect = t.Partial(
       user: t.Boolean(),
       events: t.Boolean(),
       sharedCalendars: t.Boolean(),
+      subscriptions: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       _count: t.Boolean(),
@@ -328,6 +396,7 @@ export const CalendarInclude = t.Partial(
       user: t.Boolean(),
       events: t.Boolean(),
       sharedCalendars: t.Boolean(),
+      subscriptions: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },

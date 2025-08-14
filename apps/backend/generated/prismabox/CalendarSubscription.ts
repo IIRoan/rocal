@@ -4,20 +4,27 @@ import { __transformDate__ } from "./__transformDate__";
 
 import { __nullable__ } from "./__nullable__";
 
-export const EventCategoryPlain = t.Object(
+export const CalendarSubscriptionPlain = t.Object(
   {
     id: t.String(),
     name: t.String(),
-    color: t.String(),
+    url: t.String(),
     isActive: t.Boolean(),
+    syncIntervalMinutes: t.Integer(),
+    lastSyncAt: __nullable__(t.Date()),
+    lastSyncStatus: t.String(),
+    lastErrorMessage: __nullable__(t.String()),
+    etag: __nullable__(t.String()),
+    lastModified: __nullable__(t.String()),
     userId: t.String(),
+    calendarId: t.String(),
     createdAt: t.Date(),
     updatedAt: t.Date(),
   },
   { additionalProperties: false },
 );
 
-export const EventCategoryRelations = t.Object(
+export const CalendarSubscriptionRelations = t.Object(
   {
     user: t.Object(
       {
@@ -31,30 +38,33 @@ export const EventCategoryRelations = t.Object(
       },
       { additionalProperties: false },
     ),
-    events: t.Array(
+    calendar: t.Object(
+      {
+        id: t.String(),
+        name: t.String(),
+        color: t.String(),
+        isVisible: t.Boolean(),
+        isDefault: t.Boolean(),
+        userId: t.String(),
+        createdAt: t.Date(),
+        updatedAt: t.Date(),
+      },
+      { additionalProperties: false },
+    ),
+    syncLogs: t.Array(
       t.Object(
         {
           id: t.String(),
-          title: t.String(),
-          description: __nullable__(t.String()),
-          start: t.Date(),
-          end: t.Date(),
-          allDay: t.Boolean(),
-          location: __nullable__(t.String()),
-          color: __nullable__(t.String()),
-          isPrivate: t.Boolean(),
-          reminder: __nullable__(t.Integer()),
-          recurrence: __nullable__(t.String()),
-          parentEventId: __nullable__(t.String()),
-          isSynced: t.Boolean(),
-          externalId: __nullable__(t.String()),
-          subscriptionId: __nullable__(t.String()),
-          syncedAt: __nullable__(t.Date()),
-          userId: t.String(),
-          calendarId: t.String(),
-          categoryId: __nullable__(t.String()),
-          createdAt: t.Date(),
-          updatedAt: t.Date(),
+          subscriptionId: t.String(),
+          status: t.String(),
+          eventsAdded: t.Integer(),
+          eventsUpdated: t.Integer(),
+          eventsDeleted: t.Integer(),
+          errorMessage: __nullable__(t.String()),
+          syncDurationMs: __nullable__(t.Integer()),
+          httpStatusCode: __nullable__(t.Integer()),
+          startedAt: t.Date(),
+          completedAt: __nullable__(t.Date()),
         },
         { additionalProperties: false },
       ),
@@ -64,21 +74,37 @@ export const EventCategoryRelations = t.Object(
   { additionalProperties: false },
 );
 
-export const EventCategoryPlainInputCreate = t.Object(
-  { name: t.String(), color: t.String(), isActive: t.Optional(t.Boolean()) },
-  { additionalProperties: false },
-);
-
-export const EventCategoryPlainInputUpdate = t.Object(
+export const CalendarSubscriptionPlainInputCreate = t.Object(
   {
-    name: t.Optional(t.String()),
-    color: t.Optional(t.String()),
+    name: t.String(),
+    url: t.String(),
     isActive: t.Optional(t.Boolean()),
+    syncIntervalMinutes: t.Optional(t.Integer()),
+    lastSyncAt: t.Optional(__nullable__(t.Date())),
+    lastSyncStatus: t.Optional(t.String()),
+    lastErrorMessage: t.Optional(__nullable__(t.String())),
+    etag: t.Optional(__nullable__(t.String())),
+    lastModified: t.Optional(__nullable__(t.String())),
   },
   { additionalProperties: false },
 );
 
-export const EventCategoryRelationsInputCreate = t.Object(
+export const CalendarSubscriptionPlainInputUpdate = t.Object(
+  {
+    name: t.Optional(t.String()),
+    url: t.Optional(t.String()),
+    isActive: t.Optional(t.Boolean()),
+    syncIntervalMinutes: t.Optional(t.Integer()),
+    lastSyncAt: t.Optional(__nullable__(t.Date())),
+    lastSyncStatus: t.Optional(t.String()),
+    lastErrorMessage: t.Optional(__nullable__(t.String())),
+    etag: t.Optional(__nullable__(t.String())),
+    lastModified: t.Optional(__nullable__(t.String())),
+  },
+  { additionalProperties: false },
+);
+
+export const CalendarSubscriptionRelationsInputCreate = t.Object(
   {
     user: t.Object(
       {
@@ -91,7 +117,18 @@ export const EventCategoryRelationsInputCreate = t.Object(
       },
       { additionalProperties: false },
     ),
-    events: t.Optional(
+    calendar: t.Object(
+      {
+        connect: t.Object(
+          {
+            id: t.String({ additionalProperties: false }),
+          },
+          { additionalProperties: false },
+        ),
+      },
+      { additionalProperties: false },
+    ),
+    syncLogs: t.Optional(
       t.Object(
         {
           connect: t.Array(
@@ -111,7 +148,7 @@ export const EventCategoryRelationsInputCreate = t.Object(
   { additionalProperties: false },
 );
 
-export const EventCategoryRelationsInputUpdate = t.Partial(
+export const CalendarSubscriptionRelationsInputUpdate = t.Partial(
   t.Object(
     {
       user: t.Object(
@@ -125,7 +162,18 @@ export const EventCategoryRelationsInputUpdate = t.Partial(
         },
         { additionalProperties: false },
       ),
-      events: t.Partial(
+      calendar: t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+      syncLogs: t.Partial(
         t.Object(
           {
             connect: t.Array(
@@ -155,7 +203,7 @@ export const EventCategoryRelationsInputUpdate = t.Partial(
   ),
 );
 
-export const EventCategoryWhere = t.Partial(
+export const CalendarSubscriptionWhere = t.Partial(
   t.Recursive(
     (Self) =>
       t.Object(
@@ -165,19 +213,26 @@ export const EventCategoryWhere = t.Partial(
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
           name: t.String(),
-          color: t.String(),
+          url: t.String(),
           isActive: t.Boolean(),
+          syncIntervalMinutes: t.Integer(),
+          lastSyncAt: t.Date(),
+          lastSyncStatus: t.String(),
+          lastErrorMessage: t.String(),
+          etag: t.String(),
+          lastModified: t.String(),
           userId: t.String(),
+          calendarId: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
         { additionalProperties: false },
       ),
-    { $id: "EventCategory" },
+    { $id: "CalendarSubscription" },
   ),
 );
 
-export const EventCategoryWhereUnique = t.Recursive(
+export const CalendarSubscriptionWhereUnique = t.Recursive(
   (Self) =>
     t.Intersect(
       [
@@ -185,8 +240,8 @@ export const EventCategoryWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
-              userId_name: t.Object(
-                { userId: t.String(), name: t.String() },
+              userId_url: t.Object(
+                { userId: t.String(), url: t.String() },
                 { additionalProperties: false },
               ),
             },
@@ -198,8 +253,8 @@ export const EventCategoryWhereUnique = t.Recursive(
           [
             t.Object({ id: t.String() }),
             t.Object({
-              userId_name: t.Object(
-                { userId: t.String(), name: t.String() },
+              userId_url: t.Object(
+                { userId: t.String(), url: t.String() },
                 { additionalProperties: false },
               ),
             }),
@@ -225,9 +280,16 @@ export const EventCategoryWhereUnique = t.Recursive(
             {
               id: t.String(),
               name: t.String(),
-              color: t.String(),
+              url: t.String(),
               isActive: t.Boolean(),
+              syncIntervalMinutes: t.Integer(),
+              lastSyncAt: t.Date(),
+              lastSyncStatus: t.String(),
+              lastErrorMessage: t.String(),
+              etag: t.String(),
+              lastModified: t.String(),
               userId: t.String(),
+              calendarId: t.String(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
             },
@@ -237,19 +299,27 @@ export const EventCategoryWhereUnique = t.Recursive(
       ],
       { additionalProperties: false },
     ),
-  { $id: "EventCategory" },
+  { $id: "CalendarSubscription" },
 );
 
-export const EventCategorySelect = t.Partial(
+export const CalendarSubscriptionSelect = t.Partial(
   t.Object(
     {
       id: t.Boolean(),
       name: t.Boolean(),
-      color: t.Boolean(),
+      url: t.Boolean(),
       isActive: t.Boolean(),
+      syncIntervalMinutes: t.Boolean(),
+      lastSyncAt: t.Boolean(),
+      lastSyncStatus: t.Boolean(),
+      lastErrorMessage: t.Boolean(),
+      etag: t.Boolean(),
+      lastModified: t.Boolean(),
       userId: t.Boolean(),
       user: t.Boolean(),
-      events: t.Boolean(),
+      calendarId: t.Boolean(),
+      calendar: t.Boolean(),
+      syncLogs: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       _count: t.Boolean(),
@@ -258,14 +328,19 @@ export const EventCategorySelect = t.Partial(
   ),
 );
 
-export const EventCategoryInclude = t.Partial(
+export const CalendarSubscriptionInclude = t.Partial(
   t.Object(
-    { user: t.Boolean(), events: t.Boolean(), _count: t.Boolean() },
+    {
+      user: t.Boolean(),
+      calendar: t.Boolean(),
+      syncLogs: t.Boolean(),
+      _count: t.Boolean(),
+    },
     { additionalProperties: false },
   ),
 );
 
-export const EventCategoryOrderBy = t.Partial(
+export const CalendarSubscriptionOrderBy = t.Partial(
   t.Object(
     {
       id: t.Union([t.Literal("asc"), t.Literal("desc")], {
@@ -274,13 +349,34 @@ export const EventCategoryOrderBy = t.Partial(
       name: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
-      color: t.Union([t.Literal("asc"), t.Literal("desc")], {
+      url: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       isActive: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
+      syncIntervalMinutes: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      lastSyncAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      lastSyncStatus: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      lastErrorMessage: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      etag: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      lastModified: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
       userId: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      calendarId: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {
@@ -294,17 +390,23 @@ export const EventCategoryOrderBy = t.Partial(
   ),
 );
 
-export const EventCategory = t.Composite(
-  [EventCategoryPlain, EventCategoryRelations],
+export const CalendarSubscription = t.Composite(
+  [CalendarSubscriptionPlain, CalendarSubscriptionRelations],
   { additionalProperties: false },
 );
 
-export const EventCategoryInputCreate = t.Composite(
-  [EventCategoryPlainInputCreate, EventCategoryRelationsInputCreate],
+export const CalendarSubscriptionInputCreate = t.Composite(
+  [
+    CalendarSubscriptionPlainInputCreate,
+    CalendarSubscriptionRelationsInputCreate,
+  ],
   { additionalProperties: false },
 );
 
-export const EventCategoryInputUpdate = t.Composite(
-  [EventCategoryPlainInputUpdate, EventCategoryRelationsInputUpdate],
+export const CalendarSubscriptionInputUpdate = t.Composite(
+  [
+    CalendarSubscriptionPlainInputUpdate,
+    CalendarSubscriptionRelationsInputUpdate,
+  ],
   { additionalProperties: false },
 );

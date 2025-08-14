@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
@@ -9,6 +9,36 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
 import { PasskeySettings } from "./passkey-settings";
+import { SubscriptionManagement } from "./subscription-management";
+import {
+  AppearanceSettings,
+  NotificationSettings,
+  TimeRegionSettings,
+  CalendarDefaultsSettings,
+  AccountSettings,
+  SecuritySettings,
+  ALL_TIMEZONES,
+  WORKING_DAYS,
+  type PaletteView,
+  TransitionContainer,
+  NAVIGATION_ITEMS,
+  PRESET_COLORS,
+  formatTimeForInput,
+  validateTime,
+  timeToMinutes,
+  minutesToTime,
+  scrollToSelectedTime,
+  generateAllTimeOptions,
+  resetEventForm,
+  loadEventNotifications,
+  saveEventNotifications,
+  validateEventForm,
+  validateCalendarForm,
+  handleCalendarCreate,
+  handleCalendarUpdate,
+  handleCalendarDelete,
+  resetCalendarForm,
+} from "./command-palette/index";
 import {
   NotificationManager,
   EventNotification,
@@ -76,84 +106,6 @@ import {
   ChevronUp,
 } from "lucide-react";
 
-const TIMEZONE_GROUPS = {
-  Popular: [
-    { value: "UTC", label: "UTC (Coordinated Universal Time)" },
-    { value: "America/New_York", label: "Eastern Time (New York)" },
-    { value: "America/Chicago", label: "Central Time (Chicago)" },
-    { value: "America/Denver", label: "Mountain Time (Denver)" },
-    { value: "America/Los_Angeles", label: "Pacific Time (Los Angeles)" },
-    { value: "Europe/London", label: "London" },
-    { value: "Asia/Tokyo", label: "Tokyo" },
-  ],
-  Americas: [
-    { value: "America/Anchorage", label: "Anchorage" },
-    { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires" },
-    { value: "America/Bogota", label: "Bogotá" },
-    { value: "America/Caracas", label: "Caracas" },
-    { value: "America/Guatemala", label: "Guatemala City" },
-    { value: "America/Havana", label: "Havana" },
-    { value: "America/Lima", label: "Lima" },
-    { value: "America/Mexico_City", label: "Mexico City" },
-    { value: "America/Montevideo", label: "Montevideo" },
-    { value: "America/Santiago", label: "Santiago" },
-    { value: "America/Sao_Paulo", label: "São Paulo" },
-    { value: "America/Toronto", label: "Toronto" },
-    { value: "America/Vancouver", label: "Vancouver" },
-  ],
-  "Europe & Africa": [
-    { value: "Europe/Amsterdam", label: "Amsterdam" },
-    { value: "Europe/Berlin", label: "Berlin" },
-    { value: "Europe/Brussels", label: "Brussels" },
-    { value: "Europe/Dublin", label: "Dublin" },
-    { value: "Europe/Helsinki", label: "Helsinki" },
-    { value: "Europe/Istanbul", label: "Istanbul" },
-    { value: "Europe/Madrid", label: "Madrid" },
-    { value: "Europe/Moscow", label: "Moscow" },
-    { value: "Europe/Paris", label: "Paris" },
-    { value: "Europe/Rome", label: "Rome" },
-    { value: "Europe/Stockholm", label: "Stockholm" },
-    { value: "Europe/Vienna", label: "Vienna" },
-    { value: "Europe/Zurich", label: "Zurich" },
-    { value: "Africa/Cairo", label: "Cairo" },
-    { value: "Africa/Johannesburg", label: "Johannesburg" },
-    { value: "Africa/Lagos", label: "Lagos" },
-  ],
-  "Asia & Pacific": [
-    { value: "Asia/Bangkok", label: "Bangkok" },
-    { value: "Asia/Beijing", label: "Beijing" },
-    { value: "Asia/Calcutta", label: "Mumbai" },
-    { value: "Asia/Dubai", label: "Dubai" },
-    { value: "Asia/Hong_Kong", label: "Hong Kong" },
-    { value: "Asia/Jakarta", label: "Jakarta" },
-    { value: "Asia/Karachi", label: "Karachi" },
-    { value: "Asia/Seoul", label: "Seoul" },
-    { value: "Asia/Shanghai", label: "Shanghai" },
-    { value: "Asia/Singapore", label: "Singapore" },
-    { value: "Asia/Taipei", label: "Taipei" },
-    { value: "Asia/Tehran", label: "Tehran" },
-    { value: "Australia/Adelaide", label: "Adelaide" },
-    { value: "Australia/Brisbane", label: "Brisbane" },
-    { value: "Australia/Melbourne", label: "Melbourne" },
-    { value: "Australia/Perth", label: "Perth" },
-    { value: "Australia/Sydney", label: "Sydney" },
-    { value: "Pacific/Auckland", label: "Auckland" },
-    { value: "Pacific/Fiji", label: "Fiji" },
-    { value: "Pacific/Honolulu", label: "Honolulu" },
-  ],
-};
-
-const ALL_TIMEZONES = Object.values(TIMEZONE_GROUPS).flat();
-
-const WORKING_DAYS = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-];
 
 interface CommandPaletteProps {
   open: boolean;
@@ -163,43 +115,7 @@ interface CommandPaletteProps {
   initialView?: string;
 }
 
-type PaletteView =
-  | "main"
-  | "appearance"
-  | "time-region"
-  | "timezone"
-  | "notifications"
-  | "calendar-defaults"
-  | "account"
-  | "security"
-  | "passkeys"
-  | "calendars"
-  | "calendar-create"
-  | "calendar-edit"
-  | "events"
-  | "event-editor";
 
-// Transition wrapper for slide-fade
-function TransitionContainer({
-  direction,
-  children,
-}: {
-  direction: "forward" | "back";
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative overflow-hidden">
-      <div
-        className={[
-          "animate-slide-fade",
-          direction === "forward" ? "enter-left" : "enter-right",
-        ].join(" ")}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
 
 export function CommandPalette({
   open,
@@ -238,6 +154,7 @@ export function CommandPalette({
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null
   );
+  const [eventViewMode, setEventViewMode] = useState<'view' | 'edit'>('view');
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventStartDate, setEventStartDate] = useState<Date>(new Date());
@@ -303,13 +220,19 @@ export function CommandPalette({
         !eventToEdit.id ||
         eventToEdit.id === "" ||
         eventToEdit.id === undefined;
+      const isSynced = eventToEdit.isSynced || false;
+
       console.log("Setting up event editor:", {
         eventId: eventToEdit.id,
         isNewEvent,
+        isSynced,
         title: eventToEdit.title,
       });
 
       setSelectedEvent(eventToEdit);
+      // Set view mode: new events start in edit, existing events start in view
+      // Synced events are always read-only unless explicitly edited
+      setEventViewMode(isNewEvent ? 'edit' : 'view');
       setEventTitle(eventToEdit.title || "");
       setEventDescription(eventToEdit.description || "");
       setEventStartDate(new Date(eventToEdit.start));
@@ -323,7 +246,7 @@ export function CommandPalette({
 
       // Load notifications for existing events
       if (!isNewEvent && eventToEdit.id) {
-        loadEventNotifications(eventToEdit.id);
+        loadEventNotifications(eventToEdit.id, setEventNotifications, setNotificationsLoading);
       } else {
         // For new events, add default 15-minute email notification
         setEventNotifications([
@@ -475,56 +398,6 @@ export function CommandPalette({
     }
   };
 
-  const navigationItems = [
-    {
-      id: "events",
-      label: "Events",
-      icon: CalendarIcon,
-      description: "Create and manage events",
-    },
-    {
-      id: "calendars",
-      label: "Calendar Management",
-      icon: Calendar,
-      description: "Create, edit, and delete calendars",
-    },
-    {
-      id: "appearance",
-      label: "Appearance",
-      icon: Palette,
-      description: "Theme and layout settings",
-    },
-    {
-      id: "time-region",
-      label: "Time & Region",
-      icon: Globe,
-      description: "Timezone and format preferences",
-    },
-    {
-      id: "notifications",
-      label: "Notifications",
-      icon: Bell,
-      description: "Notification preferences",
-    },
-    {
-      id: "calendar-defaults",
-      label: "Calendar Defaults",
-      icon: Calendar,
-      description: "Default event settings",
-    },
-    {
-      id: "account",
-      label: "Account",
-      icon: User,
-      description: "Account information",
-    },
-    {
-      id: "security",
-      label: "Security",
-      icon: Shield,
-      description: "Security settings",
-    },
-  ];
 
   if (loading || !localSettings) {
     return (
@@ -545,110 +418,20 @@ export function CommandPalette({
 
   const workingDaysList = JSON.parse(localSettings.workingDays) as number[];
 
-  // Helper functions for event editing
-  const formatTimeForInput = (date: Date) => {
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes();
-    return `${hours}:${minutes.toString().padStart(2, "0")}`;
-  };
-
-  // Google-style time validation - simple and predictable
-  interface TimeValidationResult {
-    isValid: boolean;
-    time?: string;
-    error?: string;
-  }
-
-  const validateTime = (timeString: string): TimeValidationResult => {
-    if (!timeString || timeString.trim() === '') {
-      return { isValid: false, error: 'Time is required' };
-    }
-
-    // Clean the input - remove any non-digit or colon characters
-    const cleaned = timeString.replace(/[^\d:]/g, '');
-    
-    // Handle various input formats
-    let formattedTime = cleaned;
-    
-    // Convert common formats to HH:MM
-    if (/^\d{1,2}$/.test(cleaned)) {
-      // Just hours: "9" -> "09:00"
-      const hours = parseInt(cleaned, 10);
-      if (hours >= 0 && hours <= 23) {
-        formattedTime = `${hours.toString().padStart(2, '0')}:00`;
-      } else {
-        return { isValid: false, error: 'Hours must be between 0-23' };
-      }
-    } else if (/^\d{3,4}$/.test(cleaned)) {
-      // HHMM format: "930" -> "09:30" or "1430" -> "14:30"
-      let hours, minutes;
-      if (cleaned.length === 3) {
-        hours = parseInt(cleaned.slice(0, 1), 10);
-        minutes = parseInt(cleaned.slice(1), 10);
-      } else {
-        hours = parseInt(cleaned.slice(0, 2), 10);
-        minutes = parseInt(cleaned.slice(2), 10);
-      }
-      
-      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-        formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      } else {
-        return { isValid: false, error: 'Invalid time format' };
-      }
-    }
-    
-    // Validate HH:MM format
-    const timeRegex = /^(\d{1,2}):(\d{1,2})$/;
-    const match = formattedTime.match(timeRegex);
-    
-    if (!match) {
-      return { isValid: false, error: 'Use HH:MM format (e.g. 09:30)' };
-    }
-    
-    const hours = parseInt(match[1] || '0', 10);
-    const minutes = parseInt(match[2] || '0', 10);
-    
-    if (hours < 0 || hours > 23) {
-      return { isValid: false, error: 'Hours must be between 0-23' };
-    }
-    
-    if (minutes < 0 || minutes > 59) {
-      return { isValid: false, error: 'Minutes must be between 0-59' };
-    }
-    
-    return {
-      isValid: true,
-      time: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-    };
-  };
-
-  const timeToMinutes = (timeString: string): number => {
-    const [hoursStr, minutesStr] = timeString.split(':');
-    const hours = parseInt(hoursStr || '0', 10);
-    const minutes = parseInt(minutesStr || '0', 10);
-    return hours * 60 + minutes;
-  };
-
-  const minutesToTime = (totalMinutes: number): string => {
-    const normalizedMinutes = Math.max(0, totalMinutes % (24 * 60));
-    const hours = Math.floor(normalizedMinutes / 60);
-    const minutes = normalizedMinutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  };
 
 
   // Handle start time change with validation
   const handleStartTimeChange = (newStartTime: string) => {
     const validation = validateTime(newStartTime);
-    
+
     if (validation.isValid && validation.time) {
       setEventStartTime(validation.time);
       setTimeErrors(prev => ({ ...prev, start: undefined }));
-      
+
       // Auto-update end time if it's before or equal to the new start time
       const startMinutes = timeToMinutes(validation.time);
       const endMinutes = timeToMinutes(eventEndTime);
-      
+
       if (endMinutes <= startMinutes) {
         // Set end time to 1 hour after start time (Google Calendar default)
         const newEndMinutes = startMinutes + 60;
@@ -665,11 +448,11 @@ export function CommandPalette({
   // Handle end time change with validation
   const handleEndTimeChange = (newEndTime: string) => {
     const validation = validateTime(newEndTime);
-    
+
     if (validation.isValid && validation.time) {
       const startMinutes = timeToMinutes(eventStartTime);
       const endMinutes = timeToMinutes(validation.time);
-      
+
       if (endMinutes > startMinutes) {
         setEventEndTime(validation.time);
         setTimeErrors(prev => ({ ...prev, end: undefined }));
@@ -683,124 +466,20 @@ export function CommandPalette({
     }
   };
 
-  // Scroll dropdown to selected time
-  const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement | null>, selectedTime: string) => {
-    if (!dropdownRef.current) return;
-    
-    // Try to find exact match first
-    const selectedButton = dropdownRef.current.querySelector(`[data-time-value="${selectedTime}"]`) as HTMLElement;
-    if (selectedButton) {
-      selectedButton.scrollIntoView({
-        block: 'center',
-        behavior: 'instant'
-      });
-      return;
-    }
-    
-    // If no exact match, find the closest time option
-    const selectedMinutes = timeToMinutes(selectedTime);
-    
-    // Find the closest time option by rounding to nearest 15 minutes
-    const roundedMinutes = Math.floor(selectedMinutes / 15) * 15;
-    const roundedTime = minutesToTime(roundedMinutes);
-    
-    const closestButton = dropdownRef.current.querySelector(`[data-time-value="${roundedTime}"]`) as HTMLElement;
-    if (closestButton) {
-      closestButton.scrollIntoView({
-        block: 'center',
-        behavior: 'instant'
-      });
-    }
-  };
 
-  const resetEventForm = () => {
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setHours(startDate.getHours() + 1);
 
-    setSelectedEvent(null);
-    setEventTitle("");
-    setEventDescription("");
-    setEventStartDate(startDate);
-    setEventEndDate(endDate);
-    setEventStartTime("09:00");
-    setEventEndTime("10:00");
-    setEventAllDay(false);
-    setEventLocation("");
-    setEventCalendarId(calendars?.[0]?.id || "");
-    setEventReminder(null);
-    // Add default 15-minute email notification for new events
-    setEventNotifications([
-      {
-        notificationType: "email",
-        minutesBefore: 15,
-        isEnabled: true,
-      },
-    ]);
-    console.log("Event form reset for new event creation");
-  };
 
-  // Load notifications for an existing event
-  const loadEventNotifications = async (eventId: string) => {
-    if (!eventId) {
-      setEventNotifications([]);
-      return;
-    }
-
-    setNotificationsLoading(true);
-    try {
-      const response = await calendarApiService.getEventNotifications(eventId);
-      if (response.success && response.data && response.data.notifications) {
-        // Filter only email notifications and map to the expected format
-        const emailNotifications = response.data.notifications
-          .filter((n) => n.notificationType === "email")
-          .map((n) => ({
-            id: n.id,
-            notificationType: "email" as const,
-            minutesBefore: n.minutesBefore,
-            isEnabled: n.isEnabled,
-          }));
-        setEventNotifications(emailNotifications);
-      }
-    } catch (error) {
-      console.error("Failed to load event notifications:", error);
-      setEventNotifications([]);
-    } finally {
-      setNotificationsLoading(false);
-    }
-  };
-
-  const validateEventForm = () => {
-    if (!eventTitle.trim()) return "Title is required";
-    if (!eventCalendarId) return "Please select a calendar";
-
-    const start = new Date(eventStartDate);
-    const end = new Date(eventEndDate);
-
-    if (!eventAllDay) {
-      const [startHours = 0, startMinutes = 0] = eventStartTime
-        .split(":")
-        .map(Number);
-      const [endHours = 0, endMinutes = 0] = eventEndTime
-        .split(":")
-        .map(Number);
-
-      start.setHours(startHours, startMinutes, 0);
-      end.setHours(endHours, endMinutes, 0);
-    } else {
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-    }
-
-    if (isBefore(end, start)) {
-      return "End date cannot be before start date";
-    }
-
-    return null;
-  };
 
   const handleEventSave = async () => {
-    const validationError = validateEventForm();
+    const validationError = validateEventForm(
+      eventTitle,
+      eventCalendarId,
+      eventStartDate,
+      eventEndDate,
+      eventAllDay,
+      eventStartTime,
+      eventEndTime
+    );
     if (validationError) {
       toast.error(validationError);
       return;
@@ -910,7 +589,7 @@ export function CommandPalette({
         console.log("Updating existing event:", selectedEvent.id, {
           title: eventTitle,
         });
-        // Update existing event
+        // Update existing event [buildwithfern.com](https://buildwithfern.com/learn/fern-definition/types) - Example of validation in `Person` interface
         await calendarData.updateEvent(selectedEvent.id, {
           title: eventData.title,
           description: eventData.description,
@@ -951,7 +630,21 @@ export function CommandPalette({
       // Small delay to ensure optimistic updates are processed, then close palette
       setTimeout(() => {
         onOpenChange(false);
-        resetEventForm();
+        resetEventForm(calendars, {
+          setSelectedEvent,
+          setEventViewMode,
+          setEventTitle,
+          setEventDescription,
+          setEventStartDate,
+          setEventEndDate,
+          setEventStartTime,
+          setEventEndTime,
+          setEventAllDay,
+          setEventLocation,
+          setEventCalendarId,
+          setEventReminder,
+          setEventNotifications,
+        });
       }, 100);
     } catch (error: any) {
       console.error("Failed to save event:", error);
@@ -1004,7 +697,21 @@ export function CommandPalette({
       // Small delay to ensure optimistic updates are processed, then close palette
       setTimeout(() => {
         onOpenChange(false);
-        resetEventForm();
+        resetEventForm(calendars, {
+          setSelectedEvent,
+          setEventViewMode,
+          setEventTitle,
+          setEventDescription,
+          setEventStartDate,
+          setEventEndDate,
+          setEventStartTime,
+          setEventEndTime,
+          setEventAllDay,
+          setEventLocation,
+          setEventCalendarId,
+          setEventReminder,
+          setEventNotifications,
+        });
       }, 100);
     } catch (error: any) {
       console.error("Failed to delete event:", error);
@@ -1014,145 +721,6 @@ export function CommandPalette({
     }
   };
 
-  // Calendar management functions
-  const validateCalendarForm = () => {
-    const errors: { name?: string; color?: string } = {};
-
-    // Check if name is empty
-    if (!calendarName.trim()) {
-      errors.name = "Calendar name is required";
-    }
-
-    // Check name length
-    if (calendarName.trim().length > 100) {
-      errors.name = "Calendar name cannot exceed 100 characters";
-    }
-
-    // Check for duplicate names (case-insensitive)
-    const existingNames = calendars.map((cal) => cal.name.toLowerCase());
-    if (existingNames.includes(calendarName.trim().toLowerCase())) {
-      errors.name = "A calendar with this name already exists";
-    }
-
-    // Validate color format (basic hex validation)
-    const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(calendarColor);
-    if (!isHexColor) {
-      errors.color = "Please select a valid color";
-    }
-
-    return errors;
-  };
-
-  const handleCalendarCreate = async () => {
-    setCalendarValidationErrors({});
-
-    const errors = validateCalendarForm();
-    if (Object.keys(errors).length > 0) {
-      setCalendarValidationErrors(errors);
-      return;
-    }
-
-    setCalendarSaving(true);
-    try {
-      await calendarData.createCalendar({
-        name: calendarName.trim(),
-        color: calendarColor,
-        isDefault: false,
-      });
-
-      toast.success(`Calendar "${calendarName}" created`);
-      setCalendarName("");
-      setCalendarColor("#3b82f6");
-      goBack("calendars");
-    } catch (error: any) {
-      console.error("Failed to create calendar:", error);
-      if (error.message && error.message.includes("already exists")) {
-        setCalendarValidationErrors({
-          name: "A calendar with this name already exists",
-        });
-      } else {
-        toast.error("Failed to create calendar");
-      }
-    } finally {
-      setCalendarSaving(false);
-    }
-  };
-
-  const handleCalendarUpdate = async () => {
-    if (!editingCalendar) return;
-
-    setCalendarValidationErrors({});
-
-    // Validate only if name changed
-    if (calendarName !== editingCalendar.name) {
-      const existingNames = calendars
-        .filter((cal) => cal.id !== editingCalendar.id)
-        .map((cal) => cal.name.toLowerCase());
-
-      if (!calendarName.trim()) {
-        setCalendarValidationErrors({ name: "Calendar name is required" });
-        return;
-      }
-
-      if (calendarName.trim().length > 100) {
-        setCalendarValidationErrors({
-          name: "Calendar name cannot exceed 100 characters",
-        });
-        return;
-      }
-
-      if (existingNames.includes(calendarName.trim().toLowerCase())) {
-        setCalendarValidationErrors({
-          name: "A calendar with this name already exists",
-        });
-        return;
-      }
-    }
-
-    setCalendarSaving(true);
-    try {
-      await calendarData.updateCalendar(editingCalendar.id, {
-        name: calendarName.trim(),
-        color: calendarColor,
-      });
-
-      toast.success(`Calendar "${calendarName}" updated`);
-      setEditingCalendar(null);
-      goBack("calendars");
-    } catch (error: any) {
-      console.error("Failed to update calendar:", error);
-      if (error.message && error.message.includes("already exists")) {
-        setCalendarValidationErrors({
-          name: "A calendar with this name already exists",
-        });
-      } else {
-        toast.error("Failed to update calendar");
-      }
-    } finally {
-      setCalendarSaving(false);
-    }
-  };
-
-  const handleCalendarDelete = async (calendar: any) => {
-    setCalendarSaving(true);
-    try {
-      await calendarData.deleteCalendar(calendar.id);
-      toast.success(`Calendar "${calendar.name}" deleted`);
-      goBack("calendars");
-    } catch (error: any) {
-      console.error("Failed to delete calendar:", error);
-      toast.error("Failed to delete calendar");
-    } finally {
-      setCalendarSaving(false);
-    }
-  };
-
-  const resetCalendarForm = () => {
-    setCalendarName("");
-    setCalendarColor("#3b82f6");
-    setEditingCalendar(null);
-    setCalendarValidationErrors({});
-  };
 
   if (currentView === "main") {
     return (
@@ -1163,7 +731,7 @@ export function CommandPalette({
           </div>
           <CommandList>
             <CommandGroup heading="Categories">
-              {navigationItems.map((item) => (
+              {NAVIGATION_ITEMS.map((item) => (
                 <CommandItem
                   key={item.id}
                   onSelect={() => goForward(item.id as PaletteView)}
@@ -1190,503 +758,87 @@ export function CommandPalette({
 
   if (currentView === "appearance") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("main")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">
-              Appearance
-            </h2>
-          </div>
-          <CommandList>
-            <CommandGroup heading="Theme">
-              <CommandItem
-                onSelect={() => updateSetting("theme", "light")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Sun className="mr-3 h-4 w-4 text-amber-500" />
-                <span className="text-foreground">Light Theme</span>
-                {localSettings.theme === "light" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => updateSetting("theme", "dark")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Moon className="mr-3 h-4 w-4 text-slate-400" />
-                <span className="text-foreground">Dark Theme</span>
-                {localSettings.theme === "dark" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => updateSetting("theme", "system")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Monitor className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">System Theme</span>
-                {localSettings.theme === "system" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            </CommandGroup>
-
-            <CommandGroup heading="Default View">
-              <CommandItem
-                onSelect={() => updateSetting("defaultView", "month")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Month View</span>
-                {localSettings.defaultView === "month" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => updateSetting("defaultView", "week")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Week View</span>
-                {localSettings.defaultView === "week" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => updateSetting("defaultView", "day")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Day View</span>
-                {localSettings.defaultView === "day" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => updateSetting("defaultView", "agenda")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Agenda View</span>
-                {localSettings.defaultView === "agenda" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            </CommandGroup>
-
-            <CommandGroup heading="Display Options">
-              <CommandItem
-                onSelect={() =>
-                  updateSetting("compactView", !localSettings.compactView)
-                }
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Eye className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">Compact View</span>
-                <Switch
-                  checked={localSettings.compactView}
-                  className="ml-auto"
-                />
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
+      <AppearanceSettings
+        open={open}
+        onOpenChange={onOpenChange}
+        localSettings={localSettings}
+        updateSetting={updateSetting}
+        goBack={goBack}
+        TransitionContainer={TransitionContainer}
+        transitionDirection={transitionDirection}
+      />
     );
   }
 
   if (currentView === "notifications") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("main")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">
-              Notifications
-            </h2>
-          </div>
-          <CommandList>
-            <CommandGroup heading="Notification Types">
-              <CommandItem
-                onSelect={() =>
-                  updateSetting(
-                    "emailNotifications",
-                    !localSettings.emailNotifications
-                  )
-                }
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Mail className="mr-3 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span className="text-foreground">Email Notifications</span>
-                  <span className="text-xs text-muted-foreground">
-                    Receive event reminders via email
-                  </span>
-                </div>
-                <Switch
-                  checked={localSettings.emailNotifications}
-                  className="ml-auto"
-                />
-              </CommandItem>
-            </CommandGroup>
-
-            <CommandGroup heading="Default Reminder">
-              <div className="px-4 py-3">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex flex-col">
-                      <Label className="text-sm font-medium text-foreground">
-                        Default Reminder Time (minutes)
-                      </Label>
-                      <span className="text-xs text-muted-foreground">
-                        Leave empty for no default reminder
-                      </span>
-                    </div>
-                  </div>
-                  <Input
-                    type="number"
-                    value={localSettings.defaultReminder || ""}
-                    onChange={(e) =>
-                      updateSetting(
-                        "defaultReminder",
-                        e.target.value ? parseInt(e.target.value) : null
-                      )
-                    }
-                    placeholder="No default reminder"
-                    min={1}
-                    max={43200}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </CommandGroup>
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
+      <NotificationSettings
+        open={open}
+        onOpenChange={onOpenChange}
+        localSettings={localSettings}
+        updateSetting={updateSetting}
+        goBack={goBack}
+        TransitionContainer={TransitionContainer}
+        transitionDirection={transitionDirection}
+      />
     );
   }
 
-  if (currentView === "time-region") {
+  if (currentView === "time-region" || currentView === "timezone") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("main")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">
-              Time & Region
-            </h2>
-          </div>
-          <CommandList>
-            <CommandGroup heading="Timezone">
-              <CommandItem
-                onSelect={() => goForward("timezone")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span className="text-foreground">Timezone</span>
-                  <span className="text-xs text-muted-foreground">
-                    {ALL_TIMEZONES.find(
-                      (tz) => tz.value === localSettings.timezone
-                    )?.label || localSettings.timezone}
-                  </span>
-                </div>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-              </CommandItem>
-            </CommandGroup>
-
-            <CommandGroup heading="Time Format">
-              <CommandItem
-                onSelect={() => updateSetting("timeFormat", "12h")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Clock className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">12 Hour (1:00 PM)</span>
-                {localSettings.timeFormat === "12h" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => updateSetting("timeFormat", "24h")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Clock className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">24 Hour (13:00)</span>
-                {localSettings.timeFormat === "24h" && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
-    );
-  }
-
-  if (currentView === "timezone") {
-    return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("time-region")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">Timezone</h2>
-          </div>
-          <div className="bg-muted/30 border-b border-border focus-within:ring-0">
-            <input
-              type="text"
-              placeholder="Search timezones..."
-              value={timezoneSearch}
-              onChange={(e) => setTimezoneSearch(e.target.value)}
-              className="w-full px-4 py-3 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
-          <CommandList>
-            {timezoneSearch ? (
-              <CommandGroup heading="Search Results">
-                {ALL_TIMEZONES.filter(
-                  (tz) =>
-                    tz.label
-                      .toLowerCase()
-                      .includes(timezoneSearch.toLowerCase()) ||
-                    tz.value
-                      .toLowerCase()
-                      .includes(timezoneSearch.toLowerCase())
-                )
-                  .slice(0, 20)
-                  .map((tz) => (
-                    <CommandItem
-                      key={tz.value}
-                      onSelect={() => {
-                        updateSetting("timezone", tz.value);
-                        setTimezoneSearch("");
-                        goBack("time-region");
-                      }}
-                      className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                    >
-                      <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-                      <div className="flex flex-col">
-                        <span className="text-foreground">{tz.label}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {tz.value}
-                        </span>
-                      </div>
-                      {localSettings.timezone === tz.value && (
-                        <Check className="ml-auto h-4 w-4 text-primary" />
-                      )}
-                    </CommandItem>
-                  ))}
-              </CommandGroup>
-            ) : (
-              Object.entries(TIMEZONE_GROUPS).map(([groupName, timezones]) => (
-                <CommandGroup key={groupName} heading={groupName}>
-                  {timezones.map((tz) => (
-                    <CommandItem
-                      key={tz.value}
-                      onSelect={() => {
-                        updateSetting("timezone", tz.value);
-                        goBack("time-region");
-                      }}
-                      className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                    >
-                      <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
-                      <div className="flex flex-col">
-                        <span className="text-foreground">{tz.label}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {tz.value}
-                        </span>
-                      </div>
-                      {localSettings.timezone === tz.value && (
-                        <Check className="ml-auto h-4 w-4 text-primary" />
-                      )}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              ))
-            )}
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
+      <TimeRegionSettings
+        open={open}
+        onOpenChange={onOpenChange}
+        localSettings={localSettings}
+        updateSetting={updateSetting}
+        goBack={goBack}
+        goForward={goForward}
+        currentView={currentView}
+        TransitionContainer={TransitionContainer}
+        transitionDirection={transitionDirection}
+      />
     );
   }
 
   if (currentView === "calendar-defaults") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("main")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">
-              Calendar Defaults
-            </h2>
-          </div>
-          <CommandList>
-            <CommandGroup heading="Week Settings">
-              {WORKING_DAYS.map((day) => (
-                <CommandItem
-                  key={day.value}
-                  onSelect={() => updateSetting("weekStartDay", day.value)}
-                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                >
-                  <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
-                  <span className="text-foreground">
-                    Week starts on {day.label}
-                  </span>
-                  {localSettings.weekStartDay === day.value && (
-                    <Check className="ml-auto h-4 w-4 text-primary" />
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-
-            <CommandGroup heading="Working Days">
-              {WORKING_DAYS.map((day) => (
-                <CommandItem
-                  key={day.value}
-                  onSelect={() => {
-                    const currentWorkingDays = [...workingDaysList];
-                    const dayIndex = currentWorkingDays.indexOf(day.value);
-                    if (dayIndex > -1) {
-                      currentWorkingDays.splice(dayIndex, 1);
-                    } else {
-                      currentWorkingDays.push(day.value);
-                    }
-                    updateSetting(
-                      "workingDays",
-                      JSON.stringify(currentWorkingDays.sort())
-                    );
-                  }}
-                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                >
-                  <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
-                  <span className="text-foreground">{day.label}</span>
-                  {workingDaysList.includes(day.value) && (
-                    <Check className="ml-auto h-4 w-4 text-primary" />
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
+      <CalendarDefaultsSettings
+        open={open}
+        onOpenChange={onOpenChange}
+        localSettings={localSettings}
+        updateSetting={updateSetting}
+        goBack={goBack}
+        workingDaysList={workingDaysList}
+        TransitionContainer={TransitionContainer}
+        transitionDirection={transitionDirection}
+      />
     );
   }
 
   if (currentView === "account") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("main")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">Account</h2>
-          </div>
-          <CommandList>
-            {!showResetConfirm ? (
-              <CommandGroup heading="Danger Zone">
-                <CommandItem
-                  onSelect={() => setShowResetConfirm(true)}
-                  disabled={saving}
-                  className="px-4 py-3 hover:bg-destructive/10 data-[selected=true]:bg-destructive/15 text-destructive"
-                >
-                  <RotateCcw className="mr-3 h-4 w-4" />
-                  <span>Reset to Defaults</span>
-                </CommandItem>
-              </CommandGroup>
-            ) : (
-              <CommandGroup heading="Confirm Reset">
-                <div className="px-4 py-3 text-sm text-muted-foreground">
-                  This will reset all your settings to their default values.
-                  This action cannot be undone.
-                </div>
-                <CommandItem
-                  onSelect={() => {
-                    handleReset();
-                    setShowResetConfirm(false);
-                  }}
-                  disabled={saving}
-                  className="px-4 py-3 hover:bg-destructive/20 data-[selected=true]:bg-destructive/25 text-destructive"
-                >
-                  <Check className="mr-3 h-4 w-4" />
-                  <span>Yes, Reset Everything</span>
-                </CommandItem>
-                <CommandItem
-                  onSelect={() => setShowResetConfirm(false)}
-                  className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-                >
-                  <X className="mr-3 h-4 w-4 text-muted-foreground" />
-                  <span className="text-foreground">Cancel</span>
-                </CommandItem>
-              </CommandGroup>
-            )}
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
+      <AccountSettings
+        open={open}
+        onOpenChange={onOpenChange}
+        goBack={goBack}
+        saving={saving}
+        handleReset={handleReset}
+        TransitionContainer={TransitionContainer}
+        transitionDirection={transitionDirection}
+      />
     );
   }
 
   if (currentView === "security") {
     return (
-      <CommandDialog open={open} onOpenChange={onOpenChange}>
-        <TransitionContainer direction={transitionDirection}>
-          <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-            <button
-              onClick={() => goBack("main")}
-              className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <h2 className="text-lg font-semibold text-foreground">Security</h2>
-          </div>
-          <CommandList>
-            <CommandGroup heading="Authentication">
-              <CommandItem
-                onSelect={() => goForward("passkeys")}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Key className="mr-3 h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span className="text-foreground">Passkeys</span>
-                  <span className="text-xs text-muted-foreground">
-                    Manage passwordless authentication
-                  </span>
-                </div>
-                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </TransitionContainer>
-      </CommandDialog>
+      <SecuritySettings
+        open={open}
+        onOpenChange={onOpenChange}
+        goBack={goBack}
+        goForward={goForward}
+        TransitionContainer={TransitionContainer}
+        transitionDirection={transitionDirection}
+      />
     );
   }
 
@@ -1700,21 +852,17 @@ export function CommandPalette({
     );
   }
 
+  if (currentView === "subscriptions") {
+    return (
+      <SubscriptionManagement
+        open={open}
+        onOpenChange={onOpenChange}
+        onBack={() => goBack("calendars")}
+      />
+    );
+  }
+
   if (currentView === "calendars") {
-    const PRESET_COLORS = [
-      "#3b82f6",
-      "#10b981",
-      "#f59e0b",
-      "#8b5cf6",
-      "#f43f5e",
-      "#ef4444",
-      "#06b6d4",
-      "#84cc16",
-      "#f97316",
-      "#6366f1",
-      "#ec4899",
-      "#14b8a6",
-    ];
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -1734,13 +882,29 @@ export function CommandPalette({
             <CommandGroup heading="Actions">
               <CommandItem
                 onSelect={() => {
-                  resetCalendarForm();
+                  resetCalendarForm({
+                    setCalendarName,
+                    setCalendarColor,
+                    setEditingCalendar,
+                    setCalendarValidationErrors,
+                  });
                   goForward("calendar-create");
                 }}
                 className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
               >
                 <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
                 <span className="text-foreground">Create New Calendar</span>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+              </CommandItem>
+
+              <CommandItem
+                onSelect={() => {
+                  goForward("subscriptions");
+                }}
+                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+              >
+                <Globe className="mr-3 h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Subscribe to External Calendar</span>
                 <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
               </CommandItem>
             </CommandGroup>
@@ -1781,20 +945,6 @@ export function CommandPalette({
   }
 
   if (currentView === "calendar-create") {
-    const PRESET_COLORS = [
-      "#3b82f6",
-      "#10b981",
-      "#f59e0b",
-      "#8b5cf6",
-      "#f43f5e",
-      "#ef4444",
-      "#06b6d4",
-      "#84cc16",
-      "#f97316",
-      "#6366f1",
-      "#ec4899",
-      "#14b8a6",
-    ];
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -1892,7 +1042,19 @@ export function CommandPalette({
                 Cancel
               </Button>
               <Button
-                onClick={handleCalendarCreate}
+                onClick={() => handleCalendarCreate(
+                  calendarName,
+                  calendarColor,
+                  calendars,
+                  calendarData,
+                  {
+                    setCalendarValidationErrors,
+                    setCalendarSaving,
+                    setCalendarName,
+                    setCalendarColor,
+                  },
+                  goBack
+                )}
                 disabled={calendarSaving || !calendarName.trim()}
               >
                 {calendarSaving ? (
@@ -1915,20 +1077,6 @@ export function CommandPalette({
   }
 
   if (currentView === "calendar-edit") {
-    const PRESET_COLORS = [
-      "#3b82f6",
-      "#10b981",
-      "#f59e0b",
-      "#8b5cf6",
-      "#f43f5e",
-      "#ef4444",
-      "#06b6d4",
-      "#84cc16",
-      "#f97316",
-      "#6366f1",
-      "#ec4899",
-      "#14b8a6",
-    ];
 
     return (
       <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -2021,7 +1169,12 @@ export function CommandPalette({
               {editingCalendar && (
                 <Button
                   variant="outline"
-                  onClick={() => handleCalendarDelete(editingCalendar)}
+                  onClick={() => handleCalendarDelete(
+                    editingCalendar,
+                    calendarData,
+                    setCalendarSaving,
+                    goBack
+                  )}
                   disabled={calendarSaving}
                   className="text-destructive hover:text-destructive"
                 >
@@ -2042,7 +1195,19 @@ export function CommandPalette({
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleCalendarUpdate}
+                  onClick={() => handleCalendarUpdate(
+                    calendarName,
+                    calendarColor,
+                    calendars,
+                    editingCalendar,
+                    calendarData,
+                    {
+                      setCalendarValidationErrors,
+                      setCalendarSaving,
+                      setEditingCalendar,
+                    },
+                    goBack
+                  )}
                   disabled={calendarSaving || !calendarName.trim()}
                 >
                   {calendarSaving ? (
@@ -2082,7 +1247,21 @@ export function CommandPalette({
             <CommandGroup heading="Actions">
               <CommandItem
                 onSelect={() => {
-                  resetEventForm();
+                  resetEventForm(calendars, {
+          setSelectedEvent,
+          setEventViewMode,
+          setEventTitle,
+          setEventDescription,
+          setEventStartDate,
+          setEventEndDate,
+          setEventStartTime,
+          setEventEndTime,
+          setEventAllDay,
+          setEventLocation,
+          setEventCalendarId,
+          setEventReminder,
+          setEventNotifications,
+        });
                   goForward("event-editor");
                 }}
                 className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
@@ -2098,29 +1277,9 @@ export function CommandPalette({
     );
   }
 
-  // Generate all time options for the dropdown (full day)
-  const generateAllTimeOptions = () => {
-    const options = [];
-    
-    for (let hour = 0; hour <= 23; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        const formattedHour = hour.toString().padStart(2, "0");
-        const formattedMinute = minute.toString().padStart(2, "0");
-        const value = `${formattedHour}:${formattedMinute}`;
-        const date = new Date(2000, 0, 1, hour, minute);
-        const label =
-          localSettings?.timeFormat === "24h"
-            ? `${formattedHour}:${formattedMinute}`
-            : format(date, "h:mm a");
-        options.push({ value, label });
-      }
-    }
-    return options;
-  };
-  
   // Generate all time options once
-  const allTimeOptions = generateAllTimeOptions();
-  
+  const allTimeOptions = generateAllTimeOptions(localSettings?.timeFormat);
+
   if (currentView === "event-editor") {
 
     return (
@@ -2133,472 +1292,609 @@ export function CommandPalette({
             >
               <ArrowLeft className="h-4 w-4 text-foreground" />
             </button>
-            <div>
+            <div className="flex-1">
               <h2 className="text-xl font-bold text-foreground">
-                {selectedEvent?.id ? "Edit Event" : "Create New Event"}
+                {!selectedEvent?.id ? "Create New Event" :
+                 eventViewMode === 'view' ? selectedEvent.title : "Edit Event"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {selectedEvent?.id ? "Make changes to your event" : "Add an event to your calendar"}
+                {!selectedEvent?.id ? "Add an event to your calendar" :
+                 selectedEvent.isSynced && eventViewMode === 'view' ? "Synced from external calendar" :
+                 eventViewMode === 'view' ? "Event details" :
+                 "Make changes to your event"}
               </p>
             </div>
+
+            {/* Edit button for view mode */}
+            {selectedEvent?.id && eventViewMode === 'view' && !selectedEvent.isSynced && (
+              <Button
+                onClick={() => setEventViewMode('edit')}
+                variant="outline"
+                size="sm"
+                className="ml-4"
+              >
+                <Edit3 className="h-4 w-4 mr-2" />
+                Edit Event
+              </Button>
+            )}
           </div>
 
           <div className="max-h-[80vh] overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Title */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="event-title"
-                  className="flex items-center gap-2 text-sm font-medium"
-                >
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  Event Title
-                </Label>
-                <Input
-                  id="event-title"
-                  value={eventTitle}
-                  onChange={(e) => setEventTitle(e.target.value)}
-                  placeholder="What's the event about?"
-                  className="border-2 hover:border-primary/50 focus:border-primary transition-colors text-base"
-                  autoFocus
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="event-description" className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Textarea
-                  id="event-description"
-                  value={eventDescription}
-                  onChange={(e) => setEventDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Add more details about your event..."
-                  className="border-2 hover:border-primary/50 focus:border-primary transition-colors resize-none"
-                />
-              </div>
-
-              {/* Calendar Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="event-calendar" className="text-sm font-medium flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: calendars.find(c => c.id === eventCalendarId)?.color || '#3b82f6' }}></div>
-                  Calendar
-                </Label>
-                <Select
-                  value={eventCalendarId}
-                  onValueChange={setEventCalendarId}
-                >
-                  <SelectTrigger id="event-calendar" className="border-2 hover:border-primary/50 focus:border-primary transition-colors">
-                    <SelectValue placeholder="Choose which calendar to save to" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {calendars.map((calendar) => (
-                      <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="size-3 rounded-full border border-white/20"
-                            style={{ backgroundColor: calendar.color }}
-                          />
-                          <span>{calendar.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date and Time - Google Material Design Style */}
-              <div className="space-y-6">
-                {/* Date Row */}
-                <div className="grid grid-cols-2 gap-4">
+              {eventViewMode === 'view' ? (
+                /* VIEW MODE - Read-only display */
+                <>
+                  {/* Title */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">Start Date</Label>
-                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between px-3 py-2.5 font-normal border-2 hover:border-primary/50 focus:border-primary transition-colors"
-                        >
-                          <span className="text-sm">
-                            {eventStartDate
-                              ? format(eventStartDate, "EEE, MMM d")
-                              : "Pick a date"}
-                          </span>
-                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarUI
-                          mode="single"
-                          selected={eventStartDate}
-                          onSelect={(date) => {
-                            if (date) {
-                              setEventStartDate(date);
-                              if (isBefore(eventEndDate, date))
-                                setEventEndDate(date);
-                              setStartDateOpen(false);
-                            }
-                          }}
-                          className="rounded-md border shadow-md"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">End Date</Label>
-                    <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between px-3 py-2.5 font-normal border-2 hover:border-primary/50 focus:border-primary transition-colors"
-                        >
-                          <span className="text-sm">
-                            {eventEndDate
-                              ? format(eventEndDate, "EEE, MMM d")
-                              : "Pick a date"}
-                          </span>
-                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarUI
-                          mode="single"
-                          selected={eventEndDate}
-                          disabled={{ before: eventStartDate }}
-                          onSelect={(date) => {
-                            if (date) {
-                              setEventEndDate(date);
-                              setEndDateOpen(false);
-                            }
-                          }}
-                          className="rounded-md border shadow-md"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                {/* Time Row */}
-                {!eventAllDay && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 relative">
-                      <Label className="text-sm font-medium text-foreground">Start Time</Label>
-                      <div className="relative">
-                        <Input
-                          value={eventStartTime}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setEventStartTime(value);
-                          }}
-                          onFocus={() => setStartTimeOpen(true)}
-                          onBlur={(e) => {
-                            // Small delay to allow dropdown clicks to register
-                            setTimeout(() => {
-                              const value = e.target.value;
-                              handleStartTimeChange(value);
-                              setStartTimeOpen(false);
-                            }, 150);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const value = e.currentTarget.value;
-                              handleStartTimeChange(value);
-                              setStartTimeOpen(false);
-                              e.currentTarget.blur();
-                            } else if (e.key === "Escape") {
-                              setStartTimeOpen(false);
-                              e.currentTarget.blur();
-                            }
-                          }}
-                          placeholder="09:00 or type time"
-                          className={`pr-10 border-2 transition-colors ${
-                            timeErrors.start 
-                              ? 'border-destructive focus:border-destructive' 
-                              : 'hover:border-primary/50 focus:border-primary'
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Scroll to the selected time when opening
-                            if (!startTimeOpen) {
-                              setTimeout(() => scrollToSelectedTime(startTimeDropdownRef, eventStartTime), 0);
-                            }
-                            setStartTimeOpen(!startTimeOpen);
-                          }}
-                          className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md"
-                        >
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                      {startTimeOpen && (
-                        <div 
-                          ref={startTimeDropdownRef}
-                          className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
-                        >
-                          {allTimeOptions.map((option) => (
-                            <button
-                              key={option.value}
-                              type="button"
-                              data-time-value={option.value}
-                              className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
-                                option.value === eventStartTime ? 'bg-accent text-accent-foreground font-medium' : ''
-                              }`}
-                              onClick={() => {
-                                handleStartTimeChange(option.value);
-                                setStartTimeOpen(false);
-                              }}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
+                    <Label className="flex items-center gap-2 text-sm font-medium">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      Event Title
+                      {selectedEvent?.isSynced && (
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                          Synced
+                        </span>
                       )}
-                      {timeErrors.start && (
-                        <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                          <span className="inline-block w-3 h-3 rounded-full bg-destructive/20 flex items-center justify-center">
-                            <span className="text-[8px] text-destructive font-bold">!</span>
-                          </span>
-                          {timeErrors.start}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 relative">
-                      <Label className="text-sm font-medium text-foreground">End Time</Label>
-                      <div className="relative">
-                        <Input
-                          value={eventEndTime}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setEventEndTime(value);
-                          }}
-                          onFocus={() => setEndTimeOpen(true)}
-                          onBlur={(e) => {
-                            // Small delay to allow dropdown clicks to register
-                            setTimeout(() => {
-                              const value = e.target.value;
-                              handleEndTimeChange(value);
-                              setEndTimeOpen(false);
-                            }, 150);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const value = e.currentTarget.value;
-                              handleEndTimeChange(value);
-                              setEndTimeOpen(false);
-                              e.currentTarget.blur();
-                            } else if (e.key === "Escape") {
-                              setEndTimeOpen(false);
-                              e.currentTarget.blur();
-                            }
-                          }}
-                          placeholder="10:00 or type time"
-                          className={`pr-10 border-2 transition-colors ${
-                            timeErrors.end 
-                              ? 'border-destructive focus:border-destructive' 
-                              : 'hover:border-primary/50 focus:border-primary'
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Scroll to the selected time when opening
-                            if (!endTimeOpen) {
-                              setTimeout(() => scrollToSelectedTime(endTimeDropdownRef, eventEndTime), 0);
-                            }
-                            setEndTimeOpen(!endTimeOpen);
-                          }}
-                          className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md"
-                        >
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                      {endTimeOpen && (
-                        <div 
-                          ref={endTimeDropdownRef}
-                          className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
-                        >
-                          {allTimeOptions
-                            .filter((option) => {
-                              // Only show times after the start time
-                              const startMinutes = timeToMinutes(eventStartTime);
-                              const optionMinutes = timeToMinutes(option.value);
-                              return optionMinutes > startMinutes;
-                            })
-                            .map((option) => (
-                              <button
-                                key={option.value}
-                                type="button"
-                                data-time-value={option.value}
-                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
-                                  option.value === eventEndTime ? 'bg-accent text-accent-foreground font-medium' : ''
-                                }`}
-                                onClick={() => {
-                                  handleEndTimeChange(option.value);
-                                  setEndTimeOpen(false);
-                                }}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                      {timeErrors.end && (
-                        <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                          <span className="inline-block w-3 h-3 rounded-full bg-destructive/20 flex items-center justify-center">
-                            <span className="text-[8px] text-destructive font-bold">!</span>
-                          </span>
-                          {timeErrors.end}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* All Day Toggle - Simple and intuitive */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="all-day"
-                      checked={eventAllDay}
-                      onCheckedChange={(checked) => {
-                        setEventAllDay(checked === true);
-                        // Clear time errors when switching to all-day
-                        if (checked) {
-                          setTimeErrors({});
-                        }
-                      }}
-                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                    />
-                    <Label htmlFor="all-day" className="text-sm font-medium cursor-pointer">
-                      All day event
                     </Label>
+                    <div className="p-3 bg-muted/50 rounded-md border">
+                      <p className="text-base">{eventTitle || "Untitled Event"}</p>
+                    </div>
                   </div>
-                  {eventAllDay && (
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                      No specific times
-                    </span>
+
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Description</Label>
+                    <div className="p-3 bg-muted/50 rounded-md border min-h-[60px]">
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {eventDescription || "No description provided"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Date and Time */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2 text-sm font-medium">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      Date & Time
+                    </Label>
+                    <div className="p-3 bg-muted/50 rounded-md border space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {format(eventStartDate, "EEEE, MMMM d, yyyy")}
+                          </p>
+                          {!eventAllDay && (
+                            <p className="text-sm text-muted-foreground">
+                              {eventStartTime} - {eventEndTime}
+                            </p>
+                          )}
+                          {eventAllDay && (
+                            <p className="text-sm text-muted-foreground">All day</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  {eventLocation && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        Location
+                      </Label>
+                      <div className="p-3 bg-muted/50 rounded-md border">
+                        <p className="text-sm">{eventLocation}</p>
+                      </div>
+                    </div>
                   )}
-                </div>
-              </div>
 
-              {/* Location */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="event-location"
-                  className="flex items-center gap-2 text-sm font-medium"
-                >
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  Location <span className="text-muted-foreground font-normal">(optional)</span>
-                </Label>
-                <Input
-                  id="event-location"
-                  value={eventLocation}
-                  onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="Where is this happening?"
-                  className="border-2 hover:border-primary/50 focus:border-primary transition-colors"
-                />
-              </div>
+                  {/* Calendar */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: calendars.find(c => c.id === eventCalendarId)?.color || '#3b82f6' }}></div>
+                      Calendar
+                    </Label>
+                    <div className="p-3 bg-muted/50 rounded-md border">
+                      <p className="text-sm">{calendars.find(c => c.id === eventCalendarId)?.name || "Unknown Calendar"}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* EDIT MODE - Editable form */
+                <>
+                  {/* Title */}
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="event-title"
+                      className="flex items-center gap-2 text-sm font-medium"
+                    >
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      Event Title
+                    </Label>
+                    <Input
+                      id="event-title"
+                      value={eventTitle}
+                      onChange={(e) => setEventTitle(e.target.value)}
+                      placeholder="What's the event about?"
+                      className="border-2 hover:border-primary/50 focus:border-primary transition-colors text-base"
+                      autoFocus // [academy.posh.vip](https://academy.posh.vip/edit-your-event-details) - Event title can be edited here
+                    />
+                  </div>
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="event-description" className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Textarea
+                      id="event-description"
+                      value={eventDescription}
+                      onChange={(e) => setEventDescription(e.target.value)}
+                      rows={2}
+                      placeholder="Add more details about your event..."
+                      className="border-2 hover:border-primary/50 focus:border-primary transition-colors resize-none"
+                    />
+                  </div>
 
+                  {/* Calendar Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="event-calendar" className="text-sm font-medium flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: calendars.find(c => c.id === eventCalendarId)?.color || '#3b82f6' }}></div>
+                      Calendar
+                    </Label>
+                    <Select
+                      value={eventCalendarId}
+                      onValueChange={setEventCalendarId}
+                    >
+                      <SelectTrigger id="event-calendar" className="border-2 hover:border-primary/50 focus:border-primary transition-colors">
+                        <SelectValue placeholder="Choose which calendar to save to" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {calendars.map((calendar) => (
+                          <SelectItem key={calendar.id} value={calendar.id} className="cursor-pointer">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="size-3 rounded-full border border-white/20"
+                                style={{ backgroundColor: calendar.color }}
+                              />
+                              <span>{calendar.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
+                  {/* Date and Time - Google Material Design Style */}
+                  <div className="space-y-6">
+                    {/* Date Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-foreground">Start Date</Label>
+                        <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between px-3 py-2.5 font-normal border-2 hover:border-primary/50 focus:border-primary transition-colors"
+                            >
+                              <span className="text-sm">
+                                {eventStartDate
+                                  ? format(eventStartDate, "EEE, MMM d")
+                                  : "Pick a date"}
+                              </span>
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarUI
+                              mode="single"
+                              selected={eventStartDate}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setEventStartDate(date);
+                                  if (isBefore(eventEndDate, date))
+                                    setEventEndDate(date);
+                                  setStartDateOpen(false);
+                                }
+                              }}
+                              className="rounded-md border shadow-md"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
 
-              {/* Email Notifications */}
-              <div className="space-y-2">
-                <div className="border rounded-lg overflow-hidden transition-all duration-200 hover:shadow-sm bg-gradient-to-br from-card/50 to-card/30">
-                  <button
-                    type="button"
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent/20 transition-colors duration-150"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Bell className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium text-foreground">
-                        Email Notifications
-                      </span>
-                      {eventNotifications.length > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                          {eventNotifications.length}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-foreground">End Date</Label>
+                        <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between px-3 py-2.5 font-normal border-2 hover:border-primary/50 focus:border-primary transition-colors"
+                            >
+                              <span className="text-sm">
+                                {eventEndDate
+                                  ? format(eventEndDate, "EEE, MMM d")
+                                  : "Pick a date"}
+                              </span>
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarUI
+                              mode="single"
+                              selected={eventEndDate}
+                              disabled={{ before: eventStartDate }}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setEventEndDate(date);
+                                  setEndDateOpen(false);
+                                }
+                              }}
+                              className="rounded-md border shadow-md"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+
+                    {/* Time Row */}
+                    {!eventAllDay && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2 relative">
+                          <Label className="text-sm font-medium text-foreground">Start Time</Label>
+                          <div className="relative">
+                            <Input
+                              value={eventStartTime}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setEventStartTime(value);
+                              }}
+                              onFocus={() => setStartTimeOpen(true)}
+                              onBlur={(e) => {
+                                // Small delay to allow dropdown clicks to register
+                                setTimeout(() => {
+                                  const value = e.target.value;
+                                  handleStartTimeChange(value);
+                                  setStartTimeOpen(false);
+                                }, 150);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const value = e.currentTarget.value;
+                                  handleStartTimeChange(value);
+                                  setStartTimeOpen(false);
+                                  e.currentTarget.blur();
+                                } else if (e.key === "Escape") {
+                                  setStartTimeOpen(false);
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              placeholder="09:00 or type time"
+                              className={`pr-10 border-2 transition-colors ${
+                                timeErrors.start
+                                  ? 'border-destructive focus:border-destructive'
+                                  : 'hover:border-primary/50 focus:border-primary'
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Scroll to the selected time when opening
+                                if (!startTimeOpen) {
+                                  setTimeout(() => scrollToSelectedTime(startTimeDropdownRef, eventStartTime), 0);
+                                }
+                                setStartTimeOpen(!startTimeOpen);
+                              }}
+                              className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md"
+                            >
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </div>
+                          {startTimeOpen && (
+                            <div
+                              ref={startTimeDropdownRef}
+                              className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
+                            >
+                              {allTimeOptions.map((option) => (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  data-time-value={option.value}
+                                  className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
+                                    option.value === eventStartTime ? 'bg-accent text-accent-foreground font-medium' : ''
+                                  }`}
+                                  onClick={() => {
+                                    handleStartTimeChange(option.value);
+                                    setStartTimeOpen(false);
+                                  }}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {timeErrors.start && (
+                            <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                              <span className="inline-block w-3 h-3 rounded-full bg-destructive/20 flex items-center justify-center">
+                                <span className="text-[8px] text-destructive font-bold">!</span>
+                              </span>
+                              {timeErrors.start}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 relative">
+                          <Label className="text-sm font-medium text-foreground">End Time</Label>
+                          <div className="relative">
+                            <Input
+                              value={eventEndTime}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setEventEndTime(value);
+                              }}
+                              onFocus={() => setEndTimeOpen(true)}
+                              onBlur={(e) => {
+                                // Small delay to allow dropdown clicks to register
+                                setTimeout(() => {
+                                  const value = e.target.value;
+                                  handleEndTimeChange(value);
+                                  setEndTimeOpen(false);
+                                }, 150);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const value = e.currentTarget.value;
+                                  handleEndTimeChange(value);
+                                  setEndTimeOpen(false);
+                                  e.currentTarget.blur();
+                                } else if (e.key === "Escape") {
+                                  setEndTimeOpen(false);
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              placeholder="10:00 or type time"
+                              className={`pr-10 border-2 transition-colors ${
+                                timeErrors.end
+                                  ? 'border-destructive focus:border-destructive'
+                                  : 'hover:border-primary/50 focus:border-primary'
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Scroll to the selected time when opening
+                                if (!endTimeOpen) {
+                                  setTimeout(() => scrollToSelectedTime(endTimeDropdownRef, eventEndTime), 0);
+                                }
+                                setEndTimeOpen(!endTimeOpen);
+                              }}
+                              className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md"
+                            >
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </div>
+                          {endTimeOpen && (
+                            <div
+                              ref={endTimeDropdownRef}
+                              className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
+                            >
+                              {allTimeOptions
+                                .filter((option) => {
+                                  // Only show times after the start time
+                                  const startMinutes = timeToMinutes(eventStartTime);
+                                  const optionMinutes = timeToMinutes(option.value);
+                                  return optionMinutes > startMinutes;
+                                })
+                                .map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    data-time-value={option.value}
+                                    className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
+                                      option.value === eventEndTime ? 'bg-accent text-accent-foreground font-medium' : ''
+                                    }`}
+                                    onClick={() => {
+                                      handleEndTimeChange(option.value);
+                                      setEndTimeOpen(false);
+                                    }}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                          {timeErrors.end && (
+                            <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                              <span className="inline-block w-3 h-3 rounded-full bg-destructive/20 flex items-center justify-center">
+                                <span className="text-[8px] text-destructive font-bold">!</span>
+                              </span>
+                              {timeErrors.end}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* All Day Toggle - Simple and intuitive */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="all-day"
+                          checked={eventAllDay}
+                          onCheckedChange={(checked) => {
+                            setEventAllDay(checked === true);
+                            // Clear time errors when switching to all-day
+                            if (checked) {
+                              setTimeErrors({});
+                            }
+                          }}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <Label htmlFor="all-day" className="text-sm font-medium cursor-pointer">
+                          All day event
+                        </Label>
+                      </div>
+                      {eventAllDay && (
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                          No specific times
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {notificationsLoading && (
-                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                      )}
-                      {showNotifications ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                      )}
-                    </div>
-                  </button>
+                  </div>
 
-                  <div
-                    className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                      showNotifications
-                        ? "max-h-96 opacity-100 border-t border-border/50"
-                        : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    <div className="p-4 pt-3">
-                      <NotificationManager
-                        eventId={selectedEvent?.id}
-                        notifications={eventNotifications}
-                        onChange={handleNotificationChange}
-                        loading={notificationsLoading}
-                        defaultReminder={localSettings?.defaultReminder}
-                      />
+                  {/* Location */}
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="event-location"
+                      className="flex items-center gap-2 text-sm font-medium"
+                    >
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      Location <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="event-location"
+                      value={eventLocation}
+                      onChange={(e) => setEventLocation(e.target.value)}
+                      placeholder="Where is this happening?"
+                      className="border-2 hover:border-primary/50 focus:border-primary transition-colors"
+                    />
+                  </div>
+
+                  {/* Email Notifications */}
+                  <div className="space-y-2">
+                    <div className="border rounded-lg overflow-hidden transition-all duration-200 hover:shadow-sm bg-gradient-to-br from-card/50 to-card/30">
+                      <button
+                        type="button"
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent/20 transition-colors duration-150"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Bell className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-foreground">
+                            Email Notifications
+                          </span>
+                          {eventNotifications.length > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                              {eventNotifications.length}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {notificationsLoading && (
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                          )}
+                          {showNotifications ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                          )}
+                        </div>
+                      </button>
+
+                      <div
+                        className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                          showNotifications
+                            ? "max-h-96 opacity-100 border-t border-border/50" // [shadcn.io](https://www.shadcn.io/components/interactive/animated-modal) - Contains information about additional CSS classes used in internal components for things like content areas and footer.
+                            : "max-h-0 opacity-0"
+                        }`}
+                      >
+                        <div className="p-4 pt-3">
+                          <NotificationManager
+                            eventId={selectedEvent?.id}
+                            notifications={eventNotifications}
+                            onChange={handleNotificationChange}
+                            loading={notificationsLoading}
+                            defaultReminder={localSettings?.defaultReminder}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
 
             {/* Action Buttons */}
             <div className="border-t border-border bg-gradient-to-r from-background/80 to-muted/20 px-6 py-5 flex items-center justify-between backdrop-blur-sm">
-              {selectedEvent?.id && (
-                <Button
-                  variant="outline"
-                  onClick={handleEventDelete}
-                  disabled={eventSaving}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-all duration-200"
-                >
-                  {eventSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Trash2 className="h-4 w-4 mr-2" />
+              {eventViewMode === 'view' ? (
+                /* VIEW MODE BUTTONS */
+                <>
+                  <div></div> {/* Spacer */}
+                  <div className="flex items-center gap-3">
+                    {selectedEvent?.id && !selectedEvent.isSynced && (
+                      <Button
+                        onClick={() => setEventViewMode('edit')}
+                        className="bg-primary hover:bg-primary/90 px-6 shadow-sm transition-all duration-200"
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Edit Event
+                      </Button>
+                    )}
+                    {selectedEvent?.isSynced && (
+                      <div className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md">
+                        <span className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          This event is synced from an external calendar and cannot be edited
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* EDIT MODE BUTTONS */
+                <>
+                  {selectedEvent?.id && !selectedEvent.isSynced && (
+                    <Button
+                      variant="outline"
+                      onClick={handleEventDelete}
+                      disabled={eventSaving}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-all duration-200"
+                    >
+                      {eventSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
+                      Delete Event
+                    </Button>
                   )}
-                  Delete Event
-                </Button>
+                  <div className="flex gap-3 ml-auto">
+                    {selectedEvent?.id ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setEventViewMode('view')}
+                        disabled={eventSaving}
+                        className="hover:bg-muted/50 transition-all duration-200"
+                      >
+                        Cancel
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => goBack("events")}
+                        disabled={eventSaving}
+                        className="hover:bg-muted/50 transition-all duration-200"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleEventSave}
+                      disabled={eventSaving || !eventCalendarId || !eventTitle.trim()}
+                      className="bg-primary hover:bg-primary/90 px-6 shadow-sm transition-all duration-200"
+                    >
+                      {eventSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          {selectedEvent?.id ? 'Updating...' : 'Creating...'}
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          {selectedEvent?.id ? 'Update Event' : 'Create Event'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
               )}
-              <div className="flex gap-3 ml-auto">
-                <Button
-                  variant="outline"
-                  onClick={() => goBack("events")}
-                  disabled={eventSaving}
-                  className="hover:bg-muted/50 transition-all duration-200"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleEventSave}
-                  disabled={eventSaving || !eventCalendarId || !eventTitle.trim()}
-                  className="bg-primary hover:bg-primary/90 px-6 shadow-sm transition-all duration-200"
-                >
-                  {eventSaving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      {selectedEvent?.id ? 'Updating...' : 'Creating...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      {selectedEvent?.id ? 'Update Event' : 'Create Event'}
-                    </>
-                  )}
-                </Button>
-              </div>
             </div>
           </div>
         </TransitionContainer>
@@ -2608,6 +1904,7 @@ export function CommandPalette({
 
   // Other views fallback
   return (
+    <>
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <TransitionContainer direction={transitionDirection}>
         <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
@@ -2631,5 +1928,7 @@ export function CommandPalette({
         </CommandList>
       </TransitionContainer>
     </CommandDialog>
+
+    </>
   );
 }

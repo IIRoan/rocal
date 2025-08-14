@@ -8,8 +8,10 @@ import { calendarsRoutes } from "./routes/calendars";
 import { settingsRoutes } from "./routes/settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
+import { subscriptionsRoute } from "./routes/subscriptions";
 import { errorHandler } from "./lib/errors";
 import { EnhancedNotificationService } from "./lib/enhanced-notification-service";
+import { CalendarSyncService } from "./lib/calendar-sync-service";
 
 // Better Auth middleware following the documentation pattern
 const betterAuth = new Elysia({ name: "better-auth" })
@@ -38,6 +40,10 @@ export const createAPI = (prefix = "") => {
   const enhancedNotificationService = EnhancedNotificationService.getInstance();
   enhancedNotificationService.start();
 
+  // Initialize Calendar sync service
+  const calendarSyncService = CalendarSyncService.getInstance();
+  calendarSyncService.start();
+
   // Only add Swagger in development
   if (process.env.NODE_ENV !== "production") {
     app.use(
@@ -60,6 +66,7 @@ export const createAPI = (prefix = "") => {
               description: "Notification system endpoints",
             },
             { name: "Recurring", description: "Recurring events endpoints" },
+            { name: "Calendar Subscriptions", description: "External calendar subscription endpoints" },
           ],
           components: {
             securitySchemes: {
@@ -130,5 +137,6 @@ export const createAPI = (prefix = "") => {
     .use(calendarsRoutes)
     .use(settingsRoutes)
     .use(notificationsRoutes)
-    .use(recurringRoutes);
+    .use(recurringRoutes)
+    .use(subscriptionsRoute);
 };

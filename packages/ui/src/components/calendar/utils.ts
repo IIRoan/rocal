@@ -163,15 +163,18 @@ export function getAllEventsForDay(
   events: CalendarEvent[],
   day: Date,
 ): CalendarEvent[] {
-  return events.filter((event) => {
+  const filteredEvents = events.filter((event) => {
     const eventStart = new Date(event.start);
     const eventEnd = new Date(event.end);
+    
     return (
       isSameDay(day, eventStart) ||
       isSameDay(day, eventEnd) ||
       (day > eventStart && day < eventEnd)
     );
   });
+  
+  return filteredEvents;
 }
 
 /**
