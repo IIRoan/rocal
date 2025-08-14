@@ -200,6 +200,10 @@ exports.Prisma.CalendarEventScalarFieldEnum = {
   reminder: 'reminder',
   recurrence: 'recurrence',
   parentEventId: 'parentEventId',
+  isSynced: 'isSynced',
+  externalId: 'externalId',
+  subscriptionId: 'subscriptionId',
+  syncedAt: 'syncedAt',
   userId: 'userId',
   calendarId: 'calendarId',
   categoryId: 'categoryId',
@@ -299,6 +303,37 @@ exports.Prisma.PasskeyScalarFieldEnum = {
   aaguid: 'aaguid'
 };
 
+exports.Prisma.CalendarSubscriptionScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  url: 'url',
+  isActive: 'isActive',
+  syncIntervalMinutes: 'syncIntervalMinutes',
+  lastSyncAt: 'lastSyncAt',
+  lastSyncStatus: 'lastSyncStatus',
+  lastErrorMessage: 'lastErrorMessage',
+  etag: 'etag',
+  lastModified: 'lastModified',
+  userId: 'userId',
+  calendarId: 'calendarId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CalendarSyncLogScalarFieldEnum = {
+  id: 'id',
+  subscriptionId: 'subscriptionId',
+  status: 'status',
+  eventsAdded: 'eventsAdded',
+  eventsUpdated: 'eventsUpdated',
+  eventsDeleted: 'eventsDeleted',
+  errorMessage: 'errorMessage',
+  syncDurationMs: 'syncDurationMs',
+  httpStatusCode: 'httpStatusCode',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -329,7 +364,9 @@ exports.Prisma.ModelName = {
   RecurrenceException: 'RecurrenceException',
   EventNotification: 'EventNotification',
   NotificationLog: 'NotificationLog',
-  Passkey: 'Passkey'
+  Passkey: 'Passkey',
+  CalendarSubscription: 'CalendarSubscription',
+  CalendarSyncLog: 'CalendarSyncLog'
 };
 
 /**

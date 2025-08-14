@@ -65,6 +65,8 @@ export interface EventCalendarProps {
   onUpdateEvent?: (id: string, event: any) => Promise<any>;
   onDeleteEvent?: (id: string) => Promise<void>;
   onCreateCategory?: (category: any) => Promise<any>;
+  // Date range change handler
+  onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
   // Settings
   showWeekNumbers?: boolean;
   compactView?: boolean;
@@ -102,6 +104,7 @@ export function EventCalendar({
   onUpdateEvent,
   onDeleteEvent,
   onCreateCategory,
+  onDateRangeChange,
   showWeekNumbers = false,
   compactView = false,
   timeFormat = "12h",
@@ -157,6 +160,17 @@ export function EventCalendar({
     return { start, end };
   }, [currentDate, view]);
 
+  // Notify parent of date range changes
+  useEffect(() => {
+    console.log('EventCalendar - Date range changed:', {
+      start: dateRange.start.toISOString(),
+      end: dateRange.end.toISOString(),
+      view,
+      currentDate: currentDate.toISOString()
+    });
+    onDateRangeChange?.(dateRange);
+  }, [dateRange, onDateRangeChange]);
+
   // Use the provided event handlers with fallbacks
   const createEvent = onCreateEvent || (async () => {});
   const updateEvent = onUpdateEvent || (async () => {});
@@ -199,29 +213,47 @@ export function EventCalendar({
   }, []);
 
   const handlePrevious = () => {
+    let newDate;
     if (view === "month") {
-      setCurrentDate(subMonths(currentDate, 1));
+      newDate = subMonths(currentDate, 1);
     } else if (view === "week") {
-      setCurrentDate(subWeeks(currentDate, 1));
+      newDate = subWeeks(currentDate, 1);
     } else if (view === "day") {
-      setCurrentDate(addDays(currentDate, -1));
+      newDate = addDays(currentDate, -1);
     } else if (view === "agenda") {
       // For agenda view, go back 30 days (a full month)
-      setCurrentDate(addDays(currentDate, -AgendaDaysToShow));
+      newDate = addDays(currentDate, -AgendaDaysToShow);
     }
+    
+    console.log('EventCalendar - Navigate Previous:', {
+      view,
+      from: currentDate.toISOString(),
+      to: newDate?.toISOString()
+    });
+    
+    if (newDate) setCurrentDate(newDate);
   };
 
   const handleNext = () => {
+    let newDate;
     if (view === "month") {
-      setCurrentDate(addMonths(currentDate, 1));
+      newDate = addMonths(currentDate, 1);
     } else if (view === "week") {
-      setCurrentDate(addWeeks(currentDate, 1));
+      newDate = addWeeks(currentDate, 1);
     } else if (view === "day") {
-      setCurrentDate(addDays(currentDate, 1));
+      newDate = addDays(currentDate, 1);
     } else if (view === "agenda") {
       // For agenda view, go forward 30 days (a full month)
-      setCurrentDate(addDays(currentDate, AgendaDaysToShow));
+      newDate = addDays(currentDate, AgendaDaysToShow);
     }
+    
+    console.log('EventCalendar - Navigate Next:', {
+      view,
+      from: currentDate.toISOString(),
+      to: newDate?.toISOString()
+    });
+    
+    if (newDate) setCurrentDate(newDate);
   };
 
   const handleToday = () => {
