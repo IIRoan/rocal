@@ -1,70 +1,65 @@
-# syntax=docker/dockerfile:1
-# --------------------------------------------------
-# 1.  Base (all stages inherit from here)
-# --------------------------------------------------
-    FROM oven/bun:1-alpine AS base
-    RUN apk add --no-cache libc6-compat         # make node-gyp happy
-    WORKDIR /app
-    
-    # --------------------------------------------------
-    # 2.  Install all node_modules once (monorepo)
-    # --------------------------------------------------
-    FROM base AS deps
-    COPY package.json bun.lock ./
-    COPY apps/backend/package.json  ./apps/backend/
-    COPY apps/web/package.json      ./apps/web/
-    # copy every other workspace so bun knows about them
-    COPY packages/**/package.json ./packages/*/
-    RUN bun install --frozen-lockfile
-    
-    # --------------------------------------------------
-    # 3.  Builder – compile all TypeScript
-    # --------------------------------------------------
-    FROM deps AS builder
-    COPY . .
-    
-    # generate Prisma client (if it exists)
-    RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
-          cd apps/backend && \
-          bunx prisma generate; \
-        fi
-    
-    RUN bunx turbo build --filter=web --no-daemon
-    
-    # optional: prune out dev files and deps
-    RUN bunx turbo prune --scope=web --docker
-    
-    # --------------------------------------------------
-    # 4.  Runtime – smallest possible image
-    # --------------------------------------------------
-    FROM base AS runner
-    RUN addgroup --system --gid 1001 nodejs && \
-        adduser --system --uid 1001 nextjs
-    
-    ENV NODE_ENV=production \
-        NEXT_TELEMETRY_DISABLED=1 \
-        HOSTNAME=0.0.0.0 \
-        PORT=3000
-    
-    # copy production node_modules
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/out/json ./package.json
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/out/apps/web ./apps/web
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/out/apps/backend ./apps/backend
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/out/bun.lock ./
-    RUN bun install --frozen-lockfile --production
-    
-    # copy compiled app
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/apps/web/.next/standalone ./apps/web
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/apps/web/.next/static ./apps/web/.next/static
-    COPY --from=builder --chown=nextjs:nodejs \
-         /app/apps/web/public ./apps/web/public
-    
-    USER nextjs
-    EXPOSE 3000
-    CMD ["node", "apps/web/server.js"]
+# Use Bun Alpine as base image
+FROM oven/bun:1-alpine AS base
+
+# Builder stage - install dependencies and build
+FROM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install turbo globally
+RUN bun add -g turbo
+
+# Copy package files first for better layer caching
+COPY package.json bun.lock ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY packages/ ./packages/
+
+# Install all dependencies
+RUN bun install
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client if needed
+RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
+    cd apps/backend && \
+    bun add -g prismabox && \
+    bun run db:generate; \
+fi
+
+# Build the web app using turbo
+RUN turbo build --filter=web
+
+# Runtime stage
+FROM base AS runner
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Copy the built application
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+# Copy public files if they exist
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+
+# Copy Prisma generated files if they exist (create empty directories if source doesn't exist)
+RUN mkdir -p /app/apps/backend
+COPY --from=builder /app/apps/backend ./apps/backend
+
+# Set correct permissions
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+CMD ["node", "apps/web/server.js"]
