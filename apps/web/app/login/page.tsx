@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { signIn, authClient, useSession } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
+import { Lock, Github, Key, Shield, Check } from "lucide-react"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -80,161 +81,208 @@ export default function LoginPage() {
   // Show loading state while checking session
   if (isPending || isCheckingSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="text-center space-y-4 animate-fade-in">
-          <div className="relative">
-            <div className="w-12 h-12 border-2 border-primary/20 rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Background matching landing page style */}
+        <div className="absolute inset-0">
+          {/* Animated grid pattern */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,theme(colors.border)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.border)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_70%,transparent_110%)] animate-pulse" />
           </div>
-          <p className="text-sm text-muted-foreground">Checking authentication status...</p>
+          
+          {/* Dynamic gradient orbs */}
+          <div className="absolute inset-0 opacity-60">
+            <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
+            <div className="absolute top-2/3 left-3/4 w-48 h-48 bg-primary/15 rounded-full blur-2xl animate-pulse delay-500" />
+          </div>
         </div>
-      </div>
+        
+        <div className="relative z-10 text-center space-y-8 animate-fade-in">
+          <div className="relative">
+            <div className="w-16 h-16 border-2 border-primary/30 rounded-full animate-spin mx-auto"></div>
+            <div className="absolute inset-0 w-16 h-16 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold text-foreground">Checking authentication status...</h2>
+            <p className="text-muted-foreground">Please wait while we verify your session</p>
+          </div>
+        </div>
+      </section>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/20">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent/5 rounded-full blur-3xl"></div>
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Background matching landing page */}
+      <div className="absolute inset-0">
+        {/* Animated grid pattern */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,theme(colors.border)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.border)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_70%,transparent_110%)] animate-pulse" />
+        </div>
+        
+        {/* Dynamic gradient orbs */}
+        <div className="absolute inset-0 opacity-60">
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-2/3 left-3/4 w-48 h-48 bg-primary/15 rounded-full blur-2xl animate-pulse delay-500" />
+        </div>
       </div>
 
-      <div className="relative w-full max-w-md">
-        {/* Main card */}
-        <div className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl p-8 shadow-lg shadow-black/5 animate-scale-in">
-          {/* Header */}
-          <div className="text-center space-y-3 mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-              <svg className="w-8 h-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-semibold text-foreground tracking-tight">Welcome back</h1>
-            <p className="text-muted-foreground">Sign in to your account to continue</p>
-          </div>
-
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 animate-slide-in">
-              <div className="flex items-center space-x-2">
-                <svg
-                  className="w-5 h-5 text-destructive flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-                <p className="text-sm text-destructive font-medium">{error}</p>
+      <div className="relative z-10 max-w-md mx-auto px-6">
+        {/* Main login card matching landing page card style */}
+        <div className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-card/80 backdrop-blur-sm border border-border/50 relative overflow-hidden rounded-2xl animate-scale-in">
+          <div className="p-8 relative z-10">
+            {/* Header matching landing page style */}
+            <div className="text-center space-y-6 mb-8">
+              {/* Icon with landing page styling */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 mb-6 mx-auto w-fit group-hover:scale-110 transition-transform duration-300">
+                <Lock className="h-8 w-8 text-primary" />
+              </div>
+              
+              <div className="space-y-2">
+                <h1 className="text-3xl md:text-4xl font-bold text-foreground">
+                  Welcome back
+                </h1>
+                <p className="text-xl text-muted-foreground leading-relaxed">
+                  Sign in to your account to continue
+                </p>
               </div>
             </div>
-          )}
 
-          {/* Auth Methods */}
-          <div className="space-y-4">
-            {isPasskeySupported ? (
-              <>
-                {/* Primary passkey button */}
-                <button
-                  onClick={handlePasskeyLogin}
-                  disabled={passkeyLoading}
-                  className="group relative w-full h-12 px-6 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-xl font-medium shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                  <div className="relative flex items-center justify-center space-x-2">
-                    {passkeyLoading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
-                        <span>Authenticating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v-2H7v-2H4a1 1 0 01-1-1v-4a1 1 0 011-1h3l4.586-4.586A6 6 0 0121 9z"
-                          />
-                        </svg>
-                        <span>Continue with Passkey</span>
-                      </>
-                    )}
+            {/* Error Alert */}
+            {error && (
+              <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 animate-slide-in">
+                <div className="flex items-center space-x-3">
+                  <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-destructive text-sm font-bold">!</span>
                   </div>
-                </button>
-
-                {/* Divider */}
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border/60"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="bg-card px-4 text-muted-foreground font-medium">or continue with</span>
-                  </div>
-                </div>
-
-                {/* GitHub button */}
-                <button
-                  onClick={handleGitHubLogin}
-                  disabled={isLoading}
-                  className="group relative w-full h-12 px-6 bg-card border border-border/60 text-foreground rounded-xl font-medium hover:bg-accent hover:border-border transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    {isLoading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin"></div>
-                        <span>Signing in...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                        </svg>
-                        <span>Continue with GitHub</span>
-                      </>
-                    )}
-                  </div>
-                </button>
-              </>
-            ) : (
-              <div className="text-center py-12 space-y-4 animate-fade-in">
-                <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center mx-auto">
-                  <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-foreground">Passkeys not supported</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    Please use a modern browser that supports WebAuthn to enable passkey authentication.
-                  </p>
+                  <p className="text-sm text-destructive font-medium">{error}</p>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-border/50 text-center">
-            <p className="text-xs text-muted-foreground">Secure authentication powered by modern web standards</p>
+            {/* Auth Methods */}
+            <div className="space-y-6">
+              {isPasskeySupported ? (
+                <>
+                  {/* Primary passkey button matching landing page style */}
+                  <button
+                    onClick={handlePasskeyLogin}
+                    disabled={passkeyLoading}
+                    className="w-full rounded-full px-8 py-4 text-lg font-semibold shadow-2xl bg-gradient-to-r from-primary to-accent hover:shadow-primary/25 group transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    <div className="flex items-center justify-center space-x-3">
+                      {passkeyLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                          <span>Authenticating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Key className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                          <span>Continue with Passkey</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Divider */}
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border/60"></div>
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-card px-4 text-sm text-muted-foreground font-medium">or continue with</span>
+                    </div>
+                  </div>
+
+                  {/* GitHub button matching landing page style */}
+                  <button
+                    onClick={handleGitHubLogin}
+                    disabled={isLoading}
+                    className="w-full rounded-full px-8 py-4 text-lg font-semibold border-2 hover:bg-accent/10 group transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border-border hover:border-border/80"
+                  >
+                    <div className="flex items-center justify-center space-x-3">
+                      {isLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
+                          <span>Signing in...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Github className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                          <span>Continue with GitHub</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <div className="text-center py-8 space-y-6 animate-fade-in">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-muted/20 to-muted/10 mx-auto w-fit">
+                    <Lock className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-xl font-bold text-foreground">Passkeys not supported</h3>
+                    <p className="text-muted-foreground leading-relaxed max-w-sm mx-auto">
+                      Please use a modern browser that supports WebAuthn to enable passkey authentication.
+                    </p>
+                  </div>
+                  
+                  {/* Fallback GitHub login */}
+                  <button
+                    onClick={handleGitHubLogin}
+                    disabled={isLoading}
+                    className="w-full rounded-full px-8 py-4 text-lg font-semibold border-2 hover:bg-accent/10 group transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border-border hover:border-border/80"
+                  >
+                    <div className="flex items-center justify-center space-x-3">
+                      {isLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
+                          <span>Signing in...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Github className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                          <span>Continue with GitHub</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer matching landing page trust indicators */}
+            <div className="mt-8 pt-6 border-t border-border/20 text-center">
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground font-medium">
+                  Secure authentication powered by modern web standards
+                </p>
+                
+                {/* Trust indicators matching landing page */}
+                <div className="flex flex-wrap justify-center items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-3 w-3 text-success" />
+                    <span>256-bit SSL encryption</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="h-3 w-3 text-success" />
+                    <span>WebAuthn standard</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-3 w-3 text-success" />
+                    <span>Zero-knowledge architecture</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+          
+          {/* Background hover effect matching landing page cards */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
       </div>
-    </div>
+    </section>
   )
 }
