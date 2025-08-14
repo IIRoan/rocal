@@ -1,12 +1,12 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../lib/prisma';
+import { prisma } from '../lib/prisma';
 import { parseICSFile, convertParsedEventToCalendarEvent, isEventModified } from '../lib/ics-parser';
 
 export const subscriptionsRoute = new Elysia()
   .get(
     '/subscriptions',
     async ({ user }: any) => {
-      const subscriptions = await db.calendarSubscription.findMany({
+      const subscriptions = await prisma.calendarSubscription.findMany({
         where: {
           userId: user.id,
         },
@@ -40,7 +40,7 @@ export const subscriptionsRoute = new Elysia()
       const { name, url, calendarId } = body;
 
       // Check if URL is already subscribed by this user
-      const existingSubscription = await db.calendarSubscription.findFirst({
+      const existingSubscription = await prisma.calendarSubscription.findFirst({
         where: {
           userId: user.id,
           url: url,
@@ -52,7 +52,7 @@ export const subscriptionsRoute = new Elysia()
       }
 
       // Verify calendar belongs to user
-      const calendar = await db.calendar.findFirst({
+      const calendar = await prisma.calendar.findFirst({
         where: {
           id: calendarId,
           userId: user.id,
@@ -87,7 +87,7 @@ export const subscriptionsRoute = new Elysia()
       }
 
       // Create the subscription
-      const subscription = await db.calendarSubscription.create({
+      const subscription = await prisma.calendarSubscription.create({
         data: {
           name: name || testParseResult.calendarName || 'External Calendar',
           url,
@@ -123,7 +123,7 @@ export const subscriptionsRoute = new Elysia()
       const { id } = params;
       const { name, isActive, syncIntervalMinutes } = body;
 
-      const subscription = await db.calendarSubscription.findFirst({
+      const subscription = await prisma.calendarSubscription.findFirst({
         where: {
           id,
           userId: user.id,
@@ -134,7 +134,7 @@ export const subscriptionsRoute = new Elysia()
         throw new Error('Subscription not found');
       }
 
-      const updatedSubscription = await db.calendarSubscription.update({
+      const updatedSubscription = await prisma.calendarSubscription.update({
         where: { id },
         data: {
           name: name || subscription.name,
@@ -171,7 +171,7 @@ export const subscriptionsRoute = new Elysia()
       const { id } = params;
       const { deleteEvents = false } = query;
 
-      const subscription = await db.calendarSubscription.findFirst({
+      const subscription = await prisma.calendarSubscription.findFirst({
         where: {
           id,
           userId: user.id,
@@ -184,7 +184,7 @@ export const subscriptionsRoute = new Elysia()
 
       // If requested, delete all synced events from this subscription
       if (deleteEvents) {
-        await db.calendarEvent.deleteMany({
+        await prisma.calendarEvent.deleteMany({
           where: {
             subscriptionId: id,
             isSynced: true,
@@ -192,7 +192,7 @@ export const subscriptionsRoute = new Elysia()
         });
       } else {
         // Otherwise, just remove the sync association but keep events
-        await db.calendarEvent.updateMany({
+        await prisma.calendarEvent.updateMany({
           where: {
             subscriptionId: id,
             isSynced: true,
@@ -206,7 +206,7 @@ export const subscriptionsRoute = new Elysia()
         });
       }
 
-      await db.calendarSubscription.delete({
+      await prisma.calendarSubscription.delete({
         where: { id },
       });
 
@@ -233,7 +233,7 @@ export const subscriptionsRoute = new Elysia()
     async ({ params, user }: any) => {
       const { id } = params;
 
-      const subscription = await db.calendarSubscription.findFirst({
+      const subscription = await prisma.calendarSubscription.findFirst({
         where: {
           id,
           userId: user.id,
@@ -268,7 +268,7 @@ export const subscriptionsRoute = new Elysia()
       const { calendarId, icsContent, fileName } = body;
 
       // Verify calendar belongs to user
-      const calendar = await db.calendar.findFirst({
+      const calendar = await prisma.calendar.findFirst({
         where: {
           id: calendarId,
           userId: user.id,
@@ -291,7 +291,7 @@ export const subscriptionsRoute = new Elysia()
       for (const parsedEvent of parseResult.events) {
         try {
           // Check if event with same external ID already exists in this calendar
-          const existingEvent = await db.calendarEvent.findFirst({
+          const existingEvent = await prisma.calendarEvent.findFirst({
             where: {
               calendarId,
               externalId: parsedEvent.uid,
@@ -311,7 +311,7 @@ export const subscriptionsRoute = new Elysia()
             // No subscriptionId for manual import
           );
 
-          const createdEvent = await db.calendarEvent.create({
+          const createdEvent = await prisma.calendarEvent.create({
             data: eventData,
           });
 
@@ -347,7 +347,7 @@ export const subscriptionsRoute = new Elysia()
 
 // Sync function for individual subscription
 export async function syncCalendarSubscription(subscription: any) {
-  const syncLog = await db.calendarSyncLog.create({
+  const syncLog = await prisma.calendarSyncLog.create({
     data: {
       subscriptionId: subscription.id,
       status: 'started',
@@ -368,7 +368,7 @@ export async function syncCalendarSubscription(subscription: any) {
 
     // Handle 304 Not Modified
     if (response.status === 304) {
-      await db.calendarSyncLog.update({
+      await prisma.calendarSyncLog.update({
         where: { id: syncLog.id },
         data: {
           status: 'success',
@@ -378,7 +378,7 @@ export async function syncCalendarSubscription(subscription: any) {
         },
       });
 
-      await db.calendarSubscription.update({
+      await prisma.calendarSubscription.update({
         where: { id: subscription.id },
         data: {
           lastSyncAt: new Date(),
@@ -402,7 +402,7 @@ export async function syncCalendarSubscription(subscription: any) {
     let eventsDeleted = 0;
 
     // Get current synced events for this subscription
-    const currentEvents = await db.calendarEvent.findMany({
+    const currentEvents = await prisma.calendarEvent.findMany({
       where: {
         subscriptionId: subscription.id,
         isSynced: true,
@@ -428,11 +428,11 @@ export async function syncCalendarSubscription(subscription: any) {
           subscription.id
         );
 
-        await db.calendarEvent.create({ data: eventData });
+        await prisma.calendarEvent.create({ data: eventData });
         eventsAdded++;
       } else if (isEventModified(existingEvent, parsedEvent)) {
         // Update existing event
-        await db.calendarEvent.update({
+        await prisma.calendarEvent.update({
           where: { id: existingEvent.id },
           data: {
             title: parsedEvent.title,
@@ -452,7 +452,7 @@ export async function syncCalendarSubscription(subscription: any) {
     // Delete events that no longer exist in the external calendar
     for (const [uid, event] of currentEventsByUid) {
       if (!newEventUids.has(uid)) {
-        await db.calendarEvent.delete({
+        await prisma.calendarEvent.delete({
           where: { id: event.id },
         });
         eventsDeleted++;
@@ -463,7 +463,7 @@ export async function syncCalendarSubscription(subscription: any) {
     const etag = response.headers.get('etag');
     const lastModified = response.headers.get('last-modified');
 
-    await db.calendarSubscription.update({
+    await prisma.calendarSubscription.update({
       where: { id: subscription.id },
       data: {
         lastSyncAt: new Date(),
@@ -475,7 +475,7 @@ export async function syncCalendarSubscription(subscription: any) {
     });
 
     // Complete sync log
-    await db.calendarSyncLog.update({
+    await prisma.calendarSyncLog.update({
       where: { id: syncLog.id },
       data: {
         status: 'success',
@@ -499,7 +499,7 @@ export async function syncCalendarSubscription(subscription: any) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    await db.calendarSyncLog.update({
+    await prisma.calendarSyncLog.update({
       where: { id: syncLog.id },
       data: {
         status: 'error',
@@ -509,7 +509,7 @@ export async function syncCalendarSubscription(subscription: any) {
       },
     });
 
-    await db.calendarSubscription.update({
+    await prisma.calendarSubscription.update({
       where: { id: subscription.id },
       data: {
         lastSyncAt: new Date(),

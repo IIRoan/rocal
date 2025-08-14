@@ -1,4 +1,4 @@
-import { db } from './prisma';
+import { prisma } from './prisma';
 import { syncCalendarSubscription } from '../routes/subscriptions';
 
 export class CalendarSyncService {
@@ -64,7 +64,7 @@ export class CalendarSyncService {
     
     try {
       // Get all active subscriptions that are due for syncing
-      const subscriptions = await db.calendarSubscription.findMany({
+      const subscriptions = await prisma.calendarSubscription.findMany({
         where: {
           isActive: true,
           OR: [
@@ -144,7 +144,7 @@ export class CalendarSyncService {
   }
 
   async syncSubscription(subscriptionId: string): Promise<void> {
-    const subscription = await db.calendarSubscription.findUnique({
+    const subscription = await prisma.calendarSubscription.findUnique({
       where: { id: subscriptionId },
       include: {
         calendar: true,
@@ -166,13 +166,13 @@ export class CalendarSyncService {
   private async cleanupOldSyncLogs(): Promise<void> {
     try {
       // Get all subscriptions
-      const subscriptions = await db.calendarSubscription.findMany({
+      const subscriptions = await prisma.calendarSubscription.findMany({
         select: { id: true },
       });
 
       // For each subscription, keep only the latest 50 sync logs
       for (const subscription of subscriptions) {
-        const logs = await db.calendarSyncLog.findMany({
+        const logs = await prisma.calendarSyncLog.findMany({
           where: { subscriptionId: subscription.id },
           select: { id: true },
           orderBy: { startedAt: 'desc' },
@@ -180,7 +180,7 @@ export class CalendarSyncService {
         });
 
         if (logs.length > 0) {
-          await db.calendarSyncLog.deleteMany({
+          await prisma.calendarSyncLog.deleteMany({
             where: {
               id: { in: logs.map(log => log.id) },
             },
@@ -217,10 +217,10 @@ export class CalendarSyncService {
     neverSynced: number;
   }> {
     const [total, active, withErrors, neverSynced] = await Promise.all([
-      db.calendarSubscription.count(),
-      db.calendarSubscription.count({ where: { isActive: true } }),
-      db.calendarSubscription.count({ where: { lastSyncStatus: 'error' } }),
-      db.calendarSubscription.count({ where: { lastSyncAt: null } }),
+      prisma.calendarSubscription.count(),
+      prisma.calendarSubscription.count({ where: { isActive: true } }),
+      prisma.calendarSubscription.count({ where: { lastSyncStatus: 'error' } }),
+      prisma.calendarSubscription.count({ where: { lastSyncAt: null } }),
     ]);
 
     return {
