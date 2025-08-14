@@ -34,6 +34,7 @@ model User {
   calendars      Calendar[]
   participations EventParticipant[]
   settings       UserSettings?
+  subscriptions  CalendarSubscription[]
 
   passkeys Passkey[]
 
@@ -97,6 +98,7 @@ model Calendar {
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   events          CalendarEvent[]
   sharedCalendars CalendarSharing[]
+  subscriptions   CalendarSubscription[]
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
@@ -133,6 +135,11 @@ model CalendarEvent {
   reminder             Int? // minutes before event to remind
   recurrence           String? // JSON string for recurrence rules (daily, weekly, monthly, etc.)
   parentEventId        String?               @map("parent_event_id") // For recurring event instances
+  // Sync fields for external calendar events
+  isSynced             Boolean               @default(false) @map("is_synced") // Whether this event came from external calendar
+  externalId           String?               @map("external_id") // UID from the .ics file
+  subscriptionId       String?               @map("subscription_id") // Which subscription this event came from
+  syncedAt             DateTime?             @map("synced_at") // When this event was last synced
   // Relationships
   userId               String                @map("user_id")
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -146,6 +153,8 @@ model CalendarEvent {
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
+  @@index([isSynced, subscriptionId])
+  @@index([externalId, subscriptionId])
   @@map("calendar_event")
 }
 
@@ -278,4 +287,53 @@ model Passkey {
   aaguid       String?
 
   @@map("passkey")
+}
+
+// Calendar Subscription Models
+
+model CalendarSubscription {
+  id                String              @id @default(cuid())
+  name              String              // User-friendly name for the subscription
+  url               String              // .ics feed URL
+  isActive          Boolean             @default(true) @map("is_active")
+  syncIntervalMinutes Int               @default(15) @map("sync_interval_minutes")
+  lastSyncAt        DateTime?           @map("last_sync_at")
+  lastSyncStatus    String              @default("pending") @map("last_sync_status") // success, error, pending
+  lastErrorMessage  String?             @map("last_error_message")
+  etag              String?             // For HTTP caching
+  lastModified      String?             @map("last_modified") // For HTTP caching
+  
+  // Relationships
+  userId            String              @map("user_id")
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarId        String              @map("calendar_id")
+  calendar          Calendar            @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  
+  // Tracking
+  syncLogs          CalendarSyncLog[]
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  @@unique([userId, url])
+  @@index([isActive, lastSyncAt])
+  @@map("calendar_subscription")
+}
+
+model CalendarSyncLog {
+  id                    String                @id @default(cuid())
+  subscriptionId        String                @map("subscription_id")
+  subscription          CalendarSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  status                String                @default("started") // started, success, error
+  eventsAdded           Int                   @default(0) @map("events_added")
+  eventsUpdated         Int                   @default(0) @map("events_updated")
+  eventsDeleted         Int                   @default(0) @map("events_deleted")
+  errorMessage          String?               @map("error_message")
+  syncDurationMs        Int?                  @map("sync_duration_ms")
+  httpStatusCode        Int?                  @map("http_status_code")
+  startedAt             DateTime              @default(now()) @map("started_at")
+  completedAt           DateTime?             @map("completed_at")
+
+  @@index([subscriptionId, startedAt])
+  @@index([status, startedAt])
+  @@map("calendar_sync_log")
 }
