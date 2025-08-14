@@ -38,6 +38,7 @@ import {
 } from "@workspace/ui/components/ui/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
+import { SubscriptionManagement } from "./subscription-management";
 import {
   Plus,
   Trash2,
@@ -50,6 +51,9 @@ import {
   AlertCircle,
   CheckCircle,
   Settings,
+  Upload,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 
 const PRESET_COLORS = [
@@ -86,7 +90,7 @@ export function CalendarManagement({
     null,
   );
   const [deleteAction, setDeleteAction] =
-    useState<CalendarDeleteAction>("prevent");
+    useState<CalendarDeleteAction>("delete_events");
   const [targetCalendarId, setTargetCalendarId] = useState<string>("");
 
   const [newCalendar, setNewCalendar] = useState({
@@ -98,6 +102,15 @@ export function CalendarManagement({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importCalendarId, setImportCalendarId] = useState<string>("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<{
+    eventsCreated: number;
+    eventsTotal: number;
+    errors?: string[];
+  } | null>(null);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
     color?: string;
@@ -273,7 +286,7 @@ export function CalendarManagement({
 
       await refetchCalendars();
       setDeletingCalendar(null);
-      setDeleteAction("prevent");
+      setDeleteAction("delete_events");
       setTargetCalendarId("");
       setSuccess("Calendar deleted successfully!");
     } catch (err: any) {
@@ -289,6 +302,63 @@ export function CalendarManagement({
 
   const handleSetDefault = (calendar: Calendar) => {
     handleUpdateCalendar(calendar, { isDefault: true });
+  };
+
+  const handleImportICS = async () => {
+    if (!importFile || !importCalendarId) return;
+
+    setLoading(true);
+    setError(null);
+    setImportResult(null);
+
+    try {
+      const fileContent = await importFile.text();
+      
+      const response = await calendarApiService.importICS({
+        calendarId: importCalendarId,
+        icsContent: fileContent,
+        fileName: importFile.name,
+      });
+
+      setImportResult({
+        eventsCreated: response.eventsCreated,
+        eventsTotal: response.eventsTotal,
+        errors: response.errors,
+      });
+
+      if (response.eventsCreated > 0) {
+        setSuccess(`Successfully imported ${response.eventsCreated} events from ${importFile.name}`);
+        await refetchCalendars(); // Refresh data
+      }
+
+      // Don't close dialog immediately if there are errors to show
+      if (!response.errors || response.errors.length === 0) {
+        // Close dialog after a delay to let user see success message
+        setTimeout(() => {
+          setShowImportDialog(false);
+          setImportFile(null);
+          setImportCalendarId("");
+          setImportResult(null);
+        }, 2000);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to import ICS file");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.name.toLowerCase().endsWith('.ics')) {
+        setError('Please select a valid .ics calendar file');
+        return;
+      }
+      setImportFile(file);
+      setError(null);
+    }
   };
 
   const availableTargetCalendars = calendars.filter(
@@ -339,6 +409,31 @@ export function CalendarManagement({
                       title="Calendar Settings"
                     >
                       <Settings className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowSubscriptionDialog(true);
+                      }}
+                      title="Subscribe to external calendars"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Subscriptions
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowImportDialog(true);
+                        setError(null);
+                        setSuccess(null);
+                        setImportResult(null);
+                      }}
+                      title="Import .ics file"
+                    >
+                      <Upload className="h-4 w-4 mr-1" />
+                      Import ICS
                     </Button>
                     <Button
                       variant="outline"
@@ -669,10 +764,10 @@ export function CalendarManagement({
               <div className="flex items-start space-x-3">
                 <input
                   type="radio"
-                  id="prevent"
+                  id="delete_events"
                   name="deleteAction"
-                  value="prevent"
-                  checked={deleteAction === "prevent"}
+                  value="delete_events"
+                  checked={deleteAction === "delete_events"}
                   onChange={(e) =>
                     setDeleteAction(e.target.value as CalendarDeleteAction)
                   }
@@ -680,13 +775,13 @@ export function CalendarManagement({
                 />
                 <div className="space-y-1">
                   <label
-                    htmlFor="prevent"
+                    htmlFor="delete_events"
                     className="font-medium cursor-pointer"
                   >
-                    Prevent deletion (recommended)
+                    Delete calendar and all events (default)
                   </label>
                   <p className="text-sm text-muted-foreground">
-                    Don't delete if the calendar contains events
+                    Permanently delete the calendar and all its events
                   </p>
                 </div>
               </div>
@@ -738,31 +833,6 @@ export function CalendarManagement({
                   )}
                 </div>
               </div>
-
-              <div className="flex items-start space-x-3">
-                <input
-                  type="radio"
-                  id="delete_events"
-                  name="deleteAction"
-                  value="delete_events"
-                  checked={deleteAction === "delete_events"}
-                  onChange={(e) =>
-                    setDeleteAction(e.target.value as CalendarDeleteAction)
-                  }
-                  className="mt-1"
-                />
-                <div className="space-y-1">
-                  <label
-                    htmlFor="delete_events"
-                    className="font-medium cursor-pointer text-red-600"
-                  >
-                    Delete calendar and all events
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    Permanently delete the calendar and all its events
-                  </p>
-                </div>
-              </div>
             </div>
 
             {deleteAction === "move_events" && !targetCalendarId && (
@@ -791,6 +861,119 @@ export function CalendarManagement({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import ICS Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Import ICS File
+            </DialogTitle>
+            <DialogDescription>
+              Import events from an .ics calendar file into one of your calendars
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="import-calendar">Select Calendar</Label>
+              <Select
+                value={importCalendarId}
+                onValueChange={setImportCalendarId}
+              >
+                <SelectTrigger id="import-calendar">
+                  <SelectValue placeholder="Choose a calendar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {calendars.map((calendar) => (
+                    <SelectItem key={calendar.id} value={calendar.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: calendar.color }}
+                        />
+                        {calendar.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="import-file">Select ICS File</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="import-file"
+                  type="file"
+                  accept=".ics"
+                  onChange={handleFileSelect}
+                  className="cursor-pointer"
+                />
+              </div>
+              {importFile && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {importFile.name}
+                </p>
+              )}
+            </div>
+
+            {importResult && (
+              <Alert className={importResult.errors?.length ? "border-yellow-200 bg-yellow-50" : "border-green-200 bg-green-50"}>
+                <CheckCircle className={`h-4 w-4 ${importResult.errors?.length ? "text-yellow-600" : "text-green-600"}`} />
+                <AlertDescription className={importResult.errors?.length ? "text-yellow-800" : "text-green-800"}>
+                  <div className="space-y-1">
+                    <p>
+                      Imported {importResult.eventsCreated} out of {importResult.eventsTotal} events
+                    </p>
+                    {importResult.errors && importResult.errors.length > 0 && (
+                      <div className="text-sm">
+                        <p className="font-medium">Warnings:</p>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {importResult.errors.slice(0, 3).map((error, index) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                          {importResult.errors.length > 3 && (
+                            <li>...and {importResult.errors.length - 3} more</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowImportDialog(false);
+                setImportFile(null);
+                setImportCalendarId("");
+                setImportResult(null);
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImportICS}
+              disabled={loading || !importFile || !importCalendarId}
+            >
+              {loading ? "Importing..." : "Import Events"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subscription Management Dialog */}
+      <SubscriptionManagement
+        open={showSubscriptionDialog}
+        onOpenChange={setShowSubscriptionDialog}
+      />
     </>
   );
 }
