@@ -34,7 +34,7 @@ export function parseICSFile(icsContent: string): ICSParseResult {
     for (const eventKey in parsed) {
       const event = parsed[eventKey];
       
-      if (event && event.type === 'VCALENDAR') {
+      if (event && (event.type as any) === 'VCALENDAR') {
         const calendar = event as VCalendar;
         if (calendar.title) {
           result.calendarName = calendar.title;
