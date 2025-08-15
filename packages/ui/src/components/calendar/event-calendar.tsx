@@ -121,11 +121,34 @@ export function EventCalendar({
 }: EventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
-  const [view, setView] = useState<CalendarView>(initialView);
+  
+  // Initialize view from sessionStorage or fallback to initialView
+  const [view, setViewState] = useState<CalendarView>(() => {
+    if (typeof window !== 'undefined') {
+      const savedView = sessionStorage.getItem('calendar-view-selection');
+      if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
+        return savedView as CalendarView;
+      }
+    }
+    return initialView;
+  });
 
-  // Update view when initialView changes (from settings)
+  // Custom setView function that also saves to sessionStorage
+  const setView = (newView: CalendarView) => {
+    setViewState(newView);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('calendar-view-selection', newView);
+    }
+  };
+
+  // Update view when initialView changes (from settings) only if no session preference exists
   useEffect(() => {
-    setView(initialView);
+    if (typeof window !== 'undefined') {
+      const savedView = sessionStorage.getItem('calendar-view-selection');
+      if (!savedView) {
+        setView(initialView);
+      }
+    }
   }, [initialView]);
   const { open } = useSidebar();
 
