@@ -97,11 +97,15 @@ export function WeekView({
       .filter((event) => {
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
+        
+        // Check if event overlaps with the current week at all
+        // This handles multi-week events properly by checking if any day in the week
+        // falls within the event's date range
         return days.some(
           (day) =>
             isSameDay(day, eventStart) ||
             isSameDay(day, eventEnd) ||
-            (day > eventStart && day < eventEnd),
+            (day >= eventStart && day <= eventEnd)
         );
       });
   }, [events, days]);
@@ -118,10 +122,13 @@ export function WeekView({
         const eventEnd = new Date(event.end);
 
         // Check if event is on this day
+        // Use proper date comparison for spanning events
+        const dayStart = startOfDay(day);
+        const dayEnd = addHours(dayStart, 24);
         return (
           isSameDay(day, eventStart) ||
           isSameDay(day, eventEnd) ||
-          (eventStart < day && eventEnd > day)
+          (eventStart < dayEnd && eventEnd > dayStart)
         );
       });
 
@@ -325,10 +332,13 @@ export function WeekView({
               const dayAllDayEvents = allDayEvents.filter((event) => {
                 const eventStart = new Date(event.start);
                 const eventEnd = new Date(event.end);
+                
+                // For multi-day/all-day events, check if this day falls within the event's date range
+                // This properly handles events that span multiple weeks
                 return (
                   isSameDay(day, eventStart) ||
-                  (day > eventStart && day < eventEnd) ||
-                  isSameDay(day, eventEnd)
+                  isSameDay(day, eventEnd) ||
+                  (day >= eventStart && day <= eventEnd)
                 );
               });
 
