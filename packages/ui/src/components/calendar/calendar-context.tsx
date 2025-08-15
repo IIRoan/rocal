@@ -63,7 +63,24 @@ export function CalendarProvider({
   onUpdateCalendar,
   onRefreshCalendars,
 }: CalendarProviderProps) {
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(() => {
+    // Load saved date from localStorage on initial render
+    if (typeof window !== "undefined") {
+      try {
+        const savedDate = localStorage.getItem("rocani-calendar-current-date");
+        if (savedDate) {
+          const parsedDate = new Date(savedDate);
+          // Validate the date is not invalid
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate;
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to load calendar date from localStorage:", error);
+      }
+    }
+    return new Date();
+  });
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const hasInitialized = useRef(false);
 
@@ -283,9 +300,23 @@ export function CalendarProvider({
     return visibleColors.includes(color);
   };
 
+  // Custom setCurrentDate that also persists to localStorage
+  const setCurrentDateWithPersistence = useCallback((date: Date) => {
+    setCurrentDate(date);
+    
+    // Save to localStorage
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("rocani-calendar-current-date", date.toISOString());
+      } catch (error) {
+        console.warn("Failed to save calendar date to localStorage:", error);
+      }
+    }
+  }, []);
+
   const value = {
     currentDate,
-    setCurrentDate,
+    setCurrentDate: setCurrentDateWithPersistence,
     calendars,
     setCalendars,
     addCalendar,
