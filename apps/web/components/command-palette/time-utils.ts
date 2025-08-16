@@ -95,9 +95,10 @@ export const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement
   // Try to find exact match first
   const selectedButton = dropdownRef.current.querySelector(`[data-time-value="${selectedTime}"]`) as HTMLElement;
   if (selectedButton) {
+    // Scroll to the selected time with center alignment
     selectedButton.scrollIntoView({
       block: 'center',
-      behavior: 'instant'
+      behavior: 'smooth'
     });
     return;
   }
@@ -113,7 +114,17 @@ export const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement
   if (closestButton) {
     closestButton.scrollIntoView({
       block: 'center',
-      behavior: 'instant'
+      behavior: 'smooth'
+    });
+  } else {
+    // Fallback: scroll to approximate position based on time
+    const container = dropdownRef.current;
+    const totalOptions = container.children.length;
+    const timeIndex = Math.floor(selectedMinutes / 15); // 15-minute intervals
+    const scrollPosition = (timeIndex / totalOptions) * container.scrollHeight;
+    container.scrollTo({
+      top: scrollPosition,
+      behavior: 'smooth'
     });
   }
 };
@@ -127,10 +138,12 @@ export const generateAllTimeOptions = (timeFormat?: string) => {
       const formattedMinute = minute.toString().padStart(2, "0");
       const value = `${formattedHour}:${formattedMinute}`;
       const date = new Date(2000, 0, 1, hour, minute);
-      const label =
-        timeFormat === "24h"
-          ? `${formattedHour}:${formattedMinute}`
-          : format(date, "h:mm a");
+      
+      // Use 24h format if explicitly set to "24h", otherwise use 12h format
+      const label = timeFormat === "24h"
+        ? `${formattedHour}:${formattedMinute}`
+        : format(date, "h:mm a");
+      
       options.push({ value, label });
     }
   }
