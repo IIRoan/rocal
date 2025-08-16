@@ -1,9 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
-import { ChevronDown } from "lucide-react";
+import { Button } from "@workspace/ui/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@workspace/ui/components/ui/popover";
+import { ChevronDown, ClockIcon } from "lucide-react";
 import { useTimeInput } from "@/hooks/use-time-input";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -27,7 +33,7 @@ export function TimeInput({
   label,
   value,
   onChange,
-  placeholder = "09:00 or type time",
+  placeholder,
   disabled = false,
   error,
   pairedTime,
@@ -43,11 +49,11 @@ export function TimeInput({
     timeOptions,
     dropdownRef,
     handleTimeChange,
-    handleFocus,
     handleBlur,
     handleKeyDown,
     handleDropdownToggle,
     handleOptionSelect,
+    setIsOpen,
   } = useTimeInput({
     initialTime: value,
     onTimeChange: onChange,
@@ -56,76 +62,138 @@ export function TimeInput({
     timeFormat,
   });
 
+  // Generate time slots every 15 minutes from 0:00 to 23:45
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = 0; hour <= 23; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        const timeString = `${hour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
+        slots.push(timeString);
+      }
+    }
+    return slots;
+  };
+
+  const timeSlots = generateTimeSlots();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleTimeInputChange = (inputTime: string) => {
+    handleTimeChange(inputTime);
+  };
+
+  const handleTimeSelect = (selectedTime: string) => {
+    onChange(selectedTime);
+    setIsOpen(false);
+  };
+
+  // Auto-scroll to selected time when popover opens
+  useEffect(() => {
+    if (isOpen && time && scrollContainerRef.current) {
+      const selectedIndex = timeSlots.findIndex(slot => slot === time);
+      if (selectedIndex !== -1) {
+        const selectedElement = scrollContainerRef.current.querySelector(
+          `[data-time-slot="${time}"]`
+        ) as HTMLElement;
+        if (selectedElement) {
+          selectedElement.scrollIntoView({
+            behavior: 'instant',
+            block: 'center'
+          });
+        }
+      }
+    }
+  }, [isOpen, time, timeSlots]);
+
   // Use external error if provided, otherwise use validation error
   const displayError = error || validationError;
 
+  // Generate appropriate placeholder based on time format
+  const defaultPlaceholder = timeFormat === "24h" ? "HH:MM" : "HH:MM";
+  const finalPlaceholder = placeholder || defaultPlaceholder;
+
   return (
-    <div {...containerProps} className={cn("space-y-2 relative", containerProps?.className)}>
+    <div {...containerProps} className={cn("space-y-2", containerProps?.className)}>
       {label && (
         <Label htmlFor={id} className="text-sm font-medium text-foreground">
           {label}
         </Label>
       )}
-      <div className="relative" data-time-input={isPairedAfter ? "end" : "start"}>
-        <Input
-          id={id}
-          value={time}
-          onChange={(e) => handleTimeChange(e.target.value)}
-          onFocus={handleFocus}
-          onBlur={(e) => handleBlur(e.target.value)}
-          onKeyDown={(e) => handleKeyDown(e, e.currentTarget.value)}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={cn(
-            "pr-10 border-2 transition-colors",
-            displayError
-              ? 'border-destructive focus:border-destructive'
-              : 'hover:border-primary/50 focus:border-primary',
-            className
-          )}
-        />
-        <button
-          type="button"
-          onClick={handleDropdownToggle}
-          disabled={disabled}
-          className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </button>
-      </div>
-      
-      {isOpen && !disabled && (
-        <div
-          ref={dropdownRef}
-          className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-[200px] overflow-auto"
-        >
-          {timeOptions
-            .filter((option) => {
-              if (!pairedTime || isPairedAfter === undefined) return true;
-              
-              const [optionHours = "0", optionMins = "0"] = option.value.split(':');
-              const optionMinutes = parseInt(optionHours) * 60 + parseInt(optionMins);
-              const [pairedHours = "0", pairedMins = "0"] = pairedTime.split(':');
-              const pairedMinutes = parseInt(pairedHours) * 60 + parseInt(pairedMins);
-              
-              return isPairedAfter ? optionMinutes > pairedMinutes : optionMinutes < pairedMinutes;
-            })
-            .map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                data-time-value={option.value}
-                className={cn(
-                  "w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors",
-                  option.value === time ? 'bg-accent text-accent-foreground font-medium' : ''
-                )}
-                onClick={() => handleOptionSelect(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <div className="relative" data-time-input={isPairedAfter ? "end" : "start"}>
+          <Input
+            id={id}
+            value={time}
+            onChange={(e) => handleTimeInputChange(e.target.value)}
+            onFocus={() => setIsOpen(true)}
+            onClick={() => setIsOpen(true)}
+            onKeyDown={(e) => handleKeyDown(e, e.currentTarget.value)}
+            placeholder={finalPlaceholder}
+            disabled={disabled}
+            className={cn(
+              "pr-10 border-2 transition-colors",
+              displayError
+                ? 'border-destructive focus:border-destructive'
+                : 'hover:border-primary/50 focus:border-primary',
+              className
+            )}
+          />
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={disabled}
+              className="absolute right-0 top-0 h-full px-3 hover:bg-accent/20 transition-colors rounded-r-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </PopoverTrigger>
         </div>
-      )}
+        
+        <PopoverContent 
+          className="w-[--radix-popover-trigger-width] p-0"
+          align="start"
+          side="bottom"
+          sideOffset={4}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <div className="p-3 border-b space-y-2">
+            <p className="text-sm font-medium">Select time</p>
+            <Input
+              type="text"
+              placeholder="HH:MM"
+              value={time}
+              onChange={(e) => handleTimeInputChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm h-8"
+              maxLength={5}
+            />
+          </div>
+          <div
+            ref={scrollContainerRef}
+            className="h-60 overflow-y-auto"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            <div className="p-2 space-y-1">
+              {timeSlots.map((timeSlot) => (
+                <Button
+                  key={timeSlot}
+                  data-time-slot={timeSlot}
+                  variant={time === timeSlot ? "default" : "ghost"}
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => handleTimeSelect(timeSlot)}
+                >
+                  <ClockIcon className="mr-2 h-3 w-3" />
+                  {timeSlot}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
       
       {displayError && (
         <p className="text-xs text-destructive flex items-center gap-1 mt-1">

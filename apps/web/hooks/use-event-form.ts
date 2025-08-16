@@ -226,15 +226,18 @@ export function useEventForm({
     const validation = validateTime(newEndTime);
 
     if (validation.isValid && validation.time) {
+      setEventEndTime(validation.time);
+      setTimeErrors(prev => ({ ...prev, end: undefined }));
+
       const startMinutes = timeToMinutes(eventStartTime);
       const endMinutes = timeToMinutes(validation.time);
 
-      if (endMinutes > startMinutes) {
-        setEventEndTime(validation.time);
-        setTimeErrors(prev => ({ ...prev, end: undefined }));
-      } else {
-        setEventEndTime(newEndTime);
-        setTimeErrors(prev => ({ ...prev, end: 'End time must be after start time' }));
+      // If end time is before or equal to start time, auto-adjust start time
+      if (endMinutes <= startMinutes) {
+        const newStartMinutes = Math.max(0, endMinutes - 60); // 1 hour before end time, but not negative
+        const newStartTime = minutesToTime(newStartMinutes);
+        setEventStartTime(newStartTime);
+        setTimeErrors(prev => ({ ...prev, start: undefined }));
       }
     } else {
       setEventEndTime(newEndTime);

@@ -32,7 +32,6 @@ interface UseTimeInputReturn {
   setTime: (time: string) => void;
   setIsOpen: (open: boolean) => void;
   handleTimeChange: (newTime: string) => void;
-  handleFocus: () => void;
   handleBlur: (value: string) => void;
   handleKeyDown: (e: React.KeyboardEvent, value: string) => void;
   handleDropdownToggle: () => void;
@@ -54,30 +53,12 @@ export function useTimeInput({
   // Generate time options
   const timeOptions = generateAllTimeOptions(timeFormat);
 
-  // Validate time and handle paired time logic
+  // Validate time format only (no paired time validation here)
   const validateAndSetTime = useCallback((newTime: string): TimeValidationResult => {
-    const validation = validateTime(newTime);
-    
-    if (validation.isValid && validation.time && pairedTime && isPairedAfter !== undefined) {
-      // Additional validation for paired times
-      const newMinutes = timeToMinutes(validation.time);
-      const pairedMinutes = timeToMinutes(pairedTime);
-      
-      if (isPairedAfter && newMinutes <= pairedMinutes) {
-        return {
-          isValid: false,
-          error: 'End time must be after start time'
-        };
-      } else if (!isPairedAfter && newMinutes >= pairedMinutes) {
-        return {
-          isValid: false,
-          error: 'Start time must be before end time'
-        };
-      }
-    }
-    
-    return validation;
-  }, [pairedTime, isPairedAfter]);
+    // Only validate the time format, not paired time relationships
+    // The parent component (event form) handles auto-adjustment of paired times
+    return validateTime(newTime);
+  }, []);
 
   // Handle time change with validation
   const handleTimeChange = useCallback((newTime: string) => {
@@ -87,37 +68,15 @@ export function useTimeInput({
       setTime(validation.time);
       setError(undefined);
       onTimeChange?.(validation.time);
-      
-      // Auto-adjust paired time if needed
-      if (pairedTime && !isPairedAfter) {
-        // This is start time, adjust end time if it's not after start
-        const startMinutes = timeToMinutes(validation.time);
-        const endMinutes = timeToMinutes(pairedTime);
-        
-        if (endMinutes <= startMinutes) {
-          const newEndMinutes = startMinutes + 60;
-          const newEndTime = minutesToTime(newEndMinutes);
-          // Note: This would need to be handled by parent component
-          // as we can't directly modify the paired time from here
-        }
-      }
     } else {
       setTime(newTime);
       setError(validation.error);
     }
-  }, [validateAndSetTime, onTimeChange, pairedTime, isPairedAfter]);
+  }, [validateAndSetTime, onTimeChange]);
 
-  // Handle focus
-  const handleFocus = useCallback(() => {
-    setIsOpen(true);
-  }, []);
-
-  // Handle blur with validation
+  // Handle blur with validation (simplified - no longer manages dropdown state)
   const handleBlur = useCallback((value: string) => {
-    setTimeout(() => {
-      handleTimeChange(value);
-      setIsOpen(false);
-    }, 150);
+    handleTimeChange(value);
   }, [handleTimeChange]);
 
   // Handle keyboard events
@@ -129,15 +88,21 @@ export function useTimeInput({
     } else if (e.key === "Escape") {
       setIsOpen(false);
       (e.currentTarget as HTMLInputElement).blur();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setIsOpen(true);
     }
   }, [handleTimeChange]);
 
   // Handle dropdown toggle
   const handleDropdownToggle = useCallback(() => {
-    if (!isOpen) {
-      setTimeout(() => scrollToSelectedTime(dropdownRef, time), 0);
+    const newOpenState = !isOpen;
+    setIsOpen(newOpenState);
+    
+    if (newOpenState) {
+      // Scroll to selected time after dropdown is rendered
+      setTimeout(() => scrollToSelectedTime(dropdownRef, time), 100);
     }
-    setIsOpen(!isOpen);
   }, [isOpen, time]);
 
   // Handle option selection
@@ -149,9 +114,10 @@ export function useTimeInput({
   // Scroll to selected time when dropdown opens
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => scrollToSelectedTime(dropdownRef, time), 50);
+      // Give the popover time to render and position
+      setTimeout(() => scrollToSelectedTime(dropdownRef, time), 200);
     }
-  }, [isOpen, time]);
+  }, [isOpen]);
 
   // Update time when initialTime changes
   useEffect(() => {
@@ -172,7 +138,6 @@ export function useTimeInput({
     setTime,
     setIsOpen,
     handleTimeChange,
-    handleFocus,
     handleBlur,
     handleKeyDown,
     handleDropdownToggle,
