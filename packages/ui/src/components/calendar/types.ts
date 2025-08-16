@@ -27,6 +27,10 @@ export interface CalendarEvent {
   createdAt: Date;
   updatedAt: Date;
   reminder?: number | null;
+  // Recurring event fields
+  recurrence?: string | null; // JSON string of recurrence rule
+  parentEventId?: string | null; // For recurring event instances
+  isRecurringInstance?: boolean; // Frontend helper field
   // Sync fields for external calendar events
   isSynced?: boolean;
   externalId?: string | null;

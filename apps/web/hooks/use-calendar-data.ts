@@ -454,24 +454,43 @@ export function useCalendarData(
         // Make API call and await the result to get the real event ID
         const newEvent = await calendarApiService.createEvent(event);
 
-        // Replace optimistic event with real event
-        setEvents((prev) =>
-          prev.map((e) => (e.id === operationId ? newEvent : e)),
-        );
+        // Check if this is a recurring event
+        const isRecurringEvent = !!(event.recurrence);
+        
+        if (isRecurringEvent) {
+          console.log('Created recurring event - refreshing to show all instances');
+          
+          // For recurring events, we need to refetch to get all instances
+          // Clear all cache since recurring events can span multiple date ranges
+          eventsCache.current.clear();
+          
+          // Remove the optimistic event and refetch all events
+          setEvents((prev) => prev.filter((e) => e.id !== operationId));
+          
+          // Refetch events to get all recurring instances
+          if (currentDateRange) {
+            await fetchEvents(currentDateRange);
+          }
+        } else {
+          // For regular events, just replace optimistic event with real event
+          setEvents((prev) =>
+            prev.map((e) => (e.id === operationId ? newEvent : e)),
+          );
 
-        // Smart cache invalidation
-        const eventDate = new Date(event.start);
-        const dayStart = new Date(eventDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(eventDate);
-        dayEnd.setHours(23, 59, 59, 999);
+          // Smart cache invalidation for regular events
+          const eventDate = new Date(event.start);
+          const dayStart = new Date(eventDate);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(eventDate);
+          dayEnd.setHours(23, 59, 59, 999);
 
-        for (const [key, entry] of eventsCache.current.entries()) {
-          if (
-            entry.dateRange.start <= dayEnd &&
-            entry.dateRange.end >= dayStart
-          ) {
-            eventsCache.current.delete(key);
+          for (const [key, entry] of eventsCache.current.entries()) {
+            if (
+              entry.dateRange.start <= dayEnd &&
+              entry.dateRange.end >= dayStart
+            ) {
+              eventsCache.current.delete(key);
+            }
           }
         }
 
@@ -486,7 +505,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [createOptimisticEvent, rollbackOperation, cleanupOperation],
+    [createOptimisticEvent, rollbackOperation, cleanupOperation, currentDateRange, fetchEvents],
   );
 
   const updateEvent = useCallback(
@@ -585,31 +604,47 @@ export function useCalendarData(
           updatedEvent,
         );
 
-        // Replace optimistic event with real event
-        setEvents((prev) => {
-          const eventIndex = prev.findIndex((e) => e.id === id);
-          if (eventIndex >= 0) {
-            // Event found - replace it
-            const updated = prev.map((e) => (e.id === id ? updatedEvent : e));
-            console.log(`Updated existing event ${id} in local state`);
-            return updated;
-          } else {
-            // Event not found - add it (this handles the case where optimistic update failed)
-            console.log(`Event ${id} not found in local state, adding it`);
-            return [...prev, updatedEvent];
+        // Check if this is a recurring event
+        const isRecurringEvent = !!(event.recurrence || updatedEvent.recurrence);
+        
+        if (isRecurringEvent) {
+          console.log('Updated recurring event - refreshing to show all instances');
+          
+          // For recurring events, we need to refetch to get all instances
+          // Clear all cache since recurring events can span multiple date ranges
+          eventsCache.current.clear();
+          
+          // Refetch events to get all recurring instances
+          if (currentDateRange) {
+            await fetchEvents(currentDateRange);
           }
-        });
+        } else {
+          // Replace optimistic event with real event for regular events
+          setEvents((prev) => {
+            const eventIndex = prev.findIndex((e) => e.id === id);
+            if (eventIndex >= 0) {
+              // Event found - replace it
+              const updated = prev.map((e) => (e.id === id ? updatedEvent : e));
+              console.log(`Updated existing event ${id} in local state`);
+              return updated;
+            } else {
+              // Event not found - add it (this handles the case where optimistic update failed)
+              console.log(`Event ${id} not found in local state, adding it`);
+              return [...prev, updatedEvent];
+            }
+          });
 
-        // Smart cache invalidation - only invalidate cache entries that might contain this event
-        const eventStartDate = new Date(event.start || updatedEvent.start);
-        const eventEndDate = new Date(event.end || updatedEvent.end);
+          // Smart cache invalidation - only invalidate cache entries that might contain this event
+          const eventStartDate = new Date(event.start || updatedEvent.start);
+          const eventEndDate = new Date(event.end || updatedEvent.end);
 
-        for (const [key, entry] of eventsCache.current.entries()) {
-          if (
-            entry.dateRange.start <= eventEndDate &&
-            entry.dateRange.end >= eventStartDate
-          ) {
-            eventsCache.current.delete(key);
+          for (const [key, entry] of eventsCache.current.entries()) {
+            if (
+              entry.dateRange.start <= eventEndDate &&
+              entry.dateRange.end >= eventStartDate
+            ) {
+              eventsCache.current.delete(key);
+            }
           }
         }
 
@@ -623,7 +658,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [events, generateOptimisticId, rollbackOperation, cleanupOperation],
+    [events, generateOptimisticId, rollbackOperation, cleanupOperation, currentDateRange, fetchEvents],
   );
 
   const deleteEvent = useCallback(

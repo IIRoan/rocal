@@ -423,6 +423,13 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
     async ({ params, query, user }: any) => {
       const { id } = params;
       const { deleteScope, occurrenceDate } = query;
+      
+      console.log('🗑️ DELETE RECURRING EVENT REQUEST:', {
+        eventId: id,
+        deleteScope,
+        occurrenceDate,
+        userId: user.id
+      });
 
       // Verify event exists and belongs to user
       const existingEvent = await prisma.calendarEvent.findFirst({
@@ -447,15 +454,57 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           }
 
           const exceptionDate = new Date(occurrenceDate);
+          console.log('📅 Creating RecurrenceException:', {
+            parentEventId: id,
+            exceptionDate: exceptionDate.toISOString(),
+            originalOccurrenceDate: occurrenceDate,
+            type: 'deleted'
+          });
 
-          // Create deletion exception
-          await prisma.recurrenceException.create({
-            data: {
-              parentEventId: id,
-              exceptionDate,
-              type: "deleted",
+          // Check if exception already exists
+          const existingException = await prisma.recurrenceException.findUnique({
+            where: {
+              parentEventId_exceptionDate: {
+                parentEventId: id,
+                exceptionDate,
+              },
             },
           });
+
+          let exception;
+          if (existingException) {
+            console.log('⚠️ RecurrenceException already exists:', existingException);
+            
+            // If it's already deleted, that's fine - just return success
+            if (existingException.type === "deleted") {
+              console.log('✅ Occurrence already deleted, returning success');
+              exception = existingException;
+            } else {
+              // If it's a different type (e.g., "modified"), update it to "deleted"
+              console.log('🔄 Updating existing exception to deleted type');
+              exception = await prisma.recurrenceException.update({
+                where: {
+                  parentEventId_exceptionDate: {
+                    parentEventId: id,
+                    exceptionDate,
+                  },
+                },
+                data: {
+                  type: "deleted",
+                },
+              });
+            }
+          } else {
+            // Create new deletion exception
+            exception = await prisma.recurrenceException.create({
+              data: {
+                parentEventId: id,
+                exceptionDate,
+                type: "deleted",
+              },
+            });
+            console.log('✅ New RecurrenceException created:', exception);
+          }
 
           return {
             success: true,

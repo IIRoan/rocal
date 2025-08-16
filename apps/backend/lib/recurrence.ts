@@ -87,6 +87,13 @@ export class RecurrenceEngine {
     const rule = this.parseRecurrenceRule(baseEvent.recurrence);
     if (!rule) return [];
 
+    console.log(`🔄 RecurrenceEngine.generateInstances for event ${baseEvent.id}:`);
+    console.log(`📅 Date range: ${rangeStart.toISOString()} to ${rangeEnd.toISOString()}`);
+    console.log(`🚫 Exceptions (${exceptions.length}):`, exceptions.map(ex => ({
+      date: ex.exceptionDate.toISOString(),
+      type: ex.type
+    })));
+
     const instances: RecurrenceInstance[] = [];
     const eventStart = baseEvent.start;
     const eventDuration = baseEvent.end.getTime() - baseEvent.start.getTime();
@@ -97,10 +104,12 @@ export class RecurrenceEngine {
 
     // Add the original event if it falls within range
     if (currentDate >= rangeStart && currentDate <= rangeEnd) {
-      const hasException = exceptions.some((ex) =>
-        isSameDay(ex.exceptionDate, currentDate),
+      const isDeleted = exceptions.some((ex) =>
+        isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
       );
-      if (!hasException) {
+      if (isDeleted) {
+        console.log(`🚫 Skipping DELETED original event on ${currentDate.toISOString()}`);
+      } else {
         instances.push({
           date: new Date(currentDate),
           isOriginal: true,
@@ -121,10 +130,12 @@ export class RecurrenceEngine {
 
       // Check if this instance falls within our range
       if (currentDate >= rangeStart && currentDate <= rangeEnd) {
-        const hasException = exceptions.some((ex) =>
-          isSameDay(ex.exceptionDate, currentDate),
+        const isDeleted = exceptions.some((ex) =>
+          isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
         );
-        if (!hasException) {
+        if (isDeleted) {
+          console.log(`🚫 Skipping DELETED recurring instance on ${currentDate.toISOString()}`);
+        } else {
           instances.push({
             date: new Date(currentDate),
             isOriginal: false,
@@ -134,6 +145,7 @@ export class RecurrenceEngine {
       }
     }
 
+    console.log(`✅ Generated ${instances.length} instances (after filtering deleted exceptions)`);
     return instances;
   }
 

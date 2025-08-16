@@ -7,7 +7,7 @@ import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
 import { format, isBefore } from "date-fns";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
+import type { UserSettings, UpdateSettingsRequest, RecurrenceRule } from "@/lib/types/calendar";
 import { PasskeySettings } from "./passkey-settings";
 import { SubscriptionManagement } from "./subscription-management";
 import {
@@ -44,6 +44,11 @@ import {
   EventNotification,
 } from "@workspace/ui/components/calendar/notification-manager";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { RecurringEventForm } from "./command-palette/recurring-event-form";
+import { RecurringDeleteModal } from "./command-palette/recurring-delete-modal";
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 import {
   CommandDialog,
   CommandList,
@@ -166,6 +171,9 @@ export function CommandPalette({
   const [eventCalendarId, setEventCalendarId] = useState<string>("");
   const [eventReminder, setEventReminder] = useState<number | null>(null);
   const [eventSaving, setEventSaving] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null);
+  const [showRecurringDeleteModal, setShowRecurringDeleteModal] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
   const [startTimeOpen, setStartTimeOpen] = useState(false);
@@ -203,6 +211,9 @@ export function CommandPalette({
       setSelectedEvent(null);
       setEventNotifications([]);
       setShowNotifications(false);
+      setShowRecurringDeleteModal(false);
+      setIsRecurring(false);
+      setRecurrenceRule(null);
     }
   }, [open, initialView]);
 
@@ -243,6 +254,22 @@ export function CommandPalette({
       setEventLocation(eventToEdit.location || "");
       setEventCalendarId(eventToEdit.calendarId || calendars?.[0]?.id || "");
       setEventReminder(eventToEdit.reminder ?? null);
+      
+      // Handle recurring event data
+      const hasRecurrence = !!eventToEdit.recurrence;
+      setIsRecurring(hasRecurrence);
+      if (hasRecurrence && eventToEdit.recurrence) {
+        try {
+          const parsedRule = JSON.parse(eventToEdit.recurrence) as RecurrenceRule;
+          setRecurrenceRule(parsedRule);
+        } catch (error) {
+          console.error("Failed to parse recurrence rule:", error);
+          setIsRecurring(false);
+          setRecurrenceRule(null);
+        }
+      } else {
+        setRecurrenceRule(null);
+      }
 
       // Load notifications for existing events
       if (!isNewEvent && eventToEdit.id) {
@@ -267,6 +294,13 @@ export function CommandPalette({
     setShowResetConfirm(false);
     setTimezoneSearch("");
   }, [currentView]);
+
+  // Debug recurring delete modal state changes
+  useEffect(() => {
+    console.log('showRecurringDeleteModal changed to:', showRecurringDeleteModal);
+    console.log('currentView:', currentView);
+    console.log('selectedEvent:', selectedEvent?.id);
+  }, [showRecurringDeleteModal, currentView, selectedEvent]);
 
   // Close time dropdowns when clicking outside
   useEffect(() => {
@@ -485,6 +519,21 @@ export function CommandPalette({
       return;
     }
 
+    // Validate recurrence rule if recurring is enabled
+    if (isRecurring && recurrenceRule) {
+      try {
+        const validation = await calendarApiService.validateRecurrence(recurrenceRule);
+        if (!validation.valid) {
+          toast.error(`Invalid recurrence rule: ${validation.errors.join(', ')}`);
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to validate recurrence rule:", error);
+        toast.error("Failed to validate recurrence settings");
+        return;
+      }
+    }
+
     // Validate for duplicate notifications
     const enabledNotifications = eventNotifications.filter((n) => n.isEnabled);
     const notificationTimes = enabledNotifications.map((n) => n.minutesBefore);
@@ -544,6 +593,8 @@ export function CommandPalette({
       updatedAt: new Date(),
       // Don't use legacy reminder field - use new notification system instead
       reminder: undefined,
+      // Add recurrence data
+      recurrence: isRecurring && recurrenceRule ? JSON.stringify(recurrenceRule) : undefined,
     };
 
     // Convert legacy reminder to notification if needed
@@ -599,6 +650,7 @@ export function CommandPalette({
           location: eventData.location,
           calendarId: eventData.calendarId,
           reminder: undefined, // Use new notification system instead
+          recurrence: eventData.recurrence || undefined,
         });
         toast.success(`Event "${eventTitle}" updated`);
       } else {
@@ -613,6 +665,7 @@ export function CommandPalette({
           location: eventData.location,
           calendarId: eventData.calendarId,
           reminder: undefined, // Use new notification system instead
+          recurrence: eventData.recurrence || undefined,
         });
         console.log("Event created successfully:", newEvent.id);
         savedEventId = newEvent.id;
@@ -621,7 +674,17 @@ export function CommandPalette({
 
       // Save notifications using the new notification system
       if (savedEventId && finalNotifications.length > 0) {
-        await saveEventNotifications(savedEventId, finalNotifications);
+        console.log('Saving notifications for event:', savedEventId, 'isRecurring:', isRecurring);
+        
+        // For recurring events, the backend handles creating notifications for all instances
+        // For non-recurring events, use the regular notification system
+        if (isRecurring && recurrenceRule) {
+          // The backend already created notifications for recurring events during event creation
+          // But we still update if the user made changes to notifications
+          await saveEventNotifications(savedEventId, finalNotifications);
+        } else {
+          await saveEventNotifications(savedEventId, finalNotifications);
+        }
       }
 
       // Trigger calendar refresh
@@ -645,6 +708,9 @@ export function CommandPalette({
           setEventReminder,
           setEventNotifications,
         });
+        setIsRecurring(false);
+        setRecurrenceRule(null);
+        setShowRecurringDeleteModal(false);
       }, 100);
     } catch (error: any) {
       console.error("Failed to save event:", error);
@@ -684,11 +750,17 @@ export function CommandPalette({
   };
 
   const handleEventDelete = async () => {
-    if (!selectedEvent?.id) return;
+    console.log('handleEventDelete called for event:', selectedEvent?.id);
+    if (!selectedEvent?.id) {
+      console.log('No selectedEvent or selectedEvent.id, returning');
+      return;
+    }
 
+    console.log('Starting delete process for event:', selectedEvent.id);
     setEventSaving(true);
     try {
       await calendarData.deleteEvent(selectedEvent.id);
+      console.log('Event deleted successfully:', selectedEvent.id);
       toast.success(`Event "${eventTitle}" deleted`);
 
       // Trigger calendar refresh
@@ -712,10 +784,229 @@ export function CommandPalette({
           setEventReminder,
           setEventNotifications,
         });
+        setIsRecurring(false);
+        setRecurrenceRule(null);
+        setShowRecurringDeleteModal(false);
       }, 100);
     } catch (error: any) {
       console.error("Failed to delete event:", error);
       toast.error("Failed to delete event");
+    } finally {
+      setEventSaving(false);
+    }
+  };
+
+  // Simple recurring delete handlers
+  const handleRecurringDeleteThis = async () => {
+    if (!selectedEvent?.id) return;
+    
+    // Prevent double-clicking / multiple simultaneous requests
+    if (eventSaving) {
+      console.log('⚠️ Delete already in progress, ignoring request');
+      return;
+    }
+    
+    console.log('=== DELETING SINGLE OCCURRENCE ===');
+    console.log('Selected event:', {
+      id: selectedEvent.id,
+      title: selectedEvent.title,
+      start: selectedEvent.start,
+      parentEventId: selectedEvent.parentEventId,
+      isRecurringInstance: selectedEvent.isRecurringInstance,
+      recurrence: selectedEvent.recurrence
+    });
+    
+    setShowRecurringDeleteModal(false);
+    
+    // Get the parent event ID for recurring instances
+    let parentEventId = selectedEvent.parentEventId || selectedEvent.id;
+    
+    // Handle synthetic IDs (pattern: parentId_date)
+    if (!selectedEvent.parentEventId && selectedEvent.id.includes('_')) {
+      const parts = selectedEvent.id.split('_');
+      if (parts.length > 1 && parts[0]) {
+        parentEventId = parts[0];
+        console.log('Extracted parent ID from synthetic ID:', parentEventId);
+      }
+    }
+    
+    // For recurring instances, prefer the date from the synthetic ID since that's 
+    // exactly what the backend used to generate the instance
+    let occurrenceDate = selectedEvent.start.toISOString();
+    let dateFromId = null;
+    
+    if (selectedEvent.id.includes('_')) {
+      const parts = selectedEvent.id.split('_');
+      if (parts.length > 1) {
+        dateFromId = parts[1]; // This should be the ISO date
+        // Use the date from ID if available, as it's more precise
+        if (dateFromId) {
+          occurrenceDate = dateFromId;
+          console.log('Using date from synthetic ID instead of event start:', dateFromId);
+        }
+      }
+    }
+    
+    console.log('API call parameters:', {
+      originalEventId: selectedEvent.id,
+      parentEventId,
+      deleteScope: 'this_only',
+      occurrenceDate,
+      dateFromId,
+      selectedEventStart: selectedEvent.start,
+      hasParentEventId: !!selectedEvent.parentEventId,
+      hasSyntheticId: selectedEvent.id.includes('_'),
+      dateComparison: {
+        fromEvent: occurrenceDate,
+        fromId: dateFromId,
+        match: occurrenceDate === dateFromId
+      }
+    });
+    
+    setEventSaving(true);
+    try {
+      console.log('About to call deleteRecurringEvent API...');
+      const result = await calendarApiService.deleteRecurringEvent(parentEventId, 'this_only', occurrenceDate);
+      console.log('✅ Delete API SUCCESS - Response:', result);
+      
+      toast.success("Event occurrence deleted");
+      
+      // Force refresh the calendar to reflect the deletion
+      console.log('🔄 Starting calendar refresh...');
+      console.log('calendarData available:', !!calendarData);
+      console.log('refetchEvents available:', !!calendarData?.refetchEvents);
+      console.log('onEventSaved available:', !!onEventSaved);
+      
+      // For recurring event deletions, we need to force a complete refresh
+      // because the backend creates RecurrenceExceptions that affect instance generation
+      let refreshCompleted = false;
+      
+      try {
+        // Clear cache first for recurring events since they affect instance generation
+        if (calendarData?.clearCache) {
+          console.log('🗑️ Clearing calendar cache...');
+          calendarData.clearCache();
+        }
+        
+        if (calendarData?.refetchEvents) {
+          console.log('📡 Calling calendarData.refetchEvents()...');
+          await calendarData.refetchEvents();
+          console.log('✅ Calendar refetchEvents completed');
+          refreshCompleted = true;
+        }
+        
+        // Also call onEventSaved as a backup to ensure refresh
+        if (onEventSaved) {
+          console.log('📞 Calling onEventSaved callback...');
+          onEventSaved();
+          console.log('✅ onEventSaved callback completed');
+        }
+        
+        // Additional fallback: try refetch with explicit cache clear
+        if (calendarData?.refetch) {
+          console.log('🔄 Calling full calendar refetch...');
+          await calendarData.refetch();
+          console.log('✅ Full calendar refetch completed');
+        }
+        
+        // Debug: Manually check if the event is still being generated
+        console.log('🔍 Debug: Checking if deleted occurrence still appears...');
+        setTimeout(() => {
+          const currentEvents = calendarData?.events || [];
+          const stillExists = currentEvents.find(e => 
+            e.id === selectedEvent.id || 
+            (e.parentEventId === parentEventId && e.start.toISOString() === occurrenceDate)
+          );
+          console.log('🔍 Event still exists after refresh:', !!stillExists);
+          if (stillExists) {
+            console.log('🔍 Event details:', stillExists);
+            console.log('⚠️ This suggests the RecurrenceException is not being properly applied during instance generation');
+          } else {
+            console.log('✅ Event successfully removed from calendar');
+          }
+        }, 1000);
+        
+        if (!refreshCompleted) {
+          console.log('⚠️ No refresh method available - this might be why calendar is not updating');
+        }
+      } catch (refreshError) {
+        console.error('❌ Calendar refresh error:', refreshError);
+        // Try fallback
+        if (onEventSaved) {
+          console.log('🔄 Trying fallback refresh...');
+          onEventSaved();
+        }
+      }
+      
+      // Wait a moment for the refresh to propagate before closing
+      console.log('⏱️ Waiting for refresh to propagate...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('🚪 Closing modal...');
+      onOpenChange(false);
+      console.log('✅ Delete occurrence process completed');
+    } catch (error: any) {
+      console.error("❌ Failed to delete recurring event occurrence:", error);
+      console.error("❌ Error details:", error.response || error);
+      console.error("❌ Error message:", error.message);
+      console.error("❌ Full error object:", error);
+      toast.error(`Failed to delete event occurrence: ${error.message || 'Unknown error'}`);
+    } finally {
+      setEventSaving(false);
+      console.log('🏁 Delete occurrence finally block executed');
+    }
+  };
+
+  const handleRecurringDeleteAll = async () => {
+    if (!selectedEvent?.id) return;
+    
+    // Prevent double-clicking / multiple simultaneous requests
+    if (eventSaving) {
+      console.log('⚠️ Delete series already in progress, ignoring request');
+      return;
+    }
+    
+    console.log('=== DELETING ENTIRE SERIES ===');
+    console.log('Selected event:', selectedEvent.id);
+    setShowRecurringDeleteModal(false);
+    
+    // Get the parent event ID for recurring instances
+    let parentEventId = selectedEvent.parentEventId || selectedEvent.id;
+    
+    // Handle synthetic IDs (pattern: parentId_date)
+    if (!selectedEvent.parentEventId && selectedEvent.id.includes('_')) {
+      const parts = selectedEvent.id.split('_');
+      if (parts.length > 1 && parts[0]) {
+        parentEventId = parts[0];
+        console.log('Extracted parent ID from synthetic ID for series deletion:', parentEventId);
+      }
+    }
+    
+    console.log('Deleting entire series with parentEventId:', parentEventId);
+    
+    setEventSaving(true);
+    try {
+      const result = await calendarApiService.deleteRecurringEvent(parentEventId, 'all');
+      console.log('Delete series API response:', result);
+      
+      toast.success("Entire event series deleted");
+      
+      // Force refresh the calendar to reflect the deletion
+      console.log('Triggering calendar refresh for series deletion...');
+      
+      if (calendarData?.refetchEvents) {
+        console.log('Calling calendarData.refetchEvents()');
+        await calendarData.refetchEvents();
+      } else {
+        console.log('Falling back to onEventSaved callback');
+        onEventSaved?.();
+      }
+      
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Failed to delete recurring event series:", error);
+      console.error("Error details:", error.response || error);
+      toast.error("Failed to delete event series");
     } finally {
       setEventSaving(false);
     }
@@ -1262,6 +1553,9 @@ export function CommandPalette({
           setEventReminder,
           setEventNotifications,
         });
+        setIsRecurring(false);
+        setRecurrenceRule(null);
+        setShowRecurringDeleteModal(false);
                   goForward("event-editor");
                 }}
                 className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
@@ -1308,7 +1602,10 @@ export function CommandPalette({
             {/* Edit button for view mode */}
             {selectedEvent?.id && eventViewMode === 'view' && !selectedEvent.isSynced && (
               <Button
-                onClick={() => setEventViewMode('edit')}
+                onClick={() => {
+                  // For now, just allow direct editing - we'll handle recurring edit later
+                  setEventViewMode('edit');
+                }}
                 variant="outline"
                 size="sm"
                 className="ml-4"
@@ -1398,6 +1695,44 @@ export function CommandPalette({
                       <p className="text-sm">{calendars.find(c => c.id === eventCalendarId)?.name || "Unknown Calendar"}</p>
                     </div>
                   </div>
+
+                  {/* Recurrence Info */}
+                  {isRecurring && recurrenceRule && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                        Recurrence
+                      </Label>
+                      <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-md border border-blue-200/50 dark:border-blue-800/50">
+                        <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+                          {(() => {
+                            // Generate a human-readable description
+                            const { frequency, interval, count, until, byWeekDay } = recurrenceRule;
+                            let description = "";
+                            
+                            if (interval === 1) {
+                              description = frequency.charAt(0).toUpperCase() + frequency.slice(1);
+                            } else {
+                              description = `Every ${interval} ${frequency === "daily" ? "days" : frequency === "weekly" ? "weeks" : frequency === "monthly" ? "months" : "years"}`;
+                            }
+                            
+                            if (frequency === "weekly" && byWeekDay && byWeekDay.length > 0) {
+                              const dayNames = byWeekDay.map(d => WEEKDAY_SHORT[d]).join(", ");
+                              description += ` on ${dayNames}`;
+                            }
+                            
+                            if (count) {
+                              description += `, ${count} times`;
+                            } else if (until) {
+                              description += `, until ${format(new Date(until), "MMM d, yyyy")}`;
+                            }
+                            
+                            return description;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 /* EDIT MODE - Editable form */
@@ -1757,6 +2092,16 @@ export function CommandPalette({
                     />
                   </div>
 
+                  {/* Recurring Event Settings */}
+                  <RecurringEventForm
+                    isRecurring={isRecurring}
+                    onIsRecurringChange={setIsRecurring}
+                    recurrenceRule={recurrenceRule}
+                    onRecurrenceRuleChange={setRecurrenceRule}
+                    eventStartDate={eventStartDate}
+                    eventEndDate={eventEndDate}
+                  />
+
                   {/* Email Notifications */}
                   <div className="space-y-2">
                     <div className="border rounded-lg overflow-hidden transition-all duration-200 hover:shadow-sm bg-gradient-to-br from-card/50 to-card/30">
@@ -1843,7 +2188,25 @@ export function CommandPalette({
                   {selectedEvent?.id && !selectedEvent.isSynced && (
                     <Button
                       variant="outline"
-                      onClick={handleEventDelete}
+                      onClick={() => {
+                        console.log('Delete button clicked for event:', selectedEvent.id);
+                        
+                        // Check if this is a recurring event (simple check)
+                        const isRecurringEvent = !!(
+                          selectedEvent.recurrence || 
+                          selectedEvent.isRecurringInstance || 
+                          selectedEvent.parentEventId ||
+                          (selectedEvent.id && selectedEvent.id.includes('_'))
+                        );
+                        
+                        if (isRecurringEvent) {
+                          console.log('Recurring event detected - showing delete modal');
+                          setShowRecurringDeleteModal(true);
+                        } else {
+                          console.log('Regular event - direct delete');
+                          handleEventDelete();
+                        }
+                      }}
                       disabled={eventSaving}
                       className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-all duration-200"
                     >
@@ -1898,14 +2261,26 @@ export function CommandPalette({
             </div>
           </div>
         </TransitionContainer>
+        
+        {/* Recurring Delete Modal */}
+        {selectedEvent && (
+          <RecurringDeleteModal
+            open={showRecurringDeleteModal}
+            onOpenChange={setShowRecurringDeleteModal}
+            eventTitle={selectedEvent.title}
+            onDeleteAll={handleRecurringDeleteAll}
+            loading={eventSaving}
+          />
+        )}
       </CommandDialog>
     );
   }
 
+
   // Other views fallback
   return (
     <>
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <CommandDialog open={open} onOpenChange={onOpenChange}>
       <TransitionContainer direction={transitionDirection}>
         <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
           <button
