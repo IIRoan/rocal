@@ -3340,6 +3340,89 @@ export class EnhancedNotificationService {
       }
     });
   }
+
+  /**
+   * Create notifications for a recurring event series
+   * This method generates notifications for each occurrence within a time window
+   */
+  public async createNotificationsForRecurringEvent(
+    eventId: string,
+    notifications: NotificationConfig[],
+    startDate: Date,
+    endDate: Date
+  ): Promise<CreateNotificationResult> {
+    try {
+      // Get the recurring event
+      const recurringEvent = await prisma.calendarEvent.findUnique({
+        where: { id: eventId },
+        select: { 
+          id: true, 
+          userId: true, 
+          start: true, 
+          end: true,
+          recurrence: true 
+        },
+      });
+
+      if (!recurringEvent) {
+        throw new Error(`Recurring event with ID ${eventId} not found`);
+      }
+
+      if (!recurringEvent.recurrence) {
+        // Not a recurring event, use regular notification creation
+        return this.createNotificationsForEvent(eventId, recurringEvent.start, notifications);
+      }
+
+      // Parse recurrence rule and generate instances
+      const { RecurrenceEngine } = await import("./recurrence");
+      const engine = new RecurrenceEngine();
+      
+      try {
+        const recurrenceRule = JSON.parse(recurringEvent.recurrence);
+        const instances = engine.generateRecurrence(
+          recurrenceRule,
+          recurringEvent.start,
+          startDate,
+          endDate,
+          1000 // Limit to prevent runaway generation
+        );
+
+        const allCreated: EventNotification[] = [];
+        const allSkipped: Array<{ config: NotificationConfig; reason: string }> = [];
+
+        // Create notifications for each occurrence
+        for (const instance of instances) {
+          if (!instance.isOriginal) {
+            // For recurring instances, create notifications with the occurrence date
+            const result = await this.createNotificationsForEvent(
+              eventId,
+              instance.date,
+              notifications
+            );
+            
+            allCreated.push(...result.created);
+            allSkipped.push(...result.skipped);
+          }
+        }
+
+        console.log(
+          `✓ Created ${allCreated.length} notifications for ${instances.length} occurrences of recurring event ${eventId}`
+        );
+
+        return {
+          created: allCreated,
+          skipped: allSkipped,
+        };
+      } catch (parseError) {
+        console.error("Failed to parse recurrence rule:", parseError);
+        // Fall back to single event notification
+        return this.createNotificationsForEvent(eventId, recurringEvent.start, notifications);
+      }
+    } catch (error) {
+      console.error("Failed to create notifications for recurring event:", error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
