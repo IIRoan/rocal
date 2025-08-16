@@ -42,9 +42,9 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     let start: Date;
     let end: Date;
 
-    // Use weekStartDay from settings, fallback to 0 (Sunday)
+    // Use weekStartDay from settings, fallback to 1 (Monday)
     // Cast the weekStartsOn to the Day type to satisfy date-fns
-    const weekStartsOn = (settings?.weekStartDay ?? 0) as Day;
+    const weekStartsOn = (settings?.weekStartDay ?? 1) as Day;
 
     switch (initialView) {
       case "month":
