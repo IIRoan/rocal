@@ -17,6 +17,7 @@ interface RecurringDeleteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventTitle: string;
+  onDeleteThis?: () => void;
   onDeleteAll: () => void;
   loading?: boolean;
 }
@@ -25,6 +26,7 @@ export function RecurringDeleteModal({
   open,
   onOpenChange,
   eventTitle,
+  onDeleteThis,
   onDeleteAll,
   loading = false,
 }: RecurringDeleteModalProps) {
@@ -41,10 +43,10 @@ export function RecurringDeleteModal({
         <div className="space-y-4">
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete "{eventTitle}"?
+              "{eventTitle}" is a recurring event.
             </p>
             <p className="text-sm text-muted-foreground">
-              This will delete all occurrences of this recurring event and cannot be undone.
+              Would you like to delete just this occurrence or the entire series?
             </p>
           </div>
 
@@ -56,6 +58,18 @@ export function RecurringDeleteModal({
             >
               Cancel
             </Button>
+            {onDeleteThis && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onDeleteThis();
+                }}
+                disabled={loading}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {loading ? "Deleting..." : "Delete This Only"}
+              </Button>
+            )}
             <Button
               variant="destructive"
               onClick={() => {
@@ -64,7 +78,7 @@ export function RecurringDeleteModal({
               disabled={loading}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              {loading ? "Deleting..." : "Delete Event"}
+              {loading ? "Deleting..." : "Delete All"}
             </Button>
           </div>
         </div>
