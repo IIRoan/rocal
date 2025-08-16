@@ -3375,16 +3375,17 @@ export class EnhancedNotificationService {
 
       // Parse recurrence rule and generate instances
       const { RecurrenceEngine } = await import("./recurrence");
-      const engine = new RecurrenceEngine();
       
       try {
-        const recurrenceRule = JSON.parse(recurringEvent.recurrence);
-        const instances = engine.generateRecurrence(
-          recurrenceRule,
-          recurringEvent.start,
+        const instances = RecurrenceEngine.generateInstances(
+          {
+            id: eventId,
+            start: recurringEvent.start,
+            end: recurringEvent.end,
+            recurrence: recurringEvent.recurrence
+          },
           startDate,
-          endDate,
-          1000 // Limit to prevent runaway generation
+          endDate
         );
 
         const allCreated: EventNotification[] = [];
