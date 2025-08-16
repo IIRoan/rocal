@@ -57,7 +57,7 @@ export function CommandPaletteProvider({
 
   const openEventEditor = (event?: CalendarEvent) => {
     setEventToEdit(event || null);
-    setInitialView("main");
+    setInitialView("event-editor");
     setIsOpen(true);
   };
 
