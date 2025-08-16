@@ -116,6 +116,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             exceptionDate: ex.exceptionDate,
             type: ex.type as "modified" | "deleted",
           }));
+          
+          console.log(`📋 Processing recurring event "${recurringEvent.title}" (${recurringEvent.id}) with ${exceptions.length} exceptions:`, exceptions);
 
           const instances = RecurrenceEngine.generateInstances(
             {
@@ -580,8 +582,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         });
 
         // Create notifications using enhanced notification service
-        // Note: For recurring events, notifications are created on the parent event only
-        // The notification system will handle sending reminders for each occurrence
         try {
           const enhancedNotificationService =
             EnhancedNotificationService.getInstance();
@@ -606,19 +606,41 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
           // Create notifications for the event
           if (notificationConfigs.length > 0) {
-            const result =
-              await enhancedNotificationService.createNotificationsForEvent(
+            let result;
+            
+            if (body.recurrence) {
+              // For recurring events, create notifications for multiple occurrences
+              const endDate = new Date(startDate);
+              endDate.setFullYear(endDate.getFullYear() + 2); // Generate 2 years ahead
+              
+              result = await enhancedNotificationService.createNotificationsForRecurringEvent(
+                event.id,
+                notificationConfigs,
+                startDate,
+                endDate
+              );
+              
+              console.log(
+                `✓ Created ${result.created.length} notifications for recurring event ${event.id}` +
+                  (result.skipped.length > 0
+                    ? `, skipped ${result.skipped.length}`
+                    : "")
+              );
+            } else {
+              // Single event notification
+              result = await enhancedNotificationService.createNotificationsForEvent(
                 event.id,
                 startDate,
                 notificationConfigs
               );
 
-            console.log(
-              `✓ Created ${result.created.length} notifications for event ${event.id}` +
-                (result.skipped.length > 0
-                  ? `, skipped ${result.skipped.length}`
-                  : "")
-            );
+              console.log(
+                `✓ Created ${result.created.length} notifications for event ${event.id}` +
+                  (result.skipped.length > 0
+                    ? `, skipped ${result.skipped.length}`
+                    : "")
+              );
+            }
           }
         } catch (notificationError) {
           console.error(
@@ -750,11 +772,17 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
     "/:id",
     async ({ params, body, user }: any) => {
       try {
-        const { id } = params;
+        const { id: requestedId } = params;
 
         // Check if this is a recurring instance ID (contains underscore and ISO date)
+        let id = requestedId;
         if (id.includes('_') && id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-          throw new ValidationError("Cannot edit recurring event instances. Please edit the parent recurring event instead.");
+          // Extract parent event ID from instance ID
+          const parentEventId = id.split('_')[0];
+          console.log(`Redirecting edit request from instance ${id} to parent ${parentEventId}`);
+          
+          // Update the parent event instead
+          id = parentEventId;
         }
 
         // Verify event exists and belongs to user
@@ -1208,11 +1236,17 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
     "/:id",
     async ({ params, user }: any) => {
       try {
-        const { id } = params;
+        const { id: requestedId } = params;
 
         // Check if this is a recurring instance ID (contains underscore and ISO date)
+        let id = requestedId;
         if (id.includes('_') && id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-          throw new ValidationError("Cannot delete recurring event instances. Please delete the parent recurring event instead.");
+          // Extract parent event ID from instance ID
+          const parentEventId = id.split('_')[0];
+          console.log(`Redirecting delete request from instance ${id} to parent ${parentEventId}`);
+          
+          // Delete the parent event instead
+          id = parentEventId;
         }
 
         // Verify event exists and belongs to user
