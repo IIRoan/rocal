@@ -142,7 +142,7 @@ export const createAPI = (prefix = "") => {
 };
 
 // Start the server if this file is run directly
-if (import.meta.main) {
+if (require.main === module) {
   const port = process.env.PORT || 3001;
   const app = createAPI();
   
