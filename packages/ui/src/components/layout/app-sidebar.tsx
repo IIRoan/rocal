@@ -43,6 +43,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
+  isMobile?: boolean;
 }
 
 export function AppSidebar({
@@ -50,6 +51,7 @@ export function AppSidebar({
   onLogout,
   onOpenSettings,
   onOpenCalendarManagement,
+  isMobile = false,
   ...props
 }: AppSidebarProps) {
   const {
@@ -91,6 +93,154 @@ export function AppSidebar({
     "#14b8a6", // teal
   ];
 
+  // Mobile version - render content directly without Sidebar wrapper
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-full bg-background">
+        {/* Header */}
+        <div className="flex justify-between items-center gap-2 p-4 border-b">
+          <a className="inline-flex" href="/">
+            <LogoSvg width="32" height="32" className="text-foreground" />
+          </a>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto">
+          {/* Mini Calendar Widget */}
+          <div className="p-4 border-b">
+            <SidebarCalendar />
+          </div>
+
+          {/* Calendars Section */}
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-foreground uppercase tracking-wide">
+                Calendars
+              </h3>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={onOpenCalendarManagement}
+                  title="Calendar Settings"
+                >
+                  <RiSettings3Line size={14} />
+                </Button>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <RiAddLine size={14} />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Create New Calendar</DialogTitle>
+                      <DialogDescription>
+                        Add a new calendar to organize your events.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <label
+                          htmlFor="calendar-name"
+                          className="text-sm font-medium"
+                        >
+                          Calendar Name
+                        </label>
+                        <Input
+                          id="calendar-name"
+                          value={newCalendarName}
+                          onChange={(e) => setNewCalendarName(e.target.value)}
+                          placeholder="Enter calendar name"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <label
+                          htmlFor="calendar-color"
+                          className="text-sm font-medium"
+                        >
+                          Color
+                        </label>
+                        <ColorPicker
+                          value={newCalendarColor}
+                          onChange={setNewCalendarColor}
+                          presetColors={presetColors}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleCreateCalendar}>
+                          Create Calendar
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+
+            {/* Calendar List */}
+            <div className="space-y-2">
+              {calendars.map((calendar) => (
+                <div key={calendar.id} className="flex items-center justify-between gap-3 p-2 rounded-md hover:bg-accent group">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Checkbox
+                      id={calendar.id}
+                      checked={isCalendarVisible(calendar.id)}
+                      onCheckedChange={() =>
+                        toggleCalendarVisibility(calendar.id)
+                      }
+                    />
+                    <label
+                      htmlFor={calendar.id}
+                      className={`text-sm font-medium cursor-pointer flex-1 ${
+                        isCalendarVisible(calendar.id)
+                          ? "text-foreground"
+                          : "text-foreground/50 line-through"
+                      }`}
+                    >
+                      {calendar.name}
+                    </label>
+                  </div>
+                  <div
+                    className="size-3 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: calendar.color?.startsWith("#")
+                        ? calendar.color
+                        : `var(--color-event-${calendar.color || "default"})`,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t p-4">
+          <NavUser
+            user={
+              user || {
+                name: "Guest User",
+                email: "guest@example.com",
+                avatar: "",
+              }
+            }
+            onLogout={onLogout}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop version - use Sidebar wrapper
   return (
     <Sidebar variant="inset" {...props} className="max-lg:p-3 lg:pe-1">
       <SidebarHeader>
@@ -98,7 +248,7 @@ export function AppSidebar({
           <a className="inline-flex" href="/">
             <LogoSvg width="32" height="32" className="text-foreground/80" />
           </a>
-          <SidebarTrigger className="text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent!" />
+          <SidebarTrigger className="text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! hidden md:flex" />
         </div>
       </SidebarHeader>
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">

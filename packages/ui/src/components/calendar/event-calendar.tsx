@@ -48,7 +48,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { SidebarTrigger, useSidebar } from "../ui/sidebar";
 import { ThemeToggle } from "../layout/theme-toggle";
 
 export interface EventCalendarProps {
@@ -90,6 +89,10 @@ export interface EventCalendarProps {
   ) => Promise<void>;
   // Command palette integration
   onEventEdit?: (event: CalendarEvent) => void;
+  // Sidebar integration (optional)
+  hideSidebarTrigger?: boolean;
+  // Custom sidebar toggle handler for mobile
+  onSidebarToggle?: () => void;
 }
 
 export function EventCalendar({
@@ -118,6 +121,8 @@ export function EventCalendar({
   onLoadNotifications,
   onUpdateNotifications,
   onEventEdit,
+  hideSidebarTrigger = false,
+  onSidebarToggle,
 }: EventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
@@ -150,7 +155,6 @@ export function EventCalendar({
       }
     }
   }, [initialView]);
-  const { open } = useSidebar();
 
   // Calculate date range based on current view and date
   const dateRange = useMemo(() => {
@@ -623,12 +627,49 @@ export function EventCalendar({
           >
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
-                <SidebarTrigger
-                  data-state={open ? "invisible" : "visible"}
-                  className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5 lg:data-[state=invisible]:opacity-0 lg:data-[state=invisible]:pointer-events-none transition-opacity ease-in-out duration-200"
-                  isOutsideSidebar
-                />
-                <h2 className="font-semibold text-xl lg:peer-data-[state=invisible]:-translate-x-7.5 transition-transform ease-in-out duration-300">
+                {!hideSidebarTrigger && !onSidebarToggle && (() => {
+                  // Dynamically import and render SidebarTrigger only when needed and no custom toggle
+                  try {
+                    const { SidebarTrigger } = require("../ui/sidebar");
+                    return (
+                      <SidebarTrigger
+                        className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5 lg:data-[state=invisible]:opacity-0 lg:data-[state=invisible]:pointer-events-none transition-opacity ease-in-out duration-200"
+                        isOutsideSidebar
+                      />
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
+                {onSidebarToggle && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5"
+                    onClick={onSidebarToggle}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M3 12h18" />
+                      <path d="M3 18h18" />
+                    </svg>
+                    <span className="sr-only">Toggle Sidebar</span>
+                  </Button>
+                )}
+                <h2 className={cn(
+                  "font-semibold text-xl transition-transform ease-in-out duration-300",
+                  !hideSidebarTrigger && "lg:peer-data-[state=invisible]:-translate-x-7.5"
+                )}>
                   {viewTitle}
                 </h2>
               </div>
