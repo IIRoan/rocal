@@ -243,27 +243,70 @@ export function WeekView({
 
         const overlappingColumns = overlappingEvents.length + 1;
         
-        // Use improved width and positioning calculation
+        // Use improved width and positioning calculation with mobile optimization
         let width: number;
         let left: number;
 
+        // Mobile-first approach for all overlap scenarios
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 640; // sm breakpoint
+        
         if (overlappingColumns === 1) {
           // No overlapping events, take full width
           width = 1;
           left = 0;
-        } else if (overlappingColumns <= 3) {
-          // For 2-3 overlapping events, use equal distribution with small gaps
-          width = (1 / overlappingColumns) * 0.95; // 95% to leave small gap
-          left = columnIndex * (1 / overlappingColumns) + (columnIndex * 0.01); // Add small offset
+        } else if (overlappingColumns === 2) {
+          if (isMobile) {
+            // On mobile, give each event more width by reducing gaps
+            width = columnIndex === 0 ? 0.95 : 0.8; // First event gets 95%, second gets 80%
+            left = columnIndex === 0 ? 0 : 0.15;     // First at 0%, second at 15%
+          } else {
+            width = (1 / overlappingColumns) * 0.92;
+            left = columnIndex * (1 / overlappingColumns) + (columnIndex * 0.02);
+          }
+        } else if (overlappingColumns === 3) {
+          if (isMobile) {
+            // For 3 events on mobile, prioritize the first two
+            const widths = [0.9, 0.75, 0.6];
+            const positions = [0, 0.1, 0.25];
+            width = widths[columnIndex] || 0.6;
+            left = positions[columnIndex] || 0.4;
+          } else {
+            width = (1 / overlappingColumns) * 0.88;
+            left = columnIndex * (1 / overlappingColumns) + (columnIndex * 0.03);
+          }
         } else {
-          // For more than 3 overlapping events, use cascading layout with better spacing
-          const baseWidth = 0.75; // Start with 75% width
-          const widthDecrement = Math.min(0.1, 0.5 / overlappingColumns); // Decrease width more gradually
-          width = baseWidth - (columnIndex * widthDecrement);
-          
-          // Stagger positioning with better spacing
-          const offsetIncrement = Math.min(0.15, 0.8 / overlappingColumns);
-          left = columnIndex * offsetIncrement;
+          // For more than 3 overlapping events, use mobile-optimized strategy
+          if (isMobile) {
+            // On mobile with many overlapping events, use a different strategy
+            if (overlappingColumns > 4) {
+              // For very crowded scenarios on mobile, use minimal stacking
+              // Make events wider but stack them more tightly
+              width = Math.max(0.85, 1 - overlappingColumns * 0.02); // Start at 85% width, minimal reduction
+              left = columnIndex * 0.08; // Small offset for visibility
+              
+              // Cap the total offset so events don't go off-screen
+              if (left + width > 1) {
+                left = Math.max(0, 1 - width);
+              }
+            } else {
+              // For 4 or fewer overlapping events, use generous widths
+              const baseWidth = 0.75; // Start with 75% width
+              const widthDecrement = 0.05; // Very small reduction per column
+              width = Math.max(0.6, baseWidth - (columnIndex * widthDecrement)); // Minimum 60% width
+              
+              // Minimal stagger offset for better readability
+              const offsetIncrement = 0.08;
+              left = Math.min(columnIndex * offsetIncrement, 0.3); // Cap offset at 30%
+            }
+          } else {
+            // Desktop behavior (original logic)
+            const baseWidth = 0.75;
+            const widthDecrement = Math.min(0.1, 0.5 / overlappingColumns);
+            width = baseWidth - (columnIndex * widthDecrement);
+            
+            const offsetIncrement = Math.min(0.15, 0.8 / overlappingColumns);
+            left = columnIndex * offsetIncrement;
+          }
         }
 
         positionedEvents.push({
@@ -354,7 +397,7 @@ export function WeekView({
         {days.map((day) => (
           <div
             key={day.toString()}
-            className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 py-2 text-center text-xs ${
+            className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 py-2 text-center text-xs transition-colors ${
               workingDays.includes(day.getDay())
                 ? "bg-[var(--calendar-workday)]"
                 : !workingDays.includes(day.getDay()) &&
@@ -364,7 +407,8 @@ export function WeekView({
             }`}
             data-today={isToday(day) || undefined}
           >
-            <span className="sm:hidden" aria-hidden="true">
+            {/* Enhanced mobile-first day display */}
+            <span className="sm:hidden font-medium" aria-hidden="true">
               {format(day, "E")[0]} {format(day, "d")}
             </span>
             <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
@@ -480,7 +524,7 @@ export function WeekView({
             {(processedDayEvents[dayIndex] ?? []).map((positionedEvent) => (
               <div
                 key={positionedEvent.event.id}
-                className="absolute z-10 px-0.5"
+                className="absolute z-10 px-[1px] sm:px-1"
                 style={{
                   top: `${positionedEvent.top}px`,
                   height: `${positionedEvent.height}px`,
