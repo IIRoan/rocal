@@ -13,6 +13,7 @@ import {
 } from "./utils";
 import { CalendarEvent } from "./types";
 import { cn } from "../../lib/utils";
+import { formatEventDescription } from "./event-description-formatter";
 
 // Using date-fns format with custom formatting:
 // 12h format: 'h' - hours (1-12), 'a' - am/pm
@@ -28,6 +29,7 @@ const formatTimeWithOptionalMinutes = (
     return format(date, getMinutes(date) === 0 ? "ha" : "h:mma").toLowerCase();
   }
 };
+
 
 interface EventWrapperProps {
   event: CalendarEvent;
@@ -284,7 +286,7 @@ export function EventItem({
         )}
       </div>
       {event.description && (
-        <div className="my-1 text-xs opacity-90">{event.description}</div>
+        <div className="my-1 text-xs opacity-90">{formatEventDescription(event.description)}</div>
       )}
     </button>
   );
