@@ -1,23 +1,47 @@
 "use client";
 
 import React from "react";
-import { Calendar, Plus, Settings } from "lucide-react";
+import { Calendar, Plus, Grid3X3, LayoutGrid } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
+import { CalendarView } from "../calendar/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 interface MobileBottomNavProps {
   onOpenSidebar?: () => void;
   onOpenAddEvent?: () => void;
-  onOpenSettings?: () => void;
+  currentView?: CalendarView;
+  onViewChange?: (view: CalendarView) => void;
   className?: string;
 }
 
 export function MobileBottomNav({
   onOpenSidebar,
   onOpenAddEvent,
-  onOpenSettings,
+  currentView = "month",
+  onViewChange,
   className,
 }: MobileBottomNavProps) {
+  const getViewIcon = (view: CalendarView) => {
+    switch (view) {
+      case "day":
+        return <div className="w-5 h-5 border-2 border-current rounded" />;
+      case "week":
+        return <Grid3X3 size={20} />;
+      case "month":
+        return <Calendar size={20} />;
+      case "agenda":
+        return <LayoutGrid size={20} />;
+      default:
+        return <Calendar size={20} />;
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -53,18 +77,36 @@ export function MobileBottomNav({
             <span className="text-xs">Add</span>
           </Button>
           
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              console.log('Settings button clicked, onOpenSettings:', onOpenSettings);
-              onOpenSettings?.();
-            }}
-            className="flex flex-col items-center gap-1 h-auto py-2 px-3"
-          >
-            <Settings size={20} />
-            <span className="text-xs">Settings</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex flex-col items-center gap-1 h-auto py-2 px-3"
+              >
+                {getViewIcon(currentView)}
+                <span className="text-xs capitalize">{currentView}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" side="top" className="mb-2">
+              <DropdownMenuItem onClick={() => onViewChange?.("day")}>
+                <div className="w-4 h-4 border-2 border-current rounded mr-2" />
+                Day
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewChange?.("week")}>
+                <Grid3X3 size={16} className="mr-2" />
+                Week
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewChange?.("month")}>
+                <Calendar size={16} className="mr-2" />
+                Month
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewChange?.("agenda")}>
+                <LayoutGrid size={16} className="mr-2" />
+                Agenda
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

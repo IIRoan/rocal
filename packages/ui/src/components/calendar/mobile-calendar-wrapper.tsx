@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "../ui/sheet";
 import { SidebarProvider } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
+import { CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
@@ -34,6 +35,7 @@ export function MobileCalendarWrapper({
   ...props
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<CalendarView>(props.initialView || "month");
   const { currentDate, setCurrentDate } = useCalendarContext();
 
   const handleDateChange = (date: Date) => {
@@ -61,25 +63,38 @@ export function MobileCalendarWrapper({
     setIsSidebarOpen(false);
   };
 
+  const handleViewChange = (view: CalendarView) => {
+    setCurrentView(view);
+  };
+
+  // Sync with initial view changes
+  React.useEffect(() => {
+    if (props.initialView) {
+      setCurrentView(props.initialView);
+    }
+  }, [props.initialView]);
+
   return (
     <div className="relative flex flex-col h-full">
       {/* Mobile Week Navigation - only visible on mobile */}
       <MobileWeekNav
         currentDate={currentDate}
+        currentView={currentView}
         onDateChange={handleDateChange}
         className="md:hidden"
       />
 
       {/* Main Calendar Content - allow scrolling with bottom padding for mobile nav */}
       <div className={cn("flex-1 overflow-auto pb-20 md:pb-0", className)}>
-        {children || <MobileEventCalendar {...props} onSidebarToggle={handleOpenSidebar} />}
+        {children || <MobileEventCalendar {...props} initialView={currentView} onSidebarToggle={handleOpenSidebar} />}
       </div>
 
       {/* Mobile Bottom Navigation - only visible on mobile */}
       <MobileBottomNav
         onOpenSidebar={handleOpenSidebar}
         onOpenAddEvent={handleOpenAddEvent}
-        onOpenSettings={handleOpenSettings}
+        currentView={currentView}
+        onViewChange={handleViewChange}
         className="md:hidden"
       />
 

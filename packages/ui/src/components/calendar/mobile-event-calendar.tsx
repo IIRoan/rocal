@@ -144,14 +144,9 @@ export function MobileEventCalendar({
     }
   };
 
-  // Update view when initialView changes (from settings) only if no session preference exists
+  // Update view when initialView changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
-      if (!savedView) {
-        setView(initialView);
-      }
-    }
+    setView(initialView);
   }, [initialView]);
 
   // Calculate date range based on current view and date
@@ -482,7 +477,12 @@ export function MobileEventCalendar({
           {
             "--event-height": `${compactView ? Math.round(EventHeight * 0.75) : EventHeight}px`,
             "--event-gap": `${compactView ? Math.round(EventGap * 0.5) : EventGap}px`,
-            "--week-cells-height": `${compactView ? Math.round(WeekCellsHeight * 0.85) : WeekCellsHeight}px`,
+            // Enhanced mobile-responsive week cell height
+            "--week-cells-height": `${compactView 
+              ? Math.round(WeekCellsHeight * 0.85) 
+              : typeof window !== 'undefined' && window.innerWidth < 640 
+                ? Math.round(WeekCellsHeight * 0.9) // Slightly more compact on mobile
+                : WeekCellsHeight}px`,
           } as React.CSSProperties
         }
       >
