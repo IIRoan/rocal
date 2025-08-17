@@ -28,6 +28,13 @@ export function SidebarCalendar({ className }: SidebarCalendarProps) {
     }
   };
 
+  // Handle month navigation
+  const handleMonthChange = (month: Date) => {
+    setCalendarMonth(month);
+    // Update the current date to the first day of the new month
+    setCurrentDate(new Date(month.getFullYear(), month.getMonth(), 1));
+  };
+
   return (
     <div className={cn("w-full flex justify-center", className)}>
       <Calendar
@@ -35,7 +42,7 @@ export function SidebarCalendar({ className }: SidebarCalendarProps) {
         selected={currentDate}
         onSelect={handleSelect}
         month={calendarMonth}
-        onMonthChange={setCalendarMonth}
+        onMonthChange={handleMonthChange}
         classNames={{
           day_button:
             "transition-none! hover:not-in-data-selected:bg-sidebar-accent group-[.range-middle]:group-data-selected:bg-sidebar-accent text-sidebar-foreground",

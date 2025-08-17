@@ -5,13 +5,11 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import type { Calendar as CalendarType } from "@/lib/types/calendar";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@workspace/ui/components/ui/dialog";
+  CommandDialog,
+  CommandList,
+  CommandGroup,
+  CommandItem,
+} from "@workspace/ui/components/navigation/command";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -23,12 +21,6 @@ import {
   SelectValue,
 } from "@workspace/ui/components/ui/select";
 import { Badge } from "@workspace/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/ui/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import {
   Plus,
@@ -199,21 +191,6 @@ export function SubscriptionManagement({
     }
   };
 
-  const handleToggleActive = async (subscription: CalendarSubscription) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      await calendarApiService.updateSubscription(subscription.id, {
-        isActive: !subscription.isActive,
-      });
-      await loadSubscriptions();
-    } catch (err: any) {
-      setError(err.message || "Failed to update subscription");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatLastSync = (lastSyncAt?: string) => {
     if (!lastSyncAt) return "Never";
@@ -250,6 +227,7 @@ export function SubscriptionManagement({
     }
   };
 
+
   console.log("SubscriptionManagement rendering with open =", open);
   
   if (open) {
@@ -257,306 +235,273 @@ export function SubscriptionManagement({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
-            <ExternalLink className="h-5 w-5" />
-            Calendar Subscriptions
-          </DialogTitle>
-          <DialogDescription>
-            Subscribe to external calendars and keep them synchronized automatically
-          </DialogDescription>
-        </DialogHeader>
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
+        <ExternalLink className="h-5 w-5" />
+        <h2 className="text-lg font-semibold text-foreground">Calendar Subscriptions</h2>
+      </div>
 
+      <CommandList>
         {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="px-6 py-3 border-b border-border">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
         )}
 
         {success && (
-          <Alert className="border-green-200 bg-green-50">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
-              {success}
-            </AlertDescription>
-          </Alert>
+          <div className="px-6 py-3 border-b border-border">
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                {success}
+              </AlertDescription>
+            </Alert>
+          </div>
         )}
 
-        <div className="space-y-4">
-          {/* Create New Subscription */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Subscribe to External Calendar</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowCreateForm(!showCreateForm);
-                    setValidationErrors({});
-                    setError(null);
-                    setSuccess(null);
+        <CommandGroup heading="Actions">
+          <CommandItem
+            onSelect={() => {
+              setShowCreateForm(!showCreateForm);
+              setValidationErrors({});
+              setError(null);
+              setSuccess(null);
+            }}
+            className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+          >
+            <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
+            <span className="text-foreground">New Subscription</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={loadSubscriptions}
+            disabled={loading}
+            className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+          >
+            <RefreshCw className={`mr-3 h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+            <span className="text-foreground">Refresh Subscriptions</span>
+          </CommandItem>
+        </CommandGroup>
+
+        {showCreateForm && (
+          <div className="px-6 py-4 border-b border-border space-y-4">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="subscription-name" className="text-sm font-medium">Subscription Name</Label>
+                <Input
+                  id="subscription-name"
+                  value={newSubscription.name}
+                  onChange={(e) => {
+                    setNewSubscription({
+                      ...newSubscription,
+                      name: e.target.value,
+                    });
+                    if (validationErrors.name) {
+                      setValidationErrors({
+                        ...validationErrors,
+                        name: undefined,
+                      });
+                    }
+                  }}
+                  placeholder="e.g., Work Calendar, Holidays"
+                  className={
+                    validationErrors.name
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }
+                />
+                {validationErrors.name && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.name}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subscription-url" className="text-sm font-medium">Calendar URL (.ics)</Label>
+                <Input
+                  id="subscription-url"
+                  value={newSubscription.url}
+                  onChange={(e) => {
+                    setNewSubscription({
+                      ...newSubscription,
+                      url: e.target.value,
+                    });
+                    if (validationErrors.url) {
+                      setValidationErrors({
+                        ...validationErrors,
+                        url: undefined,
+                      });
+                    }
+                  }}
+                  placeholder="https://example.com/calendar.ics"
+                  className={
+                    validationErrors.url
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }
+                />
+                {validationErrors.url && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.url}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Enter the URL of an .ics calendar file
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subscription-calendar" className="text-sm font-medium">Target Calendar</Label>
+                <Select
+                  value={newSubscription.calendarId}
+                  onValueChange={(value) => {
+                    setNewSubscription({
+                      ...newSubscription,
+                      calendarId: value,
+                    });
+                    if (validationErrors.calendarId) {
+                      setValidationErrors({
+                        ...validationErrors,
+                        calendarId: undefined,
+                      });
+                    }
                   }}
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Subscription
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            {showCreateForm && (
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="subscription-name">Subscription Name</Label>
-                    <Input
-                      id="subscription-name"
-                      value={newSubscription.name}
-                      onChange={(e) => {
-                        setNewSubscription({
-                          ...newSubscription,
-                          name: e.target.value,
-                        });
-                        if (validationErrors.name) {
-                          setValidationErrors({
-                            ...validationErrors,
-                            name: undefined,
-                          });
-                        }
-                      }}
-                      placeholder="e.g., Work Calendar, Holidays"
-                      className={
-                        validationErrors.name
-                          ? "border-red-500 focus-visible:ring-red-500"
-                          : ""
-                      }
-                    />
-                    {validationErrors.name && (
-                      <p className="text-sm text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subscription-calendar">Target Calendar</Label>
-                    <Select
-                      value={newSubscription.calendarId}
-                      onValueChange={(value) => {
-                        setNewSubscription({
-                          ...newSubscription,
-                          calendarId: value,
-                        });
-                        if (validationErrors.calendarId) {
-                          setValidationErrors({
-                            ...validationErrors,
-                            calendarId: undefined,
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger 
-                        id="subscription-calendar"
-                        className={
-                          validationErrors.calendarId
-                            ? "border-red-500 focus-visible:ring-red-500"
-                            : ""
-                        }
-                      >
-                        <SelectValue placeholder="Select calendar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {calendars.map((calendar) => (
-                          <SelectItem key={calendar.id} value={calendar.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: calendar.color }}
-                              />
-                              {calendar.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {validationErrors.calendarId && (
-                      <p className="text-sm text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.calendarId}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="subscription-url">Calendar URL (.ics)</Label>
-                  <Input
-                    id="subscription-url"
-                    value={newSubscription.url}
-                    onChange={(e) => {
-                      setNewSubscription({
-                        ...newSubscription,
-                        url: e.target.value,
-                      });
-                      if (validationErrors.url) {
-                        setValidationErrors({
-                          ...validationErrors,
-                          url: undefined,
-                        });
-                      }
-                    }}
-                    placeholder="https://example.com/calendar.ics"
+                  <SelectTrigger 
+                    id="subscription-calendar"
                     className={
-                      validationErrors.url
+                      validationErrors.calendarId
                         ? "border-red-500 focus-visible:ring-red-500"
                         : ""
                     }
-                  />
-                  {validationErrors.url && (
-                    <p className="text-sm text-red-600 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {validationErrors.url}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    Enter the URL of an .ics calendar file (e.g., Google Calendar, Outlook, etc.)
-                  </p>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      setNewSubscription({ name: "", url: "", calendarId: "" });
-                      setValidationErrors({});
-                    }}
                   >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateSubscription} disabled={loading}>
-                    {loading ? "Creating..." : "Subscribe"}
-                  </Button>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-
-          {/* Subscriptions List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Active Subscriptions ({subscriptions.length})</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={loadSubscriptions}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {subscriptions.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <ExternalLink className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No calendar subscriptions yet</p>
-                  <p className="text-sm">Subscribe to external calendars to sync them automatically</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {subscriptions.map((subscription) => (
-                    <div
-                      key={subscription.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex-1 space-y-1">
+                    <SelectValue placeholder="Select calendar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {calendars.map((calendar) => (
+                      <SelectItem key={calendar.id} value={calendar.id}>
                         <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{subscription.name}</h4>
-                          {getStatusBadge(subscription.lastSyncStatus, subscription.lastErrorMessage)}
-                          {!subscription.isActive && (
-                            <Badge variant="outline">Paused</Badge>
-                          )}
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: calendar.color }}
+                          />
+                          {calendar.name}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: subscription.calendar.color }}
-                            />
-                            {subscription.calendar.name}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Last sync: {formatLastSync(subscription.lastSyncAt)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Settings className="h-3 w-3" />
-                            Every {subscription.syncIntervalMinutes} min
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate max-w-md">
-                          {subscription.url}
-                        </p>
-                        {subscription.lastErrorMessage && (
-                          <div className="flex items-center gap-1 text-xs text-red-600">
-                            <AlertTriangle className="h-3 w-3" />
-                            {subscription.lastErrorMessage}
-                          </div>
-                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {validationErrors.calendarId && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {validationErrors.calendarId}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewSubscription({ name: "", url: "", calendarId: "" });
+                  setValidationErrors({});
+                }}
+              >
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreateSubscription} disabled={loading}>
+                {loading ? "Creating..." : "Subscribe"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {subscriptions.length === 0 ? (
+          <div className="px-6 py-8 text-center text-muted-foreground">
+            <ExternalLink className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No calendar subscriptions yet</p>
+            <p className="text-sm">Subscribe to external calendars to sync them automatically</p>
+          </div>
+        ) : (
+          <CommandGroup heading={`Active Subscriptions (${subscriptions.length})`}>
+            {subscriptions.map((subscription) => (
+              <div
+                key={subscription.id}
+                className="px-4 py-3 border-b border-border/30 last:border-b-0"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-medium text-sm">{subscription.name}</h4>
+                      {getStatusBadge(subscription.lastSyncStatus, subscription.lastErrorMessage)}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <div
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: subscription.calendar.color }}
+                        />
+                        <span className="truncate">{subscription.calendar.name}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActive(subscription)}
-                          disabled={loading}
-                        >
-                          {subscription.isActive ? "Pause" : "Resume"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSyncSubscription(subscription)}
-                          disabled={loading}
-                        >
-                          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteSubscription(subscription)}
-                          disabled={loading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 flex-shrink-0" />
+                        <span>{formatLastSync(subscription.lastSyncAt)}</span>
                       </div>
                     </div>
-                  ))}
+                    <div className="text-xs text-muted-foreground font-mono truncate" title={subscription.url}>
+                      {subscription.url}
+                    </div>
+                    {subscription.lastErrorMessage && (
+                      <div className="flex items-start gap-1 text-xs text-red-600">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                        <span className="break-words">{subscription.lastErrorMessage}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSyncSubscription(subscription)}
+                      disabled={loading}
+                      className="h-7 px-2"
+                      title="Sync now"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSubscription(subscription)}
+                      disabled={loading}
+                      className="h-7 px-2 text-red-600 hover:text-red-700"
+                      title="Delete subscription"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              </div>
+            ))}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </CommandDialog>
   );
 }

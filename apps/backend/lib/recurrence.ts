@@ -267,8 +267,8 @@ export class RecurrenceEngine {
     }
 
     if (rule.byWeekDay) {
-      if (rule.frequency !== "weekly") {
-        errors.push("byWeekDay can only be used with weekly frequency");
+      if (rule.frequency !== "weekly" && rule.frequency !== "daily") {
+        errors.push("byWeekDay can only be used with weekly or daily frequency");
       } else if (
         !Array.isArray(rule.byWeekDay) ||
         rule.byWeekDay.some((d) => d < 0 || d > 6)

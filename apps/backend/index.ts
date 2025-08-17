@@ -140,3 +140,13 @@ export const createAPI = (prefix = "") => {
     .use(recurringRoutes)
     .use(subscriptionsRoute);
 };
+
+// Start the server if this file is run directly
+if (import.meta.main) {
+  const port = process.env.PORT || 3001;
+  const app = createAPI();
+  
+  app.listen(port, () => {
+    console.log(`🚀 Server is running on http://localhost:${port}`);
+  });
+}
