@@ -20,6 +20,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Loader2,
+  Menu,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,7 +51,7 @@ import {
 } from "../ui/dropdown-menu";
 import { ThemeToggle } from "../layout/theme-toggle";
 
-export interface EventCalendarProps {
+export interface MobileEventCalendarProps {
   className?: string;
   initialView?: CalendarView;
   // Data props
@@ -89,13 +90,11 @@ export interface EventCalendarProps {
   ) => Promise<void>;
   // Command palette integration
   onEventEdit?: (event: CalendarEvent) => void;
-  // Sidebar integration (optional)
-  hideSidebarTrigger?: boolean;
-  // Custom sidebar toggle handler for mobile
+  // Mobile specific
   onSidebarToggle?: () => void;
 }
 
-export function EventCalendar({
+export function MobileEventCalendar({
   className,
   initialView = "month",
   events = [],
@@ -121,9 +120,8 @@ export function EventCalendar({
   onLoadNotifications,
   onUpdateNotifications,
   onEventEdit,
-  hideSidebarTrigger = false,
   onSidebarToggle,
-}: EventCalendarProps) {
+}: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
   
@@ -189,7 +187,7 @@ export function EventCalendar({
 
   // Notify parent of date range changes
   useEffect(() => {
-    console.log('EventCalendar - Date range changed:', {
+    console.log('MobileEventCalendar - Date range changed:', {
       start: dateRange.start.toISOString(),
       end: dateRange.end.toISOString(),
       view,
@@ -202,45 +200,11 @@ export function EventCalendar({
   const createEvent = onCreateEvent || (async () => {});
   const updateEvent = onUpdateEvent || (async () => {});
   const deleteEvent = onDeleteEvent || (async () => {});
-  const createCategory = onCreateCategory || (async () => {});
 
-  // Add keyboard shortcuts for view switching
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input, textarea or contentEditable element
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable)
-      ) {
-        return;
-      }
-
-      switch (e.key.toLowerCase()) {
-        case "m":
-          setView("month");
-          break;
-        case "w":
-          setView("week");
-          break;
-        case "d":
-          setView("day");
-          break;
-        case "a":
-          setView("agenda");
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
-
+  // Navigation handlers
   const handlePrevious = () => {
-    let newDate;
+    let newDate: Date;
+    
     if (view === "month") {
       newDate = subMonths(currentDate, 1);
     } else if (view === "week") {
@@ -248,11 +212,12 @@ export function EventCalendar({
     } else if (view === "day") {
       newDate = addDays(currentDate, -1);
     } else if (view === "agenda") {
-      // For agenda view, go back 30 days (a full month)
       newDate = addDays(currentDate, -AgendaDaysToShow);
+    } else {
+      newDate = subMonths(currentDate, 1);
     }
     
-    console.log('EventCalendar - Navigate Previous:', {
+    console.log('Navigation - Previous:', {
       view,
       from: currentDate.toISOString(),
       to: newDate?.toISOString()
@@ -262,7 +227,8 @@ export function EventCalendar({
   };
 
   const handleNext = () => {
-    let newDate;
+    let newDate: Date;
+    
     if (view === "month") {
       newDate = addMonths(currentDate, 1);
     } else if (view === "week") {
@@ -270,11 +236,12 @@ export function EventCalendar({
     } else if (view === "day") {
       newDate = addDays(currentDate, 1);
     } else if (view === "agenda") {
-      // For agenda view, go forward 30 days (a full month)
       newDate = addDays(currentDate, AgendaDaysToShow);
+    } else {
+      newDate = addMonths(currentDate, 1);
     }
     
-    console.log('EventCalendar - Navigate Next:', {
+    console.log('Navigation - Next:', {
       view,
       from: currentDate.toISOString(),
       to: newDate?.toISOString()
@@ -298,7 +265,7 @@ export function EventCalendar({
   };
 
   const handleEventCreate = (startTime: Date) => {
-    console.log("Creating new event at:", startTime); // Debug log
+    console.log("Creating new event at:", startTime);
 
     // Keep exact time without rounding to intervals
     // Just reset seconds and milliseconds for consistency
@@ -309,7 +276,7 @@ export function EventCalendar({
       id: undefined as any, // This ensures it's treated as a new event
       title: "",
       start: startTime,
-      end: addMinutesToDate(startTime, defaultEventDuration), // Use default duration from settings
+      end: addMinutesToDate(startTime, defaultEventDuration),
       allDay: false,
       calendarId: defaultCalendarId || "",
       userId: "",
@@ -331,7 +298,7 @@ export function EventCalendar({
         end: event.end.toISOString(),
         allDay: event.allDay || false,
         location: event.location,
-        color: event.color, // This now comes from the calendar color
+        color: event.color,
         calendarId: event.calendarId,
         categoryId: (event as any).categoryId || undefined,
         reminder: event.reminder,
@@ -339,33 +306,23 @@ export function EventCalendar({
 
       let savedEvent: any;
       if (event.id) {
-        // Update existing event
         savedEvent = await updateEvent(event.id, eventData);
-
-        // Show success toast notification when an event is updated
         toast.success(`Event "${event.title}" updated`, {
           description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
           position: "bottom-left",
         });
       } else {
-        // Create new event
         savedEvent = await createEvent(eventData);
-
-        // Show success toast notification when an event is created
         toast.success(`Event "${event.title}" created`, {
           description: format(new Date(event.start), "MMM d, yyyy 'at' h:mm a"),
           position: "bottom-left",
         });
       }
 
-      // No longer needed as we use command palette
-
-      // Return the saved event, or the original event if savedEvent is undefined
       return savedEvent || event;
     } catch (error: any) {
       console.error("Failed to save event:", error);
-
-      // Show detailed error message based on error type
+      
       const errorMessage = error?.message || "Failed to save event";
       const isNetworkError =
         error?.error === "Network Error" ||
@@ -375,26 +332,6 @@ export function EventCalendar({
       if (isNetworkError) {
         toast.error("Network error", {
           description: "Please check your connection and try again",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 401) {
-        toast.error("Authentication required", {
-          description: "Please log in again to continue",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 403) {
-        toast.error("Permission denied", {
-          description: "You don't have permission to perform this action",
-          position: "bottom-left",
-        });
-      } else if (error?.details && error.details.length > 0) {
-        toast.error("Validation error", {
-          description: error.details.map((d: any) => d.message).join(", "),
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 400) {
-        toast.error("Invalid data", {
-          description: errorMessage,
           position: "bottom-left",
         });
       } else {
@@ -411,12 +348,8 @@ export function EventCalendar({
   const handleEventDelete = async (eventId: string) => {
     try {
       const deletedEvent = events.find((e: CalendarEvent) => e.id === eventId);
-
       await deleteEvent(eventId);
 
-      // No longer needed as we use command palette
-
-      // Show success toast notification when an event is deleted
       if (deletedEvent) {
         toast.success(`Event "${deletedEvent.title}" deleted`, {
           description: format(new Date(deletedEvent.start), "MMM d, yyyy"),
@@ -425,45 +358,11 @@ export function EventCalendar({
       }
     } catch (error: any) {
       console.error("Failed to delete event:", error);
-
-      // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to delete event";
-      const isNetworkError =
-        error?.error === "Network Error" ||
-        error?.statusCode === 0 ||
-        !navigator.onLine;
-
-      if (isNetworkError) {
-        toast.error("Network error", {
-          description: "Please check your connection and try again",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 401) {
-        toast.error("Authentication required", {
-          description: "Please log in again to continue",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 403) {
-        toast.error("Permission denied", {
-          description: "You don't have permission to delete this event",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 404) {
-        toast.error("Event not found", {
-          description: "This event may have already been deleted",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 400) {
-        toast.error("Invalid request", {
-          description: errorMessage,
-          position: "bottom-left",
-        });
-      } else {
-        toast.error("Failed to delete event", {
-          description: errorMessage,
-          position: "bottom-left",
-        });
-      }
+      toast.error("Failed to delete event", {
+        description: errorMessage,
+        position: "bottom-left",
+      });
     }
   };
 
@@ -481,7 +380,6 @@ export function EventCalendar({
 
       await updateEvent(updatedEvent.id, eventData);
 
-      // Show success toast notification when an event is updated via drag and drop
       toast.success(`Event "${updatedEvent.title}" moved`, {
         description: format(
           new Date(updatedEvent.start),
@@ -491,40 +389,11 @@ export function EventCalendar({
       });
     } catch (error: any) {
       console.error("Failed to update event:", error);
-
-      // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to move event";
-      const isNetworkError =
-        error?.error === "Network Error" ||
-        error?.statusCode === 0 ||
-        !navigator.onLine;
-
-      if (isNetworkError) {
-        toast.error("Network error", {
-          description: "Please check your connection and try again",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 401) {
-        toast.error("Authentication required", {
-          description: "Please log in again to continue",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 403) {
-        toast.error("Permission denied", {
-          description: "You don't have permission to move this event",
-          position: "bottom-left",
-        });
-      } else if (error?.statusCode === 400) {
-        toast.error("Invalid request", {
-          description: errorMessage,
-          position: "bottom-left",
-        });
-      } else {
-        toast.error("Failed to move event", {
-          description: errorMessage,
-          position: "bottom-left",
-        });
-      }
+      toast.error("Failed to move event", {
+        description: errorMessage,
+        position: "bottom-left",
+      });
     }
   };
 
@@ -558,7 +427,6 @@ export function EventCalendar({
         </>
       );
     } else if (view === "agenda") {
-      // Show the month range for agenda view
       const start = currentDate;
       const end = addDays(currentDate, AgendaDaysToShow - 1);
 
@@ -619,57 +487,11 @@ export function EventCalendar({
         }
       >
         <CalendarDndProvider onEventUpdate={handleEventUpdate}>
-          <div
-            className={cn(
-              "flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
-              className,
-            )}
-          >
+          {/* Desktop-only calendar header - hidden on mobile since we have mobile nav */}
+          <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
-                {!hideSidebarTrigger && !onSidebarToggle && (() => {
-                  // Dynamically import and render SidebarTrigger only when needed and no custom toggle
-                  try {
-                    const { SidebarTrigger } = require("../ui/sidebar");
-                    return (
-                      <SidebarTrigger
-                        className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5 lg:data-[state=invisible]:opacity-0 lg:data-[state=invisible]:pointer-events-none transition-opacity ease-in-out duration-200"
-                        isOutsideSidebar
-                      />
-                    );
-                  } catch {
-                    return null;
-                  }
-                })()}
-                {onSidebarToggle && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5"
-                    onClick={onSidebarToggle}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M3 12h18" />
-                      <path d="M3 18h18" />
-                    </svg>
-                    <span className="sr-only">Toggle Sidebar</span>
-                  </Button>
-                )}
-                <h2 className={cn(
-                  "font-semibold text-xl transition-transform ease-in-out duration-300",
-                  !hideSidebarTrigger && "lg:peer-data-[state=invisible]:-translate-x-7.5"
-                )}>
+                <h2 className="font-semibold text-xl">
                   {viewTitle}
                 </h2>
               </div>
@@ -711,13 +533,10 @@ export function EventCalendar({
                   variant="outline"
                   className="max-sm:h-8 max-sm:px-2.5!"
                   onClick={() => {
-                    // Create a new event starting at current time or selected date
                     const startTime = new Date(currentDate);
                     const now = new Date();
 
-                    // If the current date is today, start at the exact current time
                     if (startTime.toDateString() === now.toDateString()) {
-                      // Use current time without rounding
                       startTime.setHours(
                         now.getHours(),
                         now.getMinutes(),
@@ -725,7 +544,6 @@ export function EventCalendar({
                         0,
                       );
                     } else {
-                      // Otherwise start at 9 AM
                       startTime.setHours(9, 0, 0, 0);
                     }
 
@@ -794,7 +612,6 @@ export function EventCalendar({
                 timeFormat={timeFormat}
                 weekStartDay={weekStartDay}
                 workingDays={workingDays}
-                timezone={timezone}
               />
             )}
             {view === "day" && (
@@ -805,7 +622,7 @@ export function EventCalendar({
                 onEventCreate={handleEventCreate}
                 compactView={compactView}
                 timeFormat={timeFormat}
-                timezone={timezone}
+                workingDays={workingDays}
               />
             )}
             {view === "agenda" && (
@@ -813,12 +630,11 @@ export function EventCalendar({
                 currentDate={currentDate}
                 events={events}
                 onEventSelect={handleEventSelect}
+                onEventCreate={handleEventCreate}
                 timeFormat={timeFormat}
               />
             )}
           </div>
-
-          {/* Event editing now handled by command palette */}
         </CalendarDndProvider>
       </div>
     </ErrorBoundary>

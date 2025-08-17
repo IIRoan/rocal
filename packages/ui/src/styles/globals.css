@@ -606,4 +606,63 @@
   .enter-right {
     animation: slide-fade-in-right 180ms cubic-bezier(0.2, 0, 0, 1);
   }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 768px) {
+    /* Safe area insets for mobile devices */
+    .safe-area-inset-top {
+      padding-top: env(safe-area-inset-top, 0);
+    }
+    
+    .safe-area-inset-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    
+    .safe-area-inset-left {
+      padding-left: env(safe-area-inset-left, 0);
+    }
+    
+    .safe-area-inset-right {
+      padding-right: env(safe-area-inset-right, 0);
+    }
+
+    /* Improved mobile touch targets */
+    button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Mobile calendar optimizations */
+    .mobile-calendar-header {
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    /* Disable hover effects on mobile to prevent sticky states */
+    @media (hover: none) and (pointer: coarse) {
+      button:hover {
+        transform: none;
+      }
+    }
+
+    /* Better mobile scrolling */
+    .mobile-scroll-container {
+      -webkit-overflow-scrolling: touch;
+      overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    /* Mobile bottom navigation spacing */
+    .mobile-content-with-bottom-nav {
+      padding-bottom: calc(80px + env(safe-area-inset-bottom, 0));
+    }
+  }
+
+  /* PWA specific styles */
+  @media (display-mode: standalone) {
+    /* Remove any browser chrome styles when running as PWA */
+    body {
+      overscroll-behavior: none;
+    }
+  }
 }

@@ -10,6 +10,8 @@ export { DayView } from "./calendar/day-view";
 export { MonthView } from "./calendar/month-view";
 export { WeekView } from "./calendar/week-view";
 export { EventCalendar } from "./calendar/event-calendar";
+export { MobileEventCalendar } from "./calendar/mobile-event-calendar";
+export { MobileCalendarWrapper } from "./calendar/mobile-calendar-wrapper";
 export { EventItem } from "./calendar/event-item";
 export { EventsPopup } from "./calendar/events-popup";
 export { DraggableEvent } from "./calendar/draggable-event";

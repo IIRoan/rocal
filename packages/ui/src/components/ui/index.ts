@@ -93,3 +93,4 @@ export {
   TooltipProvider,
   TooltipTrigger,
 } from "./tooltip";
+export { VisuallyHidden } from "./visually-hidden";
