@@ -8,6 +8,7 @@ export { EventItem } from "./event-item";
 export { EventsPopup } from "./events-popup";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
+export { formatEventDescription } from "./event-description-formatter";
 export {
   CalendarSkeleton,
   EventDialogSkeleton,
