@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import {
   addHours,
   areIntervalsOverlapping,
@@ -61,6 +61,7 @@ export function WeekView({
   workingDays = [1, 2, 3, 4, 5],
   timezone,
 }: WeekViewProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const days = useMemo(() => {
     const weekStart = startOfWeek(currentDate, {
       weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
@@ -293,9 +294,60 @@ export function WeekView({
     timezone,
   );
 
+  // Scroll to middle of day (9 AM) when component mounts or view changes
+  useEffect(() => {
+    const scrollToMiddleOfDay = () => {
+      if (scrollContainerRef.current) {
+        // Calculate position for 9 AM (hour 9)
+        const targetHour = 9;
+        const scrollPosition = (targetHour - StartHour) * WeekCellsHeight;
+        
+        // Try to find the actual scrollable parent
+        let scrollableParent: HTMLElement | null = scrollContainerRef.current;
+        
+        // Look for a parent with scrollable overflow
+        while (scrollableParent && scrollableParent !== document.body) {
+          const computedStyle = window.getComputedStyle(scrollableParent);
+          const hasVerticalScroll = computedStyle.overflowY === 'auto' || 
+                                   computedStyle.overflowY === 'scroll' ||
+                                   computedStyle.overflow === 'auto' ||
+                                   computedStyle.overflow === 'scroll';
+          
+          if (hasVerticalScroll && scrollableParent.scrollHeight > scrollableParent.clientHeight) {
+            break;
+          }
+          
+          scrollableParent = scrollableParent.parentElement;
+        }
+        
+        if (scrollableParent && scrollableParent !== document.body) {
+          scrollableParent.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        } else {
+          // Use window scroll as fallback
+          window.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        }
+      }
+    };
+
+    // Use a longer delay to ensure the component is fully rendered
+    const timeoutId = setTimeout(scrollToMiddleOfDay, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [currentDate]); // Re-run when the date changes (e.g., navigating weeks)
+
   return (
-    <div data-slot="week-view" className="flex h-full flex-col">
-      <div className="bg-background/80 border-border/70 sticky top-0 z-30 grid grid-cols-8 border-y backdrop-blur-md uppercase">
+    <div 
+      ref={scrollContainerRef}
+      data-slot="week-view" 
+      className="flex h-full flex-col"
+    >
+      <div className="bg-background/95 border-border/70 sticky top-0 z-40 grid grid-cols-8 border-y backdrop-blur-md uppercase shadow-sm">
         <div className="text-muted-foreground/70 py-2 text-center text-xs">
           <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
         </div>
