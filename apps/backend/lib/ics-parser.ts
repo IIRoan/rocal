@@ -130,21 +130,34 @@ function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
   let recurrence: string | undefined;
   if (vEvent.rrule) {
     try {
-      console.log('Raw RRULE from ICS:', vEvent.uid, vEvent.rrule);
+      console.log('📅 Processing RRULE for event:', vEvent.uid, vEvent.summary);
+      console.log('📋 Raw RRULE from ICS:', vEvent.rrule);
+      
       // Convert RRULE to our internal format
       const parsedRule = parseRRule(vEvent.rrule);
-      console.log('Parsed RRULE result:', vEvent.uid, parsedRule);
+      console.log('🔄 Parsed RRULE result:', parsedRule);
       
-      // Only set recurrence if we have valid frequency and interval
+      // Validate the parsed rule has required fields
       if (parsedRule.frequency && parsedRule.interval) {
         recurrence = JSON.stringify(parsedRule);
-        console.log('Final recurrence JSON:', vEvent.uid, recurrence);
+        console.log('✅ Final recurrence JSON for', vEvent.uid, ':', recurrence);
+        
+        // Additional validation for weekdays
+        if (parsedRule.byWeekDay && Array.isArray(parsedRule.byWeekDay)) {
+          console.log('📊 Weekdays specified:', parsedRule.byWeekDay.map((d: number) => 
+            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]
+          ).join(', '));
+        }
+        
+        if (parsedRule.until) {
+          console.log('⏰ Recurrence ends at:', parsedRule.until);
+        }
       } else {
-        console.warn(`Invalid RRULE - missing frequency or interval for ${vEvent.uid}:`, parsedRule);
+        console.warn(`❌ Invalid RRULE - missing frequency or interval for ${vEvent.uid}:`, parsedRule);
       }
     } catch (error) {
       // If RRULE parsing fails, continue without recurrence
-      console.warn(`Failed to parse RRULE for event ${vEvent.uid}: ${error}`);
+      console.warn(`💥 Failed to parse RRULE for event ${vEvent.uid}: ${error}`);
     }
   }
 
@@ -164,51 +177,84 @@ function parseRRule(rrule: any): any {
   // Convert RRULE object to our internal recurrence format
   const recurrenceRule: any = {};
 
-  if (rrule.freq) {
-    switch (rrule.freq) {
-      case 'DAILY':
-        recurrenceRule.frequency = 'daily';
+  // Handle both RRule object from ical library and simple object format
+  const ruleData = rrule.options || rrule;
+
+  // Parse frequency - ical library uses numeric constants (0=yearly, 1=monthly, 2=weekly, 3=daily)
+  if (ruleData.freq !== undefined) {
+    switch (ruleData.freq) {
+      case 0:
+      case 'YEARLY':
+        recurrenceRule.frequency = 'yearly';
         break;
-      case 'WEEKLY':
-        recurrenceRule.frequency = 'weekly';
-        break;
+      case 1:
       case 'MONTHLY':
         recurrenceRule.frequency = 'monthly';
         break;
-      case 'YEARLY':
-        recurrenceRule.frequency = 'yearly';
+      case 2:
+      case 'WEEKLY':
+        recurrenceRule.frequency = 'weekly';
+        break;
+      case 3:
+      case 'DAILY':
+        recurrenceRule.frequency = 'daily';
         break;
     }
   }
 
   // Default interval to 1 if not specified
-  recurrenceRule.interval = rrule.interval || 1;
+  recurrenceRule.interval = ruleData.interval || 1;
 
-  if (rrule.count) {
-    recurrenceRule.count = rrule.count;
+  // Handle count
+  if (ruleData.count && typeof ruleData.count === 'number') {
+    recurrenceRule.count = ruleData.count;
   }
 
-  if (rrule.until) {
-    recurrenceRule.until = rrule.until instanceof Date ? rrule.until.toISOString() : rrule.until;
+  // Handle until date
+  if (ruleData.until) {
+    if (ruleData.until instanceof Date) {
+      recurrenceRule.until = ruleData.until.toISOString();
+    } else if (typeof ruleData.until === 'string') {
+      const parsedDate = new Date(ruleData.until);
+      if (!isNaN(parsedDate.getTime())) {
+        recurrenceRule.until = parsedDate.toISOString();
+      } else {
+        recurrenceRule.until = ruleData.until;
+      }
+    }
   }
 
-  if (rrule.byday) {
-    // Convert weekday format
-    const weekdays = Array.isArray(rrule.byday) ? rrule.byday : [rrule.byday];
-    recurrenceRule.byWeekday = weekdays.map((day: string) => {
-      const weekdayMap: Record<string, number> = {
-        'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6
-      };
-      return weekdayMap[day.substr(-2)] || 0;
-    });
+  // Handle byweekday - ical library uses Monday=0 system, but JavaScript uses Sunday=0
+  // Need to convert: ical Mon=0,Tue=1,Wed=2,Thu=3,Fri=4,Sat=5,Sun=6 -> JS Sun=0,Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6
+  if (ruleData.byweekday && Array.isArray(ruleData.byweekday)) {
+    recurrenceRule.byWeekDay = ruleData.byweekday
+      .filter((day: number) => typeof day === 'number' && day >= 0 && day <= 6)
+      .map((day: number) => {
+        // Convert from Monday=0 to Sunday=0 system
+        return day === 6 ? 0 : day + 1; // Sun=6->0, Mon=0->1, Tue=1->2, etc.
+      });
+  } 
+  // Also handle legacy byday format for string-based parsing
+  else if (ruleData.byday) {
+    const weekdays = Array.isArray(ruleData.byday) ? ruleData.byday : [ruleData.byday];
+    const weekdayMap: Record<string, number> = {
+      'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6
+    };
+    
+    recurrenceRule.byWeekDay = weekdays.map((day: string) => {
+      const dayCode = day.length >= 2 ? day.substr(-2) : day;
+      return weekdayMap[dayCode];
+    }).filter((day: number) => day !== undefined);
   }
 
-  if (rrule.bymonthday) {
-    recurrenceRule.byMonthDay = Array.isArray(rrule.bymonthday) ? rrule.bymonthday : [rrule.bymonthday];
+  // Handle bymonthday
+  if (ruleData.bymonthday && Array.isArray(ruleData.bymonthday)) {
+    recurrenceRule.byMonthDay = ruleData.bymonthday;
   }
 
-  if (rrule.bymonth) {
-    recurrenceRule.byMonth = Array.isArray(rrule.bymonth) ? rrule.bymonth : [rrule.bymonth];
+  // Handle bymonth
+  if (ruleData.bymonth && Array.isArray(ruleData.bymonth)) {
+    recurrenceRule.byMonth = ruleData.bymonth;
   }
 
   return recurrenceRule;
