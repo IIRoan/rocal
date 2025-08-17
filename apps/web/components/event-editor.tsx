@@ -10,6 +10,7 @@ import {
   NotificationManager,
   EventNotification,
 } from "@workspace/ui/components/calendar/notification-manager";
+import { formatEventDescription } from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
 import { RecurringDeleteModal } from "./command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
@@ -149,7 +150,7 @@ export function EventEditor({
                     <div className="flex items-start gap-3">
                       <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
                       <div className="flex-1">
-                        <span className="text-foreground text-sm">{eventForm.eventDescription}</span>
+                        <div className="text-foreground text-sm">{formatEventDescription(eventForm.eventDescription)}</div>
                         <div className="text-xs text-muted-foreground mt-1">Description</div>
                       </div>
                     </div>
