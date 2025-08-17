@@ -74,7 +74,12 @@ function EventWrapper({
   return (
     <button
       className={cn(
-        "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden px-1 text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through sm:px-2 hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] border border-white/20 shadow-sm",
+        "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] border border-white/20 shadow-sm",
+        // Enhanced mobile touch targets and visual feedback
+        "min-h-[20px] sm:min-h-[24px]", // Minimum touch target size
+        "touch-manipulation", // Optimized touch behavior
+        // Mobile-optimized padding - less horizontal padding to show more text
+        "px-[2px] sm:px-2",
         getEventColorClasses(event.color),
         getBorderRadiusClasses(isFirstDay, isLastDay),
         className,
@@ -205,9 +210,12 @@ export function EventItem({
         isDragging={isDragging}
         onClick={onClick}
         className={cn(
-          "py-1",
+          "py-0.5 sm:py-1",
           durationMinutes < 45 ? "items-center" : "flex-col",
-          view === "week" ? "text-[10px] sm:text-[13px]" : "text-[13px]",
+          // Enhanced mobile typography and sizing with better text wrapping
+          view === "week" 
+            ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal" 
+            : "text-[13px]",
           className,
         )}
         currentTime={currentTime}
@@ -217,27 +225,59 @@ export function EventItem({
         onTouchStart={onTouchStart}
       >
         {durationMinutes < 45 ? (
-          <div className="truncate flex items-center gap-1">
-            <span className="truncate">{event.title}</span>
+          // Short events - mobile optimized layout
+          <div className="flex items-start gap-0.5 w-full min-w-0">
+            <span className={cn(
+              "font-medium flex-1 min-w-0",
+              // On mobile, allow text wrapping for very narrow events
+              view === "week" ? "break-words hyphens-auto sm:truncate" : "truncate"
+            )} 
+            title={event.title} // Tooltip for full title on hover/long press
+            >
+              {event.title}
+            </span>
             {event.isSynced && (
-              <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" />
+              <Cloud className="w-2.5 h-2.5 sm:w-3 sm:h-3 opacity-60 flex-shrink-0" />
             )}
-            {showTime && (
-              <span className="opacity-70">
-                {" " + formatTimeWithOptionalMinutes(displayStart, timeFormat)}
+            {/* Hide time display on mobile for week view since timeline shows it */}
+            {showTime && view === "day" && (
+              <span className="opacity-70 text-[10px] sm:text-xs whitespace-nowrap">
+                {formatTimeWithOptionalMinutes(displayStart, timeFormat)}
+              </span>
+            )}
+            {/* Show time only on larger screens for week view */}
+            {showTime && view === "week" && (
+              <span className="hidden sm:inline opacity-70 text-xs whitespace-nowrap">
+                {formatTimeWithOptionalMinutes(displayStart, timeFormat)}
               </span>
             )}
           </div>
         ) : (
+          // Longer events - mobile optimized layout
           <>
-            <div className="truncate font-medium flex items-center gap-1">
-              <span className="truncate">{event.title}</span>
+            <div className="flex items-start gap-0.5 w-full min-w-0">
+              <span className={cn(
+                "font-medium flex-1 min-w-0",
+                // On mobile, allow text wrapping for week view
+                view === "week" ? "break-words hyphens-auto leading-tight sm:truncate" : "truncate"
+              )}
+              title={event.title} // Tooltip for full title on hover/long press
+              >
+                {event.title}
+              </span>
               {event.isSynced && (
-                <Cloud className="w-3 h-3 opacity-60 flex-shrink-0" />
+                <Cloud className="w-2.5 h-2.5 sm:w-3 sm:h-3 opacity-60 flex-shrink-0" />
               )}
             </div>
-            {showTime && (
-              <div className="truncate font-normal opacity-70 sm:text-xs uppercase">
+            {/* Mobile: Hide time for week view, show only for day view */}
+            {showTime && view === "day" && (
+              <div className="truncate font-normal opacity-70 text-[10px] sm:text-xs uppercase mt-0.5">
+                {getEventTime()}
+              </div>
+            )}
+            {/* Desktop: Show time for both views */}
+            {showTime && view === "week" && (
+              <div className="hidden sm:block truncate font-normal opacity-70 text-xs uppercase mt-0.5">
                 {getEventTime()}
               </div>
             )}
