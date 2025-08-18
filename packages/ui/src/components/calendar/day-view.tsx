@@ -30,6 +30,7 @@ interface DayViewProps {
   compactView?: boolean;
   timeFormat?: "12h" | "24h";
   timezone?: string;
+  workingDays?: number[];
 }
 
 interface PositionedEvent {

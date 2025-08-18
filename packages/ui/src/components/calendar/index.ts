@@ -3,7 +3,7 @@ export { AgendaView } from "./agenda-view";
 export { DayView } from "./day-view";
 export { MonthView } from "./month-view";
 export { WeekView } from "./week-view";
-export { EventCalendar } from "./event-calendar";
+export { EventCalendar, type EventCalendarProps } from "./event-calendar";
 export { EventItem } from "./event-item";
 export { EventsPopup } from "./events-popup";
 export { DraggableEvent } from "./draggable-event";

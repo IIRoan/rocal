@@ -32,7 +32,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
       startTime.setMilliseconds(0);
       
       const newEvent = {
-        id: undefined,
+        id: "",
         title: "",
         start: startTime,
         end: new Date(startTime.getTime() + 60 * 60 * 1000), // 1 hour default
