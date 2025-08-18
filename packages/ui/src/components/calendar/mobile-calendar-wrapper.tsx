@@ -35,7 +35,17 @@ export function MobileCalendarWrapper({
   ...props
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<CalendarView>(props.initialView || "month");
+  const [currentView, setCurrentView] = useState<CalendarView>(() => {
+    // Check sessionStorage first, then fall back to props or day view
+    if (typeof window !== 'undefined') {
+      const savedView = sessionStorage.getItem('calendar-view-selection');
+      if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
+        return savedView as CalendarView;
+      }
+    }
+    // Default to day view on mobile if no initialView is provided
+    return props.initialView || "day";
+  });
   const { currentDate, setCurrentDate } = useCalendarContext();
 
   const handleDateChange = (date: Date) => {
@@ -64,15 +74,24 @@ export function MobileCalendarWrapper({
   };
 
   const handleViewChange = (view: CalendarView) => {
+    console.log('MobileCalendarWrapper - handleViewChange:', view);
     setCurrentView(view);
   };
 
-  // Sync with initial view changes
+  const handleCalendarViewChange = (view: CalendarView) => {
+    console.log('MobileCalendarWrapper - handleCalendarViewChange from MobileEventCalendar:', view);
+    setCurrentView(view);
+  };
+
+  // Only sync with props.initialView if it's explicitly different and no session preference exists
   React.useEffect(() => {
-    if (props.initialView) {
-      setCurrentView(props.initialView);
+    if (props.initialView && typeof window !== 'undefined') {
+      const savedView = sessionStorage.getItem('calendar-view-selection');
+      if (!savedView && props.initialView !== currentView) {
+        setCurrentView(props.initialView);
+      }
     }
-  }, [props.initialView]);
+  }, [props.initialView, currentView]);
 
   return (
     <div className="relative flex flex-col h-full">
@@ -86,7 +105,7 @@ export function MobileCalendarWrapper({
 
       {/* Main Calendar Content - allow scrolling with bottom padding for mobile nav */}
       <div className={cn("flex-1 overflow-auto pb-20 md:pb-0", className)}>
-        {children || <MobileEventCalendar {...props} initialView={currentView} onSidebarToggle={handleOpenSidebar} />}
+        {children || <MobileEventCalendar {...props} initialView={currentView} onSidebarToggle={handleOpenSidebar} onViewChange={handleCalendarViewChange} />}
       </div>
 
       {/* Mobile Bottom Navigation - only visible on mobile */}

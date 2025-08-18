@@ -92,6 +92,8 @@ export interface MobileEventCalendarProps {
   onEventEdit?: (event: CalendarEvent) => void;
   // Mobile specific
   onSidebarToggle?: () => void;
+  // View change handler
+  onViewChange?: (view: CalendarView) => void;
 }
 
 export function MobileEventCalendar({
@@ -121,33 +123,51 @@ export function MobileEventCalendar({
   onUpdateNotifications,
   onEventEdit,
   onSidebarToggle,
+  onViewChange,
 }: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
   
-  // Initialize view from sessionStorage or fallback to initialView
+  // Initialize view from sessionStorage or fallback to day view on mobile, initialView otherwise
   const [view, setViewState] = useState<CalendarView>(() => {
     if (typeof window !== 'undefined') {
       const savedView = sessionStorage.getItem('calendar-view-selection');
       if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
         return savedView as CalendarView;
       }
+      // Default to day view on mobile if no saved preference
+      return 'day';
     }
     return initialView;
   });
 
-  // Custom setView function that also saves to sessionStorage
+  // Custom setView function that also saves to sessionStorage and notifies parent
   const setView = (newView: CalendarView) => {
     setViewState(newView);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('calendar-view-selection', newView);
     }
+    // Notify parent component about view change
+    onViewChange?.(newView);
   };
 
-  // Update view when initialView changes
+  // Notify parent about the initial view on mount
   useEffect(() => {
-    setView(initialView);
-  }, [initialView]);
+    onViewChange?.(view);
+  }, []);
+
+  // Update view when initialView changes from external source (like bottom nav)
+  useEffect(() => {
+    if (initialView && initialView !== view) {
+      console.log('MobileEventCalendar - initialView changed from parent:', initialView);
+      setViewState(initialView);
+      // Don't save to sessionStorage here since this came from parent
+      // but still notify about the change
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('calendar-view-selection', initialView);
+      }
+    }
+  }, [initialView, view]);
 
   // Calculate date range based on current view and date
   const dateRange = useMemo(() => {
