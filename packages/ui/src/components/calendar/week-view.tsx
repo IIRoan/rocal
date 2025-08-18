@@ -21,6 +21,7 @@ import {
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
+import { EventDots, groupEventsByExactTime } from "./event-dots";
 import { isMultiDayEvent } from "./utils";
 import { WeekCellsHeight } from "./constants";
 import { CalendarEvent } from "./types";
@@ -42,12 +43,14 @@ interface WeekViewProps {
 }
 
 interface PositionedEvent {
-  event: CalendarEvent;
+  events: CalendarEvent[]; // Changed to array to support grouped events
   top: number;
   height: number;
   left: number;
   width: number;
   zIndex: number;
+  dayIndex: number;
+  isGrouped: boolean; // Flag to indicate if this is a grouped event
 }
 
 export function WeekView({
@@ -133,35 +136,31 @@ export function WeekView({
         );
       });
 
-      // Sort events by start time and duration
-      const sortedEvents = [...dayEvents].sort((a, b) => {
-        const aStart = new Date(a.start);
-        const bStart = new Date(b.start);
-        const aEnd = new Date(a.end);
-        const bEnd = new Date(b.end);
-
-        // First sort by start time
-        if (aStart < bStart) return -1;
-        if (aStart > bStart) return 1;
-
-        // If start times are equal, sort by duration (longer events first)
-        const aDuration = differenceInMinutes(aEnd, aStart);
-        const bDuration = differenceInMinutes(bEnd, bStart);
-        return bDuration - aDuration;
+      // Group events by exact time first, then sort by start time and duration
+      const eventGroups = groupEventsByExactTime(dayEvents);
+      
+      // Sort groups by start time
+      eventGroups.sort((a, b) => {
+        const aStart = new Date(a[0]?.start || 0);
+        const bStart = new Date(b[0]?.start || 0);
+        return aStart.getTime() - bStart.getTime();
       });
 
       // Calculate positions for each event using improved layout algorithm
       const positionedEvents: PositionedEvent[] = [];
       const dayStart = startOfDay(day);
 
-      // Track columns for overlapping events
-      const columns: { event: CalendarEvent; end: Date }[][] = [];
-      const eventColumnMapping: Map<CalendarEvent, number> = new Map();
+      // Track columns for overlapping event groups
+      const columns: { events: CalendarEvent[]; start: Date; end: Date }[][] = [];
+      const groupColumnMapping: Map<CalendarEvent[], number> = new Map();
 
-      // First pass: assign events to columns
-      sortedEvents.forEach((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
+      // First pass: assign event groups to columns
+      eventGroups.forEach((eventGroup) => {
+        const firstEvent = eventGroup[0];
+        if (!firstEvent) return; // Skip empty groups
+        
+        const eventStart = new Date(firstEvent.start);
+        const eventEnd = new Date(firstEvent.end);
 
         // Adjust start and end times if they're outside this day
         const adjustedStart = isSameDay(day, eventStart)
@@ -171,7 +170,7 @@ export function WeekView({
           ? eventEnd
           : addHours(dayStart, 24);
 
-        // Find a column for this event
+        // Find a column for this event group
         let columnIndex = 0;
         let placed = false;
 
@@ -184,10 +183,7 @@ export function WeekView({
             const overlaps = col.some((c) =>
               areIntervalsOverlapping(
                 { start: adjustedStart, end: adjustedEnd },
-                {
-                  start: new Date(c.event.start),
-                  end: new Date(c.event.end),
-                },
+                { start: c.start, end: c.end },
               ),
             );
             if (!overlaps) {
@@ -201,12 +197,19 @@ export function WeekView({
         // Ensure column is initialized before pushing
         const currentColumn = columns[columnIndex] || [];
         columns[columnIndex] = currentColumn;
-        currentColumn.push({ event, end: adjustedEnd });
-        eventColumnMapping.set(event, columnIndex);
+        currentColumn.push({ 
+          events: eventGroup, 
+          start: adjustedStart, 
+          end: adjustedEnd 
+        });
+        groupColumnMapping.set(eventGroup, columnIndex);
       });
 
-      // Second pass: calculate positions with improved algorithm
-      sortedEvents.forEach((event) => {
+      // Second pass: calculate positions for event groups
+      eventGroups.forEach((eventGroup) => {
+        const event = eventGroup[0]; // Use first event for positioning calculations
+        if (!event) return; // Skip empty groups
+        
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
@@ -226,12 +229,15 @@ export function WeekView({
         const top = (startHour - StartHour) * WeekCellsHeight;
         const height = (endHour - startHour) * WeekCellsHeight;
 
-        const columnIndex = eventColumnMapping.get(event) ?? 0;
+        const columnIndex = groupColumnMapping.get(eventGroup) ?? 0;
         const totalColumns = columns.length;
 
-        // Calculate overlapping events for this specific event's time slot
-        const overlappingEvents = sortedEvents.filter((otherEvent) => {
-          if (otherEvent.id === event.id) return false;
+        // Calculate overlapping event groups for this specific time slot
+        const overlappingGroups = eventGroups.filter((otherGroup) => {
+          if (otherGroup === eventGroup) return false;
+          const otherEvent = otherGroup[0];
+          if (!otherEvent) return false;
+          
           const otherStart = new Date(otherEvent.start);
           const otherEnd = new Date(otherEvent.end);
           
@@ -241,7 +247,7 @@ export function WeekView({
           );
         });
 
-        const overlappingColumns = overlappingEvents.length + 1;
+        const overlappingColumns = overlappingGroups.length + 1;
         
         // Use improved width and positioning calculation with mobile optimization
         let width: number;
@@ -310,12 +316,14 @@ export function WeekView({
         }
 
         positionedEvents.push({
-          event,
+          events: eventGroup,
           top,
           height,
           left,
           width,
           zIndex: 10 + columnIndex, // Higher columns get higher z-index
+          dayIndex: 0, // Will be set correctly when rendering
+          isGrouped: eventGroup.length > 1,
         });
       });
 
@@ -521,9 +529,9 @@ export function WeekView({
             data-today={isToday(day) || undefined}
           >
             {/* Positioned events */}
-            {(processedDayEvents[dayIndex] ?? []).map((positionedEvent) => (
+            {(processedDayEvents[dayIndex] ?? []).map((positionedEvent, index) => (
               <div
-                key={positionedEvent.event.id}
+                key={positionedEvent.events[0]?.id || index}
                 className="absolute z-10 px-[1px] sm:px-1"
                 style={{
                   top: `${positionedEvent.top}px`,
@@ -535,14 +543,35 @@ export function WeekView({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="h-full w-full">
-                  <DraggableEvent
-                    event={positionedEvent.event}
-                    view="week"
-                    onClick={(e) => handleEventClick(positionedEvent.event, e)}
-                    showTime
-                    height={positionedEvent.height}
-                    timeFormat={timeFormat}
-                  />
+                  {positionedEvent.isGrouped ? (
+                    // Use EventDots for grouped events with same time
+                    <EventDots
+                      events={positionedEvent.events}
+                      view="week"
+                      onClick={(event) => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        handleEventClick(event, fakeEvent);
+                      }}
+                      showTime
+                      timeFormat={timeFormat}
+                      style={{ height: '100%', width: '100%' }}
+                    />
+                  ) : (
+                    // Use regular DraggableEvent for single events
+                    positionedEvent.events[0] && (() => {
+                      const singleEvent = positionedEvent.events[0];
+                      return (
+                        <DraggableEvent
+                          event={singleEvent}
+                          view="week"
+                          onClick={(e) => handleEventClick(singleEvent, e)}
+                          showTime
+                          height={positionedEvent.height}
+                          timeFormat={timeFormat}
+                        />
+                      );
+                    })()
+                  )}
                 </div>
               </div>
             ))}

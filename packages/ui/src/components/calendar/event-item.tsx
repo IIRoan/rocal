@@ -186,15 +186,7 @@ export function EventItem({
       >
         {children || (
           <span className="truncate flex items-center gap-1">
-            {!event.allDay && (
-              <span className="truncate sm:text-xs font-normal opacity-70 uppercase">
-                {formatTimeWithOptionalMinutes(displayStart, timeFormat)}{" "}
-              </span>
-            )}
             <span className="truncate">{event.title}</span>
-            {event.isSynced && (
-              <Cloud className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60 flex-shrink-0" />
-            )}
           </span>
         )}
       </EventWrapper>
@@ -236,21 +228,6 @@ export function EventItem({
             >
               {event.title}
             </span>
-            {event.isSynced && (
-              <Cloud className="w-2.5 h-2.5 sm:w-3 sm:h-3 opacity-60 flex-shrink-0" />
-            )}
-            {/* Hide time display on mobile for week view since timeline shows it */}
-            {showTime && view === "day" && (
-              <span className="opacity-70 text-[10px] sm:text-xs whitespace-nowrap">
-                {formatTimeWithOptionalMinutes(displayStart, timeFormat)}
-              </span>
-            )}
-            {/* Show time only on larger screens for week view */}
-            {showTime && view === "week" && (
-              <span className="hidden sm:inline opacity-70 text-xs whitespace-nowrap">
-                {formatTimeWithOptionalMinutes(displayStart, timeFormat)}
-              </span>
-            )}
           </div>
         ) : (
           // Longer events - mobile optimized layout
@@ -265,22 +242,7 @@ export function EventItem({
               >
                 {event.title}
               </span>
-              {event.isSynced && (
-                <Cloud className="w-2.5 h-2.5 sm:w-3 sm:h-3 opacity-60 flex-shrink-0" />
-              )}
             </div>
-            {/* Mobile: Hide time for week view, show only for day view */}
-            {showTime && view === "day" && (
-              <div className="truncate font-normal opacity-70 text-[10px] sm:text-xs uppercase mt-0.5">
-                {getEventTime()}
-              </div>
-            )}
-            {/* Desktop: Show time for both views */}
-            {showTime && view === "week" && (
-              <div className="hidden sm:block truncate font-normal opacity-70 text-xs uppercase mt-0.5">
-                {getEventTime()}
-              </div>
-            )}
           </>
         )}
       </EventWrapper>
@@ -305,26 +267,12 @@ export function EventItem({
     >
       <div className="text-sm font-medium flex items-center gap-2">
         <span className="truncate">{event.title}</span>
-        {event.isSynced && (
-          <Cloud className="w-4 h-4 opacity-60 flex-shrink-0"/>
-        )}
       </div>
-      <div className="text-xs opacity-70">
-        {event.allDay ? (
-          <span>All day</span>
-        ) : (
-          <span className="uppercase">
-            {formatTimeWithOptionalMinutes(displayStart, timeFormat)} -{" "}
-            {formatTimeWithOptionalMinutes(displayEnd, timeFormat)}
-          </span>
-        )}
-        {event.location && (
-          <>
-            <span className="px-1 opacity-35"> · </span>
-            <span>{event.location}</span>
-          </>
-        )}
-      </div>
+      {event.location && (
+        <div className="text-xs opacity-70">
+          <span>{event.location}</span>
+        </div>
+      )}
       {event.description && (
         <div className="my-1 text-xs opacity-90">{formatEventDescription(event.description)}</div>
       )}
