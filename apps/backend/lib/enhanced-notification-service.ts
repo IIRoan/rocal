@@ -847,9 +847,7 @@ export class EnhancedNotificationService {
     );
 
     try {
-      console.log(
-        `🔍 Processing scheduled notifications for ${currentMinute.toISOString()}`
-      );
+      // Only log processing start if there might be notifications
 
       // Query for all notifications that should be sent by now (current minute or earlier)
       const notificationsToSend = await this.executeWithDatabaseRetry(
@@ -882,9 +880,12 @@ export class EnhancedNotificationService {
         }
       );
 
-      console.log(
-        `📋 Found ${notificationsToSend.length} notifications to send`
-      );
+      // Only log when there are notifications to send
+      if (notificationsToSend.length > 0) {
+        console.log(
+          `🔍 Processing ${notificationsToSend.length} scheduled notifications for ${currentMinute.toISOString()}`
+        );
+      }
 
       let processedThisRun = 0;
       let failedThisRun = 0;
@@ -895,9 +896,7 @@ export class EnhancedNotificationService {
         try {
           // Check if event is still valid (not moved to past)
           if (notification.event.start < now) {
-            console.log(
-              `⏭️ Skipping notification ${notification.id} - event moved to past`
-            );
+            // Skip notification for past events (reduce logging)
             await this.handleEventMovedToPast(
               notification.eventId,
               notification.event.start
@@ -1142,9 +1141,7 @@ export class EnhancedNotificationService {
         originalNotificationTime: notification.notificationTime,
       });
 
-      console.log(
-        `🔄 Scheduled retry ${retryCount}/${maxRetries} for notification ${notification.id} at ${nextRetryAt.toISOString()}`
-      );
+      // Scheduled retry (reduced logging)
     } else {
       // Max retries reached or non-retryable error
       console.error(
@@ -1238,13 +1235,11 @@ export class EnhancedNotificationService {
         const result = await this.sendNotificationWithRetry(notification);
 
         if (result.success) {
-          console.log(`✅ Retry successful for notification ${notificationId}`);
+          // Retry successful (reduced logging)
           this.processedCount++;
           this.retryQueue.delete(notificationId);
         } else {
-          console.log(
-            `❌ Retry failed for notification ${notificationId}: ${result.error}`
-          );
+          // Retry failed (reduced logging)
           await this.handleNotificationFailure(notification, result);
         }
       } catch (error) {
@@ -1268,13 +1263,9 @@ export class EnhancedNotificationService {
           updatedRetryInfo.nextRetryAt = new Date(Date.now() + retryDelay);
           this.retryQueue.set(notificationId, updatedRetryInfo);
 
-          console.log(
-            `🔄 Scheduled retry ${updatedRetryInfo.retryCount}/3 for notification ${notificationId} in ${retryDelay / 60000} minutes`
-          );
+          // Scheduled retry (reduced logging)
         } else {
-          console.error(
-            `❌ Permanently failed notification ${notificationId} after ${updatedRetryInfo.retryCount} attempts`
-          );
+          // Permanently failed notification (reduced logging)
           this.retryQueue.delete(notificationId);
 
           // Log permanent failure
