@@ -5,6 +5,7 @@ export { MonthView } from "./month-view";
 export { WeekView } from "./week-view";
 export { EventCalendar, type EventCalendarProps } from "./event-calendar";
 export { EventItem } from "./event-item";
+export { EventDots, groupEventsByExactTime } from "./event-dots";
 export { EventsPopup } from "./events-popup";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
