@@ -13,6 +13,7 @@ interface AgendaViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
+  onEventCreate?: (startTime: Date) => void;
   timeFormat?: "12h" | "24h";
 }
 
