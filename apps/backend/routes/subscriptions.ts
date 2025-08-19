@@ -66,23 +66,51 @@ export const subscriptionsRoute = new Elysia()
       // Test the URL by attempting to fetch and parse it
       let testParseResult;
       try {
+        console.log('🌐 Fetching calendar from URL:', url);
         const response = await fetch(url, {
           headers: {
-            'User-Agent': 'Calendar Sync Service/1.0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/calendar,text/plain,*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache',
           },
         });
+        
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch calendar: ${response.status} ${response.statusText}`);
+          console.error(`❌ HTTP error fetching calendar: ${response.status} ${response.statusText}`);
+          if (response.status >= 500) {
+            throw new Error(`The calendar server is currently unavailable (${response.status}). Please try again later or contact the calendar provider.`);
+          } else if (response.status === 404) {
+            throw new Error(`Calendar not found at the provided URL. Please check the URL and try again.`);
+          } else if (response.status === 403 || response.status === 401) {
+            throw new Error(`Access denied to the calendar. The calendar may be private or require authentication.`);
+          } else {
+            throw new Error(`Failed to fetch calendar: ${response.status} ${response.statusText}`);
+          }
         }
 
         const icsContent = await response.text();
+        console.log('📄 Fetched ICS content length:', icsContent.length);
+        console.log('📄 First 200 chars of ICS:', icsContent.substring(0, 200));
+        
+        console.log('🔍 Parsing ICS content...');
         testParseResult = parseICSFile(icsContent);
         
+        console.log('✅ ICS parsing completed:', {
+          eventsFound: testParseResult.events.length,
+          errorsCount: testParseResult.errors.length,
+          calendarName: testParseResult.calendarName
+        });
+        
         if (testParseResult.errors.length > 0) {
-          console.warn('ICS parsing warnings:', testParseResult.errors);
+          console.warn('⚠️ ICS parsing warnings:', testParseResult.errors);
         }
       } catch (error) {
+        console.error('💥 Complete error details:', error);
+        console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         throw new Error(`Unable to fetch or parse calendar from URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
@@ -358,13 +386,20 @@ export async function syncCalendarSubscription(subscription: any) {
 
   try {
     // Fetch the calendar
+    console.log('🔄 Syncing calendar from URL:', subscription.url);
     const response = await fetch(subscription.url, {
       headers: {
-        'User-Agent': 'Calendar Sync Service/1.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/calendar,text/plain,*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
         ...(subscription.etag && { 'If-None-Match': subscription.etag }),
         ...(subscription.lastModified && { 'If-Modified-Since': subscription.lastModified }),
       },
     });
+    
+    console.log('📡 Sync response status:', response.status);
+    console.log('📡 Sync response headers:', Object.fromEntries(response.headers.entries()));
 
     // Handle 304 Not Modified
     if (response.status === 304) {
