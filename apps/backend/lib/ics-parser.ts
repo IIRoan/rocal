@@ -66,27 +66,36 @@ export function parseICSFile(icsContent: string): ICSParseResult {
 }
 
 function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
-  if (!vEvent.uid || !vEvent.start || !vEvent.end || !vEvent.summary) {
-    return null;
-  }
+  try {
+    console.log('🔍 Parsing vEvent:', vEvent.uid, vEvent.summary);
+    
+    if (!vEvent.uid || !vEvent.start || !vEvent.end || !vEvent.summary) {
+      console.warn('⚠️ Missing required fields in vEvent:', {
+        uid: !!vEvent.uid,
+        start: !!vEvent.start,
+        end: !!vEvent.end,
+        summary: !!vEvent.summary
+      });
+      return null;
+    }
 
-  // Debug: Log the raw vEvent data to understand timezone handling
-  console.log('Raw vEvent data:', {
-    uid: vEvent.uid,
-    summary: vEvent.summary,
-    start: {
-      value: vEvent.start,
-      type: typeof vEvent.start,
-      isDate: vEvent.start instanceof Date
-    },
-    end: {
-      value: vEvent.end,
-      type: typeof vEvent.end,
-      isDate: vEvent.end instanceof Date
-    },
-    dtstart: vEvent.dtstart,
-    dtend: vEvent.dtend
-  });
+    // Debug: Log the raw vEvent data to understand timezone handling
+    console.log('📊 Raw vEvent data:', {
+      uid: vEvent.uid,
+      summary: vEvent.summary,
+      start: {
+        value: vEvent.start,
+        type: typeof vEvent.start,
+        isDate: vEvent.start instanceof Date
+      },
+      end: {
+        value: vEvent.end,
+        type: typeof vEvent.end,
+        isDate: vEvent.end instanceof Date
+      },
+      dtstart: vEvent.dtstart,
+      dtend: vEvent.dtend
+    });
 
   // Include all events regardless of participation status (PARTSTAT)
   // This ensures declined, tentative, and pending events are also synced
@@ -96,30 +105,56 @@ function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
   let allDay = false;
 
   // Handle date/time parsing with proper timezone handling
-  if (typeof start === 'string') {
-    const date = new Date(start);
-    if (!isNaN(date.getTime())) {
-      start = date;
-      // Check if this is truly an all-day event (no time component)
-      allDay = !start.includes('T') && !start.includes(':');
+  console.log('🕐 Processing start time:', start, typeof start);
+  try {
+    if (typeof start === 'string') {
+      const date = new Date(start);
+      if (!isNaN(date.getTime())) {
+        start = date;
+        // Check if this is truly an all-day event (no time component)
+        allDay = !start.includes('T') && !start.includes(':');
+        console.log('📅 Parsed string start date:', start, 'allDay:', allDay);
+      } else {
+        throw new Error(`Invalid start date string: ${start}`);
+      }
+    } else if (start instanceof Date) {
+      // Date object from ICS library - use as-is but check for all-day
+      // ICS library typically handles timezone conversion
+      start = vEvent.start;
+      allDay = false; // Will be determined by the original ICS data
+      console.log('📅 Using Date object start:', start);
+    } else {
+      throw new Error(`Unexpected start date type: ${typeof start}`);
     }
-  } else if (start instanceof Date) {
-    // Date object from ICS library - use as-is but check for all-day
-    // ICS library typically handles timezone conversion
-    allDay = false; // Will be determined by the original ICS data
+  } catch (error) {
+    console.error('❌ Error parsing start date:', error);
+    throw error;
   }
   
-  if (typeof end === 'string') {
-    const date = new Date(end);
-    if (!isNaN(date.getTime())) {
-      end = date;
-      if (allDay) {
-        // For all-day events, subtract 1 day from end date as ICS format uses exclusive end dates
-        end = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  console.log('🕐 Processing end time:', end, typeof end);
+  try {
+    if (typeof end === 'string') {
+      const date = new Date(end);
+      if (!isNaN(date.getTime())) {
+        end = date;
+        if (allDay) {
+          // For all-day events, subtract 1 day from end date as ICS format uses exclusive end dates
+          end = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+        }
+        console.log('📅 Parsed string end date:', end);
+      } else {
+        throw new Error(`Invalid end date string: ${end}`);
       }
+    } else if (end instanceof Date) {
+      // Date object from ICS library - use as-is
+      end = vEvent.end;
+      console.log('📅 Using Date object end:', end);
+    } else {
+      throw new Error(`Unexpected end date type: ${typeof end}`);
     }
-  } else if (end instanceof Date) {
-    // Date object from ICS library - use as-is
+  } catch (error) {
+    console.error('❌ Error parsing end date:', error);
+    throw error;
   }
 
   // Ensure we have valid Date objects
@@ -161,16 +196,22 @@ function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
     }
   }
 
-  return {
-    uid: vEvent.uid,
-    title: vEvent.summary,
-    description: vEvent.description || undefined,
-    start,
-    end,
-    allDay,
-    location: vEvent.location || undefined,
-    recurrence
-  };
+    console.log('✅ Successfully parsed event:', vEvent.uid, vEvent.summary);
+    return {
+      uid: vEvent.uid,
+      title: vEvent.summary,
+      description: vEvent.description || undefined,
+      start,
+      end,
+      allDay,
+      location: vEvent.location || undefined,
+      recurrence
+    };
+  } catch (error) {
+    console.error('💥 Fatal error parsing vEvent:', vEvent?.uid || 'unknown', error);
+    console.error('📊 vEvent data that caused error:', JSON.stringify(vEvent, null, 2));
+    throw new Error(`Failed to parse event ${vEvent?.uid || 'unknown'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 function parseRRule(rrule: any): any {
