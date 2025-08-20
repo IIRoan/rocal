@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
+import { useSession } from "@/lib/auth-client";
 
 interface SettingsContextValue {
   settings: UserSettings | null;
@@ -25,6 +26,7 @@ export function useSettingsState(): SettingsContextValue {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { data: session, isPending } = useSession();
 
   const fetchSettings = async () => {
     try {
@@ -33,8 +35,14 @@ export function useSettingsState(): SettingsContextValue {
       const userSettings = await calendarApiService.getUserSettings();
       setSettings(userSettings);
     } catch (err: any) {
-      setError(err.message || "Failed to load settings");
-      console.error("Failed to fetch user settings:", err);
+      // Quietly ignore unauthorized errors when the user isn't logged in
+      if (err?.statusCode === 401 || err?.status === 401) {
+        setSettings(null);
+        setError(null);
+      } else {
+        setError(err.message || "Failed to load settings");
+        console.error("Failed to fetch user settings:", err);
+      }
     } finally {
       setLoading(false);
     }
@@ -70,10 +78,17 @@ export function useSettingsState(): SettingsContextValue {
     await fetchSettings();
   };
 
-  // Load settings on mount
+  // Load settings only when user is authenticated; avoid 401s on public pages
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (!isPending && session?.user) {
+      fetchSettings();
+    } else if (!isPending && !session?.user) {
+      // Not authenticated: ensure clean state and not loading
+      setSettings(null);
+      setError(null);
+      setLoading(false);
+    }
+  }, [isPending, session?.user]);
 
   // Apply theme when settings change
   useEffect(() => {
