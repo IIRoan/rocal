@@ -108,38 +108,59 @@ export class HttpClient {
       ...fetchOptions
     } = options;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
     const fullUrl = url.startsWith("http") ? url : `${this.baseURL}${url}`;
-
-    const requestOptions: RequestInit = {
-      ...fetchOptions,
-      signal: controller.signal,
-      credentials: "include", // Include cookies for session authentication
-      headers: {
-        "Content-Type": "application/json",
-        ...fetchOptions.headers,
-      },
-    };
 
     let lastError: any;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
+      // Create a fresh controller and timeout for each attempt
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const requestOptions: RequestInit = {
+        ...fetchOptions,
+        signal: controller.signal,
+        credentials: "include", // Include cookies for session authentication
+        headers: {
+          "Content-Type": "application/json",
+          ...fetchOptions.headers,
+        },
+      };
+
       try {
         const response = await fetch(fullUrl, requestOptions);
         clearTimeout(timeoutId);
 
         if (!response.ok) {
+          // Capture Retry-After header (if any) before consuming body
+          const retryAfterHeader = response.headers.get("retry-after");
           const error = await this.parseErrorResponse(response);
 
-          // Don't retry authentication errors or client errors (except specific ones)
+          // Don't retry authentication errors
           if (response.status === 401 || response.status === 403) {
             throw error;
           }
 
-          if (attempt < retries && this.isRetryableError(error)) {
-            await this.delay(this.retryDelay * Math.pow(2, attempt)); // Exponential backoff
+          const retryable = this.isRetryableError(error);
+          if (attempt < retries && retryable) {
+            let delayMs = this.retryDelay * Math.pow(2, attempt);
+
+            // Respect Retry-After for 429/503 if server provides it
+            if (retryAfterHeader) {
+              const seconds = parseInt(retryAfterHeader, 10);
+              if (!isNaN(seconds)) {
+                delayMs = Math.max(delayMs, seconds * 1000);
+              } else {
+                const targetTime = Date.parse(retryAfterHeader);
+                if (!isNaN(targetTime)) {
+                  delayMs = Math.max(delayMs, targetTime - Date.now());
+                }
+              }
+            }
+
+            // Add small jitter to avoid thundering herd
+            const jitter = Math.floor(Math.random() * 250);
+            await this.delay(Math.max(0, delayMs) + jitter);
             continue;
           }
 
@@ -161,12 +182,14 @@ export class HttpClient {
         lastError = error;
 
         // Don't retry authentication errors
-        if (error.statusCode === 401 || error.statusCode === 403) {
+        if (error?.statusCode === 401 || error?.statusCode === 403) {
           throw error;
         }
 
         if (attempt < retries && this.isRetryableError(error)) {
-          await this.delay(this.retryDelay * Math.pow(2, attempt));
+          let delayMs = this.retryDelay * Math.pow(2, attempt);
+          const jitter = Math.floor(Math.random() * 250);
+          await this.delay(delayMs + jitter);
           continue;
         }
 

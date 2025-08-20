@@ -43,9 +43,37 @@ export class CalendarApiService {
       const startISO = start.toISOString();
       const endISO = end.toISOString();
 
-      const response = await this.client.get<EventsResponse>(
-        `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
-      );
+      const doFetch = async (): Promise<EventsResponse> =>
+        await this.client.get<EventsResponse>(
+          `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
+        );
+
+      let response = await doFetch();
+
+      // Validate completeness: events present, dates transformed, and optional structures if backend provides
+      const isComplete = (res: EventsResponse) => {
+        if (!res || !Array.isArray(res.events)) return false;
+        // Ensure dates are Date objects
+        const datesOk = res.events.every(
+          (e) => e && e.start instanceof Date && e.end instanceof Date,
+        );
+        return datesOk;
+      };
+
+      if (!isComplete(response)) {
+        // Attempt a single re-fetch in case of partial decode or race condition
+        await new Promise((r) => setTimeout(r, 150));
+        response = await doFetch();
+        if (!isComplete(response)) {
+          throw {
+            error: "Incomplete Data",
+            message:
+              "Event data appears incomplete. Please try again in a moment.",
+            statusCode: 502,
+            details: { reason: "validation_failed" },
+          };
+        }
+      }
 
       return response;
     } catch (error) {
