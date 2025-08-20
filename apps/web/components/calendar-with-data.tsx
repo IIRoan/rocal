@@ -31,16 +31,18 @@ interface CalendarWithDataProps {
 }
 
 export function CalendarWithData({ className }: CalendarWithDataProps) {
-  const { isCalendarVisible } = useCalendarContext();
+  const { isCalendarVisible, currentDate } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const { openEventEditor } = useCommandPalette();
 
   // Get the initial view from settings, fallback to month
   const initialView = settings?.defaultView || "month";
 
-  // Calculate default date range for initial load
+  // Calculate default date range for initial load using currentDate from context
   const defaultDateRange = useMemo(() => {
-    const now = new Date();
+    // Use currentDate from calendar context instead of new Date()
+    // This ensures we use the saved date from localStorage if available
+    const baseDate = currentDate;
     let start: Date;
     let end: Date;
 
@@ -50,31 +52,31 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
     switch (initialView) {
       case "month":
-        start = startOfMonth(now);
-        end = endOfMonth(now);
+        start = startOfMonth(baseDate);
+        end = endOfMonth(baseDate);
         break;
       case "week":
-        start = startOfWeek(now, { weekStartsOn });
-        end = endOfWeek(now, { weekStartsOn });
+        start = startOfWeek(baseDate, { weekStartsOn });
+        end = endOfWeek(baseDate, { weekStartsOn });
         break;
       case "day":
-        start = new Date(now);
+        start = new Date(baseDate);
         start.setHours(0, 0, 0, 0);
-        end = new Date(now);
+        end = new Date(baseDate);
         end.setHours(23, 59, 59, 999);
         break;
       case "agenda":
-        start = new Date(now);
-        end = addDays(now, AgendaDaysToShow - 1);
+        start = new Date(baseDate);
+        end = addDays(baseDate, AgendaDaysToShow - 1);
         break;
       default:
-        start = startOfMonth(now);
-        end = endOfMonth(now);
+        start = startOfMonth(baseDate);
+        end = endOfMonth(baseDate);
         break;
     }
 
     return { start, end };
-  }, [initialView, settings?.weekStartDay]);
+  }, [initialView, settings?.weekStartDay, currentDate]);
 
   // Use the shared calendar data
   const calendarData = useSharedCalendarData();

@@ -18,21 +18,34 @@ export function SidebarCalendar({ className }: SidebarCalendarProps) {
 
   // Update the calendar month whenever currentDate changes
   useEffect(() => {
-    setCalendarMonth(currentDate);
-  }, [currentDate]);
+    // Ensure currentDate is valid before setting calendar month
+    if (currentDate && !isNaN(currentDate.getTime())) {
+      setCalendarMonth(currentDate);
+    } else {
+      // Fallback to current date if invalid
+      const now = new Date();
+      setCalendarMonth(now);
+      setCurrentDate(now);
+    }
+  }, [currentDate, setCurrentDate]);
 
   // Handle date selection
   const handleSelect = (date: Date | undefined) => {
     if (date) {
       setCurrentDate(date);
+    } else {
+      // If no date is selected, ensure we have a valid current date
+      if (!currentDate || isNaN(currentDate.getTime())) {
+        setCurrentDate(new Date());
+      }
     }
   };
 
   // Handle month navigation
   const handleMonthChange = (month: Date) => {
     setCalendarMonth(month);
-    // Update the current date to the first day of the new month
-    setCurrentDate(new Date(month.getFullYear(), month.getMonth(), 1));
+    // Don't automatically change the selected date when navigating months
+    // Only update the calendar month display
   };
 
   return (
