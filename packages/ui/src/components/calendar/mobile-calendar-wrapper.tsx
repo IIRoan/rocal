@@ -11,6 +11,7 @@ import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { CalendarView } from "./types";
 import { cn } from "../../lib/utils";
+import { useIsMobile } from "../../hooks/use-mobile";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   user?: {
@@ -35,18 +36,32 @@ export function MobileCalendarWrapper({
   ...props
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
+  
   const [currentView, setCurrentView] = useState<CalendarView>(() => {
-    // Check sessionStorage first, then fall back to props or day view
+    // Check sessionStorage first, then fall back to smart defaults
     if (typeof window !== 'undefined') {
       const savedView = sessionStorage.getItem('calendar-view-selection');
       if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
         return savedView as CalendarView;
       }
     }
-    // Default to day view on mobile if no initialView is provided
-    return props.initialView || "day";
+    // Default based on screen size - will be updated by useEffect when isMobile is determined
+    return props.initialView || "month";
   });
+  
   const { currentDate, setCurrentDate } = useCalendarContext();
+
+  // Update view when isMobile status changes and no saved preference exists
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedView = sessionStorage.getItem('calendar-view-selection');
+      if (!savedView && isMobile) {
+        // On mobile, always default to day view regardless of initialView
+        setCurrentView("day");
+      }
+    }
+  }, [isMobile]);
 
   const handleDateChange = (date: Date) => {
     setCurrentDate(date);
