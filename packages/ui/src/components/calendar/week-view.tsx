@@ -398,7 +398,7 @@ export function WeekView({
       data-slot="week-view" 
       className="flex h-full flex-col"
     >
-      <div className="bg-background/95 border-border/70 sticky top-0 z-40 grid grid-cols-8 border-y backdrop-blur-md uppercase shadow-sm">
+      <div className="bg-background/95 border-border/70 sticky top-0 z-40 grid grid-cols-8 border-b backdrop-blur-md uppercase" style={{ top: '75px' }}>
         <div className="text-muted-foreground/70 py-2 text-center text-xs">
           <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
         </div>

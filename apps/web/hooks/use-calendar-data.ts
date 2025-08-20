@@ -1012,14 +1012,14 @@ export function useCalendarData(
         console.error("Failed to load initial calendar data:", error);
       });
     }
-  }, [autoRefetch]); // Remove function dependencies to prevent infinite loops
+  }, [autoRefetch, fetchCalendars, fetchCategories]); // Include function dependencies
 
   // Fetch events when date range changes
   useEffect(() => {
     if (autoRefetch && currentDateRange) {
       fetchEvents(currentDateRange);
     }
-  }, [autoRefetch, currentDateRange]);
+  }, [autoRefetch, currentDateRange, fetchEvents]);
 
   // Computed values
   const loading = eventsLoading || calendarsLoading || categoriesLoading;
