@@ -12,9 +12,11 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
+import { useDropdownShortcuts } from "../../hooks";
 
 export function NavUser({
   user,
@@ -34,6 +36,12 @@ export function NavUser({
     .map((name) => name.charAt(0).toUpperCase())
     .join("")
     .slice(0, 2);
+
+  // Add keyboard shortcuts
+  useDropdownShortcuts([
+    { key: "s", action: () => onOpenSettings?.() },
+    { key: "l", action: () => onLogout?.() },
+  ]);
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -71,6 +79,7 @@ export function NavUser({
                   className="size-5 text-muted-foreground/80"
                 />
                 Settings
+                <DropdownMenuShortcut>⌘+S</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-3 focus:bg-sidebar-accent"
@@ -81,6 +90,7 @@ export function NavUser({
                   className="size-5 text-muted-foreground/80"
                 />
                 Logout
+                <DropdownMenuShortcut>⌘+L</DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

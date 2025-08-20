@@ -51,6 +51,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { ThemeToggle } from "../layout/theme-toggle";
+import { useDropdownShortcuts } from "../../hooks";
 
 export interface MobileEventCalendarProps {
   className?: string;
@@ -164,6 +165,14 @@ export function MobileEventCalendar({
     // Notify parent component about view change
     onViewChange?.(newView);
   };
+
+  // Add keyboard shortcuts for view changes
+  useDropdownShortcuts([
+    { key: "m", action: () => setView("month") },
+    { key: "w", action: () => setView("week") },
+    { key: "d", action: () => setView("day") },
+    { key: "a", action: () => setView("agenda") },
+  ]);
 
   // Notify parent about the initial view on mount
   useEffect(() => {
@@ -604,16 +613,16 @@ export function MobileEventCalendar({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-32">
                     <DropdownMenuItem onClick={() => setView("month")}>
-                      Month <DropdownMenuShortcut>M</DropdownMenuShortcut>
+                      Month <DropdownMenuShortcut>⌘+M</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setView("week")}>
-                      Week <DropdownMenuShortcut>W</DropdownMenuShortcut>
+                      Week <DropdownMenuShortcut>⌘+W</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setView("day")}>
-                      Day <DropdownMenuShortcut>D</DropdownMenuShortcut>
+                      Day <DropdownMenuShortcut>⌘+D</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setView("agenda")}>
-                      Agenda <DropdownMenuShortcut>A</DropdownMenuShortcut>
+                      Agenda <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

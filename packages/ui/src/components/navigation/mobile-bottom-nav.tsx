@@ -9,8 +9,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { useDropdownShortcuts } from "../../hooks";
 
 interface MobileBottomNavProps {
   onOpenSidebar?: () => void;
@@ -27,6 +29,13 @@ export function MobileBottomNav({
   onViewChange,
   className,
 }: MobileBottomNavProps) {
+  // Add keyboard shortcuts for view changes
+  useDropdownShortcuts([
+    { key: "d", action: () => onViewChange?.("day") },
+    { key: "w", action: () => onViewChange?.("week") },
+    { key: "m", action: () => onViewChange?.("month") },
+    { key: "a", action: () => onViewChange?.("agenda") },
+  ]);
   const getViewIcon = (view: CalendarView) => {
     switch (view) {
       case "day":
@@ -92,18 +101,22 @@ export function MobileBottomNav({
               <DropdownMenuItem onClick={() => onViewChange?.("day")}>
                 <div className="w-4 h-4 border-2 border-current rounded mr-2" />
                 Day
+                <DropdownMenuShortcut>⌘+D</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange?.("week")}>
                 <Grid3X3 size={16} className="mr-2" />
                 Week
+                <DropdownMenuShortcut>⌘+W</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange?.("month")}>
                 <Calendar size={16} className="mr-2" />
                 Month
+                <DropdownMenuShortcut>⌘+M</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewChange?.("agenda")}>
                 <LayoutGrid size={16} className="mr-2" />
                 Agenda
+                <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
