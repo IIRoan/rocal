@@ -66,7 +66,7 @@ export function useCyclingMessage({
       usedMessagesRef.current.add(nextMessage);
       setIsTransitioning(false);
     }, MESSAGE_CYCLE_CONFIG.TRANSITION_DURATION / 2);
-  }, [enabled, getNextMessage]);
+  }, [enabled, messageArray, currentMessage]);
   
   // Start cycling
   const startCycling = useCallback(() => {
@@ -92,7 +92,7 @@ export function useCyclingMessage({
       // Then start regular cycling
       intervalRef.current = setInterval(changeMessage, cycleInterval);
     }, initialDelay);
-  }, [enabled, currentMessage, changeMessage, cycleInterval, initialDelay]);
+  }, [enabled, currentMessage, cycleInterval, initialDelay]);
   
   // Stop cycling
   const stopCycling = useCallback(() => {
@@ -125,14 +125,14 @@ export function useCyclingMessage({
     }
     
     return stopCycling;
-  }, [enabled, isClient, startCycling, stopCycling]);
+  }, [enabled, isClient]);
   
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCycling();
     };
-  }, [stopCycling]);
+  }, []);
   
   // Reset when context or messages change
   useEffect(() => {
@@ -146,7 +146,7 @@ export function useCyclingMessage({
       stopCycling();
       startCycling();
     }
-  }, [context, messages, enabled, messageArray, isClient, startCycling, stopCycling]);
+  }, [context, messages, enabled, messageArray, isClient]);
   
   return {
     message: currentMessage,

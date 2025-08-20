@@ -18,6 +18,7 @@ import {
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
+import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 
 // Define the Day type as expected by date-fns
 // This type is often implicitly defined by date-fns, but explicitly defining it
@@ -142,25 +143,49 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   }, [calendarData.events, calendarData.calendars, visibleCalendarIds]); // Add calendars to deps
 
 
-  // Show calendar skeleton for initial settings loading
-  if (settingsLoading || (calendarData.loading && calendarData.events.length === 0 && calendarData.calendars.length === 0)) {
-    return <CalendarSkeleton view={initialView as any} className={className} />;
+  // Show calendar skeleton and overlay until ALL core elements are ready:
+  // - settings
+  // - calendars & categories
+  // - initial events (first load)
+  const isStructureLoading = settingsLoading || 
+    (calendarData.calendarsLoading && calendarData.calendars.length === 0) ||
+    (calendarData.categoriesLoading && calendarData.categories.length === 0);
+
+  const isInitialEventsLoading = calendarData.eventsLoading && calendarData.events.length === 0;
+
+  const isAllInitialLoading = isStructureLoading || isInitialEventsLoading;
+
+  const overlayContext = settingsLoading
+    ? "SETTINGS_LOAD"
+    : isStructureLoading
+      ? "CALENDAR_LOAD"
+      : isInitialEventsLoading
+        ? "DATA_SYNC"
+        : undefined;
+
+  if (isAllInitialLoading) {
+    return (
+      <>
+        <CalendarSkeleton view={initialView} className={className} />
+        <PageLoadingOverlay 
+          isLoading={true}
+          messageContext={overlayContext}
+          enableCycling={true}
+        />
+      </>
+    );
   }
 
-  // Early return optimized calendar with loading states
-  const isInitialLoad =
-    calendarData.loading && calendarData.events.length === 0;
-
+  // After initial load, render the interactive calendar.
+  // Avoid passing top-level loading to prevent internal skeleton that hides header.
   return (
     <EventCalendar
       className={className}
       initialView={initialView}
       events={transformedEvents}
       categories={calendarData.categories}
-      loading={isInitialLoad} // Only show loading for initial load
-      eventsLoading={
-        calendarData.eventsLoading && calendarData.events.length === 0
-      } // Optimize loading state
+      loading={false}
+      eventsLoading={calendarData.eventsLoading && calendarData.events.length === 0}
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}

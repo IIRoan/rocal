@@ -478,8 +478,9 @@ export function MobileEventCalendar({
     }
   }, [currentDate, view]);
 
-  // Show loading state with skeleton
-  if (eventsLoading) {
+  // Show skeleton only for initial structure loading (calendars/categories)
+  // Events can load separately without blocking the calendar UI
+  if (loading) {
     return (
       <div className={cn("rounded-lg", className)}>
         <CalendarSkeleton view={view} />
