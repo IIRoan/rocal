@@ -14,7 +14,7 @@ import { formatEventDescription } from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
 import { RecurringDeleteModal } from "./command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
-import { PairedTimeInputs } from "@/components/ui/time-input";
+import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocompletetimepicker";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -407,15 +407,52 @@ export function EventEditor({
                       {!eventForm.eventAllDay && (
                         <div>
                           <div className="text-foreground text-sm font-medium mb-2">Time</div>
-                          <PairedTimeInputs
-                            startTime={eventForm.eventStartTime}
-                            endTime={eventForm.eventEndTime}
-                            onStartTimeChange={eventForm.handleStartTimeChange}
-                            onEndTimeChange={eventForm.handleEndTimeChange}
-                            timeFormat={localSettings?.timeFormat}
-                            startError={eventForm.timeErrors.start}
-                            endError={eventForm.timeErrors.end}
-                          />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">Start Time</div>
+                              <ShadcnAutocomleteTimePicker
+                                value={(() => {
+                                  const [hours, minutes] = eventForm.eventStartTime.split(':').map(Number);
+                                  const date = new Date();
+                                  date.setHours(hours, minutes, 0, 0);
+                                  return date;
+                                })()}
+                                onChange={(date) => {
+                                  const timeString = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                                  eventForm.handleStartTimeChange(timeString);
+                                }}
+                                is24Hour={localSettings?.timeFormat === '24h'}
+                                placeholder="Start time..."
+                              />
+                            </div>
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-1">End Time</div>
+                              <ShadcnAutocomleteTimePicker
+                                value={(() => {
+                                  const [hours, minutes] = eventForm.eventEndTime.split(':').map(Number);
+                                  const date = new Date();
+                                  date.setHours(hours, minutes, 0, 0);
+                                  return date;
+                                })()}
+                                onChange={(date) => {
+                                  const timeString = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                                  eventForm.handleEndTimeChange(timeString);
+                                }}
+                                is24Hour={localSettings?.timeFormat === '24h'}
+                                placeholder="End time..."
+                              />
+                            </div>
+                          </div>
+                          {(eventForm.timeErrors.start || eventForm.timeErrors.end) && (
+                            <div className="mt-2 space-y-1">
+                              {eventForm.timeErrors.start && (
+                                <p className="text-xs text-destructive">{eventForm.timeErrors.start}</p>
+                              )}
+                              {eventForm.timeErrors.end && (
+                                <p className="text-xs text-destructive">{eventForm.timeErrors.end}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
