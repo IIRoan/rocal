@@ -274,10 +274,36 @@ export function useCalendarData(
         }
 
         // Create and store the request promise
-        const requestPromise = calendarApiService.getEvents(
-          dateRange.start,
-          dateRange.end,
-        );
+        const requestPromise = (async () => {
+          const maxAttempts = 2; // rely primarily on HttpClient retries; add 1 app-level retry for completeness
+          let lastError: any;
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+              const res = await calendarApiService.getEvents(
+                dateRange.start,
+                dateRange.end,
+              );
+
+              // Basic completeness check: ensure events exist as array; do not treat empty array as failure (valid case)
+              const valid = Array.isArray(res.events) && res.events.every((e) => e.start instanceof Date && e.end instanceof Date);
+              if (valid) {
+                return res;
+              }
+
+              throw new Error("incomplete_events_payload");
+            } catch (err) {
+              lastError = err;
+              if (attempt < maxAttempts - 1) {
+                // Jittered backoff small delay since HttpClient already backed off
+                await new Promise((r) => setTimeout(r, 200 + Math.floor(Math.random() * 150)));
+                continue;
+              }
+              throw err;
+            }
+          }
+          throw lastError;
+        })();
+
         pendingRequests.current.set(cacheKey, requestPromise);
 
         // Fetch from API
@@ -294,7 +320,7 @@ export function useCalendarData(
         setEvents(response.events);
 
         // Update categories if included in response
-        if (response.categories) {
+        if (response.categories && Array.isArray(response.categories)) {
           setCategories(response.categories);
           categoriesCache.current = {
             data: response.categories,
@@ -303,7 +329,7 @@ export function useCalendarData(
         }
 
         // Update calendars if included in response
-        if (response.calendars) {
+        if (response.calendars && Array.isArray(response.calendars)) {
           setCalendars(response.calendars);
           calendarsCache.current = {
             data: response.calendars,
@@ -312,7 +338,8 @@ export function useCalendarData(
         }
       } catch (error) {
         setEventsError(error as ApiError);
-        setEvents([]);
+        // Do not clear existing events on error to avoid UI flicker
+        // setEvents([]);
       } finally {
         // Clean up pending request
         pendingRequests.current.delete(cacheKey);
