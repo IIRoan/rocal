@@ -414,7 +414,7 @@ export function EventEditor({
                                 value={(() => {
                                   const [hours, minutes] = eventForm.eventStartTime.split(':').map(Number);
                                   const date = new Date();
-                                  date.setHours(hours, minutes, 0, 0);
+                                  date.setHours(hours || 0, minutes || 0, 0, 0);
                                   return date;
                                 })()}
                                 onChange={(date) => {
@@ -431,7 +431,7 @@ export function EventEditor({
                                 value={(() => {
                                   const [hours, minutes] = eventForm.eventEndTime.split(':').map(Number);
                                   const date = new Date();
-                                  date.setHours(hours, minutes, 0, 0);
+                                  date.setHours(hours || 0, minutes || 0, 0, 0);
                                   return date;
                                 })()}
                                 onChange={(date) => {
