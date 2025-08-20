@@ -137,6 +137,9 @@ export function useCalendarData(
     timestamp: number;
   } | null>(null);
 
+  // Maintain last known event counts per range key for integrity validation
+  const lastEventCounts = useRef<Map<string, { count: number; timestamp: number }>>(new Map());
+
   // Request deduplication
   const pendingRequests = useRef<Map<string, Promise<any>>>(new Map());
 
@@ -228,6 +231,51 @@ export function useCalendarData(
     [],
   );
 
+  // Validate and clean events: remove duplicates, drop invalid/out-of-range, report issues
+  const validateAndCleanEvents = useCallback(
+    (
+      items: CalendarEvent[],
+      range: DateRange,
+    ): { cleanedEvents: CalendarEvent[]; issues: string[]; valid: boolean } => {
+      const seen = new Set<string>();
+      const cleaned: CalendarEvent[] = [];
+      let duplicates = 0;
+      let invalidDates = 0;
+      let outOfRange = 0;
+
+      for (const e of items) {
+        const startOk = e.start instanceof Date && !isNaN(e.start.getTime());
+        const endOk = e.end instanceof Date && !isNaN(e.end.getTime());
+        if (!startOk || !endOk || e.start > e.end) {
+          invalidDates++;
+          continue;
+        }
+
+        // Accept events that intersect the requested range
+        const intersects = e.start <= range.end && e.end >= range.start;
+        if (!intersects) {
+          outOfRange++;
+          continue;
+        }
+
+        if (seen.has(e.id)) {
+          duplicates++;
+          continue;
+        }
+        seen.add(e.id);
+        cleaned.push(e);
+      }
+
+      const issues: string[] = [];
+      if (duplicates) issues.push(`duplicates:${duplicates}`);
+      if (invalidDates) issues.push(`invalidDates:${invalidDates}`);
+      if (outOfRange) issues.push(`outOfRange:${outOfRange}`);
+
+      return { cleanedEvents: cleaned, issues, valid: invalidDates === 0 };
+    },
+    [],
+  );
+
   // Find cached data that covers the requested date range
   const findCachedEvents = useCallback(
     (dateRange: DateRange): CalendarEvent[] | null => {
@@ -275,7 +323,7 @@ export function useCalendarData(
 
         // Create and store the request promise
         const requestPromise = (async () => {
-          const maxAttempts = 2; // rely primarily on HttpClient retries; add 1 app-level retry for completeness
+          const maxAttempts = 2; // rely primarily on HttpClient retries; add 1 app-level retry for integrity/count checks
           let lastError: any;
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
@@ -284,13 +332,30 @@ export function useCalendarData(
                 dateRange.end,
               );
 
-              // Basic completeness check: ensure events exist as array; do not treat empty array as failure (valid case)
-              const valid = Array.isArray(res.events) && res.events.every((e) => e.start instanceof Date && e.end instanceof Date);
-              if (valid) {
-                return res;
+              if (!Array.isArray(res.events)) {
+                throw new Error("incomplete_events_payload");
               }
 
-              throw new Error("incomplete_events_payload");
+              // Integrity validation and cleaning
+              const { cleanedEvents } = validateAndCleanEvents(
+                res.events,
+                dateRange,
+              );
+
+              // Event count validation against previous successful fetch for this range
+              const prevMeta = lastEventCounts.current.get(cacheKey);
+              const currentCount = cleanedEvents.length;
+              const previousCount = prevMeta?.count ?? null;
+              const suspiciousDrop =
+                previousCount !== null && previousCount > 0 && currentCount + 2 < Math.floor(previousCount * 0.5);
+
+              if (suspiciousDrop && attempt < maxAttempts - 1) {
+                // Retry once with a short jittered delay to recover from transient partial responses
+                await new Promise((r) => setTimeout(r, 200 + Math.floor(Math.random() * 200)));
+                continue;
+              }
+
+              return { ...res, events: cleanedEvents };
             } catch (err) {
               lastError = err;
               if (attempt < maxAttempts - 1) {
@@ -314,6 +379,11 @@ export function useCalendarData(
           data: response.events,
           timestamp: Date.now(),
           dateRange,
+        });
+        // Update last counts
+        lastEventCounts.current.set(cacheKey, {
+          count: response.events.length,
+          timestamp: Date.now(),
         });
 
         // Update state
@@ -346,7 +416,7 @@ export function useCalendarData(
         setEventsLoading(false);
       }
     },
-    [findCachedEvents, getCacheKey],
+    [findCachedEvents, getCacheKey, validateAndCleanEvents],
   );
 
   // Fetch calendars with caching

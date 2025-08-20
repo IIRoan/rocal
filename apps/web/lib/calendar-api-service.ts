@@ -75,6 +75,7 @@ export class CalendarApiService {
         }
       }
 
+      // Note: If backend later adds X-Total-Count header or similar metadata, we can extend HttpClient to expose headers here
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to fetch events");
