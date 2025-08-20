@@ -14,6 +14,8 @@ import {
   subWeeks,
   startOfMonth,
   endOfMonth,
+  eachDayOfInterval,
+  isToday,
 } from "date-fns";
 import {
   ChevronDownIcon,
@@ -186,6 +188,18 @@ export function EventCalendar({
 
     return { start, end };
   }, [currentDate, view]);
+
+  // Calculate days for week view (needed for day headers)
+  const days = useMemo(() => {
+    if (view !== "week") return [];
+    const start = startOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    const end = endOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    return eachDayOfInterval({ start, end });
+  }, [currentDate, view, weekStartDay]);
 
   // Notify parent of date range changes
   useEffect(() => {
@@ -621,7 +635,7 @@ export function EventCalendar({
         <CalendarDndProvider onEventUpdate={handleEventUpdate}>
           <div
             className={cn(
-              "flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
+              "sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
               className,
             )}
           >
@@ -769,6 +783,7 @@ export function EventCalendar({
               </div>
             </div>
           </div>
+
 
           <div className="flex flex-1 flex-col">
             {view === "month" && (

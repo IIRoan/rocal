@@ -1,10 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CalendarEvent } from "./types";
 import { EventItem } from "./event-item";
 import { cn } from "../../lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 interface EventDotsProps {
   events: CalendarEvent[];
@@ -57,152 +67,129 @@ export function EventDots({
   }
   const remainingCount = events.length - 1;
 
+  // Add keyboard shortcuts when dropdown is open
+  useEffect(() => {
+    if (!isExpanded) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if Ctrl/Cmd is pressed and it's a number key
+      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const index = parseInt(e.key) - 1;
+        const selectedEvent = events[index];
+        if (selectedEvent) {
+          setIsExpanded(false);
+          onClick?.(selectedEvent);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded, events, onClick]);
+
   return (
     <div className={cn("relative", className)} style={style}>
-      {!isExpanded ? (
-        // Collapsed state: Show primary event with dot indicators
-        <button
-          className={cn(
-            "w-full h-full relative overflow-hidden rounded border",
-            "bg-gradient-to-r from-blue-500/20 to-purple-500/20",
-            "hover:from-blue-500/30 hover:to-purple-500/30",
-            "border-blue-500/40 hover:border-blue-500/60",
-            "transition-all duration-200 ease-out",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
-            // Better handling for very short events
-            "min-h-[20px]"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsExpanded(true);
-          }}
-          title={`${events.length} events at the same time`}
-        >
-          {/* Primary event content - adjust layout based on height */}
-          <div className={cn(
-            "flex items-center justify-between font-medium",
-            // Dynamic sizing based on container height
-            "h-full px-1 text-[10px] leading-tight",
-            // For very short events, use minimal padding and smaller text
-            style?.height && parseInt(style.height as string) < 30 
-              ? "px-0.5 text-[9px]" 
-              : "px-1 text-[10px]"
-          )}>
-            {/* Show title for normal height events, count for very short ones */}
-            {style?.height && parseInt(style.height as string) < 20 ? (
-              // Very short events: just show count
-              <span className="truncate flex-1 text-left min-w-0 font-bold">
-                {events.length} events
-              </span>
-            ) : (
-              // Normal events: show title
-              <span className="truncate flex-1 text-left min-w-0">
-                {primaryEvent.title}
-              </span>
+      <DropdownMenu open={isExpanded} onOpenChange={setIsExpanded}>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={cn(
+              "w-full h-full relative overflow-hidden rounded border",
+              "bg-gradient-to-r from-blue-500/20 to-purple-500/20",
+              "hover:from-blue-500/30 hover:to-purple-500/30",
+              "border-blue-500/40 hover:border-blue-500/60",
+              "transition-all duration-200 ease-out",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
+              "min-h-[20px]"
             )}
-            
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            title={`${events.length} events at the same time`}
+          >
             <div className={cn(
-              "flex items-center gap-1 ml-1 flex-shrink-0",
-              // Hide detailed indicators for very short events
-              style?.height && parseInt(style.height as string) < 25 && "hidden sm:flex"
+              "flex items-center justify-between font-medium h-full",
+              "px-1 text-[10px] leading-tight",
+              style?.height && parseInt(style.height as string) < 30 
+                ? "px-0.5 text-[9px]" 
+                : "px-1 text-[10px]"
             )}>
-              {/* Dot indicators */}
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: Math.min(remainingCount, 3) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "rounded-full bg-current opacity-70",
-                      // Smaller dots for very short events
-                      style?.height && parseInt(style.height as string) < 30
-                        ? "w-1 h-1"
-                        : "w-1.5 h-1.5"
-                    )}
-                  />
-                ))}
-                {remainingCount > 3 && (
-                  <span className="text-[8px] opacity-70 ml-0.5">
-                    +{remainingCount - 3}
-                  </span>
-                )}
+              {/* Show title for normal height events, count for very short ones */}
+              {style?.height && parseInt(style.height as string) < 20 ? (
+                <span className="truncate flex-1 text-left min-w-0 font-bold">
+                  {events.length} events
+                </span>
+              ) : (
+                <span className="truncate flex-1 text-left min-w-0">
+                  {primaryEvent.title}
+                </span>
+              )}
+              
+              <div className={cn(
+                "flex items-center gap-1 ml-1 flex-shrink-0",
+                style?.height && parseInt(style.height as string) < 25 && "hidden sm:flex"
+              )}>
+                <span className="text-[8px] opacity-70">
+                  +{remainingCount}
+                </span>
+                <ChevronDown className={cn(
+                  "opacity-60",
+                  style?.height && parseInt(style.height as string) < 30
+                    ? "w-2 h-2"
+                    : "w-3 h-3"
+                )} />
               </div>
-              <ChevronRight className={cn(
-                "opacity-60",
-                style?.height && parseInt(style.height as string) < 30
-                  ? "w-2 h-2"
-                  : "w-3 h-3"
-              )} />
             </div>
-          </div>
-        </button>
-      ) : (
-        // Expanded state: Show all events in a stacked layout
-        <div
-          className={cn(
-            "absolute top-0 left-0 z-50 bg-white dark:bg-gray-800",
-            "border border-gray-200 dark:border-gray-700 rounded shadow-lg",
-            "min-w-full overflow-hidden",
-            // For very short original events, position the dropdown better
-            style?.height && parseInt(style.height as string) < 30 
-              ? "min-w-[200px]" // Ensure readable width for short events
-              : "min-w-full"
-          )}
-          style={{
-            minHeight: `${Math.max(events.length * 24 + 32, 80)}px`, // Minimum readable height
-            // For very short events, position dropdown below or above as needed
-            top: style?.height && parseInt(style.height as string) < 30 
-              ? `${parseInt(style.height as string) + 4}px`
-              : "0px"
+          </button>
+        </DropdownMenuTrigger>
+        
+        <DropdownMenuContent 
+          className="w-72" 
+          align="start"
+          side="bottom"
+          onCloseAutoFocus={(e) => {
+            // Prevent the dropdown from stealing focus when closing
+            e.preventDefault();
           }}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {events.length} events
-            </span>
-            <button
-              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(false);
-              }}
-            >
-              <ChevronDown className="w-3 h-3" />
-            </button>
-          </div>
-
-          {/* Events list */}
-          <div className="max-h-40 overflow-y-auto">
-            {events.map((event, index) => (
-              <div
+          {events.map((event, index) => {
+            // Only show shortcuts for first 9 events
+            const showShortcut = index < 9;
+            const shortcutNumber = index + 1;
+            
+            return (
+              <DropdownMenuItem
                 key={event.id || index}
-                className="border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                className="cursor-pointer focus:bg-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick?.(event);
+                }}
               >
-                <button
-                  className={cn(
-                    "w-full p-2 text-left hover:bg-gray-50 dark:hover:bg-gray-750",
-                    "transition-colors duration-150"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsExpanded(false);
-                    onClick?.(event);
-                  }}
-                >
-                  <div className="text-xs font-medium truncate">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
                     {event.title}
                   </div>
                   {event.location && (
-                    <div className="text-[10px] text-gray-600 dark:text-gray-400 truncate mt-0.5">
+                    <div className="text-xs text-muted-foreground truncate mt-0.5">
                       {event.location}
                     </div>
                   )}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                </div>
+                {showShortcut && (
+                  <DropdownMenuShortcut className="flex items-center gap-0.5 font-mono text-xs text-muted-foreground">
+                    <span className="text-xs">⌘</span>
+                    <span className="text-[10px]">+</span>
+                    <span>{shortcutNumber}</span>
+                  </DropdownMenuShortcut>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

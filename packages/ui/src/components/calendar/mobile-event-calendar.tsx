@@ -23,6 +23,7 @@ import {
   Menu,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useIsMobile } from "../../hooks/use-mobile";
 
 import {
   AgendaDaysToShow,
@@ -127,19 +128,32 @@ export function MobileEventCalendar({
 }: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
+  const isMobile = useIsMobile();
   
-  // Initialize view from sessionStorage or fallback to day view on mobile, initialView otherwise
+  // Initialize view from sessionStorage or fallback to smart default
   const [view, setViewState] = useState<CalendarView>(() => {
     if (typeof window !== 'undefined') {
       const savedView = sessionStorage.getItem('calendar-view-selection');
       if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
         return savedView as CalendarView;
       }
-      // Default to day view on mobile if no saved preference
-      return 'day';
     }
+    // Default based on screen size - will be updated by useEffect when isMobile is determined
     return initialView;
   });
+
+  // Update view when isMobile status changes and no saved preference exists
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedView = sessionStorage.getItem('calendar-view-selection');
+      if (!savedView && isMobile) {
+        // On mobile, always default to day view regardless of initialView
+        setViewState('day');
+        // Notify parent about the view change
+        onViewChange?.('day');
+      }
+    }
+  }, [isMobile, onViewChange]);
 
   // Custom setView function that also saves to sessionStorage and notifies parent
   const setView = (newView: CalendarView) => {

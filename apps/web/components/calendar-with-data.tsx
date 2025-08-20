@@ -80,7 +80,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   // Set the date range when component mounts (only once)
   const initializedRef = useRef(false);
   React.useEffect(() => {
-    if (!initializedRef.current) {
+    if (!initializedRef.current && !settingsLoading) {
       console.log('CalendarWithData - Setting initial date range:', {
         start: defaultDateRange.start.toISOString(),
         end: defaultDateRange.end.toISOString(),
@@ -89,7 +89,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       calendarData.setDateRange(defaultDateRange);
       initializedRef.current = true;
     }
-  }, []); // Empty dependency array - only run once
+  }, [defaultDateRange, settingsLoading, calendarData]); // Add dependencies to ensure proper initialization
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(
