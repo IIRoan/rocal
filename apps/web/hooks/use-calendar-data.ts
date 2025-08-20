@@ -1045,11 +1045,10 @@ export function useCalendarData(
   const setDateRange = useCallback(
     (dateRange: DateRange): void => {
       setCurrentDateRange(dateRange);
-      if (autoRefetch) {
-        fetchEvents(dateRange);
-      }
+      // Don't call fetchEvents here - let the useEffect handle it to avoid race conditions
+      // The useEffect watching currentDateRange will trigger fetchEvents automatically
     },
-    [autoRefetch, fetchEvents],
+    [],
   );
 
   const clearCache = useCallback((): void => {

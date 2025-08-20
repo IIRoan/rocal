@@ -15,6 +15,7 @@ interface CalendarContextType {
   // Date management
   currentDate: Date;
   setCurrentDate: (date: Date) => void;
+  clearSavedDate: () => void; // Utility to clear localStorage date
 
   // Calendar management
   calendars: Calendar[];
@@ -63,20 +64,67 @@ export function CalendarProvider({
   onUpdateCalendar,
   onRefreshCalendars,
 }: CalendarProviderProps) {
+  // Helper function to validate and sanitize dates
+  const validateDate = useCallback((date: Date | string | null | undefined): Date => {
+    if (!date) {
+      return new Date();
+    }
+    
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date provided, falling back to current date:', date);
+      return new Date();
+    }
+    
+    // Check if date is within reasonable bounds (not too far in past/future)
+    const now = new Date();
+    const minDate = new Date(now.getFullYear() - 10, 0, 1); // 10 years ago (more restrictive)
+    const maxDate = new Date(now.getFullYear() + 10, 11, 31); // 10 years from now (more restrictive)
+    
+    if (dateObj < minDate || dateObj > maxDate) {
+      console.warn('Date out of reasonable bounds, falling back to current date:', date);
+      return new Date();
+    }
+    
+    // Additional check for problematic dates (like timezone edge cases)
+    // If the date is more than 1 day different from what we expect, it might be problematic
+    const timeDiff = Math.abs(dateObj.getTime() - now.getTime());
+    const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+    
+    // If it's more than 5 years different, treat as suspicious
+    if (daysDiff > 365 * 5) {
+      console.warn('Date seems too far from current date, falling back:', date);
+      return new Date();
+    }
+    
+    return dateObj;
+  }, []);
+
   const [currentDate, setCurrentDate] = useState<Date>(() => {
     // Load saved date from localStorage on initial render
     if (typeof window !== "undefined") {
       try {
         const savedDate = localStorage.getItem("rocani-calendar-current-date");
         if (savedDate) {
-          const parsedDate = new Date(savedDate);
-          // Validate the date is not invalid
-          if (!isNaN(parsedDate.getTime())) {
-            return parsedDate;
+          const validatedDate = validateDate(savedDate);
+          // If validation returned current date (fallback), clear the invalid localStorage entry
+          const originalDate = new Date(savedDate);
+          if (validatedDate.getTime() !== originalDate.getTime()) {
+            console.warn('Clearing invalid date from localStorage:', savedDate);
+            localStorage.removeItem("rocani-calendar-current-date");
           }
+          return validatedDate;
         }
       } catch (error) {
         console.warn("Failed to load calendar date from localStorage:", error);
+        // Clear potentially corrupted localStorage entry
+        try {
+          localStorage.removeItem("rocani-calendar-current-date");
+        } catch (clearError) {
+          console.warn("Failed to clear localStorage:", clearError);
+        }
       }
     }
     return new Date();
@@ -302,21 +350,55 @@ export function CalendarProvider({
 
   // Custom setCurrentDate that also persists to localStorage
   const setCurrentDateWithPersistence = useCallback((date: Date) => {
-    setCurrentDate(date);
+    // Validate the date before setting it
+    const validatedDate = validateDate(date);
+    setCurrentDate(validatedDate);
     
     // Save to localStorage
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("rocani-calendar-current-date", date.toISOString());
+        localStorage.setItem("rocani-calendar-current-date", validatedDate.toISOString());
       } catch (error) {
         console.warn("Failed to save calendar date to localStorage:", error);
       }
     }
+  }, [validateDate]);
+
+  // Utility function to clear saved date from localStorage
+  const clearSavedDate = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedDate = localStorage.getItem("rocani-calendar-current-date");
+        localStorage.removeItem("rocani-calendar-current-date");
+        console.log('Cleared saved calendar date from localStorage:', savedDate);
+        // Reset to current date
+        setCurrentDate(new Date());
+      } catch (error) {
+        console.warn("Failed to clear calendar date from localStorage:", error);
+      }
+    }
   }, []);
+
+  // Development helper - log localStorage state on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && process.env.NODE_ENV === 'development') {
+      try {
+        const savedDate = localStorage.getItem("rocani-calendar-current-date");
+        console.log('Calendar localStorage state:', {
+          savedDate,
+          currentDate: currentDate.toISOString(),
+          isValid: savedDate ? !isNaN(new Date(savedDate).getTime()) : 'no saved date'
+        });
+      } catch (error) {
+        console.warn('Failed to read localStorage state:', error);
+      }
+    }
+  }, []); // Only run on mount
 
   const value = {
     currentDate,
     setCurrentDate: setCurrentDateWithPersistence,
+    clearSavedDate,
     calendars,
     setCalendars,
     addCalendar,
