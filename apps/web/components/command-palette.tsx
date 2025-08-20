@@ -36,6 +36,7 @@ import {
   Plus,
   ChevronRight,
 } from "lucide-react";
+import { useNumberedShortcuts } from "@workspace/ui/hooks";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -91,6 +92,12 @@ export function CommandPalette({
       setCurrentView(initialView as PaletteView);
     }
   }, [initialView, open]);
+
+  // Add keyboard shortcuts for navigation items (Ctrl+1 through Ctrl+8) - always at top level
+  useNumberedShortcuts(
+    NAVIGATION_ITEMS.map((item) => () => goForward(item.id as PaletteView)),
+    open && currentView === "main"
+  );
 
   const updateSetting = async <K extends keyof UserSettings>(
     key: K,
@@ -201,7 +208,7 @@ export function CommandPalette({
           </div>
           <CommandList>
             <CommandGroup heading="Categories">
-              {NAVIGATION_ITEMS.map((item) => (
+              {NAVIGATION_ITEMS.map((item, index) => (
                 <CommandItem
                   key={item.id}
                   onSelect={() => goForward(item.id as PaletteView)}
@@ -216,7 +223,10 @@ export function CommandPalette({
                       {item.description}
                     </span>
                   </div>
-                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/60" />
+                  <kbd className="ml-auto mr-2 inline-flex h-5 max-h-full items-center rounded border bg-background px-1 font-[inherit] text-[0.625rem] font-medium text-muted-foreground/70">
+                    ⌘+{index + 1}
+                  </kbd>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                 </CommandItem>
               ))}
             </CommandGroup>

@@ -15,6 +15,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { useNumberedShortcuts } from "../../hooks";
 
 interface EventDotsProps {
   events: CalendarEvent[];
@@ -67,28 +68,14 @@ export function EventDots({
   }
   const remainingCount = events.length - 1;
 
-  // Add keyboard shortcuts when dropdown is open
-  useEffect(() => {
-    if (!isExpanded) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle if Ctrl/Cmd is pressed and it's a number key
-      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const index = parseInt(e.key) - 1;
-        const selectedEvent = events[index];
-        if (selectedEvent) {
-          setIsExpanded(false);
-          onClick?.(selectedEvent);
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isExpanded, events, onClick]);
+  // Add keyboard shortcuts for numbered event selection
+  useNumberedShortcuts(
+    events.map((event) => () => {
+      setIsExpanded(false);
+      onClick?.(event);
+    }),
+    isExpanded
+  );
 
   return (
     <div className={cn("relative", className)} style={style}>
@@ -179,11 +166,7 @@ export function EventDots({
                   )}
                 </div>
                 {showShortcut && (
-                  <DropdownMenuShortcut className="flex items-center gap-0.5 font-mono text-xs text-muted-foreground">
-                    <span className="text-xs">⌘</span>
-                    <span className="text-[10px]">+</span>
-                    <span>{shortcutNumber}</span>
-                  </DropdownMenuShortcut>
+                  <DropdownMenuShortcut>⌘+{shortcutNumber}</DropdownMenuShortcut>
                 )}
               </DropdownMenuItem>
             );
