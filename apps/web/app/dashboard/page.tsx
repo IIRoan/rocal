@@ -3,7 +3,13 @@
 import { useSession, signOut } from "@/lib/auth-client";
 import { AppSidebar } from "@workspace/ui/components/layout";
 import { MobileCalendarWrapper } from "@workspace/ui/components";
-import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
+import { 
+  SidebarInset, 
+  SidebarProvider,
+  DashboardSkeleton,
+  MobileCalendarSkeleton,
+  PageLoadingOverlay
+} from "@workspace/ui/components/ui";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { CommandPalette } from "@/components/command-palette";
 import { CommandPaletteProvider } from "@/components/command-palette-context";
@@ -15,7 +21,7 @@ import { useCommandPalette as useCommandPaletteContext } from "@/components/comm
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 
 function SidebarWithContext() {
   const { data: session } = useSession();
@@ -50,7 +56,6 @@ function MobileLayoutContent() {
   const { openCalendarManagement, openEventEditor, openPalette } = useCommandPaletteContext();
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
     useCommandPalette();
-  
   // Import calendar data hooks
   const { isCalendarVisible } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
@@ -134,12 +139,17 @@ function MobileLayoutContent() {
     return transformedEventsList;
   }, [calendarData.events, calendarData.calendars, visibleCalendarIds]);
 
-  // Show loading state only for settings
-  if (settingsLoading) {
+  // Show mobile calendar skeleton when initial loading
+  if (settingsLoading || (calendarData.loading && !calendarData.events.length && !calendarData.calendars.length)) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading calendar...</div>
-      </div>
+      <>
+        <MobileCalendarSkeleton />
+        <PageLoadingOverlay 
+          isLoading={settingsLoading} 
+          messageContext={settingsLoading ? "SETTINGS_LOAD" : "CALENDAR_LOAD"}
+          enableCycling={true}
+        />
+      </>
     );
   }
 
@@ -194,7 +204,6 @@ function DashboardContent() {
   const { data: session, isPending } = useSession();
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
     useCommandPalette();
-
   const handleLogout = async () => {
     try {
       await signOut();
@@ -207,9 +216,14 @@ function DashboardContent() {
 
   if (isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
+      <>
+        <DashboardSkeleton />
+        <PageLoadingOverlay 
+          isLoading={true} 
+          messageContext="AUTH_FLOW"
+          enableCycling={true}
+        />
+      </>
     );
   }
 

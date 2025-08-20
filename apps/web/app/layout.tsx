@@ -1,6 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@workspace/ui/components/ui";
-import { ThemeProvider } from "@workspace/ui/providers";
+import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
 import type { Metadata } from "next";
@@ -54,10 +54,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SettingsProvider>
-            <CalendarProvider>{children}</CalendarProvider>
-            <Toaster />
-          </SettingsProvider>
+          <LoadingProvider>
+            <SettingsProvider>
+              <CalendarProvider>{children}</CalendarProvider>
+              <Toaster />
+            </SettingsProvider>
+          </LoadingProvider>
         </ThemeProvider>
       </body>
     </html>

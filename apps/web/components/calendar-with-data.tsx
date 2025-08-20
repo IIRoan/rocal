@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import {
   EventCalendar,
   CalendarView,
   AgendaDaysToShow,
   useCalendarContext,
+  CalendarSkeleton,
 } from "@workspace/ui/components/calendar";
 import {
   addDays,
@@ -140,13 +141,10 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     return transformedEventsList;
   }, [calendarData.events, calendarData.calendars, visibleCalendarIds]); // Add calendars to deps
 
-  // Show loading state only for settings, render calendar with loading state for data
-  if (settingsLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading calendar...</div>
-      </div>
-    );
+
+  // Show calendar skeleton for initial settings loading
+  if (settingsLoading || (calendarData.loading && calendarData.events.length === 0 && calendarData.calendars.length === 0)) {
+    return <CalendarSkeleton view={initialView as any} className={className} />;
   }
 
   // Early return optimized calendar with loading states
