@@ -23,28 +23,7 @@ export function CalendarSkeleton({
     return (
       <div className={cn("space-y-4 animate-fade-in", className)}>
         {/* Header skeleton - matches actual calendar header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
-          <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
-              <Skeleton className="h-6 w-32" variant="shimmer" />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center sm:gap-2 max-sm:order-1">
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-              </div>
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Skeleton className="h-8 w-20 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-            </div>
-          </div>
-        </div>
+        
 
         {/* Calendar grid skeleton - matches actual structure */}
         <div className="space-y-0 border border-border rounded-lg overflow-hidden">
@@ -95,28 +74,6 @@ export function CalendarSkeleton({
     return (
       <div className={cn("space-y-4 animate-fade-in", className)}>
         {/* Header skeleton - matches week view header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
-          <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
-              <Skeleton className="h-6 w-40" variant="shimmer" />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center sm:gap-2 max-sm:order-1">
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-              </div>
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Skeleton className="h-8 w-20 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-            </div>
-          </div>
-        </div>
 
         {/* Week view skeleton - matches actual week grid */}
         <div className="flex flex-col border border-border rounded-lg overflow-hidden">
@@ -166,28 +123,6 @@ export function CalendarSkeleton({
     return (
       <div className={cn("space-y-4 animate-fade-in", className)}>
         {/* Header skeleton - matches day view header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
-          <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
-              <Skeleton className="h-6 w-48" variant="shimmer" />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center sm:gap-2 max-sm:order-1">
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-              </div>
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Skeleton className="h-8 w-20 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-            </div>
-          </div>
-        </div>
 
         {/* Day view skeleton - matches single day layout */}
         <div className="flex border border-border rounded-lg overflow-hidden">
@@ -237,28 +172,6 @@ export function CalendarSkeleton({
     return (
       <div className={cn("space-y-4 animate-fade-in", className)}>
         {/* Header skeleton - matches agenda view header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
-          <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
-              <Skeleton className="h-6 w-36" variant="shimmer" />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center sm:gap-2 max-sm:order-1">
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-                <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-              </div>
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <Skeleton className="h-8 w-20 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-16 rounded" variant="shimmer" />
-              <Skeleton className="h-8 w-8 rounded" variant="shimmer" />
-            </div>
-          </div>
-        </div>
 
         {/* Agenda items skeleton - matches actual agenda layout */}
         <div className="space-y-6 px-4">

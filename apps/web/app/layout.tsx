@@ -18,7 +18,7 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Rocal",
-  description: "Calendar application",
+  description: "Calendar",
   manifest: "/manifest.json",
   themeColor: "#000000",
   viewport: "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
