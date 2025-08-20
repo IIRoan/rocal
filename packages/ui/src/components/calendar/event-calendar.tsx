@@ -596,8 +596,9 @@ export function EventCalendar({
     }
   }, [currentDate, view]);
 
-  // For initial loading when no events exist, show full skeleton
-  if (loading || (eventsLoading && (!events || events.length === 0))) {
+  // Show skeleton only for initial structure loading (calendars/categories)
+  // Events can load separately without blocking the calendar UI
+  if (loading) {
     return (
       <div className={cn("rounded-lg", className)}>
         <CalendarSkeleton view={view} />

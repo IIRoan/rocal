@@ -1,29 +1,41 @@
 import * as React from "react";
 import { SVGProps } from "react";
 
-const SvgComponent = ({
-  fill = "currentColor",
-  ...props
-}: SVGProps<SVGSVGElement>) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    xmlSpace="preserve"
-    width={743.781}
-    height={743.762}
-    style={{
-      shapeRendering: "geometricPrecision",
-      textRendering: "geometricPrecision",
-      fillRule: "evenodd",
-      clipRule: "evenodd",
-    }}
-    viewBox="-2676.459 -972.76 25693.16 23573.573"
-    {...props}
-  >
+const SvgComponent = React.memo(
+  React.forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>(function SvgComponent(
+    { fill = "currentColor", style, ...props },
+    ref
+  ) {
+    const clipId0 = React.useId();
+    const clipId1 = React.useId();
+    const baseStyle = React.useMemo(
+      () => ({
+        shapeRendering: "geometricPrecision",
+        textRendering: "geometricPrecision",
+        fillRule: "evenodd",
+        clipRule: "evenodd",
+        ...style,
+      }),
+      [style]
+    );
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        xmlSpace="preserve"
+        width={743.781}
+        height={743.762}
+        viewBox="-2676.459 -972.76 25693.16 23573.573"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        focusable="false"
+        ref={ref}
+        {...props}
+      >
     <defs fill={fill}>
-      <clipPath id="id0" fill={fill}>
+      <clipPath id={clipId0} fill={fill}>
         <path d="M9520.25 5.19C9625.52 1.86 9731.15 0 9837.23 0c5432.34 0 9836.12 4403.78 9836.12 9836.12 0 2614.28-1020.38 4989.77-2684.03 6751.27l-458.66 42.28c-292.21 26.93-585.57 41.03-879.03 41.03-894.27 0-1759.5-124.25-2579.47-356.25 505.7-1184.48 785.68-2488.38 785.68-3857.76 0-4346.91-2819.97-8034.77-6730.16-9335.14 506.05-1049.39 1206.03-2002.71 2055.54-2800.03L9520.26 5.19z" />
       </clipPath>
-      <clipPath id="id1" fill={fill}>
+      <clipPath id={clipId1} fill={fill}>
         <path d="M16565.67 17009.64c-1759.44 1651.35-4126.16 2663.22-6729.56 2663.22C4403.77 19672.86 0 15269.08 0 9836.74 0 4712.68 3918.36 504.46 8922.06 43.28 8029.69 880.83 7290.92 1888.44 6759.6 3006.64c-607 1277.48-944.1 2701.03-944.1 4209.55 0 5432.33 4403.78 9836.11 9836.11 9836.11 308.27 0 613.02-14.9 914.05-42.65z" />
       </clipPath>
       <style>
@@ -34,7 +46,7 @@ const SvgComponent = ({
       <g id="_2055448040">
         <g
           style={{
-            clipPath: "url(#id0)",
+            clipPath: `url(#${clipId0})`,
           }}
         >
           <path
@@ -550,7 +562,7 @@ const SvgComponent = ({
         />
         <g
           style={{
-            clipPath: "url(#id1)",
+            clipPath: `url(#${clipId1})`,
           }}
         >
           <g id="_1293189576">
@@ -1080,6 +1092,8 @@ const SvgComponent = ({
       </g>
     </g>
   </svg>
+    );
+  })
 );
 
 export default SvgComponent;

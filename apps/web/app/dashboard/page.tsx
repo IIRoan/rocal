@@ -140,13 +140,22 @@ function MobileLayoutContent() {
   }, [calendarData.events, calendarData.calendars, visibleCalendarIds]);
 
   // Show mobile calendar skeleton when initial loading
-  if (settingsLoading || (calendarData.loading && !calendarData.events.length && !calendarData.calendars.length)) {
+  // Wait for settings and calendar structure (calendars + categories) to be loaded
+  // Events can load separately without blocking the UI
+  const isInitialLoading = settingsLoading || 
+    (calendarData.calendarsLoading && calendarData.calendars.length === 0) ||
+    (calendarData.categoriesLoading && calendarData.categories.length === 0);
+    
+  const isInitialEventsLoading = calendarData.eventsLoading && calendarData.events.length === 0;
+  const isAllInitialLoading = isInitialLoading || isInitialEventsLoading;
+  
+  if (isAllInitialLoading) {
     return (
       <>
         <MobileCalendarSkeleton />
         <PageLoadingOverlay 
-          isLoading={settingsLoading} 
-          messageContext={settingsLoading ? "SETTINGS_LOAD" : "CALENDAR_LOAD"}
+          isLoading={true} 
+          messageContext={settingsLoading ? "SETTINGS_LOAD" : (isInitialLoading ? "CALENDAR_LOAD" : "DATA_SYNC")}
           enableCycling={true}
         />
       </>
@@ -171,7 +180,7 @@ function MobileLayoutContent() {
       initialView={settings?.defaultView || "month"}
       events={transformedEvents}
       categories={calendarData.categories}
-      loading={calendarData.loading && calendarData.events.length === 0}
+      loading={false}
       eventsLoading={calendarData.eventsLoading && calendarData.events.length === 0}
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
