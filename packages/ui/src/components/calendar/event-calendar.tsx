@@ -40,6 +40,7 @@ import { WeekView } from "./week-view";
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
+import { EventLoadingSkeleton } from "./event-loading-skeleton";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -595,8 +596,8 @@ export function EventCalendar({
     }
   }, [currentDate, view]);
 
-  // Show loading state with skeleton
-  if (eventsLoading) {
+  // For initial loading when no events exist, show full skeleton
+  if (loading || (eventsLoading && (!events || events.length === 0))) {
     return (
       <div className={cn("rounded-lg", className)}>
         <CalendarSkeleton view={view} />
@@ -794,7 +795,12 @@ export function EventCalendar({
           </div>
 
 
-          <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col relative">
+            {/* Event loading overlay when navigating between dates */}
+            {eventsLoading && events && events.length > 0 && (
+              <EventLoadingSkeleton view={view} className="absolute inset-0 z-10" />
+            )}
+            
             {view === "month" && (
               <MonthView
                 currentDate={currentDate}
