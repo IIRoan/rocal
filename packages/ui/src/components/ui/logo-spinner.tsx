@@ -163,7 +163,7 @@ export function InlineLogoSpinner({
   className,
   size = "sm",
   text,
-  messageContext = "GENERAL",
+  messageContext = "PAGE_LOAD",
   enableCycling = false // Default to false for inline usage to avoid distraction
 }: InlineLogoSpinnerProps) {
   // Use cycling messages if no static text provided
