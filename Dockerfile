@@ -20,11 +20,11 @@ RUN bun install
 # Copy source code
 COPY . .
 
-# Generate Prisma client if needed
+# Generate Prisma client with optimized binary targets for production
 RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
     cd apps/backend && \
     bun add -g prismabox && \
-    bun run db:generate; \
+    PRISMA_BINARY_TARGETS="debian-openssl-3.0.x" bun run db:generate; \
 fi
 
 # Build the web app using turbo
