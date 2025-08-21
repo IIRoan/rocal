@@ -1,4 +1,11 @@
-export const TIMEZONE_GROUPS = {
+// Timezone-related constants and types
+
+export type TimezoneOption = {
+  value: string;
+  label: string;
+};
+
+export const TIMEZONE_GROUPS: Record<string, TimezoneOption[]> = {
   Popular: [
     { value: "UTC", label: "UTC (Coordinated Universal Time)" },
     { value: "America/New_York", label: "Eastern Time (New York)" },
@@ -65,9 +72,9 @@ export const TIMEZONE_GROUPS = {
   ],
 };
 
-export const ALL_TIMEZONES = Object.values(TIMEZONE_GROUPS).flat();
+export const ALL_TIMEZONES: TimezoneOption[] = Object.values(TIMEZONE_GROUPS).flat();
 
-export const WORKING_DAYS = [
+export const WORKING_DAYS: Array<{ value: number; label: string }> = [
   { value: 0, label: "Sunday" },
   { value: 1, label: "Monday" },
   { value: 2, label: "Tuesday" },
@@ -76,22 +83,3 @@ export const WORKING_DAYS = [
   { value: 5, label: "Friday" },
   { value: 6, label: "Saturday" },
 ];
-
-// Palette internal types only. Heavy constants moved to @workspace/ui/constants.
-
-export type PaletteView =
-  | "main"
-  | "appearance"
-  | "time-region"
-  | "timezone"
-  | "notifications"
-  | "calendar-defaults"
-  | "account"
-  | "security"
-  | "passkeys"
-  | "calendars"
-  | "calendar-create"
-  | "calendar-edit"
-  | "subscriptions"
-  | "events"
-  | "event-editor";
