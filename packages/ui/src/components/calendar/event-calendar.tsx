@@ -601,7 +601,7 @@ export function EventCalendar({
   if (loading) {
     return (
       <div className={cn("rounded-lg", className)}>
-        <CalendarSkeleton view={view} />
+        <CalendarSkeleton view={view} compactView={compactView} />
       </div>
     );
   }
@@ -799,7 +799,7 @@ export function EventCalendar({
           <div className="flex flex-1 flex-col relative">
             {/* Event loading overlay when navigating between dates */}
             {eventsLoading && events && events.length > 0 && (
-              <EventLoadingSkeleton view={view} className="absolute inset-0 z-10" />
+              <EventLoadingSkeleton view={view} compactView={compactView} className="absolute inset-0 z-10" />
             )}
             
             {view === "month" && (

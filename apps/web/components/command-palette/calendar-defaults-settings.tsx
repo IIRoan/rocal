@@ -9,6 +9,7 @@ import {
   Calendar,
   Check,
   ArrowLeft,
+  Minimize2,
 } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { WORKING_DAYS, type PaletteView } from "./constants";
@@ -96,6 +97,24 @@ export function CalendarDefaultsSettings({
                 )}
               </CommandItem>
             ))}
+          </CommandGroup>
+
+          <CommandGroup heading="View Settings">
+            <CommandItem
+              onSelect={() => updateSetting("compactView", !localSettings.compactView)}
+              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+            >
+              <Minimize2 className="mr-3 h-4 w-4 text-muted-foreground" />
+              <span className="text-foreground">
+                Compact Mode
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {localSettings.compactView ? "Enabled" : "Disabled"}
+              </span>
+              {localSettings.compactView && (
+                <Check className="ml-2 h-4 w-4 text-primary" />
+              )}
+            </CommandItem>
           </CommandGroup>
         </CommandList>
       </TransitionContainer>

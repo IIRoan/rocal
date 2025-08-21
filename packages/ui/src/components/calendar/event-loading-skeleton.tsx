@@ -8,12 +8,14 @@ interface EventLoadingSkeletonProps {
   view?: "month" | "week" | "day" | "agenda";
   className?: string;
   showSpinner?: boolean;
+  compactView?: boolean;
 }
 
 export function EventLoadingSkeleton({
   view = "month",
   className,
-  showSpinner = true
+  showSpinner = true,
+  compactView = false
 }: EventLoadingSkeletonProps) {
 
   if (view === "month") {
@@ -79,7 +81,7 @@ export function EventLoadingSkeleton({
         <div className="flex flex-col animate-pulse">
           {/* Time slots */}
           {Array.from({ length: 24 }).map((_, hourIndex) => (
-            <div key={hourIndex} className="grid grid-cols-8 border-b border-border/30 min-h-[60px]">
+            <div key={hourIndex} className={`grid grid-cols-8 border-b border-border/30 ${compactView ? 'min-h-[51px]' : 'min-h-[60px]'}`}>
               {/* Time column */}
               <div className="p-2 border-r border-border/30">
                 <Skeleton className="h-3 w-10" variant="shimmer" />
@@ -92,7 +94,7 @@ export function EventLoadingSkeleton({
                   <div key={dayIndex} className="p-1 border-r border-border/30 relative">
                     {hasEvent && (
                       <Skeleton 
-                        className="h-12 w-full rounded" 
+                        className={`${compactView ? 'h-9' : 'h-12'} w-full rounded`} 
                         variant="wave"
                         style={{ animationDelay: `${hourIndex * 0.02 + dayIndex * 0.01}s` }}
                       />
@@ -127,7 +129,7 @@ export function EventLoadingSkeleton({
           {/* Time column */}
           <div className="w-20 border-r border-border/30">
             {Array.from({ length: 24 }).map((_, hourIndex) => (
-              <div key={hourIndex} className="h-16 p-2 border-b border-border/30">
+              <div key={hourIndex} className={`${compactView ? 'h-9' : 'h-11'} p-2 border-b border-border/30`}>
                 <Skeleton className="h-3 w-12" variant="shimmer" />
               </div>
             ))}
@@ -138,10 +140,10 @@ export function EventLoadingSkeleton({
             {Array.from({ length: 24 }).map((_, hourIndex) => {
               const hasEvent = (hourIndex >= 9 && hourIndex <= 17) && Math.random() > 0.8;
               return (
-                <div key={hourIndex} className="h-16 p-2 border-b border-border/30 relative">
+                <div key={hourIndex} className={`${compactView ? 'h-9' : 'h-11'} p-2 border-b border-border/30 relative`}>
                   {hasEvent && (
                     <Skeleton 
-                      className="w-4/5 h-12 rounded absolute left-2 top-2"
+                      className={`w-4/5 ${compactView ? 'h-9' : 'h-12'} rounded absolute left-2 top-2`}
                       variant="wave"
                     />
                   )}

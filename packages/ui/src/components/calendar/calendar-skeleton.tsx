@@ -7,11 +7,13 @@ import { addDays, startOfWeek, format } from "date-fns";
 interface CalendarSkeletonProps {
   view?: "month" | "week" | "day" | "agenda";
   className?: string;
+  compactView?: boolean;
 }
 
 export function CalendarSkeleton({
   view = "month",
   className,
+  compactView = false,
 }: CalendarSkeletonProps) {
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 0 });
@@ -93,7 +95,7 @@ export function CalendarSkeleton({
           {/* Time slots - 24 hour format */}
           <div className="flex-1 overflow-hidden">
             {Array.from({ length: 24 }).map((_, hourIndex) => (
-              <div key={hourIndex} className="grid grid-cols-8 border-b border-border last:border-b-0 min-h-[60px]">
+              <div key={hourIndex} className={`grid grid-cols-8 border-b border-border last:border-b-0 ${compactView ? 'min-h-[34px]' : 'min-h-[40px]'}`}>
                 <div className="p-2 border-r border-border bg-muted/10">
                   <Skeleton className="h-4 w-12" variant="shimmer" />
                 </div>
@@ -103,7 +105,7 @@ export function CalendarSkeleton({
                     <div key={dayIndex} className="p-1 border-r border-border last:border-r-0 relative">
                       {hasEvent && (
                         <Skeleton 
-                          className="h-12 w-full rounded" 
+                          className={`${compactView ? 'h-9' : 'h-12'} w-full rounded`} 
                           variant="wave"
                           style={{ animationDelay: `${hourIndex * 0.05 + dayIndex * 0.02}s` }}
                         />
@@ -129,7 +131,7 @@ export function CalendarSkeleton({
           {/* Time column */}
           <div className="w-20 border-r border-border bg-muted/10">
             {Array.from({ length: 24 }).map((_, hourIndex) => (
-              <div key={hourIndex} className="h-16 p-2 border-b border-border last:border-b-0">
+              <div key={hourIndex} className={`${compactView ? 'h-9' : 'h-11'} p-2 border-b border-border last:border-b-0`}>
                 <Skeleton className="h-4 w-12" variant="shimmer" />
               </div>
             ))}
@@ -144,7 +146,7 @@ export function CalendarSkeleton({
                 const eventLength = hasEvent ? Math.floor(Math.random() * 3) + 1 : 0;
                 
                 return (
-                  <div key={hourIndex} className="h-16 p-2 border-b border-border last:border-b-0 relative">
+                  <div key={hourIndex} className={`${compactView ? 'h-9' : 'h-11'} p-2 border-b border-border last:border-b-0 relative`}>
                     {hasEvent && (
                       <Skeleton 
                         className={`w-4/5 rounded absolute left-2 top-2`}
