@@ -16,13 +16,15 @@ import {
   isToday,
   startOfDay,
   startOfWeek,
+  isWithinInterval,
+  endOfDay,
 } from "date-fns";
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
 import { EventDots, groupEventsByExactTime } from "./event-dots";
-import { isMultiDayEvent } from "./utils";
+import { isMultiDayEvent, sortEvents, getAllEventsForDay } from "./utils";
 import { WeekCellsHeight } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
@@ -83,6 +85,13 @@ export function WeekView({
     [currentDate, weekStartDay],
   );
 
+  const weekEnd = useMemo(
+    () =>
+      endOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      }),
+    [currentDate, weekStartDay]
+  );
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
@@ -99,20 +108,24 @@ export function WeekView({
         return event.allDay || isMultiDayEvent(event);
       })
       .filter((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
+        const eventStart = startOfDay(new Date(event.start));
+        const eventEnd = startOfDay(new Date(event.end));
+        const weekStartDay = startOfDay(weekStart);
+        const weekEndDay = endOfDay(weekEnd);
         
-        // Check if event overlaps with the current week at all
-        // This handles multi-week events properly by checking if any day in the week
-        // falls within the event's date range
-        return days.some(
-          (day) =>
-            isSameDay(day, eventStart) ||
-            isSameDay(day, eventEnd) ||
-            (day >= eventStart && day <= eventEnd)
+        // Check if event overlaps with the current week using proper interval checking
+        return (
+          // Event starts within the week
+          isWithinInterval(eventStart, { start: weekStartDay, end: weekEndDay }) ||
+          // Event ends within the week
+          isWithinInterval(eventEnd, { start: weekStartDay, end: weekEndDay }) ||
+          // Event spans the entire week (starts before and ends after)
+          (isBefore(eventStart, weekStartDay) && isBefore(weekEndDay, eventEnd)) ||
+          // Week is within the event
+          isWithinInterval(weekStartDay, { start: eventStart, end: eventEnd })
         );
       });
-  }, [events, days]);
+  }, [events, weekStart, weekEnd]);
 
   // Process events for each day to calculate positions
   const processedDayEvents = useMemo(() => {
@@ -402,17 +415,22 @@ export function WeekView({
           <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
         </div>
         {days.map((day, dayIndex) => {
-          const dayAllDayEvents = allDayEvents.filter((event) => {
-            const eventStart = new Date(event.start);
-            const eventEnd = new Date(event.end);
-            
-            // For multi-day/all-day events, check if this day falls within the event's date range
-            return (
-              isSameDay(day, eventStart) ||
-              isSameDay(day, eventEnd) ||
-              (day >= eventStart && day <= eventEnd)
-            );
-          });
+          const dayAllDayEvents = sortEvents(
+            allDayEvents.filter((event) => {
+              const eventStart = startOfDay(new Date(event.start));
+              const eventEnd = startOfDay(new Date(event.end));
+              const dayStart = startOfDay(day);
+              const dayEndTime = endOfDay(day);
+              
+              // For multi-day/all-day events, check if this day overlaps with the event
+              return (
+                isSameDay(dayStart, eventStart) ||
+                isSameDay(dayStart, eventEnd) ||
+                isWithinInterval(dayStart, { start: eventStart, end: eventEnd }) ||
+                isWithinInterval(eventStart, { start: dayStart, end: dayEndTime })
+              );
+            })
+          );
 
           return (
             <div
@@ -442,13 +460,16 @@ export function WeekView({
                   {dayAllDayEvents.map((event) => {
                     const eventStart = new Date(event.start);
                     const eventEnd = new Date(event.end);
-                    const isFirstDay = isSameDay(day, eventStart);
-                    const isLastDay = isSameDay(day, eventEnd);
 
-                    // Check if this is the first day in the current week view
-                    const isFirstVisibleDay =
-                      dayIndex === 0 && isBefore(eventStart, weekStart);
-                    const shouldShowTitle = isFirstDay || isFirstVisibleDay;
+                    // Determine the visible segment boundaries within the current week
+                    const visibleStart = isBefore(eventStart, startOfDay(weekStart)) ? startOfDay(weekStart) : eventStart;
+                    const visibleEnd = isBefore(startOfDay(weekEnd), eventEnd) ? startOfDay(weekEnd) : eventEnd;
+
+                    const isFirstSegmentDay = isSameDay(day, visibleStart);
+                    const isLastSegmentDay = isSameDay(day, visibleEnd);
+
+                    // Show title on the first visible day of the segment within this week
+                    const shouldShowTitle = isFirstSegmentDay;
 
                     return (
                       <EventItem
@@ -456,11 +477,11 @@ export function WeekView({
                         onClick={(e) => handleEventClick(event, e)}
                         event={event}
                         view="month"
-                        isFirstDay={isFirstDay}
-                        isLastDay={isLastDay}
+                        isFirstDay={isFirstSegmentDay}
+                        isLastDay={isLastSegmentDay}
                         className="text-xs"
                       >
-                        {/* Show title if it's the first day of the event or the first visible day in the week */}
+                        {/* Show title only on the first visible day in the current week */}
                         <div
                           className={cn(
                             "truncate text-xs",
