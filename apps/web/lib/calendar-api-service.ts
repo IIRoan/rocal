@@ -38,7 +38,7 @@ export class CalendarApiService {
   }
 
   // Events API methods
-  async getEvents(start: Date, end: Date): Promise<EventsResponse> {
+  async getEvents(start: Date, end: Date, signal?: AbortSignal): Promise<EventsResponse> {
     try {
       const startISO = start.toISOString();
       const endISO = end.toISOString();
@@ -46,6 +46,7 @@ export class CalendarApiService {
       const doFetch = async (): Promise<EventsResponse> =>
         await this.client.get<EventsResponse>(
           `/api/events?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`,
+          { signal },
         );
 
       let response = await doFetch();

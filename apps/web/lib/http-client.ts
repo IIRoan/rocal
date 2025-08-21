@@ -117,19 +117,41 @@ export class HttpClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+      // Wire external AbortSignal (if provided) to our internal controller
+      const externalSignal = (fetchOptions as RequestInit).signal as
+        | AbortSignal
+        | undefined;
+      let abortListener: (() => void) | null = null;
+      if (externalSignal) {
+        if (externalSignal.aborted) {
+          controller.abort();
+        } else {
+          abortListener = () => controller.abort();
+          externalSignal.addEventListener("abort", abortListener, {
+            once: true,
+          });
+        }
+      }
+
       const requestOptions: RequestInit = {
         ...fetchOptions,
+        // Use our controller's signal so we still manage retries/timeouts
         signal: controller.signal,
         credentials: "include", // Include cookies for session authentication
         headers: {
           "Content-Type": "application/json",
-          ...fetchOptions.headers,
+          ...(fetchOptions as RequestInit).headers,
         },
       };
 
       try {
         const response = await fetch(fullUrl, requestOptions);
         clearTimeout(timeoutId);
+        // Clean up external abort listener to avoid leaks
+        if (abortListener && externalSignal) {
+          externalSignal.removeEventListener("abort", abortListener);
+          abortListener = null;
+        }
 
         if (!response.ok) {
           // Capture Retry-After header (if any) before consuming body
@@ -179,6 +201,11 @@ export class HttpClient {
         return this.transformDates(data);
       } catch (error: any) {
         clearTimeout(timeoutId);
+        // Clean up external abort listener to avoid leaks
+        if (abortListener && externalSignal) {
+          externalSignal.removeEventListener("abort", abortListener);
+          abortListener = null;
+        }
         lastError = error;
 
         // Don't retry authentication errors

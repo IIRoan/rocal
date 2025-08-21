@@ -77,6 +77,8 @@ export const WORKING_DAYS = [
   { value: 6, label: "Saturday" },
 ];
 
+// Palette internal types only. Heavy constants moved to @workspace/ui/constants.
+
 export type PaletteView =
   | "main"
   | "appearance"
