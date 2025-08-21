@@ -483,7 +483,7 @@ export function MobileEventCalendar({
   if (loading) {
     return (
       <div className={cn("rounded-lg", className)}>
-        <CalendarSkeleton view={view} />
+        <CalendarSkeleton view={view} compactView={compactView} />
       </div>
     );
   }
