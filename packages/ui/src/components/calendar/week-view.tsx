@@ -338,7 +338,6 @@ export function WeekView({
     onEventSelect(event);
   };
 
-  const showAllDaySection = allDayEvents.length > 0;
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
     currentDate,
     "week",
@@ -402,63 +401,44 @@ export function WeekView({
         <div className="text-muted-foreground/70 py-2 text-center text-xs">
           <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
         </div>
-        {days.map((day) => (
-          <div
-            key={day.toString()}
-            className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 py-2 text-center text-xs transition-colors ${
-              workingDays.includes(day.getDay())
-                ? "bg-[var(--calendar-workday)]"
-                : !workingDays.includes(day.getDay()) &&
-                    [0, 6].includes(day.getDay())
-                  ? "bg-[var(--calendar-weekend)]"
-                  : ""
-            }`}
-            data-today={isToday(day) || undefined}
-          >
-            {/* Enhanced mobile-first day display */}
-            <span className="sm:hidden font-medium" aria-hidden="true">
-              {format(day, "E")[0]} {format(day, "d")}
-            </span>
-            <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
-          </div>
-        ))}
-      </div>
+        {days.map((day, dayIndex) => {
+          const dayAllDayEvents = allDayEvents.filter((event) => {
+            const eventStart = new Date(event.start);
+            const eventEnd = new Date(event.end);
+            
+            // For multi-day/all-day events, check if this day falls within the event's date range
+            return (
+              isSameDay(day, eventStart) ||
+              isSameDay(day, eventEnd) ||
+              (day >= eventStart && day <= eventEnd)
+            );
+          });
 
-      {showAllDaySection && (
-        <div className="border-border/70 bg-muted/50 border-b">
-          <div className="grid grid-cols-8">
-            <div className="border-border/70 relative border-r">
-              <span className="text-muted-foreground/70 absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs">
-                All day
-              </span>
-            </div>
-            {days.map((day, dayIndex) => {
-              const dayAllDayEvents = allDayEvents.filter((event) => {
-                const eventStart = new Date(event.start);
-                const eventEnd = new Date(event.end);
-                
-                // For multi-day/all-day events, check if this day falls within the event's date range
-                // This properly handles events that span multiple weeks
-                return (
-                  isSameDay(day, eventStart) ||
-                  isSameDay(day, eventEnd) ||
-                  (day >= eventStart && day <= eventEnd)
-                );
-              });
-
-              return (
-                <div
-                  key={day.toString()}
-                  className={`border-border/70 relative border-r p-1 last:border-r-0 ${
-                    workingDays.includes(day.getDay())
-                      ? "bg-[var(--calendar-workday)]"
-                      : !workingDays.includes(day.getDay()) &&
-                          [0, 6].includes(day.getDay())
-                        ? "bg-[var(--calendar-weekend)]"
-                        : ""
-                  }`}
-                  data-today={isToday(day) || undefined}
-                >
+          return (
+            <div
+              key={day.toString()}
+              className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 text-center text-xs transition-colors flex flex-col ${
+                workingDays.includes(day.getDay())
+                  ? "bg-[var(--calendar-workday)]"
+                  : !workingDays.includes(day.getDay()) &&
+                      [0, 6].includes(day.getDay())
+                    ? "bg-[var(--calendar-weekend)]"
+                    : ""
+              }`}
+              data-today={isToday(day) || undefined}
+            >
+              {/* Day header */}
+              <div className="py-2">
+                {/* Enhanced mobile-first day display */}
+                <span className="sm:hidden font-medium" aria-hidden="true">
+                  {format(day, "E")[0]} {format(day, "d")}
+                </span>
+                <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
+              </div>
+              
+              {/* All-day events integrated into day header */}
+              {dayAllDayEvents.length > 0 && (
+                <div className="pb-1 px-1 space-y-1">
                   {dayAllDayEvents.map((event) => {
                     const eventStart = new Date(event.start);
                     const eventEnd = new Date(event.end);
@@ -478,11 +458,12 @@ export function WeekView({
                         view="month"
                         isFirstDay={isFirstDay}
                         isLastDay={isLastDay}
+                        className="text-xs"
                       >
                         {/* Show title if it's the first day of the event or the first visible day in the week */}
                         <div
                           className={cn(
-                            "truncate",
+                            "truncate text-xs",
                             !shouldShowTitle && "invisible",
                           )}
                           aria-hidden={!shouldShowTitle}
@@ -493,11 +474,13 @@ export function WeekView({
                     );
                   })}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+
 
       <div className="grid flex-1 grid-cols-8 overflow-hidden">
         <div className="border-border/70 border-r grid auto-cols-fr">
