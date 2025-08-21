@@ -22,7 +22,50 @@ export interface ICSParseResult {
   calendarDescription?: string;
 }
 
-export function parseICSFile(icsContent: string): ICSParseResult {
+// Timezone conversion utilities
+function convertTimezoneToUserTimezone(
+  date: Date,
+  sourceTimezone: string | undefined,
+  userTimezone: string
+): Date {
+  if (!sourceTimezone || sourceTimezone === userTimezone) {
+    return date;
+  }
+
+  try {
+    // Convert the date to the source timezone first, then to user timezone
+    const sourceTime = new Date(date.toLocaleString('en-US', { timeZone: sourceTimezone }));
+    const utcTime = new Date(date.getTime() + (date.getTime() - sourceTime.getTime()));
+    
+    // Now convert from UTC to user timezone
+    const userTime = new Date(utcTime.toLocaleString('en-US', { timeZone: userTimezone }));
+    const offset = userTime.getTime() - utcTime.getTime();
+    
+    return new Date(utcTime.getTime() - offset);
+  } catch (error) {
+    console.warn(`Failed to convert timezone from ${sourceTimezone} to ${userTimezone}:`, error);
+    return date; // Return original date if conversion fails
+  }
+}
+
+function mapICSTimezoneToIANA(icsTimezone: string): string {
+  // Map common ICS timezone names to IANA timezone identifiers
+  const timezoneMap: Record<string, string> = {
+    'W. Europe Standard Time': 'Europe/Berlin',
+    'Central European Standard Time': 'Europe/Paris',
+    'Eastern Standard Time': 'America/New_York',
+    'Pacific Standard Time': 'America/Los_Angeles',
+    'Central Standard Time': 'America/Chicago',
+    'Mountain Standard Time': 'America/Denver',
+    'GMT Standard Time': 'Europe/London',
+    'UTC': 'UTC',
+    'Greenwich Standard Time': 'UTC',
+  };
+
+  return timezoneMap[icsTimezone] || icsTimezone;
+}
+
+export function parseICSFile(icsContent: string, userTimezone: string = 'UTC'): ICSParseResult {
   const result: ICSParseResult = {
     events: [],
     errors: []
@@ -49,7 +92,7 @@ export function parseICSFile(icsContent: string): ICSParseResult {
         const vEvent = event as VEvent;
         
         try {
-          const parsedEvent = parseVEvent(vEvent);
+          const parsedEvent = parseVEvent(vEvent, userTimezone);
           if (parsedEvent) {
             result.events.push(parsedEvent);
           }
@@ -65,7 +108,7 @@ export function parseICSFile(icsContent: string): ICSParseResult {
   return result;
 }
 
-function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
+function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEvent | null {
   try {
     console.log('🔍 Parsing vEvent:', vEvent.uid, vEvent.summary);
     
@@ -103,6 +146,12 @@ function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
   let start = vEvent.start;
   let end = vEvent.end;
   let allDay = false;
+  let sourceTimezone: string | undefined;
+
+  // Extract timezone information from the raw event data
+  if (vEvent.dtstart && vEvent.dtstart.params && vEvent.dtstart.params.TZID) {
+    sourceTimezone = mapICSTimezoneToIANA(vEvent.dtstart.params.TZID);
+  }
 
   // Handle date/time parsing with proper timezone handling
   console.log('🕐 Processing start time:', start, typeof start);
@@ -155,6 +204,13 @@ function parseVEvent(vEvent: VEvent): ParsedICSEvent | null {
   } catch (error) {
     console.error('❌ Error parsing end date:', error);
     throw error;
+  }
+
+  // Convert timezone if not all-day and timezone info is available
+  if (!allDay && sourceTimezone) {
+    console.log(`🌍 Converting from ${sourceTimezone} to ${userTimezone}`);
+    start = convertTimezoneToUserTimezone(start, sourceTimezone, userTimezone);
+    end = convertTimezoneToUserTimezone(end, sourceTimezone, userTimezone);
   }
 
   // Ensure we have valid Date objects

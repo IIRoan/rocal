@@ -96,8 +96,21 @@ export const subscriptionsRoute = new Elysia()
         console.log('📄 Fetched ICS content length:', icsContent.length);
         console.log('📄 First 200 chars of ICS:', icsContent.substring(0, 200));
         
-        console.log('🔍 Parsing ICS content...');
-        testParseResult = parseICSFile(icsContent);
+        // Get user settings for timezone
+        let userSettings = await prisma.userSettings.findUnique({
+          where: { userId: user.id }
+        });
+        
+        // Create default settings if none exist
+        if (!userSettings) {
+          userSettings = await prisma.userSettings.create({
+            data: { userId: user.id }
+          });
+        }
+        
+        const userTimezone = userSettings.timezone || 'UTC';
+        console.log('🔍 Parsing ICS content with user timezone:', userTimezone);
+        testParseResult = parseICSFile(icsContent, userTimezone);
         
         console.log('✅ ICS parsing completed:', {
           eventsFound: testParseResult.events.length,
@@ -307,7 +320,21 @@ export const subscriptionsRoute = new Elysia()
         throw new Error('Calendar not found or not owned by user');
       }
 
-      const parseResult = parseICSFile(icsContent);
+      // Get user settings for timezone
+      let userSettings = await prisma.userSettings.findUnique({
+        where: { userId: user.id }
+      });
+      
+      // Create default settings if none exist
+      if (!userSettings) {
+        userSettings = await prisma.userSettings.create({
+          data: { userId: user.id }
+        });
+      }
+      
+      const userTimezone = userSettings.timezone || 'UTC';
+      console.log('🔍 Parsing ICS content with user timezone:', userTimezone);
+      const parseResult = parseICSFile(icsContent, userTimezone);
       
       if (parseResult.events.length === 0) {
         throw new Error('No valid events found in ICS file');
@@ -430,7 +457,22 @@ export async function syncCalendarSubscription(subscription: any) {
     }
 
     const icsContent = await response.text();
-    const parseResult = parseICSFile(icsContent);
+    
+    // Get user settings for timezone
+    let userSettings = await prisma.userSettings.findUnique({
+      where: { userId: subscription.userId }
+    });
+    
+    // Create default settings if none exist
+    if (!userSettings) {
+      userSettings = await prisma.userSettings.create({
+        data: { userId: subscription.userId }
+      });
+    }
+    
+    const userTimezone = userSettings.timezone || 'UTC';
+    console.log('🔍 Parsing ICS content with user timezone:', userTimezone);
+    const parseResult = parseICSFile(icsContent, userTimezone);
 
     let eventsAdded = 0;
     let eventsUpdated = 0;
