@@ -1,4 +1,4 @@
-import { isSameDay } from "date-fns";
+import { isSameDay, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter } from "date-fns";
 
 import type {
   CalendarEvent,
@@ -100,9 +100,9 @@ export function getBorderRadiusClasses(
  * Check if an event is a multi-day event
  */
 export function isMultiDayEvent(event: CalendarEvent): boolean {
-  const eventStart = new Date(event.start);
-  const eventEnd = new Date(event.end);
-  return event.allDay || eventStart.getDate() !== eventEnd.getDate();
+  const eventStart = startOfDay(new Date(event.start));
+  const eventEnd = startOfDay(new Date(event.end));
+  return event.allDay || !isSameDay(eventStart, eventEnd);
 }
 
 /**
@@ -142,16 +142,19 @@ export function getSpanningEventsForDay(
   events: CalendarEvent[],
   day: Date,
 ): CalendarEvent[] {
+  const dayStart = startOfDay(day);
+  
   return events.filter((event) => {
     if (!isMultiDayEvent(event)) return false;
 
-    const eventStart = new Date(event.start);
-    const eventEnd = new Date(event.end);
+    const eventStart = startOfDay(new Date(event.start));
+    const eventEnd = startOfDay(new Date(event.end));
 
-    // Only include if it's not the start day but is either the end day or a middle day
+    // Only include if it's not the start day but the day falls within the event range
     return (
-      !isSameDay(day, eventStart) &&
-      (isSameDay(day, eventEnd) || (day > eventStart && day < eventEnd))
+      !isSameDay(dayStart, eventStart) &&
+      (isSameDay(dayStart, eventEnd) || 
+       isWithinInterval(dayStart, { start: eventStart, end: eventEnd }))
     );
   });
 }
@@ -163,14 +166,19 @@ export function getAllEventsForDay(
   events: CalendarEvent[],
   day: Date,
 ): CalendarEvent[] {
+  const dayStart = startOfDay(day);
+  const dayEnd = endOfDay(day);
+  
   const filteredEvents = events.filter((event) => {
-    const eventStart = new Date(event.start);
-    const eventEnd = new Date(event.end);
+    const eventStart = startOfDay(new Date(event.start));
+    const eventEnd = startOfDay(new Date(event.end));
     
+    // Check if the event overlaps with this day
     return (
-      isSameDay(day, eventStart) ||
-      isSameDay(day, eventEnd) ||
-      (day > eventStart && day < eventEnd)
+      isSameDay(dayStart, eventStart) ||
+      isSameDay(dayStart, eventEnd) ||
+      isWithinInterval(dayStart, { start: eventStart, end: eventEnd }) ||
+      isWithinInterval(eventStart, { start: dayStart, end: dayEnd })
     );
   });
   
