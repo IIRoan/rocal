@@ -25,6 +25,7 @@ interface EventDotsProps {
   timeFormat?: "12h" | "24h";
   className?: string;
   style?: React.CSSProperties;
+  timezone?: string;
 }
 
 export function EventDots({
@@ -35,6 +36,7 @@ export function EventDots({
   timeFormat = "12h",
   className,
   style,
+  timezone,
 }: EventDotsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -54,6 +56,7 @@ export function EventDots({
           }}
           showTime={showTime}
           timeFormat={timeFormat}
+          timezone={timezone}
         />
       </div>
     );

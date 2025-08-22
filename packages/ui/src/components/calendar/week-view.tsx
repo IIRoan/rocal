@@ -480,6 +480,7 @@ export function WeekView({
                         isFirstDay={isFirstSegmentDay}
                         isLastDay={isLastSegmentDay}
                         className="text-xs"
+                        timezone={timezone}
                       >
                         {/* Show title only on the first visible day in the current week */}
                         <div
@@ -558,6 +559,7 @@ export function WeekView({
                       }}
                       showTime
                       timeFormat={timeFormat}
+                      timezone={timezone}
                       style={{ height: '100%', width: '100%' }}
                     />
                   ) : (
@@ -572,6 +574,7 @@ export function WeekView({
                           showTime
                           height={positionedEvent.height}
                           timeFormat={timeFormat}
+                          timezone={timezone}
                         />
                       );
                     })()

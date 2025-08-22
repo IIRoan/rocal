@@ -64,11 +64,13 @@ export const useCalendarDnd = () => useContext(CalendarDndContext);
 interface CalendarDndProviderProps {
   children: ReactNode;
   onEventUpdate: (event: CalendarEvent) => void;
+  timezone?: string;
 }
 
 export function CalendarDndProvider({
   children,
   onEventUpdate,
+  timezone,
 }: CalendarDndProviderProps) {
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -356,6 +358,7 @@ export function CalendarDndProvider({
                 currentTime={currentTime || undefined}
                 isFirstDay={dragHandlePosition?.data?.isFirstDay !== false}
                 isLastDay={dragHandlePosition?.data?.isLastDay !== false}
+                timezone={timezone}
               />
             </div>
           )}
