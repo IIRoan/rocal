@@ -29,6 +29,7 @@
     "date-fns": "^4.1.0",
     "elysia": "1",
     "ical": "^0.8.0",
+    "node-ical": "^0.20.1",
     "prismabox": "^1.1.24",
     "react": "^19.1.1",
     "resend": "^4.7.0"

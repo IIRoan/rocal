@@ -9408,6 +9408,7 @@ export namespace Prisma {
     allDay: boolean | null
     location: string | null
     color: string | null
+    timezone: string | null
     isPrivate: boolean | null
     reminder: number | null
     recurrence: string | null
@@ -9432,6 +9433,7 @@ export namespace Prisma {
     allDay: boolean | null
     location: string | null
     color: string | null
+    timezone: string | null
     isPrivate: boolean | null
     reminder: number | null
     recurrence: string | null
@@ -9456,6 +9458,7 @@ export namespace Prisma {
     allDay: number
     location: number
     color: number
+    timezone: number
     isPrivate: number
     reminder: number
     recurrence: number
@@ -9490,6 +9493,7 @@ export namespace Prisma {
     allDay?: true
     location?: true
     color?: true
+    timezone?: true
     isPrivate?: true
     reminder?: true
     recurrence?: true
@@ -9514,6 +9518,7 @@ export namespace Prisma {
     allDay?: true
     location?: true
     color?: true
+    timezone?: true
     isPrivate?: true
     reminder?: true
     recurrence?: true
@@ -9538,6 +9543,7 @@ export namespace Prisma {
     allDay?: true
     location?: true
     color?: true
+    timezone?: true
     isPrivate?: true
     reminder?: true
     recurrence?: true
@@ -9649,6 +9655,7 @@ export namespace Prisma {
     allDay: boolean
     location: string | null
     color: string | null
+    timezone: string
     isPrivate: boolean
     reminder: number | null
     recurrence: string | null
@@ -9692,6 +9699,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: boolean
     color?: boolean
+    timezone?: boolean
     isPrivate?: boolean
     reminder?: boolean
     recurrence?: boolean
@@ -9723,6 +9731,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: boolean
     color?: boolean
+    timezone?: boolean
     isPrivate?: boolean
     reminder?: boolean
     recurrence?: boolean
@@ -9750,6 +9759,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: boolean
     color?: boolean
+    timezone?: boolean
     isPrivate?: boolean
     reminder?: boolean
     recurrence?: boolean
@@ -9777,6 +9787,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: boolean
     color?: boolean
+    timezone?: boolean
     isPrivate?: boolean
     reminder?: boolean
     recurrence?: boolean
@@ -9792,7 +9803,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type CalendarEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "start" | "end" | "allDay" | "location" | "color" | "isPrivate" | "reminder" | "recurrence" | "parentEventId" | "isSynced" | "externalId" | "subscriptionId" | "syncedAt" | "userId" | "calendarId" | "categoryId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarEvent"]>
+  export type CalendarEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "start" | "end" | "allDay" | "location" | "color" | "timezone" | "isPrivate" | "reminder" | "recurrence" | "parentEventId" | "isSynced" | "externalId" | "subscriptionId" | "syncedAt" | "userId" | "calendarId" | "categoryId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarEvent"]>
   export type CalendarEventInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     calendar?: boolean | CalendarDefaultArgs<ExtArgs>
@@ -9832,6 +9843,7 @@ export namespace Prisma {
       allDay: boolean
       location: string | null
       color: string | null
+      timezone: string
       isPrivate: boolean
       reminder: number | null
       recurrence: string | null
@@ -10282,6 +10294,7 @@ export namespace Prisma {
     readonly allDay: FieldRef<"CalendarEvent", 'Boolean'>
     readonly location: FieldRef<"CalendarEvent", 'String'>
     readonly color: FieldRef<"CalendarEvent", 'String'>
+    readonly timezone: FieldRef<"CalendarEvent", 'String'>
     readonly isPrivate: FieldRef<"CalendarEvent", 'Boolean'>
     readonly reminder: FieldRef<"CalendarEvent", 'Int'>
     readonly recurrence: FieldRef<"CalendarEvent", 'String'>
@@ -21331,6 +21344,7 @@ export namespace Prisma {
     allDay: 'allDay',
     location: 'location',
     color: 'color',
+    timezone: 'timezone',
     isPrivate: 'isPrivate',
     reminder: 'reminder',
     recurrence: 'recurrence',
@@ -22067,6 +22081,7 @@ export namespace Prisma {
     allDay?: BoolFilter<"CalendarEvent"> | boolean
     location?: StringNullableFilter<"CalendarEvent"> | string | null
     color?: StringNullableFilter<"CalendarEvent"> | string | null
+    timezone?: StringFilter<"CalendarEvent"> | string
     isPrivate?: BoolFilter<"CalendarEvent"> | boolean
     reminder?: IntNullableFilter<"CalendarEvent"> | number | null
     recurrence?: StringNullableFilter<"CalendarEvent"> | string | null
@@ -22097,6 +22112,7 @@ export namespace Prisma {
     allDay?: SortOrder
     location?: SortOrderInput | SortOrder
     color?: SortOrderInput | SortOrder
+    timezone?: SortOrder
     isPrivate?: SortOrder
     reminder?: SortOrderInput | SortOrder
     recurrence?: SortOrderInput | SortOrder
@@ -22130,6 +22146,7 @@ export namespace Prisma {
     allDay?: BoolFilter<"CalendarEvent"> | boolean
     location?: StringNullableFilter<"CalendarEvent"> | string | null
     color?: StringNullableFilter<"CalendarEvent"> | string | null
+    timezone?: StringFilter<"CalendarEvent"> | string
     isPrivate?: BoolFilter<"CalendarEvent"> | boolean
     reminder?: IntNullableFilter<"CalendarEvent"> | number | null
     recurrence?: StringNullableFilter<"CalendarEvent"> | string | null
@@ -22160,6 +22177,7 @@ export namespace Prisma {
     allDay?: SortOrder
     location?: SortOrderInput | SortOrder
     color?: SortOrderInput | SortOrder
+    timezone?: SortOrder
     isPrivate?: SortOrder
     reminder?: SortOrderInput | SortOrder
     recurrence?: SortOrderInput | SortOrder
@@ -22192,6 +22210,7 @@ export namespace Prisma {
     allDay?: BoolWithAggregatesFilter<"CalendarEvent"> | boolean
     location?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
     color?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    timezone?: StringWithAggregatesFilter<"CalendarEvent"> | string
     isPrivate?: BoolWithAggregatesFilter<"CalendarEvent"> | boolean
     reminder?: IntNullableWithAggregatesFilter<"CalendarEvent"> | number | null
     recurrence?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
@@ -23505,6 +23524,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -23532,6 +23552,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -23559,6 +23580,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -23586,6 +23608,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -23613,6 +23636,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -23637,6 +23661,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -23658,6 +23683,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -25028,6 +25054,7 @@ export namespace Prisma {
     allDay?: SortOrder
     location?: SortOrder
     color?: SortOrder
+    timezone?: SortOrder
     isPrivate?: SortOrder
     reminder?: SortOrder
     recurrence?: SortOrder
@@ -25056,6 +25083,7 @@ export namespace Prisma {
     allDay?: SortOrder
     location?: SortOrder
     color?: SortOrder
+    timezone?: SortOrder
     isPrivate?: SortOrder
     reminder?: SortOrder
     recurrence?: SortOrder
@@ -25080,6 +25108,7 @@ export namespace Prisma {
     allDay?: SortOrder
     location?: SortOrder
     color?: SortOrder
+    timezone?: SortOrder
     isPrivate?: SortOrder
     reminder?: SortOrder
     recurrence?: SortOrder
@@ -26882,6 +26911,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -26908,6 +26938,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -27253,6 +27284,7 @@ export namespace Prisma {
     allDay?: BoolFilter<"CalendarEvent"> | boolean
     location?: StringNullableFilter<"CalendarEvent"> | string | null
     color?: StringNullableFilter<"CalendarEvent"> | string | null
+    timezone?: StringFilter<"CalendarEvent"> | string
     isPrivate?: BoolFilter<"CalendarEvent"> | boolean
     reminder?: IntNullableFilter<"CalendarEvent"> | number | null
     recurrence?: StringNullableFilter<"CalendarEvent"> | string | null
@@ -27708,6 +27740,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -27734,6 +27767,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -27994,6 +28028,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -28020,6 +28055,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -28495,6 +28531,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -28521,6 +28558,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -28604,6 +28642,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28630,6 +28669,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28859,6 +28899,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -28885,6 +28926,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -28927,6 +28969,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28953,6 +28996,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28979,6 +29023,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -29005,6 +29050,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -29047,6 +29093,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -29073,6 +29120,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -29521,6 +29569,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -29676,6 +29725,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -29702,6 +29752,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -29728,6 +29779,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -29932,6 +29984,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -29981,6 +30034,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30007,6 +30061,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30033,6 +30088,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30136,6 +30192,7 @@ export namespace Prisma {
     allDay?: boolean
     location?: string | null
     color?: string | null
+    timezone?: string
     isPrivate?: boolean
     reminder?: number | null
     recurrence?: string | null
@@ -30159,6 +30216,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30185,6 +30243,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30211,6 +30270,7 @@ export namespace Prisma {
     allDay?: BoolFieldUpdateOperationsInput | boolean
     location?: NullableStringFieldUpdateOperationsInput | string | null
     color?: NullableStringFieldUpdateOperationsInput | string | null
+    timezone?: StringFieldUpdateOperationsInput | string
     isPrivate?: BoolFieldUpdateOperationsInput | boolean
     reminder?: NullableIntFieldUpdateOperationsInput | number | null
     recurrence?: NullableStringFieldUpdateOperationsInput | string | null
