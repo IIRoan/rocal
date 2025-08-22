@@ -14,6 +14,7 @@ import {
 import { CalendarEvent } from "./types";
 import { cn } from "../../lib/utils";
 import { formatEventDescription } from "./event-description-formatter";
+import { formatInTimeZone } from "date-fns-tz";
 
 // Using date-fns format with custom formatting:
 // 12h format: 'h' - hours (1-12), 'a' - am/pm
@@ -28,6 +29,18 @@ const formatTimeWithOptionalMinutes = (
   } else {
     return format(date, getMinutes(date) === 0 ? "ha" : "h:mma").toLowerCase();
   }
+};
+
+// Timezone-aware formatter (falls back to local if no timezone)
+const formatTimeWithOptionalMinutesTZ = (
+  date: Date,
+  timeFormat: "12h" | "24h" = "12h",
+  timezone?: string,
+) => {
+  if (!timezone) return formatTimeWithOptionalMinutes(date, timeFormat);
+  const token = timeFormat === "24h" ? (getMinutes(date) === 0 ? "H" : "H:mm") : (getMinutes(date) === 0 ? "ha" : "h:mma");
+  const str = formatInTimeZone(date, timezone, token);
+  return timeFormat === "12h" ? str.toLowerCase() : str;
 };
 
 
@@ -114,6 +127,7 @@ interface EventItemProps {
   onMouseDown?: (e: React.MouseEvent) => void;
   onTouchStart?: (e: React.TouchEvent) => void;
   timeFormat?: "12h" | "24h";
+  timezone?: string;
 }
 
 export function EventItem({
@@ -132,6 +146,7 @@ export function EventItem({
   onMouseDown,
   onTouchStart,
   timeFormat = "12h",
+  timezone,
 }: EventItemProps) {
   const eventColor = event.color;
 
@@ -159,11 +174,11 @@ export function EventItem({
 
     // For short events (less than 45 minutes), only show start time
     if (durationMinutes < 45) {
-      return formatTimeWithOptionalMinutes(displayStart, timeFormat);
+      return formatTimeWithOptionalMinutesTZ(displayStart, timeFormat, timezone);
     }
 
     // For longer events, show both start and end time
-    return `${formatTimeWithOptionalMinutes(displayStart, timeFormat)} - ${formatTimeWithOptionalMinutes(displayEnd, timeFormat)}`;
+    return `${formatTimeWithOptionalMinutesTZ(displayStart, timeFormat, timezone)} - ${formatTimeWithOptionalMinutesTZ(displayEnd, timeFormat, timezone)}`;
   };
 
   if (view === "month") {
@@ -268,6 +283,11 @@ export function EventItem({
       <div className="text-sm font-medium flex items-center gap-2">
         <span className="truncate">{event.title}</span>
       </div>
+      {!event.allDay && (
+        <div className="text-xs opacity-70">
+          {getEventTime()}
+        </div>
+      )}
       {event.location && (
         <div className="text-xs opacity-70">
           <span>{event.location}</span>
