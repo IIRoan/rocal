@@ -643,7 +643,7 @@ export function EventCalendar({
           } as React.CSSProperties
         }
       >
-        <CalendarDndProvider onEventUpdate={handleEventUpdate}>
+        <CalendarDndProvider onEventUpdate={handleEventUpdate} timezone={timezone}>
           <div
             className={cn(
               "sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
@@ -813,6 +813,7 @@ export function EventCalendar({
                 timeFormat={timeFormat}
                 weekStartDay={weekStartDay}
                 workingDays={workingDays}
+                timezone={timezone}
               />
             )}
             {view === "week" && (
@@ -845,6 +846,7 @@ export function EventCalendar({
                 events={events}
                 onEventSelect={handleEventSelect}
                 timeFormat={timeFormat}
+                timezone={timezone}
               />
             )}
           </div>

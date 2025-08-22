@@ -13,6 +13,7 @@ interface EventsPopupProps {
   position: { top: number; left: number };
   onClose: () => void;
   onEventSelect: (event: CalendarEvent) => void;
+  timezone?: string;
 }
 
 export function EventsPopup({
@@ -21,6 +22,7 @@ export function EventsPopup({
   position,
   onClose,
   onEventSelect,
+  timezone,
 }: EventsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -125,6 +127,7 @@ export function EventsPopup({
                   view="agenda"
                   isFirstDay={isFirstDay}
                   isLastDay={isLastDay}
+                  timezone={timezone}
                 />
               </div>
             );

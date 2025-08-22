@@ -270,6 +270,7 @@ export function DayView({
                     view="month"
                     isFirstDay={isFirstDay}
                     isLastDay={isLastDay}
+                    timezone={timezone}
                   >
                     {/* Always show the title in day view for better usability */}
                     <div>{event.title}</div>
@@ -319,6 +320,7 @@ export function DayView({
                   showTime
                   height={positionedEvent.height}
                   timeFormat={timeFormat}
+                  timezone={timezone}
                 />
               </div>
             </div>

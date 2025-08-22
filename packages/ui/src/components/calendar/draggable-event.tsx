@@ -21,6 +21,7 @@ interface DraggableEventProps {
   isLastDay?: boolean;
   "aria-hidden"?: boolean | "true" | "false";
   timeFormat?: "12h" | "24h";
+  timezone?: string;
 }
 
 export function DraggableEvent({
@@ -35,6 +36,7 @@ export function DraggableEvent({
   isLastDay = true,
   "aria-hidden": ariaHidden,
   timeFormat = "12h",
+  timezone,
 }: DraggableEventProps) {
   const { activeId } = useCalendarDnd();
   const elementRef = useRef<HTMLDivElement>(null);
@@ -136,6 +138,7 @@ export function DraggableEvent({
         dndAttributes={attributes}
         aria-hidden={ariaHidden}
         timeFormat={timeFormat}
+        timezone={timezone}
       />
     </div>
   );

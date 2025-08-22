@@ -40,6 +40,7 @@ interface MonthViewProps {
   timeFormat?: "12h" | "24h";
   weekStartDay?: number;
   workingDays?: number[];
+  timezone?: string;
 }
 
 export function MonthView({
@@ -52,6 +53,7 @@ export function MonthView({
   timeFormat = "12h",
   weekStartDay = 0,
   workingDays = [1, 2, 3, 4, 5],
+  timezone,
 }: MonthViewProps) {
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
@@ -223,6 +225,7 @@ export function MonthView({
                                 isFirstDay={isFirstDay}
                                 isLastDay={isLastDay}
                                 timeFormat={timeFormat}
+                                timezone={timezone}
                               >
                                 <div className="invisible" aria-hidden={true}>
                                   {!event.allDay && (
@@ -254,6 +257,7 @@ export function MonthView({
                               isFirstDay={isFirstDay}
                               isLastDay={isLastDay}
                               timeFormat={timeFormat}
+                              timezone={timezone}
                             />
                           </div>
                         );
@@ -303,6 +307,7 @@ export function MonthView({
                                       isFirstDay={isFirstDay}
                                       isLastDay={isLastDay}
                                       timeFormat={timeFormat}
+                                      timezone={timezone}
                                     />
                                   );
                                 })}

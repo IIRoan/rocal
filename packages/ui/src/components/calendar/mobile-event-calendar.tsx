@@ -530,7 +530,7 @@ export function MobileEventCalendar({
           } as React.CSSProperties
         }
       >
-        <CalendarDndProvider onEventUpdate={handleEventUpdate}>
+        <CalendarDndProvider onEventUpdate={handleEventUpdate} timezone={timezone}>
           {/* Desktop-only calendar header - hidden on mobile since we have mobile nav */}
           <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
@@ -644,6 +644,7 @@ export function MobileEventCalendar({
                 timeFormat={timeFormat}
                 weekStartDay={weekStartDay}
                 workingDays={workingDays}
+                timezone={timezone}
               />
             )}
             {view === "week" && (
@@ -656,6 +657,7 @@ export function MobileEventCalendar({
                 timeFormat={timeFormat}
                 weekStartDay={weekStartDay}
                 workingDays={workingDays}
+                timezone={timezone}
               />
             )}
             {view === "day" && (
@@ -667,6 +669,7 @@ export function MobileEventCalendar({
                 compactView={compactView}
                 timeFormat={timeFormat}
                 workingDays={workingDays}
+                timezone={timezone}
               />
             )}
             {view === "agenda" && (
@@ -676,6 +679,7 @@ export function MobileEventCalendar({
                 onEventSelect={handleEventSelect}
                 onEventCreate={handleEventCreate}
                 timeFormat={timeFormat}
+                timezone={timezone}
               />
             )}
           </div>
