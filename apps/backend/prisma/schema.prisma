@@ -130,6 +130,7 @@ model CalendarEvent {
   allDay               Boolean               @default(false) @map("all_day")
   location             String?
   color                String? // blue, orange, violet, rose, emerald
+  timezone             String                @default("UTC") // IANA timezone identifier
   // Additional fields for a complete calendar app
   isPrivate            Boolean               @default(false) @map("is_private")
   reminder             Int? // minutes before event to remind

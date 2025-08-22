@@ -1,5 +1,5 @@
-import * as ical from 'ical';
-import { CalendarEvent, Prisma } from '../generated/prisma';
+import * as ical from 'node-ical';
+import { CalendarEvent, Prisma } from '../generated/prisma/index.js';
 
 type VEvent = any;
 type VCalendar = any;
@@ -13,6 +13,7 @@ export interface ParsedICSEvent {
   allDay: boolean;
   location?: string;
   recurrence?: string;
+  timezone?: string; // IANA timezone identifier
 }
 
 export interface ICSParseResult {
@@ -20,6 +21,7 @@ export interface ICSParseResult {
   errors: string[];
   calendarName?: string;
   calendarDescription?: string;
+  calendarTimezone?: string; // X-WR-TIMEZONE from calendar
 }
 
 // Timezone conversion utilities
@@ -68,6 +70,7 @@ export function parseICSFile(icsContent: string, userTimezone: string = 'UTC'): 
   try {
     const parsed = ical.parseICS(icsContent);
     
+    // First pass: extract calendar-level metadata including X-WR-TIMEZONE
     for (const eventKey in parsed) {
       const event = parsed[eventKey];
       
@@ -79,14 +82,23 @@ export function parseICSFile(icsContent: string, userTimezone: string = 'UTC'): 
         if (calendar.description) {
           result.calendarDescription = calendar.description;
         }
+        // Extract X-WR-TIMEZONE if present
+        if (calendar['X-WR-TIMEZONE'] || calendar['x-wr-timezone']) {
+          result.calendarTimezone = mapICSTimezoneToIANA(calendar['X-WR-TIMEZONE'] || calendar['x-wr-timezone']);
+        }
         continue;
       }
+    }
+    
+    // Second pass: parse events with calendar timezone context
+    for (const eventKey in parsed) {
+      const event = parsed[eventKey];
       
       if (event && event.type === 'VEVENT') {
         const vEvent = event as VEvent;
         
         try {
-          const parsedEvent = parseVEvent(vEvent, userTimezone);
+          const parsedEvent = parseVEvent(vEvent, userTimezone, result.calendarTimezone);
           if (parsedEvent) {
             result.events.push(parsedEvent);
           }
@@ -102,7 +114,7 @@ export function parseICSFile(icsContent: string, userTimezone: string = 'UTC'): 
   return result;
 }
 
-function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEvent | null {
+function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC', calendarTimezone?: string): ParsedICSEvent | null {
   try {
     console.log('🔍 Parsing vEvent:', vEvent.uid, vEvent.summary);
     
@@ -131,7 +143,8 @@ function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEve
         isDate: vEvent.end instanceof Date
       },
       dtstart: vEvent.dtstart,
-      dtend: vEvent.dtend
+      dtend: vEvent.dtend,
+      datetype: (vEvent as any).datetype
     });
 
   // Include all events regardless of participation status (PARTSTAT)
@@ -142,10 +155,23 @@ function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEve
   let allDay = false;
   let sourceTimezone: string | undefined;
 
-  // Extract timezone information from the raw event data
-  if (vEvent.dtstart && vEvent.dtstart.params && vEvent.dtstart.params.TZID) {
-    sourceTimezone = mapICSTimezoneToIANA(vEvent.dtstart.params.TZID);
+  // Node-ical marks all-day events with datetype === 'date'
+  if ((vEvent as any).datetype === 'date') {
+    allDay = true;
   }
+
+  // Determine event timezone with priority: TZID > X-WR-TIMEZONE > floating time (user timezone)
+  if (vEvent.dtstart && vEvent.dtstart.params && vEvent.dtstart.params.TZID) {
+    // Event has explicit TZID - use it
+    sourceTimezone = mapICSTimezoneToIANA(vEvent.dtstart.params.TZID);
+  } else if (calendarTimezone) {
+    // No TZID but calendar has X-WR-TIMEZONE - use calendar timezone
+    sourceTimezone = calendarTimezone;
+  } else if (!allDay) {
+    // No TZID and no calendar timezone - this is floating time, use user timezone
+    sourceTimezone = userTimezone;
+  }
+  // For all-day events, timezone is not applicable
 
   // Handle date/time parsing with proper timezone handling
   console.log('🕐 Processing start time:', start, typeof start);
@@ -156,7 +182,7 @@ function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEve
       const date = new Date(startStr);
       if (!isNaN(date.getTime())) {
         start = date;
-        allDay = isAllDayFromStart;
+        allDay = allDay || isAllDayFromStart;
         console.log('📅 Parsed string start date:', start, 'allDay:', allDay);
       } else {
         throw new Error(`Invalid start date string: ${start}`);
@@ -190,6 +216,10 @@ function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEve
     } else if (end instanceof Date) {
       // Date object from ICS library - use as-is
       end = vEvent.end;
+      if (allDay) {
+        // Ensure exclusive end is converted to inclusive for all-day
+        end = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+      }
       console.log('📅 Using Date object end:', end);
     } else {
       throw new Error(`Unexpected end date type: ${typeof end}`);
@@ -224,34 +254,28 @@ function parseVEvent(vEvent: VEvent, userTimezone: string = 'UTC'): ParsedICSEve
         
         // Additional validation for weekdays
         if (parsedRule.byWeekDay && Array.isArray(parsedRule.byWeekDay)) {
-          console.log('📊 Weekdays specified:', parsedRule.byWeekDay.map((d: number) => 
-            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]
-          ).join(', '));
-        }
-        
-        if (parsedRule.until) {
-          console.log('⏰ Recurrence ends at:', parsedRule.until);
+          // Keep as is
         }
       } else {
         console.warn(`❌ Invalid RRULE - missing frequency or interval for ${vEvent.uid}:`, parsedRule);
       }
     } catch (error) {
-      // If RRULE parsing fails, continue without recurrence
       console.warn(`💥 Failed to parse RRULE for event ${vEvent.uid}: ${error}`);
     }
   }
 
-    console.log('✅ Successfully parsed event:', vEvent.uid, vEvent.summary);
-    return {
-      uid: vEvent.uid,
-      title: vEvent.summary,
-      description: vEvent.description || undefined,
-      start,
-      end,
-      allDay,
-      location: vEvent.location || undefined,
-      recurrence
-    };
+  console.log('✅ Successfully parsed event:', vEvent.uid, vEvent.summary, 'timezone:', sourceTimezone);
+  return {
+    uid: vEvent.uid,
+    title: vEvent.summary,
+    description: vEvent.description || undefined,
+    start: start,
+    end: end,
+    allDay: allDay,
+    location: vEvent.location || undefined,
+    recurrence: recurrence,
+    timezone: sourceTimezone,
+  };
   } catch (error) {
     console.error('💥 Fatal error parsing vEvent:', vEvent?.uid || 'unknown', error);
     console.error('📊 vEvent data that caused error:', JSON.stringify(vEvent, null, 2));
@@ -360,6 +384,7 @@ export function convertParsedEventToCalendarEvent(
     allDay: parsedEvent.allDay,
     location: parsedEvent.location,
     recurrence: parsedEvent.recurrence,
+    timezone: parsedEvent.timezone || 'UTC',
     isSynced: !!subscriptionId,
     externalId: parsedEvent.uid,
     subscriptionId: subscriptionId,
@@ -382,6 +407,7 @@ export function isEventModified(existing: CalendarEvent, parsed: ParsedICSEvent)
     existing.end.getTime() !== parsed.end.getTime() ||
     existing.allDay !== parsed.allDay ||
     existing.location !== (parsed.location || null) ||
-    existing.recurrence !== (parsed.recurrence || null)
+    existing.recurrence !== (parsed.recurrence || null) ||
+    existing.timezone !== (parsed.timezone || 'UTC')
   );
 }

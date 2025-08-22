@@ -29,6 +29,7 @@ export const EventParticipantRelations = t.Object(
         allDay: t.Boolean(),
         location: __nullable__(t.String()),
         color: __nullable__(t.String()),
+        timezone: t.String(),
         isPrivate: t.Boolean(),
         reminder: __nullable__(t.Integer()),
         recurrence: __nullable__(t.String()),

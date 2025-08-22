@@ -196,6 +196,7 @@ exports.Prisma.CalendarEventScalarFieldEnum = {
   allDay: 'allDay',
   location: 'location',
   color: 'color',
+  timezone: 'timezone',
   isPrivate: 'isPrivate',
   reminder: 'reminder',
   recurrence: 'recurrence',

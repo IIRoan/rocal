@@ -129,6 +129,7 @@ model CalendarEvent {
   allDay               Boolean               @default(false) @map("all_day")
   location             String?
   color                String? // blue, orange, violet, rose, emerald
+  timezone             String                @default("UTC") // IANA timezone identifier
   // Additional fields for a complete calendar app
   isPrivate            Boolean               @default(false) @map("is_private")
   reminder             Int? // minutes before event to remind
@@ -179,10 +180,10 @@ model UserSettings {
   // Display preferences
   theme                String   @default("light") // light, dark, system
   defaultView          String   @default("month") // month, week, day, agenda
-  weekStartDay         Int      @default(0) // 0 = Sunday, 1 = Monday
+  weekStartDay         Int      @default(1) // 0 = Sunday, 1 = Monday
   // Time & Timezone
   timezone             String   @default("UTC") // IANA timezone identifier
-  timeFormat           String   @default("12h") // 12h, 24h
+  timeFormat           String   @default("24h") // 12h, 24h
   // Working hours (in minutes from midnight)
   workingHoursStart    Int      @default(540) // 9:00 AM = 540 minutes
   workingHoursEnd      Int      @default(1020) // 5:00 PM = 1020 minutes
