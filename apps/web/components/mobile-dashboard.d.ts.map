@@ -1,0 +1,1 @@
+{"version":3,"file":"mobile-dashboard.d.ts","sourceRoot":"","sources":["mobile-dashboard.tsx"],"names":[],"mappings":"AASA,UAAU,oBAAoB;IAC5B,IAAI,EAAE;QACJ,IAAI,EAAE,MAAM,CAAC;QACb,KAAK,EAAE,MAAM,CAAC;QACd,MAAM,CAAC,EAAE,MAAM,CAAC;KACjB,CAAC;IACF,QAAQ,EAAE,MAAM,IAAI,CAAC;CACtB;AAED,wBAAgB,eAAe,CAAC,EAAE,IAAI,EAAE,QAAQ,EAAE,EAAE,oBAAoB,+BAyDvE"}
