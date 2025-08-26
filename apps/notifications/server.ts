@@ -10,10 +10,11 @@ import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as dotenv from "dotenv";
 
-// Load environment variables
+// Load environment variables (optional .env file for local development)
 const envResult = dotenv.config();
 if (envResult.error) {
   console.warn('⚠️ Could not load .env file:', envResult.error.message);
+  console.log('📝 Using environment variables from system (Railway deployment)');
 } else {
   console.log('✅ Environment variables loaded from .env');
 }
