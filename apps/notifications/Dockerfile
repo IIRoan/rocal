@@ -35,13 +35,13 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
-# Copy the built application including generated Prisma client
+# Copy the built application and generated Prisma client
 COPY --from=builder --chown=notifications:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=notifications:nodejs /app/server.ts ./
 COPY --from=builder --chown=notifications:nodejs /app/package.json ./
 COPY --from=builder --chown=notifications:nodejs /app/prisma ./prisma
 
-# Set correct permissions before switching user
+# Set correct permissions
 RUN chown -R notifications:nodejs /app
 
 USER notifications
