@@ -41,10 +41,13 @@ COPY --from=builder --chown=notifications:nodejs /app/server.ts ./
 COPY --from=builder --chown=notifications:nodejs /app/package.json ./
 COPY --from=builder --chown=notifications:nodejs /app/prisma ./prisma
 
-# Set correct permissions
+# Set correct permissions before switching user
 RUN chown -R notifications:nodejs /app
 
 USER notifications
+
+# Run Prisma generate as the notifications user to ensure client is available
+RUN bun run prisma:generate
 
 EXPOSE 3001
 
