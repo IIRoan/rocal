@@ -5,7 +5,7 @@
  * Checks the database for notifications that need sending and sends them using Resend API.
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from './generated/prisma/index.js';
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as dotenv from "dotenv";
