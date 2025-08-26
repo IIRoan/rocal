@@ -1,1 +1,0 @@
-{"version":3,"file":"transition-container.d.ts","sourceRoot":"","sources":["transition-container.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,UAAU,wBAAwB;IAChC,SAAS,EAAE,SAAS,GAAG,MAAM,CAAC;IAC9B,QAAQ,EAAE,KAAK,CAAC,SAAS,CAAC;CAC3B;AAED,wBAAgB,mBAAmB,CAAC,EAClC,SAAS,EACT,QAAQ,GACT,EAAE,wBAAwB,qBAa1B"}
