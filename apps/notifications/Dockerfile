@@ -35,7 +35,7 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
-# Copy the built application
+# Copy the built application including generated Prisma client
 COPY --from=builder --chown=notifications:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=notifications:nodejs /app/server.ts ./
 COPY --from=builder --chown=notifications:nodejs /app/package.json ./
@@ -45,9 +45,6 @@ COPY --from=builder --chown=notifications:nodejs /app/prisma ./prisma
 RUN chown -R notifications:nodejs /app
 
 USER notifications
-
-# Run Prisma generate as the notifications user to ensure client is available
-RUN bun run prisma:generate
 
 EXPOSE 3001
 
