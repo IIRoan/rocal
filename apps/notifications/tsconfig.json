@@ -1,28 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "moduleDetection": "force",
     "noEmit": true,
-    "composite": true,
     "strict": true,
-    "downlevelIteration": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",
+    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "allowJs": true,
-    "types": ["bun-types"]
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx"
   },
   "include": [
-    "server.ts",
-    "prisma/schema.prisma"
+    "server.ts"
   ],
   "exclude": [
-    "node_modules",
-    "../../packages"
+    "node_modules"
   ]
 }
