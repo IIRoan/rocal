@@ -1,0 +1,29 @@
+{
+  "name": "notifications",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run server.ts",
+    "start": "bun run server.ts",
+    "build": "bun run prisma:generate && bun run typecheck",
+    "prisma:generate": "prisma generate",
+    "prisma:deploy": "prisma migrate deploy",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/bun": "1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "bun-types": "^1.2.19",
+    "prisma": "^6.12.0",
+    "typescript": "5"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.12.0",
+    "@react-email/components": "^0.4.0",
+    "@react-email/render": "^1.1.4",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "react": "^19.1.1",
+    "resend": "^4.7.0"
+  }
+}

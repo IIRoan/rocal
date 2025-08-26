@@ -1,0 +1,689 @@
+"use client";
+import { useState } from "react";
+import { calendarApiService } from "@/lib/calendar-api-service";
+import { useCalendarData } from "@/hooks/use-calendar-data";
+import { useCommandPalette } from "@/components/command-palette-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, } from "@workspace/ui/components/ui/dialog";
+import { Button } from "@workspace/ui/components/ui/button";
+import { Input } from "@workspace/ui/components/ui/input";
+import { Label } from "@workspace/ui/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@workspace/ui/components/ui/select";
+import { Switch } from "@workspace/ui/components/ui/switch";
+import { Badge } from "@workspace/ui/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, } from "@workspace/ui/components/ui/card";
+import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
+import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
+import { SubscriptionManagement } from "./subscription-management";
+import { Plus, Trash2, Edit, Eye, EyeOff, Star, AlertTriangle, AlertCircle, CheckCircle, Settings, Upload, FileText, ExternalLink, } from "lucide-react";
+const PRESET_COLORS = [
+    "#3b82f6", // blue
+    "#10b981", // emerald
+    "#f59e0b", // orange
+    "#8b5cf6", // violet
+    "#f43f5e", // rose
+    "#ef4444", // red
+    "#06b6d4", // cyan
+    "#84cc16", // lime
+    "#f97316", // orange-500
+    "#6366f1", // indigo
+    "#ec4899", // pink
+    "#14b8a6", // teal
+];
+export function CalendarManagement({ open, onOpenChange, }) {
+    const { calendars, refetchCalendars, updateCalendar, createCalendar } = useCalendarData();
+    const { openCalendarManagement } = useCommandPalette();
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [editingCalendar, setEditingCalendar] = useState(null);
+    const [deletingCalendar, setDeletingCalendar] = useState(null);
+    const [deleteAction, setDeleteAction] = useState("delete_events");
+    const [targetCalendarId, setTargetCalendarId] = useState("");
+    const [newCalendar, setNewCalendar] = useState({
+        name: "",
+        color: "#3b82f6",
+        isDefault: false,
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
+    const [showImportDialog, setShowImportDialog] = useState(false);
+    const [importCalendarId, setImportCalendarId] = useState("");
+    const [importFile, setImportFile] = useState(null);
+    const [importResult, setImportResult] = useState(null);
+    const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+    const [validationErrors, setValidationErrors] = useState({});
+    const validateCalendarForm = () => {
+        const errors = {};
+        // Check if name is empty
+        if (!newCalendar.name.trim()) {
+            errors.name = "Calendar name is required";
+        }
+        // Check name length
+        if (newCalendar.name.trim().length > 100) {
+            errors.name = "Calendar name cannot exceed 100 characters";
+        }
+        // Check for duplicate names (case-insensitive)
+        const existingNames = calendars.map((cal) => cal.name.toLowerCase());
+        if (existingNames.includes(newCalendar.name.trim().toLowerCase())) {
+            errors.name = "A calendar with this name already exists";
+        }
+        // Validate color format
+        const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(newCalendar.color);
+        const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
+        if (!allowedColors.includes(newCalendar.color) && !isHexColor) {
+            errors.color = "Please select a valid color";
+        }
+        return errors;
+    };
+    const handleCreateCalendar = async () => {
+        // Clear any previous errors
+        setError(null);
+        setValidationErrors({});
+        setSuccess(null);
+        // Validate form
+        const errors = validateCalendarForm();
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            return;
+        }
+        setLoading(true);
+        try {
+            const calendarData = {
+                name: newCalendar.name.trim(),
+                color: newCalendar.color,
+                isDefault: newCalendar.isDefault,
+            };
+            await createCalendar(calendarData);
+            setNewCalendar({ name: "", color: "#3b82f6", isDefault: false });
+            setShowCreateForm(false);
+            setValidationErrors({});
+            setSuccess("Calendar created successfully!");
+        }
+        catch (err) {
+            // Handle specific API errors
+            if (err.message && err.message.includes("already exists")) {
+                setValidationErrors({
+                    name: "A calendar with this name already exists",
+                });
+            }
+            else if (err.message && err.message.includes("name is required")) {
+                setValidationErrors({ name: "Calendar name is required" });
+            }
+            else if (err.message && err.message.includes("exceed 100 characters")) {
+                setValidationErrors({
+                    name: "Calendar name cannot exceed 100 characters",
+                });
+            }
+            else if (err.message && err.message.includes("Color must be")) {
+                setValidationErrors({ color: "Please select a valid color" });
+            }
+            else {
+                // Generic error fallback
+                setError(err.message || "Failed to create calendar. Please try again.");
+            }
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const validateEditCalendarForm = (name, currentCalendarId) => {
+        const errors = {};
+        // Check if name is empty
+        if (!name.trim()) {
+            errors.name = "Calendar name is required";
+        }
+        // Check name length
+        if (name.trim().length > 100) {
+            errors.name = "Calendar name cannot exceed 100 characters";
+        }
+        // Check for duplicate names (excluding current calendar)
+        const existingNames = calendars
+            .filter((cal) => cal.id !== currentCalendarId)
+            .map((cal) => cal.name.toLowerCase());
+        if (existingNames.includes(name.trim().toLowerCase())) {
+            errors.name = "A calendar with this name already exists";
+        }
+        return errors;
+    };
+    const handleUpdateCalendar = async (calendar, updates) => {
+        setLoading(true);
+        setError(null);
+        setValidationErrors({});
+        setSuccess(null);
+        // Validate if name is being updated
+        if (updates.name) {
+            const errors = validateEditCalendarForm(updates.name, calendar.id);
+            if (Object.keys(errors).length > 0) {
+                setValidationErrors(errors);
+                setLoading(false);
+                return;
+            }
+        }
+        try {
+            await updateCalendar(calendar.id, updates);
+            setSuccess("Calendar updated successfully!");
+            return true; // Indicate success
+        }
+        catch (err) {
+            // Handle specific API errors
+            if (err.message && err.message.includes("already exists")) {
+                setValidationErrors({
+                    name: "A calendar with this name already exists",
+                });
+            }
+            else if (err.message && err.message.includes("name is required")) {
+                setValidationErrors({ name: "Calendar name is required" });
+            }
+            else if (err.message && err.message.includes("exceed 100 characters")) {
+                setValidationErrors({
+                    name: "Calendar name cannot exceed 100 characters",
+                });
+            }
+            else if (err.message && err.message.includes("Color must be")) {
+                setValidationErrors({ color: "Please select a valid color" });
+            }
+            else {
+                setError(err.message || "Failed to update calendar. Please try again.");
+            }
+            return false; // Indicate failure
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const handleDeleteCalendar = async () => {
+        if (!deletingCalendar)
+            return;
+        setLoading(true);
+        setError(null);
+        try {
+            await calendarApiService.deleteCalendarAdvanced(deletingCalendar.id, deleteAction, targetCalendarId || undefined);
+            await refetchCalendars();
+            setDeletingCalendar(null);
+            setDeleteAction("delete_events");
+            setTargetCalendarId("");
+            setSuccess("Calendar deleted successfully!");
+        }
+        catch (err) {
+            setError(err.message || "Failed to delete calendar");
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const handleToggleVisibility = (calendar) => {
+        handleUpdateCalendar(calendar, { isVisible: !calendar.isVisible });
+    };
+    const handleSetDefault = (calendar) => {
+        handleUpdateCalendar(calendar, { isDefault: true });
+    };
+    const handleImportICS = async () => {
+        if (!importFile || !importCalendarId)
+            return;
+        setLoading(true);
+        setError(null);
+        setImportResult(null);
+        try {
+            const fileContent = await importFile.text();
+            const response = await calendarApiService.importICS({
+                calendarId: importCalendarId,
+                icsContent: fileContent,
+                fileName: importFile.name,
+            });
+            setImportResult({
+                eventsCreated: response.eventsCreated,
+                eventsTotal: response.eventsTotal,
+                errors: response.errors,
+            });
+            if (response.eventsCreated > 0) {
+                setSuccess(`Successfully imported ${response.eventsCreated} events from ${importFile.name}`);
+                await refetchCalendars(); // Refresh data
+            }
+            // Don't close dialog immediately if there are errors to show
+            if (!response.errors || response.errors.length === 0) {
+                // Close dialog after a delay to let user see success message
+                setTimeout(() => {
+                    setShowImportDialog(false);
+                    setImportFile(null);
+                    setImportCalendarId("");
+                    setImportResult(null);
+                }, 2000);
+            }
+        }
+        catch (err) {
+            setError(err.message || "Failed to import ICS file");
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const handleFileSelect = (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.ics')) {
+                setError('Please select a valid .ics calendar file');
+                return;
+            }
+            setImportFile(file);
+            setError(null);
+        }
+    };
+    const availableTargetCalendars = calendars.filter((c) => c.id !== deletingCalendar?.id);
+    return (<>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Calendars</DialogTitle>
+            <DialogDescription>
+              Create, edit, and organize your calendars
+            </DialogDescription>
+          </DialogHeader>
+
+          {error && (<Alert variant="destructive">
+              <AlertCircle className="h-4 w-4"/>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>)}
+
+          {success && (<Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600"/>
+              <AlertDescription className="text-green-800">
+                {success}
+              </AlertDescription>
+            </Alert>)}
+
+          <div className="space-y-4">
+            {/* Create New Calendar */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Create New Calendar</span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => {
+            onOpenChange(false);
+            openCalendarManagement();
+        }} title="Calendar Settings">
+                      <Settings className="h-4 w-4"/>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+            setShowSubscriptionDialog(true);
+        }} title="Subscribe to external calendars">
+                      <ExternalLink className="h-4 w-4 mr-1"/>
+                      Subscriptions
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+            setShowImportDialog(true);
+            setError(null);
+            setSuccess(null);
+            setImportResult(null);
+        }} title="Import .ics file">
+                      <Upload className="h-4 w-4 mr-1"/>
+                      Import ICS
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+            setShowCreateForm(!showCreateForm);
+            // Clear errors when opening/closing form
+            setValidationErrors({});
+            setError(null);
+            setSuccess(null);
+        }}>
+                      <Plus className="h-4 w-4 mr-1"/>
+                      New Calendar
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              {showCreateForm && (<CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newCalendarName">Calendar Name</Label>
+                    <Input id="newCalendarName" value={newCalendar.name} onChange={(e) => {
+                setNewCalendar({
+                    ...newCalendar,
+                    name: e.target.value,
+                });
+                // Clear name error when user starts typing
+                if (validationErrors.name) {
+                    setValidationErrors({
+                        ...validationErrors,
+                        name: undefined,
+                    });
+                }
+            }} placeholder="Enter calendar name" className={validationErrors.name
+                ? "border-red-500 focus-visible:ring-red-500"
+                : ""}/>
+                    {validationErrors.name && (<p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3"/>
+                        {validationErrors.name}
+                      </p>)}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Color</Label>
+                    <ColorPicker value={newCalendar.color} onChange={(color) => {
+                setNewCalendar({
+                    ...newCalendar,
+                    color,
+                });
+                // Clear color error when user selects a new color
+                if (validationErrors.color) {
+                    setValidationErrors({
+                        ...validationErrors,
+                        color: undefined,
+                    });
+                }
+            }} presetColors={PRESET_COLORS}/>
+                    {validationErrors.color && (<p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3"/>
+                        {validationErrors.color}
+                      </p>)}
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch id="newCalendarDefault" checked={newCalendar.isDefault} onCheckedChange={(checked) => setNewCalendar({ ...newCalendar, isDefault: checked })}/>
+                    <Label htmlFor="newCalendarDefault">
+                      Set as default calendar
+                    </Label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button onClick={handleCreateCalendar} disabled={loading}>
+                      Create Calendar
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowCreateForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>)}
+            </Card>
+
+            {/* Existing Calendars */}
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Your Calendars</h3>
+              <div className="space-y-2">
+                {calendars.map((calendar) => (<Card key={calendar.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: calendar.color }}/>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">
+                                {calendar.name}
+                              </span>
+                              {calendar.isDefault && (<Badge variant="outline" className="text-xs">
+                                  <Star className="h-3 w-3 mr-1"/>
+                                  Default
+                                </Badge>)}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {calendar.isVisible ? "Visible" : "Hidden"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleVisibility(calendar)} title={calendar.isVisible
+                ? "Hide calendar"
+                : "Show calendar"}>
+                            {calendar.isVisible ? (<Eye className="h-4 w-4"/>) : (<EyeOff className="h-4 w-4"/>)}
+                          </Button>
+
+                          {!calendar.isDefault && (<Button variant="ghost" size="sm" onClick={() => handleSetDefault(calendar)} title="Set as default calendar">
+                              <Star className="h-4 w-4"/>
+                            </Button>)}
+
+                          <Button variant="ghost" size="sm" onClick={() => {
+                setEditingCalendar(calendar);
+                // Clear errors when opening edit dialog
+                setValidationErrors({});
+                setError(null);
+                setSuccess(null);
+            }} title="Edit calendar">
+                            <Edit className="h-4 w-4"/>
+                          </Button>
+
+                          <Button variant="ghost" size="sm" onClick={() => setDeletingCalendar(calendar)} title="Delete calendar" className="text-red-600 hover:text-red-700">
+                            <Trash2 className="h-4 w-4"/>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Calendar Dialog */}
+      <Dialog open={!!editingCalendar} onOpenChange={(open) => !open && setEditingCalendar(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Calendar</DialogTitle>
+          </DialogHeader>
+
+          {editingCalendar && (<div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="editCalendarName">Calendar Name</Label>
+                <Input id="editCalendarName" value={editingCalendar.name} onChange={(e) => {
+                setEditingCalendar({
+                    ...editingCalendar,
+                    name: e.target.value,
+                });
+                // Clear name error when user starts typing
+                if (validationErrors.name) {
+                    setValidationErrors({
+                        ...validationErrors,
+                        name: undefined,
+                    });
+                }
+            }} className={validationErrors.name
+                ? "border-red-500 focus-visible:ring-red-500"
+                : ""}/>
+                {validationErrors.name && (<p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3"/>
+                    {validationErrors.name}
+                  </p>)}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <ColorPicker value={editingCalendar.color} onChange={(color) => {
+                setEditingCalendar({
+                    ...editingCalendar,
+                    color,
+                });
+                // Clear color error when user selects a new color
+                if (validationErrors.color) {
+                    setValidationErrors({
+                        ...validationErrors,
+                        color: undefined,
+                    });
+                }
+            }} presetColors={PRESET_COLORS}/>
+                {validationErrors.color && (<p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3"/>
+                    {validationErrors.color}
+                  </p>)}
+              </div>
+            </div>)}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+            setEditingCalendar(null);
+            setValidationErrors({});
+            setError(null);
+        }}>
+              Cancel
+            </Button>
+            <Button onClick={async () => {
+            if (editingCalendar) {
+                const success = await handleUpdateCalendar(editingCalendar, {
+                    name: editingCalendar.name,
+                    color: editingCalendar.color,
+                });
+                // Only close dialog on successful update
+                if (success) {
+                    setEditingCalendar(null);
+                }
+            }
+        }} disabled={loading}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Calendar Dialog */}
+      <Dialog open={!!deletingCalendar} onOpenChange={(open) => !open && setDeletingCalendar(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600"/>
+              Delete Calendar
+            </DialogTitle>
+            <DialogDescription>
+              You're about to delete "{deletingCalendar?.name}". What would you
+              like to do with existing events?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <input type="radio" id="delete_events" name="deleteAction" value="delete_events" checked={deleteAction === "delete_events"} onChange={(e) => setDeleteAction(e.target.value)} className="mt-1"/>
+                <div className="space-y-1">
+                  <label htmlFor="delete_events" className="font-medium cursor-pointer">
+                    Delete calendar and all events (default)
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Permanently delete the calendar and all its events
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <input type="radio" id="move_events" name="deleteAction" value="move_events" checked={deleteAction === "move_events"} onChange={(e) => setDeleteAction(e.target.value)} className="mt-1"/>
+                <div className="space-y-1 flex-1">
+                  <label htmlFor="move_events" className="font-medium cursor-pointer">
+                    Move events to another calendar
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Transfer all events to a different calendar
+                  </p>
+                  {deleteAction === "move_events" && (<Select value={targetCalendarId} onValueChange={setTargetCalendarId}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Select target calendar"/>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTargetCalendars.map((calendar) => (<SelectItem key={calendar.id} value={calendar.id}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: calendar.color }}/>
+                              {calendar.name}
+                            </div>
+                          </SelectItem>))}
+                      </SelectContent>
+                    </Select>)}
+                </div>
+              </div>
+            </div>
+
+            {deleteAction === "move_events" && !targetCalendarId && (<Alert>
+                <AlertCircle className="h-4 w-4"/>
+                <AlertDescription>
+                  Please select a target calendar to move events to.
+                </AlertDescription>
+              </Alert>)}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingCalendar(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteCalendar} disabled={loading || (deleteAction === "move_events" && !targetCalendarId)}>
+              {loading ? "Deleting..." : "Delete Calendar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import ICS Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5"/>
+              Import ICS File
+            </DialogTitle>
+            <DialogDescription>
+              Import events from an .ics calendar file into one of your calendars
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="import-calendar">Select Calendar</Label>
+              <Select value={importCalendarId} onValueChange={setImportCalendarId}>
+                <SelectTrigger id="import-calendar">
+                  <SelectValue placeholder="Choose a calendar"/>
+                </SelectTrigger>
+                <SelectContent>
+                  {calendars.map((calendar) => (<SelectItem key={calendar.id} value={calendar.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: calendar.color }}/>
+                        {calendar.name}
+                      </div>
+                    </SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="import-file">Select ICS File</Label>
+              <div className="flex items-center gap-2">
+                <Input id="import-file" type="file" accept=".ics" onChange={handleFileSelect} className="cursor-pointer"/>
+              </div>
+              {importFile && (<p className="text-sm text-muted-foreground">
+                  Selected: {importFile.name}
+                </p>)}
+            </div>
+
+            {importResult && (<Alert className={importResult.errors?.length ? "border-yellow-200 bg-yellow-50" : "border-green-200 bg-green-50"}>
+                <CheckCircle className={`h-4 w-4 ${importResult.errors?.length ? "text-yellow-600" : "text-green-600"}`}/>
+                <AlertDescription className={importResult.errors?.length ? "text-yellow-800" : "text-green-800"}>
+                  <div className="space-y-1">
+                    <p>
+                      Imported {importResult.eventsCreated} out of {importResult.eventsTotal} events
+                    </p>
+                    {importResult.errors && importResult.errors.length > 0 && (<div className="text-sm">
+                        <p className="font-medium">Warnings:</p>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {importResult.errors.slice(0, 3).map((error, index) => (<li key={index}>{error}</li>))}
+                          {importResult.errors.length > 3 && (<li>...and {importResult.errors.length - 3} more</li>)}
+                        </ul>
+                      </div>)}
+                  </div>
+                </AlertDescription>
+              </Alert>)}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+            setShowImportDialog(false);
+            setImportFile(null);
+            setImportCalendarId("");
+            setImportResult(null);
+            setError(null);
+        }}>
+              Cancel
+            </Button>
+            <Button onClick={handleImportICS} disabled={loading || !importFile || !importCalendarId}>
+              {loading ? "Importing..." : "Import Events"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subscription Management Dialog */}
+      <SubscriptionManagement open={showSubscriptionDialog} onOpenChange={setShowSubscriptionDialog}/>
+    </>);
+}

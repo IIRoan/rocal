@@ -10,7 +10,6 @@ import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
 import { errorHandler } from "./lib/errors";
-import { EnhancedNotificationService } from "./lib/enhanced-notification-service";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 
 // Better Auth middleware following the documentation pattern
@@ -35,10 +34,6 @@ const betterAuth = new Elysia({ name: "better-auth" })
 
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix });
-
-  // Initialize Enhanced notification service
-  const enhancedNotificationService = EnhancedNotificationService.getInstance();
-  enhancedNotificationService.start();
 
   // Initialize Calendar sync service
   const calendarSyncService = CalendarSyncService.getInstance();

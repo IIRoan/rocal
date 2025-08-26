@@ -3,8 +3,7 @@ import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
 import { ensureUserCalendars } from "../lib/user-setup";
 import { RecurrenceEngine } from "../lib/recurrence";
-import { EnhancedNotificationService } from "../lib/enhanced-notification-service";
-import type { NotificationConfig } from "../lib/notification-calculator";
+import { NotificationCalculator } from "../lib/notification-calculator";
 
 export const eventsRoutes = new Elysia({ prefix: "/events" })
   .get(
@@ -581,70 +580,39 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           },
         });
 
-        // Create notifications using enhanced notification service
+        // Create notifications directly in database
         try {
-          const enhancedNotificationService =
-            EnhancedNotificationService.getInstance();
-
-          // Create notification configurations based on reminder setting
-          const notificationConfigs: NotificationConfig[] = [];
-
           if (body.reminder && body.reminder > 0) {
-            // Create email notification if user has email notifications enabled
+            // Check if user has email notifications enabled
             const userSettings = await prisma.userSettings.findUnique({
               where: { userId: user.id },
             });
 
             if (userSettings?.emailNotifications !== false) {
-              notificationConfigs.push({
-                notificationType: "email",
-                minutesBefore: body.reminder,
-                isEnabled: true,
+              // Calculate notification time
+              const { NotificationCalculator } = await import("../lib/notification-calculator");
+              const notificationTime = NotificationCalculator.calculateNotificationTime(
+                startDate,
+                body.reminder
+              );
+
+              // Create notification record
+              await prisma.eventNotification.create({
+                data: {
+                  eventId: event.id,
+                  notificationType: "email",
+                  notificationTime,
+                  minutesBefore: body.reminder,
+                  isSent: false,
+                },
               });
-            }
-          }
 
-          // Create notifications for the event
-          if (notificationConfigs.length > 0) {
-            let result;
-            
-            if (body.recurrence) {
-              // For recurring events, create notifications for multiple occurrences
-              const endDate = new Date(startDate);
-              endDate.setFullYear(endDate.getFullYear() + 2); // Generate 2 years ahead
-              
-              result = await enhancedNotificationService.createNotificationsForRecurringEvent(
-                event.id,
-                notificationConfigs,
-                startDate,
-                endDate
-              );
-              
-              console.log(
-                `✓ Created ${result.created.length} notifications for recurring event ${event.id}` +
-                  (result.skipped.length > 0
-                    ? `, skipped ${result.skipped.length}`
-                    : "")
-              );
-            } else {
-              // Single event notification
-              result = await enhancedNotificationService.createNotificationsForEvent(
-                event.id,
-                startDate,
-                notificationConfigs
-              );
-
-              console.log(
-                `✓ Created ${result.created.length} notifications for event ${event.id}` +
-                  (result.skipped.length > 0
-                    ? `, skipped ${result.skipped.length}`
-                    : "")
-              );
+              console.log(`✓ Created notification for event ${event.id}`);
             }
           }
         } catch (notificationError) {
           console.error(
-            "Failed to create notifications with enhanced service:",
+            "Failed to create notifications:",
             notificationError
           );
           // Don't fail the event creation if notifications fail
@@ -1025,16 +993,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         // Update notifications if event time or reminder changed
         try {
-          const enhancedNotificationService =
-            EnhancedNotificationService.getInstance();
-
           // Check if we need to update notifications
           const timeChanged = startDate || endDate;
           const reminderChanged = body.reminder !== undefined;
 
           if (timeChanged || reminderChanged) {
             // Get current notification configurations or create from reminder
-            let notificationConfigs: NotificationConfig[] = [];
+            let notificationConfigs: { notificationType: "email" | "browser"; minutesBefore: number; isEnabled: boolean; }[] = [];
 
             // If reminder was updated, use the new reminder value
             if (reminderChanged) {
@@ -1068,20 +1033,35 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               }));
             }
 
-            // Update notifications with new event time
-            const result =
-              await enhancedNotificationService.updateNotificationsForEvent(
-                id,
-                finalStartDate,
-                notificationConfigs
-              );
+            // Update notifications with direct database operations
+            // First, delete existing notifications
+            await prisma.eventNotification.deleteMany({
+              where: { eventId: id },
+            });
 
-            console.log(
-              `✓ Updated ${result.created.length} notifications for event ${id}` +
-                (result.skipped.length > 0
-                  ? `, skipped ${result.skipped.length}`
-                  : "")
-            );
+            // Create new notifications based on configurations
+            if (notificationConfigs.length > 0) {
+              const { NotificationCalculator } = await import("../lib/notification-calculator");
+              
+              for (const config of notificationConfigs) {
+                const notificationTime = NotificationCalculator.calculateNotificationTime(
+                  finalStartDate,
+                  config.minutesBefore
+                );
+
+                await prisma.eventNotification.create({
+                  data: {
+                    eventId: id,
+                    notificationType: config.notificationType,
+                    notificationTime,
+                    minutesBefore: config.minutesBefore,
+                    isSent: false,
+                  },
+                });
+              }
+            }
+
+            console.log(`✓ Updated notifications for event ${id}`);
           }
         } catch (notificationError) {
           console.error(
@@ -1266,25 +1246,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           throw new ValidationError("Cannot delete synced events. Synced events are read-only.");
         }
 
-        // Clean up associated notifications using enhanced notification service
-        try {
-          const enhancedNotificationService =
-            EnhancedNotificationService.getInstance();
-          const deletedCount =
-            await enhancedNotificationService.deleteNotificationsForEvent(id);
-          console.log(
-            `✓ Deleted ${deletedCount} notifications for event ${id}`
-          );
-        } catch (notificationError) {
-          console.error(
-            "Failed to delete notifications with enhanced service:",
-            notificationError
-          );
-          // Fallback to direct database cleanup
-          await prisma.eventNotification.deleteMany({
-            where: { eventId: id },
-          });
-        }
+        // Clean up associated notifications
+        const deletedNotifications = await prisma.eventNotification.deleteMany({
+          where: { eventId: id },
+        });
+        console.log(
+          `✓ Deleted ${deletedNotifications.count} notifications for event ${id}`
+        );
 
         // Clean up notification logs
         await prisma.notificationLog.deleteMany({
@@ -1430,33 +1398,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             };
 
           case "delete":
-            // Clean up associated notifications using enhanced notification service
-            try {
-              const enhancedNotificationService =
-                EnhancedNotificationService.getInstance();
-              let totalDeletedNotifications = 0;
-
-              for (const eventId of eventIds) {
-                const deletedCount =
-                  await enhancedNotificationService.deleteNotificationsForEvent(
-                    eventId
-                  );
-                totalDeletedNotifications += deletedCount;
-              }
-
-              console.log(
-                `✓ Deleted ${totalDeletedNotifications} notifications for ${eventIds.length} events`
-              );
-            } catch (notificationError) {
-              console.error(
-                "Failed to delete notifications with enhanced service:",
-                notificationError
-              );
-              // Fallback to direct database cleanup
-              await prisma.eventNotification.deleteMany({
-                where: { eventId: { in: eventIds } },
-              });
-            }
+            // Clean up associated notifications
+            const deletedNotifications = await prisma.eventNotification.deleteMany({
+              where: { eventId: { in: eventIds } },
+            });
+            console.log(
+              `✓ Deleted ${deletedNotifications.count} notifications for ${eventIds.length} events`
+            );
 
             // Clean up notification logs
             await prisma.notificationLog.deleteMany({
@@ -1504,14 +1452,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                 },
               });
 
-              // Create notifications for the duplicated event using enhanced service
+              // Create notifications for the duplicated event using direct database operations
               try {
-                const enhancedNotificationService =
-                  EnhancedNotificationService.getInstance();
-
-                // Create notification configurations based on original event's reminder
-                const notificationConfigs: NotificationConfig[] = [];
-
                 if (event.reminder && event.reminder > 0) {
                   // Get user settings to check if email notifications are enabled
                   const userSettings = await prisma.userSettings.findUnique({
@@ -1519,30 +1461,31 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                   });
 
                   if (userSettings?.emailNotifications !== false) {
-                    notificationConfigs.push({
-                      notificationType: "email",
-                      minutesBefore: event.reminder,
-                      isEnabled: true,
-                    });
-                  }
-                }
-
-                // Create notifications for the duplicated event
-                if (notificationConfigs.length > 0) {
-                  const result =
-                    await enhancedNotificationService.createNotificationsForEvent(
-                      duplicated.id,
+                    const { NotificationCalculator } = await import("../lib/notification-calculator");
+                    
+                    const notificationTime = NotificationCalculator.calculateNotificationTime(
                       duplicated.start,
-                      notificationConfigs
+                      event.reminder
                     );
 
-                  console.log(
-                    `✓ Created ${result.created.length} notifications for duplicated event ${duplicated.id}`
-                  );
+                    await prisma.eventNotification.create({
+                      data: {
+                        eventId: duplicated.id,
+                        notificationType: "email",
+                        notificationTime,
+                        minutesBefore: event.reminder,
+                        isSent: false,
+                      },
+                    });
+
+                    console.log(
+                      `✓ Created notification for duplicated event ${duplicated.id}`
+                    );
+                  }
                 }
               } catch (notificationError) {
                 console.error(
-                  "Failed to create notifications for duplicated event with enhanced service:",
+                  "Failed to create notifications for duplicated event:",
                   notificationError
                 );
                 // Don't fail the duplication if notifications fail
