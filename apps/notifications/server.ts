@@ -9,6 +9,7 @@ import { PrismaClient } from "@prisma/client";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as dotenv from "dotenv";
+import { EventReminderEmail } from "./emails/templates/event-reminder.tsx";
 
 // Load environment variables
 const envResult = dotenv.config();
@@ -485,46 +486,25 @@ class NotificationServer {
    * Render email template
    */
   private async renderEmailTemplate(event: any, user: any, formattedDetails: any): Promise<string> {
-    // Simple HTML template since we can't import React components easily
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Event Reminder</title>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-            .event-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-            .event-time { font-size: 18px; color: #666; }
-            .reminder-text { background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 20px 0; }
-            .event-details { background: #f5f5f5; padding: 15px; border-radius: 6px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="event-title">${event.title}</div>
-              <div class="event-time">${formattedDetails.formattedStartTime}</div>
-            </div>
-            
-            <div class="reminder-text">
-              <strong>Reminder:</strong> ${formattedDetails.reminderText}
-            </div>
-            
-            <div class="event-details">
-              <h3>Event Details</h3>
-              <p><strong>Start:</strong> ${formattedDetails.formattedStartTime}</p>
-              <p><strong>End:</strong> ${formattedDetails.formattedEndTime}</p>
-              ${event.description ? `<p><strong>Description:</strong> ${event.description}</p>` : ""}
-              ${event.location ? `<p><strong>Location:</strong> ${event.location}</p>` : ""}
-              ${formattedDetails.duration ? `<p><strong>Duration:</strong> ${formattedDetails.duration}</p>` : ""}
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+    const userSettings = user.settings;
+    
+    return await render(
+      EventReminderEmail({
+        eventTitle: event.title,
+        eventDate: formattedDetails.formattedStartTime.split(' at ')[0] || formattedDetails.formattedStartTime,
+        eventTime: formattedDetails.formattedStartTime.split(' at ')[1] || formattedDetails.formattedStartTime,
+        eventLocation: event.location,
+        categoryName: event.category?.name,
+        categoryColor: event.category?.color || 'blue',
+        description: event.description,
+        timeUntilEvent: formattedDetails.reminderText.replace('Your event starts ', '').replace('Your event is starting now!', 'now'),
+        duration: formattedDetails.duration,
+        reminderText: formattedDetails.reminderText,
+        userName: user.name || user.email?.split('@')[0],
+        userEmail: user.email,
+        userTheme: userSettings?.theme || 'light',
+      })
+    );
   }
 
   /**
