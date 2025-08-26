@@ -40,6 +40,7 @@ COPY --from=builder --chown=notifications:nodejs /app/node_modules ./node_module
 COPY --from=builder --chown=notifications:nodejs /app/server.ts ./
 COPY --from=builder --chown=notifications:nodejs /app/package.json ./
 COPY --from=builder --chown=notifications:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=notifications:nodejs /app/emails ./emails
 
 # Set correct permissions
 RUN chown -R notifications:nodejs /app

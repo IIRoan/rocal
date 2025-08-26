@@ -15,7 +15,8 @@
     "jsx": "react-jsx"
   },
   "include": [
-    "server.ts"
+    "server.ts",
+    "emails/**/*"
   ],
   "exclude": [
     "node_modules"
