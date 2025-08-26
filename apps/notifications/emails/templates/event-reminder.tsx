@@ -8,6 +8,7 @@ import {
   Section,
   Text,
   Font,
+  Img,
 } from "@react-email/components";
 import * as React from "react";
 
@@ -49,54 +50,58 @@ export const EventReminderEmail = ({
 
   const colors = isDark
     ? {
-        background: "#1C1C1C",
-        foreground: "#F5F5F5",
-        card: "#1F1F1F",
-        cardForeground: "#F5F5F5",
-        primary: "#FFFFFF",
-        primaryForeground: "#1C1C1C",
-        secondary: "#2A2A2A",
-        secondaryForeground: "#EDEDED",
-        muted: "#262626",
-        mutedForeground: "#A3A3A3",
-        accent: "#9CA3AF",
-        accentForeground: "#111827",
-        border: "#2F2F2F",
-        ring: "#A3A3A3",
+        background: "#0C0A09",
+        foreground: "#FAFAF9",
+        card: "#1C1917",
+        cardForeground: "#FAFAF9",
+        primary: "#FAFAF9",
+        primaryForeground: "#0C0A09",
+        secondary: "#292524",
+        secondaryForeground: "#FAFAF9",
+        muted: "#292524",
+        mutedForeground: "#A8A29E",
+        accent: "#292524",
+        accentForeground: "#FAFAF9",
+        border: "#44403C",
+        ring: "#D6D3D1",
+        calendarAccent: "#3B82F6",
+        logoFill: "#FAFAF9",
       }
     : {
-        background: "#FAFAFA",
-        foreground: "#111827",
+        background: "#FFFFFF",
+        foreground: "#0C0A09",
         card: "#FFFFFF",
-        cardForeground: "#111827",
-        primary: "#111827",
-        primaryForeground: "#FFFFFF",
-        secondary: "#F3F4F6",
-        secondaryForeground: "#111827",
-        muted: "#F3F4F6",
-        mutedForeground: "#6B7280",
-        accent: "#6B7280",
-        accentForeground: "#FFFFFF",
-        border: "#E5E7EB",
-        ring: "#6B7280",
+        cardForeground: "#0C0A09",
+        primary: "#0C0A09",
+        primaryForeground: "#FAFAF9",
+        secondary: "#F5F5F4",
+        secondaryForeground: "#0C0A09",
+        muted: "#F5F5F4",
+        mutedForeground: "#78716C",
+        accent: "#F5F5F4",
+        accentForeground: "#0C0A09",
+        border: "#E7E5E4",
+        ring: "#D6D3D1",
+        calendarAccent: "#3B82F6",
+        logoFill: "#0C0A09",
       };
-
   // Resolve category accent to a hex color (supports hex and named variants)
   const getCategoryAccentColor = (color: string | undefined): string => {
-    if (!color) return colors.accent;
+    if (!color) return colors.calendarAccent;
     const c = color.toLowerCase();
     if (c.startsWith("#")) return c; // already a hex
 
+    // Updated color mapping to match app's event colors
     const map: Record<string, string> = {
       sky: "#0EA5E9",
-      blue: "#0EA5E9",
+      blue: "#3B82F6",
       azure: "#0EA5E9",
-      orange: "#F59E0B",
+      orange: "#F97316",
       amber: "#F59E0B",
-      violet: "#7C3AED",
-      purple: "#7C3AED",
-      rose: "#E11D48",
-      pink: "#E11D48",
+      violet: "#8B5CF6",
+      purple: "#8B5CF6",
+      rose: "#F43F5E",
+      pink: "#EC4899",
       emerald: "#10B981",
       green: "#10B981",
       default: "#0EA5E9",
@@ -180,26 +185,38 @@ export const EventReminderEmail = ({
           <Section
             style={{
               textAlign: "center",
-              padding: "28px 24px 20px",
+              padding: "32px 24px 24px",
               borderBottom: `1px solid ${colors.border}`,
+              backgroundColor: colors.card,
             }}
           >
-            <Heading
+            <div
               style={{
-                fontSize: "22px",
-                fontWeight: 700,
-                color: colors.primary,
-                margin: "0 0 6px 0",
-                letterSpacing: "0.2px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "12px",
+                marginBottom: "8px",
               }}
             >
-              📅 Rocal Calendar
-            </Heading>
+              <Heading
+                style={{
+                  fontSize: "24px",
+                  fontWeight: 700,
+                  color: colors.primary,
+                  margin: 0,
+                  letterSpacing: "-0.025em",
+                }}
+              >
+                Rocal
+              </Heading>
+            </div>
             <Text
               style={{
                 color: colors.mutedForeground,
                 fontSize: "14px",
                 margin: 0,
+                fontWeight: 500,
               }}
             >
               Event Reminder
