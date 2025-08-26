@@ -7,9 +7,7 @@ import {
   Preview,
   Section,
   Text,
-  Hr,
   Font,
-  Tailwind,
 } from "@react-email/components";
 import * as React from "react";
 
@@ -27,6 +25,8 @@ interface EventReminderEmailProps {
   userName?: string;
   userEmail?: string;
   userTheme?: "light" | "dark" | "system";
+  // Optional deep link to view the event in the app
+  calendarUrl?: string;
 }
 
 export const EventReminderEmail = ({
@@ -43,53 +43,106 @@ export const EventReminderEmail = ({
   userName,
   userEmail,
   userTheme = "light",
+  calendarUrl,
 }: EventReminderEmailProps) => {
   const isDark = userTheme === "dark";
 
   const colors = isDark
     ? {
-        background: "#2A2A2A",
-        foreground: "#F0F0F0",
-        card: "#2A2A2A",
-        cardForeground: "#F0F0F0",
-        primary: "#E0E0E0",
-        primaryForeground: "#2A2A2A",
-        secondary: "#3A3A3A",
-        secondaryForeground: "#F0F0F0",
-        muted: "#3A3A3A",
-        mutedForeground: "#A0A0A0",
-        accent: "#A0A0A0",
-        accentForeground: "#1A1A1A",
-        border: "#3A3A3A",
-        ring: "#A0A0A0",
+        background: "#1C1C1C",
+        foreground: "#F5F5F5",
+        card: "#1F1F1F",
+        cardForeground: "#F5F5F5",
+        primary: "#FFFFFF",
+        primaryForeground: "#1C1C1C",
+        secondary: "#2A2A2A",
+        secondaryForeground: "#EDEDED",
+        muted: "#262626",
+        mutedForeground: "#A3A3A3",
+        accent: "#9CA3AF",
+        accentForeground: "#111827",
+        border: "#2F2F2F",
+        ring: "#A3A3A3",
       }
     : {
-        background: "#FEFEFE",
-        foreground: "#1A1A1A",
-        card: "#FEFEFE",
-        cardForeground: "#1A1A1A",
-        primary: "#1A1A1A",
-        primaryForeground: "#FAFAFA",
-        secondary: "#F0F0F0",
-        secondaryForeground: "#1A1A1A",
-        muted: "#F0F0F0",
-        mutedForeground: "#808080",
-        accent: "#808080",
-        accentForeground: "#FAFAFA",
-        border: "#F0F0F0",
-        ring: "#808080",
+        background: "#FAFAFA",
+        foreground: "#111827",
+        card: "#FFFFFF",
+        cardForeground: "#111827",
+        primary: "#111827",
+        primaryForeground: "#FFFFFF",
+        secondary: "#F3F4F6",
+        secondaryForeground: "#111827",
+        muted: "#F3F4F6",
+        mutedForeground: "#6B7280",
+        accent: "#6B7280",
+        accentForeground: "#FFFFFF",
+        border: "#E5E7EB",
+        ring: "#6B7280",
       };
 
-  const getCategoryAccentColor = (color: string) => {
-    const colorMap: Record<string, string> = {
-      blue: isDark ? "#3B82F6" : "#2563EB",
-      orange: isDark ? "#F97316" : "#EA580C",
-      violet: isDark ? "#8B5CF6" : "#7C3AED",
-      rose: isDark ? "#F43F5E" : "#E11D48",
-      emerald: isDark ? "#10B981" : "#059669",
+  // Resolve category accent to a hex color (supports hex and named variants)
+  const getCategoryAccentColor = (color: string | undefined): string => {
+    if (!color) return colors.accent;
+    const c = color.toLowerCase();
+    if (c.startsWith("#")) return c; // already a hex
+
+    const map: Record<string, string> = {
+      sky: "#0EA5E9",
+      blue: "#0EA5E9",
+      azure: "#0EA5E9",
+      orange: "#F59E0B",
+      amber: "#F59E0B",
+      violet: "#7C3AED",
+      purple: "#7C3AED",
+      rose: "#E11D48",
+      pink: "#E11D48",
+      emerald: "#10B981",
+      green: "#10B981",
+      default: "#0EA5E9",
     };
-    return colorMap[color] || colors.accent;
+    return map[c] || colors.accent;
   };
+
+  // Derive a subtle translucent background for accent chips (12.5% opacity)
+  const withAlpha20 = (hex: string): string => {
+    if (!hex.startsWith("#")) return `${colors.accent}20`;
+    // Normalize #RGB to #RRGGBB
+    const normalized = hex.length === 4
+      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+      : hex;
+    return `${normalized}20`;
+  };
+
+  // Extract month/day from eventDate for a mini calendar badge
+  const parseMonthDay = (
+    dateStr: string,
+  ): { month: string; day: string } | null => {
+    try {
+      const d = new Date(dateStr);
+      if (!Number.isNaN(d.getTime())) {
+        return {
+          month: d
+            .toLocaleString("en-US", { month: "short" })
+            .toUpperCase(),
+          day: String(d.getDate()).padStart(2, "0"),
+        };
+      }
+    } catch (_) {
+      // ignore
+    }
+    const match = dateStr.match(/([A-Za-z]+)\s+(\d{1,2})/);
+    if (match) {
+      return {
+        month: match[1].slice(0, 3).toUpperCase(),
+        day: match[2].padStart(2, "0"),
+      };
+    }
+    return null;
+  };
+
+  const accent = getCategoryAccentColor(categoryColor);
+  const dateParts = parseMonthDay(eventDate);
 
   return (
     <Html>
@@ -98,7 +151,7 @@ export const EventReminderEmail = ({
           fontFamily="Inter"
           fallbackFontFamily="Arial"
           webFont={{
-            url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+            url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
             format: "woff2",
           }}
           fontWeight={400}
@@ -127,25 +180,26 @@ export const EventReminderEmail = ({
           <Section
             style={{
               textAlign: "center",
-              padding: "32px 24px 24px",
+              padding: "28px 24px 20px",
               borderBottom: `1px solid ${colors.border}`,
             }}
           >
             <Heading
               style={{
-                fontSize: "24px",
-                fontWeight: "600",
+                fontSize: "22px",
+                fontWeight: 700,
                 color: colors.primary,
-                margin: "0 0 8px 0",
+                margin: "0 0 6px 0",
+                letterSpacing: "0.2px",
               }}
             >
-              📅 Rocani
+              📅 Rocal Calendar
             </Heading>
             <Text
               style={{
                 color: colors.mutedForeground,
                 fontSize: "14px",
-                margin: "0 0 4px 0",
+                margin: 0,
               }}
             >
               Event Reminder
@@ -153,10 +207,14 @@ export const EventReminderEmail = ({
             {reminderText && (
               <Text
                 style={{
-                  color: colors.accent,
+                  display: "inline-block",
+                  backgroundColor: withAlpha20(accent),
+                  color: accent,
+                  padding: "6px 10px",
+                  borderRadius: 999,
                   fontSize: "12px",
-                  fontWeight: "500",
-                  margin: 0,
+                  fontWeight: 600,
+                  marginTop: 10,
                 }}
               >
                 {reminderText}
@@ -165,113 +223,157 @@ export const EventReminderEmail = ({
           </Section>
 
           {/* Content */}
-          <Section style={{ padding: "32px 24px" }}>
+          <Section style={{ padding: "28px 24px" }}>
             {/* Event Card */}
             <Section
               style={{
                 backgroundColor: colors.card,
                 border: `1px solid ${colors.border}`,
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
+                borderRadius: 12,
+                padding: 24,
+                marginBottom: 20,
                 boxShadow:
-                  "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+                  "0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)",
               }}
             >
               {/* Event Header */}
               <Section
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: "12px",
-                  marginBottom: "16px",
+                  alignItems: "center",
+                  gap: 14,
+                  marginBottom: 14,
                 }}
               >
-                <div
-                  style={{
-                    width: "4px",
-                    height: "48px",
-                    backgroundColor: getCategoryAccentColor(categoryColor),
-                    borderRadius: "2px",
-                    flexShrink: 0,
-                  }}
-                />
-                <Section>
+                {/* Date Badge */}
+                {dateParts && (
+                  <div
+                    style={{
+                      width: 64,
+                      borderRadius: 12,
+                      border: `1px solid ${colors.border}`,
+                      overflow: "hidden",
+                      textAlign: "center",
+                      backgroundColor: colors.secondary,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: accent,
+                        color: "#FFFFFF",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "6px 0",
+                        letterSpacing: 0.6,
+                      }}
+                    >
+                      {dateParts.month}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 26,
+                        fontWeight: 700,
+                        color: colors.cardForeground,
+                        padding: "8px 0",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {dateParts.day}
+                    </div>
+                  </div>
+                )}
+
+                {/* Title & Meta */}
+                <Section style={{ flex: 1 }}>
                   <Heading
                     style={{
-                      fontSize: "20px",
-                      fontWeight: "600",
+                      fontSize: 20,
+                      fontWeight: 700,
                       color: colors.cardForeground,
-                      margin: "0 0 4px 0",
+                      margin: "0 0 6px 0",
                     }}
                   >
                     {eventTitle}
                   </Heading>
-                  <Text
-                    style={{
-                      display: "inline-block",
-                      backgroundColor: `${colors.accent}20`,
-                      color: colors.accent,
-                      padding: "4px 8px",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.025em",
-                      margin: 0,
-                    }}
-                  >
-                    Starting {timeUntilEvent}
-                  </Text>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        backgroundColor: withAlpha20(accent),
+                        color: accent,
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      Starting {timeUntilEvent}
+                    </span>
+                    {categoryName && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          backgroundColor: withAlpha20(accent),
+                          color: accent,
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          letterSpacing: 0.2,
+                        }}
+                      >
+                        {categoryName}
+                      </span>
+                    )}
+                  </div>
                 </Section>
               </Section>
 
               {/* Event Details */}
-              <Section style={{ marginTop: "16px" }}>
+              <Section style={{ marginTop: 8 }}>
                 <Section
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "8px",
-                    fontSize: "14px",
+                    gap: 8,
+                    marginBottom: 8,
+                    fontSize: 14,
                   }}
                 >
                   <span
                     style={{
-                      fontWeight: "500",
+                      fontWeight: 600,
                       color: colors.cardForeground,
-                      minWidth: "60px",
+                      minWidth: 64,
                     }}
                   >
                     Date:
                   </span>
-                  <span style={{ color: colors.mutedForeground }}>
-                    {eventDate}
-                  </span>
+                  <span style={{ color: colors.mutedForeground }}>{eventDate}</span>
                 </Section>
 
                 <Section
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "8px",
-                    fontSize: "14px",
+                    gap: 8,
+                    marginBottom: 8,
+                    fontSize: 14,
                   }}
                 >
                   <span
                     style={{
-                      fontWeight: "500",
+                      fontWeight: 600,
                       color: colors.cardForeground,
-                      minWidth: "60px",
+                      minWidth: 64,
                     }}
                   >
                     Time:
                   </span>
-                  <span style={{ color: colors.mutedForeground }}>
-                    {eventTime}
-                  </span>
+                  <span style={{ color: colors.mutedForeground }}>{eventTime}</span>
                 </Section>
 
                 {eventLocation && (
@@ -279,16 +381,16 @@ export const EventReminderEmail = ({
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "8px",
-                      fontSize: "14px",
+                      gap: 8,
+                      marginBottom: 8,
+                      fontSize: 14,
                     }}
                   >
                     <span
                       style={{
-                        fontWeight: "500",
+                        fontWeight: 600,
                         color: colors.cardForeground,
-                        minWidth: "60px",
+                        minWidth: 64,
                       }}
                     >
                       Location:
@@ -304,47 +406,22 @@ export const EventReminderEmail = ({
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "8px",
-                      fontSize: "14px",
+                      gap: 8,
+                      marginBottom: 8,
+                      fontSize: 14,
                     }}
                   >
                     <span
                       style={{
-                        fontWeight: "500",
+                        fontWeight: 600,
                         color: colors.cardForeground,
-                        minWidth: "60px",
+                        minWidth: 64,
                       }}
                     >
                       Duration:
                     </span>
                     <span style={{ color: colors.mutedForeground }}>
                       {duration}
-                    </span>
-                  </Section>
-                )}
-
-                {categoryName && (
-                  <Section
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "8px",
-                      fontSize: "14px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: "500",
-                        color: colors.cardForeground,
-                        minWidth: "60px",
-                      }}
-                    >
-                      Category:
-                    </span>
-                    <span style={{ color: colors.mutedForeground }}>
-                      {categoryName}
                     </span>
                   </Section>
                 )}
@@ -355,12 +432,12 @@ export const EventReminderEmail = ({
                 <Section
                   style={{
                     backgroundColor: colors.muted,
-                    padding: "12px",
-                    borderRadius: "8px",
-                    marginTop: "12px",
-                    fontSize: "14px",
+                    padding: 12,
+                    borderRadius: 10,
+                    marginTop: 10,
+                    fontSize: 14,
                     color: colors.mutedForeground,
-                    lineHeight: "1.4",
+                    lineHeight: 1.5,
                   }}
                 >
                   <Text style={{ margin: 0, whiteSpace: "pre-wrap" }}>
@@ -369,12 +446,35 @@ export const EventReminderEmail = ({
                 </Section>
               )}
             </Section>
+
+            {/* CTA */}
+            {calendarUrl && (
+              <Section style={{ textAlign: "center", marginTop: 4 }}>
+                <a
+                  href={calendarUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-block",
+                    backgroundColor: accent,
+                    color: "#FFFFFF",
+                    padding: "10px 16px",
+                    borderRadius: 10,
+                    fontWeight: 600,
+                    fontSize: 14,
+                    textDecoration: "none",
+                  }}
+                >
+                  Open in Calendar
+                </a>
+              </Section>
+            )}
           </Section>
 
           {/* Footer */}
           <Section
             style={{
-              padding: "24px",
+              padding: 24,
               borderTop: `1px solid ${colors.border}`,
               textAlign: "center",
             }}
@@ -382,9 +482,9 @@ export const EventReminderEmail = ({
             {userName && (
               <Text
                 style={{
-                  fontSize: "14px",
+                  fontSize: 14,
                   color: colors.cardForeground,
-                  margin: "0 0 12px 0",
+                  margin: "0 0 10px 0",
                 }}
               >
                 Hi {userName}! 👋
@@ -392,22 +492,20 @@ export const EventReminderEmail = ({
             )}
             <Text
               style={{
-                fontSize: "12px",
+                fontSize: 12,
                 color: colors.mutedForeground,
-                lineHeight: "1.4",
+                lineHeight: 1.5,
                 margin: 0,
               }}
             >
-              This reminder was sent because you have email notifications
-              enabled.
+              You’re receiving this because event notifications are enabled.
               <br />
-              You can manage your notification preferences in your calendar
-              settings.
+              Manage your preferences any time in Calendar settings.
             </Text>
             {userEmail && (
               <Text
                 style={{
-                  fontSize: "11px",
+                  fontSize: 11,
                   color: colors.mutedForeground,
                   margin: "8px 0 0 0",
                   opacity: 0.7,
