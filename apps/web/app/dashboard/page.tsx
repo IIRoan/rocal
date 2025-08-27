@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 import { AppSidebar } from "@workspace/ui/components/layout";
 import { MobileCalendarWrapper } from "@workspace/ui/components";
 import { 
@@ -211,6 +212,7 @@ function MobileLayoutContent() {
 
 function DashboardContent() {
   const { data: session, isPending } = useSession();
+  const router = useRouter();
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
     useCommandPalette();
   const handleLogout = async () => {
@@ -222,6 +224,13 @@ function DashboardContent() {
       console.error("Logout failed:", error);
     }
   };
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isPending && !session?.user) {
+      router.replace("/login");
+    }
+  }, [isPending, session?.user, router]);
 
   if (isPending) {
     return (
@@ -238,17 +247,14 @@ function DashboardContent() {
 
   if (!session?.user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Not authenticated</h1>
-          <a
-            href="/login"
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Go to Login
-          </a>
-        </div>
-      </div>
+      <>
+        <DashboardSkeleton />
+        <PageLoadingOverlay 
+          isLoading={true} 
+          messageContext="AUTH_FLOW"
+          enableCycling={true}
+        />
+      </>
     );
   }
 
