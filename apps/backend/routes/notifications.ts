@@ -308,26 +308,77 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           where: { eventId },
         });
 
-        // Create new notifications
-        const createdNotifications = [];
-        for (const config of notifications) {
-          if (config.isEnabled) {
-            const notificationTime = new Date(
-              event.start.getTime() - config.minutesBefore * 60 * 1000
-            );
-            
-            const notification = await prisma.eventNotification.create({
-              data: {
-                eventId,
-                notificationType: config.notificationType,
-                minutesBefore: config.minutesBefore,
-                notificationTime,
-                isEnabled: config.isEnabled,
-                isSent: false,
+        // Create new notifications, but skip any that would be in the past or for past events
+        const createdNotifications = [] as Array<{
+          id: string;
+          notificationType: string;
+          minutesBefore: number;
+          notificationTime: Date;
+          isEnabled: boolean;
+        }>;
+        const skippedConfigurations: Array<{
+          notificationType: string;
+          minutesBefore: number;
+          reason: string;
+        }> = [];
+
+        const now = new Date();
+        const eventIsInPast = event.start <= now;
+
+        if (eventIsInPast) {
+          // Entirely skip creating notifications for past events
+          return {
+            success: true,
+            message: "Event is in the past; notifications skipped",
+            data: {
+              eventId,
+              created: 0,
+              skipped: notifications.length,
+              details: {
+                createdNotifications: [],
+                skippedConfigurations: notifications.map((n) => ({
+                  notificationType: n.notificationType,
+                  minutesBefore: n.minutesBefore,
+                  reason: "event_in_past",
+                })),
               },
+            },
+          };
+        }
+
+        for (const config of notifications) {
+          if (!config.isEnabled) {
+            skippedConfigurations.push({
+              notificationType: config.notificationType,
+              minutesBefore: config.minutesBefore,
+              reason: "disabled",
             });
-            createdNotifications.push(notification);
+            continue;
           }
+
+          const notificationTime = new Date(
+            event.start.getTime() - config.minutesBefore * 60 * 1000,
+          );
+          if (notificationTime <= now) {
+            skippedConfigurations.push({
+              notificationType: config.notificationType,
+              minutesBefore: config.minutesBefore,
+              reason: "notification_time_in_past",
+            });
+            continue;
+          }
+
+          const notification = await prisma.eventNotification.create({
+            data: {
+              eventId,
+              notificationType: config.notificationType,
+              minutesBefore: config.minutesBefore,
+              notificationTime,
+              isEnabled: true,
+              isSent: false,
+            },
+          });
+          createdNotifications.push(notification as any);
         }
 
         return {
@@ -336,16 +387,16 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           data: {
             eventId,
             created: createdNotifications.length,
-            skipped: 0,
+            skipped: skippedConfigurations.length,
             details: {
               createdNotifications: createdNotifications.map((n) => ({
                 id: n.id,
                 type: n.notificationType,
                 minutesBefore: n.minutesBefore,
                 notificationTime: n.notificationTime.toISOString(),
-                isEnabled: n.isEnabled,
+                isEnabled: true,
               })),
-              skippedConfigurations: [],
+              skippedConfigurations,
             },
           },
         };

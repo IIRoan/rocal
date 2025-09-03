@@ -174,8 +174,15 @@ export function EventCalendar({
     let end: Date;
 
     if (view === "month") {
-      start = startOfMonth(currentDate);
-      end = endOfMonth(currentDate);
+      // Expand to full calendar grid (start/end of weeks around the month)
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(currentDate);
+      start = startOfWeek(monthStart, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      end = endOfWeek(monthEnd, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
     } else if (view === "week") {
       start = startOfWeek(currentDate, {
         weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,

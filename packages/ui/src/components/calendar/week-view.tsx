@@ -24,7 +24,7 @@ import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
 import { EventDots, groupEventsByExactTime } from "./event-dots";
-import { isMultiDayEvent, sortEvents, getAllEventsForDay } from "./utils";
+import { isMultiDayEvent, sortEvents, getAllEventsForDay, eventOverlapsRange, getEventInterval } from "./utils";
 import { WeekCellsHeight } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
@@ -103,28 +103,8 @@ export function WeekView({
   // Get all-day events and multi-day events for the week
   const allDayEvents = useMemo(() => {
     return events
-      .filter((event) => {
-        // Include explicitly marked all-day events or multi-day events
-        return event.allDay || isMultiDayEvent(event);
-      })
-      .filter((event) => {
-        const eventStart = startOfDay(new Date(event.start));
-        const eventEnd = startOfDay(new Date(event.end));
-        const weekStartDay = startOfDay(weekStart);
-        const weekEndDay = endOfDay(weekEnd);
-        
-        // Check if event overlaps with the current week using proper interval checking
-        return (
-          // Event starts within the week
-          isWithinInterval(eventStart, { start: weekStartDay, end: weekEndDay }) ||
-          // Event ends within the week
-          isWithinInterval(eventEnd, { start: weekStartDay, end: weekEndDay }) ||
-          // Event spans the entire week (starts before and ends after)
-          (isBefore(eventStart, weekStartDay) && isBefore(weekEndDay, eventEnd)) ||
-          // Week is within the event
-          isWithinInterval(weekStartDay, { start: eventStart, end: eventEnd })
-        );
-      });
+      .filter((event) => event.allDay || isMultiDayEvent(event))
+      .filter((event) => eventOverlapsRange(event, weekStart, weekEnd, "day"));
   }, [events, weekStart, weekEnd]);
 
   // Process events for each day to calculate positions
@@ -416,20 +396,7 @@ export function WeekView({
         </div>
         {days.map((day, dayIndex) => {
           const dayAllDayEvents = sortEvents(
-            allDayEvents.filter((event) => {
-              const eventStart = startOfDay(new Date(event.start));
-              const eventEnd = startOfDay(new Date(event.end));
-              const dayStart = startOfDay(day);
-              const dayEndTime = endOfDay(day);
-              
-              // For multi-day/all-day events, check if this day overlaps with the event
-              return (
-                isSameDay(dayStart, eventStart) ||
-                isSameDay(dayStart, eventEnd) ||
-                isWithinInterval(dayStart, { start: eventStart, end: eventEnd }) ||
-                isWithinInterval(eventStart, { start: dayStart, end: dayEndTime })
-              );
-            })
+            allDayEvents.filter((event) => eventOverlapsRange(event, day, day, "day"))
           );
 
           return (
@@ -458,12 +425,12 @@ export function WeekView({
               {dayAllDayEvents.length > 0 && (
                 <div className="pb-1 px-1 space-y-1">
                   {dayAllDayEvents.map((event) => {
-                    const eventStart = new Date(event.start);
-                    const eventEnd = new Date(event.end);
-
-                    // Determine the visible segment boundaries within the current week
-                    const visibleStart = isBefore(eventStart, startOfDay(weekStart)) ? startOfDay(weekStart) : eventStart;
-                    const visibleEnd = isBefore(startOfDay(weekEnd), eventEnd) ? startOfDay(weekEnd) : eventEnd;
+                    const { start: eStartDay, end: eEndDay } = getEventInterval(event, "day");
+                    // Clip to the visible week boundaries for segment rendering
+                    const weekStartDay = startOfDay(weekStart);
+                    const weekEndDay = endOfDay(weekEnd);
+                    const visibleStart = isBefore(eStartDay, weekStartDay) ? weekStartDay : eStartDay;
+                    const visibleEnd = isBefore(weekEndDay, eEndDay) ? weekEndDay : eEndDay;
 
                     const isFirstSegmentDay = isSameDay(day, visibleStart);
                     const isLastSegmentDay = isSameDay(day, visibleEnd);

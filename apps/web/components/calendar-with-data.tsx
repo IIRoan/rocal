@@ -52,8 +52,11 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
     switch (initialView) {
       case "month":
-        start = startOfMonth(baseDate);
-        end = endOfMonth(baseDate);
+        // Expand to full calendar grid (weeks surrounding the month)
+        const mStart = startOfMonth(baseDate);
+        const mEnd = endOfMonth(mStart);
+        start = startOfWeek(mStart, { weekStartsOn });
+        end = endOfWeek(mEnd, { weekStartsOn });
         break;
       case "week":
         start = startOfWeek(baseDate, { weekStartsOn });

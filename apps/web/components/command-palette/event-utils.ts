@@ -89,16 +89,22 @@ export const saveEventNotifications = async (
   if (!eventId) return;
 
   try {
-    const notificationData = notifications.map((n) => ({
-      notificationType: n.notificationType,
-      minutesBefore: n.minutesBefore,
-      isEnabled: n.isEnabled,
-    }));
+    // Sanitize and dedupe
+    const clamped = notifications
+      .map((n) => ({
+        notificationType: n.notificationType,
+        minutesBefore: Math.max(0, Math.min(43200, Number(n.minutesBefore) || 0)),
+        isEnabled: !!n.isEnabled,
+      }))
+      .filter((n) => n.isEnabled && Number.isFinite(n.minutesBefore));
 
-    await calendarApiService.updateEventNotifications(
-      eventId,
-      notificationData
-    );
+    const unique = new Map<string, { notificationType: "browser" | "email"; minutesBefore: number; isEnabled: boolean }>();
+    for (const n of clamped) unique.set(`${n.notificationType}-${n.minutesBefore}`, n);
+    const notificationData = Array.from(unique.values());
+
+    if (notificationData.length > 0) {
+      await calendarApiService.updateEventNotifications(eventId, notificationData);
+    }
   } catch (error) {
     console.error("Failed to save event notifications:", error);
     toast.error("Failed to save notification settings");
