@@ -220,12 +220,6 @@ export function EventCalendar({
 
   // Notify parent of date range changes
   useEffect(() => {
-    console.log('EventCalendar - Date range changed:', {
-      start: dateRange.start.toISOString(),
-      end: dateRange.end.toISOString(),
-      view,
-      currentDate: currentDate.toISOString()
-    });
     onDateRangeChange?.(dateRange);
   }, [dateRange, onDateRangeChange]);
 
@@ -283,12 +277,6 @@ export function EventCalendar({
       newDate = addDays(currentDate, -AgendaDaysToShow);
     }
     
-    console.log('EventCalendar - Navigate Previous:', {
-      view,
-      from: currentDate.toISOString(),
-      to: newDate?.toISOString()
-    });
-    
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -305,12 +293,6 @@ export function EventCalendar({
       newDate = addDays(currentDate, AgendaDaysToShow);
     }
     
-    console.log('EventCalendar - Navigate Next:', {
-      view,
-      from: currentDate.toISOString(),
-      to: newDate?.toISOString()
-    });
-    
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -319,18 +301,11 @@ export function EventCalendar({
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
-    console.log("Event selected for editing:", {
-      id: event.id,
-      title: event.title,
-      eventObject: event,
-    });
     // Open command palette with event to edit
     onEventEdit?.(event);
   };
 
   const handleEventCreate = (startTime: Date) => {
-    console.log("Creating new event at:", startTime); // Debug log
-
     // Keep exact time without rounding to intervals
     // Just reset seconds and milliseconds for consistency
     startTime.setSeconds(0);

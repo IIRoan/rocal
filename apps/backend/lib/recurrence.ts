@@ -87,12 +87,7 @@ export class RecurrenceEngine {
     const rule = this.parseRecurrenceRule(baseEvent.recurrence);
     if (!rule) return [];
 
-    console.log(`🔄 RecurrenceEngine.generateInstances for event ${baseEvent.id}:`);
-    console.log(`📅 Date range: ${rangeStart.toISOString()} to ${rangeEnd.toISOString()}`);
-    console.log(`🚫 Exceptions (${exceptions.length}):`, exceptions.map(ex => ({
-      date: ex.exceptionDate.toISOString(),
-      type: ex.type
-    })));
+
 
     const instances: RecurrenceInstance[] = [];
     const eventStart = baseEvent.start;
@@ -108,7 +103,7 @@ export class RecurrenceEngine {
         isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
       );
       if (isDeleted) {
-        console.log(`🚫 Skipping DELETED original event on ${currentDate.toISOString()}`);
+
       } else {
         instances.push({
           date: new Date(currentDate),
@@ -134,7 +129,7 @@ export class RecurrenceEngine {
           isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
         );
         if (isDeleted) {
-          console.log(`🚫 Skipping DELETED recurring instance on ${currentDate.toISOString()}`);
+
         } else {
           instances.push({
             date: new Date(currentDate),
@@ -145,7 +140,7 @@ export class RecurrenceEngine {
       }
     }
 
-    console.log(`✅ Generated ${instances.length} instances (after filtering deleted exceptions)`);
+
     return instances;
   }
 
