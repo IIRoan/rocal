@@ -16,7 +16,7 @@ import {
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
-import { isMultiDayEvent } from "./utils";
+import { isMultiDayEvent, eventOverlapsRange } from "./utils";
 import { WeekCellsHeight, StartHour, EndHour } from "./constants";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
@@ -60,19 +60,11 @@ export function DayView({
   }, [currentDate]);
 
   const dayEvents = useMemo(() => {
+    const dayStart = startOfDay(currentDate);
+    const dayEnd = addHours(dayStart, 24);
     return events
-      .filter((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-        return (
-          isSameDay(currentDate, eventStart) ||
-          isSameDay(currentDate, eventEnd) ||
-          (currentDate > eventStart && currentDate < eventEnd)
-        );
-      })
-      .sort(
-        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
-      );
+      .filter((event) => eventOverlapsRange(event, dayStart, dayEnd, "time"))
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   }, [currentDate, events]);
 
   // Filter all-day events

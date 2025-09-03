@@ -383,14 +383,38 @@ export function useEventForm({
         toast.success(`Event "${eventTitle}" created`);
       }
 
-      // Save notifications
-      if (savedEventId && finalNotifications.length > 0) {
-        const notificationData = finalNotifications.map((n) => ({
-          notificationType: n.notificationType,
-          minutesBefore: n.minutesBefore,
-          isEnabled: n.isEnabled,
-        }));
-        await calendarApiService.updateEventNotifications(savedEventId, notificationData);
+      // Save notifications (non-blocking, sanitized)
+      if (savedEventId) {
+        // Sanitize: clamp minutes, remove invalid, dedupe by type+minutes
+        const clamped = finalNotifications
+          .map((n) => ({
+            notificationType: n.notificationType,
+            minutesBefore: Math.max(0, Math.min(43200, Number(n.minutesBefore) || 0)),
+            isEnabled: !!n.isEnabled,
+          }))
+          .filter((n) => n.isEnabled && Number.isFinite(n.minutesBefore));
+
+        const uniqueMap = new Map<string, { notificationType: "browser" | "email"; minutesBefore: number; isEnabled: boolean }>();
+        for (const n of clamped) {
+          uniqueMap.set(`${n.notificationType}-${n.minutesBefore}`, n);
+        }
+        const notificationData = Array.from(uniqueMap.values());
+
+        // If the event starts in the past, skip notifications entirely
+        const now = new Date();
+        const startsInFuture = new Date(eventData.start) > now;
+        if (startsInFuture && notificationData.length > 0) {
+          try {
+            await calendarApiService.updateEventNotifications(savedEventId, notificationData);
+          } catch (notifError) {
+            console.warn("Failed to update event notifications (non-fatal):", notifError);
+            // Do not block saving the event on notification failures
+            toast.warning?.("Saved event without notifications", {
+              description: "Notification settings could not be updated right now.",
+              position: "bottom-left",
+            } as any);
+          }
+        }
       }
 
       onEventSaved?.();

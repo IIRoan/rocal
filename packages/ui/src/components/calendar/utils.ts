@@ -106,6 +106,48 @@ export function isMultiDayEvent(event: CalendarEvent): boolean {
 }
 
 /**
+ * Normalize an event's interval for overlap checks.
+ * - For day-level granularity: compare on day boundaries and treat end as endOfDay
+ * - For time-level granularity: use actual start/end
+ */
+export function getEventInterval(
+  event: CalendarEvent,
+  granularity: "day" | "time" = "day",
+): { start: Date; end: Date } {
+  const rawStart = new Date(event.start);
+  const rawEnd = new Date(event.end);
+
+  if (granularity === "time") {
+    // Use precise times; guard against inverted ranges
+    const start = rawStart <= rawEnd ? rawStart : rawEnd;
+    const end = rawEnd >= rawStart ? rawEnd : rawStart;
+    return { start, end };
+  }
+
+  // Day-level comparisons: inclusive of the final day
+  const start = startOfDay(rawStart);
+  const end = endOfDay(rawEnd);
+  return { start, end };
+}
+
+/**
+ * Check if an event overlaps a target range [start, end]
+ * Uses day-level or time-level semantics.
+ */
+export function eventOverlapsRange(
+  event: CalendarEvent,
+  rangeStart: Date,
+  rangeEnd: Date,
+  granularity: "day" | "time" = "day",
+): boolean {
+  const { start, end } = getEventInterval(event, granularity);
+  const rStart = granularity === "day" ? startOfDay(rangeStart) : rangeStart;
+  const rEnd = granularity === "day" ? endOfDay(rangeEnd) : rangeEnd;
+
+  return start <= rEnd && end >= rStart;
+}
+
+/**
  * Filter events for a specific day
  */
 export function getEventsForDay(
@@ -143,19 +185,13 @@ export function getSpanningEventsForDay(
   day: Date,
 ): CalendarEvent[] {
   const dayStart = startOfDay(day);
-  
+  const dayEnd = endOfDay(day);
+
   return events.filter((event) => {
     if (!isMultiDayEvent(event)) return false;
-
-    const eventStart = startOfDay(new Date(event.start));
-    const eventEnd = startOfDay(new Date(event.end));
-
-    // Only include if it's not the start day but the day falls within the event range
-    return (
-      !isSameDay(dayStart, eventStart) &&
-      (isSameDay(dayStart, eventEnd) || 
-       isWithinInterval(dayStart, { start: eventStart, end: eventEnd }))
-    );
+    const { start, end } = getEventInterval(event, "day");
+    // Only include if it's not the start day but overlaps the day range
+    return !isSameDay(dayStart, start) && start <= dayEnd && end >= dayStart;
   });
 }
 
@@ -168,21 +204,8 @@ export function getAllEventsForDay(
 ): CalendarEvent[] {
   const dayStart = startOfDay(day);
   const dayEnd = endOfDay(day);
-  
-  const filteredEvents = events.filter((event) => {
-    const eventStart = startOfDay(new Date(event.start));
-    const eventEnd = startOfDay(new Date(event.end));
-    
-    // Check if the event overlaps with this day
-    return (
-      isSameDay(dayStart, eventStart) ||
-      isSameDay(dayStart, eventEnd) ||
-      isWithinInterval(dayStart, { start: eventStart, end: eventEnd }) ||
-      isWithinInterval(eventStart, { start: dayStart, end: dayEnd })
-    );
-  });
-  
-  return filteredEvents;
+
+  return events.filter((event) => eventOverlapsRange(event, dayStart, dayEnd, "day"));
 }
 
 /**
