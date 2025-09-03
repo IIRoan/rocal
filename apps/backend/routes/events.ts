@@ -87,22 +87,16 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       const recurringInstances = [];
       for (const recurringEvent of recurringEvents) {
         try {
-          console.log(`Generating instances for recurring event: ${recurringEvent.title}`, {
-            id: recurringEvent.id,
-            recurrence: recurringEvent.recurrence,
-            start: recurringEvent.start,
-            end: recurringEvent.end,
-            dateRange: `${startDate.toISOString()} to ${endDate.toISOString()}`
-          });
+
 
           // Debug: Try to parse the recurrence rule
           let recurrenceRule = recurringEvent.recurrence || '{}';
           const parsedRule = RecurrenceEngine.parseRecurrenceRule(recurrenceRule);
-          console.log(`Parsed recurrence rule for ${recurringEvent.title}:`, parsedRule);
+
 
           // TEMPORARY FIX: If we have an empty recurrence rule but the title suggests it's recurring
           if (!parsedRule && (recurringEvent.title.toLowerCase().includes('standup') || recurringEvent.title.toLowerCase().includes('daily'))) {
-            console.log(`Applying temporary daily weekday rule for: ${recurringEvent.title}`);
+
             // Create a daily weekday recurrence rule (Mon-Fri)
             recurrenceRule = JSON.stringify({
               frequency: 'daily',
@@ -116,7 +110,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             type: ex.type as "modified" | "deleted",
           }));
           
-          console.log(`📋 Processing recurring event "${recurringEvent.title}" (${recurringEvent.id}) with ${exceptions.length} exceptions:`, exceptions);
+
 
           const instances = RecurrenceEngine.generateInstances(
             {
@@ -130,10 +124,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             exceptions
           );
 
-          console.log(`Generated ${instances.length} instances for ${recurringEvent.title}:`, instances.map(i => ({
-            date: i.date.toISOString(),
-            isOriginal: i.isOriginal
-          })));
+
 
           // Convert instances to events
           for (const instance of instances) {
@@ -203,94 +194,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
       // Debug: Log synced events for troubleshooting
       const syncedEvents = events.filter(e => e.isSynced);
-      if (syncedEvents.length > 0) {
-        console.log('Synced events found:', syncedEvents.map(e => ({
-          id: e.id,
-          title: e.title,
-          start: e.start,
-          end: e.end,
-          isSynced: e.isSynced,
-          calendarId: e.calendarId,
-          calendar: { name: e.calendar?.name, isVisible: e.calendar?.isVisible }
-        })));
-      }
 
-      console.log(`Fetching events for date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-      console.log(`Total events found: ${events.length}, Regular: ${regularEvents.length}, Recurring: ${recurringInstances.length}, Modified: ${modifiedInstances.length}`);
 
-      // Debug: Show ALL synced events in database (regardless of date range)
-      const allSyncedEvents = await prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          isSynced: true,
-        },
-        include: {
-          calendar: true,
-        },
-        orderBy: { start: 'asc' }
-      });
-      console.log('ALL synced events in database:', allSyncedEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        start: e.start,
-        end: e.end,
-        recurrence: e.recurrence,
-        parentEventId: e.parentEventId,
-        calendarVisible: e.calendar?.isVisible,
-        inDateRange: e.start >= startDate && e.start <= endDate
-      })));
 
-      // Debug: Check which synced events match the regular events query
-      const syncedRegularEvents = await prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          isSynced: true,
-          recurrence: null,
-          calendar: {
-            isVisible: true,
-          },
-          OR: [
-            {
-              start: { gte: startDate, lte: endDate },
-            },
-            {
-              end: { gte: startDate, lte: endDate },
-            },
-            {
-              start: { lte: startDate },
-              end: { gte: endDate },
-            },
-          ],
-        },
-        include: {
-          calendar: true,
-        },
-      });
-      console.log('Synced events matching regular events query:', syncedRegularEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        start: e.start,
-        end: e.end
-      })));
 
-      // Debug: Check which synced events have recurrence
-      const syncedRecurringEvents = await prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          isSynced: true,
-          recurrence: { not: null },
-          parentEventId: null,
-        },
-        include: {
-          calendar: true,
-        },
-      });
-      console.log('Synced recurring events:', syncedRecurringEvents.map(e => ({
-        id: e.id,
-        title: e.title,
-        start: e.start,
-        recurrence: e.recurrence
-      })));
+
+
 
       // Fetch user's categories for efficient frontend rendering
       const categories = await prisma.eventCategory.findMany({

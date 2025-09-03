@@ -66,7 +66,7 @@ export const subscriptionsRoute = new Elysia()
       // Test the URL by attempting to fetch and parse it
       let testParseResult;
       try {
-        console.log('🌐 Fetching calendar from URL:', url);
+
         const response = await fetch(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -76,8 +76,7 @@ export const subscriptionsRoute = new Elysia()
           },
         });
         
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
 
         if (!response.ok) {
           console.error(`❌ HTTP error fetching calendar: ${response.status} ${response.statusText}`);
@@ -109,7 +108,7 @@ export const subscriptionsRoute = new Elysia()
         }
         
         const userTimezone = userSettings.timezone || 'UTC';
-        console.log('🔍 Parsing ICS content with user timezone:', userTimezone);
+    
         testParseResult = parseICSFile(icsContent, userTimezone);
         
         console.log('✅ ICS parsing completed:', {
@@ -413,7 +412,7 @@ export async function syncCalendarSubscription(subscription: any) {
 
   try {
     // Fetch the calendar
-    console.log('🔄 Syncing calendar from URL:', subscription.url);
+
     const response = await fetch(subscription.url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -425,8 +424,7 @@ export async function syncCalendarSubscription(subscription: any) {
       },
     });
     
-    console.log('📡 Sync response status:', response.status);
-    console.log('📡 Sync response headers:', Object.fromEntries(response.headers.entries()));
+
 
     // Handle 304 Not Modified
     if (response.status === 304) {

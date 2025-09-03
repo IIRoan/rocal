@@ -182,7 +182,6 @@ export function MobileEventCalendar({
   // Update view when initialView changes from external source (like bottom nav)
   useEffect(() => {
     if (initialView && initialView !== view) {
-      console.log('MobileEventCalendar - initialView changed from parent:', initialView);
       setViewState(initialView);
       // Don't save to sessionStorage here since this came from parent
       // but still notify about the change
@@ -225,12 +224,6 @@ export function MobileEventCalendar({
 
   // Notify parent of date range changes
   useEffect(() => {
-    console.log('MobileEventCalendar - Date range changed:', {
-      start: dateRange.start.toISOString(),
-      end: dateRange.end.toISOString(),
-      view,
-      currentDate: currentDate.toISOString()
-    });
     onDateRangeChange?.(dateRange);
   }, [dateRange, onDateRangeChange]);
 
@@ -255,12 +248,6 @@ export function MobileEventCalendar({
       newDate = subMonths(currentDate, 1);
     }
     
-    console.log('Navigation - Previous:', {
-      view,
-      from: currentDate.toISOString(),
-      to: newDate?.toISOString()
-    });
-    
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -279,12 +266,6 @@ export function MobileEventCalendar({
       newDate = addMonths(currentDate, 1);
     }
     
-    console.log('Navigation - Next:', {
-      view,
-      from: currentDate.toISOString(),
-      to: newDate?.toISOString()
-    });
-    
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -293,18 +274,11 @@ export function MobileEventCalendar({
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
-    console.log("Event selected for editing:", {
-      id: event.id,
-      title: event.title,
-      eventObject: event,
-    });
     // Open command palette with event to edit
     onEventEdit?.(event);
   };
 
   const handleEventCreate = (startTime: Date) => {
-    console.log("Creating new event at:", startTime);
-
     // Keep exact time without rounding to intervals
     // Just reset seconds and milliseconds for consistency
     startTime.setSeconds(0);

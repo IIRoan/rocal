@@ -370,7 +370,6 @@ export function CalendarProvider({
       try {
         const savedDate = localStorage.getItem("rocani-calendar-current-date");
         localStorage.removeItem("rocani-calendar-current-date");
-        console.log('Cleared saved calendar date from localStorage:', savedDate);
         // Reset to current date
         setCurrentDate(new Date());
       } catch (error) {
@@ -384,11 +383,6 @@ export function CalendarProvider({
     if (typeof window !== "undefined" && process.env.NODE_ENV === 'development') {
       try {
         const savedDate = localStorage.getItem("rocani-calendar-current-date");
-        console.log('Calendar localStorage state:', {
-          savedDate,
-          currentDate: currentDate.toISOString(),
-          isValid: savedDate ? !isNaN(new Date(savedDate).getTime()) : 'no saved date'
-        });
       } catch (error) {
         console.warn('Failed to read localStorage state:', error);
       }
