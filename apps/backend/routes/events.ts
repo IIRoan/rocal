@@ -454,6 +454,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           }
         }
 
+        // Normalize all-day boundaries if requested
+        if (body.allDay === true) {
+          // Clamp to full-day inclusive bounds
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+        }
+
         // Validate recurrence rule if provided
         if (body.recurrence) {
           try {
@@ -596,16 +603,20 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                 body.reminder
               );
 
-              // Create notification record
-              await prisma.eventNotification.create({
-                data: {
-                  eventId: event.id,
-                  notificationType: "email",
-                  notificationTime,
-                  minutesBefore: body.reminder,
-                  isSent: false,
-                },
-              });
+              // Only create if notification is in the future
+              if (notificationTime > new Date()) {
+                await prisma.eventNotification.create({
+                  data: {
+                    eventId: event.id,
+                    notificationType: "email",
+                    notificationTime,
+                    minutesBefore: body.reminder,
+                    isSent: false,
+                  },
+                });
+              } else {
+                console.log(`Skipping creating past notification for event ${event.id}`);
+              }
 
               console.log(`✓ Created notification for event ${event.id}`);
             }
@@ -796,8 +807,16 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         }
 
         // Use existing dates if not provided in update
-        const finalStartDate = startDate || existingEvent.start;
-        const finalEndDate = endDate || existingEvent.end;
+        let finalStartDate = startDate || existingEvent.start;
+        let finalEndDate = endDate || existingEvent.end;
+
+        // Normalize all-day boundaries if the event is or becomes all-day
+        const willBeAllDay = body.allDay !== undefined ? !!body.allDay : !!existingEvent.allDay;
+        if (willBeAllDay) {
+          // Only adjust the dates that are being changed; keep others as-is
+          if (startDate) finalStartDate = new Date(finalStartDate.setHours(0, 0, 0, 0));
+          if (endDate) finalEndDate = new Date(finalEndDate.setHours(23, 59, 59, 999));
+        }
 
         // Validate date logic
         if (finalStartDate >= finalEndDate) {
@@ -920,10 +939,10 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           updateData.description = body.description?.trim() || null;
         }
         if (startDate) {
-          updateData.start = startDate;
+          updateData.start = finalStartDate;
         }
         if (endDate) {
-          updateData.end = endDate;
+          updateData.end = finalEndDate;
         }
         if (body.allDay !== undefined) {
           updateData.allDay = body.allDay;
@@ -1042,13 +1061,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             // Create new notifications based on configurations
             if (notificationConfigs.length > 0) {
               const { NotificationCalculator } = await import("../lib/notification-calculator");
-              
+              const now = new Date();
               for (const config of notificationConfigs) {
                 const notificationTime = NotificationCalculator.calculateNotificationTime(
                   finalStartDate,
-                  config.minutesBefore
+                  config.minutesBefore,
                 );
-
+                // Skip past notification times
+                if (notificationTime <= now) continue;
                 await prisma.eventNotification.create({
                   data: {
                     eventId: id,

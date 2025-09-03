@@ -341,10 +341,11 @@ export function useCalendarData(
           };
           eventsCache.current.set(key, touched);
 
-          // Filter events to the requested range
-          return touched.data.filter(
-            (event) =>
-              event.start >= dateRange.start && event.start <= dateRange.end,
+          // Filter events to those that overlap the requested range
+          // Include events that started before the window but end within/after it,
+          // and events that start within the window but end after it.
+          return touched.data.filter((event) =>
+            event.start <= dateRange.end && event.end >= dateRange.start,
           );
         }
       }
