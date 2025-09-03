@@ -82,19 +82,16 @@ export function MobileCalendarWrapper({
   };
 
   const handleOpenSettings = () => {
-    console.log('handleOpenSettings called, onOpenSettings:', onOpenSettings);
     onOpenSettings?.();
     // Close sidebar if open when opening settings
     setIsSidebarOpen(false);
   };
 
   const handleViewChange = (view: CalendarView) => {
-    console.log('MobileCalendarWrapper - handleViewChange:', view);
     setCurrentView(view);
   };
 
   const handleCalendarViewChange = (view: CalendarView) => {
-    console.log('MobileCalendarWrapper - handleCalendarViewChange from MobileEventCalendar:', view);
     setCurrentView(view);
   };
 

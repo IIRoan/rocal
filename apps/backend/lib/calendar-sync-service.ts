@@ -17,11 +17,8 @@ export class CalendarSyncService {
 
   start() {
     if (this.isRunning) {
-      console.log('Calendar sync service is already running');
       return;
     }
-
-    console.log('Starting Calendar sync service...');
     this.isRunning = true;
     
     // Run initial sync after a short delay
@@ -39,16 +36,12 @@ export class CalendarSyncService {
         console.error('Scheduled sync failed:', error);
       }
     }, 15 * 60 * 1000); // 15 minutes in milliseconds
-
-    console.log('Calendar sync service started - running every 15 minutes');
   }
 
   stop() {
     if (!this.isRunning) {
       return;
     }
-
-    console.log('Stopping Calendar sync service...');
     
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -56,11 +49,9 @@ export class CalendarSyncService {
     }
     
     this.isRunning = false;
-    console.log('Calendar sync service stopped');
   }
 
   async syncAllActiveSubscriptions(): Promise<void> {
-    console.log('Starting scheduled sync of all active subscriptions...');
     
     try {
       // Get all active subscriptions that are due for syncing
@@ -87,7 +78,7 @@ export class CalendarSyncService {
         },
       });
 
-      console.log(`Found ${subscriptions.length} subscriptions to sync`);
+
 
       const results = {
         total: subscriptions.length,
@@ -115,7 +106,7 @@ export class CalendarSyncService {
               return;
             }
 
-            console.log(`Syncing subscription: ${subscription.name} (${subscription.url})`);
+
             await syncCalendarSubscription(subscription);
             results.success++;
             
@@ -133,7 +124,7 @@ export class CalendarSyncService {
         }
       }
 
-      console.log(`Sync completed: ${results.success} successful, ${results.errors} errors, ${results.skipped} skipped out of ${results.total} total`);
+
 
       // Clean up old sync logs (keep last 50 per subscription)
       await this.cleanupOldSyncLogs();
@@ -185,7 +176,7 @@ export class CalendarSyncService {
               id: { in: logs.map(log => log.id) },
             },
           });
-          console.log(`Cleaned up ${logs.length} old sync logs for subscription ${subscription.id}`);
+
         }
       }
     } catch (error) {
