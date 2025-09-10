@@ -142,11 +142,18 @@ export function EventCalendar({
     return initialView;
   });
 
-  // Custom setView function that also saves to sessionStorage
+  // Custom setView function that also saves to sessionStorage with expiration
   const setView = (newView: CalendarView) => {
     setViewState(newView);
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('calendar-view-selection', newView);
+      // Save view with expiration time (1 hour from now)
+      const expirationTime = new Date();
+      expirationTime.setHours(expirationTime.getHours() + 1);
+      const viewData = {
+        view: newView,
+        expires: expirationTime.getTime()
+      };
+      sessionStorage.setItem('calendar-view-selection', JSON.stringify(viewData));
     }
   };
 
@@ -158,11 +165,35 @@ export function EventCalendar({
     { key: "a", action: () => setView("agenda") },
   ]);
 
-  // Update view when initialView changes (from settings) only if no session preference exists
+  // Update view when initialView changes (from settings) only if no valid session preference exists
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
-      if (!savedView) {
+      const savedViewData = sessionStorage.getItem('calendar-view-selection');
+      let validSavedView = null;
+      
+      // Check if we have saved data and it's not expired
+      if (savedViewData) {
+        try {
+          const parsedData = JSON.parse(savedViewData);
+          const now = new Date().getTime();
+          
+          // Only use the saved view if it hasn't expired
+          if (parsedData.expires && parsedData.expires > now) {
+            validSavedView = parsedData.view;
+            // Set the view state to the valid saved view
+            setViewState(parsedData.view);
+          } else {
+            // Clear expired data
+            sessionStorage.removeItem('calendar-view-selection');
+          }
+        } catch (e) {
+          // Handle legacy format or invalid JSON
+          console.warn('Invalid calendar view data in sessionStorage');
+          sessionStorage.removeItem('calendar-view-selection');
+        }
+      }
+      
+      if (!validSavedView) {
         setView(initialView);
       }
     }
