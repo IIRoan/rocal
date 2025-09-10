@@ -146,8 +146,32 @@ export function MobileEventCalendar({
   // Update view when isMobile status changes and no saved preference exists
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
-      if (!savedView && isMobile) {
+      const savedViewData = sessionStorage.getItem('calendar-view-selection');
+      let validSavedView = null;
+      
+      // Check if we have saved data and it's not expired
+      if (savedViewData) {
+        try {
+          const parsedData = JSON.parse(savedViewData);
+          const now = new Date().getTime();
+          
+          // Only use the saved view if it hasn't expired
+          if (parsedData.expires && parsedData.expires > now) {
+            validSavedView = parsedData.view;
+            // Set the view state to the valid saved view
+            setViewState(parsedData.view);
+          } else {
+            // Clear expired data
+            sessionStorage.removeItem('calendar-view-selection');
+          }
+        } catch (e) {
+          // Handle legacy format or invalid JSON
+          console.warn('Invalid calendar view data in sessionStorage');
+          sessionStorage.removeItem('calendar-view-selection');
+        }
+      }
+      
+      if (!validSavedView && isMobile) {
         // On mobile, always default to day view regardless of initialView
         setViewState('day');
         // Notify parent about the view change
@@ -156,11 +180,18 @@ export function MobileEventCalendar({
     }
   }, [isMobile, onViewChange]);
 
-  // Custom setView function that also saves to sessionStorage and notifies parent
+  // Custom setView function that also saves to sessionStorage with expiration and notifies parent
   const setView = (newView: CalendarView) => {
     setViewState(newView);
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('calendar-view-selection', newView);
+      // Save view with expiration time (1 hour from now)
+      const expirationTime = new Date();
+      expirationTime.setHours(expirationTime.getHours() + 1);
+      const viewData = {
+        view: newView,
+        expires: expirationTime.getTime()
+      };
+      sessionStorage.setItem('calendar-view-selection', JSON.stringify(viewData));
     }
     // Notify parent component about view change
     onViewChange?.(newView);
