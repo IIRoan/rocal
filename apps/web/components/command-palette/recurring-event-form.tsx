@@ -108,14 +108,81 @@ export function RecurringEventForm({
   const generatePreview = async () => {
     if (!recurrenceRule) return;
 
+    // Expand preview window based on frequency/interval so we show multiple
+    // upcoming instances (esp. monthly/yearly).
+    const desiredOccurrences = 6; // aim to fetch at least ~6
+    const interval = Math.max(1, recurrenceRule.interval || 1);
+    const unitDays =
+      recurrenceRule.frequency === "daily"
+        ? 1
+        : recurrenceRule.frequency === "weekly"
+          ? 7
+          : recurrenceRule.frequency === "monthly"
+            ? 30
+            : 365; // yearly
+    let previewDays = interval * desiredOccurrences * unitDays + (unitDays >= 30 ? 30 : 7);
+    // Minimum sensible windows
+    if (recurrenceRule.frequency === "daily") previewDays = Math.max(previewDays, 45);
+    if (recurrenceRule.frequency === "weekly") previewDays = Math.max(previewDays, 90);
+    if (recurrenceRule.frequency === "monthly") previewDays = Math.max(previewDays, 365);
+    if (recurrenceRule.frequency === "yearly") previewDays = Math.max(previewDays, 365 * 6);
+
+    // Respect backend constraints (previewDays <= 365)
+    previewDays = Math.min(Math.max(7, previewDays), 365);
     setPreviewLoading(true);
     try {
-      const previewData = await calendarApiService.previewRecurrence(
+      let previewData = await calendarApiService.previewRecurrence(
         eventStartDate.toISOString(),
         eventEndDate.toISOString(),
         recurrenceRule,
-        30 // Preview next 30 days
+        previewDays
       );
+      // Frontend fallback: ensure multiple visible occurrences for long intervals
+      try {
+        const freq = recurrenceRule.frequency;
+        const interval = Math.max(1, recurrenceRule.interval || 1);
+        const instances = previewData.instances ?? [];
+        const needed = Math.max(0, 5 - instances.length);
+        const until = recurrenceRule.until ? new Date(recurrenceRule.until) : null;
+        const count = typeof recurrenceRule.count === 'number' ? recurrenceRule.count : undefined;
+
+        if ((freq === 'yearly' || freq === 'monthly') && needed > 0) {
+          const extra: { date: string; isOriginal: boolean }[] = [];
+          const anchor = new Date(eventStartDate);
+          // Start from last preview instance if any (safe check for undefined)
+          const lastInstance = instances.length ? instances[instances.length - 1] : undefined;
+          let cursor = lastInstance ? new Date(lastInstance.date) : anchor;
+          const addMonths = (d: Date, m: number) => {
+            const nd = new Date(d);
+            const day = nd.getDate();
+            nd.setDate(1);
+            nd.setMonth(nd.getMonth() + m);
+            const maxDay = new Date(nd.getFullYear(), nd.getMonth() + 1, 0).getDate();
+            nd.setDate(Math.min(day, maxDay));
+            return nd;
+          };
+          const addYears = (d: Date, y: number) => addMonths(d, y * 12);
+          const step = freq === 'monthly' ? (d: Date) => addMonths(d, interval) : (d: Date) => addYears(d, interval);
+
+          let produced = 0;
+          // Determine how many already counted
+          let already = instances.length;
+          while (produced < needed && (!count || already + produced < count)) {
+            cursor = step(cursor);
+            if (until && cursor > until) break;
+            extra.push({ date: cursor.toISOString(), isOriginal: false });
+            produced += 1;
+          }
+          if (extra.length) {
+            const merged = [...instances, ...extra];
+            previewData = {
+              ...previewData,
+              instances: merged,
+              totalInstances: Math.max(previewData.totalInstances || 0, merged.length),
+            };
+          }
+        }
+      } catch {}
       setPreview(previewData);
     } catch (error) {
       console.error("Failed to generate preview:", error);
@@ -186,8 +253,8 @@ export function RecurringEventForm({
   }
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 p-3 sm:p-4 border border-border rounded-md bg-card/50">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center space-x-2">
           <Checkbox
             id="recurring"
@@ -196,7 +263,7 @@ export function RecurringEventForm({
             className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
           />
           <Label htmlFor="recurring" className="text-sm font-medium cursor-pointer flex items-center gap-2">
-            <RotateCcw className="h-4 w-4 text-primary" />
+            <RotateCcw className="h-4 w-4 text-muted-foreground" />
             Recurring Event
           </Label>
         </div>
@@ -225,7 +292,7 @@ export function RecurringEventForm({
         /* Simple Mode - Common Patterns */
         <div className="space-y-3">
           <Label className="text-sm font-medium">Choose a pattern:</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {patternsLoading ? (
               <div className="col-span-2 flex items-center justify-center py-4">
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -260,7 +327,7 @@ export function RecurringEventForm({
       ) : (
         /* Advanced Mode - Custom Configuration */
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Frequency */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Repeat</Label>
@@ -292,7 +359,7 @@ export function RecurringEventForm({
                   max="99"
                   value={customRule.interval}
                   onChange={(e) => handleCustomRuleUpdate({ interval: parseInt(e.target.value) || 1 })}
-                  className="w-20"
+                  className="w-20 sm:w-24"
                 />
                 <span className="text-sm text-muted-foreground">
                   {customRule.frequency === "daily" && (customRule.interval === 1 ? "day" : "days")}
@@ -308,19 +375,20 @@ export function RecurringEventForm({
           {customRule.frequency === "weekly" && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">Repeat on</Label>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                 {WEEKDAY_SHORT.map((day, index) => (
                   <Button
                     key={index}
                     type="button"
                     variant="outline"
                     size="sm"
+                    aria-pressed={customRule.byWeekDay?.includes(index) ? true : false}
                     onClick={() => handleWeekdayToggle(index)}
-                    className={`w-12 h-8 p-0 text-xs ${
+                    className={`${
                       customRule.byWeekDay?.includes(index)
-                        ? "bg-primary text-primary-foreground border-primary"
+                        ? "bg-primary/90 text-primary-foreground border-primary"
                         : ""
-                    }`}
+                    } h-8 p-0 text-xs w-full`}
                   >
                     {day}
                   </Button>
@@ -466,7 +534,7 @@ export function RecurringEventForm({
                       max="999"
                       value={customRule.count}
                       onChange={(e) => handleCountSet(parseInt(e.target.value) || undefined)}
-                      className="w-16 h-8 px-2 text-xs"
+                      className="w-16 sm:w-20 h-8 px-2 text-xs"
                     />
                     <span className="text-xs text-muted-foreground">occurrences</span>
                   </div>
@@ -479,30 +547,32 @@ export function RecurringEventForm({
 
       {/* Preview */}
       {preview && (
-        <div className="border-t pt-3 mt-3">
+        <div className="border-t border-border pt-3 mt-3">
           <div className="flex items-center gap-2 mb-2">
             <Eye className="h-4 w-4 text-muted-foreground" />
             <Label className="text-sm font-medium">Preview</Label>
             {previewLoading && <Loader2 className="h-3 w-3 animate-spin" />}
           </div>
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-primary">{preview.description}</p>
-            <p className="text-xs text-muted-foreground">
-              Next {Math.min(preview.instances.length, 5)} occurrences:
-            </p>
-            <div className="space-y-1">
-              {preview.instances.slice(0, 5).map((instance, index) => (
-                <div key={index} className="text-xs text-muted-foreground">
-                  • {format(new Date(instance.date), "EEE, MMM d, yyyy")}
-                  {instance.isOriginal && " (original)"}
-                </div>
-              ))}
-              {preview.instances.length > 5 && (
-                <div className="text-xs text-muted-foreground">
-                  ... and {preview.instances.length - 5} more
-                </div>
-              )}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">{preview.description}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Next 5 occurrences</p>
             </div>
+            <ol className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {preview.instances.slice(0, 5).map((instance, index) => (
+                <li
+                  key={index}
+                  className="text-xs rounded-md border border-border bg-muted px-3 py-2 text-foreground flex items-center justify-between"
+                >
+                  <span>{format(new Date(instance.date), "EEE, MMM d, yyyy")}</span>
+                  {instance.isOriginal && (
+                    <span className="ml-2 inline-flex items-center rounded border border-border/50 px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
+                      original
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       )}
