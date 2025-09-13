@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useCallback, useState } from "react";
 import { GlobalLoadingScreen } from "../components/ui/global-loading-screen";
+import type { GlobalLoadingScreenProps } from "../components/ui/global-loading-screen";
 
 interface LoadingState {
   id: string;
@@ -40,11 +41,14 @@ interface LoadingProviderProps {
   children: React.ReactNode;
   // Optional: customize default loading screen
   defaultVariant?: "minimal" | "detailed" | "splash";
+  // Optional: pass through props to the GlobalLoadingScreen
+  loadingScreenProps?: Partial<GlobalLoadingScreenProps>;
 }
 
 export function LoadingProvider({
   children,
   defaultVariant = "detailed",
+  loadingScreenProps,
 }: LoadingProviderProps) {
   const [loadingStates, setLoadingStates] = useState<LoadingState[]>([]);
 
@@ -62,7 +66,7 @@ export function LoadingProvider({
         const existingIndex = prev.findIndex((state) => state.id === id);
         const newState: LoadingState = {
           id,
-          message: options.message || "Loading...",
+          message: options.message,
           variant: options.variant || defaultVariant,
           priority: options.priority || 0,
         };
@@ -93,7 +97,7 @@ export function LoadingProvider({
 
   // Convenience methods for common loading scenarios
   const showPageLoading = useCallback(
-    (message = "Loading page...") => {
+    (message?: string) => {
       showLoading("page", { message, variant: "detailed", priority: 10 });
     },
     [showLoading],
@@ -104,7 +108,7 @@ export function LoadingProvider({
   }, [hideLoading]);
 
   const showSplashLoading = useCallback(
-    (message = "Initializing application...") => {
+    (message?: string) => {
       showLoading("splash", { message, variant: "splash", priority: 20 });
     },
     [showLoading],
@@ -149,6 +153,7 @@ export function LoadingProvider({
           isLoading={true}
           message={currentLoadingState.message}
           variant={currentLoadingState.variant}
+          {...loadingScreenProps}
         />
       )}
     </LoadingContext.Provider>
