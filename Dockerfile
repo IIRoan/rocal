@@ -12,6 +12,7 @@ RUN bun add -g turbo
 # Copy package files first for better layer caching
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY apps/backend/package.json ./apps/backend/package.json
 COPY packages/ ./packages/
 
 # Install all dependencies
