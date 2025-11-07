@@ -12,9 +12,12 @@
   "iconLibrary": "lucide",
   "aliases": {
     "components": "@workspace/ui/components",
-    "utils": "@workspace/ui/lib/utils",
     "hooks": "@workspace/ui/hooks",
     "lib": "@workspace/ui/lib",
+    "utils": "@workspace/ui/lib/utils",
     "ui": "@workspace/ui/components"
+  },
+  "registries": {
+    "@animate-ui": "https://animate-ui.com/r/{name}.json"
   }
 }
