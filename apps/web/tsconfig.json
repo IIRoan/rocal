@@ -7,6 +7,7 @@
       "@workspace/ui/*": ["../../packages/ui/src/*"],
       "@backend/*": ["../backend/*"]
     },
+    "types": ["node"],
     "plugins": [
       {
         "name": "next"

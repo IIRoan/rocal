@@ -2,19 +2,19 @@
   "name": "notifications",
   "type": "module",
   "scripts": {
-    "dev": "bun run server.ts",
-    "start": "bun run server.ts",
-    "build": "bun run prisma:generate && bun run typecheck",
+    "dev": "tsx watch server.ts",
+    "start": "node --import tsx server.ts",
+    "build": "pnpm run prisma:generate && pnpm run typecheck",
     "prisma:generate": "prisma generate",
     "prisma:deploy": "prisma migrate deploy",
     "typecheck": "tsc"
   },
   "devDependencies": {
-    "@types/bun": "1",
+    "@types/node": "^20",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "bun-types": "^1.2.19",
     "prisma": "^6.12.0",
+    "tsx": "^4.19.2",
     "typescript": "5"
   },
   "dependencies": {
