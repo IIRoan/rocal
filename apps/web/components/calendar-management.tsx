@@ -55,6 +55,7 @@ import {
   FileText,
   ExternalLink,
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const PRESET_COLORS = [
   "#3b82f6", // blue
@@ -80,6 +81,7 @@ export function CalendarManagement({
   open,
   onOpenChange,
 }: CalendarManagementProps) {
+  const queryClient = useQueryClient();
   const { calendars, refetchCalendars, updateCalendar, createCalendar } =
     useCalendarData();
   const { openCalendarManagement } = useCommandPalette();
@@ -87,7 +89,7 @@ export function CalendarManagement({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [deletingCalendar, setDeletingCalendar] = useState<Calendar | null>(
-    null,
+    null
   );
   const [deleteAction, setDeleteAction] =
     useState<CalendarDeleteAction>("delete_events");
@@ -99,7 +101,6 @@ export function CalendarManagement({
     isDefault: false,
   });
 
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -116,6 +117,74 @@ export function CalendarManagement({
     color?: string;
     general?: string;
   }>({});
+
+  // Mutations
+  const deleteCalendarMutation = useMutation({
+    mutationFn: async (data: {
+      id: string;
+      action: CalendarDeleteAction;
+      targetId?: string;
+    }) => {
+      await calendarApiService.deleteCalendarAdvanced(
+        data.id,
+        data.action,
+        data.targetId
+      );
+    },
+    onSuccess: async () => {
+      await refetchCalendars();
+      setDeletingCalendar(null);
+      setDeleteAction("delete_events");
+      setTargetCalendarId("");
+      setSuccess("Calendar deleted successfully!");
+      // Also invalidate events since they might have been moved or deleted
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+    },
+    onError: (err: any) => {
+      setError(err.message || "Failed to delete calendar");
+    },
+  });
+
+  const importICSMutation = useMutation({
+    mutationFn: async (data: { calendarId: string; file: File }) => {
+      const fileContent = await data.file.text();
+      return calendarApiService.importICS({
+        calendarId: data.calendarId,
+        icsContent: fileContent,
+        fileName: data.file.name,
+      });
+    },
+    onSuccess: async (response) => {
+      setImportResult({
+        eventsCreated: response.eventsCreated,
+        eventsTotal: response.eventsTotal,
+        errors: response.errors,
+      });
+
+      if (response.eventsCreated > 0) {
+        setSuccess(
+          `Successfully imported ${response.eventsCreated} events from ${importFile?.name}`
+        );
+        await refetchCalendars();
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+      }
+
+      if (!response.errors || response.errors.length === 0) {
+        setTimeout(() => {
+          setShowImportDialog(false);
+          setImportFile(null);
+          setImportCalendarId("");
+          setImportResult(null);
+        }, 2000);
+      }
+    },
+    onError: (err: any) => {
+      setError(err.message || "Failed to import ICS file");
+    },
+  });
+
+  const loading =
+    deleteCalendarMutation.isPending || importICSMutation.isPending;
 
   const validateCalendarForm = () => {
     const errors: { name?: string; color?: string; general?: string } = {};
@@ -138,7 +207,7 @@ export function CalendarManagement({
 
     // Validate color format
     const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-      newCalendar.color,
+      newCalendar.color
     );
     const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
     if (!allowedColors.includes(newCalendar.color) && !isHexColor) {
@@ -160,8 +229,6 @@ export function CalendarManagement({
       setValidationErrors(errors);
       return;
     }
-
-    setLoading(true);
 
     try {
       const calendarData: CreateCalendarRequest = {
@@ -193,14 +260,12 @@ export function CalendarManagement({
         // Generic error fallback
         setError(err.message || "Failed to create calendar. Please try again.");
       }
-    } finally {
-      setLoading(false);
     }
   };
 
   const validateEditCalendarForm = (
     name: string,
-    currentCalendarId: string,
+    currentCalendarId: string
   ) => {
     const errors: { name?: string; color?: string; general?: string } = {};
 
@@ -227,9 +292,8 @@ export function CalendarManagement({
 
   const handleUpdateCalendar = async (
     calendar: Calendar,
-    updates: Partial<UpdateCalendarRequest>,
+    updates: Partial<UpdateCalendarRequest>
   ) => {
-    setLoading(true);
     setError(null);
     setValidationErrors({});
     setSuccess(null);
@@ -239,7 +303,6 @@ export function CalendarManagement({
       const errors = validateEditCalendarForm(updates.name, calendar.id);
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
-        setLoading(false);
         return;
       }
     }
@@ -266,34 +329,17 @@ export function CalendarManagement({
         setError(err.message || "Failed to update calendar. Please try again.");
       }
       return false; // Indicate failure
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDeleteCalendar = async () => {
     if (!deletingCalendar) return;
-
-    setLoading(true);
     setError(null);
-
-    try {
-      await calendarApiService.deleteCalendarAdvanced(
-        deletingCalendar.id,
-        deleteAction,
-        targetCalendarId || undefined,
-      );
-
-      await refetchCalendars();
-      setDeletingCalendar(null);
-      setDeleteAction("delete_events");
-      setTargetCalendarId("");
-      setSuccess("Calendar deleted successfully!");
-    } catch (err: any) {
-      setError(err.message || "Failed to delete calendar");
-    } finally {
-      setLoading(false);
-    }
+    deleteCalendarMutation.mutate({
+      id: deletingCalendar.id,
+      action: deleteAction,
+      targetId: targetCalendarId || undefined,
+    });
   };
 
   const handleToggleVisibility = (calendar: Calendar) => {
@@ -306,54 +352,20 @@ export function CalendarManagement({
 
   const handleImportICS = async () => {
     if (!importFile || !importCalendarId) return;
-
-    setLoading(true);
     setError(null);
     setImportResult(null);
-
-    try {
-      const fileContent = await importFile.text();
-      
-      const response = await calendarApiService.importICS({
-        calendarId: importCalendarId,
-        icsContent: fileContent,
-        fileName: importFile.name,
-      });
-
-      setImportResult({
-        eventsCreated: response.eventsCreated,
-        eventsTotal: response.eventsTotal,
-        errors: response.errors,
-      });
-
-      if (response.eventsCreated > 0) {
-        setSuccess(`Successfully imported ${response.eventsCreated} events from ${importFile.name}`);
-        await refetchCalendars(); // Refresh data
-      }
-
-      // Don't close dialog immediately if there are errors to show
-      if (!response.errors || response.errors.length === 0) {
-        // Close dialog after a delay to let user see success message
-        setTimeout(() => {
-          setShowImportDialog(false);
-          setImportFile(null);
-          setImportCalendarId("");
-          setImportResult(null);
-        }, 2000);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to import ICS file");
-    } finally {
-      setLoading(false);
-    }
+    importICSMutation.mutate({
+      calendarId: importCalendarId,
+      file: importFile,
+    });
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      if (!file.name.toLowerCase().endsWith('.ics')) {
-        setError('Please select a valid .ics calendar file');
+      if (!file.name.toLowerCase().endsWith(".ics")) {
+        setError("Please select a valid .ics calendar file");
         return;
       }
       setImportFile(file);
@@ -362,7 +374,7 @@ export function CalendarManagement({
   };
 
   const availableTargetCalendars = calendars.filter(
-    (c) => c.id !== deletingCalendar?.id,
+    (c) => c.id !== deletingCalendar?.id
   );
 
   return (
@@ -798,7 +810,7 @@ export function CalendarManagement({
                   }
                   className="mt-1"
                 />
-                <div className="space-y-1 flex-1">
+                <div className="space-y-1">
                   <label
                     htmlFor="move_events"
                     className="font-medium cursor-pointer"
@@ -806,43 +818,31 @@ export function CalendarManagement({
                     Move events to another calendar
                   </label>
                   <p className="text-sm text-muted-foreground">
-                    Transfer all events to a different calendar
+                    Select a calendar to move events to
                   </p>
-                  {deleteAction === "move_events" && (
-                    <Select
-                      value={targetCalendarId}
-                      onValueChange={setTargetCalendarId}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select target calendar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableTargetCalendars.map((calendar) => (
-                          <SelectItem key={calendar.id} value={calendar.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded"
-                                style={{ backgroundColor: calendar.color }}
-                              />
-                              {calendar.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
               </div>
-            </div>
 
-            {deleteAction === "move_events" && !targetCalendarId && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Please select a target calendar to move events to.
-                </AlertDescription>
-              </Alert>
-            )}
+              {deleteAction === "move_events" && (
+                <div className="ml-7">
+                  <Select
+                    value={targetCalendarId}
+                    onValueChange={setTargetCalendarId}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select target calendar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTargetCalendars.map((cal) => (
+                        <SelectItem key={cal.id} value={cal.id}>
+                          {cal.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -863,109 +863,131 @@ export function CalendarManagement({
       </Dialog>
 
       {/* Import ICS Dialog */}
-      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="max-w-md">
+      <Dialog
+        open={showImportDialog}
+        onOpenChange={(open) => {
+          setShowImportDialog(open);
+          if (!open) {
+            setImportFile(null);
+            setImportCalendarId("");
+            setImportResult(null);
+            setError(null);
+            setSuccess(null);
+          }
+        }}
+      >
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Import ICS File
-            </DialogTitle>
+            <DialogTitle>Import Calendar (ICS)</DialogTitle>
             <DialogDescription>
-              Import events from an .ics calendar file into one of your calendars
+              Import events from an .ics file into one of your calendars.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="import-calendar">Select Calendar</Label>
-              <Select
-                value={importCalendarId}
-                onValueChange={setImportCalendarId}
-              >
-                <SelectTrigger id="import-calendar">
-                  <SelectValue placeholder="Choose a calendar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {calendars.map((calendar) => (
-                    <SelectItem key={calendar.id} value={calendar.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: calendar.color }}
-                        />
-                        {calendar.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="import-file">Select ICS File</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="import-file"
-                  type="file"
-                  accept=".ics"
-                  onChange={handleFileSelect}
-                  className="cursor-pointer"
-                />
-              </div>
-              {importFile && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {importFile.name}
-                </p>
-              )}
-            </div>
-
-            {importResult && (
-              <Alert className={importResult.errors?.length ? "border-yellow-200 bg-yellow-50" : "border-green-200 bg-green-50"}>
-                <CheckCircle className={`h-4 w-4 ${importResult.errors?.length ? "text-yellow-600" : "text-green-600"}`} />
-                <AlertDescription className={importResult.errors?.length ? "text-yellow-800" : "text-green-800"}>
-                  <div className="space-y-1">
-                    <p>
-                      Imported {importResult.eventsCreated} out of {importResult.eventsTotal} events
-                    </p>
-                    {importResult.errors && importResult.errors.length > 0 && (
-                      <div className="text-sm">
-                        <p className="font-medium">Warnings:</p>
-                        <ul className="list-disc list-inside space-y-0.5">
-                          {importResult.errors.slice(0, 3).map((error, index) => (
-                            <li key={index}>{error}</li>
-                          ))}
-                          {importResult.errors.length > 3 && (
-                            <li>...and {importResult.errors.length - 3} more</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
+          {importResult ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-md bg-muted">
+                <h4 className="font-medium mb-2">Import Summary</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total Events Found:</span>
+                    <span className="font-medium">
+                      {importResult.eventsTotal}
+                    </span>
                   </div>
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
+                  <div className="flex justify-between text-green-600">
+                    <span>Events Created:</span>
+                    <span className="font-medium">
+                      {importResult.eventsCreated}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowImportDialog(false);
-                setImportFile(null);
-                setImportCalendarId("");
-                setImportResult(null);
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleImportICS}
-              disabled={loading || !importFile || !importCalendarId}
-            >
-              {loading ? "Importing..." : "Import Events"}
-            </Button>
-          </DialogFooter>
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-red-600 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Errors ({importResult.errors.length})
+                  </h4>
+                  <div className="max-h-40 overflow-y-auto text-xs space-y-1 p-2 border rounded-md bg-red-50">
+                    {importResult.errors.map((err, i) => (
+                      <div key={i} className="text-red-700">
+                        {err}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button onClick={() => setShowImportDialog(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="importFile">Select .ics File</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="importFile"
+                    type="file"
+                    accept=".ics"
+                    onChange={handleFileSelect}
+                    className="cursor-pointer"
+                  />
+                </div>
+                {importFile && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="importCalendar">Target Calendar</Label>
+                <Select
+                  value={importCalendarId}
+                  onValueChange={setImportCalendarId}
+                >
+                  <SelectTrigger id="importCalendar">
+                    <SelectValue placeholder="Select calendar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {calendars.map((cal) => (
+                      <SelectItem key={cal.id} value={cal.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: cal.color }}
+                          />
+                          {cal.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowImportDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleImportICS}
+                  disabled={loading || !importFile || !importCalendarId}
+                >
+                  {loading ? "Importing..." : "Import Events"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -973,6 +995,7 @@ export function CalendarManagement({
       <SubscriptionManagement
         open={showSubscriptionDialog}
         onOpenChange={setShowSubscriptionDialog}
+        onBack={() => setShowSubscriptionDialog(false)}
       />
     </>
   );
