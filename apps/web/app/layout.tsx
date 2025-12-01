@@ -3,6 +3,7 @@ import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
+import { QueryProvider } from "@/components/query-provider";
 import type { Metadata } from "next";
 import "@workspace/ui/globals.css";
 
@@ -21,7 +22,8 @@ export const metadata: Metadata = {
   description: "Calendar",
   manifest: "/manifest.json",
   themeColor: "#000000",
-  viewport: "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
+  viewport:
+    "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -48,19 +50,21 @@ export default function RootLayout({
       <body
         className={`${fontSans.variable} ${fontMono.variable} bg-background font-sans antialiased`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <LoadingProvider>
-            <SettingsProvider>
-              <CalendarProvider>{children}</CalendarProvider>
-              <Toaster />
-            </SettingsProvider>
-          </LoadingProvider>
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <LoadingProvider>
+              <SettingsProvider>
+                <CalendarProvider>{children}</CalendarProvider>
+                <Toaster />
+              </SettingsProvider>
+            </LoadingProvider>
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );

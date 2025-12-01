@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
 import { useSession } from "@/lib/auth-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface SettingsContextValue {
   settings: UserSettings | null;
@@ -23,87 +24,55 @@ export function useSettings() {
 }
 
 export function useSettingsState(): SettingsContextValue {
-  const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending: isSessionPending } = useSession();
+  const queryClient = useQueryClient();
 
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const userSettings = await calendarApiService.getUserSettings();
-      setSettings(userSettings);
-    } catch (err: any) {
-      // Quietly ignore unauthorized errors when the user isn't logged in
-      if (err?.statusCode === 401 || err?.status === 401) {
-        setSettings(null);
-        setError(null);
-      } else {
-        setError(err.message || "Failed to load settings");
-        console.error("Failed to fetch user settings:", err);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const settingsQuery = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => calendarApiService.getUserSettings(),
+    enabled: !!session?.user,
+    staleTime: Infinity, // Settings don't change often
+    retry: false,
+  });
 
-  const updateSettings = async (updates: UpdateSettingsRequest) => {
-    try {
-      setError(null);
-      const updatedSettings =
-        await calendarApiService.updateUserSettings(updates);
-      setSettings(updatedSettings);
+  const updateSettingsMutation = useMutation({
+    mutationFn: (updates: UpdateSettingsRequest) =>
+      calendarApiService.updateUserSettings(updates),
+    onSuccess: (newSettings: UserSettings) => {
+      queryClient.setQueryData(["settings"], newSettings);
+      applyTheme(newSettings.theme);
+    },
+  });
 
-      // Apply theme immediately
-      applyTheme(updatedSettings.theme);
-    } catch (err: any) {
-      setError(err.message || "Failed to update settings");
-      throw err;
-    }
-  };
+  const resetSettingsMutation = useMutation({
+    mutationFn: () => calendarApiService.resetUserSettings(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+  });
 
-  const resetSettings = async () => {
-    try {
-      setError(null);
-      await calendarApiService.resetUserSettings();
-      await fetchSettings();
-    } catch (err: any) {
-      setError(err.message || "Failed to reset settings");
-      throw err;
-    }
-  };
-
-  const refetchSettings = async () => {
-    await fetchSettings();
-  };
-
-  // Load settings only when user is authenticated; avoid 401s on public pages
+  // Apply theme when settings are loaded
   useEffect(() => {
-    if (!isPending && session?.user) {
-      fetchSettings();
-    } else if (!isPending && !session?.user) {
-      // Not authenticated: ensure clean state and not loading
-      setSettings(null);
-      setError(null);
-      setLoading(false);
+    if (settingsQuery.data?.theme) {
+      applyTheme(settingsQuery.data.theme);
     }
-  }, [isPending, session?.user]);
-
-  // Apply theme when settings change
-  useEffect(() => {
-    if (settings?.theme) {
-      applyTheme(settings.theme);
-    }
-  }, [settings?.theme]);
+  }, [settingsQuery.data?.theme]);
 
   return {
-    settings,
-    loading,
-    error,
-    updateSettings,
-    resetSettings,
-    refetchSettings,
+    settings: settingsQuery.data || null,
+    loading: settingsQuery.isLoading && !settingsQuery.isError, // Don't show loading on error
+    error: settingsQuery.error
+      ? (settingsQuery.error as any).message || "Failed to load settings"
+      : null,
+    updateSettings: async (updates) => {
+      await updateSettingsMutation.mutateAsync(updates);
+    },
+    resetSettings: async () => {
+      await resetSettingsMutation.mutateAsync();
+    },
+    refetchSettings: async () => {
+      await settingsQuery.refetch();
+    },
   };
 }
 
@@ -112,7 +81,7 @@ function applyTheme(theme: "light" | "dark" | "system") {
 
   if (theme === "system") {
     const systemPrefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
+      "(prefers-color-scheme: dark)"
     ).matches;
     root.classList.toggle("dark", systemPrefersDark);
   } else {
