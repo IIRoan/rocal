@@ -1,22 +1,23 @@
-# Use Bun Alpine as base image
-FROM oven/bun:1-alpine AS base
+# Use Node Alpine as base image
+FROM node:20-alpine AS base
 
 # Builder stage - install dependencies and build
 FROM base AS builder
 RUN apk update && apk add --no-cache libc6-compat
+
+# Install pnpm globally
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
 WORKDIR /app
 
-# Install turbo globally
-RUN bun add -g turbo
-
 # Copy package files first for better layer caching
-COPY package.json bun.lock ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/backend/package.json ./apps/backend/package.json
 COPY packages/ ./packages/
 
 # Install all dependencies
-RUN bun install
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -24,11 +25,11 @@ COPY . .
 # Generate Prisma client with optimized binary targets for production
 RUN if [ -f "apps/backend/prisma/schema.prisma" ]; then \
     cd apps/backend && \
-    PRISMA_BINARY_TARGETS="debian-openssl-3.0.x" bunx prisma generate; \
+    PRISMA_BINARY_TARGETS="debian-openssl-3.0.x" pnpm exec prisma generate; \
 fi
 
 # Build the web app using turbo
-RUN turbo build --filter=web
+RUN pnpm exec turbo build --filter=web
 
 # Runtime stage
 FROM base AS runner

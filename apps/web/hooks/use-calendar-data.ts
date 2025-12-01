@@ -69,19 +69,19 @@ export interface UseCalendarDataReturn {
   createEvent: (event: CreateEventRequest) => Promise<CalendarEvent>;
   updateEvent: (
     id: string,
-    event: UpdateEventRequest,
+    event: UpdateEventRequest
   ) => Promise<CalendarEvent>;
   deleteEvent: (id: string) => Promise<void>;
   createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
   updateCalendar: (
     id: string,
-    calendar: UpdateCalendarRequest,
+    calendar: UpdateCalendarRequest
   ) => Promise<Calendar>;
   deleteCalendar: (id: string) => Promise<void>;
   createCategory: (category: CreateCategoryRequest) => Promise<EventCategory>;
   updateCategory: (
     id: string,
-    category: UpdateCategoryRequest,
+    category: UpdateCategoryRequest
   ) => Promise<EventCategory>;
   deleteCategory: (id: string) => Promise<void>;
 
@@ -93,7 +93,7 @@ export interface UseCalendarDataReturn {
   loadNotifications: (eventId: string) => Promise<EventNotification[]>;
   updateNotifications: (
     eventId: string,
-    notifications: EventNotification[],
+    notifications: EventNotification[]
   ) => Promise<void>;
 }
 
@@ -128,7 +128,7 @@ const LAST_COUNT_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
 function pruneMapToSize<K, V>(
   map: Map<K, V>,
   maxSize: number,
-  protectKey?: K,
+  protectKey?: K
 ): void {
   if (maxSize <= 0) {
     map.clear();
@@ -146,7 +146,7 @@ function pruneMapToSize<K, V>(
 }
 
 export function useCalendarData(
-  options: UseCalendarDataOptions = {},
+  options: UseCalendarDataOptions = {}
 ): UseCalendarDataReturn {
   const {
     initialDateRange,
@@ -159,7 +159,7 @@ export function useCalendarData(
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [currentDateRange, setCurrentDateRange] = useState<DateRange | null>(
-    initialDateRange || null,
+    initialDateRange || null
   );
 
   // Loading states
@@ -184,14 +184,16 @@ export function useCalendarData(
   } | null>(null);
 
   // Maintain last known event counts per range key for integrity validation
-  const lastEventCounts = useRef<Map<string, { count: number; timestamp: number }>>(new Map());
+  const lastEventCounts = useRef<
+    Map<string, { count: number; timestamp: number }>
+  >(new Map());
 
   // Request deduplication
   const pendingRequests = useRef<Map<string, Promise<any>>>(new Map());
 
   // Optimistic operations tracking
   const optimisticOperations = useRef<Map<string, OptimisticOperation>>(
-    new Map(),
+    new Map()
   );
   const operationCounter = useRef<number>(0);
 
@@ -222,7 +224,7 @@ export function useCalendarData(
         updatedAt: new Date(),
       };
     },
-    [generateOptimisticId, calendars, categories],
+    [generateOptimisticId, calendars, categories]
   );
 
   const createOptimisticCategory = useCallback(
@@ -238,7 +240,7 @@ export function useCalendarData(
         updatedAt: new Date(),
       };
     },
-    [generateOptimisticId],
+    [generateOptimisticId]
   );
 
   const rollbackOperation = useCallback((operationId: string): void => {
@@ -263,7 +265,7 @@ export function useCalendarData(
     (timestamp: number): boolean => {
       return Date.now() - timestamp < cacheTimeout;
     },
-    [cacheTimeout],
+    [cacheTimeout]
   );
 
   // Check if date range overlaps with cached range
@@ -274,14 +276,14 @@ export function useCalendarData(
         requestedRange.end >= cachedRange.start
       );
     },
-    [],
+    []
   );
 
   // Validate and clean events: remove duplicates, drop invalid/out-of-range, report issues
   const validateAndCleanEvents = useCallback(
     (
       items: CalendarEvent[],
-      range: DateRange,
+      range: DateRange
     ): { cleanedEvents: CalendarEvent[]; issues: string[]; valid: boolean } => {
       const seen = new Set<string>();
       const cleaned: CalendarEvent[] = [];
@@ -319,7 +321,7 @@ export function useCalendarData(
 
       return { cleanedEvents: cleaned, issues, valid: invalidDates === 0 };
     },
-    [],
+    []
   );
 
   // Find cached data that covers the requested date range
@@ -344,21 +346,22 @@ export function useCalendarData(
           // Filter events to those that overlap the requested range
           // Include events that started before the window but end within/after it,
           // and events that start within the window but end after it.
-          return touched.data.filter((event) =>
-            event.start <= dateRange.end && event.end >= dateRange.start,
+          return touched.data.filter(
+            (event) =>
+              event.start <= dateRange.end && event.end >= dateRange.start
           );
         }
       }
       return null;
     },
-    [isCacheValid, isDateRangeOverlapping],
+    [isCacheValid, isDateRangeOverlapping]
   );
 
   // Fetch events with caching and deduplication
   const fetchEvents = useCallback(
     async (
       dateRange: DateRange,
-      opts?: { signal?: AbortSignal },
+      opts?: { signal?: AbortSignal }
     ): Promise<void> => {
       const cacheKey = getCacheKey(dateRange);
 
@@ -389,7 +392,7 @@ export function useCalendarData(
               const res = await calendarApiService.getEvents(
                 dateRange.start,
                 dateRange.end,
-                opts?.signal,
+                opts?.signal
               );
 
               if (!Array.isArray(res.events)) {
@@ -399,7 +402,7 @@ export function useCalendarData(
               // Integrity validation and cleaning
               const { cleanedEvents } = validateAndCleanEvents(
                 res.events,
-                dateRange,
+                dateRange
               );
 
               // Event count validation against previous successful fetch for this range
@@ -407,11 +410,15 @@ export function useCalendarData(
               const currentCount = cleanedEvents.length;
               const previousCount = prevMeta?.count ?? null;
               const suspiciousDrop =
-                previousCount !== null && previousCount > 0 && currentCount + 2 < Math.floor(previousCount * 0.5);
+                previousCount !== null &&
+                previousCount > 0 &&
+                currentCount + 2 < Math.floor(previousCount * 0.5);
 
               if (suspiciousDrop && attempt < maxAttempts - 1) {
                 // Retry once with a short jittered delay to recover from transient partial responses
-                await new Promise((r) => setTimeout(r, 200 + Math.floor(Math.random() * 200)));
+                await new Promise((r) =>
+                  setTimeout(r, 200 + Math.floor(Math.random() * 200))
+                );
                 continue;
               }
 
@@ -424,7 +431,9 @@ export function useCalendarData(
               }
               if (attempt < maxAttempts - 1) {
                 // Jittered backoff small delay since HttpClient already backed off
-                await new Promise((r) => setTimeout(r, 200 + Math.floor(Math.random() * 150)));
+                await new Promise((r) =>
+                  setTimeout(r, 200 + Math.floor(Math.random() * 150))
+                );
                 continue;
               }
               throw err;
@@ -435,7 +444,11 @@ export function useCalendarData(
 
         pendingRequests.current.set(cacheKey, requestPromise);
         // Bound pendingRequests size to prevent growth
-        pruneMapToSize(pendingRequests.current as unknown as Map<string, unknown>, MAX_PENDING_REQUESTS, cacheKey);
+        pruneMapToSize(
+          pendingRequests.current as unknown as Map<string, unknown>,
+          MAX_PENDING_REQUESTS,
+          cacheKey
+        );
 
         // Fetch from API
         const response = await requestPromise;
@@ -447,7 +460,10 @@ export function useCalendarData(
           dateRange,
         });
         // Enforce LRU size bound
-        pruneMapToSize(eventsCache.current as unknown as Map<string, unknown>, MAX_EVENTS_CACHE_ENTRIES);
+        pruneMapToSize(
+          eventsCache.current as unknown as Map<string, unknown>,
+          MAX_EVENTS_CACHE_ENTRIES
+        );
 
         // Update last counts
         lastEventCounts.current.set(cacheKey, {
@@ -455,7 +471,10 @@ export function useCalendarData(
           timestamp: Date.now(),
         });
         // Bound lastEventCounts size
-        pruneMapToSize(lastEventCounts.current as unknown as Map<string, unknown>, MAX_LAST_COUNTS);
+        pruneMapToSize(
+          lastEventCounts.current as unknown as Map<string, unknown>,
+          MAX_LAST_COUNTS
+        );
 
         // Update state
         setEvents(response.events);
@@ -491,7 +510,7 @@ export function useCalendarData(
         setEventsLoading(false);
       }
     },
-    [findCachedEvents, getCacheKey, validateAndCleanEvents, pruneMapToSize],
+    [findCachedEvents, getCacheKey, validateAndCleanEvents, pruneMapToSize]
   );
 
   // Fetch calendars with caching
@@ -576,7 +595,7 @@ export function useCalendarData(
 
       await fetchEvents(rangeToUse);
     },
-    [currentDateRange, getCacheKey, fetchEvents],
+    [currentDateRange, getCacheKey, fetchEvents]
   );
 
   const refetchCalendars = useCallback(async (): Promise<Calendar[]> => {
@@ -627,18 +646,20 @@ export function useCalendarData(
         const newEvent = await calendarApiService.createEvent(event);
 
         // Check if this is a recurring event
-        const isRecurringEvent = !!(event.recurrence);
-        
+        const isRecurringEvent = !!event.recurrence;
+
         if (isRecurringEvent) {
-          console.log('Created recurring event - refreshing to show all instances');
-          
+          console.log(
+            "Created recurring event - refreshing to show all instances"
+          );
+
           // For recurring events, we need to refetch to get all instances
           // Clear all cache since recurring events can span multiple date ranges
           eventsCache.current.clear();
-          
+
           // Remove the optimistic event and refetch all events
           setEvents((prev) => prev.filter((e) => e.id !== operationId));
-          
+
           // Refetch events to get all recurring instances
           if (currentDateRange) {
             await fetchEvents(currentDateRange);
@@ -646,7 +667,7 @@ export function useCalendarData(
         } else {
           // For regular events, just replace optimistic event with real event
           setEvents((prev) =>
-            prev.map((e) => (e.id === operationId ? newEvent : e)),
+            prev.map((e) => (e.id === operationId ? newEvent : e))
           );
 
           // Smart cache invalidation for regular events
@@ -677,7 +698,13 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [createOptimisticEvent, rollbackOperation, cleanupOperation, currentDateRange, fetchEvents],
+    [
+      createOptimisticEvent,
+      rollbackOperation,
+      cleanupOperation,
+      currentDateRange,
+      fetchEvents,
+    ]
   );
 
   const updateEvent = useCallback(
@@ -693,15 +720,15 @@ export function useCalendarData(
             availableEventIds: events.map((e) => e.id),
             eventData: event,
             totalEvents: events.length,
-          },
+          }
         );
 
         // Trigger a background refresh to sync local state with server
         refetchEvents().catch((error) =>
           console.error(
             "Failed to refresh events after missing event detected:",
-            error,
-          ),
+            error
+          )
         );
       }
 
@@ -723,13 +750,13 @@ export function useCalendarData(
 
         // Apply optimistic update immediately
         setEvents((prev) =>
-          prev.map((e) => (e.id === id ? optimisticEvent : e)),
+          prev.map((e) => (e.id === id ? optimisticEvent : e))
         );
 
         // Store rollback function
         rollback = () => {
           setEvents((prev) =>
-            prev.map((e) => (e.id === id ? originalEvent : e)),
+            prev.map((e) => (e.id === id ? originalEvent : e))
           );
         };
       } else {
@@ -773,19 +800,23 @@ export function useCalendarData(
 
         console.log(
           `Successfully updated event ${id} on server:`,
-          updatedEvent,
+          updatedEvent
         );
 
         // Check if this is a recurring event
-        const isRecurringEvent = !!(event.recurrence || updatedEvent.recurrence);
-        
+        const isRecurringEvent = !!(
+          event.recurrence || updatedEvent.recurrence
+        );
+
         if (isRecurringEvent) {
-          console.log('Updated recurring event - refreshing to show all instances');
-          
+          console.log(
+            "Updated recurring event - refreshing to show all instances"
+          );
+
           // For recurring events, we need to refetch to get all instances
           // Clear all cache since recurring events can span multiple date ranges
           eventsCache.current.clear();
-          
+
           // Refetch events to get all recurring instances
           if (currentDateRange) {
             await fetchEvents(currentDateRange);
@@ -830,7 +861,14 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [events, generateOptimisticId, rollbackOperation, cleanupOperation, currentDateRange, fetchEvents],
+    [
+      events,
+      generateOptimisticId,
+      rollbackOperation,
+      cleanupOperation,
+      currentDateRange,
+      fetchEvents,
+    ]
   );
 
   const deleteEvent = useCallback(
@@ -887,7 +925,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [events, generateOptimisticId, rollbackOperation, cleanupOperation],
+    [events, generateOptimisticId, rollbackOperation, cleanupOperation]
   );
 
   const createCategory = useCallback(
@@ -917,7 +955,7 @@ export function useCalendarData(
 
         // Replace optimistic category with real category
         setCategories((prev) =>
-          prev.map((c) => (c.id === operationId ? newCategory : c)),
+          prev.map((c) => (c.id === operationId ? newCategory : c))
         );
 
         // Invalidate cache
@@ -933,13 +971,13 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [createOptimisticCategory, rollbackOperation, cleanupOperation],
+    [createOptimisticCategory, rollbackOperation, cleanupOperation]
   );
 
   const updateCategory = useCallback(
     async (
       id: string,
-      category: UpdateCategoryRequest,
+      category: UpdateCategoryRequest
     ): Promise<EventCategory> => {
       // Store original category for rollback
       const originalCategory = categories.find((c) => c.id === id);
@@ -958,13 +996,13 @@ export function useCalendarData(
 
       // Apply optimistic update immediately
       setCategories((prev) =>
-        prev.map((c) => (c.id === id ? optimisticCategory : c)),
+        prev.map((c) => (c.id === id ? optimisticCategory : c))
       );
 
       // Store rollback function
       const rollback = () => {
         setCategories((prev) =>
-          prev.map((c) => (c.id === id ? originalCategory : c)),
+          prev.map((c) => (c.id === id ? originalCategory : c))
         );
       };
 
@@ -980,12 +1018,12 @@ export function useCalendarData(
         // Make API call
         const updatedCategory = await calendarApiService.updateCategory(
           id,
-          category,
+          category
         );
 
         // Replace optimistic category with real category
         setCategories((prev) =>
-          prev.map((c) => (c.id === id ? updatedCategory : c)),
+          prev.map((c) => (c.id === id ? updatedCategory : c))
         );
 
         // Invalidate cache
@@ -1001,7 +1039,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [categories, generateOptimisticId, rollbackOperation, cleanupOperation],
+    [categories, generateOptimisticId, rollbackOperation, cleanupOperation]
   );
 
   const deleteCategory = useCallback(
@@ -1021,8 +1059,8 @@ export function useCalendarData(
       // Update events that used this category
       setEvents((prev) =>
         prev.map((e) =>
-          e.categoryId === id ? { ...e, categoryId: null, category: null } : e,
-        ),
+          e.categoryId === id ? { ...e, categoryId: null, category: null } : e
+        )
       );
 
       // Store rollback function
@@ -1032,7 +1070,7 @@ export function useCalendarData(
           prev.map((e) => {
             const affectedEvent = affectedEvents.find((ae) => ae.id === e.id);
             return affectedEvent ? affectedEvent : e;
-          }),
+          })
         );
       };
 
@@ -1066,7 +1104,7 @@ export function useCalendarData(
       generateOptimisticId,
       rollbackOperation,
       cleanupOperation,
-    ],
+    ]
   );
 
   // Calendar CRUD operations
@@ -1081,7 +1119,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [],
+    []
   );
 
   const updateCalendar = useCallback(
@@ -1089,10 +1127,10 @@ export function useCalendarData(
       try {
         const updatedCalendar = await calendarApiService.updateCalendar(
           id,
-          calendar,
+          calendar
         );
         setCalendars((prev) =>
-          prev.map((c) => (c.id === id ? updatedCalendar : c)),
+          prev.map((c) => (c.id === id ? updatedCalendar : c))
         );
         calendarsCache.current = null; // Invalidate cache
         return updatedCalendar;
@@ -1100,7 +1138,7 @@ export function useCalendarData(
         throw error as ApiError;
       }
     },
-    [],
+    []
   );
 
   const deleteCalendar = useCallback(async (id: string): Promise<void> => {
@@ -1117,14 +1155,11 @@ export function useCalendarData(
   }, []);
 
   // Utility functions
-  const setDateRange = useCallback(
-    (dateRange: DateRange): void => {
-      setCurrentDateRange(dateRange);
-      // Don't call fetchEvents here - let the useEffect handle it to avoid race conditions
-      // The useEffect watching currentDateRange will trigger fetchEvents automatically
-    },
-    [],
-  );
+  const setDateRange = useCallback((dateRange: DateRange): void => {
+    setCurrentDateRange(dateRange);
+    // Don't call fetchEvents here - let the useEffect handle it to avoid race conditions
+    // The useEffect watching currentDateRange will trigger fetchEvents automatically
+  }, []);
 
   const clearCache = useCallback((): void => {
     eventsCache.current.clear();
@@ -1150,13 +1185,13 @@ export function useCalendarData(
         return [];
       }
     },
-    [],
+    []
   );
 
   const updateNotifications = useCallback(
     async (
       eventId: string,
-      notifications: EventNotification[],
+      notifications: EventNotification[]
     ): Promise<void> => {
       try {
         const notificationData = notifications.map((n) => ({
@@ -1166,14 +1201,14 @@ export function useCalendarData(
         }));
         await calendarApiService.updateEventNotifications(
           eventId,
-          notificationData,
+          notificationData
         );
       } catch (error) {
         console.error("Failed to update event notifications:", error);
         throw error;
       }
     },
-    [],
+    []
   );
 
   // Periodic cleanup for caches to prevent unbounded growth
@@ -1187,7 +1222,10 @@ export function useCalendarData(
         }
       }
       // Enforce LRU bound explicitly in case manual clears didn't happen
-      pruneMapToSize(eventsCache.current as unknown as Map<string, unknown>, MAX_EVENTS_CACHE_ENTRIES);
+      pruneMapToSize(
+        eventsCache.current as unknown as Map<string, unknown>,
+        MAX_EVENTS_CACHE_ENTRIES
+      );
 
       // Clean old lastEventCounts entries
       const now = Date.now();
@@ -1196,10 +1234,16 @@ export function useCalendarData(
           lastEventCounts.current.delete(key);
         }
       }
-      pruneMapToSize(lastEventCounts.current as unknown as Map<string, unknown>, MAX_LAST_COUNTS);
+      pruneMapToSize(
+        lastEventCounts.current as unknown as Map<string, unknown>,
+        MAX_LAST_COUNTS
+      );
 
       // Bound pending requests map size defensively
-      pruneMapToSize(pendingRequests.current as unknown as Map<string, unknown>, MAX_PENDING_REQUESTS);
+      pruneMapToSize(
+        pendingRequests.current as unknown as Map<string, unknown>,
+        MAX_PENDING_REQUESTS
+      );
     }, intervalMs);
     return () => clearInterval(interval);
   }, [cacheTimeout, isCacheValid, pruneMapToSize]);
@@ -1217,10 +1261,10 @@ export function useCalendarData(
   useEffect(() => {
     if (autoRefetch && currentDateRange) {
       const controller = new AbortController();
-      fetchEvents(currentDateRange, { signal: controller.signal }).catch((error) => {
-        if ((error as any)?.name !== "AbortError") {
-          console.error("Failed to fetch events:", error);
-        }
+      // Errors are already handled in fetchEvents and stored in eventsError state
+      // No need to log them here - this would show errors during normal background refreshes
+      fetchEvents(currentDateRange, { signal: controller.signal }).catch(() => {
+        // Silently handle errors - they're already in state if needed
       });
       return () => {
         controller.abort();

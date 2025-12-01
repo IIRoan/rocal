@@ -1,11 +1,9 @@
 import { createAuthClient } from "better-auth/react";
-import { passkeyClient } from "better-auth/client/plugins";
 
 // Define a specific type for the auth client
 const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_APP_URL,
   basePath: "/api/auth",
-  plugins: [passkeyClient()],
 }) as any;
 
 // Export the full client

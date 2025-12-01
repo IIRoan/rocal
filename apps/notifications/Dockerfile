@@ -1,29 +1,37 @@
-# Use Bun Alpine as base image
-FROM oven/bun:1-alpine AS base
+# Use Node Alpine as base image
+FROM node:20-alpine AS base
 
 # Builder stage - install dependencies and build
 FROM base AS builder
 RUN apk update && apk add --no-cache libc6-compat
+
+# Install pnpm globally
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY package.json bun.lockb* ./
+COPY package.json pnpm-lock.yaml* ./
 COPY prisma/ ./prisma/
 
 # Install dependencies
-RUN bun install
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Generate Prisma client with optimized binary targets for production
-RUN PRISMA_BINARY_TARGETS="linux-musl-openssl-3.0.x" bun run prisma:generate
+RUN PRISMA_BINARY_TARGETS="linux-musl-openssl-3.0.x" pnpm run prisma:generate
 
 # Build the application
-RUN bun run build
+RUN pnpm run build
 
 # Runtime stage
 FROM base AS runner
+
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
 WORKDIR /app
 
 # Create non-root user
@@ -49,4 +57,4 @@ USER notifications
 
 EXPOSE 3001
 
-CMD ["bun", "run", "start"]
+CMD ["node", "--import", "tsx", "server.ts"]
