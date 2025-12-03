@@ -41,10 +41,10 @@ function DialogOverlay({
         // Base
         "fixed inset-0 z-50 bg-black/50",
         // Animate opacity
-        "transition-[opacity,backdrop-filter] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "transition-[opacity,backdrop-filter] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
         // Subtle blur when supported
-        "supports-[backdrop-filter]:backdrop-blur-[2px]",
+        "supports-[backdrop-filter]:backdrop-blur-sm data-[state=open]:backdrop-blur-md",
         // Respect reduced motion
         "motion-reduce:transition-none",
         className
@@ -140,7 +140,7 @@ function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="group focus-visible:border-ring focus-visible:ring-ring/50 absolute top-3 right-3 flex size-7 items-center justify-center rounded transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:pointer-events-none">
+        <DialogPrimitive.Close className="group focus-visible:border-ring focus-visible:ring-ring/50 hover:bg-accent/50 hover:scale-105 focus-visible:scale-105 absolute top-3 right-3 flex size-7 items-center justify-center rounded transition-all duration-200 ease-out outline-none focus-visible:ring-[3px] disabled:pointer-events-none">
           <XIcon
             size={16}
             className="opacity-60 transition-opacity group-hover:opacity-100"

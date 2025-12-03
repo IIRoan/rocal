@@ -23,7 +23,6 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       return { calendars };
     },
     {
-      auth: true,
       detail: {
         tags: ["Calendars"],
         summary: "Get user's calendars",
@@ -140,7 +139,6 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       return calendar;
     },
     {
-      auth: true,
       body: t.Object({
         name: t.String({
           minLength: 1,
@@ -299,7 +297,6 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       return updatedCalendar;
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String({
           description: "Calendar ID",
@@ -482,7 +479,6 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       };
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String({
           description: "Calendar ID to delete",

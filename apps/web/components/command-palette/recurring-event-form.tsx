@@ -22,18 +22,15 @@ import { format } from "date-fns";
 import {
   CalendarIcon,
   RotateCcw,
-  Eye,
   ChevronDown,
   ChevronUp,
   Loader2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type {
   RecurrenceRule,
   RecurrenceFrequency,
-  RecurrencePreview,
   RecurrencePatterns,
 } from "@/lib/types/calendar";
 import { useQuery } from "@tanstack/react-query";
@@ -88,126 +85,6 @@ export function RecurringEventForm({
     }
   }, [isRecurring, recurrenceRule, customRule, onRecurrenceRuleChange]);
 
-  // Generate preview when rule changes
-  const { data: preview, isLoading: previewLoading } = useQuery({
-    queryKey: [
-      "recurrencePreview",
-      recurrenceRule,
-      eventStartDate,
-      eventEndDate,
-    ],
-    queryFn: async () => {
-      if (!recurrenceRule) return null;
-
-      // Expand preview window based on frequency/interval so we show multiple
-      // upcoming instances (esp. monthly/yearly).
-      const desiredOccurrences = 6; // aim to fetch at least ~6
-      const interval = Math.max(1, recurrenceRule.interval || 1);
-      const unitDays =
-        recurrenceRule.frequency === "daily"
-          ? 1
-          : recurrenceRule.frequency === "weekly"
-            ? 7
-            : recurrenceRule.frequency === "monthly"
-              ? 30
-              : 365; // yearly
-      let previewDays =
-        interval * desiredOccurrences * unitDays + (unitDays >= 30 ? 30 : 7);
-      // Minimum sensible windows
-      if (recurrenceRule.frequency === "daily")
-        previewDays = Math.max(previewDays, 45);
-      if (recurrenceRule.frequency === "weekly")
-        previewDays = Math.max(previewDays, 90);
-      if (recurrenceRule.frequency === "monthly")
-        previewDays = Math.max(previewDays, 365);
-      if (recurrenceRule.frequency === "yearly")
-        previewDays = Math.max(previewDays, 365 * 6);
-
-      // Respect backend constraints (previewDays <= 365)
-      previewDays = Math.min(Math.max(7, previewDays), 365);
-
-      try {
-        let previewData = await calendarApiService.previewRecurrence(
-          eventStartDate.toISOString(),
-          eventEndDate.toISOString(),
-          recurrenceRule,
-          previewDays
-        );
-        // Frontend fallback: ensure multiple visible occurrences for long intervals
-        try {
-          const freq = recurrenceRule.frequency;
-          const interval = Math.max(1, recurrenceRule.interval || 1);
-          const instances = previewData.instances ?? [];
-          const needed = Math.max(0, 5 - instances.length);
-          const until = recurrenceRule.until
-            ? new Date(recurrenceRule.until)
-            : null;
-          const count =
-            typeof recurrenceRule.count === "number"
-              ? recurrenceRule.count
-              : undefined;
-
-          if ((freq === "yearly" || freq === "monthly") && needed > 0) {
-            const extra: { date: string; isOriginal: boolean }[] = [];
-            const anchor = new Date(eventStartDate);
-            // Start from last preview instance if any (safe check for undefined)
-            const lastInstance = instances.length
-              ? instances[instances.length - 1]
-              : undefined;
-            let cursor = lastInstance ? new Date(lastInstance.date) : anchor;
-            const addMonths = (d: Date, m: number) => {
-              const nd = new Date(d);
-              const day = nd.getDate();
-              nd.setDate(1);
-              nd.setMonth(nd.getMonth() + m);
-              const maxDay = new Date(
-                nd.getFullYear(),
-                nd.getMonth() + 1,
-                0
-              ).getDate();
-              nd.setDate(Math.min(day, maxDay));
-              return nd;
-            };
-            const addYears = (d: Date, y: number) => addMonths(d, y * 12);
-            const step =
-              freq === "monthly"
-                ? (d: Date) => addMonths(d, interval)
-                : (d: Date) => addYears(d, interval);
-
-            let produced = 0;
-            // Determine how many already counted
-            let already = instances.length;
-            while (
-              produced < needed &&
-              (!count || already + produced < count)
-            ) {
-              cursor = step(cursor);
-              if (until && cursor > until) break;
-              extra.push({ date: cursor.toISOString(), isOriginal: false });
-              produced += 1;
-            }
-            if (extra.length) {
-              const merged = [...instances, ...extra];
-              previewData = {
-                ...previewData,
-                instances: merged,
-                totalInstances: Math.max(
-                  previewData.totalInstances || 0,
-                  merged.length
-                ),
-              };
-            }
-          }
-        } catch {}
-        return previewData;
-      } catch (error) {
-        console.error("Failed to generate preview:", error);
-        return null;
-      }
-    },
-    enabled: isRecurring && !!recurrenceRule,
-    staleTime: 1000 * 60, // Cache preview for 1 minute
-  });
 
   const handlePatternSelect = (patternKey: string) => {
     const pattern = patterns[patternKey];
@@ -603,44 +480,6 @@ export function RecurringEventForm({
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Preview */}
-      {preview && (
-        <div className="border-t border-border pt-3 mt-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Eye className="h-4 w-4 text-muted-foreground" />
-            <Label className="text-sm font-medium">Preview</Label>
-            {previewLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-foreground">
-              {preview.description}
-            </p>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Next 5 occurrences
-              </p>
-            </div>
-            <ol className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {preview.instances.slice(0, 5).map((instance, index) => (
-                <li
-                  key={index}
-                  className="text-xs rounded-md border border-border bg-muted px-3 py-2 text-foreground flex items-center justify-between"
-                >
-                  <span>
-                    {format(new Date(instance.date), "EEE, MMM d, yyyy")}
-                  </span>
-                  {instance.isOriginal && (
-                    <span className="ml-2 inline-flex items-center rounded border border-border/50 px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
-                      original
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
           </div>
         </div>
       )}

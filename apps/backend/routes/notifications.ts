@@ -189,7 +189,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
     },
     {
-      auth: true,
       params: t.Object({
         eventId: t.String({
           description: "Event ID to get notifications for",
@@ -413,7 +412,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
     },
     {
-      auth: true,
       params: t.Object({
         eventId: t.String({
           description: "Event ID to update notifications for",
@@ -509,7 +507,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
     },
     {
-      auth: true,
       params: t.Object({
         eventId: t.String({
           description: "Event ID to delete notifications for",

@@ -94,29 +94,19 @@ export function NotificationManager({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Label className="flex items-center gap-2">
-          <Bell className="h-4 w-4" />
-          Email Notifications
-        </Label>
-      </div>
-
+    <div className="space-y-2.5">
       {/* Default notification indicator */}
       {defaultReminder && (
-        <div className="flex items-center gap-2 p-3 border rounded-lg bg-info-bg border-info-border">
-          <Mail className="h-4 w-4 text-info" />
-          <div className="flex-1">
-            <div className="text-sm font-medium text-info-foreground">
-              Default Email Reminder
-            </div>
-            <div className="text-xs text-info">
-              {formatMinutesToReadable(defaultReminder)} before the event
+        <div className="flex items-center gap-2 p-2 border rounded-md bg-info-bg border-info-border">
+          <Mail className="h-3.5 w-3.5 text-info flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-info-foreground">
+              Default: {formatMinutesToReadable(defaultReminder)} before
             </div>
           </div>
           <Badge
             variant="outline"
-            className="text-xs border-info-border text-info"
+            className="text-[10px] px-1.5 py-0 h-5 border-info-border text-info"
           >
             Auto
           </Badge>
@@ -124,21 +114,21 @@ export function NotificationManager({
       )}
 
       {notifications.length === 0 ? (
-        <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 text-center">
+        <div className="text-xs text-muted-foreground bg-muted/30 rounded-md p-2.5 text-center">
           {defaultReminder
-            ? "Your default email reminder is already configured above. Add additional notifications below if needed."
-            : "No email notifications configured. Add one below to get reminded about this event."}
+            ? "Default reminder set. Add more if needed."
+            : "Add reminders to be notified about this event."}
         </div>
       ) : (
         <div className="space-y-2">
           {notifications.map((notification, index) => (
             <div
               key={index}
-              className="flex items-center gap-2 p-3 border rounded-lg bg-card"
+              className="flex items-center gap-2 p-2 border rounded-md bg-card"
             >
-              <Mail className="h-4 w-4 text-muted-foreground" />
+              <Mail className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
 
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <Select
                   value={notification.minutesBefore.toString()}
                   onValueChange={(value) =>
@@ -149,7 +139,7 @@ export function NotificationManager({
                     )
                   }
                 >
-                  <SelectTrigger className="h-8">
+                  <SelectTrigger className="h-7 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -169,9 +159,9 @@ export function NotificationManager({
                 variant="ghost"
                 size="sm"
                 onClick={() => handleRemoveNotification(index)}
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
           ))}
@@ -183,10 +173,10 @@ export function NotificationManager({
         size="sm"
         onClick={handleAddNotification}
         disabled={loading}
-        className="w-full"
+        className="w-full h-7 text-xs"
       >
-        <Plus className="h-4 w-4 mr-2" />
-        Add Email Notification
+        <Plus className="h-3.5 w-3.5 mr-1.5" />
+        Add Reminder
       </Button>
     </div>
   );

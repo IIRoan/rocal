@@ -53,6 +53,7 @@ import {
 } from "../ui/dropdown-menu";
 import { ThemeToggle } from "../layout/theme-toggle";
 import { useDropdownShortcuts } from "../../hooks";
+import { SidebarTrigger } from "../ui/sidebar";
 
 export interface EventCalendarProps {
   className?: string;
@@ -665,20 +666,12 @@ export function EventCalendar({
           >
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
-                {!hideSidebarTrigger && !onSidebarToggle && (() => {
-                  // Dynamically import and render SidebarTrigger only when needed and no custom toggle
-                  try {
-                    const { SidebarTrigger } = require("../ui/sidebar");
-                    return (
-                      <SidebarTrigger
-                        className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5 lg:data-[state=invisible]:opacity-0 lg:data-[state=invisible]:pointer-events-none transition-opacity ease-in-out duration-200"
-                        isOutsideSidebar
-                      />
-                    );
-                  } catch {
-                    return null;
-                  }
-                })()}
+                {!hideSidebarTrigger && !onSidebarToggle && (
+                  <SidebarTrigger
+                    className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5 lg:data-[state=invisible]:opacity-0 lg:data-[state=invisible]:pointer-events-none transition-opacity ease-in-out duration-200"
+                    isOutsideSidebar
+                  />
+                )}
                 {onSidebarToggle && (
                   <Button
                     variant="ghost"

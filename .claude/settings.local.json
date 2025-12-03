@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(pnpm run typecheck:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

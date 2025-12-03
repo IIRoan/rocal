@@ -225,7 +225,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       };
     },
     {
-      auth: true,
       query: t.Object({
         start: t.String({
           description: "Start date in ISO 8601 format",
@@ -545,7 +544,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      auth: true,
       body: t.Object({
         title: t.String({
           minLength: 1,
@@ -1017,7 +1015,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String({
           description: "Event ID",
@@ -1205,7 +1202,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String({
           description: "Event ID to delete",
@@ -1443,7 +1439,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      auth: true,
       body: t.Object({
         action: t.Union(
           [t.Literal("move"), t.Literal("delete"), t.Literal("duplicate")],

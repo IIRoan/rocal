@@ -45,7 +45,6 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
       }
     },
     {
-      auth: true,
       body: t.Object({
         rule: t.Union([
           t.String({ description: "JSON string of recurrence rule" }),
@@ -60,10 +59,10 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
             count: t.Optional(t.Number({ minimum: 1 })),
             until: t.Optional(t.String({ description: "ISO date string" })),
             byWeekDay: t.Optional(
-              t.Array(t.Number({ minimum: 0, maximum: 6 })),
+              t.Array(t.Number({ minimum: 0, maximum: 6 }))
             ),
             byMonthDay: t.Optional(
-              t.Array(t.Number({ minimum: 1, maximum: 31 })),
+              t.Array(t.Number({ minimum: 1, maximum: 31 }))
             ),
             byMonth: t.Optional(t.Array(t.Number({ minimum: 1, maximum: 12 }))),
           }),
@@ -95,7 +94,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           401: { description: "Unauthorized" },
         },
       },
-    },
+    }
   )
 
   // Generate recurrence instances for preview
@@ -108,7 +107,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
         const startDate = new Date(eventStart);
         const endDate = new Date(eventEnd);
         const previewEndDate = new Date(
-          startDate.getTime() + previewDays * 24 * 60 * 60 * 1000,
+          startDate.getTime() + previewDays * 24 * 60 * 60 * 1000
         );
 
         const rule =
@@ -119,7 +118,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
         if (!rule) {
           throw new ValidationError(
             "Invalid recurrence rule",
-            "recurrenceRule",
+            "recurrenceRule"
           );
         }
 
@@ -134,7 +133,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           mockEvent,
           startDate,
           previewEndDate,
-          [],
+          []
         );
 
         return {
@@ -148,12 +147,11 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
       } catch (error) {
         throw new ValidationError(
           "Failed to generate preview",
-          "recurrenceRule",
+          "recurrenceRule"
         );
       }
     },
     {
-      auth: true,
       body: t.Object({
         eventStart: t.String({ description: "ISO date string" }),
         eventEnd: t.String({ description: "ISO date string" }),
@@ -170,16 +168,16 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
             count: t.Optional(t.Number({ minimum: 1 })),
             until: t.Optional(t.String()),
             byWeekDay: t.Optional(
-              t.Array(t.Number({ minimum: 0, maximum: 6 })),
+              t.Array(t.Number({ minimum: 0, maximum: 6 }))
             ),
             byMonthDay: t.Optional(
-              t.Array(t.Number({ minimum: 1, maximum: 31 })),
+              t.Array(t.Number({ minimum: 1, maximum: 31 }))
             ),
             byMonth: t.Optional(t.Array(t.Number({ minimum: 1, maximum: 12 }))),
           }),
         ]),
         previewDays: t.Optional(
-          t.Number({ minimum: 7, maximum: 365, default: 90 }),
+          t.Number({ minimum: 7, maximum: 365, default: 90 })
         ),
       }),
       detail: {
@@ -217,7 +215,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           401: { description: "Unauthorized" },
         },
       },
-    },
+    }
   )
 
   // Edit recurring event series
@@ -248,7 +246,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           if (!occurrenceDate) {
             throw new ValidationError(
               "Occurrence date is required for 'this_only' edit",
-              "occurrenceDate",
+              "occurrenceDate"
             );
           }
 
@@ -293,7 +291,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           if (!occurrenceDate) {
             throw new ValidationError(
               "Occurrence date is required for 'this_and_future' edit",
-              "occurrenceDate",
+              "occurrenceDate"
             );
           }
 
@@ -301,11 +299,11 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
 
           // Update original event to end before split date
           const originalRule = RecurrenceEngine.parseRecurrenceRule(
-            existingEvent.recurrence!,
+            existingEvent.recurrence!
           );
           if (originalRule) {
             originalRule.until = new Date(
-              splitDate.getTime() - 24 * 60 * 60 * 1000,
+              splitDate.getTime() - 24 * 60 * 60 * 1000
             );
             await prisma.calendarEvent.update({
               where: { id },
@@ -330,7 +328,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
                 : new Date(
                     splitDate.getTime() +
                       (existingEvent.end.getTime() -
-                        existingEvent.start.getTime()),
+                        existingEvent.start.getTime())
                   ),
               createdAt: undefined,
               updatedAt: undefined,
@@ -366,12 +364,11 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
         default:
           throw new ValidationError(
             "Invalid edit scope. Use 'this_only', 'this_and_future', or 'all'",
-            "editScope",
+            "editScope"
           );
       }
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String({ description: "Recurring event ID" }),
       }),
@@ -385,7 +382,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           t.String({
             description:
               "ISO date of the specific occurrence (required for this_only and this_and_future)",
-          }),
+          })
         ),
         updates: t.Object({
           title: t.Optional(t.String()),
@@ -414,7 +411,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           404: { description: "Recurring event not found" },
         },
       },
-    },
+    }
   )
 
   // Delete recurring event series
@@ -423,12 +420,12 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
     async ({ params, query, user }: any) => {
       const { id } = params;
       const { deleteScope, occurrenceDate } = query;
-      
-      console.log('🗑️ DELETE RECURRING EVENT REQUEST:', {
+
+      console.log("🗑️ DELETE RECURRING EVENT REQUEST:", {
         eventId: id,
         deleteScope,
         occurrenceDate,
-        userId: user.id
+        userId: user.id,
       });
 
       // Verify event exists and belongs to user
@@ -449,39 +446,44 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           if (!occurrenceDate) {
             throw new ValidationError(
               "Occurrence date is required for 'this_only' delete",
-              "occurrenceDate",
+              "occurrenceDate"
             );
           }
 
           const exceptionDate = new Date(occurrenceDate);
-          console.log('📅 Creating RecurrenceException:', {
+          console.log("📅 Creating RecurrenceException:", {
             parentEventId: id,
             exceptionDate: exceptionDate.toISOString(),
             originalOccurrenceDate: occurrenceDate,
-            type: 'deleted'
+            type: "deleted",
           });
 
           // Check if exception already exists
-          const existingException = await prisma.recurrenceException.findUnique({
-            where: {
-              parentEventId_exceptionDate: {
-                parentEventId: id,
-                exceptionDate,
+          const existingException = await prisma.recurrenceException.findUnique(
+            {
+              where: {
+                parentEventId_exceptionDate: {
+                  parentEventId: id,
+                  exceptionDate,
+                },
               },
-            },
-          });
+            }
+          );
 
           let exception;
           if (existingException) {
-            console.log('⚠️ RecurrenceException already exists:', existingException);
-            
+            console.log(
+              "⚠️ RecurrenceException already exists:",
+              existingException
+            );
+
             // If it's already deleted, that's fine - just return success
             if (existingException.type === "deleted") {
-              console.log('✅ Occurrence already deleted, returning success');
+              console.log("✅ Occurrence already deleted, returning success");
               exception = existingException;
             } else {
               // If it's a different type (e.g., "modified"), update it to "deleted"
-              console.log('🔄 Updating existing exception to deleted type');
+              console.log("🔄 Updating existing exception to deleted type");
               exception = await prisma.recurrenceException.update({
                 where: {
                   parentEventId_exceptionDate: {
@@ -503,7 +505,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
                 type: "deleted",
               },
             });
-            console.log('✅ New RecurrenceException created:', exception);
+            console.log("✅ New RecurrenceException created:", exception);
           }
 
           return {
@@ -518,7 +520,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           if (!occurrenceDate) {
             throw new ValidationError(
               "Occurrence date is required for 'this_and_future' delete",
-              "occurrenceDate",
+              "occurrenceDate"
             );
           }
 
@@ -526,11 +528,11 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
 
           // Update original event to end before split date
           const originalRule = RecurrenceEngine.parseRecurrenceRule(
-            existingEvent.recurrence!,
+            existingEvent.recurrence!
           );
           if (originalRule) {
             originalRule.until = new Date(
-              splitDate.getTime() - 24 * 60 * 60 * 1000,
+              splitDate.getTime() - 24 * 60 * 60 * 1000
             );
             await prisma.calendarEvent.update({
               where: { id },
@@ -573,12 +575,11 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
         default:
           throw new ValidationError(
             "Invalid delete scope. Use 'this_only', 'this_and_future', or 'all'",
-            "deleteScope",
+            "deleteScope"
           );
       }
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String({ description: "Recurring event ID" }),
       }),
@@ -589,7 +590,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           t.Literal("all"),
         ]),
         occurrenceDate: t.Optional(
-          t.String({ description: "ISO date of the specific occurrence" }),
+          t.String({ description: "ISO date of the specific occurrence" })
         ),
       }),
       detail: {
@@ -605,7 +606,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           404: { description: "Recurring event not found" },
         },
       },
-    },
+    }
   )
 
   // Get common recurrence patterns
@@ -638,13 +639,12 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           },
           weekdays: {
             rule: patterns.weekdays(),
-            description: "Every weekday (Monday to Friday)",
+            description: "Every weekday",
           },
         },
       };
     },
     {
-      auth: true,
       detail: {
         tags: ["Recurring"],
         summary: "Get common recurrence patterns",
@@ -676,5 +676,5 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           401: { description: "Unauthorized" },
         },
       },
-    },
+    }
   );
