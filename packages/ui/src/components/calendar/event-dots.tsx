@@ -40,6 +40,15 @@ export function EventDots({
 }: EventDotsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Add keyboard shortcuts for numbered event selection - must be called before any early returns
+  useNumberedShortcuts(
+    events.map((event) => () => {
+      setIsExpanded(false);
+      onClick?.(event);
+    }),
+    isExpanded
+  );
+
   if (events.length === 0) return null;
 
   // If only one event, render it normally
@@ -64,21 +73,12 @@ export function EventDots({
 
   // For multiple events with same time, show dots
   const primaryEvent = events[0];
-  
+
   // Safety check - if no primary event, return null
   if (!primaryEvent) {
     return null;
   }
   const remainingCount = events.length - 1;
-
-  // Add keyboard shortcuts for numbered event selection
-  useNumberedShortcuts(
-    events.map((event) => () => {
-      setIsExpanded(false);
-      onClick?.(event);
-    }),
-    isExpanded
-  );
 
   return (
     <div className={cn("relative", className)} style={style}>

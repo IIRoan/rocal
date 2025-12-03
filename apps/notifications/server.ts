@@ -9,7 +9,7 @@ import { PrismaClient } from "@prisma/client";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as dotenv from "dotenv";
-import { EventReminderEmail } from "./emails/templates/event-reminder.tsx";
+import { EventReminderEmail } from "./emails/templates/event-reminder";
 
 // Load environment variables
 const envResult = dotenv.config();

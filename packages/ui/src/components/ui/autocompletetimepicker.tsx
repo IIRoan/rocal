@@ -27,6 +27,8 @@ interface TimePickerProps {
   locale?: string;
   timeZone?: string;
   placeholder?: string;
+  className?: string;
+  inline?: boolean;
 }
 
 export function ShadcnAutocomleteTimePicker({
@@ -36,6 +38,8 @@ export function ShadcnAutocomleteTimePicker({
   locale = "en-US",
   timeZone = currentTimezone,
   placeholder = "Select time...",
+  className,
+  inline = false,
 }: TimePickerProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -121,30 +125,43 @@ export function ShadcnAutocomleteTimePicker({
       }}
     >
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-        >
-          <div className="flex items-center">
-            <Clock className="mr-2 h-4 w-4" data-testid="ClockIcon" />
+        {inline ? (
+          <button
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              "outline-none text-foreground font-semibold hover:text-primary transition-colors duration-150 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-primary after:opacity-0 hover:after:opacity-100 after:transition-opacity",
+              className
+            )}
+          >
             {currentTimeString}
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
+          </button>
+        ) : (
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn("w-full justify-between", className)}
+          >
+            <div className="flex items-center">
+              <Clock className="mr-2 h-4 w-4" data-testid="ClockIcon" />
+              {currentTimeString}
+            </div>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        )}
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[200px] p-0"
+      <PopoverContent
+        className="w-[200px] p-0 border-border shadow-lg"
         onOpenAutoFocus={(e) => {
           e.preventDefault();
           // Scroll to selected item after popover opens
           setTimeout(scrollToSelectedItem, 100);
         }}
       >
-        <Command>
+        <Command className="border-none">
           <CommandInput
-            placeholder="Search or type time (e.g. 0:05)..."
+            placeholder="Search or type time..."
             data-testid="CommandInput"
             value={searchValue}
             onValueChange={setSearchValue}
@@ -157,29 +174,30 @@ export function ShadcnAutocomleteTimePicker({
                 }
               }
             }}
+            className="border-b border-border text-sm font-medium"
           />
-          <CommandList 
+          <CommandList
             ref={commandListRef}
             className="max-h-[200px] overflow-y-auto"
             onWheel={(e) => e.stopPropagation()}
           >
-            <CommandEmpty>No time found.</CommandEmpty>
+            <CommandEmpty className="text-sm text-muted-foreground py-6 text-center">No time found.</CommandEmpty>
             {searchValue && isValidCustomTime(searchValue) && (
-              <CommandGroup heading="Custom Time">
+              <CommandGroup heading="Custom Time" className="px-2 py-1.5">
                 <CommandItem
                   value={`custom-${searchValue}`}
                   onSelect={() => {
                     handleCustomTimeInput(searchValue);
                     setSearchValue("");
                   }}
-                  className="text-blue-600 font-medium"
+                  className="text-primary font-semibold rounded-md px-2 py-1.5 cursor-pointer hover:bg-accent"
                 >
                   <Clock className="mr-2 h-4 w-4" />
                   Use "{searchValue}" (Press Enter)
                 </CommandItem>
               </CommandGroup>
             )}
-            <CommandGroup>
+            <CommandGroup className="px-2 py-1">
               {timeOptions.map((time, index) => {
                 const timeString = formatTime(time);
                 const isSelected =
@@ -190,11 +208,15 @@ export function ShadcnAutocomleteTimePicker({
                     key={index}
                     value={timeString}
                     onSelect={() => handleSelect(time)}
+                    className={cn(
+                      "rounded-md px-2 py-1.5 cursor-pointer font-medium text-sm",
+                      isSelected && "bg-accent text-foreground"
+                    )}
                   >
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        isSelected ? "opacity-100" : "opacity-0"
+                        isSelected ? "opacity-100 text-primary" : "opacity-0"
                       )}
                     />
                     {timeString}
