@@ -33,7 +33,6 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       return { categories: categoriesWithCount };
     },
     {
-      auth: true,
     },
   )
 
@@ -81,7 +80,6 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       return category;
     },
     {
-      auth: true,
       body: t.Object({
         name: t.String(),
         color: t.String(),
@@ -148,7 +146,6 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       return updatedCategory;
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String(),
       }),
@@ -195,7 +192,6 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       return { success: true, message: "Category deleted successfully" };
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String(),
       }),

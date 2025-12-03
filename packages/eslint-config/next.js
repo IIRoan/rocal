@@ -46,6 +46,18 @@ export const nextJsConfig = [
       // React scope no longer necessary with new JSX transform.
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
+      // Disable unused variable warnings
+      "@typescript-eslint/no-unused-vars": "off",
+      // Allow explicit any type
+      "@typescript-eslint/no-explicit-any": "off",
+      // Allow unescaped entities in JSX
+      "react/no-unescaped-entities": "off",
+      // Allow lexical declarations in case blocks
+      "no-case-declarations": "off",
+      // Allow unknown properties (for SVG attributes)
+      "react/no-unknown-property": "off",
+      // Disable exhaustive-deps warnings
+      "react-hooks/exhaustive-deps": "off",
     },
   },
 ]

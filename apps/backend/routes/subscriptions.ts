@@ -26,7 +26,6 @@ export const subscriptionsRoute = new Elysia()
       return subscriptions;
     },
     {
-      auth: true,
       detail: {
         tags: ['Calendar Subscriptions'],
         summary: 'Get all calendar subscriptions for user',
@@ -143,7 +142,6 @@ export const subscriptionsRoute = new Elysia()
       return subscription;
     },
     {
-      auth: true,
       body: t.Object({
         name: t.Optional(t.String()),
         url: t.String({ format: 'uri' }),
@@ -189,7 +187,6 @@ export const subscriptionsRoute = new Elysia()
       return updatedSubscription;
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String(),
       }),
@@ -253,7 +250,6 @@ export const subscriptionsRoute = new Elysia()
       return { success: true };
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String(),
       }),
@@ -291,7 +287,6 @@ export const subscriptionsRoute = new Elysia()
       return syncResult;
     },
     {
-      auth: true,
       params: t.Object({
         id: t.String(),
       }),
@@ -385,7 +380,6 @@ export const subscriptionsRoute = new Elysia()
       };
     },
     {
-      auth: true,
       body: t.Object({
         calendarId: t.String(),
         icsContent: t.String(),

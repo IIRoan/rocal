@@ -89,7 +89,7 @@ export function EventsPopup({
   return (
     <div
       ref={popupRef}
-      className="bg-background absolute z-50 max-h-96 w-80 overflow-auto rounded-md border shadow-lg"
+      className="bg-background absolute z-50 max-h-96 w-80 overflow-auto rounded-md border shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
       style={{
         top: `${adjustedPosition.top}px`,
         left: `${adjustedPosition.left}px`,
@@ -99,7 +99,7 @@ export function EventsPopup({
         <h3 className="font-medium">{format(date, "d MMMM yyyy")}</h3>
         <button
           onClick={onClose}
-          className="hover:bg-muted rounded-full p-1"
+          className="hover:bg-muted rounded-full p-1 transition-colors duration-150"
           aria-label="Close"
         >
           <XIcon className="h-4 w-4" />

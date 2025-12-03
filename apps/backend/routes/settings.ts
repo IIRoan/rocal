@@ -25,7 +25,6 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       return settings;
     },
     {
-      auth: true,
       detail: {
         tags: ["Settings"],
         summary: "Get user settings",
@@ -161,7 +160,6 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       return settings;
     },
     {
-      auth: true,
       body: t.Object({
         theme: t.Optional(
           t.Union([t.Literal("light"), t.Literal("dark"), t.Literal("system")]),
@@ -285,7 +283,6 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       };
     },
     {
-      auth: true,
       detail: {
         tags: ["Settings"],
         summary: "Reset user settings",
