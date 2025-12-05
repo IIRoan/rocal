@@ -303,7 +303,10 @@ export function EventEditor({
                           <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                           <span className="truncate">
                             {eventForm.eventStartDate
-                              ? format(eventForm.eventStartDate, "EEEE, MMMM d, yyyy")
+                              ? format(
+                                  eventForm.eventStartDate,
+                                  "EEEE, MMMM d, yyyy"
+                                )
                               : "Select date"}
                           </span>
                         </Button>
@@ -348,7 +351,9 @@ export function EventEditor({
                             inline
                             className="text-sm py-1 min-w-[60px] text-center"
                           />
-                          <span className="text-muted-foreground text-sm">→</span>
+                          <span className="text-muted-foreground text-sm">
+                            →
+                          </span>
                           <ShadcnAutocomleteTimePicker
                             value={(() => {
                               const [hours, minutes] = eventForm.eventEndTime
@@ -388,7 +393,9 @@ export function EventEditor({
                       <div className="flex items-center justify-between bg-background border border-border rounded-md px-4 h-9 hover:border-primary/50 transition-all">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-foreground font-medium">All Day Event</span>
+                          <span className="text-sm text-foreground font-medium">
+                            All Day Event
+                          </span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Checkbox
@@ -419,7 +426,7 @@ export function EventEditor({
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowLocation(true)}
-                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <MapPin className="mr-1.5 h-3.5 w-3.5" /> Location
                   </Button>
@@ -429,7 +436,7 @@ export function EventEditor({
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowDescription(true)}
-                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <FileText className="mr-1.5 h-3.5 w-3.5" /> Description
                   </Button>
@@ -439,7 +446,7 @@ export function EventEditor({
                     variant="ghost"
                     size="sm"
                     onClick={() => eventForm.setIsRecurring(true)}
-                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Repeat
                   </Button>
@@ -449,7 +456,7 @@ export function EventEditor({
                     variant="ghost"
                     size="sm"
                     onClick={() => eventForm.setShowNotifications(true)}
-                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+                    className="h-8 text-xs px-3 font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <Bell className="mr-1.5 h-3.5 w-3.5" /> Reminders
                   </Button>
@@ -535,16 +542,14 @@ export function EventEditor({
                         <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    <div className="p-3 rounded-lg border border-border bg-card/30 hover:border-primary/30 transition-all">
-                      <RecurringEventForm
-                        isRecurring={eventForm.isRecurring}
-                        onIsRecurringChange={eventForm.setIsRecurring}
-                        recurrenceRule={eventForm.recurrenceRule}
-                        onRecurrenceRuleChange={eventForm.setRecurrenceRule}
-                        eventStartDate={eventForm.eventStartDate}
-                        eventEndDate={eventForm.eventEndDate}
-                      />
-                    </div>
+                    <RecurringEventForm
+                      isRecurring={eventForm.isRecurring}
+                      onIsRecurringChange={eventForm.setIsRecurring}
+                      recurrenceRule={eventForm.recurrenceRule}
+                      onRecurrenceRuleChange={eventForm.setRecurrenceRule}
+                      eventStartDate={eventForm.eventStartDate}
+                      eventEndDate={eventForm.eventEndDate}
+                    />
                   </div>
                 )}
 
