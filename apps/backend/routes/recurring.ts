@@ -2,8 +2,12 @@ import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
 import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
+import { requireAuth } from "../lib/auth-guard";
+import { auth } from "../lib/auth";
+import { ensureAuthenticatedUser } from "../lib/auth-utils";
 
 export const recurringRoutes = new Elysia({ prefix: "/recurring" })
+  .use(requireAuth)
   // Validate recurrence rule
   .post(
     "/validate",
@@ -221,7 +225,10 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
   // Edit recurring event series
   .put(
     "/event/:id",
-    async ({ params, body, user }: any) => {
+    async ({ params, body, user, request }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       const { id } = params;
       const { editScope, updates } = body;
 
@@ -417,7 +424,10 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
   // Delete recurring event series
   .delete(
     "/event/:id",
-    async ({ params, query, user }: any) => {
+    async ({ params, query, user, request }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       const { id } = params;
       const { deleteScope, occurrenceDate } = query;
 

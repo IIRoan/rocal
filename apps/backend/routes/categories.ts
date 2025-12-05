@@ -1,10 +1,16 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
+import { requireAuth } from "../lib/auth-guard";
+
+import { auth } from "../lib/auth";
+import { ensureAuthenticatedUser } from "../lib/auth-utils";
 
 export const categoriesRoutes = new Elysia({ prefix: "/categories" })
+  .use(requireAuth)
   .get(
     "/",
-    async ({ user }: any) => {
+    async ({ user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
       // Fetch user's active categories with usage count
       const categories = await prisma.eventCategory.findMany({
         where: {
@@ -32,13 +38,15 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
 
       return { categories: categoriesWithCount };
     },
-    {
-    },
+    {}
   )
 
   .post(
     "/",
-    async ({ body, user }: any) => {
+    async ({ body, user, request }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       const { name, color } = body;
 
       // Validate required fields
@@ -52,7 +60,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
 
       if (!allowedColors.includes(color) && !isHexColor) {
         throw new Error(
-          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`
         );
       }
 
@@ -84,12 +92,15 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.String(),
         color: t.String(),
       }),
-    },
+    }
   )
 
   .put(
     "/:id",
-    async ({ params, body, user }: any) => {
+    async ({ params, body, user, request }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       const { id } = params;
       const updates = body;
 
@@ -109,12 +120,12 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       if (updates.color) {
         const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
         const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-          updates.color,
+          updates.color
         );
 
         if (!allowedColors.includes(updates.color) && !isHexColor) {
           throw new Error(
-            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`
           );
         }
       }
@@ -153,12 +164,15 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
       }),
-    },
+    }
   )
 
   .delete(
     "/:id",
-    async ({ params, user }: any) => {
+    async ({ params, user, request }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       const { id } = params;
 
       // Verify category ownership
@@ -195,5 +209,5 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       params: t.Object({
         id: t.String(),
       }),
-    },
+    }
   );

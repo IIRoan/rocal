@@ -9,27 +9,29 @@ import { settingsRoutes } from "./routes/settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
-import { errorHandler } from "./lib/errors";
+import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 
-// Better Auth middleware following the documentation pattern
+// Better Auth middleware
 const betterAuth = new Elysia({ name: "better-auth" })
   .mount(auth.handler)
-  .macro({
-    auth: {
-      async resolve({ status, request: { headers } }) {
-        const session = await auth.api.getSession({
-          headers,
-        });
+  .derive(async ({ request }) => {
+    try {
+      const session = await auth.api.getSession({
+        headers: request.headers as Headers,
+      });
 
-        if (!session) return status(401);
-
-        return {
-          user: session.user,
-          session: session.session,
-        };
-      },
-    },
+      return {
+        user: session?.user,
+        session: session?.session,
+      };
+    } catch (error) {
+      console.error("Auth Middleware Error:", error);
+      return {
+        user: null,
+        session: null,
+      };
+    }
   });
 
 export const createAPI = (prefix = "") => {
@@ -61,7 +63,10 @@ export const createAPI = (prefix = "") => {
               description: "Notification system endpoints",
             },
             { name: "Recurring", description: "Recurring events endpoints" },
-            { name: "Calendar Subscriptions", description: "External calendar subscription endpoints" },
+            {
+              name: "Calendar Subscriptions",
+              description: "External calendar subscription endpoints",
+            },
           ],
           components: {
             securitySchemes: {
@@ -110,13 +115,26 @@ export const createAPI = (prefix = "") => {
         detail: { tags: ["Auth"] },
       }
     )
-    .get("/user", ({ user }) => user, {
-      auth: true,
-      detail: {
-        tags: ["Auth"],
-        security: [{ bearerAuth: [] }],
+    .get(
+      "/user",
+      async ({ request }) => {
+        const session = await auth.api.getSession({
+          headers: request.headers as Headers,
+        });
+
+        if (!session) {
+          throw new UnauthorizedError();
+        }
+
+        return session.user;
       },
-    })
+      {
+        detail: {
+          tags: ["Auth"],
+          security: [{ bearerAuth: [] }],
+        },
+      }
+    )
     .get(
       "/test",
       () => ({
@@ -140,7 +158,7 @@ export const createAPI = (prefix = "") => {
 if (require.main === module) {
   const port = process.env.PORT || 3001;
   const app = createAPI();
-  
+
   app.listen(port, () => {
     console.log(`🚀 Server is running on http://localhost:${port}`);
   });

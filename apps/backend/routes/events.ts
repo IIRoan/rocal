@@ -4,12 +4,40 @@ import { ValidationError } from "../lib/errors";
 import { ensureUserCalendars } from "../lib/user-setup";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
+import { requireAuth } from "../lib/auth-guard";
+
+import { auth } from "../lib/auth";
+import { ensureAuthenticatedUser } from "../lib/auth-utils";
 
 export const eventsRoutes = new Elysia({ prefix: "/events" })
+  .use(requireAuth)
   .get(
     "/",
-    async ({ query, user }: any) => {
+    async ({ query, user, request }: any) => {
       const { start, end } = query;
+
+      // Robust user check with fallback
+      if (!user || !user.id) {
+        try {
+          // Fallback: Try to fetch session directly using request headers
+          const session = await auth.api.getSession({
+            headers: request.headers as Headers,
+          });
+
+          if (session?.user?.id) {
+            user = session.user;
+          } else {
+            console.error("User missing in events handler and fallback failed");
+            throw new Error("User context missing");
+          }
+        } catch (e) {
+          console.error(
+            "User missing in events handler and fallback failed",
+            e
+          );
+          throw new Error("User context missing");
+        }
+      }
 
       // Ensure user has default calendars
       await ensureUserCalendars(user.id);
@@ -87,21 +115,22 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       const recurringInstances = [];
       for (const recurringEvent of recurringEvents) {
         try {
-
-
           // Debug: Try to parse the recurrence rule
-          let recurrenceRule = recurringEvent.recurrence || '{}';
-          const parsedRule = RecurrenceEngine.parseRecurrenceRule(recurrenceRule);
-
+          let recurrenceRule = recurringEvent.recurrence || "{}";
+          const parsedRule =
+            RecurrenceEngine.parseRecurrenceRule(recurrenceRule);
 
           // TEMPORARY FIX: If we have an empty recurrence rule but the title suggests it's recurring
-          if (!parsedRule && (recurringEvent.title.toLowerCase().includes('standup') || recurringEvent.title.toLowerCase().includes('daily'))) {
-
+          if (
+            !parsedRule &&
+            (recurringEvent.title.toLowerCase().includes("standup") ||
+              recurringEvent.title.toLowerCase().includes("daily"))
+          ) {
             // Create a daily weekday recurrence rule (Mon-Fri)
             recurrenceRule = JSON.stringify({
-              frequency: 'daily',
+              frequency: "daily",
               interval: 1,
-              byWeekDay: [1, 2, 3, 4, 5] // Mon-Fri
+              byWeekDay: [1, 2, 3, 4, 5], // Mon-Fri
             });
           }
 
@@ -109,8 +138,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             exceptionDate: ex.exceptionDate,
             type: ex.type as "modified" | "deleted",
           }));
-          
-
 
           const instances = RecurrenceEngine.generateInstances(
             {
@@ -123,8 +150,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             endDate,
             exceptions
           );
-
-
 
           // Convert instances to events
           for (const instance of instances) {
@@ -193,13 +218,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       ].sort((a, b) => a.start.getTime() - b.start.getTime());
 
       // Debug: Log synced events for troubleshooting
-      const syncedEvents = events.filter(e => e.isSynced);
-
-
-
-
-
-
+      const syncedEvents = events.filter((e) => e.isSynced);
 
       // Fetch user's categories for efficient frontend rendering
       const categories = await prisma.eventCategory.findMany({
@@ -305,7 +324,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
   .post(
     "/",
-    async ({ body, user }: any) => {
+    async ({ body, user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         const { title, start, end } = body;
 
@@ -505,11 +526,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
             if (userSettings?.emailNotifications !== false) {
               // Calculate notification time
-              const { NotificationCalculator } = await import("../lib/notification-calculator");
-              const notificationTime = NotificationCalculator.calculateNotificationTime(
-                startDate,
-                body.reminder
-              );
+              const { NotificationCalculator } =
+                await import("../lib/notification-calculator");
+              const notificationTime =
+                NotificationCalculator.calculateNotificationTime(
+                  startDate,
+                  body.reminder
+                );
 
               // Only create if notification is in the future
               if (notificationTime > new Date()) {
@@ -523,17 +546,16 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                   },
                 });
               } else {
-                console.log(`Skipping creating past notification for event ${event.id}`);
+                console.log(
+                  `Skipping creating past notification for event ${event.id}`
+                );
               }
 
               console.log(`✓ Created notification for event ${event.id}`);
             }
           }
         } catch (notificationError) {
-          console.error(
-            "Failed to create notifications:",
-            notificationError
-          );
+          console.error("Failed to create notifications:", notificationError);
           // Don't fail the event creation if notifications fail
         }
 
@@ -656,17 +678,25 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
   .put(
     "/:id",
-    async ({ params, body, user }: any) => {
+    async ({ params, body, user, request }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         const { id: requestedId } = params;
 
         // Check if this is a recurring instance ID (contains underscore and ISO date)
         let id = requestedId;
-        if (id.includes('_') && id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+        if (
+          id.includes("_") &&
+          id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+        ) {
           // Extract parent event ID from instance ID
-          const parentEventId = id.split('_')[0];
-          console.log(`Redirecting edit request from instance ${id} to parent ${parentEventId}`);
-          
+          const parentEventId = id.split("_")[0];
+          console.log(
+            `Redirecting edit request from instance ${id} to parent ${parentEventId}`
+          );
+
           // Update the parent event instead
           id = parentEventId;
         }
@@ -686,7 +716,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         // Check if the event is synced - synced events cannot be edited
         if (existingEvent.isSynced) {
-          throw new ValidationError("Cannot edit synced events. Synced events are read-only.");
+          throw new ValidationError(
+            "Cannot edit synced events. Synced events are read-only."
+          );
         }
 
         // Validate dates if provided
@@ -718,11 +750,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         let finalEndDate = endDate || existingEvent.end;
 
         // Normalize all-day boundaries if the event is or becomes all-day
-        const willBeAllDay = body.allDay !== undefined ? !!body.allDay : !!existingEvent.allDay;
+        const willBeAllDay =
+          body.allDay !== undefined ? !!body.allDay : !!existingEvent.allDay;
         if (willBeAllDay) {
           // Only adjust the dates that are being changed; keep others as-is
-          if (startDate) finalStartDate = new Date(finalStartDate.setHours(0, 0, 0, 0));
-          if (endDate) finalEndDate = new Date(finalEndDate.setHours(23, 59, 59, 999));
+          if (startDate)
+            finalStartDate = new Date(finalStartDate.setHours(0, 0, 0, 0));
+          if (endDate)
+            finalEndDate = new Date(finalEndDate.setHours(23, 59, 59, 999));
         }
 
         // Validate date logic
@@ -925,7 +960,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
           if (timeChanged || reminderChanged) {
             // Get current notification configurations or create from reminder
-            let notificationConfigs: { notificationType: "email" | "browser"; minutesBefore: number; isEnabled: boolean; }[] = [];
+            let notificationConfigs: {
+              notificationType: "email" | "browser";
+              minutesBefore: number;
+              isEnabled: boolean;
+            }[] = [];
 
             // If reminder was updated, use the new reminder value
             if (reminderChanged) {
@@ -967,13 +1006,15 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
             // Create new notifications based on configurations
             if (notificationConfigs.length > 0) {
-              const { NotificationCalculator } = await import("../lib/notification-calculator");
+              const { NotificationCalculator } =
+                await import("../lib/notification-calculator");
               const now = new Date();
               for (const config of notificationConfigs) {
-                const notificationTime = NotificationCalculator.calculateNotificationTime(
-                  finalStartDate,
-                  config.minutesBefore,
-                );
+                const notificationTime =
+                  NotificationCalculator.calculateNotificationTime(
+                    finalStartDate,
+                    config.minutesBefore
+                  );
                 // Skip past notification times
                 if (notificationTime <= now) continue;
                 await prisma.eventNotification.create({
@@ -1140,17 +1181,24 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
   .delete(
     "/:id",
-    async ({ params, user }: any) => {
+    async ({ params, user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         const { id: requestedId } = params;
 
         // Check if this is a recurring instance ID (contains underscore and ISO date)
         let id = requestedId;
-        if (id.includes('_') && id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+        if (
+          id.includes("_") &&
+          id.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+        ) {
           // Extract parent event ID from instance ID
-          const parentEventId = id.split('_')[0];
-          console.log(`Redirecting delete request from instance ${id} to parent ${parentEventId}`);
-          
+          const parentEventId = id.split("_")[0];
+          console.log(
+            `Redirecting delete request from instance ${id} to parent ${parentEventId}`
+          );
+
           // Delete the parent event instead
           id = parentEventId;
         }
@@ -1169,7 +1217,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         // Check if the event is synced - synced events cannot be deleted
         if (existingEvent.isSynced) {
-          throw new ValidationError("Cannot delete synced events. Synced events are read-only.");
+          throw new ValidationError(
+            "Cannot delete synced events. Synced events are read-only."
+          );
         }
 
         // Clean up associated notifications
@@ -1245,7 +1295,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
   .post(
     "/bulk",
-    async ({ body, user }: any) => {
+    async ({ body, user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         const { action, eventIds, targetCalendarId } = body;
 
@@ -1270,10 +1322,10 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         }
 
         // Check if any of the events are synced - synced events cannot be modified
-        const syncedEvents = events.filter(event => event.isSynced);
+        const syncedEvents = events.filter((event) => event.isSynced);
         if (syncedEvents.length > 0) {
           throw new ValidationError(
-            `Cannot modify synced events. The following synced events are read-only: ${syncedEvents.map(e => e.title).join(', ')}`
+            `Cannot modify synced events. The following synced events are read-only: ${syncedEvents.map((e) => e.title).join(", ")}`
           );
         }
 
@@ -1324,9 +1376,10 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
           case "delete":
             // Clean up associated notifications
-            const deletedNotifications = await prisma.eventNotification.deleteMany({
-              where: { eventId: { in: eventIds } },
-            });
+            const deletedNotifications =
+              await prisma.eventNotification.deleteMany({
+                where: { eventId: { in: eventIds } },
+              });
             console.log(
               `✓ Deleted ${deletedNotifications.count} notifications for ${eventIds.length} events`
             );
@@ -1386,12 +1439,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                   });
 
                   if (userSettings?.emailNotifications !== false) {
-                    const { NotificationCalculator } = await import("../lib/notification-calculator");
-                    
-                    const notificationTime = NotificationCalculator.calculateNotificationTime(
-                      duplicated.start,
-                      event.reminder
-                    );
+                    const { NotificationCalculator } =
+                      await import("../lib/notification-calculator");
+
+                    const notificationTime =
+                      NotificationCalculator.calculateNotificationTime(
+                        duplicated.start,
+                        event.reminder
+                      );
 
                     await prisma.eventNotification.create({
                       data: {
