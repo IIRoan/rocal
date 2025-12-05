@@ -6,6 +6,9 @@ import {
   ForbiddenError,
 } from "../lib/errors";
 import { prisma } from "../lib/prisma";
+import { requireAuth } from "../lib/auth-guard";
+import { auth } from "../lib/auth";
+import { ensureAuthenticatedUser } from "../lib/auth-utils";
 
 // Rate limiting configuration
 const RATE_LIMITS = {
@@ -94,7 +97,10 @@ function validateNotificationConfig(config: any): void {
  */
 async function validateEventOwnership(eventId: string, userId: string) {
   // Check if this is a recurring instance ID or synced event - just return null for these
-  if (eventId.includes('_') && eventId.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+  if (
+    eventId.includes("_") &&
+    eventId.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+  ) {
     return null; // Recurring instances don't have notifications
   }
 
@@ -116,10 +122,13 @@ async function validateEventOwnership(eventId: string, userId: string) {
 }
 
 export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
-
+  .use(requireAuth)
   .get(
     "/event/:eventId",
     async ({ params, user, request, set }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         // Apply rate limiting
         rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({ request, set, user });
@@ -263,6 +272,9 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
   .put(
     "/event/:eventId",
     async ({ params, body, user, request, set }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         // Apply rate limiting
         rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({ request, set, user });
@@ -356,7 +368,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           }
 
           const notificationTime = new Date(
-            event.start.getTime() - config.minutesBefore * 60 * 1000,
+            event.start.getTime() - config.minutesBefore * 60 * 1000
           );
           if (notificationTime <= now) {
             skippedConfigurations.push({
@@ -462,6 +474,9 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
   .delete(
     "/event/:eventId",
     async ({ params, user, request, set }: any) => {
+      // Robust user check with fallback
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       try {
         // Apply rate limiting
         rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({ request, set, user });
@@ -548,8 +563,6 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         },
       },
     }
-  )
+  );
 
-  // Status, debug, and cleanup routes removed - handled by separate notification server
-
-  ;
+// Status, debug, and cleanup routes removed - handled by separate notification server

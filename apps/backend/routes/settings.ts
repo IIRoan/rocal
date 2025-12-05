@@ -1,11 +1,17 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
+import { requireAuth } from "../lib/auth-guard";
+import { ensureAuthenticatedUser } from "../lib/auth-utils";
+
+import { auth } from "../lib/auth";
 
 export const settingsRoutes = new Elysia({ prefix: "/settings" })
+  .use(requireAuth)
   .get(
     "/",
-    async ({ user }: any) => {
+    async ({ user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
       // Get user settings, create default if doesn't exist
       let settings = await prisma.userSettings.findUnique({
         where: {
@@ -74,13 +80,14 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           },
         },
       },
-    },
+    }
   )
 
   .put(
     "/",
-    async ({ body, user }: any) => {
-      // Validate timezone if provided
+    async ({ body, user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+      const { name, color, isDefault } = body;
       if (body.timezone) {
         try {
           Intl.DateTimeFormat(undefined, { timeZone: body.timezone });
@@ -97,7 +104,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
         if (body.workingHoursStart >= body.workingHoursEnd) {
           throw new ValidationError(
             "Working hours start must be before working hours end",
-            "workingHoursStart",
+            "workingHoursStart"
           );
         }
       }
@@ -109,18 +116,18 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           if (
             !Array.isArray(workingDays) ||
             !workingDays.every(
-              (day) => typeof day === "number" && day >= 0 && day <= 6,
+              (day) => typeof day === "number" && day >= 0 && day <= 6
             )
           ) {
             throw new ValidationError(
               "Working days must be a JSON array of numbers 0-6",
-              "workingDays",
+              "workingDays"
             );
           }
         } catch (error) {
           throw new ValidationError(
             "Invalid working days format - must be valid JSON array",
-            "workingDays",
+            "workingDays"
           );
         }
       }
@@ -137,7 +144,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
         if (!calendar) {
           throw new ValidationError(
             "Invalid default calendar or calendar does not belong to user",
-            "defaultCalendarId",
+            "defaultCalendarId"
           );
         }
       }
@@ -162,7 +169,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
     {
       body: t.Object({
         theme: t.Optional(
-          t.Union([t.Literal("light"), t.Literal("dark"), t.Literal("system")]),
+          t.Union([t.Literal("light"), t.Literal("dark"), t.Literal("system")])
         ),
         defaultView: t.Optional(
           t.Union([
@@ -170,7 +177,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
             t.Literal("week"),
             t.Literal("day"),
             t.Literal("agenda"),
-          ]),
+          ])
         ),
         weekStartDay: t.Optional(t.Number({ minimum: 0, maximum: 6 })),
         timezone: t.Optional(t.String()),
@@ -182,7 +189,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
         browserNotifications: t.Optional(t.Boolean()),
         reminderSound: t.Optional(t.Boolean()),
         defaultReminder: t.Optional(
-          t.Union([t.Number({ minimum: 1 }), t.Null()]),
+          t.Union([t.Number({ minimum: 1 }), t.Null()])
         ),
         defaultEventDuration: t.Optional(t.Number({ minimum: 1 })),
         defaultCalendarId: t.Optional(t.Union([t.String(), t.Null()])),
@@ -264,12 +271,14 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           },
         },
       },
-    },
+    }
   )
 
   .delete(
     "/",
-    async ({ user }: any) => {
+    async ({ user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
       // Delete user settings (will recreate with defaults on next GET)
       await prisma.userSettings.deleteMany({
         where: {
@@ -308,5 +317,5 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
           },
         },
       },
-    },
+    }
   );
