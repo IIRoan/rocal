@@ -148,7 +148,31 @@ export function EventEditor({
                   <Clock className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">
-                      {format(eventForm.eventStartDate, "EEEE, MMMM d, yyyy")}
+                      {(() => {
+                        const startStr = format(
+                          eventForm.eventStartDate,
+                          "EEEE, MMMM d, yyyy"
+                        );
+                        const endStr = format(
+                          eventForm.eventEndDate,
+                          "EEEE, MMMM d, yyyy"
+                        );
+                        const isSameDay = startStr === endStr;
+
+                        if (isSameDay) {
+                          return startStr;
+                        }
+                        // Multi-day event - show date range
+                        return (
+                          <>
+                            {format(eventForm.eventStartDate, "EEE, MMM d")}
+                            <span className="text-muted-foreground mx-1.5">
+                              →
+                            </span>
+                            {format(eventForm.eventEndDate, "EEE, MMM d, yyyy")}
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="text-muted-foreground text-xs">
                       {!eventForm.eventAllDay
@@ -289,45 +313,85 @@ export function EventEditor({
                     Date & Time
                   </Label>
                   <div className="space-y-2">
-                    {/* Date picker */}
-                    <Popover
-                      open={eventForm.startDateOpen}
-                      onOpenChange={eventForm.setStartDateOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-sm bg-background border-border hover:border-primary/50 transition-all font-medium justify-start text-foreground"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                          <span className="truncate">
-                            {eventForm.eventStartDate
-                              ? format(
-                                  eventForm.eventStartDate,
-                                  "EEEE, MMMM d, yyyy"
-                                )
-                              : "Select date"}
-                          </span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarUI
-                          mode="single"
-                          selected={eventForm.eventStartDate}
-                          weekStartsOn={1}
-                          onSelect={(date) => {
-                            if (date) {
-                              eventForm.setEventStartDate(date);
-                              if (date > eventForm.eventEndDate)
+                    {/* Date pickers - Start and End */}
+                    <div className="flex items-center gap-2">
+                      {/* Start Date */}
+                      <Popover
+                        open={eventForm.startDateOpen}
+                        onOpenChange={eventForm.setStartDateOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-9 text-sm bg-background border-border font-medium justify-start text-foreground"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {eventForm.eventStartDate
+                                ? format(eventForm.eventStartDate, "EEE, MMM d")
+                                : "Start date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarUI
+                            mode="single"
+                            selected={eventForm.eventStartDate}
+                            weekStartsOn={1}
+                            onSelect={(date) => {
+                              if (date) {
+                                eventForm.setEventStartDate(date);
+                                if (date > eventForm.eventEndDate)
+                                  eventForm.setEventEndDate(date);
+                                eventForm.setStartDateOpen(false);
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      <span className="text-muted-foreground text-sm font-medium">
+                        →
+                      </span>
+
+                      {/* End Date */}
+                      <Popover
+                        open={eventForm.endDateOpen}
+                        onOpenChange={eventForm.setEndDateOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-9 text-sm bg-background border-border font-medium justify-start text-foreground"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {eventForm.eventEndDate
+                                ? format(eventForm.eventEndDate, "EEE, MMM d")
+                                : "End date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <CalendarUI
+                            mode="single"
+                            selected={eventForm.eventEndDate}
+                            weekStartsOn={1}
+                            disabled={(date) => date < eventForm.eventStartDate}
+                            onSelect={(date) => {
+                              if (date) {
                                 eventForm.setEventEndDate(date);
-                              eventForm.setStartDateOpen(false);
-                            }
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                                eventForm.setEndDateOpen(false);
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
 
                     {/* Time & All-day */}
                     {!eventForm.eventAllDay ? (
