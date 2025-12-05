@@ -435,9 +435,7 @@ export function useEventForm({
         updatedAt: new Date(),
         reminder: undefined,
         recurrence:
-          isRecurring && recurrenceRule
-            ? JSON.stringify(recurrenceRule)
-            : undefined,
+          isRecurring && recurrenceRule ? JSON.stringify(recurrenceRule) : null,
       };
 
       // Convert legacy reminder to notification if needed
@@ -475,7 +473,7 @@ export function useEventForm({
             location: eventData.location,
             calendarId: eventData.calendarId,
             reminder: undefined,
-            recurrence: eventData.recurrence || undefined,
+            recurrence: eventData.recurrence ?? null,
           });
           toast.success(`Event "${eventTitle}" updated`);
         } else {
@@ -488,7 +486,7 @@ export function useEventForm({
             location: eventData.location,
             calendarId: eventData.calendarId,
             reminder: undefined,
-            recurrence: eventData.recurrence || undefined,
+            recurrence: eventData.recurrence ?? undefined,
           });
           savedEventId = newEvent.id;
           toast.success(`Event "${eventTitle}" created`);

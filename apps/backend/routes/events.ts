@@ -1122,9 +1122,13 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           ])
         ),
         recurrence: t.Optional(
-          t.String({
-            description: "JSON string of recurrence rule for recurring events",
-          })
+          t.Union([
+            t.String({
+              description:
+                "JSON string of recurrence rule for recurring events",
+            }),
+            t.Null(),
+          ])
         ),
       }),
       detail: {
