@@ -17,13 +17,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 COPY apps/notifications/package.json ./apps/notifications/
 
 # Copy any workspace packages that might be needed
-COPY packages/ ./packages/
-
+COPY packages ./packages/
 # Install dependencies (will install for entire workspace)
 RUN pnpm install --frozen-lockfile --filter notifications...
 
 # Copy notifications app source
-COPY apps/notifications/ ./apps/notifications/
+COPY apps/notifications ./apps/notifications/
 
 WORKDIR /app/apps/notifications
 
