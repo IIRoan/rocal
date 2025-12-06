@@ -40,11 +40,11 @@ function DialogOverlay({
       className={cn(
         // Base
         "fixed inset-0 z-50 bg-black/50",
-        // Animate opacity
-        "transition-[opacity,backdrop-filter] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+        // Animate opacity only (backdrop-filter transition causes issues in Firefox/Edge)
+        "transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-        // Subtle blur when supported
-        "supports-[backdrop-filter]:backdrop-blur-sm data-[state=open]:backdrop-blur-md",
+        // Subtle blur when supported (no transition - just applied)
+        "supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:data-[state=open]:backdrop-blur-md",
         // Respect reduced motion
         "motion-reduce:transition-none",
         className
@@ -126,7 +126,9 @@ function DialogContent({
           sizeDefaults,
           positionClasses,
           // No transition classes for center variant - handled by CSS
-          variant === "center" ? "" : "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+          variant === "center"
+            ? ""
+            : "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
           animationClasses,
           // Reduce motion support
           "motion-reduce:transition-none",
