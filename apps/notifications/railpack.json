@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "20"
+  },
+  "caches": {
+    "pnpm-store": {
+      "directory": "/root/.local/share/pnpm/store",
+      "type": "shared"
+    }
+  },
+  "steps": {
+    "install": {
+      "commands": [
+        { "cmd": "corepack enable" },
+        { "cmd": "corepack prepare pnpm@9.15.0 --activate" },
+        { "cmd": "pnpm install --frozen-lockfile" }
+      ],
+      "caches": ["pnpm-store"]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": [
+        { "cmd": "pnpm --filter notifications run prisma:generate" },
+        { "cmd": "pnpm --filter notifications run typecheck" }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "node --import tsx server.ts",
+    "variables": {
+      "NODE_ENV": "production"
+    }
+  }
+}
