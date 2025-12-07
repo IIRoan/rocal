@@ -28,8 +28,8 @@
       "commands": [
         { "cmd": "pnpm --filter backend run db:generate" },
         { "cmd": "pnpm --filter web run build" },
-        { "cmd": "cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static" },
-        { "cmd": "cp -r apps/web/public apps/web/.next/standalone/apps/web/public" }
+        { "cmd": "mkdir -p apps/web/.next/standalone/apps/web/.next && cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/" },
+        { "cmd": "mkdir -p apps/web/.next/standalone/apps/web && cp -r apps/web/public apps/web/.next/standalone/apps/web/" }
       ],
       "caches": ["next-cache"]
     }
