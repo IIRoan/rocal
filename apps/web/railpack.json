@@ -27,7 +27,9 @@
       "inputs": [{ "step": "install" }],
       "commands": [
         { "cmd": "pnpm --filter backend run db:generate" },
-        { "cmd": "pnpm --filter web run build" }
+        { "cmd": "pnpm --filter web run build" },
+        { "cmd": "cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static" },
+        { "cmd": "cp -r apps/web/public apps/web/.next/standalone/apps/web/public" }
       ],
       "caches": ["next-cache"]
     }
@@ -37,15 +39,11 @@
       {
         "step": "build",
         "include": [
-          "apps/web/.next/standalone/**",
-          "apps/web/.next/static/**",
-          "apps/web/public/**",
-          "apps/backend/**",
-          "node_modules/.pnpm/**"
+          "apps/web/.next/standalone/**"
         ]
       }
     ],
-    "startCommand": "node apps/web/.next/standalone/server.js",
+    "startCommand": "cd apps/web/.next/standalone && node apps/web/server.js",
     "variables": {
       "NODE_ENV": "production",
       "PORT": "3000",
