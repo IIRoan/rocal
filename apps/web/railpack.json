@@ -8,6 +8,10 @@
     "pnpm-store": {
       "directory": "/root/.local/share/pnpm/store",
       "type": "shared"
+    },
+    "next-cache": {
+      "directory": "apps/web/.next/cache",
+      "type": "shared"
     }
   },
   "steps": {
@@ -22,18 +26,21 @@
     "build": {
       "inputs": [{ "step": "install" }],
       "commands": [
-        { "cmd": "pnpm --filter notifications run prisma:generate" },
-        { "cmd": "pnpm --filter notifications run typecheck" }
-      ]
+        { "cmd": "pnpm --filter backend run db:generate" },
+        { "cmd": "pnpm --filter web run build" }
+      ],
+      "caches": ["next-cache"]
     }
   },
   "deploy": {
     "inputs": [
-      { "step": "build", "include": ["apps/notifications/**", "node_modules/**", "packages/**"] }
+      { "step": "build", "include": ["apps/web/.next/standalone/**", "apps/web/.next/static/**", "apps/web/public/**"] }
     ],
-    "startCommand": "node --import tsx apps/notifications/server.ts",
+    "startCommand": "node apps/web/.next/standalone/apps/web/server.js",
     "variables": {
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "PORT": "3000",
+      "HOSTNAME": "0.0.0.0"
     }
   }
 }

@@ -1,0 +1,10 @@
+[build]
+builder = "RAILPACK"
+watchPatterns = ["apps/web/**", "packages/ui/**", "packages/typescript-config/**", "pnpm-lock.yaml"]
+
+[deploy]
+startCommand = "node apps/web/.next/standalone/apps/web/server.js"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
