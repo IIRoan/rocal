@@ -34,9 +34,16 @@
   },
   "deploy": {
     "inputs": [
-      { "step": "build", "include": ["apps/web/.next/standalone/**", "apps/web/.next/static/**", "apps/web/public/**"] }
+      {
+        "step": "build",
+        "include": [
+          "apps/web/.next/standalone/**",
+          "apps/web/.next/static/**",
+          "apps/web/public/**"
+        ]
+      }
     ],
-    "startCommand": "node apps/web/.next/standalone/apps/web/server.js",
+    "startCommand": "node apps/web/.next/standalone/server.js",
     "variables": {
       "NODE_ENV": "production",
       "PORT": "3000",
