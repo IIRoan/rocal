@@ -28,7 +28,10 @@
     }
   },
   "deploy": {
-    "startCommand": "node --import tsx server.ts",
+    "inputs": [
+      { "step": "build", "include": ["apps/notifications/**", "node_modules/**", "packages/**"] }
+    ],
+    "startCommand": "node --import tsx apps/notifications/server.ts",
     "variables": {
       "NODE_ENV": "production"
     }

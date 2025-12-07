@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "20"
+  },
+  "caches": {
+    "pnpm-store": {
+      "directory": "/root/.local/share/pnpm/store",
+      "type": "shared"
+    },
+    "next-cache": {
+      "directory": "apps/web/.next/cache",
+      "type": "shared"
+    }
+  },
+  "steps": {
+    "install": {
+      "commands": [
+        { "cmd": "corepack enable" },
+        { "cmd": "corepack prepare pnpm@9.15.0 --activate" },
+        { "cmd": "pnpm install --frozen-lockfile" }
+      ],
+      "caches": ["pnpm-store"]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": [
+        { "cmd": "pnpm --filter backend run db:generate" },
+        { "cmd": "pnpm --filter web run build" }
+      ],
+      "caches": ["next-cache"]
+    }
+  },
+  "deploy": {
+    "inputs": [
+      { "step": "build", "include": ["apps/web/.next/standalone/**", "apps/web/.next/static/**", "apps/web/public/**"] }
+    ],
+    "startCommand": "node apps/web/.next/standalone/apps/web/server.js",
+    "variables": {
+      "NODE_ENV": "production",
+      "PORT": "3000",
+      "HOSTNAME": "0.0.0.0"
+    }
+  }
+}

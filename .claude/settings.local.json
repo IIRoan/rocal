@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(find:*)",
-      "Bash(pnpm run typecheck:*)"
+      "Bash(pnpm run typecheck:*)",
+      "WebFetch(domain:docs.railway.com)",
+      "WebFetch(domain:railpack.com)"
     ],
     "deny": [],
     "ask": []
