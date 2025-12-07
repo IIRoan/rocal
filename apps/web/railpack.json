@@ -39,7 +39,9 @@
         "include": [
           "apps/web/.next/standalone/**",
           "apps/web/.next/static/**",
-          "apps/web/public/**"
+          "apps/web/public/**",
+          "apps/backend/**",
+          "node_modules/.pnpm/**"
         ]
       }
     ],
