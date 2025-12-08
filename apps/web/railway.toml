@@ -1,7 +1,7 @@
 [build]
 builder = "RAILPACK"
 rootDirectory = "."
-buildCommand = "cd apps/web && bun install --frozen-lockfile && bun run build"
+buildCommand = "cd packages/ui && bun install --frozen-lockfile && cd ../../apps/web && bun install --frozen-lockfile && bun run build"
 watchPatterns = ["apps/web/**", "packages/ui/**", "packages/typescript-config/**", "bun.lockb"]
 
 [deploy]
