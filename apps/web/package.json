@@ -56,11 +56,14 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^20.19.25",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.22",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.0.8",
     "nanoid": "^5.1.6",
     "picocolors": "^1.1.1",
     "postcss": "^8.5.6",

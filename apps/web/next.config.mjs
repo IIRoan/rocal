@@ -7,12 +7,10 @@ const __dirname = path.dirname(__filename)
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        '@workspace/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
-        '@workspace/ui/*': path.resolve(__dirname, '../../packages/ui/src/*'),
-      },
+  turbopack: {
+    resolveAlias: {
+      '@workspace/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
+      '@workspace/ui/*': path.resolve(__dirname, '../../packages/ui/src/*'),
     },
   },
   webpack: (config) => {

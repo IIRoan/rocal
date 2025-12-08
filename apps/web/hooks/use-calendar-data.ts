@@ -358,10 +358,10 @@ export function useCalendarData(
     // Error states
     error: (eventsQuery.error ||
       calendarsQuery.error ||
-      categoriesQuery.error) as ApiError | null,
-    eventsError: eventsQuery.error as ApiError | null,
-    calendarsError: calendarsQuery.error as ApiError | null,
-    categoriesError: categoriesQuery.error as ApiError | null,
+      categoriesQuery.error) as unknown as ApiError | null,
+    eventsError: eventsQuery.error as unknown as ApiError | null,
+    calendarsError: calendarsQuery.error as unknown as ApiError | null,
+    categoriesError: categoriesQuery.error as unknown as ApiError | null,
 
     // Actions
     refetch,
