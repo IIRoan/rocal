@@ -7,13 +7,13 @@
   "steps": {
     "install": {
       "commands": [
-        { "cmd": "cd apps/backend && bun install" }
+        { "cmd": "bun install" }
       ]
     },
     "build": {
       "inputs": [{ "step": "install" }],
       "commands": [
-        { "cmd": "cd apps/backend && bun run db:generate" }
+        { "cmd": "bun run db:generate" }
       ]
     }
   },
@@ -22,12 +22,12 @@
       {
         "step": "build",
         "include": [
-          "apps/backend/**",
-          "!apps/backend/node_modules"
+          "**",
+          "!node_modules"
         ]
       }
     ],
-    "startCommand": "cd apps/backend && bun run start",
+    "startCommand": "bun run start",
     "variables": {
       "NODE_ENV": "production",
       "PORT": "3001",
