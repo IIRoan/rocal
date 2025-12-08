@@ -5,7 +5,7 @@ import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
 import type { Metadata } from "next";
-import "@workspace/ui/globals.css";
+import "./globals.css";
 
 const fontSans = Geist({
   variable: "--font-sans",
