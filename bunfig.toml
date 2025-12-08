@@ -1,0 +1,13 @@
+[install]
+# Configure workspace support
+workspaces = true
+
+# Use exact versions
+exact = false
+
+# Faster installs
+concurrent-fetch = true
+
+[install.lockfile]
+# Save lockfile
+save = true

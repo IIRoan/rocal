@@ -1,14 +1,14 @@
 {
   "name": "notifications",
   "type": "module",
-  "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "bun": ">=1.0.0"
   },
   "scripts": {
-    "dev": "tsx watch server.ts",
-    "start": "node --import tsx server.ts",
-    "build": "pnpm run prisma:generate && pnpm run typecheck",
+    "dev": "bun --watch server.ts",
+    "start": "bun server.ts",
+    "build": "bun run prisma:generate && bun run typecheck",
     "prisma:generate": "prisma generate",
     "prisma:deploy": "prisma migrate deploy",
     "typecheck": "tsc"
@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@prisma/client": "^6.12.0",
-    "tsx": "^4.19.2",
     "@react-email/components": "^0.4.0",
     "@react-email/render": "^1.1.4",
     "date-fns": "^4.1.0",
