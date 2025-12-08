@@ -2,23 +2,18 @@
   "name": "rocal",
   "version": "0.0.1",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "build": "bun run --filter='*' build",
-    "dev": "bun run --filter='web' dev & bun run --filter='backend' dev & bun run --filter='notifications' dev",
-    "dev:frontend": "bun run --filter='web' dev",
-    "dev:backend": "bun run --filter='backend' dev",
-    "dev:notifications": "bun run --filter='notifications' dev",
-    "lint": "bun run --filter='*' lint",
-    "typecheck": "bun run --filter='*' typecheck",
+    "install:all": "cd apps/backend && bun install && cd ../web && bun install && cd ../notifications && bun install",
+    "build": "cd apps/backend && bun run build && cd ../web && bun run build && cd ../notifications && bun run build",
+    "dev": "cd apps/backend && bun run dev & cd apps/web && bun run dev & cd apps/notifications && bun run dev",
+    "dev:frontend": "cd apps/web && bun run dev",
+    "dev:backend": "cd apps/backend && bun run dev",
+    "dev:notifications": "cd apps/notifications && bun run dev",
+    "lint": "cd apps/backend && bun run lint & cd apps/web && bun run lint & cd apps/notifications && bun run lint",
+    "typecheck": "cd apps/backend && bun run typecheck & cd apps/web && bun run typecheck & cd apps/notifications && bun run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
-    "@workspace/typescript-config": "workspace:*",
     "minimatch": "^10.1.1",
     "prettier": "^3.7.4",
     "typescript": "5.7.3"
