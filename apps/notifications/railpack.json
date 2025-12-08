@@ -2,28 +2,26 @@
   "$schema": "https://schema.railpack.com",
   "provider": "node",
   "packages": {
-    "node": "20"
+    "bun": "latest"
   },
   "caches": {
-    "pnpm-store": {
-      "directory": "/root/.local/share/pnpm/store",
+    "bun-cache": {
+      "directory": "/root/.bun/install/cache",
       "type": "shared"
     }
   },
   "steps": {
     "install": {
       "commands": [
-        { "cmd": "corepack enable" },
-        { "cmd": "corepack prepare pnpm@9.15.0 --activate" },
-        { "cmd": "pnpm install --frozen-lockfile" }
+        { "cmd": "bun install --frozen-lockfile" }
       ],
-      "caches": ["pnpm-store"]
+      "caches": ["bun-cache"]
     },
     "build": {
       "inputs": [{ "step": "install" }],
       "commands": [
-        { "cmd": "pnpm --filter notifications run prisma:generate" },
-        { "cmd": "pnpm --filter notifications run typecheck" }
+        { "cmd": "bun run --filter=notifications prisma:generate" },
+        { "cmd": "bun run --filter=notifications typecheck" }
       ]
     }
   },
@@ -31,7 +29,7 @@
     "inputs": [
       { "step": "build", "include": ["apps/notifications/**", "node_modules/**", "packages/**"] }
     ],
-    "startCommand": "node --import tsx apps/notifications/server.ts",
+    "startCommand": "bun apps/notifications/server.ts",
     "variables": {
       "NODE_ENV": "production"
     }

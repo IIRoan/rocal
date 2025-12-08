@@ -2,11 +2,11 @@
   "$schema": "https://schema.railpack.com",
   "provider": "node",
   "packages": {
-    "node": "20"
+    "bun": "latest"
   },
   "caches": {
-    "pnpm-store": {
-      "directory": "/root/.local/share/pnpm/store",
+    "bun-cache": {
+      "directory": "/root/.bun/install/cache",
       "type": "shared"
     },
     "next-cache": {
@@ -17,16 +17,14 @@
   "steps": {
     "install": {
       "commands": [
-        { "cmd": "corepack enable" },
-        { "cmd": "corepack prepare pnpm@9.15.0 --activate" },
-        { "cmd": "pnpm install --frozen-lockfile" }
+        { "cmd": "bun install --frozen-lockfile" }
       ],
-      "caches": ["pnpm-store"]
+      "caches": ["bun-cache"]
     },
     "build": {
       "inputs": [{ "step": "install" }],
       "commands": [
-        { "cmd": "pnpm --filter web run build" },
+        { "cmd": "bun run --filter=web build" },
         { "cmd": "mkdir -p apps/web/.next/standalone/apps/web/.next && cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/" },
         { "cmd": "mkdir -p apps/web/.next/standalone/apps/web && cp -r apps/web/public apps/web/.next/standalone/apps/web/" }
       ],
@@ -42,7 +40,7 @@
         ]
       }
     ],
-    "startCommand": "cd apps/web/.next/standalone && node apps/web/server.js",
+    "startCommand": "cd apps/web/.next/standalone && bun apps/web/server.js",
     "variables": {
       "NODE_ENV": "production",
       "PORT": "3000",
