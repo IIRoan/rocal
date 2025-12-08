@@ -1,8 +1,14 @@
 [build]
 builder = "RAILPACK"
-watchPatterns = ["apps/web/**", "packages/ui/**", "packages/typescript-config/**", "pnpm-lock.yaml"]
+rootDirectory = "."
+watchPatterns = ["apps/web/**", "packages/ui/**", "packages/typescript-config/**", "bun.lockb"]
+
+[build.command]
+install = "cd apps/web && bun install --frozen-lockfile"
+build = "cd apps/web && bun run build"
 
 [deploy]
+startCommand = "cd apps/web && bun run start"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
