@@ -19,18 +19,15 @@ export class HttpClient {
   private retryDelay: number;
 
   constructor(options: HttpClientOptions = {}) {
-    const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
 
     // Debug logging
     if (typeof window !== "undefined") {
-      console.log("NEXT_PUBLIC_APP_URL in browser:", envUrl);
+      console.log("NEXT_PUBLIC_API_URL in browser:", envUrl);
     }
 
-    // Use current window location as fallback in browser
-    const fallbackUrl =
-      typeof window !== "undefined"
-        ? `${window.location.protocol}//${window.location.host}`
-        : "http://localhost:3000";
+    // Fallback to localhost backend
+    const fallbackUrl = "http://localhost:3001";
 
     this.baseURL = envUrl || fallbackUrl;
     this.timeout = options.timeout || 10000; // 10 seconds

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "bun": "latest"
+  },
+  "steps": {
+    "install": {
+      "commands": [
+        { "cmd": "cd apps/backend && bun install" }
+      ]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": [
+        { "cmd": "cd apps/backend && bun run db:generate" }
+      ]
+    }
+  },
+  "deploy": {
+    "inputs": [
+      {
+        "step": "build",
+        "include": [
+          "apps/backend/**",
+          "!apps/backend/node_modules"
+        ]
+      }
+    ],
+    "startCommand": "cd apps/backend && bun run start",
+    "variables": {
+      "NODE_ENV": "production",
+      "PORT": "3001",
+      "HOSTNAME": "0.0.0.0"
+    }
+  }
+}
