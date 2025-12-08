@@ -1,0 +1,13 @@
+[build]
+builder = "RAILPACK"
+watchPatterns = [
+  "apps/backend/**",
+  "packages/typescript-config/**",
+  "pnpm-lock.yaml"
+]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev --filter=!backend",
+    "dev": "turbo dev",
+    "dev:frontend": "turbo dev --filter=web",
+    "dev:backend": "turbo dev --filter=backend",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
