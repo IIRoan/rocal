@@ -85,10 +85,11 @@ export const createAPI = (prefix = "") => {
   return app
     .use(
       cors({
-        origin: process.env.NEXT_PUBLIC_APP_URL,
+        origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
         credentials: true,
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-Requested-With", "Accept", "Origin"],
+        exposeHeaders: ["Set-Cookie"],
       })
     )
     .use(errorHandler)
@@ -154,12 +155,11 @@ export const createAPI = (prefix = "") => {
     .use(subscriptionsRoute);
 };
 
-// Start the server if this file is run directly
-if (require.main === module) {
-  const port = process.env.PORT || 3001;
-  const app = createAPI();
+// Start the server when this file is run directly
+const port = process.env.PORT || 3001;
+const app = createAPI("/api");
 
-  app.listen(port, () => {
-    console.log(`🚀 Server is running on http://localhost:${port}`);
-  });
-}
+app.listen(port, () => {
+  console.log(`🚀 Server is running on http://localhost:${port}`);
+  console.log(`📝 API documentation: http://localhost:${port}/api/swagger`);
+});

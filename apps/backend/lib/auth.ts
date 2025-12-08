@@ -1,6 +1,5 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { nextCookies } from "better-auth/next-js";
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
@@ -20,7 +19,19 @@ export const auth = betterAuth({
           },
         }
       : {},
-  baseURL: process.env.NEXT_PUBLIC_APP_URL,
+  baseURL: process.env.BACKEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001",
   basePath: "/api/auth",
-  plugins: [nextCookies()],
+  trustedOrigins: [
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  ],
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
+  },
+  socialProviderConfig: {
+    redirectURL: process.env.FRONTEND_URL || "http://localhost:3000",
+  },
 }) as any;

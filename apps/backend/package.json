@@ -2,8 +2,8 @@
   "name": "backend",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch index.ts",
-    "start": "node --import tsx index.ts",
+    "dev": "bun --watch index.ts",
+    "start": "bun index.ts",
     "typecheck": "tsc",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
