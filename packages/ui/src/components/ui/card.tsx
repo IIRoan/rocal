@@ -5,6 +5,7 @@ import { cn } from "@workspace/ui/lib/utils";
 interface CardProps extends React.ComponentProps<"div"> {
   hoverable?: boolean;
   animated?: boolean;
+  children?: React.ReactNode;
 }
 
 function Card({ className, hoverable = false, animated = true, ...props }: CardProps) {
