@@ -1,0 +1,1273 @@
+@import "tailwindcss";
+@source "../**/*.{ts,tsx}";
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+
+@import "tw-animate-css";
+
+/* Dark mode via class on root element */
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   ROCAL DESIGN SYSTEM
+   ============================================
+   Warm, vibrant color palette with clear hierarchy
+   Enhanced contrast for icons and text
+   Subtle animation system throughout
+   ============================================ */
+
+:root {
+  /* Core Background - warm undertones */
+  --background: oklch(0.9821 0 0);
+  --foreground: oklch(0.2435 0 0);
+
+  /* Card & surfaces - pure white for contrast */
+  --card: oklch(0.9911 0 0);
+  --card-foreground: oklch(0.2435 0 0);
+
+  /* Popover */
+  --popover: oklch(0.9911 0 0);
+  --popover-foreground: oklch(0.2435 0 0);
+
+  /* Primary - warm amber/ochre - THE SIGNATURE COLOR */
+  --primary: oklch(0.4341 0.0392 41.9938);
+  --primary-foreground: oklch(1 0 0);
+
+  /* Secondary - warm cream/gold accent */
+  --secondary: oklch(0.92 0.0651 74.3695);
+  --secondary-foreground: oklch(0.3499 0.0685 40.8288);
+
+  /* Muted - warm gray with better icon contrast */
+  --muted: oklch(0.9521 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+
+  /* Accent - warm highlight */
+  --accent: oklch(0.931 0 0);
+  --accent-foreground: oklch(0.2435 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.6271 0.1936 33.339);
+  --destructive-foreground: oklch(1 0 0);
+
+  /* Borders & Inputs - slightly more visible */
+  --border: oklch(0.86 0 0);
+  --input: oklch(0.8822 0 0);
+
+  /* Ring focus */
+  --ring: oklch(0.4341 0.0392 41.9938);
+
+  /* Charts - vibrant and distinct */
+  --chart-1: oklch(0.4341 0.0392 41.9938);
+  --chart-2: oklch(0.92 0.0651 74.3695);
+  --chart-3: oklch(0.931 0 0);
+  --chart-4: oklch(0.9367 0.0523 75.5009);
+  --chart-5: oklch(0.4338 0.0437 41.6746);
+
+  /* Sidebar */
+  --sidebar: oklch(0.9881 0 0);
+  --sidebar-foreground: oklch(0.2645 0 0);
+  --sidebar-primary: oklch(0.325 0 0);
+  --sidebar-primary-foreground: oklch(0.9881 0 0);
+  --sidebar-accent: oklch(0.9761 0 0);
+  --sidebar-accent-foreground: oklch(0.325 0 0);
+  --sidebar-border: oklch(0.9401 0 0);
+  --sidebar-ring: oklch(0.7731 0 0);
+
+  /* Typography */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+
+  /* Spacing & Radius */
+  --radius: 0.5rem;
+  --spacing: 0.25rem;
+
+  /* Shadows */
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  --tracking-normal: 0em;
+
+  /* Calendar */
+  --calendar-accent: var(--primary);
+  --calendar-accent-bg: oklch(0.85 0.02 42);
+  --calendar-workday: oklch(0.975 0.005 42);
+  --calendar-weekend: oklch(0.96 0.005 42);
+
+  /* Events - vibrant and colorful */
+  --event-sky: oklch(0.86 0.09 250);
+  --event-sky-foreground: oklch(0.28 0.12 250);
+  --event-violet: oklch(0.86 0.09 285);
+  --event-violet-foreground: oklch(0.28 0.12 285);
+  --event-orange: oklch(0.86 0.09 65);
+  --event-orange-foreground: oklch(0.28 0.12 65);
+  --event-rose: oklch(0.86 0.09 15);
+  --event-rose-foreground: oklch(0.28 0.12 15);
+  --event-emerald: oklch(0.86 0.09 150);
+  --event-emerald-foreground: oklch(0.28 0.12 150);
+  --event-default: var(--event-sky);
+  --event-default-foreground: var(--event-sky-foreground);
+
+  /* Status */
+  --success: oklch(0.78 0.12 150);
+  --success-foreground: oklch(0.995 0.002 286);
+  --warning: oklch(0.84 0.14 85);
+  --warning-foreground: var(--foreground);
+
+  /* Info */
+  --info: oklch(0.72 0.16 250);
+  --info-foreground: oklch(0.995 0.002 286);
+  --info-bg: oklch(0.95 0.03 250);
+  --info-border: oklch(0.83 0.09 250);
+}
+
+.dark {
+  /* Core Background - rich dark with cool undertones */
+  --background: oklch(0.1776 0 0);
+  --foreground: oklch(0.9491 0 0);
+
+  /* Card & surfaces */
+  --card: oklch(0.2134 0 0);
+  --card-foreground: oklch(0.9491 0 0);
+
+  /* Popover */
+  --popover: oklch(0.2134 0 0);
+  --popover-foreground: oklch(0.9491 0 0);
+
+  /* Primary - warm gold in dark mode */
+  --primary: oklch(0.9247 0.0524 66.1732);
+  --primary-foreground: oklch(0.2029 0.024 200.1962);
+
+  /* Secondary */
+  --secondary: oklch(0.3163 0.019 63.6992);
+  --secondary-foreground: oklch(0.9247 0.0524 66.1732);
+
+  /* Muted - better icon visibility */
+  --muted: oklch(0.252 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+
+  /* Accent */
+  --accent: oklch(0.285 0 0);
+  --accent-foreground: oklch(0.9491 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.6271 0.1936 33.339);
+  --destructive-foreground: oklch(1 0 0);
+
+  /* Borders & Inputs */
+  --border: oklch(0.3 0.0115 91.7467);
+  --input: oklch(0.4017 0 0);
+
+  /* Ring focus */
+  --ring: oklch(0.9247 0.0524 66.1732);
+
+  /* Charts */
+  --chart-1: oklch(0.9247 0.0524 66.1732);
+  --chart-2: oklch(0.3163 0.019 63.6992);
+  --chart-3: oklch(0.285 0 0);
+  --chart-4: oklch(0.3481 0.0219 67.0001);
+  --chart-5: oklch(0.9245 0.0533 67.0855);
+
+  /* Sidebar */
+  --sidebar: oklch(0.2103 0.0059 285.8852);
+  --sidebar-foreground: oklch(0.9674 0.0013 286.3752);
+  --sidebar-primary: oklch(0.4882 0.2172 264.3763);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.2739 0.0055 286.0326);
+  --sidebar-accent-foreground: oklch(0.9674 0.0013 286.3752);
+  --sidebar-border: oklch(0.2739 0.0055 286.0326);
+  --sidebar-ring: oklch(0.8711 0.0055 286.286);
+
+  /* Shadows */
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  /* Calendar */
+  --calendar-accent: var(--primary);
+  --calendar-accent-bg: oklch(0.25 0.02 66);
+  --calendar-workday: oklch(0.185 0.005 0);
+  --calendar-weekend: oklch(0.16 0.008 0);
+
+  /* Events - vibrant in dark mode */
+  --event-sky: oklch(0.45 0.15 250);
+  --event-sky-foreground: oklch(0.9 0.06 250);
+  --event-violet: oklch(0.45 0.15 285);
+  --event-violet-foreground: oklch(0.9 0.06 285);
+  --event-orange: oklch(0.45 0.15 65);
+  --event-orange-foreground: oklch(0.9 0.06 65);
+  --event-rose: oklch(0.45 0.15 15);
+  --event-rose-foreground: oklch(0.9 0.06 15);
+  --event-emerald: oklch(0.45 0.15 150);
+  --event-emerald-foreground: oklch(0.9 0.06 150);
+  --event-default: var(--event-sky);
+  --event-default-foreground: var(--event-sky-foreground);
+
+  /* Status */
+  --success: oklch(0.68 0.15 150);
+  --success-foreground: var(--foreground);
+  --warning: oklch(0.72 0.16 85);
+  --warning-foreground: oklch(0.12 0.01 286);
+
+  /* Info */
+  --info: oklch(0.78 0.18 250);
+  --info-foreground: var(--foreground);
+  --info-bg: oklch(0.26 0.03 250);
+  --info-border: oklch(0.38 0.09 250);
+}
+
+/* Tailwind color aliases */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-foreground: var(--input-foreground);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  /* Calendar */
+  --color-calendar-accent: var(--calendar-accent);
+  --color-calendar-accent-bg: var(--calendar-accent-bg);
+  --color-calendar-workday: var(--calendar-workday);
+  --color-calendar-weekend: var(--calendar-weekend);
+
+  /* Events */
+  --color-event-sky: var(--event-sky);
+  --color-event-sky-foreground: var(--event-sky-foreground);
+  --color-event-violet: var(--event-violet);
+  --color-event-violet-foreground: var(--event-violet-foreground);
+  --color-event-orange: var(--event-orange);
+  --color-event-orange-foreground: var(--event-orange-foreground);
+  --color-event-rose: var(--event-rose);
+  --color-event-rose-foreground: var(--event-rose-foreground);
+  --color-event-emerald: var(--event-emerald);
+  --color-event-emerald-foreground: var(--event-emerald-foreground);
+  --color-event-default: var(--event-default);
+  --color-event-default-foreground: var(--event-default-foreground);
+
+  /* Event color utility mapping used in UI controls (e.g., selects) */
+  --color-blue-400: var(--event-sky);
+  --color-emerald-400: var(--event-emerald);
+  --color-orange-400: var(--event-orange);
+  --color-violet-400: var(--event-violet);
+  --color-rose-400: var(--event-rose);
+}
+
+@layer base {
+  /* Custom keyframes for animations */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes wave {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideIn {
+    0% {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes dialogPop {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.75) translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1) translateY(0);
+    }
+  }
+
+  /* Improve contrast on borders and focus outlines globally */
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Form fields: clearer separation from cards/background */
+  input,
+  textarea,
+  select {
+    @apply bg-input text-input-foreground border border-border;
+    box-shadow: inset 0 1px 0
+      color-mix(in oklch, var(--background) 70%, transparent);
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: color-mix(in oklch, var(--muted-foreground) 75%, transparent);
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply ring-2 ring-ring border-ring;
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--ring) 25%, transparent),
+      inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
+  }
+
+  /* Buttons: consistent hover/focus feedback - subtle, no excessive animation */
+  button {
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  /* Focus visibility for a11y */
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Calendar-specific */
+  [data-today="true"] {
+    /* strengthen contrast of today indicators when used */
+    --_accent-bg: var(--color-calendar-accent-bg);
+    --_accent-fg: var(--color-calendar-accent);
+  }
+
+  /* Fix: correct var name for working day highlight */
+  [data-working-day="true"] {
+    background-color: var(--calendar-workday);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: color-mix(in oklch, var(--muted) 70%, transparent);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--accent) 70%, var(--border));
+    border: 2px solid color-mix(in oklch, var(--muted) 70%, transparent);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+  }
+
+  /* Animation utilities */
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  .animate-wave {
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Smooth transitions for interactive elements */
+  .transition-smooth {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .transition-bounce {
+    transition: transform 0.15s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  /* Text selection */
+  ::selection {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  /* States */
+  [aria-invalid="true"] {
+    border-color: var(--destructive);
+    background-color: color-mix(in oklch, var(--destructive) 6%, var(--input));
+  }
+
+  [data-state="success"] {
+    border-color: var(--success);
+    background-color: color-mix(in oklch, var(--success) 6%, var(--input));
+  }
+
+  [data-state="warning"] {
+    border-color: var(--warning);
+    background-color: color-mix(in oklch, var(--warning) 6%, var(--input));
+  }
+
+  /* Disabled */
+  :disabled,
+  [aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* Loading */
+  [data-loading="true"] {
+    opacity: 0.7;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  /* Smooth scrolling */
+  * {
+    scroll-behavior: smooth;
+  }
+
+  /* Reduce motion for users with motion sensitivity */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Enhanced focus states for accessibility */
+  .focus-enhanced:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--ring) 20%, transparent);
+  }
+
+  /* Utility classes for common animations */
+  .animate-bounce-in {
+    animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-logo-float {
+    animation: logoFloat 2s ease-in-out infinite;
+  }
+
+  .animate-logo-pulse {
+    animation: logoPulse 2s ease-in-out infinite;
+  }
+
+  .animate-logo-spin {
+    animation: logoSpin 3s linear infinite;
+  }
+
+  /* Dialog command palette animation - slides down from top with quick fade */
+  /* Only apply animation to center variant dialogs (those with top:50%) */
+  [data-slot="dialog-content"][class*="top-1/2"] {
+    animation: commandPaletteSlide 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: opacity, transform;
+  }
+
+  @keyframes commandPaletteSlide {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -50%) translateY(-20px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) translateY(0) scale(1);
+    }
+  }
+
+  @keyframes slideUp {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes logoFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes logoPulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--primary);
+    }
+    50% {
+      box-shadow: 0 0 0 8px transparent;
+    }
+  }
+
+  @keyframes logoSpin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes slide-fade-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slide-fade-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* optional: for future exit animations if you want to crossfade; current impl animates only entering */
+  @keyframes slide-fade-out-left {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+  }
+
+  @keyframes slide-fade-out-right {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+  }
+
+  .animate-slide-fade {
+    will-change: opacity, transform;
+  }
+
+  .enter-left {
+    animation: slide-fade-in-left 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .enter-right {
+    animation: slide-fade-in-right 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 768px) {
+    /* Safe area insets for mobile devices */
+    .safe-area-inset-top {
+      padding-top: env(safe-area-inset-top, 0);
+    }
+
+    .safe-area-inset-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    .safe-area-inset-left {
+      padding-left: env(safe-area-inset-left, 0);
+    }
+
+    .safe-area-inset-right {
+      padding-right: env(safe-area-inset-right, 0);
+    }
+
+    /* Improved mobile touch targets */
+    button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Mobile calendar optimizations */
+    .mobile-calendar-header {
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    /* Disable hover effects on mobile to prevent sticky states */
+    @media (hover: none) and (pointer: coarse) {
+      button:hover {
+        transform: none;
+      }
+    }
+
+    /* Better mobile scrolling */
+    .mobile-scroll-container {
+      -webkit-overflow-scrolling: touch;
+      overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    /* Mobile bottom navigation spacing */
+    .mobile-content-with-bottom-nav {
+      padding-bottom: calc(80px + env(safe-area-inset-bottom, 0));
+    }
+  }
+
+  /* PWA specific styles */
+  @media (display-mode: standalone) {
+    /* Remove any browser chrome styles when running as PWA */
+    body {
+      overscroll-behavior: none;
+    }
+  }
+}
+
+/* Popup and modal animation keyframes */
+@keyframes fadeInZoom {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animation utility classes */
+.animate-fade-in-zoom {
+  animation: fadeInZoom 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-top {
+  animation: slideInFromTop 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-bottom {
+  animation: slideInFromBottom 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-right {
+  animation: slideInFromRight 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================
+   PREMIUM MODAL & COMMAND PALETTE SYSTEM
+   ============================================
+   Modern glass-morphism with refined animations
+   Better contrast and visual hierarchy
+   ============================================ */
+
+/* Custom Modal Animations */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) translateY(0);
+  }
+}
+
+@keyframes modalExit {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95) translateY(-8px);
+  }
+}
+
+@keyframes overlayEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fieldExpandIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.9);
+    max-height: 0;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    max-height: 500px;
+  }
+}
+
+@keyframes chipPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes subtleGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 16px 2px
+      color-mix(in oklch, var(--primary) 20%, transparent);
+  }
+}
+
+@keyframes shimmerHighlight {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Premium Modal Container */
+.modal-premium {
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--card) 97%, transparent),
+    color-mix(in oklch, var(--card) 92%, var(--muted))
+  );
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--background) 50%, transparent),
+    0 4px 12px color-mix(in oklch, var(--foreground) 5%, transparent),
+    0 16px 48px color-mix(in oklch, var(--foreground) 8%, transparent),
+    inset 0 1px 0 color-mix(in oklch, var(--background) 30%, transparent);
+}
+
+.dark .modal-premium {
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--card) 95%, transparent),
+    color-mix(in oklch, var(--card) 85%, var(--background))
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--border) 40%, transparent),
+    0 4px 12px color-mix(in oklch, var(--foreground) 3%, transparent),
+    0 16px 48px color-mix(in oklch, var(--foreground) 6%, transparent),
+    0 0 80px color-mix(in oklch, var(--primary) 5%, transparent),
+    inset 0 1px 0 color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+/* Premium Modal Header */
+.modal-header-premium {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--muted) 40%, transparent),
+    transparent
+  );
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 50%, transparent);
+  position: relative;
+}
+
+.modal-header-premium::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--primary) 30%, transparent),
+    transparent
+  );
+}
+
+/* Premium Modal Footer */
+.modal-footer-premium {
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in oklch, var(--muted) 30%, transparent)
+  );
+  border-top: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
+}
+
+/* Premium Input Fields */
+.input-premium {
+  background: color-mix(in oklch, var(--background) 80%, var(--card));
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in oklch, var(--foreground) 3%, transparent),
+    0 1px 0 color-mix(in oklch, var(--background) 50%, transparent);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.input-premium:hover {
+  border-color: color-mix(in oklch, var(--border) 100%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in oklch, var(--foreground) 3%, transparent),
+    0 1px 0 color-mix(in oklch, var(--background) 50%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--primary) 5%, transparent);
+}
+
+.input-premium:focus {
+  border-color: var(--primary);
+  box-shadow:
+    inset 0 1px 2px color-mix(in oklch, var(--foreground) 2%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--primary) 15%, transparent);
+}
+
+.dark .input-premium {
+  background: color-mix(in oklch, var(--muted) 60%, var(--card));
+}
+
+/* Premium Section Cards */
+.section-card-premium {
+  background: color-mix(in oklch, var(--muted) 30%, transparent);
+  border: 1px solid color-mix(in oklch, var(--border) 50%, transparent);
+  border-radius: calc(var(--radius) + 2px);
+  position: relative;
+  overflow: hidden;
+}
+
+.section-card-premium::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 10%,
+    color-mix(in oklch, var(--background) 60%, transparent),
+    transparent 90%
+  );
+}
+
+/* Premium Option Pills */
+.option-pill {
+  background: color-mix(in oklch, var(--muted) 40%, transparent);
+  border: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.option-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--primary) 0%, transparent),
+    color-mix(in oklch, var(--primary) 0%, transparent)
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.option-pill:hover {
+  border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 8px color-mix(in oklch, var(--foreground) 5%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.option-pill:hover::before {
+  opacity: 1;
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--primary) 5%, transparent),
+    transparent
+  );
+}
+
+/* Premium Action Buttons */
+.btn-action-primary {
+  background: linear-gradient(
+    145deg,
+    var(--primary),
+    color-mix(in oklch, var(--primary) 85%, oklch(0.3 0.1 250))
+  );
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--primary) 30%, transparent),
+    0 4px 12px color-mix(in oklch, var(--primary) 20%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 15%, transparent);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-action-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px color-mix(in oklch, var(--primary) 30%, transparent),
+    0 8px 20px color-mix(in oklch, var(--primary) 25%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 20%, transparent);
+}
+
+.btn-action-primary:active {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--primary) 20%, transparent),
+    inset 0 1px 2px color-mix(in oklch, black 10%, transparent);
+}
+
+/* Command Palette Premium Styling */
+.command-item-premium {
+  border-radius: calc(var(--radius) - 2px);
+  margin: 2px 4px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.command-item-premium:hover,
+.command-item-premium[data-selected="true"] {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--accent) 80%, transparent),
+    color-mix(in oklch, var(--accent) 60%, transparent)
+  );
+  box-shadow:
+    0 2px 8px color-mix(in oklch, var(--foreground) 4%, transparent),
+    inset 0 1px 0 color-mix(in oklch, var(--background) 30%, transparent);
+}
+
+.command-item-premium::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  background: var(--primary);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  transform: scaleY(0);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.command-item-premium[data-selected="true"]::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* Expand/Collapse Animation Classes */
+.field-expand {
+  animation: fieldExpandIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top;
+}
+
+.chip-pop {
+  animation: chipPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Premium Scrollbar for Modals */
+.modal-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--muted-foreground) 30%, transparent);
+  border-radius: 3px;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
+}
+
+/* Date/Time Section Premium */
+.datetime-section {
+  background: color-mix(in oklch, var(--muted) 25%, transparent);
+  border: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
+  border-radius: calc(var(--radius) + 2px);
+  position: relative;
+}
+
+.datetime-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background) 20%, transparent),
+    transparent 30%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Icon Contrast Enhancement */
+.icon-contrast {
+  color: var(--muted-foreground);
+  opacity: 0.8;
+  transition: all 0.15s ease;
+}
+
+.icon-contrast:hover,
+*:hover > .icon-contrast,
+*:focus-within > .icon-contrast {
+  opacity: 1;
+  color: var(--foreground);
+}
+
+/* Label Premium Styling */
+.label-premium {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 0.5rem;
+}
+
+/* Divider Premium */
+.divider-premium {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--border) 60%, transparent) 20%,
+    color-mix(in oklch, var(--border) 60%, transparent) 80%,
+    transparent
+  );
+  margin: 0.75rem 0;
+}
+
+/* Title Input Premium */
+.title-input-premium {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding: 0.5rem 0;
+  transition: all 0.2s ease;
+}
+
+.title-input-premium:focus {
+  border-bottom-color: var(--primary);
+  outline: none;
+  box-shadow: none;
+}
+
+.title-input-premium::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.5;
+}
