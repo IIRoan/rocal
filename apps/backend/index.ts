@@ -14,16 +14,6 @@ import { CalendarSyncService } from "./lib/calendar-sync-service";
 
 // Better Auth middleware
 const betterAuth = new Elysia({ name: "better-auth" })
-  .onRequest(({ request }) => {
-    // Debug OAuth flow
-    const url = new URL(request.url);
-    if (url.pathname.includes("/api/auth")) {
-      console.log(`[AUTH] ${request.method} ${url.pathname}${url.search}`);
-      console.log(`[AUTH] Cookies:`, request.headers.get("cookie"));
-      console.log(`[AUTH] Origin:`, request.headers.get("origin"));
-      console.log(`[AUTH] Referer:`, request.headers.get("referer"));
-    }
-  })
   .mount(auth.handler)
   .derive(async ({ request }) => {
     try {
