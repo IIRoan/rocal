@@ -2,9 +2,10 @@
   "name": "backend",
   "type": "module",
   "scripts": {
-    "build": "prisma generate",
+    "build": "prisma generate && bun build --compile --minify-whitespace --minify-syntax --target bun-linux-x64 --outfile server index.ts",
     "dev": "bun --watch index.ts",
-    "start": "bun index.ts",
+    "start": "./server",
+    "start:dev": "bun index.ts",
     "typecheck": "tsc",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
