@@ -31,7 +31,14 @@ export const auth = betterAuth({
       maxAge: 5 * 60, // 5 minutes
     },
   },
+  advanced: {
+    useSecureCookies: true,
+    crossSubDomainCookies: {
+      enabled: false,
+    },
+  },
   socialProviderConfig: {
     redirectURL: process.env.FRONTEND_URL || "http://localhost:3000",
+    redirectURI: `${process.env.BACKEND_URL || "http://localhost:3001"}/api/auth/callback/github`,
   },
 }) as any;
