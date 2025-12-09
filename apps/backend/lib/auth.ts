@@ -34,9 +34,10 @@ export const auth = betterAuth({
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
     cookieOptions: {
-      sameSite: "none", // Allow cross-site cookies for OAuth
-      secure: true, // Required for sameSite: none
+      sameSite: "lax", // Can use lax since both on same domain
+      secure: true,
       httpOnly: true,
+      domain: process.env.NODE_ENV === "production" ? "roan.dev" : undefined, // Share cookies across subdomains
     },
   },
   socialProviderConfig: {
