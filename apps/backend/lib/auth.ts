@@ -32,13 +32,9 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    useSecureCookies: true,
-    crossSubDomainCookies: {
-      enabled: false,
-    },
+    useSecureCookies: process.env.NODE_ENV === "production",
   },
   socialProviderConfig: {
     redirectURL: process.env.FRONTEND_URL || "http://localhost:3000",
-    redirectURI: `${process.env.BACKEND_URL || "http://localhost:3001"}/api/auth/callback/github`,
   },
 }) as any;
