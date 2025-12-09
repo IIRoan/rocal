@@ -1157,17 +1157,59 @@ const notificationServer = new NotificationServer();
 console.log("🚀 Starting Notification Server...");
 notificationServer.start();
 
-// Handle graceful shutdown
-process.on("SIGINT", () => {
-  console.log("\n🛑 Received SIGINT, shutting down gracefully...");
-  notificationServer.stop();
-  process.exit(0);
+// Create HTTP server for health checks
+const PORT = process.env.PORT || 3001;
+
+const server = Bun.serve({
+  port: PORT,
+  async fetch(req) {
+    const url = new URL(req.url);
+
+    if (url.pathname === "/health") {
+      try {
+        const health = await notificationServer.healthCheck();
+        return new Response(JSON.stringify(health), {
+          status: health.status === "healthy" ? 200 : 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({
+          status: "unhealthy",
+          error: error instanceof Error ? error.message : "Unknown error"
+        }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/status") {
+      const status = notificationServer.getStatus();
+      return new Response(JSON.stringify(status), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response("Notification Server", {
+      headers: { "Content-Type": "text/plain" },
+    });
+  },
 });
 
-process.on("SIGTERM", () => {
-  console.log("\n🛑 Received SIGTERM, shutting down gracefully...");
+console.log(`🌐 HTTP server listening on port ${PORT}`);
+console.log(`   Health check: http://localhost:${PORT}/health`);
+console.log(`   Status: http://localhost:${PORT}/status`);
+
+// Handle graceful shutdown
+const shutdown = async () => {
+  console.log("\n🛑 Shutting down gracefully...");
   notificationServer.stop();
+  server.stop();
+  await prisma.$disconnect();
   process.exit(0);
-});
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 export { NotificationServer };
