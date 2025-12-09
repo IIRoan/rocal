@@ -65,9 +65,10 @@ export default function LoginPage() {
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true)
+      const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
       await signIn.social({
         provider: "github",
-        callbackURL: "/dashboard",
+        callbackURL: `${frontendUrl}/dashboard`,
       })
     } catch (error) {
       console.error("Login failed:", error)
