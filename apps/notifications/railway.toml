@@ -3,7 +3,7 @@ builder = "RAILPACK"
 watchPatterns = ["apps/notifications/**", "bun.lockb"]
 
 [deploy]
-startCommand = "cd apps/notifications && bun run prisma:deploy && bun server.ts"
+startCommand = "bun run prisma:deploy && bun server.ts"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
