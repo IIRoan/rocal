@@ -177,7 +177,7 @@ export const createAPI = (prefix = "") => {
 };
 
 // Start the server when this file is run directly
-const port = process.env.PORT || 3001;
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 const app = createAPI("/api");
 
 // Handle OAuth errors at root (better-auth redirects here on error)
