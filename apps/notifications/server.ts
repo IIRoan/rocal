@@ -6,10 +6,12 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { Resend } from "resend";
-import { render } from "@react-email/render";
 import * as dotenv from "dotenv";
-import { EventReminderEmail } from "./emails/templates/event-reminder";
+
+// Lazy-loaded dependencies to reduce memory footprint
+let renderEmail: typeof import("@react-email/render").render | null = null;
+let EventReminderEmail: any = null;
+let Resend: any = null;
 
 // Load environment variables
 const envResult = dotenv.config();
@@ -23,8 +25,15 @@ console.log('🔧 Environment check:');
 console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '✅ Set' : '❌ Missing');
 console.log('- RESEND_API_KEY:', process.env.RESEND_API_KEY ? '✅ Set' : '❌ Missing');
 
-// Initialize Prisma client for standalone operation
-const prisma = new PrismaClient();
+// Initialize Prisma client with optimized settings for low memory usage
+const prisma = new PrismaClient({
+  log: ['error'], // Only log errors to reduce overhead
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
 
 // Types from the original service
 interface NotificationStatus {
@@ -73,16 +82,14 @@ class NotificationServer {
   private failedCount = 0;
   private errors: NotificationError[] = [];
   private lastProcessedAt?: Date;
-  private resend: Resend | null;
+  private resend: any = null;
   private retryQueue: Map<string, NotificationRetryInfo> = new Map();
   private cleanupTimer?: NodeJS.Timeout;
+  private readonly MAX_ERRORS = 50; // Cap errors array size
 
   constructor() {
-
-    // Initialize Resend if API key is available
-    this.resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-
-    if (!this.resend) {
+    // Don't initialize heavy dependencies yet - lazy load on first use
+    if (!process.env.RESEND_API_KEY) {
       console.warn("⚠️ RESEND_API_KEY not found - email notifications will be disabled");
     }
 
@@ -426,6 +433,9 @@ class NotificationServer {
    * Send email notification using Resend
    */
   private async sendEmailNotification(event: any, user: any, minutesBefore: number): Promise<void> {
+    // Lazy load Resend client on first email send
+    await this.loadResendClient();
+
     if (!this.resend) {
       throw new Error("Email service not configured - RESEND_API_KEY missing");
     }
@@ -483,12 +493,40 @@ class NotificationServer {
   }
 
   /**
+   * Lazy load email dependencies
+   */
+  private async loadEmailDependencies() {
+    if (!renderEmail) {
+      const { render } = await import("@react-email/render");
+      renderEmail = render;
+    }
+    if (!EventReminderEmail) {
+      const module = await import("./emails/templates/event-reminder");
+      EventReminderEmail = module.EventReminderEmail;
+    }
+  }
+
+  /**
+   * Lazy load Resend client
+   */
+  private async loadResendClient() {
+    if (!this.resend && process.env.RESEND_API_KEY) {
+      if (!Resend) {
+        const module = await import("resend");
+        Resend = module.Resend;
+      }
+      this.resend = new Resend(process.env.RESEND_API_KEY);
+    }
+  }
+
+  /**
    * Render email template
    */
   private async renderEmailTemplate(event: any, user: any, formattedDetails: any): Promise<string> {
+    await this.loadEmailDependencies();
     const userSettings = user.settings;
-    
-    return await render(
+
+    return await renderEmail!(
       EventReminderEmail({
         eventTitle: event.title,
         eventDate: formattedDetails.formattedStartTime.split(' at ')[0] || formattedDetails.formattedStartTime,
@@ -710,7 +748,11 @@ class NotificationServer {
       timestamp: new Date(),
     };
 
+    // Cap errors array to prevent unbounded memory growth
     this.errors.push(error);
+    if (this.errors.length > this.MAX_ERRORS) {
+      this.errors.shift();
+    }
 
     if (result.shouldRetry && result.retryAfterMinutes) {
       const retryInfo: NotificationRetryInfo = {
