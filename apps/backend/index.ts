@@ -1,8 +1,3 @@
-import { logMemoryUsage } from "./lib/memory-profiler";
-
-// Log initial memory before any imports
-logMemoryUsage("App Start (before imports)");
-
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
@@ -16,8 +11,6 @@ import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
-
-logMemoryUsage("After all imports");
 
 // Better Auth middleware
 const betterAuth = new Elysia({ name: "better-auth" })
@@ -52,15 +45,11 @@ const betterAuth = new Elysia({ name: "better-auth" })
   });
 
 export const createAPI = (prefix = "") => {
-  logMemoryUsage("Before creating Elysia app");
   const app = new Elysia({ prefix });
-  logMemoryUsage("After creating Elysia app");
 
   // Initialize Calendar sync service
-  logMemoryUsage("Before CalendarSyncService");
   const calendarSyncService = CalendarSyncService.getInstance();
   calendarSyncService.start();
-  logMemoryUsage("After CalendarSyncService started");
 
   // Only add Swagger in development
   if (process.env.NODE_ENV !== "production") {
@@ -196,10 +185,4 @@ app.get("/", ({ query, redirect }) => {
 app.listen(port, () => {
   console.log(`🚀 Server is running on http://localhost:${port}`);
   console.log(`📝 API documentation: http://localhost:${port}/api/swagger`);
-  logMemoryUsage("After server started (idle)");
-
-  // Log memory every 30 seconds to track growth
-  setInterval(() => {
-    logMemoryUsage("Idle check");
-  }, 30000);
 });
