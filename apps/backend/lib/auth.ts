@@ -33,6 +33,11 @@ export const auth = betterAuth({
   },
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
+    cookieOptions: {
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+    },
   },
   socialProviderConfig: {
     redirectURL: process.env.FRONTEND_URL || "http://localhost:3000",

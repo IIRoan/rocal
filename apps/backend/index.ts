@@ -159,6 +159,19 @@ export const createAPI = (prefix = "") => {
 const port = process.env.PORT || 3001;
 const app = createAPI("/api");
 
+// Handle OAuth errors at root (better-auth redirects here on error)
+app.get("/", ({ query, redirect }) => {
+  const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // If there's an OAuth error, redirect to frontend with error
+  if (query.error) {
+    return redirect(`${frontendUrl}/login?error=${query.error}`);
+  }
+
+  // Otherwise redirect to frontend
+  return redirect(frontendUrl);
+});
+
 app.listen(port, () => {
   console.log(`🚀 Server is running on http://localhost:${port}`);
   console.log(`📝 API documentation: http://localhost:${port}/api/swagger`);
