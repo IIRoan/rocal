@@ -1,9 +1,9 @@
 [build]
 builder = "RAILPACK"
-watchPatterns = ["apps/notifications/**", "pnpm-lock.yaml"]
+watchPatterns = ["apps/notifications/**", "bun.lockb"]
 
 [deploy]
-startCommand = "node --import tsx apps/notifications/server.ts"
+startCommand = "cd apps/notifications && bun run prisma:deploy && bun server.ts"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
