@@ -145,15 +145,8 @@ export function EventEditor({
         <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
           <DrawerContent className="max-h-[92dvh] rounded-t-2xl bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0">
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
-            <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center justify-between shrink-0">
+            <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
               <h2 className="text-base font-semibold">{dialogTitle}</h2>
-              <button
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
             </div>
             <MobileEventEditorBody
               eventForm={eventForm}
@@ -181,7 +174,7 @@ export function EventEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="min-w-[420px] max-w-[580px] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] p-0 gap-0 overflow-hidden border-none shadow-2xl bg-card/95 backdrop-blur-xl flex flex-col">
+      <DialogContent showClose={false} className="min-w-[420px] max-w-[580px] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] p-0 gap-0 overflow-hidden border-none shadow-2xl bg-card/95 backdrop-blur-xl flex flex-col">
         <DialogHeader className="px-5 py-3 border-b border-border/40 flex flex-row items-center justify-between space-y-0 shrink-0">
           <DialogTitle className="text-base font-semibold">{dialogTitle}</DialogTitle>
         </DialogHeader>
