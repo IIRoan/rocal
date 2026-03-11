@@ -45,7 +45,7 @@ export function Navbar() {
           : "bg-transparent",
       )}
     >
-      <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 safe-area-inset-top">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
@@ -100,7 +100,7 @@ export function Navbar() {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80">
+              <SheetContent side="right" className="w-[85vw] max-w-80 safe-area-inset-top safe-area-inset-bottom">
                 <div className="flex flex-col gap-6 mt-8">
                   <nav className="flex flex-col gap-2">
                     {navItems.map((item) => (
