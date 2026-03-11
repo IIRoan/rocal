@@ -1,16 +1,5 @@
 import type { Metadata } from "next";
-import {
-  Navbar,
-  HeroSection,
-  StatsSection,
-  FeaturesSection,
-  IntegrationsSection,
-  TestimonialsSection,
-  PricingSection,
-  FAQSection,
-  CTASection,
-  Footer,
-} from "@workspace/ui/components/landing";
+import { HomePageClient } from "./home-page-client";
 
 export const metadata: Metadata = {
   title: "Rocani - The Smartest Way to Manage Your Time | AI-Powered Calendar",
@@ -19,14 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main>
-        <HeroSection />
-<PricingSection />
-      </main>
-      <Footer />
-    </div>
-  );
+  return <HomePageClient />;
 }

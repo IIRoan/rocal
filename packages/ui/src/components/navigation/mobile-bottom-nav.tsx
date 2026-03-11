@@ -1,18 +1,15 @@
 "use client";
 
 import React from "react";
-import { Calendar, Plus, Grid3X3, LayoutGrid } from "lucide-react";
-import { Button } from "../ui/button";
+import { Calendar, Plus, Grid3X3, LayoutGrid, CalendarDays } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { CalendarView } from "../calendar/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { useDropdownShortcuts } from "../../hooks";
 
 interface MobileBottomNavProps {
   onOpenSidebar?: () => void;
@@ -22,6 +19,23 @@ interface MobileBottomNavProps {
   className?: string;
 }
 
+const VIEW_OPTIONS: { value: CalendarView; label: string; icon: React.ReactNode }[] = [
+  { value: "day", label: "Day", icon: <CalendarDays size={16} /> },
+  { value: "week", label: "Week", icon: <Grid3X3 size={16} /> },
+  { value: "month", label: "Month", icon: <Calendar size={16} /> },
+  { value: "agenda", label: "Agenda", icon: <LayoutGrid size={16} /> },
+];
+
+function getViewIcon(view: CalendarView, size = 20) {
+  switch (view) {
+    case "day": return <CalendarDays size={size} />;
+    case "week": return <Grid3X3 size={size} />;
+    case "month": return <Calendar size={size} />;
+    case "agenda": return <LayoutGrid size={size} />;
+    default: return <Calendar size={size} />;
+  }
+}
+
 export function MobileBottomNav({
   onOpenSidebar,
   onOpenAddEvent,
@@ -29,97 +43,66 @@ export function MobileBottomNav({
   onViewChange,
   className,
 }: MobileBottomNavProps) {
-  // Add keyboard shortcuts for view changes
-  useDropdownShortcuts([
-    { key: "d", action: () => onViewChange?.("day") },
-    { key: "w", action: () => onViewChange?.("week") },
-    { key: "m", action: () => onViewChange?.("month") },
-    { key: "a", action: () => onViewChange?.("agenda") },
-  ]);
-  const getViewIcon = (view: CalendarView) => {
-    switch (view) {
-      case "day":
-        return <div className="w-5 h-5 border-2 border-current rounded" />;
-      case "week":
-        return <Grid3X3 size={20} />;
-      case "month":
-        return <Calendar size={20} />;
-      case "agenda":
-        return <LayoutGrid size={20} />;
-      default:
-        return <Calendar size={20} />;
-    }
-  };
-
   return (
     <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border md:hidden",
+        "fixed bottom-0 left-0 right-0 z-50 md:hidden",
         className
       )}
     >
-      <div className="flex items-center justify-center px-4 py-2 safe-area-inset-bottom">
-        <div className="flex items-center justify-around w-full max-w-sm">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              console.log('Calendar button clicked');
-              onOpenSidebar?.();
-            }}
-            className="flex flex-col items-center gap-1 h-auto py-2 px-3"
+      <div className="border-t border-border/60 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-stretch h-14">
+
+          {/* Calendars */}
+          <button
+            type="button"
+            onClick={onOpenSidebar}
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:bg-accent/60 transition-colors touch-manipulation"
           >
             <Calendar size={20} />
-            <span className="text-xs">Calendar</span>
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              console.log('Add button clicked');
-              onOpenAddEvent?.();
-            }}
-            className="flex flex-col items-center gap-1 h-auto py-2 px-3 bg-primary/10 text-primary"
+            <span className="text-[10px] font-medium">Calendars</span>
+          </button>
+
+          {/* Add Event */}
+          <button
+            type="button"
+            onClick={onOpenAddEvent}
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-primary active:bg-primary/10 transition-colors touch-manipulation"
           >
-            <Plus size={20} />
-            <span className="text-xs">Add</span>
-          </Button>
-          
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Plus size={18} />
+            </div>
+            <span className="text-[10px] font-medium text-muted-foreground">Add</span>
+          </button>
+
+          {/* View Switcher */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex flex-col items-center gap-1 h-auto py-2 px-3"
+              <button
+                type="button"
+                className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:bg-accent/60 transition-colors touch-manipulation outline-none"
               >
                 {getViewIcon(currentView)}
-                <span className="text-xs capitalize">{currentView}</span>
-              </Button>
+                <span className="text-[10px] font-medium capitalize">{currentView}</span>
+              </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" side="top" className="mb-2">
-              <DropdownMenuItem onClick={() => onViewChange?.("day")}>
-                <div className="w-4 h-4 border-2 border-current rounded mr-2" />
-                Day
-                <DropdownMenuShortcut>⌘+D</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onViewChange?.("week")}>
-                <Grid3X3 size={16} className="mr-2" />
-                Week
-                <DropdownMenuShortcut>⌘+W</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onViewChange?.("month")}>
-                <Calendar size={16} className="mr-2" />
-                Month
-                <DropdownMenuShortcut>⌘+M</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onViewChange?.("agenda")}>
-                <LayoutGrid size={16} className="mr-2" />
-                Agenda
-                <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-40 rounded-xl mb-1">
+              {VIEW_OPTIONS.map(({ value, label, icon }) => (
+                <DropdownMenuItem
+                  key={value}
+                  onClick={() => onViewChange?.(value)}
+                  className={cn(
+                    "gap-2",
+                    currentView === value && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  {icon}
+                  {label}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
         </div>
       </div>
     </div>

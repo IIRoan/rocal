@@ -12,7 +12,7 @@ export function HeroSection() {
   const [isVideoPlaying, setIsVideoPlaying] = React.useState(false);
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[100dvh] flex items-center justify-center overflow-hidden">
       {/* Enhanced Background with multiple layers */}
       <div className="absolute inset-0">
         {/* Animated grid pattern */}
@@ -28,8 +28,8 @@ export function HeroSection() {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-32">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+        <div className="grid lg:grid-cols-2 gap-10 sm:gap-16 items-center">
           {/* Left Column - Content */}
           <div className="text-center lg:text-left space-y-8">
             {/* Announcement Badge with enhanced styling */}
@@ -40,7 +40,7 @@ export function HeroSection() {
             </div>
 
             {/* Enhanced Main Heading */}
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
               The
               <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-pulse"> smartest </span>
               way to manage
@@ -52,7 +52,7 @@ export function HeroSection() {
             </h1>
 
             {/* Enhanced Subtitle */}
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+            <p className="text-base sm:text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               Stop juggling calendars. Start experiencing seamless scheduling with 
               <span className="font-semibold text-foreground"> AI that learns </span>
               your preferences and 
@@ -62,10 +62,10 @@ export function HeroSection() {
 
             {/* Enhanced CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center">
-              <Link href="/dashboard">
+              <Link href="/dashboard" className="w-full sm:w-auto">
                 <Button
                   size="lg"
-                  className="rounded-full px-10 py-5 text-lg font-semibold shadow-2xl bg-gradient-to-r from-primary to-accent hover:shadow-primary/25 group transition-all duration-300 hover:scale-105"
+                  className="w-full sm:w-auto rounded-full px-8 sm:px-10 py-5 text-base sm:text-lg font-semibold shadow-2xl bg-gradient-to-r from-primary to-accent hover:shadow-primary/25 group transition-all duration-300 hover:scale-105"
                 >
                   Start Free - No Card Required
                   <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-2 transition-transform duration-300" />
@@ -74,7 +74,7 @@ export function HeroSection() {
               <Button
                 variant="outline"
                 size="lg"
-                className="rounded-full px-10 py-5 text-lg font-semibold border-2 hover:bg-accent/10 group transition-all duration-300"
+                className="w-full sm:w-auto rounded-full px-8 sm:px-10 py-5 text-base sm:text-lg font-semibold border-2 hover:bg-accent/10 group transition-all duration-300"
                 onClick={() => setIsVideoPlaying(true)}
               >
                 <Play className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
@@ -211,16 +211,16 @@ export function HeroSection() {
             </div>
             
             {/* Company logos with better styling */}
-            <div className="flex flex-wrap justify-center items-center gap-12 opacity-60">
+            <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-12 opacity-60">
               <div className="h-12 w-32 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">TechFlow</div>
               <div className="h-12 w-28 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">DataSync</div>
               <div className="h-12 w-36 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">ScaleUp Inc</div>
-              <div className="h-12 w-30 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">InnovateLab</div>
-              <div className="h-12 w-34 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">NextGen</div>
+              <div className="h-12 w-32 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">InnovateLab</div>
+              <div className="h-12 w-32 bg-gradient-to-r from-muted to-muted/50 rounded-lg flex items-center justify-center font-semibold text-muted-foreground">NextGen</div>
             </div>
             
             {/* Quick stats */}
-            <div className="flex justify-center items-center gap-8 text-sm text-muted-foreground pt-4">
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8 text-sm text-muted-foreground pt-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
                 <span>2.5M+ events scheduled</span>

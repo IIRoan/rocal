@@ -55,8 +55,8 @@ function DialogOverlay({
         left: 0,
         right: 0,
         bottom: 0,
-        width: "100vw",
-        height: "100vh",
+        width: "100dvw",
+        height: "100dvh",
       }}
       {...props}
     />
@@ -82,9 +82,9 @@ function DialogContent({
     variant === "center"
       ? "left-1/2 top-1/2" // Transform handled by CSS
       : variant === "top"
-        ? "left-1/2 top-6 -translate-x-1/2"
+        ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] -translate-x-1/2"
         : // bottom
-          "left-1/2 bottom-6 -translate-x-1/2";
+          "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)] -translate-x-1/2";
 
   // Animation per variant - center uses CSS animation, others use Tailwind
   const animationClasses =
@@ -105,10 +105,10 @@ function DialogContent({
   // Suggested sizing defaults per variant
   const sizeDefaults =
     variant === "center"
-      ? "w-[520px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]"
+      ? "w-[520px] max-w-[calc(100dvw-1rem)] sm:max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
       : variant === "top"
-        ? "w-[720px] max-w-[min(90vw,840px)]"
-        : "w-[720px] max-w-[min(90vw,840px)]";
+        ? "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]"
+        : "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]";
 
   // Radius per variant (command palette often slightly less rounded)
   const radius =
@@ -121,7 +121,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // Base
-          "bg-background fixed z-50 grid gap-4 overflow-y-auto border p-6 shadow-lg",
+          "bg-background fixed z-50 grid gap-4 overflow-y-auto border p-4 sm:p-6 shadow-lg",
           radius,
           sizeDefaults,
           positionClasses,
@@ -136,13 +136,14 @@ function DialogContent({
         )}
         // Inline style for positioning without transform conflicts
         style={{
-          maxHeight: "calc(100vh - 2rem)",
+          maxHeight:
+            "calc(100dvh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
           ...props.style,
         }}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="group focus-visible:border-ring focus-visible:ring-ring/50 hover:bg-accent/50 hover:scale-105 focus-visible:scale-105 absolute top-3 right-3 flex size-7 items-center justify-center rounded transition-all duration-200 ease-out outline-none focus-visible:ring-[3px] disabled:pointer-events-none">
+        <DialogPrimitive.Close className="group focus-visible:border-ring focus-visible:ring-ring/50 hover:bg-accent/50 hover:scale-105 focus-visible:scale-105 absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] flex size-7 items-center justify-center rounded transition-all duration-200 ease-out outline-none focus-visible:ring-[3px] disabled:pointer-events-none">
           <XIcon
             size={16}
             className="opacity-60 transition-opacity group-hover:opacity-100"
@@ -169,7 +170,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end fixed",
+        "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto",
         className
       )}
       {...props}

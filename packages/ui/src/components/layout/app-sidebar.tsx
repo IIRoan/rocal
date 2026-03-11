@@ -168,14 +168,15 @@ export function AppSidebar({
                           presetColors={presetColors}
                         />
                       </div>
-                      <div className="flex justify-end gap-2 pt-4">
+                      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
                         <Button
                           variant="outline"
+                          className="w-full sm:w-auto"
                           onClick={() => setIsDialogOpen(false)}
                         >
                           Cancel
                         </Button>
-                        <Button onClick={handleCreateCalendar}>
+                        <Button className="w-full sm:w-auto" onClick={handleCreateCalendar}>
                           Create Calendar
                         </Button>
                       </div>
@@ -311,14 +312,15 @@ export function AppSidebar({
                         presetColors={presetColors}
                       />
                     </div>
-                    <div className="flex justify-end gap-2 pt-4">
+                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
                       <Button
                         variant="outline"
+                        className="w-full sm:w-auto"
                         onClick={() => setIsDialogOpen(false)}
                       >
                         Cancel
                       </Button>
-                      <Button onClick={handleCreateCalendar}>
+                      <Button className="w-full sm:w-auto" onClick={handleCreateCalendar}>
                         Create Calendar
                       </Button>
                     </div>
