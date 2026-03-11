@@ -766,7 +766,7 @@ export function CalendarManagement({
               Delete Calendar
             </DialogTitle>
             <DialogDescription>
-              You're about to delete "{deletingCalendar?.name}". What would you
+              You&apos;re about to delete &quot;{deletingCalendar?.name}&quot;. What would you
               like to do with existing events?
             </DialogDescription>
           </DialogHeader>

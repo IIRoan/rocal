@@ -4,7 +4,7 @@ import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 const fontSans = Geist({
@@ -21,9 +21,6 @@ export const metadata: Metadata = {
   title: "Rocal",
   description: "Calendar",
   manifest: "/manifest.json",
-  themeColor: "#000000",
-  viewport:
-    "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -38,6 +35,14 @@ export const metadata: Metadata = {
     "msapplication-TileColor": "#000000",
     "msapplication-tap-highlight": "no",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  userScalable: false,
+  themeColor: "#000000",
 };
 
 export default function RootLayout({

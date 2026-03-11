@@ -43,7 +43,7 @@ export function RecurringDeleteModal({
         <div className="space-y-4">
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
-              "{eventTitle}" is a recurring event.
+              &quot;{eventTitle}&quot; is a recurring event.
             </p>
             <p className="text-sm text-muted-foreground">
               Would you like to delete just this occurrence or the entire series?
