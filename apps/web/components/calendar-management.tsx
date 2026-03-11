@@ -380,7 +380,7 @@ export function CalendarManagement({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[calc(90dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Calendars</DialogTitle>
             <DialogDescription>
@@ -408,9 +408,9 @@ export function CalendarManagement({
             {/* Create New Calendar */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+                <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <span>Create New Calendar</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -539,7 +539,7 @@ export function CalendarManagement({
                     </Label>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button onClick={handleCreateCalendar} disabled={loading}>
                       Create Calendar
                     </Button>
@@ -585,7 +585,7 @@ export function CalendarManagement({
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button
                             variant="ghost"
                             size="sm"

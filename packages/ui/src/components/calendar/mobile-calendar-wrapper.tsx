@@ -116,7 +116,7 @@ export function MobileCalendarWrapper({
       />
 
       {/* Main Calendar Content - allow scrolling with bottom padding for mobile nav */}
-      <div className={cn("flex-1 overflow-auto pb-20 md:pb-0", className)}>
+      <div className={cn("flex-1 overflow-auto pb-24 md:pb-0", className)}>
         {children || <MobileEventCalendar {...props} initialView={currentView} onSidebarToggle={handleOpenSidebar} onViewChange={handleCalendarViewChange} />}
       </div>
 
@@ -133,7 +133,7 @@ export function MobileCalendarWrapper({
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
         <SheetContent 
           side="left" 
-          className="w-80 p-0"
+          className="w-[85vw] max-w-80 p-0 safe-area-inset-top safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>

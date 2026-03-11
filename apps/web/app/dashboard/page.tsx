@@ -264,12 +264,12 @@ function DashboardContent() {
         <CalendarProviderWrapper>
           <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
             {/* Mobile Layout */}
-            <div className="md:hidden h-screen">
+            <div className="md:hidden min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom">
               <MobileLayoutContent />
             </div>
 
             {/* Desktop Layout */}
-            <div className="hidden md:block h-screen">
+            <div className="hidden md:block min-h-screen">
               <SidebarProvider>
                 <SidebarWithContext />
                 <SidebarInset>

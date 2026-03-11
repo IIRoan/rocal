@@ -214,10 +214,13 @@ export function MobileEventCalendar({
   useEffect(() => {
     if (initialView && initialView !== view) {
       setViewState(initialView);
-      // Don't save to sessionStorage here since this came from parent
-      // but still notify about the change
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('calendar-view-selection', initialView);
+        const expirationTime = new Date();
+        expirationTime.setHours(expirationTime.getHours() + 1);
+        sessionStorage.setItem('calendar-view-selection', JSON.stringify({
+          view: initialView,
+          expires: expirationTime.getTime(),
+        }));
       }
     }
   }, [initialView, view]);

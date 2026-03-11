@@ -80,7 +80,7 @@ export default function LoginPage() {
   // Loading state while checking session
   if (isPending || isCheckingSession) {
     return (
-      <section className="min-h-screen flex items-center justify-center px-4">
+      <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex items-center justify-center px-4 py-6 sm:py-8">
         <div className="flex flex-col items-center gap-4 text-center">
           <Logo width={56} height={56} className="text-primary" aria-label="Rocal" />
           <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
@@ -93,9 +93,9 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4">
+    <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex items-center justify-center px-4 py-6 sm:py-8">
       <div className="w-full max-w-sm">
-        <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+        <div className="bg-card border border-border rounded-xl shadow-sm p-5 sm:p-6">
           <div className="flex flex-col items-center text-center gap-3 mb-4">
             <Logo width={56} height={56} className="text-primary" aria-label="Rocal" />
             <h1 className="text-xl font-semibold text-foreground">Sign in</h1>
@@ -141,7 +141,7 @@ export default function LoginPage() {
                 <button
                   onClick={handlePasskeyLogin}
                   disabled={passkeyLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-busy={passkeyLoading}
                 >
                   {passkeyLoading ? (
@@ -166,7 +166,7 @@ export default function LoginPage() {
                 <button
                   onClick={handleGitHubLogin}
                   disabled={isLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900 border border-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900 border border-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-busy={isLoading}
                 >
                   {isLoading ? (

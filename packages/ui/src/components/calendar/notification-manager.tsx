@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, Bell, Mail } from "lucide-react";
-import { Button } from "../ui/button";
-import { Label } from "../ui/label";
+import { Bell, Plus, X, ChevronDown } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { Badge } from "../ui/badge";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../ui/popover";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerTrigger,
+} from "../ui/drawer";
+import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
+import { cn } from "@workspace/ui/lib/utils";
 
 export interface EventNotification {
   id?: string;
@@ -22,11 +25,11 @@ export interface EventNotification {
   isSent?: boolean;
 }
 
-const NOTIFICATION_OPTIONS = [
-  { value: 5, label: "5 minutes before" },
-  { value: 10, label: "10 minutes before" },
-  { value: 15, label: "15 minutes before" },
-  { value: 30, label: "30 minutes before" },
+const TIME_OPTIONS = [
+  { value: 5, label: "5 min before" },
+  { value: 10, label: "10 min before" },
+  { value: 15, label: "15 min before" },
+  { value: 30, label: "30 min before" },
   { value: 60, label: "1 hour before" },
   { value: 120, label: "2 hours before" },
   { value: 360, label: "6 hours before" },
@@ -37,147 +40,199 @@ const NOTIFICATION_OPTIONS = [
   { value: 10080, label: "1 week before" },
 ];
 
+function formatTimeShort(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1440) return `${minutes / 60} hour${minutes / 60 > 1 ? "s" : ""}`;
+  const days = minutes / 1440;
+  return `${days} day${days > 1 ? "s" : ""}`;
+}
+
 interface NotificationManagerProps {
   eventId?: string;
   notifications: EventNotification[];
   onChange: (notifications: EventNotification[]) => void;
   loading?: boolean;
-  defaultReminder?: number | null; // User's default reminder setting
+  defaultReminder?: number | null;
+}
+
+function ReminderRow({
+  value,
+  onSelect,
+  onRemove,
+  isMobile,
+}: {
+  value: number;
+  onSelect: (value: number) => void;
+  onRemove?: () => void;
+  isMobile: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const content = (
+    <div className="grid grid-cols-2 gap-1 p-2">
+      {TIME_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => {
+            onSelect(option.value);
+            setOpen(false);
+          }}
+          className={cn(
+            "flex items-center justify-center h-9 rounded-lg text-sm font-medium transition-colors",
+            option.value === value
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted/50 hover:bg-muted active:bg-muted/80"
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <div className="flex items-center gap-2 w-full cursor-pointer group">
+            <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+              <Bell className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 inline-flex items-center justify-between gap-1 px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 text-sm font-medium text-foreground transition-colors">
+              <span>{formatTimeShort(value)} before</span>
+              {onRemove ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                  className="flex items-center justify-center h-6 w-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              )}
+            </div>
+          </div>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[60dvh]">
+          <DrawerTitle className="sr-only">Select reminder time</DrawerTitle>
+          {content}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center gap-2 w-full cursor-pointer group">
+          <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+            <Bell className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 inline-flex items-center justify-between gap-1 px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 text-sm font-medium text-foreground transition-colors">
+            <span>{formatTimeShort(value)} before</span>
+            {onRemove ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                className="flex items-center justify-center h-6 w-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            )}
+          </div>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        {content}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function NotificationManager({
-  eventId,
   notifications,
   onChange,
   loading = false,
   defaultReminder = null,
 }: NotificationManagerProps) {
-  const handleAddNotification = () => {
-    const newNotification: EventNotification = {
-      notificationType: "email",
-      minutesBefore: 15, // Default to 15 minutes
-      isEnabled: true,
-    };
-    onChange([...notifications, newNotification]);
+  const isMobile = useIsMobile();
+
+  const handleAdd = () => {
+    onChange([
+      ...notifications,
+      { notificationType: "email", minutesBefore: 15, isEnabled: true },
+    ]);
   };
 
-  const handleRemoveNotification = (index: number) => {
-    const updated = notifications.filter((_, i) => i !== index);
-    onChange(updated);
+  const handleRemove = (index: number) => {
+    onChange(notifications.filter((_, i) => i !== index));
   };
 
-  const handleUpdateNotification = (
-    index: number,
-    field: keyof EventNotification,
-    value: any,
-  ) => {
-    const updated = notifications.map((notification, i) =>
-      i === index ? { ...notification, [field]: value } : notification,
+  const handleSelect = (index: number, value: number) => {
+    onChange(
+      notifications.map((n, i) =>
+        i === index ? { ...n, minutesBefore: value } : n
+      )
     );
-    onChange(updated);
-  };
-
-  const formatMinutesToReadable = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${minutes}min`;
-    } else if (minutes < 1440) {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return remainingMinutes > 0
-        ? `${hours}h ${remainingMinutes}min`
-        : `${hours}h`;
-    } else {
-      const days = Math.floor(minutes / 1440);
-      const remainingHours = Math.floor((minutes % 1440) / 60);
-      return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-    }
   };
 
   return (
-    <div className="space-y-2.5">
-      {/* Default notification indicator */}
+    <div className="space-y-1">
+      {/* Default reminder */}
       {defaultReminder && (
-        <div className="flex items-center gap-2 p-2 border rounded-md bg-info-bg border-info-border">
-          <Mail className="h-3.5 w-3.5 text-info flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-info-foreground">
-              Default: {formatMinutesToReadable(defaultReminder)} before
-            </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-primary/10">
+            <Bell className="h-4 w-4 text-primary" />
           </div>
-          <Badge
-            variant="outline"
-            className="text-[10px] px-1.5 py-0 h-5 border-info-border text-info"
-          >
-            Auto
-          </Badge>
+          <div className="flex-1 flex items-center justify-between px-3 h-9 rounded-lg bg-muted/30">
+            <span className="text-sm font-medium text-foreground">
+              {formatTimeShort(defaultReminder)} before
+            </span>
+            <span className="text-muted-foreground text-xs">(default)</span>
+          </div>
         </div>
       )}
 
-      {notifications.length === 0 ? (
-        <div className="text-xs text-muted-foreground bg-muted/30 rounded-md p-2.5 text-center">
-          {defaultReminder
-            ? "Default reminder set. Add more if needed."
-            : "Add reminders to be notified about this event."}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {notifications.map((notification, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-2 p-2 border rounded-md bg-card"
-            >
-              <Mail className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+      {/* Custom reminders */}
+      {notifications.map((notification, index) => (
+        <ReminderRow
+          key={index}
+          value={notification.minutesBefore}
+          onSelect={(value) => handleSelect(index, value)}
+          onRemove={() => handleRemove(index)}
+          isMobile={isMobile}
+        />
+      ))}
 
-              <div className="flex-1 min-w-0">
-                <Select
-                  value={notification.minutesBefore.toString()}
-                  onValueChange={(value) =>
-                    handleUpdateNotification(
-                      index,
-                      "minutesBefore",
-                      parseInt(value),
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NOTIFICATION_OPTIONS.map((option) => (
-                      <SelectItem
-                        key={option.value}
-                        value={option.value.toString()}
-                      >
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRemoveNotification(index)}
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleAddNotification}
+      {/* Add button */}
+      <button
+        type="button"
+        onClick={handleAdd}
         disabled={loading}
-        className="w-full h-7 text-xs"
+        className={cn(
+          "flex items-center gap-2 w-full text-left group cursor-pointer",
+          "disabled:opacity-50 disabled:cursor-not-allowed"
+        )}
       >
-        <Plus className="h-3.5 w-3.5 mr-1.5" />
-        Add Reminder
-      </Button>
+        <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+          <Plus className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div className="flex-1 flex items-center px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 transition-colors">
+          <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            Add reminder
+          </span>
+        </div>
+      </button>
     </div>
   );
 }
