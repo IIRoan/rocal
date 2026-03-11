@@ -9,8 +9,8 @@ const nextConfig = {
   output: 'export',
   turbopack: {
     resolveAlias: {
+      '@workspace/ui/globals.css': path.resolve(__dirname, '../../packages/ui/src/styles/globals.css'),
       '@workspace/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
-      '@workspace/ui/*': path.resolve(__dirname, '../../packages/ui/src/*'),
     },
   },
   webpack: (config) => {
@@ -18,13 +18,7 @@ const nextConfig = {
       ...config.resolve.alias,
       '@workspace/ui/globals.css': path.resolve(__dirname, '../../packages/ui/src/styles/globals.css'),
       '@workspace/ui': path.resolve(__dirname, '../../packages/ui/src'),
-      '@workspace/ui/*': path.resolve(__dirname, '../../packages/ui/src/*'),
     }
-    // Add web app's node_modules to module resolution
-    config.resolve.modules = [
-      path.resolve(__dirname, 'node_modules'),
-      'node_modules',
-    ]
     return config
   },
 }

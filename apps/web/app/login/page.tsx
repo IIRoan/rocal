@@ -184,13 +184,6 @@ export default function LoginPage() {
               </div>
             )}
           </div>
-
-          <div className="mt-6 text-center">
-            <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-1"><Check className="h-3 w-3 text-success" /><span>WebAuthn</span></div>
-              <div className="flex items-center gap-1"><Shield className="h-3 w-3 text-success" /><span>Private & secure</span></div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
