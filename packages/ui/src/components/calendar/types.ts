@@ -36,6 +36,8 @@ export interface CalendarEvent {
   externalId?: string | null;
   subscriptionId?: string | null;
   syncedAt?: Date | null;
+  // Preview event (ghost event shown in timeline while creating via popover)
+  isPreview?: boolean;
 }
 
 export interface CreateCalendarData {

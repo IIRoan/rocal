@@ -48,6 +48,8 @@ interface CommandPaletteProps {
   initialView?: string;
   eventEditorMode?: EventEditorMode;
   popoverAnchorPosition?: { x: number; y: number } | null;
+  previewEvent?: CalendarEvent | null;
+  updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
 }
 
 export function CommandPalette({
@@ -58,6 +60,8 @@ export function CommandPalette({
   initialView = "main",
   eventEditorMode = "modal",
   popoverAnchorPosition = null,
+  previewEvent = null,
+  updatePreviewEvent,
 }: CommandPaletteProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
@@ -188,6 +192,7 @@ export function CommandPalette({
         localSettings={localSettings}
         editorMode={eventEditorMode}
         anchorPosition={popoverAnchorPosition}
+        updatePreviewEvent={updatePreviewEvent}
       />
     );
   }
