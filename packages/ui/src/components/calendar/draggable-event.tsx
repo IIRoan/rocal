@@ -45,6 +45,8 @@ export function DraggableEvent({
     y: number;
   } | null>(null);
 
+  const isPreview = !!(event as any).isPreview;
+
   // Check if this is a multi-day event
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);
@@ -64,6 +66,7 @@ export function DraggableEvent({
         isFirstDay,
         isLastDay,
       },
+      disabled: isPreview,
     });
 
   // Handle mouse down to track where on the event the user clicked
@@ -131,11 +134,11 @@ export function DraggableEvent({
         isFirstDay={isFirstDay}
         isLastDay={isLastDay}
         isDragging={isDragging}
-        onClick={onClick}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        dndListeners={listeners}
-        dndAttributes={attributes}
+        onClick={isPreview ? undefined : onClick}
+        onMouseDown={isPreview ? undefined : handleMouseDown}
+        onTouchStart={isPreview ? undefined : handleTouchStart}
+        dndListeners={isPreview ? undefined : listeners}
+        dndAttributes={isPreview ? undefined : attributes}
         aria-hidden={ariaHidden}
         timeFormat={timeFormat}
         timezone={timezone}

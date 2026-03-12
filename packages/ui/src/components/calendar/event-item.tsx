@@ -83,6 +83,44 @@ function EventWrapper({
     : new Date(event.end);
 
   const isEventInPast = isPast(displayEnd);
+  const isPreview = !!(event as any).isPreview;
+
+  // Preview events get a distinct ghost/outline style
+  if (isPreview) {
+    // For hex colors, derive a semi-transparent background from the hex
+    // For named colors, use the color class with reduced opacity for visibility in both themes
+    const hexStyles = getEventColorStyles(event.color);
+    const hasHex = Object.keys(hexStyles).length > 0;
+
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none",
+          "min-h-[20px] sm:min-h-[24px]",
+          "px-[2px] sm:px-2",
+          "border-2 border-dashed rounded-md",
+          "animate-in fade-in-0 duration-300",
+          // Use the event color classes for named colors so the border inherits the right color
+          !hasHex && getEventColorClasses(event.color),
+          className,
+        )}
+        style={
+          hasHex
+            ? {
+                borderColor: hexStyles.backgroundColor as string,
+                backgroundColor: `${hexStyles.backgroundColor}33`,
+                color: hexStyles.color,
+                opacity: 0.85,
+              }
+            : { opacity: 0.85 }
+        }
+        data-preview-event="true"
+        data-event-id={event.id}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <button

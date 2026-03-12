@@ -19,6 +19,7 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
+import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
 
 // Define the Day type as expected by date-fns
 // This type is often implicitly defined by date-fns, but explicitly defining it
@@ -33,7 +34,7 @@ interface CalendarWithDataProps {
 export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible, currentDate } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
-  const { openEventEditor } = useCommandPalette();
+  const { openEventEditor, previewEvent } = useCommandPalette();
 
   // Get the initial view from settings, fallback to month
   const initialView = settings?.defaultView || "month";
@@ -127,7 +128,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       calendarData.calendars.map((cal) => [cal.id, cal]),
     );
 
-    const transformedEventsList = calendarData.events
+    const transformedEventsList: CalendarEvent[] = calendarData.events
       .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup
       .map((event) => {
         // Use event's color if it exists, otherwise fall back to calendar color
@@ -144,8 +145,24 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         };
       });
 
+    // Merge preview event into the list if it exists
+    if (previewEvent) {
+      const calendar = calendarMap.get(previewEvent.calendarId);
+      const previewColor = previewEvent.color || calendar?.color || undefined;
+      transformedEventsList.push({
+        ...previewEvent,
+        id: previewEvent.id || "__preview__",
+        description: previewEvent.description ?? undefined,
+        color: previewColor as any,
+        location: previewEvent.location ?? undefined,
+        categoryId: previewEvent.categoryId ?? undefined,
+        reminder: (previewEvent as any).reminder ?? undefined,
+        isPreview: true,
+      });
+    }
+
     return transformedEventsList;
-  }, [calendarData.events, calendarData.calendars, visibleCalendarIds]); // Add calendars to deps
+  }, [calendarData.events, calendarData.calendars, visibleCalendarIds, previewEvent]); // Add calendars + previewEvent to deps
 
 
   // Show calendar skeleton and overlay until ALL core elements are ready:
