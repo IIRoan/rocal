@@ -50,7 +50,6 @@ function TimeGrid({
 }: TimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   useEffect(() => {
     if (open && containerRef.current && scrollToIndex >= 0) {
@@ -80,11 +79,9 @@ function TimeGrid({
           const isSelected =
             time.getHours() === selectedTime.getHours() &&
             time.getMinutes() === selectedTime.getMinutes();
-          const optionMinutes = time.getHours() * 60 + time.getMinutes();
           const isCurrentTime =
             time.getHours() === now.getHours() &&
             time.getMinutes() === now.getMinutes();
-          const isPastCurrent = optionMinutes < currentMinutes;
 
           return (
             <button
@@ -93,15 +90,13 @@ function TimeGrid({
               data-time-index={index}
               onClick={() => handleSelect(time)}
               className={cn(
-                "flex items-center justify-center rounded-lg text-sm font-medium transition-colors relative",
+                "flex items-center justify-center rounded-lg text-sm font-semibold transition-colors relative cursor-pointer",
                 compact ? "h-11 min-w-[80px]" : "h-12",
                 isSelected
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : isCurrentTime
-                    ? "bg-primary/20 text-primary ring-2 ring-primary"
-                    : isPastCurrent
-                      ? "bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                      : "bg-muted/50 hover:bg-muted active:bg-muted/80"
+                    ? "bg-primary/20 text-primary ring-2 ring-primary hover:bg-primary/30"
+                    : "bg-accent hover:bg-accent/80 text-accent-foreground"
               )}
             >
               {timeString}
@@ -301,7 +296,7 @@ export function ShadcnAutocomleteTimePicker({
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
         <DrawerContent className="max-h-[300px]">
           <DrawerTitle className="sr-only">Select time</DrawerTitle>
-          <div className="flex flex-col items-center flex-1 overflow-y-auto">
+          <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
             <TimeGrid
               selectedTime={selectedTime}
               timeOptions={timeOptions}
@@ -348,7 +343,7 @@ export function ShadcnAutocomleteTimePicker({
       <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
       <DrawerContent className="max-h-[400px]">
         <DrawerTitle className="sr-only">Select time</DrawerTitle>
-        <div className="flex flex-col items-center flex-1 overflow-y-auto">
+        <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
           <TimeGrid
             selectedTime={selectedTime}
             timeOptions={timeOptions}
