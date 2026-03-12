@@ -91,7 +91,7 @@ export interface MobileEventCalendarProps {
     notifications: EventNotification[],
   ) => Promise<void>;
   // Command palette integration
-  onEventEdit?: (event: CalendarEvent) => void;
+  onEventEdit?: (event: CalendarEvent, options?: { mode?: "modal" | "popover"; anchorPosition?: { x: number; y: number } }) => void;
   // Mobile specific
   onSidebarToggle?: () => void;
   // View change handler

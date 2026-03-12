@@ -38,12 +38,16 @@ import {
 } from "lucide-react";
 import { useNumberedShortcuts } from "@workspace/ui/hooks";
 
+import type { EventEditorMode } from "./command-palette-context";
+
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventToEdit?: CalendarEvent | null;
   onEventSaved?: () => void;
   initialView?: string;
+  eventEditorMode?: EventEditorMode;
+  popoverAnchorPosition?: { x: number; y: number } | null;
 }
 
 export function CommandPalette({
@@ -52,6 +56,8 @@ export function CommandPalette({
   eventToEdit,
   onEventSaved,
   initialView = "main",
+  eventEditorMode = "modal",
+  popoverAnchorPosition = null,
 }: CommandPaletteProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
@@ -180,6 +186,8 @@ export function CommandPalette({
         onEventSaved={onEventSaved}
         onBack={() => goBack("events")}
         localSettings={localSettings}
+        editorMode={eventEditorMode}
+        anchorPosition={popoverAnchorPosition}
       />
     );
   }

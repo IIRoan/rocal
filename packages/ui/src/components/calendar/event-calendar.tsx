@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -93,7 +93,7 @@ export interface EventCalendarProps {
     notifications: EventNotification[],
   ) => Promise<void>;
   // Command palette integration
-  onEventEdit?: (event: CalendarEvent) => void;
+  onEventEdit?: (event: CalendarEvent, options?: { mode?: "modal" | "popover"; anchorPosition?: { x: number; y: number } }) => void;
   // Sidebar integration (optional)
   hideSidebarTrigger?: boolean;
   // Custom sidebar toggle handler for mobile
@@ -332,8 +332,19 @@ export function EventCalendar({
     setCurrentDate(new Date());
   };
 
+  // Track last mouse click position for popover positioning on timeline clicks
+  const lastClickPositionRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      lastClickPositionRef.current = { x: e.clientX, y: e.clientY };
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
+
   const handleEventSelect = (event: CalendarEvent) => {
-    // Open command palette with event to edit
+    // Open command palette with event to edit (always modal for existing events)
     onEventEdit?.(event);
   };
 
@@ -354,8 +365,33 @@ export function EventCalendar({
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    // Open command palette with new event
-    onEventEdit?.(newEvent);
+    // Open as popover near the click position (for timeline cell clicks)
+    const anchorPos = lastClickPositionRef.current;
+    if (anchorPos) {
+      onEventEdit?.(newEvent, { mode: "popover", anchorPosition: anchorPos });
+    } else {
+      onEventEdit?.(newEvent);
+    }
+  };
+
+  // Create event from button (always modal, no popover)
+  const handleButtonEventCreate = (startTime: Date) => {
+    startTime.setSeconds(0);
+    startTime.setMilliseconds(0);
+
+    const newEvent: CalendarEvent = {
+      id: undefined as any,
+      title: "",
+      start: startTime,
+      end: addMinutesToDate(startTime, defaultEventDuration),
+      allDay: false,
+      calendarId: defaultCalendarId || "",
+      userId: "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    // Always open as modal for button-triggered creation
+    onEventEdit?.(newEvent, { mode: "modal" });
   };
 
   const handleEventSave = async (
@@ -760,7 +796,8 @@ export function EventCalendar({
                       startTime.setHours(9, 0, 0, 0);
                     }
 
-                    handleEventCreate(startTime);
+                    // Use button handler (always modal)
+                    handleButtonEventCreate(startTime);
                   }}
                   disabled={loading}
                 >
