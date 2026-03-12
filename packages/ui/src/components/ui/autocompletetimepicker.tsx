@@ -1,20 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Check, ChevronsUpDown, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@workspace/ui/components/navigation/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/ui/popover";
 import {
   Drawer,
   DrawerContent,
@@ -22,10 +9,14 @@ import {
   DrawerTrigger,
 } from "@workspace/ui/components/ui/drawer";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
-
 import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-timepicker";
 
 const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const INPUT_STYLES =
+  "w-7 bg-transparent text-center text-sm font-medium outline-none border-none shadow-none " +
+  "focus:outline-none focus:ring-0 focus:shadow-none " +
+  "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 interface TimePickerProps {
   value?: Date;
@@ -38,148 +29,63 @@ interface TimePickerProps {
   inline?: boolean;
 }
 
-function DesktopTimePickerContent({
-  selectedTime,
-  timeOptions,
-  formatTime,
-  searchValue,
-  setSearchValue,
-  handleSelect,
-  handleCustomTimeInput,
-  isValidCustomTime,
-  commandListRef,
-}: {
-  selectedTime: Date;
-  timeOptions: Date[];
-  formatTime: (time: Date) => string;
-  searchValue: string;
-  setSearchValue: (value: string) => void;
-  handleSelect: (time: Date) => void;
-  handleCustomTimeInput: (inputValue: string) => boolean;
-  isValidCustomTime: (inputValue: string) => boolean;
-  commandListRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  return (
-    <Command className="border-none">
-      <CommandInput
-        placeholder="Search or type time..."
-        data-testid="CommandInput"
-        value={searchValue}
-        onValueChange={setSearchValue}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            const inputValue = searchValue.trim();
-            if (handleCustomTimeInput(inputValue)) {
-              e.preventDefault();
-              setSearchValue("");
-            }
-          }
-        }}
-        className="border-b border-border text-sm font-medium"
-      />
-      <CommandList
-        ref={commandListRef}
-        className="max-h-[200px] overflow-y-auto"
-        onWheel={(e) => e.stopPropagation()}
-      >
-        <CommandEmpty className="text-sm text-muted-foreground py-6 text-center">
-          No time found.
-        </CommandEmpty>
-        {searchValue && isValidCustomTime(searchValue) && (
-          <CommandGroup heading="Custom Time" className="px-2 py-1.5">
-            <CommandItem
-              value={`custom-${searchValue}`}
-              onSelect={() => {
-                handleCustomTimeInput(searchValue);
-                setSearchValue("");
-              }}
-              className="text-primary font-semibold rounded-md px-2 py-1.5 cursor-pointer hover:bg-accent"
-            >
-              <Clock className="mr-2 h-4 w-4" />
-              Use "{searchValue}" (Press Enter)
-            </CommandItem>
-          </CommandGroup>
-        )}
-        <CommandGroup className="px-2 py-1">
-          {timeOptions.map((time, index) => {
-            const timeString = formatTime(time);
-            const isSelected =
-              time.getHours() === selectedTime.getHours() &&
-              time.getMinutes() === selectedTime.getMinutes();
-            return (
-              <CommandItem
-                key={index}
-                value={timeString}
-                onSelect={() => handleSelect(time)}
-                className={cn(
-                  "rounded-md px-2 py-1.5 cursor-pointer font-medium text-sm",
-                  isSelected && "bg-accent text-foreground"
-                )}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    isSelected ? "opacity-100 text-primary" : "opacity-0"
-                  )}
-                />
-                {timeString}
-              </CommandItem>
-            );
-          })}
-        </CommandGroup>
-      </CommandList>
-    </Command>
-  );
-}
-
-interface MobileTimePickerContentProps {
+interface TimeGridProps {
   selectedTime: Date;
   timeOptions: Date[];
   formatTime: (time: Date) => string;
   handleSelect: (time: Date) => void;
   scrollToIndex: number;
+  compact?: boolean;
+  open?: boolean;
 }
 
-function MobileTimePickerContent({
+function TimeGrid({
   selectedTime,
   timeOptions,
   formatTime,
   handleSelect,
   scrollToIndex,
-}: MobileTimePickerContentProps) {
+  compact = false,
+  open,
+}: TimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrolledRef = useRef(false);
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // Scroll on mount
   useEffect(() => {
-    if (containerRef.current && !scrolledRef.current && scrollToIndex >= 0) {
-      scrolledRef.current = true;
-      requestAnimationFrame(() => {
+    if (open && containerRef.current && scrollToIndex >= 0) {
+      const timer = setTimeout(() => {
         const button = containerRef.current?.querySelector(
           `[data-time-index="${scrollToIndex}"]`
         ) as HTMLElement;
         if (button && containerRef.current) {
-          const containerHeight = containerRef.current.clientHeight;
-          const buttonTop = button.offsetTop;
-          const buttonHeight = button.offsetHeight;
-          const scrollTop = buttonTop - containerHeight / 2 + buttonHeight / 2;
-          containerRef.current.scrollTop = Math.max(0, scrollTop);
+          button.scrollIntoView({ behavior: "instant", block: "center" });
         }
-      });
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [scrollToIndex]);
+  }, [open, scrollToIndex]);
 
   return (
     <div
       ref={containerRef}
-      className="h-full max-h-[70dvh] overflow-y-auto overscroll-contain"
+      className={cn(
+        "overflow-y-auto overscroll-contain",
+        compact ? "max-h-[300px]" : "h-full"
+      )}
     >
-      <div className="grid grid-cols-3 gap-1 p-2">
+      <div className={cn("grid gap-2 p-3", compact ? "grid-cols-4" : "grid-cols-3")}>
         {timeOptions.map((time, index) => {
           const timeString = formatTime(time);
           const isSelected =
             time.getHours() === selectedTime.getHours() &&
             time.getMinutes() === selectedTime.getMinutes();
+          const optionMinutes = time.getHours() * 60 + time.getMinutes();
+          const isCurrentTime =
+            time.getHours() === now.getHours() &&
+            time.getMinutes() === now.getMinutes();
+          const isPastCurrent = optionMinutes < currentMinutes;
+
           return (
             <button
               key={timeString}
@@ -187,17 +93,110 @@ function MobileTimePickerContent({
               data-time-index={index}
               onClick={() => handleSelect(time)}
               className={cn(
-                "flex items-center justify-center h-12 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center justify-center rounded-lg text-sm font-medium transition-colors relative",
+                compact ? "h-11 min-w-[80px]" : "h-12",
                 isSelected
                   ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 hover:bg-muted active:bg-muted/80"
+                  : isCurrentTime
+                    ? "bg-primary/20 text-primary ring-2 ring-primary"
+                    : isPastCurrent
+                      ? "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                      : "bg-muted/50 hover:bg-muted active:bg-muted/80"
               )}
             >
               {timeString}
+              {isCurrentTime && !isSelected && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+              )}
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+interface TimeInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => boolean;
+  isValid: boolean;
+  open?: boolean;
+}
+
+function TimeInput({ value, onChange, onSubmit, isValid, open }: TimeInputProps) {
+  const hhRef = useRef<HTMLInputElement>(null);
+  const mmRef = useRef<HTMLInputElement>(null);
+  const hours = value.split(":")[0] || "";
+  const minutes = value.split(":")[1] || "";
+
+  // Auto-focus HH input when drawer opens
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => hhRef.current?.focus(), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+    const validated = raw.length === 2 && parseInt(raw, 10) > 23 ? "23" : raw;
+    if (validated.length === 2) {
+      onChange(`${validated}:${minutes}`);
+      setTimeout(() => mmRef.current?.focus(), 0);
+    } else {
+      onChange(minutes ? `${validated}:${minutes}` : validated);
+    }
+  };
+
+  const handleMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+    const validated = raw.length === 2 && parseInt(raw, 10) > 59 ? "59" : raw;
+    if (hours.length === 2) {
+      onChange(`${hours}:${validated}`);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && minutes.length === 0 && e.currentTarget === mmRef.current) {
+      e.preventDefault();
+      onChange(hours);
+      hhRef.current?.focus();
+    }
+    if (e.key === "Enter" && value.length === 5) {
+      if (onSubmit()) {
+        onChange("");
+      }
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 bg-muted/30 rounded-lg px-3 py-2">
+      <input
+        ref={hhRef}
+        type="text"
+        inputMode="numeric"
+        placeholder="HH"
+        value={hours}
+        onChange={handleHoursChange}
+        className={cn(INPUT_STYLES, "focus:text-primary")}
+        autoComplete="off"
+        maxLength={2}
+      />
+      <span className="text-muted-foreground font-semibold">:</span>
+      <input
+        ref={mmRef}
+        type="text"
+        inputMode="numeric"
+        placeholder="MM"
+        value={minutes}
+        onChange={handleMinutesChange}
+        onKeyDown={handleKeyDown}
+        className={cn(INPUT_STYLES, "focus:text-primary", hours.length < 2 && "opacity-50")}
+        autoComplete="off"
+        maxLength={2}
+        disabled={hours.length < 2}
+      />
     </div>
   );
 }
@@ -213,7 +212,7 @@ export function ShadcnAutocomleteTimePicker({
   inline = false,
 }: TimePickerProps) {
   const [open, setOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
+  const [customTimeInput, setCustomTimeInput] = useState("");
   const isMobile = useIsMobile();
   const { timeOptions, formatTime } = useAutocompleteTimepicker({
     is24Hour,
@@ -223,33 +222,31 @@ export function ShadcnAutocomleteTimePicker({
 
   const selectedTime = value || new Date();
 
-  const commandListRef = useRef<HTMLDivElement>(null);
-
-  // Find index of selected time
   const selectedIndex = timeOptions.findIndex(
     (time) =>
       time.getHours() === selectedTime.getHours() &&
       time.getMinutes() === selectedTime.getMinutes()
   );
 
-  // Get scroll target index - selected time or closest upcoming time
   const getScrollToIndex = useCallback(() => {
     if (selectedIndex !== -1) return selectedIndex;
 
-    // Find closest time >= current time
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const selectedMinutes = selectedTime.getHours() * 60 + selectedTime.getMinutes();
+    let closestIndex = 0;
+    let closestDiff = Infinity;
 
     for (let i = 0; i < timeOptions.length; i++) {
       const option = timeOptions[i];
       if (!option) continue;
       const optionMinutes = option.getHours() * 60 + option.getMinutes();
-      if (optionMinutes >= currentMinutes) {
-        return i;
+      const diff = Math.abs(optionMinutes - selectedMinutes);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestIndex = i;
       }
     }
-    return 0;
-  }, [selectedIndex, timeOptions]);
+    return closestIndex;
+  }, [selectedIndex, selectedTime, timeOptions]);
 
   const handleSelect = (time: Date) => {
     const newTime = new Date(selectedTime);
@@ -258,17 +255,14 @@ export function ShadcnAutocomleteTimePicker({
     setOpen(false);
   };
 
-  const handleCustomTimeInput = (inputValue: string) => {
-    const timeRegex = /^(\d{1,2}):(\d{1,2})$/;
-    const match = inputValue.match(timeRegex);
-
-    if (match && match[1] && match[2]) {
-      const hours = parseInt(match[1], 10);
-      const minutes = parseInt(match[2], 10);
-
-      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+  const handleCustomTimeSubmit = () => {
+    const match = customTimeInput.match(/^(\d{1,2}):(\d{2})$/);
+    if (match?.[1] && match?.[2]) {
+      const h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
         const customTime = new Date();
-        customTime.setHours(hours, minutes, 0, 0);
+        customTime.setHours(h, m, 0, 0);
         handleSelect(customTime);
         return true;
       }
@@ -276,148 +270,122 @@ export function ShadcnAutocomleteTimePicker({
     return false;
   };
 
-  const isValidCustomTime = (inputValue: string) => {
-    const timeRegex = /^(\d{1,2}):(\d{1,2})$/;
-    const match = inputValue.match(timeRegex);
-
-    if (match && match[1] && match[2]) {
-      const hours = parseInt(match[1], 10);
-      const minutes = parseInt(match[2], 10);
-      return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
-    }
-    return false;
-  };
-
   const currentTimeString = formatTime(selectedTime);
 
-  const scrollToSelectedItem = () => {
-    if (
-      selectedIndex !== -1 &&
-      commandListRef.current &&
-      timeOptions[selectedIndex]
-    ) {
-      const selectedElement = commandListRef.current.querySelector(
-        `[data-value="${formatTime(timeOptions[selectedIndex])}"]`
-      ) as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({
-          behavior: "instant",
-          block: "center",
-        });
-      }
-    }
-  };
+  const triggerButton = inline ? (
+    <button
+      role="combobox"
+      aria-expanded={open}
+      className={cn(
+        "outline-none text-foreground font-semibold active:opacity-70 transition-opacity",
+        className
+      )}
+    >
+      {currentTimeString}
+    </button>
+  ) : (
+    <Button
+      variant="outline"
+      role="combobox"
+      aria-expanded={open}
+      className={cn("w-full justify-start font-normal cursor-pointer", className)}
+    >
+      <Clock className="mr-2 h-4 w-4 flex-shrink-0" data-testid="ClockIcon" />
+      {currentTimeString}
+    </Button>
+  );
 
-  // Mobile: use Drawer
   if (isMobile) {
     return (
-      <Drawer
-        open={open}
-        onOpenChange={(newOpen) => {
-          setOpen(newOpen);
-          if (!newOpen) {
-            setSearchValue("");
-          }
-        }}
-      >
-        <DrawerTrigger asChild>
-          {inline ? (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
+        <DrawerContent className="max-h-[300px]">
+          <DrawerTitle className="sr-only">Select time</DrawerTitle>
+          <div className="flex flex-col items-center flex-1 overflow-y-auto">
+            <TimeGrid
+              selectedTime={selectedTime}
+              timeOptions={timeOptions}
+              formatTime={formatTime}
+              handleSelect={handleSelect}
+              scrollToIndex={getScrollToIndex()}
+              compact
+              open={open}
+            />
+          </div>
+          <div className="w-full px-3 pt-3 pb-4 border-t flex justify-center gap-2">
+            <TimeInput
+              value={customTimeInput}
+              onChange={setCustomTimeInput}
+              onSubmit={handleCustomTimeSubmit}
+              isValid={customTimeInput.length === 5}
+              open={open}
+            />
             <button
-              role="combobox"
-              aria-expanded={open}
+              type="button"
+              onClick={() => {
+                if (handleCustomTimeSubmit()) {
+                  setCustomTimeInput("");
+                }
+              }}
+              disabled={customTimeInput.length !== 5}
               className={cn(
-                "outline-none text-foreground font-semibold active:opacity-70 transition-opacity",
-                className
+                "h-11 min-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
+                customTimeInput.length === 5
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-muted/30 text-muted-foreground"
               )}
             >
-              {currentTimeString}
+              Apply
             </button>
-          ) : (
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className={cn("w-full justify-between", className)}
-            >
-              <div className="flex items-center">
-                <Clock className="mr-2 h-4 w-4" data-testid="ClockIcon" />
-                {currentTimeString}
-              </div>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          )}
-        </DrawerTrigger>
-        <DrawerContent className="max-h-[80dvh]">
-          <DrawerTitle className="sr-only">Select time</DrawerTitle>
-          <MobileTimePickerContent
-            selectedTime={selectedTime}
-            timeOptions={timeOptions}
-            formatTime={formatTime}
-            handleSelect={handleSelect}
-            scrollToIndex={getScrollToIndex()}
-          />
+          </div>
         </DrawerContent>
       </Drawer>
     );
   }
 
-  // Desktop: use Popover
   return (
-    <Popover
-      open={open}
-      onOpenChange={(newOpen) => {
-        setOpen(newOpen);
-        if (!newOpen) {
-          setSearchValue("");
-        }
-      }}
-    >
-      <PopoverTrigger asChild>
-        {inline ? (
+    <Drawer open={open} onOpenChange={setOpen} direction="bottom">
+      <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
+      <DrawerContent className="max-h-[400px]">
+        <DrawerTitle className="sr-only">Select time</DrawerTitle>
+        <div className="flex flex-col items-center flex-1 overflow-y-auto">
+          <TimeGrid
+            selectedTime={selectedTime}
+            timeOptions={timeOptions}
+            formatTime={formatTime}
+            handleSelect={handleSelect}
+            scrollToIndex={getScrollToIndex()}
+            compact
+            open={open}
+          />
+        </div>
+        <div className="w-full px-3 pt-3 pb-4 border-t flex justify-center gap-2">
+          <TimeInput
+            value={customTimeInput}
+            onChange={setCustomTimeInput}
+            onSubmit={handleCustomTimeSubmit}
+            isValid={customTimeInput.length === 5}
+            open={open}
+          />
           <button
-            role="combobox"
-            aria-expanded={open}
+            type="button"
+            onClick={() => {
+              if (handleCustomTimeSubmit()) {
+                setCustomTimeInput("");
+              }
+            }}
+            disabled={customTimeInput.length !== 5}
             className={cn(
-              "outline-none text-foreground font-semibold hover:text-primary transition-colors duration-150 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-primary after:opacity-0 hover:after:opacity-100 after:transition-opacity",
-              className
+              "h-11 min-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
+              customTimeInput.length === 5
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-muted/30 text-muted-foreground"
             )}
           >
-            {currentTimeString}
+            Apply
           </button>
-        ) : (
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn("w-full justify-between", className)}
-          >
-            <div className="flex items-center">
-              <Clock className="mr-2 h-4 w-4" data-testid="ClockIcon" />
-              {currentTimeString}
-            </div>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        )}
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[200px] p-0 border-border shadow-lg"
-        onOpenAutoFocus={(e) => {
-          e.preventDefault();
-          setTimeout(scrollToSelectedItem, 100);
-        }}
-      >
-        <DesktopTimePickerContent
-          selectedTime={selectedTime}
-          timeOptions={timeOptions}
-          formatTime={formatTime}
-          searchValue={searchValue}
-          setSearchValue={setSearchValue}
-          handleSelect={handleSelect}
-          handleCustomTimeInput={handleCustomTimeInput}
-          isValidCustomTime={isValidCustomTime}
-          commandListRef={commandListRef}
-        />
-      </PopoverContent>
-    </Popover>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
