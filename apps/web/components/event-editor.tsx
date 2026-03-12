@@ -174,10 +174,10 @@ export function EventEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showClose={false} className="min-w-[420px] max-w-[580px] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] p-0 gap-0 overflow-hidden border-none shadow-2xl bg-card/95 backdrop-blur-xl flex flex-col">
-        <DialogHeader className="px-5 py-3 border-b border-border/40 flex flex-row items-center justify-between space-y-0 shrink-0">
-          <DialogTitle className="text-base font-semibold">{dialogTitle}</DialogTitle>
-        </DialogHeader>
+      <DialogContent showClose={false} className="sm:max-w-[520px] p-0 gap-0 overflow-hidden flex flex-col">
+        <div className="px-6 pt-6 pb-4">
+          <DialogTitle className="text-lg font-semibold">{dialogTitle}</DialogTitle>
+        </div>
         <MobileEventEditorBody
           eventForm={eventForm}
           isViewMode={isViewMode}
@@ -195,6 +195,8 @@ export function EventEditor({
           onBack={onBack}
           handleEventSave={handleEventSave}
           handleEventDelete={handleEventDelete}
+          desktop
+          onClose={() => onOpenChange(false)}
         />
       </DialogContent>
       {recurringModal}
@@ -229,28 +231,28 @@ function MobileEventEditorBody({
   desktop,
 }: BodyProps) {
   const bodyClass = desktop
-    ? "p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar max-h-[calc(70dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
+    ? "px-6 pb-4 space-y-5 flex-1 overflow-y-auto"
     : "p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar";
 
   return (
     <div className={bodyClass}>
           {isViewMode ? (
             /* VIEW MODE */
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <h2 className="text-xl font-bold text-foreground mb-1">
+                <h2 className={`font-semibold ${desktop ? "text-xl" : "text-xl"}`}>
                   {eventForm.eventTitle || "Untitled Event"}
                 </h2>
                 {eventForm.selectedEvent?.isSynced && (
-                  <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-500 ring-1 ring-inset ring-blue-500/20">
+                  <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-500 ring-1 ring-inset ring-blue-500/20 mt-1">
                     Synced
                   </span>
                 )}
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start gap-2.5 text-sm">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+              <div className="space-y-3 text-sm">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">
                       {(() => {
@@ -267,7 +269,6 @@ function MobileEventEditorBody({
                         if (isSameDay) {
                           return startStr;
                         }
-                        // Multi-day event - show date range
                         return (
                           <>
                             {format(eventForm.eventStartDate, "EEE, MMM d")}
@@ -279,7 +280,7 @@ function MobileEventEditorBody({
                         );
                       })()}
                     </div>
-                    <div className="text-muted-foreground text-xs">
+                    <div className="text-muted-foreground">
                       {!eventForm.eventAllDay
                         ? `${eventForm.eventStartTime} - ${eventForm.eventEndTime}`
                         : "All day"}
@@ -287,9 +288,9 @@ function MobileEventEditorBody({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 text-sm">
+                <div className="flex items-center gap-3">
                   <div
-                    className="w-3.5 h-3.5 rounded-full flex-shrink-0"
+                    className="w-4 h-4 rounded-full flex-shrink-0"
                     style={{
                       backgroundColor:
                         calendars.find(
@@ -297,34 +298,34 @@ function MobileEventEditorBody({
                         )?.color || "#3b82f6",
                     }}
                   />
-                  <span className="text-foreground text-xs">
+                  <span>
                     {calendars.find((c) => c.id === eventForm.eventCalendarId)
                       ?.name || "Unknown Calendar"}
                   </span>
                 </div>
 
                 {eventForm.eventLocation && (
-                  <div className="flex items-start gap-2.5 text-sm">
-                    <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-                    <span className="text-foreground text-xs flex-1 min-w-0">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <span className="flex-1 min-w-0">
                       {eventForm.eventLocation}
                     </span>
                   </div>
                 )}
 
                 {eventForm.eventDescription && (
-                  <div className="flex items-start gap-2.5 text-sm">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-                    <div className="text-foreground text-xs whitespace-pre-wrap flex-1 min-w-0">
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div className="whitespace-pre-wrap flex-1 min-w-0">
                       {formatEventDescription(eventForm.eventDescription)}
                     </div>
                   </div>
                 )}
 
                 {eventForm.isRecurring && eventForm.recurrenceRule && (
-                  <div className="flex items-start gap-2.5 text-sm">
-                    <RotateCcw className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-                    <span className="text-foreground text-xs flex-1 min-w-0">
+                  <div className="flex items-start gap-3">
+                    <RotateCcw className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <span className="flex-1 min-w-0">
                       {(() => {
                         const { frequency, interval, count, until, byWeekDay } =
                           eventForm.recurrenceRule!;
@@ -358,28 +359,28 @@ function MobileEventEditorBody({
             </div>
           ) : (
             /* EDIT MODE */
-            <div className="space-y-3.5">
+            <div className="space-y-4">
               {/* Title Input */}
               <Input
                 value={eventForm.eventTitle}
                 onChange={(e) => eventForm.setEventTitle(e.target.value)}
-                placeholder="Event Title"
-                className="text-lg font-semibold h-10"
+                placeholder="Event title"
+                className={`${desktop ? "text-base h-10" : "text-lg font-semibold h-10"}`}
                 autoFocus
               />
 
-              {/* Primary Controls - Clean Grid Layout */}
-              <div className="space-y-3">
+              {/* Primary Controls */}
+              <div className="space-y-4">
                 {/* Calendar Select */}
                 <div>
-                  <Label className="text-xs font-medium text-foreground/70 mb-1.5 block">
+                  <Label className="text-sm font-medium mb-2 block">
                     Calendar
                   </Label>
                   <Select
                     value={eventForm.eventCalendarId}
                     onValueChange={eventForm.setEventCalendarId}
                   >
-                    <SelectTrigger className="h-9 text-sm text-foreground font-medium">
+                    <SelectTrigger className={`${desktop ? "h-10" : "h-9"} text-sm`}>
                       <div className="flex items-center gap-2 truncate">
                         <div
                           className="size-2.5 rounded-full flex-shrink-0"
@@ -411,7 +412,7 @@ function MobileEventEditorBody({
 
                 {/* Date & Time */}
                 <div>
-                  <Label className="text-xs font-medium text-foreground/70 mb-1.5 block">
+                  <Label className="text-sm font-medium mb-2 block">
                     Date & Time
                   </Label>
                   <div className="space-y-2">
@@ -426,13 +427,10 @@ function MobileEventEditorBody({
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              size="sm"
-                              className="flex-1 h-9 text-sm font-medium justify-start text-foreground"
+                              className="flex-1 h-10 justify-start font-normal cursor-pointer"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">
-                                {format(eventForm.eventStartDate, "EEE, MMM d")}
-                              </span>
+                              {format(eventForm.eventStartDate, "EEE, MMM d")}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -461,7 +459,7 @@ function MobileEventEditorBody({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 h-9 text-sm font-medium justify-start text-foreground"
+                              className="flex-1 h-9 text-sm font-medium justify-start text-foreground cursor-pointer"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                               <span className="truncate">
@@ -504,13 +502,10 @@ function MobileEventEditorBody({
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              size="sm"
-                              className="flex-1 h-9 text-sm font-medium justify-start text-foreground"
+                              className="flex-1 h-10 justify-start font-normal cursor-pointer"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">
-                                {format(eventForm.eventEndDate, "EEE, MMM d")}
-                              </span>
+                              {format(eventForm.eventEndDate, "EEE, MMM d")}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="end">
@@ -538,7 +533,7 @@ function MobileEventEditorBody({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 h-9 text-sm font-medium justify-start text-foreground"
+                              className="flex-1 h-9 text-sm font-medium justify-start text-foreground cursor-pointer"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                               <span className="truncate">
@@ -568,37 +563,74 @@ function MobileEventEditorBody({
                       )}
                     </div>
 
+                    {/* Time */}
+                    {!eventForm.eventAllDay ? (
+                      <div className="flex items-center gap-2">
+                        <ShadcnAutocomleteTimePicker
+                          value={(() => {
+                            const [hours, minutes] = eventForm.eventStartTime
+                              .split(":")
+                              .map(Number);
+                            const date = new Date();
+                            date.setHours(hours || 0, minutes || 0, 0, 0);
+                            return date;
+                          })()}
+                          onChange={(date) => {
+                            const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+                            eventForm.handleStartTimeChange(timeString);
+                          }}
+                          is24Hour={localSettings?.timeFormat === "24h"}
+                          className={`flex-1 ${desktop ? "h-10" : "h-9"} cursor-pointer`}
+                        />
+                        <span className="text-muted-foreground text-sm font-medium">
+                          →
+                        </span>
+                        <ShadcnAutocomleteTimePicker
+                          value={(() => {
+                            const [hours, minutes] = eventForm.eventEndTime
+                              .split(":")
+                              .map(Number);
+                            const date = new Date();
+                            date.setHours(hours || 0, minutes || 0, 0, 0);
+                            return date;
+                          })()}
+                          onChange={(date) => {
+                            const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+                            eventForm.handleEndTimeChange(timeString);
+                          }}
+                          is24Hour={localSettings?.timeFormat === "24h"}
+                          className={`flex-1 ${desktop ? "h-10" : "h-9"} cursor-pointer`}
+                        />
+                      </div>
+                    ) : null}
+
+                    {/* All day toggle */}
                     {desktop ? (
-                      <div className="bg-input rounded-md px-3 h-9 flex items-center">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id="event-all-day-checkbox"
-                            checked={eventForm.eventAllDay}
-                            onCheckedChange={(checked) =>
-                              eventForm.setEventAllDay(checked === true)
-                            }
-                            className="h-4 w-4"
-                          />
-                          <Label
-                            htmlFor="event-all-day-checkbox"
-                            className="text-xs font-medium cursor-pointer text-foreground/80"
-                          >
-                            All day
-                          </Label>
-                        </div>
+                      <div className="flex items-center gap-2 py-1">
+                        <Checkbox
+                          id="event-all-day-checkbox"
+                          checked={eventForm.eventAllDay}
+                          onCheckedChange={(checked) =>
+                            eventForm.setEventAllDay(checked === true)
+                          }
+                        />
+                        <Label
+                          htmlFor="event-all-day-checkbox"
+                          className="text-sm cursor-pointer"
+                        >
+                          All day
+                        </Label>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={eventForm.eventAllDay}
-                        onClick={() => eventForm.setEventAllDay(!eventForm.eventAllDay)}
-                        className="flex items-center justify-between w-full py-3 px-1 active:opacity-80 transition-opacity"
-                      >
+                      <div className="flex items-center justify-between w-full py-3 px-1">
                         <span className="text-sm font-medium text-foreground">
                           All day
                         </span>
-                        <span
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={eventForm.eventAllDay}
+                          onClick={() => eventForm.setEventAllDay(!eventForm.eventAllDay)}
                           className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 ${
                             eventForm.eventAllDay
                               ? "bg-primary"
@@ -610,155 +642,128 @@ function MobileEventEditorBody({
                               eventForm.eventAllDay ? "translate-x-5.5" : "translate-x-0.5"
                             }`}
                           />
-                        </span>
-                      </button>
-                    )}
-
-                    {/* Time */}
-                    {!eventForm.eventAllDay ? (
-                      <div className="flex items-center gap-3 bg-input rounded-md px-4 h-9">
-                        <Clock className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                        <div className="flex items-center gap-2 flex-1">
-                          <ShadcnAutocomleteTimePicker
-                            value={(() => {
-                              const [hours, minutes] = eventForm.eventStartTime
-                                .split(":")
-                                .map(Number);
-                              const date = new Date();
-                              date.setHours(hours || 0, minutes || 0, 0, 0);
-                              return date;
-                            })()}
-                            onChange={(date) => {
-                              const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-                              eventForm.handleStartTimeChange(timeString);
-                            }}
-                            is24Hour={localSettings?.timeFormat === "24h"}
-                            inline
-                            className="text-sm py-1 min-w-[60px] text-center"
-                          />
-                          <span className="text-muted-foreground text-sm">
-                            →
-                          </span>
-                          <ShadcnAutocomleteTimePicker
-                            value={(() => {
-                              const [hours, minutes] = eventForm.eventEndTime
-                                .split(":")
-                                .map(Number);
-                              const date = new Date();
-                              date.setHours(hours || 0, minutes || 0, 0, 0);
-                              return date;
-                            })()}
-                            onChange={(date) => {
-                              const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-                              eventForm.handleEndTimeChange(timeString);
-                            }}
-                            is24Hour={localSettings?.timeFormat === "24h"}
-                            inline
-                            className="text-sm py-1 min-w-[60px] text-center"
-                          />
-                        </div>
+                        </button>
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Add More Options - Clean Pills */}
+              {/* Add More Options */}
               <div className="flex flex-wrap gap-2">
-                {!showLocation && (
+                {showLocation ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLocation(false);
+                      eventForm.setEventLocation("");
+                    }}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-primary/50 bg-primary/10 text-primary cursor-pointer hover:bg-destructive/20 hover:border-destructive/30 hover:text-destructive/70 transition-colors"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    <span>Location</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => setShowLocation(true)}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-dashed border-border hover:border-solid hover:bg-muted/50 transition-colors"
                   >
                     <MapPin className="h-4 w-4" /> Location
                   </button>
                 )}
-                {!showDescription && (
+
+                {showDescription ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDescription(false);
+                      eventForm.setEventDescription("");
+                    }}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-primary/50 bg-primary/10 text-primary cursor-pointer hover:bg-destructive/20 hover:border-destructive/30 hover:text-destructive/70 transition-colors"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>Description</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => setShowDescription(true)}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-dashed border-border hover:border-solid hover:bg-muted/50 transition-colors"
                   >
                     <FileText className="h-4 w-4" /> Description
                   </button>
                 )}
-                {!eventForm.isRecurring && (
+
+                {eventForm.isRecurring ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      eventForm.setIsRecurring(false);
+                      eventForm.setRecurrenceRule(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-primary/50 bg-primary/10 text-primary cursor-pointer hover:bg-destructive/20 hover:border-destructive/30 hover:text-destructive/70 transition-colors"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Repeat</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => eventForm.setIsRecurring(true)}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-dashed border-border hover:border-solid hover:bg-muted/50 transition-colors"
                   >
                     <RotateCcw className="h-4 w-4" /> Repeat
                   </button>
                 )}
-                {!eventForm.showNotifications && (
+
+                {eventForm.showNotifications ? (
+                  <button
+                    type="button"
+                    onClick={() => eventForm.setShowNotifications(false)}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-primary/50 bg-primary/10 text-primary cursor-pointer hover:bg-destructive/20 hover:border-destructive/30 hover:text-destructive/70 transition-colors"
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span>Reminder</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => eventForm.setShowNotifications(true)}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-dashed border-border hover:border-solid hover:bg-muted/50 transition-colors"
                   >
-                    <Bell className="h-4 w-4" /> Reminders
+                    <Bell className="h-4 w-4" /> Reminder
                   </button>
                 )}
               </div>
 
               {/* Expanded Fields */}
-              <div className="space-y-3">
+              <div className="space-y-4 pt-5 mt-5 border-t">
                 {showLocation && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label className="text-xs font-medium text-foreground/70">
-                        Location
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowLocation(false);
-                          eventForm.setEventLocation("");
-                        }}
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      <Input
-                        value={eventForm.eventLocation}
-                        onChange={(e) =>
-                          eventForm.setEventLocation(e.target.value)
-                        }
-                        placeholder="Add location"
-                        className="pl-10 h-10"
-                      />
-                    </div>
+                    <Input
+                      value={eventForm.eventLocation}
+                      onChange={(e) =>
+                        eventForm.setEventLocation(e.target.value)
+                      }
+                      placeholder="Location"
+                      className="h-10"
+                    />
                   </div>
                 )}
 
                 {showDescription && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label className="text-xs font-medium text-foreground/70">
-                        Description
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowDescription(false);
-                          eventForm.setEventDescription("");
-                        }}
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
                     <Textarea
                       value={eventForm.eventDescription}
                       onChange={(e) =>
                         eventForm.setEventDescription(e.target.value)
                       }
-                      placeholder="Add description..."
+                      placeholder="Description..."
                       className="min-h-[80px] text-sm resize-none"
                     />
                   </div>
@@ -766,21 +771,6 @@ function MobileEventEditorBody({
 
                 {eventForm.isRecurring && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                        <RotateCcw className="h-3.5 w-3.5" /> Recurrence
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          eventForm.setIsRecurring(false);
-                          eventForm.setRecurrenceRule(null);
-                        }}
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
                     <RecurringEventForm
                       isRecurring={eventForm.isRecurring}
                       onIsRecurringChange={eventForm.setIsRecurring}
@@ -794,19 +784,7 @@ function MobileEventEditorBody({
 
                 {eventForm.showNotifications && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                        <Bell className="h-3.5 w-3.5" /> Notifications
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => eventForm.setShowNotifications(false)}
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="p-3 rounded-lg border border-border bg-muted/30">
+                    <div className="p-3 rounded-lg border bg-muted/30">
                       <NotificationManager
                         eventId={eventForm.selectedEvent?.id}
                         notifications={eventForm.eventNotifications}
@@ -830,6 +808,8 @@ interface FooterProps {
   onBack?: () => void;
   handleEventSave: () => void;
   handleEventDelete: () => void;
+  desktop?: boolean;
+  onClose?: () => void;
 }
 
 function EventEditorFooter({
@@ -838,7 +818,86 @@ function EventEditorFooter({
   onBack,
   handleEventSave,
   handleEventDelete,
+  desktop,
+  onClose,
 }: FooterProps) {
+  if (desktop) {
+    return (
+      <div className="px-6 py-4 flex flex-row items-center gap-2 shrink-0">
+        {isViewMode ? (
+          <>
+            {eventForm.selectedEvent?.id &&
+              !eventForm.selectedEvent.isSynced && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const isRecurringEvent = !!(
+                      eventForm.selectedEvent?.recurrence ||
+                      eventForm.selectedEvent?.isRecurringInstance ||
+                      eventForm.selectedEvent?.parentEventId ||
+                      (eventForm.selectedEvent?.id &&
+                        eventForm.selectedEvent.id.includes("_"))
+                    );
+                    if (isRecurringEvent) {
+                      eventForm.setShowRecurringDeleteModal(true);
+                    } else {
+                      handleEventDelete();
+                    }
+                  }}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" /> Delete
+                </Button>
+              )}
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Close
+            </Button>
+            {eventForm.selectedEvent?.id &&
+              !eventForm.selectedEvent.isSynced && (
+                <Button size="sm" onClick={() => eventForm.setEventViewMode("edit")}>
+                  <Edit3 className="h-4 w-4 mr-1.5" /> Edit
+                </Button>
+              )}
+          </>
+        ) : (
+          <>
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleEventSave}
+              disabled={
+                eventForm.eventSaving ||
+                !eventForm.eventCalendarId ||
+                !eventForm.eventTitle.trim()
+              }
+            >
+              {eventForm.eventSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-1.5" />
+                  Save
+                </>
+              )}
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-3 border-t border-border/40 bg-muted/30 flex flex-row gap-3 shrink-0">
       {isViewMode ? (
