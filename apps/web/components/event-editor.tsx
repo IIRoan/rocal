@@ -107,6 +107,7 @@ interface EventEditorProps {
   localSettings: UserSettings;
   editorMode?: EventEditorMode;
   anchorPosition?: { x: number; y: number } | null;
+  updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
 }
 
 export function EventEditor({
@@ -118,6 +119,7 @@ export function EventEditor({
   localSettings,
   editorMode = "modal",
   anchorPosition = null,
+  updatePreviewEvent,
 }: EventEditorProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
@@ -154,6 +156,62 @@ export function EventEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventToEdit, open]);
+
+  // Sync form changes to preview event in real-time (popover mode only)
+  // Guard against infinite loops by diff-checking the outgoing payload
+  const lastPreviewPayloadRef = React.useRef<string>("");
+  useEffect(() => {
+    if (editorMode !== "popover" || !updatePreviewEvent || !open) {
+      lastPreviewPayloadRef.current = "";
+      return;
+    }
+
+    const [startH, startM] = eventForm.eventStartTime.split(":").map(Number);
+    const [endH, endM] = eventForm.eventEndTime.split(":").map(Number);
+
+    const start = new Date(eventForm.eventStartDate);
+    start.setHours(startH || 0, startM || 0, 0, 0);
+
+    const end = new Date(eventForm.eventEndDate);
+    end.setHours(endH || 0, endM || 0, 0, 0);
+
+    const payload = {
+      title: eventForm.eventTitle || "(No title)",
+      startIso: start.toISOString(),
+      endIso: end.toISOString(),
+      allDay: eventForm.eventAllDay,
+      calendarId: eventForm.eventCalendarId,
+      location: eventForm.eventLocation || "",
+      description: eventForm.eventDescription || "",
+    };
+
+    const payloadKey = JSON.stringify(payload);
+    if (payloadKey === lastPreviewPayloadRef.current) return;
+    lastPreviewPayloadRef.current = payloadKey;
+
+    updatePreviewEvent({
+      title: payload.title,
+      start,
+      end,
+      allDay: payload.allDay,
+      calendarId: payload.calendarId,
+      location: payload.location || undefined,
+      description: payload.description || undefined,
+    });
+  }, [
+    editorMode,
+    updatePreviewEvent,
+    open,
+    eventForm.eventTitle,
+    eventForm.eventStartDate,
+    eventForm.eventEndDate,
+    eventForm.eventStartTime,
+    eventForm.eventEndTime,
+    eventForm.eventAllDay,
+    eventForm.eventCalendarId,
+    eventForm.eventLocation,
+    eventForm.eventDescription,
+  ]);
 
   // Use hook handlers
   const handleEventSave = () => eventForm.handleEventSave(calendarData);
@@ -322,7 +380,13 @@ function EventEditorPopover({
   const popoverRef = React.useRef<HTMLDivElement>(null);
 
   // Calculate position to keep popover within viewport
-  const [position, setPosition] = React.useState({ top: 0, left: 0 });
+  // null = not yet calculated (keeps popover invisible to avoid flash at {0,0})
+  const [position, setPosition] = React.useState<{ top: number; left: number } | null>(null);
+
+  // Reset position when closed so next open starts hidden again
+  React.useEffect(() => {
+    if (!open) setPosition(null);
+  }, [open]);
 
   React.useEffect(() => {
     if (!open || !anchorPosition) return;
@@ -330,22 +394,38 @@ function EventEditorPopover({
     const POPOVER_WIDTH = 380;
     const POPOVER_MAX_HEIGHT = 520;
     const VIEWPORT_PADDING = 16;
+    const GAP = 12;
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    let left = anchorPosition.x;
-    let top = anchorPosition.y;
+    // If we have a preview event rendered in timeline, anchor beside it
+    const previewEl = document.querySelector("[data-preview-event='true']") as HTMLElement | null;
+    let anchorX = anchorPosition.x;
+    let anchorY = anchorPosition.y;
 
-    // Horizontal: prefer right of click, flip left if needed
-    if (left + POPOVER_WIDTH + VIEWPORT_PADDING > viewportWidth) {
-      left = Math.max(VIEWPORT_PADDING, left - POPOVER_WIDTH);
+    if (previewEl) {
+      const rect = previewEl.getBoundingClientRect();
+      anchorX = rect.right + GAP;
+      anchorY = rect.top;
     }
 
-    // Vertical: prefer below click, flip above if needed
+    let left = anchorX;
+    let top = anchorY;
+
+    // Horizontal: prefer right side of anchor, flip to left if overflow
+    if (left + POPOVER_WIDTH + VIEWPORT_PADDING > viewportWidth) {
+      left = Math.max(
+        VIEWPORT_PADDING,
+        (previewEl ? previewEl.getBoundingClientRect().left - POPOVER_WIDTH - GAP : anchorX - POPOVER_WIDTH - GAP),
+      );
+    }
+
+    // Vertical: clamp to viewport
     if (top + POPOVER_MAX_HEIGHT + VIEWPORT_PADDING > viewportHeight) {
       top = Math.max(VIEWPORT_PADDING, viewportHeight - POPOVER_MAX_HEIGHT - VIEWPORT_PADDING);
     }
+    if (top < VIEWPORT_PADDING) top = VIEWPORT_PADDING;
 
     setPosition({ top, left });
   }, [open, anchorPosition]);
@@ -397,16 +477,17 @@ function EventEditorPopover({
     <>
       {/* Subtle backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[1px] animate-in fade-in-0 duration-150"
+        className="fixed inset-0 z-50"
         onClick={() => onOpenChange(false)}
       />
       {/* Popover panel */}
       <div
         ref={popoverRef}
-        className="fixed z-50 w-[380px] max-h-[520px] bg-card border border-border rounded-xl shadow-xl flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200"
+        className={`fixed z-50 w-[380px] max-h-[520px] bg-card border border-border rounded-xl shadow-xl flex flex-col overflow-hidden duration-200${position ? " animate-in fade-in-0 zoom-in-95 slide-in-from-top-2" : ""}`}
         style={{
-          top: position.top,
-          left: position.left,
+          top: position?.top ?? 0,
+          left: position?.left ?? 0,
+          visibility: position ? "visible" : "hidden",
         }}
       >
         {/* Header */}
