@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import type { CalendarEvent, Calendar } from "@workspace/ui/components/calendar/types";
 import { format } from "date-fns";
@@ -13,6 +13,42 @@ import { useEventForm } from "@/hooks/use-event-form";
 import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocompletetimepicker";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Hook to track keyboard visibility on mobile
+function useKeyboardHeight() {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("visualViewport" in window)) {
+      return;
+    }
+
+    const visualViewport = window.visualViewport as VisualViewport;
+    let rafId: number;
+
+    const handleResize = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const viewportHeight = visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const kbHeight = Math.max(0, windowHeight - viewportHeight);
+        setKeyboardHeight(kbHeight);
+      });
+    };
+
+    visualViewport.addEventListener("resize", handleResize);
+    visualViewport.addEventListener("scroll", handleResize);
+    handleResize();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      visualViewport.removeEventListener("resize", handleResize);
+      visualViewport.removeEventListener("scroll", handleResize);
+    };
+  }, []);
+
+  return keyboardHeight;
+}
 
 import {
   Dialog,
@@ -59,6 +95,9 @@ import {
   X,
 } from "lucide-react";
 
+import type { EventEditorMode } from "./command-palette-context";
+import { createPortal } from "react-dom";
+
 interface EventEditorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -66,6 +105,8 @@ interface EventEditorProps {
   onEventSaved?: () => void;
   onBack: () => void;
   localSettings: UserSettings;
+  editorMode?: EventEditorMode;
+  anchorPosition?: { x: number; y: number } | null;
 }
 
 export function EventEditor({
@@ -75,6 +116,8 @@ export function EventEditor({
   onEventSaved,
   onBack,
   localSettings,
+  editorMode = "modal",
+  anchorPosition = null,
 }: EventEditorProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
@@ -122,6 +165,7 @@ export function EventEditor({
 
   const isViewMode = eventForm.eventViewMode === "view";
   const isMobile = useIsMobile();
+  const keyboardHeight = useKeyboardHeight();
   const dialogTitle = !eventForm.selectedEvent?.id
     ? "Create Event"
     : isViewMode
@@ -142,8 +186,14 @@ export function EventEditor({
   if (isMobile) {
     return (
       <>
-        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
-          <DrawerContent className="max-h-[92dvh] rounded-t-2xl bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0">
+        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom" modal={false}>
+          <DrawerContent
+            className="rounded-t-2xl bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
+            style={{
+              maxHeight: keyboardHeight > 0 ? `calc(100dvh - ${keyboardHeight}px)` : "92dvh",
+              bottom: keyboardHeight,
+            }}
+          >
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
             <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
               <h2 className="text-base font-semibold">{dialogTitle}</h2>
@@ -172,6 +222,31 @@ export function EventEditor({
     );
   }
 
+  // Desktop popover mode — render a floating panel near the click position
+  if (editorMode === "popover" && anchorPosition) {
+    return (
+      <EventEditorPopover
+        open={open}
+        onOpenChange={onOpenChange}
+        anchorPosition={anchorPosition}
+        dialogTitle={dialogTitle}
+        eventForm={eventForm}
+        isViewMode={isViewMode}
+        showLocation={showLocation}
+        showDescription={showDescription}
+        setShowLocation={setShowLocation}
+        setShowDescription={setShowDescription}
+        localSettings={localSettings}
+        calendars={calendars}
+        onBack={onBack}
+        handleEventSave={handleEventSave}
+        handleEventDelete={handleEventDelete}
+        recurringModal={recurringModal}
+      />
+    );
+  }
+
+  // Desktop modal mode (default)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showClose={false} className="sm:max-w-[520px] p-0 gap-0 overflow-hidden flex flex-col">
@@ -203,6 +278,175 @@ export function EventEditor({
     </Dialog>
   );
 
+}
+
+// ─── Popover Editor (Desktop timeline click) ─────────────────────────────────
+
+interface EventEditorPopoverProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  anchorPosition: { x: number; y: number };
+  dialogTitle: string;
+  eventForm: ReturnType<typeof useEventForm>;
+  isViewMode: boolean;
+  showLocation: boolean;
+  showDescription: boolean;
+  setShowLocation: (v: boolean) => void;
+  setShowDescription: (v: boolean) => void;
+  localSettings: UserSettings;
+  calendars: Calendar[];
+  onBack: () => void;
+  handleEventSave: () => void;
+  handleEventDelete: () => void;
+  recurringModal: React.ReactNode;
+}
+
+function EventEditorPopover({
+  open,
+  onOpenChange,
+  anchorPosition,
+  dialogTitle,
+  eventForm,
+  isViewMode,
+  showLocation,
+  showDescription,
+  setShowLocation,
+  setShowDescription,
+  localSettings,
+  calendars,
+  onBack,
+  handleEventSave,
+  handleEventDelete,
+  recurringModal,
+}: EventEditorPopoverProps) {
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+
+  // Calculate position to keep popover within viewport
+  const [position, setPosition] = React.useState({ top: 0, left: 0 });
+
+  React.useEffect(() => {
+    if (!open || !anchorPosition) return;
+
+    const POPOVER_WIDTH = 380;
+    const POPOVER_MAX_HEIGHT = 520;
+    const VIEWPORT_PADDING = 16;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let left = anchorPosition.x;
+    let top = anchorPosition.y;
+
+    // Horizontal: prefer right of click, flip left if needed
+    if (left + POPOVER_WIDTH + VIEWPORT_PADDING > viewportWidth) {
+      left = Math.max(VIEWPORT_PADDING, left - POPOVER_WIDTH);
+    }
+
+    // Vertical: prefer below click, flip above if needed
+    if (top + POPOVER_MAX_HEIGHT + VIEWPORT_PADDING > viewportHeight) {
+      top = Math.max(VIEWPORT_PADDING, viewportHeight - POPOVER_MAX_HEIGHT - VIEWPORT_PADDING);
+    }
+
+    setPosition({ top, left });
+  }, [open, anchorPosition]);
+
+  // Close on Escape
+  React.useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onOpenChange(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, onOpenChange]);
+
+  // Close on click outside
+  React.useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        // Don't close if clicking on a select dropdown or popover content (date pickers etc.)
+        const target = e.target as HTMLElement;
+        if (
+          target.closest("[data-radix-popper-content-wrapper]") ||
+          target.closest("[role='listbox']") ||
+          target.closest("[role='dialog']")
+        ) {
+          return;
+        }
+        onOpenChange(false);
+      }
+    };
+    // Use a small delay to avoid closing immediately from the same click that opened it
+    const timeoutId = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 100);
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open, onOpenChange]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <>
+      {/* Subtle backdrop */}
+      <div
+        className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[1px] animate-in fade-in-0 duration-150"
+        onClick={() => onOpenChange(false)}
+      />
+      {/* Popover panel */}
+      <div
+        ref={popoverRef}
+        className="fixed z-50 w-[380px] max-h-[520px] bg-card border border-border rounded-xl shadow-xl flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200"
+        style={{
+          top: position.top,
+          left: position.left,
+        }}
+      >
+        {/* Header */}
+        <div className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0">
+          <h2 className="text-sm font-semibold">{dialogTitle}</h2>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="p-1 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {/* Body */}
+        <MobileEventEditorBody
+          eventForm={eventForm}
+          isViewMode={isViewMode}
+          showLocation={showLocation}
+          showDescription={showDescription}
+          setShowLocation={setShowLocation}
+          setShowDescription={setShowDescription}
+          localSettings={localSettings}
+          calendars={calendars}
+          desktop
+        />
+        {/* Footer */}
+        <EventEditorFooter
+          isViewMode={isViewMode}
+          eventForm={eventForm}
+          onBack={onBack}
+          handleEventSave={handleEventSave}
+          handleEventDelete={handleEventDelete}
+          desktop
+          onClose={() => onOpenChange(false)}
+        />
+      </div>
+      {recurringModal}
+    </>,
+    document.body,
+  );
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
