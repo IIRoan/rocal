@@ -43,6 +43,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
+  onCreateEvent?: () => void;
   isMobile?: boolean;
 }
 
@@ -51,6 +52,7 @@ export function AppSidebar({
   onLogout,
   onOpenSettings,
   onOpenCalendarManagement,
+  onCreateEvent,
   isMobile = false,
   ...props
 }: AppSidebarProps) {
@@ -224,7 +226,17 @@ export function AppSidebar({
         </div>
 
         {/* Footer */}
-        <div className="border-t p-4">
+        <div className="border-t p-4 space-y-3">
+          {onCreateEvent && (
+            <Button
+              onClick={onCreateEvent}
+              className="w-full gap-2"
+              size="sm"
+            >
+              <RiAddLine size={16} />
+              <span>New Event</span>
+            </Button>
+          )}
           <NavUser
             user={
               user || {
@@ -375,7 +387,17 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="gap-1">
+        {onCreateEvent && (
+          <Button
+            onClick={onCreateEvent}
+            className="w-full gap-2"
+            size="sm"
+          >
+            <RiAddLine size={16} />
+            <span>New Event</span>
+          </Button>
+        )}
         <NavUser
           user={
             user || {

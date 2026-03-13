@@ -1,13 +1,12 @@
 import React from "react";
 import {
-  CommandDialog,
-  CommandList,
-  CommandGroup,
-  CommandItem,
-} from "@workspace/ui/components/navigation/command";
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
+import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Switch } from "@workspace/ui/components/ui/switch";
 import { Input } from "@workspace/ui/components/ui/input";
-import { Label } from "@workspace/ui/components/ui/label";
 import {
   Mail,
   Clock,
@@ -25,6 +24,7 @@ interface NotificationSettingsProps {
   TransitionContainer: React.ComponentType<{
     direction: "forward" | "back";
     children: React.ReactNode;
+    viewKey?: string;
   }>;
   transitionDirection: "forward" | "back";
 }
@@ -39,56 +39,64 @@ export function NotificationSettings({
   transitionDirection,
 }: NotificationSettingsProps) {
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <TransitionContainer direction={transitionDirection}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => goBack("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Notifications
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Notification Types">
-            <CommandItem
-              onSelect={() =>
-                updateSetting(
-                  "emailNotifications",
-                  !localSettings.emailNotifications
-                )
-              }
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Mail className="mr-3 h-4 w-4 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span className="text-foreground">Email Notifications</span>
-                <span className="text-xs text-muted-foreground">
-                  Receive event reminders via email
-                </span>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        variant="spotlight"
+        showClose={false}
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
+      >
+        <VisuallyHidden>
+          <DialogTitle>Notification Settings</DialogTitle>
+        </VisuallyHidden>
+        <TransitionContainer direction={transitionDirection} viewKey="notifications">
+          <div className="flex flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+              <button
+                onClick={() => goBack("main")}
+                className="p-1 rounded hover:bg-muted/50 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <span className="text-sm font-medium">Notifications</span>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Notification Types Section */}
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Notification Types</div>
+              <div className="p-1">
+                <div
+                  onClick={() =>
+                    updateSetting(
+                      "emailNotifications",
+                      !localSettings.emailNotifications
+                    )
+                  }
+                  className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer hover:bg-accent/30 transition-colors"
+                >
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm">Email Notifications</div>
+                    <div className="text-xs text-muted-foreground">
+                      Receive event reminders via email
+                    </div>
+                  </div>
+                  <Switch
+                    checked={localSettings.emailNotifications}
+                    className="shrink-0 scale-75 origin-right"
+                  />
+                </div>
               </div>
-              <Switch
-                checked={localSettings.emailNotifications}
-                className="ml-auto"
-              />
-            </CommandItem>
-          </CommandGroup>
 
-          <CommandGroup heading="Default Reminder">
-            <div className="px-4 py-3">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex flex-col">
-                    <Label className="text-sm font-medium text-foreground">
-                      Default Reminder Time (minutes)
-                    </Label>
-                    <span className="text-xs text-muted-foreground">
-                      Leave empty for no default reminder
-                    </span>
+              {/* Default Reminder Section */}
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">Default Reminder</div>
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-sm">Default Reminder (minutes)</div>
+                    <div className="text-xs text-muted-foreground">
+                      Leave empty for no reminder
+                    </div>
                   </div>
                 </div>
                 <Input
@@ -103,13 +111,13 @@ export function NotificationSettings({
                   placeholder="No default reminder"
                   min={1}
                   max={43200}
-                  className="w-full"
+                  className="h-9 text-sm"
                 />
               </div>
             </div>
-          </CommandGroup>
-        </CommandList>
-      </TransitionContainer>
-    </CommandDialog>
+          </div>
+        </TransitionContainer>
+      </DialogContent>
+    </Dialog>
   );
 }
