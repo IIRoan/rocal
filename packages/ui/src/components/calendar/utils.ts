@@ -60,6 +60,25 @@ export function getEventColorStyles(
 }
 
 /**
+ * Resolve an event color value to a CSS color string for indicator dots.
+ */
+export function resolveEventColorValue(color?: EventColor | string): string {
+  if (!color) {
+    return "var(--color-event-default)";
+  }
+
+  if (isHexColor(color)) {
+    return color;
+  }
+
+  if (color === "blue") {
+    return "var(--color-event-sky)";
+  }
+
+  return `var(--color-event-${color})`;
+}
+
+/**
  * Get contrasting text color for a given background color
  */
 function getContrastColor(hexColor: string): string {

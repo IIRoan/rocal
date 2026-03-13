@@ -244,7 +244,7 @@ export function EventEditor({
   if (isMobile) {
     return (
       <>
-        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom" modal={false}>
+        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom" modal={true}>
           <DrawerContent
             className="rounded-t-2xl bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
             style={{
@@ -780,7 +780,12 @@ function MobileEventEditorBody({
                       ) : (
                         <Drawer
                           open={eventForm.startDateOpen}
-                          onOpenChange={eventForm.setStartDateOpen}
+                          onOpenChange={(nextOpen) => {
+                            if (nextOpen) {
+                              eventForm.setEndDateOpen(false);
+                            }
+                            eventForm.setStartDateOpen(nextOpen);
+                          }}
                         >
                           <DrawerTrigger asChild>
                             <Button
@@ -854,7 +859,12 @@ function MobileEventEditorBody({
                       ) : (
                         <Drawer
                           open={eventForm.endDateOpen}
-                          onOpenChange={eventForm.setEndDateOpen}
+                          onOpenChange={(nextOpen) => {
+                            if (nextOpen) {
+                              eventForm.setStartDateOpen(false);
+                            }
+                            eventForm.setEndDateOpen(nextOpen);
+                          }}
                         >
                           <DrawerTrigger asChild>
                             <Button
