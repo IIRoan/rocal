@@ -123,8 +123,7 @@ export function MonthView({
         {weekdays.map((day, index) => (
           <div
             key={day}
-            className="text-muted-foreground/70 py-2 text-center text-xs animate-slide-in"
-            style={{ animationDelay: `${index * 0.05}s` }}
+            className="text-muted-foreground/70 py-2 text-center text-xs"
           >
             {day}
           </div>
@@ -134,8 +133,7 @@ export function MonthView({
         {weeks.map((week, weekIndex) => (
           <div
             key={`week-${weekIndex}`}
-            className={`grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} [&:last-child>*]:border-b-0 animate-slide-in`}
-            style={{ animationDelay: `${weekIndex * 0.1}s` }}
+            className={`grid ${showWeekNumbers ? "grid-cols-8" : "grid-cols-7"} [&:last-child>*]:border-b-0`}
           >
             {showWeekNumbers && (
               <div className="border-border/70 border-r border-b bg-muted/10 flex items-center justify-center">
