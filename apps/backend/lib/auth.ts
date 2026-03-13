@@ -1,10 +1,35 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { passkey } from "@better-auth/passkey";
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
 
+const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+const isProduction = process.env.NODE_ENV === "production";
+
+// Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
+const getRpId = (url: string) => {
+  try {
+    const hostname = new URL(url).hostname;
+    if (hostname === "localhost") return "localhost";
+    const parts = hostname.split(".");
+    // Get root domain (last two parts: roan.dev)
+    return parts.slice(-2).join(".");
+  } catch {
+    return "localhost";
+  }
+};
+
 export const auth = betterAuth({
+  plugins: [
+    passkey({
+      rpID: getRpId(frontendUrl),
+      rpName: "Rocani",
+      origin: frontendUrl,
+    }),
+  ],
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
@@ -19,12 +44,9 @@ export const auth = betterAuth({
           },
         }
       : {},
-  baseURL: process.env.BACKEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001",
+  baseURL: backendUrl,
   basePath: "/api/auth",
-  trustedOrigins: [
-    process.env.FRONTEND_URL || "http://localhost:3000",
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-  ],
+  trustedOrigins: [frontendUrl],
   session: {
     cookieCache: {
       enabled: true,
@@ -32,15 +54,15 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies: isProduction,
     cookieOptions: {
-      sameSite: "lax", // Can use lax since both on same domain
-      secure: true,
+      sameSite: "lax",
+      secure: isProduction,
       httpOnly: true,
-      domain: process.env.NODE_ENV === "production" ? "roan.dev" : undefined, // Share cookies across subdomains
+      domain: isProduction ? getRpId(backendUrl) : undefined,
     },
   },
   socialProviderConfig: {
-    redirectURL: process.env.FRONTEND_URL || "http://localhost:3000",
+    redirectURL: frontendUrl,
   },
 }) as any;
