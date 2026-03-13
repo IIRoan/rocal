@@ -63,7 +63,7 @@ function DialogOverlay({
   );
 }
 
-type DialogVariant = "center" | "top" | "bottom";
+type DialogVariant = "center" | "top" | "bottom" | "spotlight";
 
 type DialogContentProps = React.ComponentProps<
   typeof DialogPrimitive.Content
@@ -83,38 +83,49 @@ function DialogContent({
   const positionClasses =
     variant === "center"
       ? "left-1/2 top-1/2" // Transform handled by CSS
-      : variant === "top"
-        ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] -translate-x-1/2"
-        : // bottom
-          "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)] -translate-x-1/2";
+      : variant === "spotlight"
+        ? "left-1/2 top-[18%] -translate-x-1/2" // Spotlight style like macOS/Raycast
+        : variant === "top"
+          ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] -translate-x-1/2"
+          : // bottom
+            "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)] -translate-x-1/2";
 
   // Animation per variant - center uses CSS animation, others use Tailwind
   const animationClasses =
     variant === "center"
       ? "" // Animation handled by CSS in globals.css for data-slot="dialog-content"
-      : variant === "top"
+      : variant === "spotlight"
         ? [
-            // Slide from top + fade
+            // Spotlight: fade + subtle scale
             "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-            "data-[state=open]:translate-y-0 data-[state=closed]:-translate-y-4",
+            "data-[state=open]:scale-100 data-[state=closed]:scale-95",
+            "transition-all duration-200 ease-out",
           ].join(" ")
-        : [
-            // bottom: lift up + fade
-            "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-            "data-[state=open]:translate-y-0 data-[state=closed]:translate-y-4",
-          ].join(" ");
+        : variant === "top"
+          ? [
+              // Slide from top + fade
+              "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+              "data-[state=open]:translate-y-0 data-[state=closed]:-translate-y-4",
+            ].join(" ")
+          : [
+              // bottom: lift up + fade
+              "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+              "data-[state=open]:translate-y-0 data-[state=closed]:translate-y-4",
+            ].join(" ");
 
   // Suggested sizing defaults per variant
   const sizeDefaults =
     variant === "center"
       ? "w-[520px] max-w-[calc(100dvw-1rem)] sm:max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
-      : variant === "top"
-        ? "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]"
-        : "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]";
+      : variant === "spotlight"
+        ? "w-[480px] max-w-[calc(100dvw-2rem)]"
+        : variant === "top"
+          ? "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]"
+          : "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]";
 
-  // Radius per variant (command palette often slightly less rounded)
+  // Radius per variant
   const radius =
-    variant === "center" ? "rounded-xl" : "rounded-lg md:rounded-xl";
+    variant === "spotlight" ? "rounded-xl" : variant === "center" ? "rounded-xl" : "rounded-lg md:rounded-xl";
 
   return (
     <DialogPortal>

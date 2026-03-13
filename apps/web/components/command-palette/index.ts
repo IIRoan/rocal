@@ -6,7 +6,7 @@ export { AccountSettings } from './account-settings';
 export { SecuritySettings } from './security-settings';
 export { type PaletteView } from './constants';
 export { TransitionContainer } from './transition-container';
-export { NAVIGATION_ITEMS, PRESET_COLORS } from './navigation-config';
+export { NAVIGATION_ITEMS, SEARCH_INDEX, VIEW_LABELS, PRESET_COLORS } from './navigation-config';
 export * from './time-utils';
 export * from './event-utils';
 export * from './calendar-utils';

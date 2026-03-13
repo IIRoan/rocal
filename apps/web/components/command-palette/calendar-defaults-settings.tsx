@@ -1,15 +1,21 @@
 import React from "react";
 import {
-  CommandDialog,
-  CommandList,
-  CommandGroup,
-  CommandItem,
-} from "@workspace/ui/components/navigation/command";
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
+import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/ui/select";
 import {
   Calendar,
   Check,
   ArrowLeft,
-  Minimize2,
 } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { WORKING_DAYS, type PaletteView } from "./constants";
@@ -24,6 +30,7 @@ interface CalendarDefaultsSettingsProps {
   TransitionContainer: React.ComponentType<{
     direction: "forward" | "back";
     children: React.ReactNode;
+    viewKey?: string;
   }>;
   transitionDirection: "forward" | "back";
 }
@@ -39,85 +46,87 @@ export function CalendarDefaultsSettings({
   transitionDirection,
 }: CalendarDefaultsSettingsProps) {
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <TransitionContainer direction={transitionDirection}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => goBack("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Calendar Defaults
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Week Settings">
-            {WORKING_DAYS.map((day) => (
-              <CommandItem
-                key={day.value}
-                onSelect={() => updateSetting("weekStartDay", day.value)}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        variant="spotlight"
+        showClose={false}
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
+      >
+        <VisuallyHidden>
+          <DialogTitle>Calendar Defaults</DialogTitle>
+        </VisuallyHidden>
+        <TransitionContainer direction={transitionDirection} viewKey="calendar-defaults">
+          <div className="flex flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+              <button
+                onClick={() => goBack("main")}
+                className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
-                <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">
-                  Week starts on {day.label}
-                </span>
-                {localSettings.weekStartDay === day.value && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <span className="text-sm font-medium">Calendar Defaults</span>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {/* First Day of Week - Dropdown */}
+              <div className="px-4 py-3 border-b border-border/50">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm">First day of week</span>
+                  </div>
+                  <Select
+                    value={String(localSettings.weekStartDay)}
+                    onValueChange={(value) => updateSetting("weekStartDay", Number(value))}
+                  >
+                    <SelectTrigger className="w-[120px] h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WORKING_DAYS.map((day) => (
+                        <SelectItem key={day.value} value={String(day.value)}>
+                          {day.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <CommandGroup heading="Working Days">
-            {WORKING_DAYS.map((day) => (
-              <CommandItem
-                key={day.value}
-                onSelect={() => {
-                  const currentWorkingDays = [...workingDaysList];
-                  const dayIndex = currentWorkingDays.indexOf(day.value);
-                  if (dayIndex > -1) {
-                    currentWorkingDays.splice(dayIndex, 1);
-                  } else {
-                    currentWorkingDays.push(day.value);
-                  }
-                  updateSetting(
-                    "workingDays",
-                    JSON.stringify(currentWorkingDays.sort())
-                  );
-                }}
-                className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-              >
-                <Calendar className="mr-3 h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{day.label}</span>
-                {workingDaysList.includes(day.value) && (
-                  <Check className="ml-auto h-4 w-4 text-primary" />
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-
-          <CommandGroup heading="View Settings">
-            <CommandItem
-              onSelect={() => updateSetting("compactView", !localSettings.compactView)}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Minimize2 className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">
-                Compact Mode
-              </span>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {localSettings.compactView ? "Enabled" : "Disabled"}
-              </span>
-              {localSettings.compactView && (
-                <Check className="ml-2 h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </TransitionContainer>
-    </CommandDialog>
+              {/* Working Days */}
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Working Days</div>
+              <div className="p-1">
+                {WORKING_DAYS.map((day) => (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => {
+                      const currentWorkingDays = [...workingDaysList];
+                      const dayIndex = currentWorkingDays.indexOf(day.value);
+                      if (dayIndex > -1) {
+                        currentWorkingDays.splice(dayIndex, 1);
+                      } else {
+                        currentWorkingDays.push(day.value);
+                      }
+                      updateSetting(
+                        "workingDays",
+                        JSON.stringify(currentWorkingDays.sort())
+                      );
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                  >
+                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm flex-1">{day.label}</span>
+                    {workingDaysList.includes(day.value) && (
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </TransitionContainer>
+      </DialogContent>
+    </Dialog>
   );
 }

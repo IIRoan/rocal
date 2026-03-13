@@ -16,6 +16,7 @@ export interface KeyboardShortcut {
 export interface UseKeyboardShortcutsOptions {
   enabled?: boolean;
   target?: HTMLElement | Document | null;
+  ignoreInputs?: boolean;
 }
 
 /**
@@ -26,11 +27,23 @@ export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcut[],
   options: UseKeyboardShortcutsOptions = {}
 ) {
-  const { enabled = true, target = document } = options;
+  const { enabled = true, target = document, ignoreInputs = false } = options;
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (!enabled) return;
+
+      // Skip shortcuts if we're typing in an input/textarea (unless the shortcut explicitly uses modifiers that indicate intentional shortcut)
+      if (ignoreInputs) {
+        const activeElement = document.activeElement;
+        const isTyping = activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement?.getAttribute("contenteditable") === "true";
+
+        if (isTyping) {
+          return;
+        }
+      }
 
       // Find matching shortcut
       const matchingShortcut = shortcuts.find((shortcut) => {
@@ -53,7 +66,7 @@ export function useKeyboardShortcuts(
         matchingShortcut.action();
       }
     },
-    [shortcuts, enabled]
+    [shortcuts, enabled, ignoreInputs]
   );
 
   useEffect(() => {
@@ -81,7 +94,7 @@ export function useDropdownShortcuts(
     stopPropagation: true,
   }));
 
-  useKeyboardShortcuts(keyboardShortcuts, { enabled });
+  useKeyboardShortcuts(keyboardShortcuts, { enabled, ignoreInputs: true });
 }
 
 /**
@@ -99,5 +112,5 @@ export function useNumberedShortcuts(
     stopPropagation: true,
   }));
 
-  useKeyboardShortcuts(shortcuts, { enabled });
+  useKeyboardShortcuts(shortcuts, { enabled, ignoreInputs: true });
 }

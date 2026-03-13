@@ -1,17 +1,15 @@
 import React from "react";
 import {
-  CommandDialog,
-  CommandList,
-  CommandGroup,
-  CommandItem,
-} from "@workspace/ui/components/navigation/command";
-import { Switch } from "@workspace/ui/components/ui/switch";
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
+import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import {
   Sun,
   Moon,
   Monitor,
   Layout,
-  Eye,
   Check,
   ArrowLeft,
 } from "lucide-react";
@@ -27,6 +25,7 @@ interface AppearanceSettingsProps {
   TransitionContainer: React.ComponentType<{
     direction: "forward" | "back";
     children: React.ReactNode;
+    viewKey?: string;
   }>;
   transitionDirection: "forward" | "back";
 }
@@ -41,113 +40,73 @@ export function AppearanceSettings({
   transitionDirection,
 }: AppearanceSettingsProps) {
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <TransitionContainer direction={transitionDirection}>
-        <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => goBack("main")}
-            className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <h2 className="text-lg font-semibold text-foreground">
-            Appearance
-          </h2>
-        </div>
-        <CommandList>
-          <CommandGroup heading="Theme">
-            <CommandItem
-              onSelect={() => updateSetting("theme", "light")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Sun className="mr-3 h-4 w-4 text-amber-500" />
-              <span className="text-foreground">Light Theme</span>
-              {localSettings.theme === "light" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("theme", "dark")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Moon className="mr-3 h-4 w-4 text-slate-400" />
-              <span className="text-foreground">Dark Theme</span>
-              {localSettings.theme === "dark" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("theme", "system")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Monitor className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">System Theme</span>
-              {localSettings.theme === "system" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-          </CommandGroup>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        variant="spotlight"
+        showClose={false}
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
+      >
+        <VisuallyHidden>
+          <DialogTitle>Appearance Settings</DialogTitle>
+        </VisuallyHidden>
+        <TransitionContainer direction={transitionDirection} viewKey="appearance">
+          <div className="flex flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+              <button
+                onClick={() => goBack("main")}
+                className="p-1 rounded hover:bg-muted/50 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <span className="text-sm font-medium">Appearance</span>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Theme Section */}
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Theme</div>
+              <div className="p-1">
+                {[
+                  { value: "light", icon: Sun, label: "Light Theme", color: "text-amber-500" },
+                  { value: "dark", icon: Moon, label: "Dark Theme", color: "text-slate-400" },
+                  { value: "system", icon: Monitor, label: "System Theme", color: "text-muted-foreground" },
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => updateSetting("theme", item.value)}
+                    className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                  >
+                    <item.icon className={`h-4 w-4 ${item.color} shrink-0`} />
+                    <span className="text-sm flex-1">{item.label}</span>
+                    {localSettings.theme === item.value && (
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
 
-          <CommandGroup heading="Default View">
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "month")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Month View</span>
-              {localSettings.defaultView === "month" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "week")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Week View</span>
-              {localSettings.defaultView === "week" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "day")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Day View</span>
-              {localSettings.defaultView === "day" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => updateSetting("defaultView", "agenda")}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Layout className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Agenda View</span>
-              {localSettings.defaultView === "agenda" && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
-            </CommandItem>
-          </CommandGroup>
-
-          <CommandGroup heading="Display Options">
-            <CommandItem
-              onSelect={() =>
-                updateSetting("compactView", !localSettings.compactView)
-              }
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
-            >
-              <Eye className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Compact View</span>
-              <Switch
-                checked={localSettings.compactView}
-                className="ml-auto"
-              />
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </TransitionContainer>
-    </CommandDialog>
+              {/* Default View Section */}
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">Default View</div>
+              <div className="p-1">
+                {["month", "week", "day", "agenda"].map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    onClick={() => updateSetting("defaultView", view)}
+                    className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                  >
+                    <Layout className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm flex-1 capitalize">{view} View</span>
+                    {localSettings.defaultView === view && (
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </TransitionContainer>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -5,11 +5,13 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  CommandDialog,
-  CommandList,
-  CommandGroup,
-  CommandItem,
-} from "@workspace/ui/components/navigation/command";
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
+import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
+import { Input } from "@workspace/ui/components/ui/input";
+import { Button } from "@workspace/ui/components/ui/button";
 import {
   ArrowLeft,
   RefreshCw,
@@ -18,6 +20,7 @@ import {
   Key,
   Smartphone,
   Usb,
+  ChevronRight,
 } from "lucide-react";
 
 interface PasskeySettingsProps {
@@ -140,132 +143,155 @@ export function PasskeySettings({
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <div className="bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </button>
-        <h2 className="text-lg font-semibold text-foreground">Passkeys</h2>
-      </div>
-      <CommandList>
-        {!showAddPasskey ? (
-          <CommandGroup heading="Actions">
-            <CommandItem
-              onSelect={() => setShowAddPasskey(true)}
-              disabled={passkeyLoading}
-              className="px-4 py-3 hover:bg-accent/20 data-[selected=true]:bg-accent/30"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        variant="spotlight"
+        showClose={false}
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
+      >
+        <VisuallyHidden>
+          <DialogTitle>Passkeys</DialogTitle>
+        </VisuallyHidden>
+        <div className="flex flex-col">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+            <button
+              onClick={onBack}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <Plus className="mr-3 h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">Add New Passkey</span>
-            </CommandItem>
-          </CommandGroup>
-        ) : (
-          <CommandGroup heading="Add New Passkey">
-            <div className="px-4 py-3 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Passkey Name
-                </label>
-                <input
-                  type="text"
-                  value={passkeyName}
-                  onChange={(e) => setPasskeyName(e.target.value)}
-                  placeholder="e.g., iPhone Face ID, YubiKey"
-                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={addPasskey}
-                  disabled={addPasskeyMutation.isPending || !passkeyName.trim()}
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
-                >
-                  {addPasskeyMutation.isPending ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin inline" />
-                      Adding...
-                    </>
-                  ) : (
-                    "Create Passkey"
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddPasskey(false);
-                    setPasskeyName("");
-                  }}
-                  disabled={addPasskeyMutation.isPending}
-                  className="px-4 py-2 border border-border rounded-md text-sm font-medium hover:bg-muted transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </CommandGroup>
-        )}
-
-        {passkeyLoading && passkeys.length === 0 ? (
-          <div className="px-4 py-8 text-center">
-            <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Loading passkeys...</p>
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <span className="text-sm font-medium">Passkeys</span>
           </div>
-        ) : passkeys.length === 0 ? (
-          <div className="px-4 py-8 text-center">
-            <Key className="h-8 w-8 mx-auto mb-3 text-muted-foreground opacity-50" />
-            <p className="text-sm text-muted-foreground mb-2">
-              No passkeys found
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Add your first passkey to enable passwordless authentication
-            </p>
-          </div>
-        ) : (
-          <CommandGroup heading="Your Passkeys">
-            {passkeys
-              .filter((passkey: any) => passkey && passkey.id)
-              .map((passkey: any) => {
-                const DeviceIcon = getDeviceIcon(passkey?.deviceType);
-                return (
-                  <div
-                    key={passkey.id}
-                    className="px-4 py-3 border-b border-border/30 last:border-b-0"
+
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {!showAddPasskey ? (
+              <>
+                {/* Add Passkey Button */}
+                <div className="p-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPasskey(true)}
+                    disabled={passkeyLoading}
+                    className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-md bg-muted">
-                          <DeviceIcon className="h-3 w-3 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">
-                              {passkey?.name || "Unnamed Passkey"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Added{" "}
-                            {passkey?.createdAt
-                              ? new Date(passkey.createdAt).toLocaleDateString()
-                              : "Unknown date"}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => deletePasskeyMutation.mutate(passkey.id)}
-                        className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
+                    <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm flex-1">Add New Passkey</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                  </button>
+                </div>
+
+                {passkeyLoading && passkeys.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Loading passkeys...</p>
                   </div>
-                );
-              })}
-          </CommandGroup>
-        )}
-      </CommandList>
-    </CommandDialog>
+                ) : passkeys.length === 0 ? (
+                  <div className="px-4 py-6 text-center border-t border-border/50">
+                    <Key className="h-6 w-6 mx-auto mb-2 text-muted-foreground/50" />
+                    <p className="text-xs text-muted-foreground mb-1">
+                      No passkeys found
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/50">
+                      Add your first passkey to enable passwordless authentication
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50">
+                      Your Passkeys
+                    </div>
+                    <div className="p-1">
+                      {passkeys
+                        .filter((passkey: any) => passkey && passkey.id)
+                        .map((passkey: any) => {
+                          const DeviceIcon = getDeviceIcon(passkey?.deviceType);
+                          return (
+                            <div
+                              key={passkey.id}
+                              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/20 transition-colors"
+                            >
+                              <div className="p-1 rounded bg-muted/50 shrink-0">
+                                <DeviceIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm truncate">
+                                  {passkey?.name || "Unnamed Passkey"}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground/60">
+                                  Added{" "}
+                                  {passkey?.createdAt
+                                    ? new Date(passkey.createdAt).toLocaleDateString()
+                                    : "Unknown date"}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => deletePasskeyMutation.mutate(passkey.id)}
+                                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Add Passkey Form */}
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                  Add New Passkey
+                </div>
+                <div className="px-4 py-3 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                      Passkey Name
+                    </label>
+                    <Input
+                      type="text"
+                      value={passkeyName}
+                      onChange={(e) => setPasskeyName(e.target.value)}
+                      placeholder="e.g., iPhone Face ID, YubiKey"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={addPasskey}
+                      disabled={addPasskeyMutation.isPending || !passkeyName.trim()}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      {addPasskeyMutation.isPending ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        "Create Passkey"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowAddPasskey(false);
+                        setPasskeyName("");
+                      }}
+                      disabled={addPasskeyMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
