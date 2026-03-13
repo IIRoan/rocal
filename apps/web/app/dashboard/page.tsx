@@ -26,7 +26,9 @@ import { useMemo, useEffect } from "react";
 
 function SidebarWithContext() {
   const { data: session } = useSession();
-  const { openCalendarManagement, openPalette } = useCommandPaletteContext();
+  const { openCalendarManagement, openPalette, openEventEditor } = useCommandPaletteContext();
+  const { settings } = useSettings();
+  const calendarData = useSharedCalendarData();
 
   const handleLogout = async () => {
     try {
@@ -36,6 +38,26 @@ function SidebarWithContext() {
     } catch (error) {
       console.error("Logout failed:", error);
     }
+  };
+
+  const handleCreateEvent = () => {
+    const startTime = new Date();
+    startTime.setSeconds(0);
+    startTime.setMilliseconds(0);
+    
+    const newEvent = {
+      id: undefined as any,
+      title: "",
+      start: startTime,
+      end: new Date(startTime.getTime() + 60 * 60 * 1000),
+      allDay: false,
+      calendarId: settings?.defaultCalendarId || calendarData.calendars?.[0]?.id || "",
+      userId: "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    openEventEditor(newEvent);
   };
 
   return (
@@ -48,6 +70,7 @@ function SidebarWithContext() {
       onLogout={handleLogout}
       onOpenSettings={openPalette}
       onOpenCalendarManagement={openCalendarManagement}
+      onCreateEvent={handleCreateEvent}
     />
   );
 }
