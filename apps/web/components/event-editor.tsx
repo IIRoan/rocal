@@ -379,17 +379,17 @@ function EventEditorPopover({
 }: EventEditorPopoverProps) {
   const popoverRef = React.useRef<HTMLDivElement>(null);
 
-  // Calculate position to keep popover within viewport
-  // null = not yet calculated (keeps popover invisible to avoid flash at {0,0})
+  // Calculate position synchronously before paint to avoid flash
+  // useLayoutEffect runs before browser paint, so position is set before first render
   const [position, setPosition] = React.useState<{ top: number; left: number } | null>(null);
+  const positionRef = React.useRef<{ top: number; left: number } | null>(null);
 
-  // Reset position when closed so next open starts hidden again
-  React.useEffect(() => {
-    if (!open) setPosition(null);
-  }, [open]);
-
-  React.useEffect(() => {
-    if (!open || !anchorPosition) return;
+  // Calculate position synchronously - runs before paint
+  React.useLayoutEffect(() => {
+    if (!open || !anchorPosition) {
+      if (!open) setPosition(null);
+      return;
+    }
 
     const POPOVER_WIDTH = 380;
     const POPOVER_MAX_HEIGHT = 520;
@@ -427,7 +427,9 @@ function EventEditorPopover({
     }
     if (top < VIEWPORT_PADDING) top = VIEWPORT_PADDING;
 
-    setPosition({ top, left });
+    const newPos = { top, left };
+    positionRef.current = newPos;
+    setPosition(newPos);
   }, [open, anchorPosition]);
 
   // Close on Escape
@@ -471,7 +473,8 @@ function EventEditorPopover({
     };
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  // Don't render until we have calculated position (prevents flash at wrong position)
+  if (!open || !position) return null;
 
   return createPortal(
     <>
@@ -483,11 +486,10 @@ function EventEditorPopover({
       {/* Popover panel */}
       <div
         ref={popoverRef}
-        className={`fixed z-50 w-[380px] max-h-[520px] bg-card border border-border rounded-xl shadow-xl flex flex-col overflow-hidden duration-200${position ? " animate-in fade-in-0 zoom-in-95 slide-in-from-top-2" : ""}`}
+        className="fixed z-50 w-[380px] max-h-[520px] bg-card border border-border rounded-xl shadow-xl flex flex-col overflow-hidden"
         style={{
           top: position?.top ?? 0,
           left: position?.left ?? 0,
-          visibility: position ? "visible" : "hidden",
         }}
       >
         {/* Header */}
