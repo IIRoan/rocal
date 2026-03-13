@@ -108,6 +108,19 @@ export function AppSidebar({
 
         {/* Content */}
         <div className="flex-1 overflow-auto">
+          {/* New Event Button */}
+          {onCreateEvent && (
+            <div className="p-4 border-b">
+              <Button
+                onClick={onCreateEvent}
+                className="w-full gap-2"
+                size="sm"
+              >
+                <RiAddLine size={16} />
+                <span>New Event</span>
+              </Button>
+            </div>
+          )}
           {/* Mini Calendar Widget */}
           <div className="p-4 border-b">
             <SidebarCalendar />
@@ -226,17 +239,7 @@ export function AppSidebar({
         </div>
 
         {/* Footer */}
-        <div className="border-t p-4 space-y-3">
-          {onCreateEvent && (
-            <Button
-              onClick={onCreateEvent}
-              className="w-full gap-2"
-              size="sm"
-            >
-              <RiAddLine size={16} />
-              <span>New Event</span>
-            </Button>
-          )}
+        <div className="border-t p-4">
           <NavUser
             user={
               user || {
@@ -265,6 +268,18 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">
+        {onCreateEvent && (
+          <SidebarGroup className="px-1 mb-2">
+            <Button
+              onClick={onCreateEvent}
+              className="w-full gap-2"
+              size="sm"
+            >
+              <RiAddLine size={16} />
+              <span>New Event</span>
+            </Button>
+          </SidebarGroup>
+        )}
         <SidebarGroup className="px-1">
           <SidebarCalendar />
         </SidebarGroup>
@@ -388,16 +403,6 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="gap-1">
-        {onCreateEvent && (
-          <Button
-            onClick={onCreateEvent}
-            className="w-full gap-2"
-            size="sm"
-          >
-            <RiAddLine size={16} />
-            <span>New Event</span>
-          </Button>
-        )}
         <NavUser
           user={
             user || {
