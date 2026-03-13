@@ -3,7 +3,7 @@
 import * as React from "react";
 import { RiCheckLine, RiAddLine, RiSettings3Line } from "@remixicon/react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { CreateCalendarData, EventColor } from "../calendar/types";
+import { CalendarEvent, CreateCalendarData, EventColor } from "../calendar/types";
 import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
@@ -44,6 +44,8 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
   onCreateEvent?: () => void;
+  events?: CalendarEvent[];
+  onMiniCalendarMonthChange?: (dateRange: { start: Date; end: Date }) => void;
   isMobile?: boolean;
 }
 
@@ -53,6 +55,8 @@ export function AppSidebar({
   onOpenSettings,
   onOpenCalendarManagement,
   onCreateEvent,
+  events,
+  onMiniCalendarMonthChange,
   isMobile = false,
   ...props
 }: AppSidebarProps) {
@@ -123,7 +127,10 @@ export function AppSidebar({
           )}
           {/* Mini Calendar Widget */}
           <div className="p-4 border-b">
-            <SidebarCalendar />
+            <SidebarCalendar
+              events={events}
+              onDisplayMonthChange={onMiniCalendarMonthChange}
+            />
           </div>
 
           {/* Calendars Section */}
@@ -281,7 +288,10 @@ export function AppSidebar({
           </SidebarGroup>
         )}
         <SidebarGroup className="px-1">
-          <SidebarCalendar />
+          <SidebarCalendar
+            events={events}
+            onDisplayMonthChange={onMiniCalendarMonthChange}
+          />
         </SidebarGroup>
         <SidebarGroup className="px-1 mt-3 pt-4 border-t">
           <div className="flex items-center justify-between">

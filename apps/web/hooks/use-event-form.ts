@@ -272,6 +272,10 @@ export function useEventForm({
     setIsRecurring(false);
     setRecurrenceRule(null);
     setShowRecurringDeleteModal(false);
+    setStartDateOpen(false);
+    setEndDateOpen(false);
+    setStartTimeOpen(false);
+    setEndTimeOpen(false);
     setTimeErrors({});
     setShowNotifications(false);
   }, []);

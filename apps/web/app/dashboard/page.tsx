@@ -27,8 +27,30 @@ import { useMemo, useEffect } from "react";
 function SidebarWithContext() {
   const { data: session } = useSession();
   const { openCalendarManagement, openPalette, openEventEditor } = useCommandPaletteContext();
+  const { isCalendarVisible } = useCalendarContext();
   const { settings } = useSettings();
   const calendarData = useSharedCalendarData();
+
+  const visibleCalendarIds = useMemo(() => {
+    return new Set(
+      calendarData.calendars
+        .filter((cal) => isCalendarVisible(cal.id))
+        .map((cal) => cal.id),
+    );
+  }, [calendarData.calendars, isCalendarVisible]);
+
+  const transformedEvents = useMemo(() => {
+    const calendarMap = new Map(calendarData.calendars.map((cal) => [cal.id, cal]));
+    return calendarData.events
+      .filter((event) => visibleCalendarIds.has(event.calendarId))
+      .map((event) => {
+        const calendar = calendarMap.get(event.calendarId);
+        return {
+          ...event,
+          color: event.color || calendar?.color || undefined,
+        };
+      });
+  }, [calendarData.events, calendarData.calendars, visibleCalendarIds]);
 
   const handleLogout = async () => {
     try {
@@ -71,6 +93,8 @@ function SidebarWithContext() {
       onOpenSettings={openPalette}
       onOpenCalendarManagement={openCalendarManagement}
       onCreateEvent={handleCreateEvent}
+      events={transformedEvents}
+      onMiniCalendarMonthChange={calendarData.setDateRange}
     />
   );
 }
