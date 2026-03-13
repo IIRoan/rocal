@@ -584,21 +584,68 @@
     animation: slideUp 0.3s ease-out;
   }
 
-  /* Dialog command palette animation - slides down from top with quick fade */
-  /* Only apply animation to center variant dialogs (those with top:50%) */
-  [data-slot="dialog-content"][class*="top-1/2"] {
-    animation: commandPaletteSlide 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Command palette / dialog animations */
+  /* Spotlight variant: slides down from top-center */
+  [data-slot="dialog-content"].dialog-spotlight-animation {
     will-change: opacity, transform;
+    animation: spotlightSlideDown 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  @keyframes commandPaletteSlide {
+  [data-slot="dialog-content"].dialog-spotlight-animation[data-state="closed"] {
+    animation: spotlightSlideUp 120ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes spotlightSlideDown {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  @keyframes spotlightSlideUp {
+    0% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-10px);
+    }
+  }
+
+  /* Center variant dialogs: fade + scale from center */
+  [data-slot="dialog-content"].dialog-center-animation {
+    will-change: opacity, transform;
+    animation: centerEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  [data-slot="dialog-content"].dialog-center-animation[data-state="closed"] {
+    animation: centerExit 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes centerEnter {
     from {
       opacity: 0;
-      transform: translate(-50%, -50%) translateY(-20px) scale(0.96);
+      transform: translate(-50%, -50%) scale(0.96);
     }
     to {
       opacity: 1;
-      transform: translate(-50%, -50%) translateY(0) scale(1);
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  @keyframes centerExit {
+    from {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.96);
     }
   }
 
