@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "../../lib/utils";
-import { useEffect, useState } from "react";
 import { default as Logo } from "../layout/logo";
 import { useCyclingMessage } from "../../hooks/use-cycling-message";
 import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
@@ -39,67 +38,27 @@ export function LogoSpinner({
     xl: "h-20 w-20"
   };
 
-  const containerSizeClasses = {
-    sm: "h-10 w-10",
-    md: "h-14 w-14",
-    lg: "h-18 w-18", 
-    xl: "h-22 w-22"
-  };
-
   return (
-    <div className={cn("flex flex-col items-center gap-4", className)}>
-      {/* Logo container with floating animation */}
-      <div className={cn(
-        "relative flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-primary/20 border border-primary/20 animate-logo-float",
-        containerSizeClasses[size]
-      )}>
-        {/* Background pulse effect */}
-        <div className={cn(
-          "absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/40 animate-logo-pulse",
-          containerSizeClasses[size]
-        )} />
-        
-        {/* Rotating border */}
-        <div className={cn(
-          "absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary via-primary/50 to-primary opacity-30 animate-logo-spin",
-        )} />
-        
-        {/* Logo icon */}
-        <div className={cn(
-          "relative z-10 rounded-lg bg-primary/10 flex items-center justify-center p-2",
+    <div className={cn("flex flex-col items-center gap-3", className)}>
+      {/* Logo with subtle pulse */}
+      <Logo 
+        className={cn(
+          "text-primary animate-pulse",
           sizeClasses[size]
-        )}>
-          {/* Actual logo component with rotation animation */}
-          <div className="relative animate-spin" style={{ animationDuration: '4s' }}>
-            <Logo 
-              className={cn(
-                "text-primary drop-shadow-sm",
-                sizeClasses[size]
-              )}
-              fill="currentColor"
-            />
-          </div>
-        </div>
-      </div>
+        )}
+        fill="currentColor"
+        style={{ animationDuration: '2s' }}
+      />
 
       {/* Loading text */}
       {showText && (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-1.5">
           <p className={cn(
-            "text-sm font-medium text-foreground transition-opacity duration-300",
+            "text-sm font-medium text-muted-foreground transition-opacity duration-300",
             isTransitioning && enableCycling && !text ? "opacity-50" : "opacity-100"
           )}>
             {displayText}
           </p>
-          
-          {/* Progress indicator */}
-          <div className="w-24 h-1 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-primary/60 to-primary animate-pulse rounded-full" 
-                 style={{
-                   width: '75%',
-                   animation: 'pulse 1.5s ease-in-out infinite'
-                 }} />
-          </div>
         </div>
       )}
     </div>
@@ -126,25 +85,16 @@ export function PageLoadingOverlay({
 
   return (
     <div className={cn(
-      "fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm",
+      "fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm",
       "animate-fade-in",
       className
     )}>
-      <div className="flex flex-col items-center">
-        <LogoSpinner 
-          size="lg" 
-          text={message}
-          messageContext={messageContext}
-          enableCycling={enableCycling}
-        />
-        
-        {/* Additional branding */}
-        <div className="mt-6 text-center animate-slide-in" style={{ animationDelay: '0.3s' }}>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Rocal
-          </h1>
-        </div>
-      </div>
+      <LogoSpinner 
+        size="lg" 
+        text={message}
+        messageContext={messageContext}
+        enableCycling={enableCycling}
+      />
     </div>
   );
 }
@@ -163,13 +113,13 @@ export function InlineLogoSpinner({
   size = "sm",
   text,
   messageContext = "PAGE_LOAD",
-  enableCycling = false // Default to false for inline usage to avoid distraction
+  enableCycling = false
 }: InlineLogoSpinnerProps) {
   // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !text,
-    cycleInterval: 3000 // Slower cycling for inline usage
+    cycleInterval: 3000
   });
   
   const displayText = text || message;
@@ -181,17 +131,14 @@ export function InlineLogoSpinner({
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <div className="relative">
-        <div className="animate-spin" style={{ animationDuration: '2s' }}>
-          <Logo 
-            className={cn(
-              "text-primary",
-              sizeClasses[size]
-            )}
-            fill="currentColor"
-          />
-        </div>
-      </div>
+      <Logo 
+        className={cn(
+          "text-primary animate-pulse",
+          sizeClasses[size]
+        )}
+        fill="currentColor"
+        style={{ animationDuration: '2s' }}
+      />
       <span className={cn(
         "text-sm text-muted-foreground transition-opacity duration-300",
         isTransitioning && enableCycling && !text ? "opacity-50" : "opacity-100"
