@@ -79,80 +79,57 @@ function DialogContent({
   showClose = true,
   ...props
 }: DialogContentProps) {
-  // Variant presets
+  // Variant presets - positioning only (no transform classes, those are in CSS animations)
   const positionClasses =
     variant === "center"
-      ? "left-1/2 top-1/2" // Transform handled by CSS
+      ? "left-1/2 top-1/2"
       : variant === "spotlight"
-        ? "left-1/2 top-[18%] -translate-x-1/2" // Spotlight style like macOS/Raycast
+        ? "left-1/2 top-[15%]"
         : variant === "top"
-          ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] -translate-x-1/2"
-          : // bottom
-            "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)] -translate-x-1/2";
+          ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)]"
+          : "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)]";
 
-  // Animation per variant - center uses CSS animation, others use Tailwind
+  // Animation classes for spotlight variant (uses CSS keyframes via data-state)
   const animationClasses =
-    variant === "center"
-      ? "" // Animation handled by CSS in globals.css for data-slot="dialog-content"
-      : variant === "spotlight"
-        ? [
-            // Spotlight: fade + subtle scale
-            "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-            "data-[state=open]:scale-100 data-[state=closed]:scale-95",
-            "transition-all duration-200 ease-out",
-          ].join(" ")
+    variant === "spotlight"
+      ? "dialog-spotlight-animation"
+      : variant === "center"
+        ? "dialog-center-animation"
         : variant === "top"
-          ? [
-              // Slide from top + fade
-              "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-              "data-[state=open]:translate-y-0 data-[state=closed]:-translate-y-4",
-            ].join(" ")
-          : [
-              // bottom: lift up + fade
-              "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-              "data-[state=open]:translate-y-0 data-[state=closed]:translate-y-4",
-            ].join(" ");
+          ? "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 data-[state=open]:translate-y-0 data-[state=closed]:-translate-y-4 transition-all duration-200"
+          : "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 data-[state=open]:translate-y-0 data-[state=closed]:translate-y-4 transition-all duration-200";
 
   // Suggested sizing defaults per variant
   const sizeDefaults =
     variant === "center"
       ? "w-[520px] max-w-[calc(100dvw-1rem)] sm:max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
       : variant === "spotlight"
-        ? "w-[480px] max-w-[calc(100dvw-2rem)]"
+        ? "w-[560px] max-w-[calc(100dvw-2rem)]"
         : variant === "top"
           ? "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]"
           : "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]";
 
   // Radius per variant
   const radius =
-    variant === "spotlight" ? "rounded-xl" : variant === "center" ? "rounded-xl" : "rounded-lg md:rounded-xl";
+    variant === "spotlight" ? "rounded-lg" : variant === "center" ? "rounded-xl" : "rounded-lg md:rounded-xl";
 
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-variant={variant}
         className={cn(
           // Base
-          "bg-background fixed z-50 grid gap-4 overflow-y-auto border p-4 sm:p-6 shadow-lg",
+          "bg-background fixed z-50 overflow-hidden border shadow-lg",
           radius,
           sizeDefaults,
           positionClasses,
-          // No transition classes for center variant - handled by CSS
-          variant === "center"
-            ? ""
-            : "transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
           animationClasses,
           // Reduce motion support
           "motion-reduce:transition-none",
           className
         )}
-        // Inline style for positioning without transform conflicts
-        style={{
-          maxHeight:
-            "calc(100dvh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-          ...props.style,
-        }}
         {...props}
       >
         {children}

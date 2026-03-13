@@ -236,7 +236,7 @@ function MobileLayoutContent() {
 function DashboardContent() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
-  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
+  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen, initialQuery } =
     useCommandPalette();
   const handleLogout = async () => {
     try {
@@ -305,6 +305,7 @@ function DashboardContent() {
           <CommandPalette
             open={commandPaletteOpen}
             onOpenChange={setCommandPaletteOpen}
+            initialSearchQuery={initialQuery}
           />
         </CalendarProviderWrapper>
       </CalendarDataProvider>
