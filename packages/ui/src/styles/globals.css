@@ -768,6 +768,16 @@
     }
   }
 
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* PWA specific styles */
   @media (display-mode: standalone) {
     /* Remove any browser chrome styles when running as PWA */

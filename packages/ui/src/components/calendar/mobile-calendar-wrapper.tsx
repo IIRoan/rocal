@@ -12,6 +12,7 @@ import { useCalendarContext } from "./calendar-context";
 import { CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 import { useIsMobile } from "../../hooks/use-mobile";
+import { StickyMiniCalendar } from "./sticky-mini-calendar";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   user?: {
@@ -39,63 +40,40 @@ export function MobileCalendarWrapper({
   const isMobile = useIsMobile();
   
   const [currentView, setCurrentView] = useState<CalendarView>(() => {
-    // Check sessionStorage first, then fall back to smart defaults
     if (typeof window !== 'undefined') {
       const savedView = sessionStorage.getItem('calendar-view-selection');
       if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
         return savedView as CalendarView;
       }
     }
-    // Default based on screen size - will be updated by useEffect when isMobile is determined
     return props.initialView || "month";
   });
   
   const { currentDate, setCurrentDate } = useCalendarContext();
 
-  // Update view when isMobile status changes and no saved preference exists
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedView = sessionStorage.getItem('calendar-view-selection');
       if (!savedView && isMobile) {
-        // On mobile, always default to day view regardless of initialView
         setCurrentView("day");
       }
     }
   }, [isMobile]);
 
-  const handleDateChange = (date: Date) => {
-    setCurrentDate(date);
-  };
-
-  const handleOpenSidebar = () => {
-    setIsSidebarOpen(true);
-  };
-
-  const handleCloseSidebar = () => {
-    setIsSidebarOpen(false);
-  };
-
+  const handleDateChange = (date: Date) => setCurrentDate(date);
+  const handleOpenSidebar = () => setIsSidebarOpen(true);
+  const handleCloseSidebar = () => setIsSidebarOpen(false);
   const handleOpenAddEvent = () => {
     onOpenAddEvent?.();
-    // Close sidebar if open when creating new event
     setIsSidebarOpen(false);
   };
-
   const handleOpenSettings = () => {
     onOpenSettings?.();
-    // Close sidebar if open when opening settings
     setIsSidebarOpen(false);
   };
+  const handleViewChange = (view: CalendarView) => setCurrentView(view);
+  const handleCalendarViewChange = (view: CalendarView) => setCurrentView(view);
 
-  const handleViewChange = (view: CalendarView) => {
-    setCurrentView(view);
-  };
-
-  const handleCalendarViewChange = (view: CalendarView) => {
-    setCurrentView(view);
-  };
-
-  // Only sync with props.initialView if it's explicitly different and no session preference exists
   React.useEffect(() => {
     if (props.initialView && typeof window !== 'undefined') {
       const savedView = sessionStorage.getItem('calendar-view-selection');
@@ -105,22 +83,41 @@ export function MobileCalendarWrapper({
     }
   }, [props.initialView, currentView]);
 
+  const showSeparateNav = currentView === "month" || currentView === "agenda";
+  const showMiniCalendar = currentView === "day" || currentView === "week";
+
   return (
     <div className="relative flex flex-col h-full">
-      {/* Mobile Week Navigation - only visible on mobile */}
-      <MobileWeekNav
-        currentDate={currentDate}
-        currentView={currentView}
-        onDateChange={handleDateChange}
-        className="md:hidden"
-      />
+      {/* Fixed Mini Calendar for day/week views */}
+      {showMiniCalendar && isMobile && (
+        <StickyMiniCalendar
+          events={props.events}
+          onDisplayMonthChange={props.onDateRangeChange}
+          onEventSelect={props.onEventEdit}
+          weekStartDay={props.weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+          workingDays={props.workingDays}
+          timezone={props.timezone}
+          showDayStrip={currentView === "week"}
+          showAllDayEvents={currentView === "day"}
+        />
+      )}
 
-      {/* Main Calendar Content - allow scrolling with bottom padding for mobile nav */}
-      <div className={cn("flex-1 overflow-auto pb-24 md:pb-0", className)}>
+      {/* Mobile Week Navigation - only for month/agenda views */}
+      {showSeparateNav && (
+        <MobileWeekNav
+          currentDate={currentDate}
+          currentView={currentView}
+          onDateChange={handleDateChange}
+          className="md:hidden"
+        />
+      )}
+
+      {/* Main Calendar Content */}
+      <div className={cn("flex-1 overflow-y-auto pb-20 md:pb-0 md:overflow-hidden", className)}>
         {children || <MobileEventCalendar {...props} initialView={currentView} onSidebarToggle={handleOpenSidebar} onViewChange={handleCalendarViewChange} />}
       </div>
 
-      {/* Mobile Bottom Navigation - only visible on mobile */}
+      {/* Mobile Bottom Navigation */}
       <MobileBottomNav
         onOpenSidebar={handleOpenSidebar}
         onOpenAddEvent={handleOpenAddEvent}
@@ -137,17 +134,16 @@ export function MobileCalendarWrapper({
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>
-            <SheetDescription>
-              Access your calendars, mini calendar, and account settings
-            </SheetDescription>
+            <SheetDescription>Access your calendars, mini calendar, and account settings</SheetDescription>
           </VisuallyHidden>
-          
           <SidebarProvider defaultOpen={true}>
             <AppSidebar
               user={user}
               onLogout={onLogout}
               onOpenSettings={handleOpenSettings}
               onOpenCalendarManagement={onOpenCalendarManagement}
+              events={props.events}
+              onMiniCalendarMonthChange={props.onDateRangeChange}
               isMobile={true}
             />
           </SidebarProvider>

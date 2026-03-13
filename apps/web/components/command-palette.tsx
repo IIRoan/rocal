@@ -340,7 +340,7 @@ export function CommandPalette({
         onOpenChange={onOpenChange}
         eventToEdit={eventToEdit}
         onEventSaved={onEventSaved}
-        onBack={() => goBack("events")}
+        onBack={() => onOpenChange(false)}
         localSettings={localSettings}
         editorMode={eventEditorMode}
         anchorPosition={popoverAnchorPosition}

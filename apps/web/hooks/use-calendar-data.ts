@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { calendarApiService } from "../lib/calendar-api-service";
 import {
   CalendarEvent,
@@ -19,6 +20,12 @@ import { EventNotification } from "@workspace/ui/components/calendar/notificatio
 interface DateRange {
   start: Date;
   end: Date;
+}
+
+function normalizeDateRange(dateRange: DateRange): DateRange {
+  const start = startOfWeek(startOfMonth(dateRange.start), { weekStartsOn: 1 });
+  const end = endOfWeek(endOfMonth(dateRange.end), { weekStartsOn: 1 });
+  return { start, end };
 }
 
 interface UseCalendarDataOptions {
@@ -301,6 +308,20 @@ export function useCalendarData(
     queryClient.clear();
   }, [queryClient]);
 
+  const setDateRange = useCallback((dateRange: DateRange) => {
+    const normalized = normalizeDateRange(dateRange);
+    setCurrentDateRange((prev) => {
+      if (
+        prev &&
+        prev.start.getTime() === normalized.start.getTime() &&
+        prev.end.getTime() === normalized.end.getTime()
+      ) {
+        return prev;
+      }
+      return normalized;
+    });
+  }, []);
+
   // --- Notification Handlers ---
 
   const loadNotifications = useCallback(async (eventId: string) => {
@@ -389,7 +410,7 @@ export function useCalendarData(
     },
 
     // Utility
-    setDateRange: setCurrentDateRange,
+    setDateRange,
     clearCache,
 
     // Notification handlers

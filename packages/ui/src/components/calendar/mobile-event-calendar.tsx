@@ -37,6 +37,8 @@ import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
 import { WeekView } from "./week-view";
+import { MobileDayView } from "./mobile-day-view";
+import { MobileWeekView } from "./mobile-week-view";
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
@@ -656,29 +658,57 @@ export function MobileEventCalendar({
               />
             )}
             {view === "week" && (
-              <WeekView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                compactView={compactView}
-                timeFormat={timeFormat}
-                weekStartDay={weekStartDay}
-                workingDays={workingDays}
-                timezone={timezone}
-              />
+              isMobile ? (
+                <MobileWeekView
+                  currentDate={currentDate}
+                  events={events}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  timeFormat={timeFormat}
+                  weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+                  workingDays={workingDays}
+                  timezone={timezone}
+                  showMonthPicker={true}
+                />
+              ) : (
+                <WeekView
+                  currentDate={currentDate}
+                  events={events}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  compactView={compactView}
+                  timeFormat={timeFormat}
+                  weekStartDay={weekStartDay}
+                  workingDays={workingDays}
+                  timezone={timezone}
+                />
+              )
             )}
             {view === "day" && (
-              <DayView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                compactView={compactView}
-                timeFormat={timeFormat}
-                workingDays={workingDays}
-                timezone={timezone}
-              />
+              isMobile ? (
+                <MobileDayView
+                  currentDate={currentDate}
+                  events={events}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  timeFormat={timeFormat}
+                  timezone={timezone}
+                  workingDays={workingDays}
+                  showMonthPicker={true}
+                  weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+                />
+              ) : (
+                <DayView
+                  currentDate={currentDate}
+                  events={events}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  compactView={compactView}
+                  timeFormat={timeFormat}
+                  workingDays={workingDays}
+                  timezone={timezone}
+                />
+              )
             )}
             {view === "agenda" && (
               <AgendaView
