@@ -58,8 +58,8 @@ export function SidebarCalendar({ className }: SidebarCalendarProps) {
         onMonthChange={handleMonthChange}
         classNames={{
           day_button:
-            "transition-none! hover:not-in-data-selected:bg-sidebar-accent group-[.range-middle]:group-data-selected:bg-sidebar-accent text-sidebar-foreground",
-          today: "*:after:transition-none",
+            "transition-none! hover:not-in-data-selected:bg-sidebar-accent group-[.range-middle]:group-data-selected:bg-sidebar-accent text-sidebar-foreground group-data-selected:bg-primary group-data-selected:text-primary-foreground",
+          today: "*:after:transition-none *:after:bg-primary *:after:size-[4px] [&[data-selected]>**]:after:bg-primary-foreground",
           outside: "data-selected:bg-sidebar-accent/50",
         }}
       />
