@@ -11,7 +11,8 @@ import {
   Monitor,
   Clock,
   Mail,
-  ChevronRight,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 // View labels for breadcrumb display
@@ -24,7 +25,38 @@ export const VIEW_LABELS: Record<string, string> = {
   "calendar-defaults": "Calendar Defaults",
   "account": "Account",
   "security": "Security",
+  "passkeys": "Passkeys",
 };
+
+// Command types - all actions, no navigation
+export type CommandAction = { 
+  action: string; 
+  payload?: Record<string, unknown> 
+};
+
+export interface Command {
+  command: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  execute: CommandAction;
+}
+
+// Commands that can be executed with ">" prefix - ALL actions
+export const COMMANDS: Command[] = [
+  // Event actions
+  { command: "new event", label: "New Event", icon: Plus, description: "Create a new event", execute: { action: "newEvent" } },
+  // Calendar actions
+  { command: "new calendar", label: "New Calendar", icon: Plus, description: "Create a new calendar", execute: { action: "newCalendar" } },
+  { command: "delete calendar", label: "Delete Calendar", icon: Trash2, description: "Manage and delete calendars", execute: { action: "openCalendars" } },
+  // Theme actions - execute immediately
+  { command: "dark mode", label: "Dark Mode", icon: Moon, description: "Switch to dark theme", execute: { action: "setTheme", payload: { theme: "dark" } } },
+  { command: "light mode", label: "Light Mode", icon: Sun, description: "Switch to light theme", execute: { action: "setTheme", payload: { theme: "light" } } },
+  { command: "system theme", label: "System Theme", icon: Monitor, description: "Use system theme", execute: { action: "setTheme", payload: { theme: "system" } } },
+  // Passkey actions
+  { command: "new passkey", label: "New Passkey", icon: Plus, description: "Add a new passkey", execute: { action: "newPasskey" } },
+  { command: "delete passkey", label: "Delete Passkey", icon: Trash2, description: "Remove existing passkeys", execute: { action: "openPasskeys" } },
+];
 
 export const NAVIGATION_ITEMS = [
   {
