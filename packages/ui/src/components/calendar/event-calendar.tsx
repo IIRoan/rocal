@@ -774,35 +774,6 @@ export function EventCalendar({
                 </Button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  className="max-sm:h-8 max-sm:px-2.5!"
-                  onClick={() => {
-                    // Create a new event starting at current time or selected date
-                    const startTime = new Date(currentDate);
-                    const now = new Date();
-
-                    // If the current date is today, start at the exact current time
-                    if (startTime.toDateString() === now.toDateString()) {
-                      // Use current time without rounding
-                      startTime.setHours(
-                        now.getHours(),
-                        now.getMinutes(),
-                        0,
-                        0,
-                      );
-                    } else {
-                      // Otherwise start at 9 AM
-                      startTime.setHours(9, 0, 0, 0);
-                    }
-
-                    // Use button handler (always modal)
-                    handleButtonEventCreate(startTime);
-                  }}
-                  disabled={loading}
-                >
-                  New Event
-                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
