@@ -21865,15 +21865,15 @@ export namespace Prisma {
 
   export type VerificationWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    identifier?: string
     AND?: VerificationWhereInput | VerificationWhereInput[]
     OR?: VerificationWhereInput[]
     NOT?: VerificationWhereInput | VerificationWhereInput[]
-    identifier?: StringFilter<"Verification"> | string
     value?: StringFilter<"Verification"> | string
     expiresAt?: DateTimeFilter<"Verification"> | Date | string
     createdAt?: DateTimeNullableFilter<"Verification"> | Date | string | null
     updatedAt?: DateTimeNullableFilter<"Verification"> | Date | string | null
-  }, "id">
+  }, "id" | "identifier">
 
   export type VerificationOrderByWithAggregationInput = {
     id?: SortOrder
