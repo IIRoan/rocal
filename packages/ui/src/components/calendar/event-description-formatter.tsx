@@ -32,7 +32,7 @@ export const formatEventDescription = (description: string) => {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-400 hover:text-blue-300 underline"
+          className="text-primary hover:text-primary/80 underline"
           onClick={(e) => e.stopPropagation()}
         >
           {displayText}
@@ -57,7 +57,7 @@ export const formatEventDescription = (description: string) => {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 underline"
+            className="text-primary hover:text-primary/80 underline"
             onClick={(e) => e.stopPropagation()}
           >
             Link
