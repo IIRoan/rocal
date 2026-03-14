@@ -70,7 +70,7 @@ export interface UseCalendarDataReturn {
     id: string,
     calendar: UpdateCalendarRequest
   ) => Promise<Calendar>;
-  deleteCalendar: (id: string) => Promise<void>;
+  deleteCalendar: (id: string, action?: string, targetCalendarId?: string) => Promise<void>;
   createCategory: (category: CreateCategoryRequest) => Promise<EventCategory>;
   updateCategory: (
     id: string,
@@ -236,7 +236,8 @@ export function useCalendarData(
   });
 
   const deleteCalendarMutation = useMutation({
-    mutationFn: (id: string) => calendarApiService.deleteCalendar(id),
+    mutationFn: ({ id, action, targetCalendarId }: { id: string; action?: string; targetCalendarId?: string }) =>
+      calendarApiService.deleteCalendarAdvanced(id, action, targetCalendarId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
@@ -399,8 +400,8 @@ export function useCalendarData(
     createCalendar: (calendar) => createCalendarMutation.mutateAsync(calendar),
     updateCalendar: (id, calendar) =>
       updateCalendarMutation.mutateAsync({ id, calendar }),
-    deleteCalendar: async (id) => {
-      await deleteCalendarMutation.mutateAsync(id);
+    deleteCalendar: async (id, action = "delete_events", targetCalendarId) => {
+      await deleteCalendarMutation.mutateAsync({ id, action, targetCalendarId });
     },
     createCategory: (category) => createCategoryMutation.mutateAsync(category),
     updateCategory: (id, category) =>

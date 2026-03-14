@@ -3,7 +3,7 @@
 import * as React from "react";
 import { RiCheckLine, RiAddLine, RiSettings3Line } from "@remixicon/react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { CalendarEvent, CreateCalendarData, EventColor } from "../calendar/types";
+import { CalendarEvent } from "../calendar/types";
 import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
@@ -23,16 +23,6 @@ import {
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { ColorPicker } from "../ui/color-picker";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "../ui/dialog";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -62,42 +52,9 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const {
     calendars,
-    addCalendar,
     toggleCalendarVisibility,
     isCalendarVisible,
   } = useCalendarContext();
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [newCalendarName, setNewCalendarName] = React.useState("");
-  const [newCalendarColor, setNewCalendarColor] =
-    React.useState<string>("#3b82f6");
-
-  const handleCreateCalendar = () => {
-    if (newCalendarName.trim()) {
-      const calendarData: CreateCalendarData = {
-        name: newCalendarName.trim(),
-        color: newCalendarColor,
-      };
-      addCalendar(calendarData);
-      setNewCalendarName("");
-      setNewCalendarColor("#3b82f6");
-      setIsDialogOpen(false);
-    }
-  };
-
-  const presetColors = [
-    "#3b82f6", // blue
-    "#10b981", // emerald
-    "#f59e0b", // orange
-    "#8b5cf6", // violet
-    "#f43f5e", // rose
-    "#ef4444", // red
-    "#06b6d4", // cyan
-    "#84cc16", // lime
-    "#f97316", // orange-500
-    "#6366f1", // indigo
-    "#ec4899", // pink
-    "#14b8a6", // teal
-  ];
 
   // Mobile version - render content directly without Sidebar wrapper
   if (isMobile) {
@@ -149,62 +106,6 @@ export function AppSidebar({
                 >
                   <RiSettings3Line size={14} />
                 </Button>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <RiAddLine size={14} />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Create New Calendar</DialogTitle>
-                      <DialogDescription>
-                        Add a new calendar to organize your events.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <label
-                          htmlFor="calendar-name"
-                          className="text-sm font-medium"
-                        >
-                          Calendar Name
-                        </label>
-                        <Input
-                          id="calendar-name"
-                          value={newCalendarName}
-                          onChange={(e) => setNewCalendarName(e.target.value)}
-                          placeholder="Enter calendar name"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <label
-                          htmlFor="calendar-color"
-                          className="text-sm font-medium"
-                        >
-                          Color
-                        </label>
-                        <ColorPicker
-                          value={newCalendarColor}
-                          onChange={setNewCalendarColor}
-                          presetColors={presetColors}
-                        />
-                      </div>
-                      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
-                        <Button
-                          variant="outline"
-                          className="w-full sm:w-auto"
-                          onClick={() => setIsDialogOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button className="w-full sm:w-auto" onClick={handleCreateCalendar}>
-                          Create Calendar
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
 
@@ -308,62 +209,6 @@ export function AppSidebar({
               >
                 <RiSettings3Line size={14} />
               </Button>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <RiAddLine size={14} />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Create New Calendar</DialogTitle>
-                    <DialogDescription>
-                      Add a new calendar to organize your events.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <label
-                        htmlFor="calendar-name"
-                        className="text-sm font-medium"
-                      >
-                        Calendar Name
-                      </label>
-                      <Input
-                        id="calendar-name"
-                        value={newCalendarName}
-                        onChange={(e) => setNewCalendarName(e.target.value)}
-                        placeholder="Enter calendar name"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <label
-                        htmlFor="calendar-color"
-                        className="text-sm font-medium"
-                      >
-                        Color
-                      </label>
-                      <ColorPicker
-                        value={newCalendarColor}
-                        onChange={setNewCalendarColor}
-                        presetColors={presetColors}
-                      />
-                    </div>
-                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
-                      <Button
-                        variant="outline"
-                        className="w-full sm:w-auto"
-                        onClick={() => setIsDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button className="w-full sm:w-auto" onClick={handleCreateCalendar}>
-                        Create Calendar
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
             </div>
           </div>
           <SidebarGroupContent>
