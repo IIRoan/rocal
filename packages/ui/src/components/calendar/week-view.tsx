@@ -23,7 +23,7 @@ import {
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
-import { EventDots, groupEventsByExactTime } from "./event-dots";
+import { EventDots } from "./event-dots";
 import {
   isMultiDayEvent,
   sortEvents,
@@ -51,14 +51,13 @@ interface WeekViewProps {
 }
 
 interface PositionedEvent {
-  events: CalendarEvent[]; // Changed to array to support grouped events
+  event: CalendarEvent;
   top: number;
   height: number;
   left: number;
   width: number;
   zIndex: number;
   dayIndex: number;
-  isGrouped: boolean; // Flag to indicate if this is a grouped event
 }
 
 export function WeekView({
@@ -135,13 +134,10 @@ export function WeekView({
         );
       });
 
-      // Group events by exact time first, then sort by start time and duration
-      const eventGroups = groupEventsByExactTime(dayEvents);
-
-      // Sort groups by start time
-      eventGroups.sort((a, b) => {
-        const aStart = new Date(a[0]?.start || 0);
-        const bStart = new Date(b[0]?.start || 0);
+      // Sort events by start time
+      dayEvents.sort((a, b) => {
+        const aStart = new Date(a.start);
+        const bStart = new Date(b.start);
         return aStart.getTime() - bStart.getTime();
       });
 
@@ -149,18 +145,15 @@ export function WeekView({
       const positionedEvents: PositionedEvent[] = [];
       const dayStart = startOfDay(day);
 
-      // Track columns for overlapping event groups
-      const columns: { events: CalendarEvent[]; start: Date; end: Date }[][] =
+      // Track columns for overlapping events
+      const columns: { event: CalendarEvent; start: Date; end: Date }[][] =
         [];
-      const groupColumnMapping: Map<CalendarEvent[], number> = new Map();
+      const eventColumnMapping: Map<CalendarEvent, number> = new Map();
 
-      // First pass: assign event groups to columns
-      eventGroups.forEach((eventGroup) => {
-        const firstEvent = eventGroup[0];
-        if (!firstEvent) return; // Skip empty groups
-
-        const eventStart = new Date(firstEvent.start);
-        const eventEnd = new Date(firstEvent.end);
+      // First pass: assign events to columns
+      dayEvents.forEach((event) => {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
 
         // Adjust start and end times if they're outside this day
         const adjustedStart = isSameDay(day, eventStart)
@@ -198,18 +191,15 @@ export function WeekView({
         const currentColumn = columns[columnIndex] || [];
         columns[columnIndex] = currentColumn;
         currentColumn.push({
-          events: eventGroup,
+          event: event,
           start: adjustedStart,
           end: adjustedEnd,
         });
-        groupColumnMapping.set(eventGroup, columnIndex);
+        eventColumnMapping.set(event, columnIndex);
       });
 
-      // Second pass: calculate positions for event groups
-      eventGroups.forEach((eventGroup) => {
-        const event = eventGroup[0]; // Use first event for positioning calculations
-        if (!event) return; // Skip empty groups
-
+      // Second pass: calculate positions for events
+      dayEvents.forEach((event) => {
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
@@ -229,14 +219,12 @@ export function WeekView({
         const top = (startHour - StartHour) * WeekCellsHeight;
         const height = (endHour - startHour) * WeekCellsHeight;
 
-        const columnIndex = groupColumnMapping.get(eventGroup) ?? 0;
+        const columnIndex = eventColumnMapping.get(event) ?? 0;
         const totalColumns = columns.length;
 
-        // Calculate overlapping event groups for this specific time slot
-        const overlappingGroups = eventGroups.filter((otherGroup) => {
-          if (otherGroup === eventGroup) return false;
-          const otherEvent = otherGroup[0];
-          if (!otherEvent) return false;
+        // Calculate overlapping events for this specific time slot
+        const overlappingEvents = dayEvents.filter((otherEvent) => {
+          if (otherEvent === event) return false;
 
           const otherStart = new Date(otherEvent.start);
           const otherEnd = new Date(otherEvent.end);
@@ -247,84 +235,42 @@ export function WeekView({
           );
         });
 
-        const overlappingColumns = overlappingGroups.length + 1;
+        const overlappingColumns = overlappingEvents.length + 1;
 
         // Use improved width and positioning calculation with mobile optimization
         let width: number;
         let left: number;
 
-        // Mobile-first approach for all overlap scenarios
-        const isMobile =
-          typeof window !== "undefined" && window.innerWidth < 640; // sm breakpoint
-
+        // Simple approach for all overlap scenarios - GUARANTEE no overflow
         if (overlappingColumns === 1) {
-          // No overlapping events, take full width
           width = 1;
           left = 0;
         } else if (overlappingColumns === 2) {
-          if (isMobile) {
-            // On mobile, give each event more width by reducing gaps
-            width = columnIndex === 0 ? 0.95 : 0.8; // First event gets 95%, second gets 80%
-            left = columnIndex === 0 ? 0 : 0.15; // First at 0%, second at 15%
-          } else {
-            width = (1 / overlappingColumns) * 0.92;
-            left = columnIndex * (1 / overlappingColumns) + columnIndex * 0.02;
-          }
+          width = 0.495;
+          left = columnIndex === 0 ? 0 : 0.505;
         } else if (overlappingColumns === 3) {
-          if (isMobile) {
-            // For 3 events on mobile, prioritize the first two
-            const widths = [0.9, 0.75, 0.6];
-            const positions = [0, 0.1, 0.25];
-            width = widths[columnIndex] || 0.6;
-            left = positions[columnIndex] || 0.4;
-          } else {
-            width = (1 / overlappingColumns) * 0.88;
-            left = columnIndex * (1 / overlappingColumns) + columnIndex * 0.03;
-          }
+          width = 0.33;
+          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.34 : 0.67;
+        } else if (overlappingColumns === 4) {
+          width = 0.2475;
+          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.255 : columnIndex === 2 ? 0.51 : 0.765;
         } else {
-          // For more than 3 overlapping events, use mobile-optimized strategy
-          if (isMobile) {
-            // On mobile with many overlapping events, use a different strategy
-            if (overlappingColumns > 4) {
-              // For very crowded scenarios on mobile, use minimal stacking
-              // Make events wider but stack them more tightly
-              width = Math.max(0.85, 1 - overlappingColumns * 0.02); // Start at 85% width, minimal reduction
-              left = columnIndex * 0.08; // Small offset for visibility
-
-              // Cap the total offset so events don't go off-screen
-              if (left + width > 1) {
-                left = Math.max(0, 1 - width);
-              }
-            } else {
-              // For 4 or fewer overlapping events, use generous widths
-              const baseWidth = 0.75; // Start with 75% width
-              const widthDecrement = 0.05; // Very small reduction per column
-              width = Math.max(0.6, baseWidth - columnIndex * widthDecrement); // Minimum 60% width
-
-              // Minimal stagger offset for better readability
-              const offsetIncrement = 0.08;
-              left = Math.min(columnIndex * offsetIncrement, 0.3); // Cap offset at 30%
-            }
-          } else {
-            // Desktop behavior (original logic)
-            const baseWidth = 0.75;
-            const widthDecrement = Math.min(0.1, 0.5 / overlappingColumns);
-            width = baseWidth - columnIndex * widthDecrement;
-
-            const offsetIncrement = Math.min(0.15, 0.8 / overlappingColumns);
-            left = columnIndex * offsetIncrement;
-          }
+          // For 5+ events, guarantee no overflow
+          const gap = 0.005;
+          const totalGap = (overlappingColumns - 1) * gap;
+          const availableWidth = 1 - totalGap;
+          width = availableWidth / overlappingColumns;
+          left = columnIndex === 0 ? 0 : columnIndex * (width + gap);
         }
 
         positionedEvents.push({
-          events: eventGroup,
+          event: event,
           top,
           height,
           left,
           width,
           zIndex: 10 + columnIndex, // Higher columns get higher z-index
           dayIndex: 0, // Will be set correctly when rendering
-          isGrouped: eventGroup.length > 1,
         });
       });
 
@@ -526,8 +472,8 @@ export function WeekView({
             {(processedDayEvents[dayIndex] ?? []).map(
               (positionedEvent, index) => (
                 <div
-                  key={positionedEvent.events[0]?.id || index}
-                  className="absolute z-10 px-[1px] sm:px-1"
+                  key={positionedEvent.event?.id || index}
+                  className="absolute z-10 h-full"
                   style={{
                     top: `${positionedEvent.top}px`,
                     height: `${positionedEvent.height}px`,
@@ -537,40 +483,18 @@ export function WeekView({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="h-full w-full">
-                    {positionedEvent.isGrouped ? (
-                      // Use EventDots for grouped events with same time
-                      <EventDots
-                        events={positionedEvent.events}
+                  <div className="h-full w-full overflow-hidden px-[1px] sm:px-1">
+                    {/* Use regular DraggableEvent for all events */}
+                    {positionedEvent.event && (
+                      <DraggableEvent
+                        event={positionedEvent.event}
                         view="week"
-                        onClick={(event) => {
-                          const fakeEvent = {
-                            stopPropagation: () => {},
-                          } as React.MouseEvent;
-                          handleEventClick(event, fakeEvent);
-                        }}
+                        onClick={(e) => handleEventClick(positionedEvent.event, e)}
                         showTime
+                        height={positionedEvent.height}
                         timeFormat={timeFormat}
                         timezone={timezone}
-                        style={{ height: "100%", width: "100%" }}
                       />
-                    ) : (
-                      // Use regular DraggableEvent for single events
-                      positionedEvent.events[0] &&
-                      (() => {
-                        const singleEvent = positionedEvent.events[0];
-                        return (
-                          <DraggableEvent
-                            event={singleEvent}
-                            view="week"
-                            onClick={(e) => handleEventClick(singleEvent, e)}
-                            showTime
-                            height={positionedEvent.height}
-                            timeFormat={timeFormat}
-                            timezone={timezone}
-                          />
-                        );
-                      })()
                     )}
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect, useRef } from "react";
+import React, { useMemo, useEffect, useRef, useState } from "react";
 import {
   addHours,
   areIntervalsOverlapping,
@@ -18,11 +18,16 @@ import {
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
-import { EventDots, groupEventsByExactTime } from "./event-dots";
+import { EventDots } from "./event-dots";
 import { isMultiDayEvent } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+} from "../ui/drawer";
 
 // Show entire 24 hours for mobile week view
 const MobileStartHour = 0;
@@ -42,14 +47,13 @@ interface MobileWeekViewProps {
 }
 
 interface PositionedEvent {
-  events: CalendarEvent[];
+  event: CalendarEvent;
   top: number;
   height: number;
   left: number;
   width: number;
   zIndex: number;
   dayIndex: number;
-  isGrouped: boolean;
 }
 
 export function MobileWeekView({
@@ -65,6 +69,8 @@ export function MobileWeekView({
 }: MobileWeekViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerEvents, setDrawerEvents] = useState<CalendarEvent[]>([]);
 
   const days = useMemo(() => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: weekStartDay });
@@ -97,27 +103,22 @@ export function MobileWeekView({
         );
       });
 
-      const eventGroups = groupEventsByExactTime(dayEvents);
-
-      eventGroups.sort((a, b) => {
-        const aStart = new Date(a[0]?.start || 0);
-        const bStart = new Date(b[0]?.start || 0);
+      dayEvents.sort((a, b) => {
+        const aStart = new Date(a.start);
+        const bStart = new Date(b.start);
         return aStart.getTime() - bStart.getTime();
       });
 
       const positionedEvents: PositionedEvent[] = [];
       const dayStart = startOfDay(day);
 
-      const columns: { events: CalendarEvent[]; start: Date; end: Date }[][] =
+      const columns: { event: CalendarEvent; start: Date; end: Date }[][] =
         [];
-      const groupColumnMapping: Map<CalendarEvent[], number> = new Map();
+      const eventColumnMapping: Map<CalendarEvent, number> = new Map();
 
-      eventGroups.forEach((eventGroup) => {
-        const firstEvent = eventGroup[0];
-        if (!firstEvent) return;
-
-        const eventStart = new Date(firstEvent.start);
-        const eventEnd = new Date(firstEvent.end);
+      dayEvents.forEach((event) => {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
 
         const adjustedStart = isSameDay(day, eventStart)
           ? eventStart
@@ -152,17 +153,14 @@ export function MobileWeekView({
         const currentColumn = columns[columnIndex] || [];
         columns[columnIndex] = currentColumn;
         currentColumn.push({
-          events: eventGroup,
+          event: event,
           start: adjustedStart,
           end: adjustedEnd,
         });
-        groupColumnMapping.set(eventGroup, columnIndex);
+        eventColumnMapping.set(event, columnIndex);
       });
 
-      eventGroups.forEach((eventGroup) => {
-        const event = eventGroup[0];
-        if (!event) return;
-
+      dayEvents.forEach((event) => {
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
@@ -181,12 +179,10 @@ export function MobileWeekView({
         const top = startHour * MobileCellHeight;
         const height = (endHour - startHour) * MobileCellHeight;
 
-        const columnIndex = groupColumnMapping.get(eventGroup) ?? 0;
+        const columnIndex = eventColumnMapping.get(event) ?? 0;
 
-        const overlappingGroups = eventGroups.filter((otherGroup) => {
-          if (otherGroup === eventGroup) return false;
-          const otherEvent = otherGroup[0];
-          if (!otherEvent) return false;
+        const overlappingEvents = dayEvents.filter((otherEvent) => {
+          if (otherEvent === event) return false;
 
           const otherStart = new Date(otherEvent.start);
           const otherEnd = new Date(otherEvent.end);
@@ -197,35 +193,41 @@ export function MobileWeekView({
           );
         });
 
-        const overlappingColumns = overlappingGroups.length + 1;
+        const overlappingColumns = overlappingEvents.length + 1;
 
         let width: number;
         let left: number;
 
-        // Mobile-optimized for week view (narrower columns)
+        // Mobile-optimized for week view (narrower columns) - GUARANTEE no overflow
         if (overlappingColumns === 1) {
-          width = 0.9;
-          left = 0.05;
+          width = 1;
+          left = 0;
         } else if (overlappingColumns === 2) {
-          width = columnIndex === 0 ? 0.85 : 0.7;
-          left = columnIndex === 0 ? 0.05 : 0.2;
+          width = 0.495;
+          left = columnIndex === 0 ? 0 : 0.505;
+        } else if (overlappingColumns === 3) {
+          width = 0.33;
+          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.34 : 0.67;
+        } else if (overlappingColumns === 4) {
+          width = 0.2475;
+          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.255 : columnIndex === 2 ? 0.51 : 0.765;
         } else {
-          const baseWidth = 0.65;
-          const widthDecrement = 0.08;
-          width = Math.max(0.5, baseWidth - columnIndex * widthDecrement);
-          const offsetIncrement = 0.12;
-          left = Math.min(columnIndex * offsetIncrement, 0.35);
+          // For 5+ events, guarantee no overflow
+          const gap = 0.005;
+          const totalGap = (overlappingColumns - 1) * gap;
+          const availableWidth = 1 - totalGap;
+          width = availableWidth / overlappingColumns;
+          left = columnIndex === 0 ? 0 : columnIndex * (width + gap);
         }
 
         positionedEvents.push({
-          events: eventGroup,
+          event: event,
           top,
           height,
           left,
           width,
           zIndex: 10 + columnIndex,
           dayIndex: 0,
-          isGrouped: eventGroup.length > 1,
         });
       });
 
@@ -233,9 +235,43 @@ export function MobileWeekView({
     });
   }, [days, events]);
 
-  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
+  const handleEventClick = (
+    event: CalendarEvent,
+    e: React.MouseEvent,
+    dayIndex: number,
+  ) => {
     e.stopPropagation();
-    onEventSelect(event);
+
+    const isMobile =
+      typeof window !== "undefined" && window.innerWidth < 640;
+
+    if (isMobile) {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+
+      const allDayEvents = processedDayEvents[dayIndex] ?? [];
+      const overlapping = allDayEvents
+        .filter((pe) => {
+          if (!pe.event) return false;
+          const otherStart = new Date(pe.event.start);
+          const otherEnd = new Date(pe.event.end);
+          return areIntervalsOverlapping(
+            { start: eventStart, end: eventEnd },
+            { start: otherStart, end: otherEnd },
+          );
+        })
+        .map((pe) => pe.event!)
+        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+      if (overlapping.length > 1) {
+        setDrawerEvents(overlapping);
+        setDrawerOpen(true);
+      } else {
+        onEventSelect(event);
+      }
+    } else {
+      onEventSelect(event);
+    }
   };
 
   const { currentTimePosition, currentTimeVisible } = useCurrentTimeIndicator(
@@ -310,8 +346,8 @@ export function MobileWeekView({
               {(processedDayEvents[dayIndex] ?? []).map(
                 (positionedEvent, index) => (
                   <div
-                    key={positionedEvent.events[0]?.id || index}
-                    className="absolute z-10 px-0.5"
+                    key={positionedEvent.event?.id || index}
+                    className="absolute z-10 h-full"
                     style={{
                       top: `${positionedEvent.top}px`,
                       height: `${positionedEvent.height}px`,
@@ -321,38 +357,17 @@ export function MobileWeekView({
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="h-full w-full">
-                      {positionedEvent.isGrouped ? (
-                        <EventDots
-                          events={positionedEvent.events}
+                    <div className="h-full w-full overflow-hidden px-0.5">
+                      {positionedEvent.event && (
+                        <DraggableEvent
+                          event={positionedEvent.event}
                           view="week"
-                          onClick={(event) => {
-                            const fakeEvent = {
-                              stopPropagation: () => {},
-                            } as React.MouseEvent;
-                            handleEventClick(event, fakeEvent);
-                          }}
+                          onClick={(e) => handleEventClick(positionedEvent.event, e, dayIndex)}
                           showTime
+                          height={positionedEvent.height}
                           timeFormat={timeFormat}
                           timezone={timezone}
-                          style={{ height: "100%", width: "100%" }}
                         />
-                      ) : (
-                        (() => {
-                          const singleEvent = positionedEvent.events[0];
-                          if (!singleEvent) return null;
-                          return (
-                            <DraggableEvent
-                              event={singleEvent}
-                              view="week"
-                              onClick={(e) => handleEventClick(singleEvent, e)}
-                              showTime
-                              height={positionedEvent.height}
-                              timeFormat={timeFormat}
-                              timezone={timezone}
-                            />
-                          );
-                        })()
                       )}
                     </div>
                   </div>
@@ -411,6 +426,57 @@ export function MobileWeekView({
               })}
             </div>
           ))}
+
+          {/* Mobile event selection drawer */}
+          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <DrawerContent>
+              <DrawerTitle className="sr-only">Select Event</DrawerTitle>
+              <div className="px-5 py-3 border-b border-border/40">
+                <span className="text-base font-semibold">Select Event</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {drawerEvents[0] &&
+                    format(new Date(drawerEvents[0].start), "EEEE, MMMM d")}
+                </p>
+              </div>
+              <div className="px-2 py-2 pb-6">
+                {drawerEvents.map((event) => {
+                  const eventStart = new Date(event.start);
+                  const eventEnd = new Date(event.end);
+                  return (
+                    <button
+                      key={event.id}
+                      className="w-full text-left flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
+                      onClick={() => {
+                        onEventSelect(event);
+                        setDrawerOpen(false);
+                        setDrawerEvents([]);
+                      }}
+                    >
+                      <div className="flex items-center justify-center w-6 h-6 shrink-0">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{
+                            backgroundColor: (event.color as string) || "#3b82f6",
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {event.title || "Untitled Event"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {event.allDay
+                            ? "All day"
+                            : `${format(eventStart, "h:mm a")} - ${format(eventEnd, "h:mm a")}`}
+                          {event.location && ` · ${event.location}`}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </DrawerContent>
+          </Drawer>
         </div>
       </div>
     </div>
