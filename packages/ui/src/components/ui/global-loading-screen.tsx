@@ -46,8 +46,12 @@ export function GlobalLoadingScreen({
   }, [isLoading]);
 
   // Only enable auto-retry for global overlays (splash/detailed)
-  const autoRetryEnabled = autoRetry && (variant === "splash" || variant === "detailed");
-  const delays = useMemo(() => retryDelaysMs ?? [10000, 20000, 40000], [retryDelaysMs]);
+  const autoRetryEnabled =
+    autoRetry && (variant === "splash" || variant === "detailed");
+  const delays = useMemo(
+    () => retryDelaysMs ?? [10000, 20000, 40000],
+    [retryDelaysMs],
+  );
 
   const [attempt, setAttempt] = useState(0);
   const [showLonger, setShowLonger] = useState(false);
@@ -91,7 +95,10 @@ export function GlobalLoadingScreen({
       return;
     }
 
-    const longerTimer = window.setTimeout(() => setShowLonger(true), longerThanUsualMs);
+    const longerTimer = window.setTimeout(
+      () => setShowLonger(true),
+      longerThanUsualMs,
+    );
     if (autoRetryEnabled && attempt < delays.length && nextRetryAt === null) {
       const d = delays.at(attempt) ?? delays[delays.length - 1] ?? 10000;
       setNextRetryAt(Date.now() + d);
@@ -99,7 +106,14 @@ export function GlobalLoadingScreen({
     return () => {
       window.clearTimeout(longerTimer);
     };
-  }, [isLoading, longerThanUsualMs, autoRetryEnabled, delays, attempt, nextRetryAt]);
+  }, [
+    isLoading,
+    longerThanUsualMs,
+    autoRetryEnabled,
+    delays,
+    attempt,
+    nextRetryAt,
+  ]);
 
   // Countdown state for next retry
   useEffect(() => {
@@ -124,10 +138,12 @@ export function GlobalLoadingScreen({
 
   if (variant === "minimal") {
     return (
-      <div className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
-        className,
-      )}>
+      <div
+        className={cn(
+          "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
+          className,
+        )}
+      >
         <div className="flex items-center space-x-2">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <span className="text-sm font-medium text-muted-foreground">
@@ -160,11 +176,15 @@ export function GlobalLoadingScreen({
         {/* Status and guidance */}
         <div className="w-full text-center space-y-2">
           {showLonger && (
-            <p className="text-sm text-muted-foreground">This is taking longer than usual.</p>
+            <p className="text-sm text-muted-foreground">
+              This is taking longer than usual.
+            </p>
           )}
           {autoRetryEnabled && nextRetryAt && timeLeft !== null && (
             <p className="text-xs text-muted-foreground">
-              {attempt > 0 ? `Attempt ${attempt + 1} of ${delays.length}. ` : ""}
+              {attempt > 0
+                ? `Attempt ${attempt + 1} of ${delays.length}. `
+                : ""}
               Auto-retry in {Math.ceil((timeLeft || 0) / 1000)}s
             </p>
           )}
@@ -248,10 +268,12 @@ export function SectionLoading({
   className,
 }: SectionLoadingProps) {
   return (
-    <div className={cn(
-      "flex flex-col items-center justify-center p-8 text-center space-y-4",
-      className,
-    )}>
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center p-8 text-center space-y-4",
+        className,
+      )}
+    >
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">{title}</h3>
@@ -290,4 +312,8 @@ export function LoadingOverlay({
   );
 }
 
-export type { GlobalLoadingScreenProps, SectionLoadingProps, LoadingOverlayProps };
+export type {
+  GlobalLoadingScreenProps,
+  SectionLoadingProps,
+  LoadingOverlayProps,
+};

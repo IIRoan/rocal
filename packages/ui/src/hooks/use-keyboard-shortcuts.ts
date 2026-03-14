@@ -25,7 +25,7 @@ export interface UseKeyboardShortcutsOptions {
  */
 export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcut[],
-  options: UseKeyboardShortcutsOptions = {}
+  options: UseKeyboardShortcutsOptions = {},
 ) {
   const { enabled = true, target = document, ignoreInputs = false } = options;
 
@@ -36,7 +36,8 @@ export function useKeyboardShortcuts(
       // Skip shortcuts if we're typing in an input/textarea (unless the shortcut explicitly uses modifiers that indicate intentional shortcut)
       if (ignoreInputs) {
         const activeElement = document.activeElement;
-        const isTyping = activeElement instanceof HTMLInputElement ||
+        const isTyping =
+          activeElement instanceof HTMLInputElement ||
           activeElement instanceof HTMLTextAreaElement ||
           activeElement?.getAttribute("contenteditable") === "true";
 
@@ -48,8 +49,12 @@ export function useKeyboardShortcuts(
       // Find matching shortcut
       const matchingShortcut = shortcuts.find((shortcut) => {
         const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase();
-        const ctrlMatch = shortcut.ctrlKey ? event.ctrlKey || event.metaKey : true;
-        const metaMatch = shortcut.metaKey ? event.ctrlKey || event.metaKey : true;
+        const ctrlMatch = shortcut.ctrlKey
+          ? event.ctrlKey || event.metaKey
+          : true;
+        const metaMatch = shortcut.metaKey
+          ? event.ctrlKey || event.metaKey
+          : true;
         const altMatch = shortcut.altKey ? event.altKey : !event.altKey;
         const shiftMatch = shortcut.shiftKey ? event.shiftKey : !event.shiftKey;
 
@@ -66,7 +71,7 @@ export function useKeyboardShortcuts(
         matchingShortcut.action();
       }
     },
-    [shortcuts, enabled, ignoreInputs]
+    [shortcuts, enabled, ignoreInputs],
   );
 
   useEffect(() => {
@@ -85,7 +90,7 @@ export function useKeyboardShortcuts(
  */
 export function useDropdownShortcuts(
   shortcuts: Array<{ key: string; action: () => void }>,
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
   const keyboardShortcuts: KeyboardShortcut[] = shortcuts.map((shortcut) => ({
     ...shortcut,
@@ -102,15 +107,17 @@ export function useDropdownShortcuts(
  */
 export function useNumberedShortcuts(
   actions: Array<() => void>,
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
-  const shortcuts: KeyboardShortcut[] = actions.slice(0, 9).map((action, index) => ({
-    key: String(index + 1),
-    action,
-    ctrlKey: true,
-    preventDefault: true,
-    stopPropagation: true,
-  }));
+  const shortcuts: KeyboardShortcut[] = actions
+    .slice(0, 9)
+    .map((action, index) => ({
+      key: String(index + 1),
+      action,
+      ctrlKey: true,
+      preventDefault: true,
+      stopPropagation: true,
+    }));
 
   useKeyboardShortcuts(shortcuts, { enabled, ignoreInputs: true });
 }

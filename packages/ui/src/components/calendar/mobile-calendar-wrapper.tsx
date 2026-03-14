@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { MobileEventCalendar, MobileEventCalendarProps } from "./mobile-event-calendar";
+import {
+  MobileEventCalendar,
+  MobileEventCalendarProps,
+} from "./mobile-event-calendar";
 import { MobileBottomNav } from "../navigation/mobile-bottom-nav";
 import { MobileWeekNav } from "../navigation/mobile-week-nav";
 import { AppSidebar } from "../layout/app-sidebar";
@@ -38,22 +41,22 @@ export function MobileCalendarWrapper({
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
-  
+
   const [currentView, setCurrentView] = useState<CalendarView>(() => {
-    if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
-      if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
+    if (typeof window !== "undefined") {
+      const savedView = sessionStorage.getItem("calendar-view-selection");
+      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
         return savedView as CalendarView;
       }
     }
     return props.initialView || "month";
   });
-  
+
   const { currentDate, setCurrentDate } = useCalendarContext();
 
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
+    if (typeof window !== "undefined") {
+      const savedView = sessionStorage.getItem("calendar-view-selection");
       if (!savedView && isMobile) {
         setCurrentView("day");
       }
@@ -75,8 +78,8 @@ export function MobileCalendarWrapper({
   const handleCalendarViewChange = (view: CalendarView) => setCurrentView(view);
 
   React.useEffect(() => {
-    if (props.initialView && typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
+    if (props.initialView && typeof window !== "undefined") {
+      const savedView = sessionStorage.getItem("calendar-view-selection");
       if (!savedView && props.initialView !== currentView) {
         setCurrentView(props.initialView);
       }
@@ -113,8 +116,20 @@ export function MobileCalendarWrapper({
       )}
 
       {/* Main Calendar Content */}
-      <div className={cn("flex-1 overflow-y-auto pb-20 md:pb-0 md:overflow-hidden", className)}>
-        {children || <MobileEventCalendar {...props} initialView={currentView} onSidebarToggle={handleOpenSidebar} onViewChange={handleCalendarViewChange} />}
+      <div
+        className={cn(
+          "flex-1 overflow-y-auto pb-20 md:pb-0 md:overflow-hidden",
+          className,
+        )}
+      >
+        {children || (
+          <MobileEventCalendar
+            {...props}
+            initialView={currentView}
+            onSidebarToggle={handleOpenSidebar}
+            onViewChange={handleCalendarViewChange}
+          />
+        )}
       </div>
 
       {/* Mobile Bottom Navigation */}
@@ -128,13 +143,15 @@ export function MobileCalendarWrapper({
 
       {/* Mobile Sidebar Drawer */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-        <SheetContent 
-          side="left" 
+        <SheetContent
+          side="left"
           className="w-[85vw] max-w-80 p-0 safe-area-inset-top safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>
-            <SheetDescription>Access your calendars, mini calendar, and account settings</SheetDescription>
+            <SheetDescription>
+              Access your calendars, mini calendar, and account settings
+            </SheetDescription>
           </VisuallyHidden>
           <SidebarProvider defaultOpen={true}>
             <AppSidebar

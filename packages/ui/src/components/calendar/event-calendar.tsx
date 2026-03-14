@@ -93,7 +93,13 @@ export interface EventCalendarProps {
     notifications: EventNotification[],
   ) => Promise<void>;
   // Command palette integration
-  onEventEdit?: (event: CalendarEvent, options?: { mode?: "modal" | "popover"; anchorPosition?: { x: number; y: number } }) => void;
+  onEventEdit?: (
+    event: CalendarEvent,
+    options?: {
+      mode?: "modal" | "popover";
+      anchorPosition?: { x: number; y: number };
+    },
+  ) => void;
   // Sidebar integration (optional)
   hideSidebarTrigger?: boolean;
   // Custom sidebar toggle handler for mobile
@@ -131,12 +137,12 @@ export function EventCalendar({
 }: EventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
-  
+
   // Initialize view from sessionStorage or fallback to initialView
   const [view, setViewState] = useState<CalendarView>(() => {
-    if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
-      if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
+    if (typeof window !== "undefined") {
+      const savedView = sessionStorage.getItem("calendar-view-selection");
+      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
         return savedView as CalendarView;
       }
     }
@@ -146,15 +152,18 @@ export function EventCalendar({
   // Custom setView function that also saves to sessionStorage with expiration
   const setView = (newView: CalendarView) => {
     setViewState(newView);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       // Save view with expiration time (1 hour from now)
       const expirationTime = new Date();
       expirationTime.setHours(expirationTime.getHours() + 1);
       const viewData = {
         view: newView,
-        expires: expirationTime.getTime()
+        expires: expirationTime.getTime(),
       };
-      sessionStorage.setItem('calendar-view-selection', JSON.stringify(viewData));
+      sessionStorage.setItem(
+        "calendar-view-selection",
+        JSON.stringify(viewData),
+      );
     }
   };
 
@@ -168,16 +177,16 @@ export function EventCalendar({
 
   // Update view when initialView changes (from settings) only if no valid session preference exists
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedViewData = sessionStorage.getItem('calendar-view-selection');
+    if (typeof window !== "undefined") {
+      const savedViewData = sessionStorage.getItem("calendar-view-selection");
       let validSavedView = null;
-      
+
       // Check if we have saved data and it's not expired
       if (savedViewData) {
         try {
           const parsedData = JSON.parse(savedViewData);
           const now = new Date().getTime();
-          
+
           // Only use the saved view if it hasn't expired
           if (parsedData.expires && parsedData.expires > now) {
             validSavedView = parsedData.view;
@@ -185,15 +194,15 @@ export function EventCalendar({
             setViewState(parsedData.view);
           } else {
             // Clear expired data
-            sessionStorage.removeItem('calendar-view-selection');
+            sessionStorage.removeItem("calendar-view-selection");
           }
         } catch (e) {
           // Handle legacy format or invalid JSON
-          console.warn('Invalid calendar view data in sessionStorage');
-          sessionStorage.removeItem('calendar-view-selection');
+          console.warn("Invalid calendar view data in sessionStorage");
+          sessionStorage.removeItem("calendar-view-selection");
         }
       }
-      
+
       if (!validSavedView) {
         setView(initialView);
       }
@@ -308,7 +317,7 @@ export function EventCalendar({
       // For agenda view, go back 30 days (a full month)
       newDate = addDays(currentDate, -AgendaDaysToShow);
     }
-    
+
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -324,7 +333,7 @@ export function EventCalendar({
       // For agenda view, go forward 30 days (a full month)
       newDate = addDays(currentDate, AgendaDaysToShow);
     }
-    
+
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -693,7 +702,10 @@ export function EventCalendar({
           } as React.CSSProperties
         }
       >
-        <CalendarDndProvider onEventUpdate={handleEventUpdate} timezone={timezone}>
+        <CalendarDndProvider
+          onEventUpdate={handleEventUpdate}
+          timezone={timezone}
+        >
           <div
             className={cn(
               "sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
@@ -733,10 +745,13 @@ export function EventCalendar({
                     <span className="sr-only">Toggle Sidebar</span>
                   </Button>
                 )}
-                <h2 className={cn(
-                  "font-semibold text-xl transition-transform ease-in-out duration-300",
-                  !hideSidebarTrigger && "lg:peer-data-[state=invisible]:-translate-x-7.5"
-                )}>
+                <h2
+                  className={cn(
+                    "font-semibold text-xl transition-transform ease-in-out duration-300",
+                    !hideSidebarTrigger &&
+                      "lg:peer-data-[state=invisible]:-translate-x-7.5",
+                  )}
+                >
                   {viewTitle}
                 </h2>
               </div>
@@ -809,13 +824,16 @@ export function EventCalendar({
             </div>
           </div>
 
-
           <div className="flex flex-1 flex-col relative">
             {/* Event loading overlay when navigating between dates */}
             {eventsLoading && events && events.length > 0 && (
-              <EventLoadingSkeleton view={view} compactView={compactView} className="absolute inset-0 z-10" />
+              <EventLoadingSkeleton
+                view={view}
+                compactView={compactView}
+                className="absolute inset-0 z-10"
+              />
             )}
-            
+
             {view === "month" && (
               <MonthView
                 currentDate={currentDate}

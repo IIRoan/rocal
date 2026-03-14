@@ -14,7 +14,7 @@ export function CTASection() {
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary to-accent p-1">
           {/* Animated border gradient */}
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-primary to-accent animate-pulse" />
-          
+
           {/* Content container */}
           <div className="relative rounded-3xl bg-background p-12 md:p-16 text-center">
             {/* Decorative elements */}
@@ -46,8 +46,8 @@ export function CTASection() {
 
             {/* Subheading */}
             <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
-              Join thousands of teams who have transformed their productivity with
-              Rocani's intelligent calendar platform.
+              Join thousands of teams who have transformed their productivity
+              with Rocani's intelligent calendar platform.
             </p>
 
             {/* CTA Buttons */}
@@ -90,16 +90,28 @@ export function CTASection() {
             <div className="mt-12 pt-8 border-t border-border/50">
               <div className="grid grid-cols-3 gap-8 max-w-lg mx-auto">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground mb-1">10k+</div>
-                  <div className="text-xs text-muted-foreground">Happy Teams</div>
+                  <div className="text-2xl font-bold text-foreground mb-1">
+                    10k+
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Happy Teams
+                  </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground mb-1">4.9★</div>
-                  <div className="text-xs text-muted-foreground">User Rating</div>
+                  <div className="text-2xl font-bold text-foreground mb-1">
+                    4.9★
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    User Rating
+                  </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-foreground mb-1">2.5M+</div>
-                  <div className="text-xs text-muted-foreground">Events Scheduled</div>
+                  <div className="text-2xl font-bold text-foreground mb-1">
+                    2.5M+
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Events Scheduled
+                  </div>
                 </div>
               </div>
             </div>

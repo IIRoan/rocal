@@ -15,9 +15,9 @@ export {
   EventDialogSkeleton,
   SidebarCalendarSkeleton,
 } from "./calendar-skeleton";
-export { 
-  EventLoadingSkeleton, 
-  QuickEventSkeleton 
+export {
+  EventLoadingSkeleton,
+  QuickEventSkeleton,
 } from "./event-loading-skeleton";
 
 // Context providers

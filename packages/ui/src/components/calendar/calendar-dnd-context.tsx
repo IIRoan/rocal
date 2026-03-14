@@ -179,10 +179,10 @@ export function CalendarDndProvider({
         // Calculate hours and minutes with exact precision
         const hours = Math.floor(time);
         const fractionalHour = time - hours;
-        
+
         // Use exact minutes instead of rounding to 15-minute intervals
         const minutes = Math.round(fractionalHour * 60);
-        
+
         newTime.setHours(hours, minutes, 0, 0);
 
         // Only update if time has changed
@@ -266,10 +266,10 @@ export function CalendarDndProvider({
       if (time !== undefined) {
         const hours = Math.floor(time);
         const fractionalHour = time - hours;
-        
+
         // Use exact minutes instead of rounding to 15-minute intervals
         const minutes = Math.round(fractionalHour * 60);
-        
+
         newStart.setHours(hours, minutes, 0, 0);
       } else {
         // For month view, preserve the original time from currentTime

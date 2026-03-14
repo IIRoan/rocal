@@ -6,9 +6,9 @@ export const LOADING_MESSAGES = {
     "Signing you in...",
     "Verifying credentials...",
     "Securing your session...",
-    "Connecting to your account..."
+    "Connecting to your account...",
   ],
-  
+
   // General loading
   GENERAL: [
     "Loading...",
@@ -20,9 +20,9 @@ export const LOADING_MESSAGES = {
     "Preparing your view...",
     "Almost ready...",
     "Syncing your information...",
-    "Organizing your schedule..."
+    "Organizing your schedule...",
   ],
-  
+
   // Calendar specific
   CALENDAR: [
     "Loading calendar...",
@@ -34,9 +34,9 @@ export const LOADING_MESSAGES = {
     "Refreshing calendar view...",
     "Syncing with calendars...",
     "Updating event details...",
-    "Loading calendar settings..."
+    "Loading calendar settings...",
   ],
-  
+
   // Settings and configuration
   SETTINGS: [
     "Loading settings...",
@@ -48,9 +48,9 @@ export const LOADING_MESSAGES = {
     "Customizing your experience...",
     "Loading user preferences...",
     "Configuring your workspace...",
-    "Setting up your account..."
+    "Setting up your account...",
   ],
-  
+
   // Data syncing
   SYNC: [
     "Syncing data...",
@@ -62,9 +62,9 @@ export const LOADING_MESSAGES = {
     "Refreshing your data...",
     "Syncing with server...",
     "Updating local cache...",
-    "Fetching latest changes..."
+    "Fetching latest changes...",
   ],
-  
+
   // Initial app loading
   STARTUP: [
     "Starting Rocal...",
@@ -76,9 +76,9 @@ export const LOADING_MESSAGES = {
     "Getting your calendar ready...",
     "Booting up your schedule...",
     "Initializing your workspace...",
-    "Welcome to Rocal..."
+    "Welcome to Rocal...",
   ],
-  
+
   // Fun/engaging messages
   ENGAGING: [
     "Organizing your time...",
@@ -90,8 +90,8 @@ export const LOADING_MESSAGES = {
     "Optimizing your time...",
     "Curating your calendar...",
     "Building your day...",
-    "Scheduling success..."
-  ]
+    "Scheduling success...",
+  ],
 } as const;
 
 // Combined arrays for different loading contexts
@@ -102,10 +102,10 @@ export const COMBINED_MESSAGES = {
   SETTINGS_LOAD: [...LOADING_MESSAGES.SETTINGS, ...LOADING_MESSAGES.GENERAL],
   DATA_SYNC: [...LOADING_MESSAGES.SYNC, ...LOADING_MESSAGES.CALENDAR],
   ENGAGING_MIX: [
-    ...LOADING_MESSAGES.ENGAGING, 
-    ...LOADING_MESSAGES.GENERAL.slice(0, 3), 
-    ...LOADING_MESSAGES.CALENDAR.slice(0, 3)
-  ]
+    ...LOADING_MESSAGES.ENGAGING,
+    ...LOADING_MESSAGES.GENERAL.slice(0, 3),
+    ...LOADING_MESSAGES.CALENDAR.slice(0, 3),
+  ],
 } as const;
 
 // Helper function to get a random message from an array
@@ -117,7 +117,9 @@ export function getRandomMessage(messages: readonly string[]): string {
 }
 
 // Helper function to get a message by context
-export function getLoadingMessage(context: keyof typeof COMBINED_MESSAGES): string {
+export function getLoadingMessage(
+  context: keyof typeof COMBINED_MESSAGES,
+): string {
   return getRandomMessage(COMBINED_MESSAGES[context]);
 }
 
@@ -125,10 +127,10 @@ export function getLoadingMessage(context: keyof typeof COMBINED_MESSAGES): stri
 export const MESSAGE_CYCLE_CONFIG = {
   // How often to change messages (in milliseconds)
   CYCLE_INTERVAL: 2000, // 2 seconds
-  
+
   // Minimum time before first message change
   INITIAL_DELAY: 1000, // 1 second
-  
+
   // Animation duration for message transitions
   TRANSITION_DURATION: 300, // 0.3 seconds
 } as const;

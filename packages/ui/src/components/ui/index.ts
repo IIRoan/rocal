@@ -85,10 +85,10 @@ export {
   useSidebar,
 } from "./sidebar";
 export { Skeleton } from "./skeleton";
-export { 
+export {
   GlobalLoadingScreen,
   SectionLoading,
-  LoadingOverlay
+  LoadingOverlay,
 } from "./global-loading-screen";
 export {
   DashboardSkeleton,
@@ -96,12 +96,12 @@ export {
   EventEditorSkeleton,
   MobileCalendarSkeleton,
   ListSkeleton,
-  FormSkeleton
+  FormSkeleton,
 } from "./app-skeletons";
 export {
   LogoSpinner,
   PageLoadingOverlay,
-  InlineLogoSpinner
+  InlineLogoSpinner,
 } from "./logo-spinner";
 export { Toaster } from "./sonner";
 export { Textarea } from "./textarea";

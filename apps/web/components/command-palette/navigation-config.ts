@@ -17,21 +17,21 @@ import {
 
 // View labels for breadcrumb display
 export const VIEW_LABELS: Record<string, string> = {
-  "events": "Events",
-  "calendars": "Calendar Management",
-  "appearance": "Appearance",
+  events: "Events",
+  calendars: "Calendar Management",
+  appearance: "Appearance",
   "time-region": "Time & Region",
-  "notifications": "Notifications",
+  notifications: "Notifications",
   "calendar-defaults": "Calendar Defaults",
-  "account": "Account",
-  "security": "Security",
-  "passkeys": "Passkeys",
+  account: "Account",
+  security: "Security",
+  passkeys: "Passkeys",
 };
 
 // Command types - all actions, no navigation
-export type CommandAction = { 
-  action: string; 
-  payload?: Record<string, unknown> 
+export type CommandAction = {
+  action: string;
+  payload?: Record<string, unknown>;
 };
 
 export interface Command {
@@ -45,17 +45,65 @@ export interface Command {
 // Commands that can be executed with ">" prefix - ALL actions
 export const COMMANDS: Command[] = [
   // Event actions
-  { command: "new event", label: "New Event", icon: Plus, description: "Create a new event", execute: { action: "newEvent" } },
+  {
+    command: "new event",
+    label: "New Event",
+    icon: Plus,
+    description: "Create a new event",
+    execute: { action: "newEvent" },
+  },
   // Calendar actions
-  { command: "new calendar", label: "New Calendar", icon: Plus, description: "Create a new calendar", execute: { action: "newCalendar" } },
-  { command: "delete calendar", label: "Delete Calendar", icon: Trash2, description: "Manage and delete calendars", execute: { action: "openCalendars" } },
+  {
+    command: "new calendar",
+    label: "New Calendar",
+    icon: Plus,
+    description: "Create a new calendar",
+    execute: { action: "newCalendar" },
+  },
+  {
+    command: "delete calendar",
+    label: "Delete Calendar",
+    icon: Trash2,
+    description: "Manage and delete calendars",
+    execute: { action: "openCalendars" },
+  },
   // Theme actions - execute immediately
-  { command: "dark mode", label: "Dark Mode", icon: Moon, description: "Switch to dark theme", execute: { action: "setTheme", payload: { theme: "dark" } } },
-  { command: "light mode", label: "Light Mode", icon: Sun, description: "Switch to light theme", execute: { action: "setTheme", payload: { theme: "light" } } },
-  { command: "system theme", label: "System Theme", icon: Monitor, description: "Use system theme", execute: { action: "setTheme", payload: { theme: "system" } } },
+  {
+    command: "dark mode",
+    label: "Dark Mode",
+    icon: Moon,
+    description: "Switch to dark theme",
+    execute: { action: "setTheme", payload: { theme: "dark" } },
+  },
+  {
+    command: "light mode",
+    label: "Light Mode",
+    icon: Sun,
+    description: "Switch to light theme",
+    execute: { action: "setTheme", payload: { theme: "light" } },
+  },
+  {
+    command: "system theme",
+    label: "System Theme",
+    icon: Monitor,
+    description: "Use system theme",
+    execute: { action: "setTheme", payload: { theme: "system" } },
+  },
   // Passkey actions
-  { command: "new passkey", label: "New Passkey", icon: Plus, description: "Add a new passkey", execute: { action: "newPasskey" } },
-  { command: "delete passkey", label: "Delete Passkey", icon: Trash2, description: "Remove existing passkeys", execute: { action: "openPasskeys" } },
+  {
+    command: "new passkey",
+    label: "New Passkey",
+    icon: Plus,
+    description: "Add a new passkey",
+    execute: { action: "newPasskey" },
+  },
+  {
+    command: "delete passkey",
+    label: "Delete Passkey",
+    icon: Trash2,
+    description: "Remove existing passkeys",
+    execute: { action: "openPasskeys" },
+  },
 ];
 
 export const NAVIGATION_ITEMS = [
@@ -74,7 +122,12 @@ export const NAVIGATION_ITEMS = [
     icon: Calendar,
     description: "Create, edit, and delete calendars",
     targetView: "calendars",
-    keywords: ["calendar", "manage calendars", "create calendar", "subscription"],
+    keywords: [
+      "calendar",
+      "manage calendars",
+      "create calendar",
+      "subscription",
+    ],
     parent: null,
   },
   {
@@ -83,7 +136,14 @@ export const NAVIGATION_ITEMS = [
     icon: Palette,
     description: "Theme and layout settings",
     targetView: "appearance",
-    keywords: ["theme", "dark mode", "light mode", "appearance", "compact", "view"],
+    keywords: [
+      "theme",
+      "dark mode",
+      "light mode",
+      "appearance",
+      "compact",
+      "view",
+    ],
     parent: null,
   },
   {
@@ -110,7 +170,13 @@ export const NAVIGATION_ITEMS = [
     icon: Calendar,
     description: "Default event settings",
     targetView: "calendar-defaults",
-    keywords: ["defaults", "working days", "week start", "first day", "calendar defaults"],
+    keywords: [
+      "defaults",
+      "working days",
+      "week start",
+      "first day",
+      "calendar defaults",
+    ],
     parent: null,
   },
   {
@@ -267,7 +333,13 @@ export const SEARCH_INDEX = [
     icon: Calendar,
     description: "Set which day the week starts on",
     targetView: "calendar-defaults",
-    keywords: ["week start", "first day", "sunday", "monday", "calendar defaults"],
+    keywords: [
+      "week start",
+      "first day",
+      "sunday",
+      "monday",
+      "calendar defaults",
+    ],
     parent: "calendar-defaults",
     parentLabel: "Calendar Defaults",
   },
@@ -277,7 +349,12 @@ export const SEARCH_INDEX = [
     icon: Calendar,
     description: "Set your working days",
     targetView: "calendar-defaults",
-    keywords: ["working days", "work days", "business days", "calendar defaults"],
+    keywords: [
+      "working days",
+      "work days",
+      "business days",
+      "calendar defaults",
+    ],
     parent: "calendar-defaults",
     parentLabel: "Calendar Defaults",
   },

@@ -14,7 +14,9 @@ export function TransitionContainer({
   const [displayChildren, setDisplayChildren] = useState(children);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [prevChildren, setPrevChildren] = useState<React.ReactNode>(null);
-  const [currentDirection, setCurrentDirection] = useState<"forward" | "back">("forward");
+  const [currentDirection, setCurrentDirection] = useState<"forward" | "back">(
+    "forward",
+  );
   const lastViewKey = useRef(viewKey);
 
   useEffect(() => {
@@ -45,22 +47,19 @@ export function TransitionContainer({
     };
   }, [children, direction, viewKey]);
 
-  const enterClass = currentDirection === "forward" ? "slide-enter-forward" : "slide-enter-back";
-  const exitClass = currentDirection === "forward" ? "slide-exit-forward" : "slide-exit-back";
+  const enterClass =
+    currentDirection === "forward" ? "slide-enter-forward" : "slide-enter-back";
+  const exitClass =
+    currentDirection === "forward" ? "slide-exit-forward" : "slide-exit-back";
 
   return (
     <div className="relative overflow-hidden">
       {isTransitioning && prevChildren && (
-        <div
-          className={`absolute inset-0 ${exitClass}`}
-          aria-hidden="true"
-        >
+        <div className={`absolute inset-0 ${exitClass}`} aria-hidden="true">
           {prevChildren}
         </div>
       )}
-      <div className={isTransitioning ? enterClass : ""}>
-        {displayChildren}
-      </div>
+      <div className={isTransitioning ? enterClass : ""}>{displayChildren}</div>
     </div>
   );
 }

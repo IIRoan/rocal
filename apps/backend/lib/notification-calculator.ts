@@ -26,7 +26,7 @@ export class NotificationCalculator {
    */
   static calculateNotificationTime(
     eventStart: Date,
-    minutesBefore: number
+    minutesBefore: number,
   ): Date {
     if (!eventStart || isNaN(eventStart.getTime())) {
       throw new Error("Invalid event start time");
@@ -38,7 +38,7 @@ export class NotificationCalculator {
 
     // Calculate notification time by subtracting minutes from event start
     const notificationTime = new Date(
-      eventStart.getTime() - minutesBefore * 60 * 1000
+      eventStart.getTime() - minutesBefore * 60 * 1000,
     );
 
     // Round to minute precision to avoid second-level precision issues
@@ -55,16 +55,16 @@ export class NotificationCalculator {
   static calculateNotificationTimeWithValidation(
     eventStart: Date,
     minutesBefore: number,
-    currentTime: Date = new Date()
+    currentTime: Date = new Date(),
   ): NotificationTimeResult {
     try {
       const notificationTime = this.calculateNotificationTime(
         eventStart,
-        minutesBefore
+        minutesBefore,
       );
       const isValid = this.validateNotificationTime(
         notificationTime,
-        currentTime
+        currentTime,
       );
 
       if (!isValid) {
@@ -96,7 +96,7 @@ export class NotificationCalculator {
    */
   static validateNotificationTime(
     notificationTime: Date,
-    currentTime: Date = new Date()
+    currentTime: Date = new Date(),
   ): boolean {
     if (!notificationTime || isNaN(notificationTime.getTime())) {
       return false;
@@ -138,13 +138,13 @@ export class NotificationCalculator {
   static calculateMultipleNotificationTimes(
     eventStart: Date,
     notificationConfigs: NotificationConfig[],
-    currentTime: Date = new Date()
+    currentTime: Date = new Date(),
   ): Array<NotificationTimeResult & { config: NotificationConfig }> {
     return notificationConfigs.map((config) => ({
       ...this.calculateNotificationTimeWithValidation(
         eventStart,
         config.minutesBefore,
-        currentTime
+        currentTime,
       ),
       config,
     }));
@@ -158,7 +158,7 @@ export class NotificationCalculator {
    */
   static isEventInFuture(
     eventStart: Date,
-    currentTime: Date = new Date()
+    currentTime: Date = new Date(),
   ): boolean {
     if (!eventStart || isNaN(eventStart.getTime())) {
       return false;
@@ -179,7 +179,7 @@ export class NotificationCalculator {
    */
   static getMaxValidMinutesBefore(
     eventStart: Date,
-    currentTime: Date = new Date()
+    currentTime: Date = new Date(),
   ): number {
     if (!this.isEventInFuture(eventStart, currentTime)) {
       return 0;
@@ -200,7 +200,7 @@ export class NotificationCalculator {
    */
   static formatTimeDifference(
     notificationTime: Date,
-    eventStart: Date
+    eventStart: Date,
   ): string {
     const diffMs = eventStart.getTime() - notificationTime.getTime();
     const diffMinutes = Math.floor(diffMs / (60 * 1000));

@@ -78,19 +78,29 @@ export const createAPI = (prefix = "") => {
             },
           },
         },
-      })
+      }),
     );
   }
 
   return app
     .use(
       cors({
-        origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        origin:
+          process.env.FRONTEND_URL ||
+          process.env.NEXT_PUBLIC_APP_URL ||
+          "http://localhost:3000",
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-Requested-With", "Accept", "Origin"],
+        allowedHeaders: [
+          "Content-Type",
+          "Authorization",
+          "Cookie",
+          "X-Requested-With",
+          "Accept",
+          "Origin",
+        ],
         exposeHeaders: ["Set-Cookie"],
-      })
+      }),
     )
     .use(errorHandler)
     .use(betterAuth)
@@ -114,7 +124,7 @@ export const createAPI = (prefix = "") => {
       },
       {
         detail: { tags: ["Auth"] },
-      }
+      },
     )
     .get(
       "/user",
@@ -134,7 +144,7 @@ export const createAPI = (prefix = "") => {
           tags: ["Auth"],
           security: [{ bearerAuth: [] }],
         },
-      }
+      },
     )
     .get(
       "/test",
@@ -144,7 +154,7 @@ export const createAPI = (prefix = "") => {
       }),
       {
         detail: { tags: ["Health"] },
-      }
+      },
     )
     .use(eventsRoutes)
     .use(categoriesRoutes)
@@ -161,7 +171,10 @@ const app = createAPI("/api");
 
 // Handle OAuth errors at root (better-auth redirects here on error)
 app.get("/", ({ query, redirect }) => {
-  const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const frontendUrl =
+    process.env.FRONTEND_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000";
 
   // If there's an OAuth error, redirect to frontend with error
   if (query.error) {

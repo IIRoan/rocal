@@ -23,7 +23,12 @@ export function SettingsFormHeader({
   className,
 }: SettingsFormHeaderProps) {
   return (
-    <div className={cn("bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3", className)}>
+    <div
+      className={cn(
+        "bg-card/50 border-b border-border px-6 py-4 flex items-center gap-3",
+        className,
+      )}
+    >
       {onBack && (
         <button
           onClick={onBack}
@@ -57,7 +62,9 @@ export function SettingsFormContent({
   className,
 }: SettingsFormContentProps) {
   return (
-    <div className={cn("p-6 space-y-6 max-h-[70vh] overflow-y-auto", className)}>
+    <div
+      className={cn("p-6 space-y-6 max-h-[70vh] overflow-y-auto", className)}
+    >
       {children}
     </div>
   );
@@ -70,13 +77,25 @@ interface SettingsFormFooterProps {
     onClick: () => void;
     loading?: boolean;
     disabled?: boolean;
-    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+    variant?:
+      | "default"
+      | "destructive"
+      | "outline"
+      | "secondary"
+      | "ghost"
+      | "link";
   };
   secondaryAction?: {
     label: string;
     onClick: () => void;
     disabled?: boolean;
-    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+    variant?:
+      | "default"
+      | "destructive"
+      | "outline"
+      | "secondary"
+      | "ghost"
+      | "link";
   };
   className?: string;
 }
@@ -88,7 +107,12 @@ export function SettingsFormFooter({
   className,
 }: SettingsFormFooterProps) {
   return (
-    <div className={cn("border-t border-border bg-gradient-to-r from-background/80 to-muted/20 px-6 py-4 flex items-center justify-between backdrop-blur-sm", className)}>
+    <div
+      className={cn(
+        "border-t border-border bg-gradient-to-r from-background/80 to-muted/20 px-6 py-4 flex items-center justify-between backdrop-blur-sm",
+        className,
+      )}
+    >
       <div className="flex items-center gap-3">
         {secondaryAction && (
           <Button
@@ -126,7 +150,12 @@ interface SettingsFormProps {
 
 export function SettingsForm({ children, className }: SettingsFormProps) {
   return (
-    <div className={cn("bg-background border border-border rounded-lg shadow-sm overflow-hidden", className)}>
+    <div
+      className={cn(
+        "bg-background border border-border rounded-lg shadow-sm overflow-hidden",
+        className,
+      )}
+    >
       {children}
     </div>
   );

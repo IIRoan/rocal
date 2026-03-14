@@ -5,7 +5,7 @@ export const validateCalendarForm = (
   calendarName: string,
   calendarColor: string,
   calendars: any[],
-  editingCalendar?: any
+  editingCalendar?: any,
 ) => {
   const errors: { name?: string; color?: string } = {};
 
@@ -21,9 +21,9 @@ export const validateCalendarForm = (
 
   // Check for duplicate names (case-insensitive)
   const existingNames = calendars
-    .filter((cal) => editingCalendar ? cal.id !== editingCalendar.id : true)
+    .filter((cal) => (editingCalendar ? cal.id !== editingCalendar.id : true))
     .map((cal) => cal.name.toLowerCase());
-  
+
   if (existingNames.includes(calendarName.trim().toLowerCase())) {
     errors.name = "A calendar with this name already exists";
   }
@@ -48,7 +48,7 @@ export const handleCalendarCreate = async (
     setCalendarName: (name: string) => void;
     setCalendarColor: (color: string) => void;
   },
-  goBack: (view: PaletteView) => void
+  goBack: (view: PaletteView) => void,
 ) => {
   setters.setCalendarValidationErrors({});
 
@@ -95,7 +95,7 @@ export const handleCalendarUpdate = async (
     setCalendarSaving: (saving: boolean) => void;
     setEditingCalendar: (calendar: any) => void;
   },
-  goBack: (view: PaletteView) => void
+  goBack: (view: PaletteView) => void,
 ) => {
   if (!editingCalendar) return;
 
@@ -108,7 +108,9 @@ export const handleCalendarUpdate = async (
       .map((cal) => cal.name.toLowerCase());
 
     if (!calendarName.trim()) {
-      setters.setCalendarValidationErrors({ name: "Calendar name is required" });
+      setters.setCalendarValidationErrors({
+        name: "Calendar name is required",
+      });
       return;
     }
 
@@ -155,7 +157,7 @@ export const handleCalendarDelete = async (
   calendar: any,
   calendarData: any,
   setCalendarSaving: (saving: boolean) => void,
-  goBack: (view: PaletteView) => void
+  goBack: (view: PaletteView) => void,
 ) => {
   setCalendarSaving(true);
   try {

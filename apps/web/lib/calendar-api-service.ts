@@ -38,7 +38,11 @@ export class CalendarApiService {
   }
 
   // Events API methods
-  async getEvents(start: Date, end: Date, signal?: AbortSignal): Promise<EventsResponse> {
+  async getEvents(
+    start: Date,
+    end: Date,
+    signal?: AbortSignal,
+  ): Promise<EventsResponse> {
     try {
       const startISO = start.toISOString();
       const endISO = end.toISOString();
@@ -511,27 +515,39 @@ export class CalendarApiService {
     calendarId: string;
   }): Promise<any> {
     try {
-      const response = await this.client.post<any>("/api/subscriptions", request);
+      const response = await this.client.post<any>(
+        "/api/subscriptions",
+        request,
+      );
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to create subscription");
     }
   }
 
-  async updateSubscription(id: string, request: {
-    name?: string;
-    isActive?: boolean;
-    syncIntervalMinutes?: number;
-  }): Promise<any> {
+  async updateSubscription(
+    id: string,
+    request: {
+      name?: string;
+      isActive?: boolean;
+      syncIntervalMinutes?: number;
+    },
+  ): Promise<any> {
     try {
-      const response = await this.client.put<any>(`/api/subscriptions/${id}`, request);
+      const response = await this.client.put<any>(
+        `/api/subscriptions/${id}`,
+        request,
+      );
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to update subscription");
     }
   }
 
-  async deleteSubscription(id: string, deleteEvents = false): Promise<{ success: boolean }> {
+  async deleteSubscription(
+    id: string,
+    deleteEvents = false,
+  ): Promise<{ success: boolean }> {
     try {
       const params = new URLSearchParams();
       if (deleteEvents) params.append("deleteEvents", "true");
@@ -609,15 +625,13 @@ export class CalendarApiService {
     }
   }
 
-  async getEventNotifications(
-    eventId: string,
-  ): Promise<{ 
-    success: boolean; 
-    data: { 
-      eventId: string; 
-      notifications: EventNotification[]; 
-      count: number; 
-    } 
+  async getEventNotifications(eventId: string): Promise<{
+    success: boolean;
+    data: {
+      eventId: string;
+      notifications: EventNotification[];
+      count: number;
+    };
   }> {
     try {
       const response = await this.client.get<{

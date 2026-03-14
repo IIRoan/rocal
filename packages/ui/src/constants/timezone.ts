@@ -72,7 +72,8 @@ export const TIMEZONE_GROUPS: Record<string, TimezoneOption[]> = {
   ],
 };
 
-export const ALL_TIMEZONES: TimezoneOption[] = Object.values(TIMEZONE_GROUPS).flat();
+export const ALL_TIMEZONES: TimezoneOption[] =
+  Object.values(TIMEZONE_GROUPS).flat();
 
 export const WORKING_DAYS: Array<{ value: number; label: string }> = [
   { value: 0, label: "Sunday" },

@@ -183,7 +183,7 @@ export function SubscriptionManagement({
   const handleDeleteSubscription = (subscription: CalendarSubscription) => {
     if (
       !confirm(
-        `Are you sure you want to unsubscribe from "${subscription.name}"?`
+        `Are you sure you want to unsubscribe from "${subscription.name}"?`,
       )
     ) {
       return;
@@ -218,20 +218,35 @@ export function SubscriptionManagement({
     switch (status) {
       case "success":
         return (
-          <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">
+          <Badge
+            variant="secondary"
+            className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0"
+          >
             Synced
           </Badge>
         );
       case "error":
         return (
-          <Badge variant="destructive" title={lastErrorMessage} className="text-[10px] px-1.5 py-0">
+          <Badge
+            variant="destructive"
+            title={lastErrorMessage}
+            className="text-[10px] px-1.5 py-0"
+          >
             Error
           </Badge>
         );
       case "pending":
-        return <Badge variant="outline" className="text-[10px] px-1.5 py-0">Pending</Badge>;
+        return (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            Pending
+          </Badge>
+        );
       default:
-        return <Badge variant="outline" className="text-[10px] px-1.5 py-0">Unknown</Badge>;
+        return (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            Unknown
+          </Badge>
+        );
     }
   };
 
@@ -282,7 +297,9 @@ export function SubscriptionManagement({
 
           <div className="flex-1 overflow-y-auto min-h-0">
             {/* Actions Section */}
-            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Actions</div>
+            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+              Actions
+            </div>
             <div className="p-1">
               <button
                 type="button"
@@ -315,7 +332,10 @@ export function SubscriptionManagement({
             {showCreateForm && (
               <div className="px-4 py-3 border-b border-border/50 space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="subscription-name" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="subscription-name"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     NAME
                   </Label>
                   <Input
@@ -345,7 +365,10 @@ export function SubscriptionManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="subscription-url" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="subscription-url"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     CALENDAR URL (.ics)
                   </Label>
                   <Input
@@ -375,7 +398,10 @@ export function SubscriptionManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="subscription-calendar" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="subscription-calendar"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     TARGET CALENDAR
                   </Label>
                   <Select
@@ -473,7 +499,7 @@ export function SubscriptionManagement({
                             </span>
                             {getStatusBadge(
                               subscription.lastSyncStatus,
-                              subscription.lastErrorMessage
+                              subscription.lastErrorMessage,
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -490,7 +516,9 @@ export function SubscriptionManagement({
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3 flex-shrink-0" />
-                              <span>{formatLastSync(subscription.lastSyncAt)}</span>
+                              <span>
+                                {formatLastSync(subscription.lastSyncAt)}
+                              </span>
                             </div>
                           </div>
                           {subscription.lastErrorMessage && (
@@ -518,7 +546,9 @@ export function SubscriptionManagement({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteSubscription(subscription)}
+                            onClick={() =>
+                              handleDeleteSubscription(subscription)
+                            }
                             disabled={loading}
                             className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                             title="Delete subscription"

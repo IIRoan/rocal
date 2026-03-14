@@ -22,7 +22,8 @@ import { render } from "@react-email/render";
 // Conditional import to avoid Next.js build issues
 let EventReminderEmail: any;
 if (!process.env.SKIP_EMAIL_TEMPLATES) {
-  EventReminderEmail = require("../emails/templates/event-reminder").EventReminderEmail;
+  EventReminderEmail =
+    require("../emails/templates/event-reminder").EventReminderEmail;
 }
 
 export interface NotificationStatus {
@@ -156,14 +157,14 @@ export class EnhancedNotificationService {
         secondsUntilNextMinute * 1000 - now.getMilliseconds();
 
       console.log(
-        `⏰ Aligning notification timer to minute boundary. Current time: ${now.toISOString()}, delay: ${msUntilNextMinute}ms`
+        `⏰ Aligning notification timer to minute boundary. Current time: ${now.toISOString()}, delay: ${msUntilNextMinute}ms`,
       );
 
       // Run immediately if we're at the start of a minute, otherwise wait
       if (msUntilNextMinute < 1000) {
         // We're very close to the minute boundary, run immediately
         console.log(
-          "🚀 Running notification check immediately (already at minute boundary)"
+          "🚀 Running notification check immediately (already at minute boundary)",
         );
         this.processScheduledNotifications().catch((error) => {
           console.error("❌ Initial notification processing failed:", error);
@@ -174,7 +175,7 @@ export class EnhancedNotificationService {
       // Set up timer to run at the start of each minute
       this.alignmentTimer = setTimeout(() => {
         console.log(
-          "🎯 Timer aligned! Starting minute-boundary notification checks"
+          "🎯 Timer aligned! Starting minute-boundary notification checks",
         );
 
         // Run the first aligned execution
@@ -206,7 +207,7 @@ export class EnhancedNotificationService {
           this.processScheduledNotifications().catch((error) => {
             console.error(
               "❌ Background notification processing failed:",
-              error
+              error,
             );
             this.failedCount++;
 
@@ -236,13 +237,13 @@ export class EnhancedNotificationService {
         // Default to enabled unless explicitly disabled
         this.scheduleAutomaticCleanup(
           options?.cleanupIntervalHours || 24,
-          options?.cleanupRetentionDays || 30
+          options?.cleanupRetentionDays || 30,
         );
       }
 
       console.log("✅ Enhanced notification service started successfully");
       console.log(
-        `📊 Service status: Running=${this.isRunning}, RetryQueue=${this.retryQueue.size}, AutoCleanup=${!!this.cleanupTimer}`
+        `📊 Service status: Running=${this.isRunning}, RetryQueue=${this.retryQueue.size}, AutoCleanup=${!!this.cleanupTimer}`,
       );
 
       // Log service startup for monitoring
@@ -281,7 +282,7 @@ export class EnhancedNotificationService {
 
       if (pendingCount > 0) {
         console.log(
-          `⚠️ Found ${pendingCount} overdue notifications that will be processed`
+          `⚠️ Found ${pendingCount} overdue notifications that will be processed`,
         );
       }
 
@@ -372,12 +373,12 @@ export class EnhancedNotificationService {
       // Log final statistics
       console.log("✅ Enhanced notification service stopped successfully");
       console.log(
-        `📊 Final statistics: Processed=${this.processedCount}, Failed=${this.failedCount}, RetryQueue=${this.retryQueue.size}`
+        `📊 Final statistics: Processed=${this.processedCount}, Failed=${this.failedCount}, RetryQueue=${this.retryQueue.size}`,
       );
 
       if (this.retryQueue.size > 0) {
         console.warn(
-          `⚠️ ${this.retryQueue.size} notifications remain in retry queue`
+          `⚠️ ${this.retryQueue.size} notifications remain in retry queue`,
         );
       }
     } catch (error) {
@@ -410,7 +411,7 @@ export class EnhancedNotificationService {
   public async createNotificationsForEvent(
     eventId: string,
     eventStart: Date,
-    notifications: NotificationConfig[]
+    notifications: NotificationConfig[],
   ): Promise<CreateNotificationResult> {
     try {
       // Validate event exists with database retry
@@ -432,7 +433,7 @@ export class EnhancedNotificationService {
       const now = new Date();
       if (actualEventStart < now) {
         console.log(
-          `⏭️ Event ${eventId} is in the past, skipping notification creation`
+          `⏭️ Event ${eventId} is in the past, skipping notification creation`,
         );
         return {
           created: [],
@@ -453,7 +454,7 @@ export class EnhancedNotificationService {
           const result =
             NotificationCalculator.calculateNotificationTimeWithValidation(
               actualEventStart,
-              config.minutesBefore
+              config.minutesBefore,
             );
 
           if (!result.isValid) {
@@ -482,7 +483,7 @@ export class EnhancedNotificationService {
 
           console.log(
             `✅ Created ${config.notificationType} notification for event ${eventId}: ` +
-              `${config.minutesBefore}min before at ${result.notificationTime.toISOString()}`
+              `${config.minutesBefore}min before at ${result.notificationTime.toISOString()}`,
           );
         } catch (error) {
           const errorMessage =
@@ -494,13 +495,13 @@ export class EnhancedNotificationService {
 
           console.error(
             `❌ Failed to create notification for event ${eventId}:`,
-            errorMessage
+            errorMessage,
           );
         }
       }
 
       console.log(
-        `✅ Created notifications for event ${eventId}: ${created.length} created, ${skipped.length} skipped`
+        `✅ Created notifications for event ${eventId}: ${created.length} created, ${skipped.length} skipped`,
       );
 
       return { created, skipped };
@@ -521,7 +522,7 @@ export class EnhancedNotificationService {
   public async updateNotificationsForEvent(
     eventId: string,
     eventStart: Date,
-    notifications: NotificationConfig[]
+    notifications: NotificationConfig[],
   ): Promise<CreateNotificationResult> {
     const maxRetries = 3;
     let lastError: Error | null = null;
@@ -533,7 +534,7 @@ export class EnhancedNotificationService {
           eventId,
           eventStart,
           notifications,
-          attempt
+          attempt,
         );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error("Unknown error");
@@ -542,7 +543,7 @@ export class EnhancedNotificationService {
         if (this.isRetryableUpdateError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
           console.warn(
-            `⚠️ Update attempt ${attempt} failed for event ${eventId}, retrying in ${delay}ms: ${lastError.message}`
+            `⚠️ Update attempt ${attempt} failed for event ${eventId}, retrying in ${delay}ms: ${lastError.message}`,
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
@@ -551,7 +552,7 @@ export class EnhancedNotificationService {
         // Non-retryable error or max retries reached
         console.error(
           `❌ Failed to update notifications for event ${eventId} after ${attempt} attempts:`,
-          lastError.message
+          lastError.message,
         );
         throw lastError;
       }
@@ -572,7 +573,7 @@ export class EnhancedNotificationService {
     eventId: string,
     eventStart: Date,
     notifications: NotificationConfig[],
-    attempt: number
+    attempt: number,
   ): Promise<CreateNotificationResult> {
     try {
       // Validate event exists with database connection handling
@@ -593,7 +594,7 @@ export class EnhancedNotificationService {
 
       if (actualEventStart < now) {
         console.log(
-          `🧹 Event ${eventId} moved to past date, cleaning up future notifications`
+          `🧹 Event ${eventId} moved to past date, cleaning up future notifications`,
         );
         await this.handleEventMovedToPast(eventId, actualEventStart);
         return { created: [], skipped: [] };
@@ -612,7 +613,7 @@ export class EnhancedNotificationService {
             });
 
             console.log(
-              `✓ Deleted ${deletedCount.count} existing notifications for event ${eventId} (attempt ${attempt})`
+              `✓ Deleted ${deletedCount.count} existing notifications for event ${eventId} (attempt ${attempt})`,
             );
 
             // Create new notifications if any provided
@@ -633,7 +634,7 @@ export class EnhancedNotificationService {
                 const calcResult =
                   NotificationCalculator.calculateNotificationTimeWithValidation(
                     actualEventStart,
-                    config.minutesBefore
+                    config.minutesBefore,
                   );
 
                 if (!calcResult.isValid) {
@@ -660,7 +661,7 @@ export class EnhancedNotificationService {
 
                 console.log(
                   `✓ Created ${config.notificationType} notification for event ${eventId}: ` +
-                    `${config.minutesBefore}min before at ${calcResult.notificationTime.toISOString()}`
+                    `${config.minutesBefore}min before at ${calcResult.notificationTime.toISOString()}`,
                 );
               } catch (error) {
                 const errorMessage =
@@ -672,7 +673,7 @@ export class EnhancedNotificationService {
 
                 console.error(
                   `Failed to create notification for event ${eventId}:`,
-                  errorMessage
+                  errorMessage,
                 );
               }
             }
@@ -682,20 +683,20 @@ export class EnhancedNotificationService {
           {
             isolationLevel: "Serializable", // Prevent concurrent update conflicts
             timeout: 10000, // 10 second timeout
-          }
+          },
         );
       });
 
       console.log(
         `✅ Updated notifications for event ${eventId} (attempt ${attempt}): ` +
-          `${result.created.length} created, ${result.skipped.length} skipped`
+          `${result.created.length} created, ${result.skipped.length} skipped`,
       );
 
       return result;
     } catch (error) {
       console.error(
         `❌ Update attempt ${attempt} failed for event ${eventId}:`,
-        error
+        error,
       );
       throw error;
     }
@@ -718,7 +719,7 @@ export class EnhancedNotificationService {
 
       if (!event) {
         console.warn(
-          `Event with ID ${eventId} not found, but proceeding with notification cleanup`
+          `Event with ID ${eventId} not found, but proceeding with notification cleanup`,
         );
       }
 
@@ -734,13 +735,13 @@ export class EnhancedNotificationService {
         if (retryInfo.eventId === eventId) {
           this.retryQueue.delete(notificationId);
           console.log(
-            `🗑️ Removed notification ${notificationId} from retry queue`
+            `🗑️ Removed notification ${notificationId} from retry queue`,
           );
         }
       }
 
       console.log(
-        `✅ Deleted ${result.count} notifications for event ${eventId}`
+        `✅ Deleted ${result.count} notifications for event ${eventId}`,
       );
       return result.count;
     } catch (error) {
@@ -758,20 +759,20 @@ export class EnhancedNotificationService {
    */
   public async handleEventMovedToPast(
     eventId: string,
-    eventStart: Date
+    eventStart: Date,
   ): Promise<number> {
     try {
       const now = new Date();
 
       if (eventStart >= now) {
         console.log(
-          `⏭️ Event ${eventId} is not in the past, no cleanup needed`
+          `⏭️ Event ${eventId} is not in the past, no cleanup needed`,
         );
         return 0;
       }
 
       console.log(
-        `🧹 Cleaning up notifications for event ${eventId} moved to past date: ${eventStart.toISOString()}`
+        `🧹 Cleaning up notifications for event ${eventId} moved to past date: ${eventStart.toISOString()}`,
       );
 
       // Delete all future notifications for this event
@@ -810,14 +811,14 @@ export class EnhancedNotificationService {
       });
 
       console.log(
-        `✅ Cleaned up ${result.count} future notifications and ${removedFromRetryQueue} retry queue entries for past event ${eventId}`
+        `✅ Cleaned up ${result.count} future notifications and ${removedFromRetryQueue} retry queue entries for past event ${eventId}`,
       );
 
       return result.count;
     } catch (error) {
       console.error(
         `❌ Failed to clean up notifications for past event ${eventId}:`,
-        error
+        error,
       );
       throw error;
     }
@@ -843,7 +844,7 @@ export class EnhancedNotificationService {
       now.getHours(),
       now.getMinutes(),
       0,
-      0
+      0,
     );
 
     try {
@@ -877,13 +878,13 @@ export class EnhancedNotificationService {
               notificationTime: "asc",
             },
           });
-        }
+        },
       );
 
       // Only log when there are notifications to send
       if (notificationsToSend.length > 0) {
         console.log(
-          `🔍 Processing ${notificationsToSend.length} scheduled notifications for ${currentMinute.toISOString()}`
+          `🔍 Processing ${notificationsToSend.length} scheduled notifications for ${currentMinute.toISOString()}`,
         );
       }
 
@@ -899,7 +900,7 @@ export class EnhancedNotificationService {
             // Skip notification for past events (reduce logging)
             await this.handleEventMovedToPast(
               notification.eventId,
-              notification.event.start
+              notification.event.start,
             );
             skippedThisRun++;
             continue;
@@ -938,7 +939,7 @@ export class EnhancedNotificationService {
           });
 
           console.error(
-            `❌ Error processing notification ${notification.id} for event "${notification.event.title}": ${errorMessage}`
+            `❌ Error processing notification ${notification.id} for event "${notification.event.title}": ${errorMessage}`,
           );
         }
       }
@@ -956,7 +957,7 @@ export class EnhancedNotificationService {
         failedThisRun > 0
       ) {
         console.log(
-          `✅ Notification processing complete: ${processedThisRun} sent, ${failedThisRun} failed, ${skippedThisRun} skipped`
+          `✅ Notification processing complete: ${processedThisRun} sent, ${failedThisRun} failed, ${skippedThisRun} skipped`,
         );
       }
 
@@ -965,7 +966,7 @@ export class EnhancedNotificationService {
         await this.logProcessingMetrics(
           processedThisRun,
           failedThisRun,
-          skippedThisRun
+          skippedThisRun,
         );
       }
     } catch (error) {
@@ -975,7 +976,7 @@ export class EnhancedNotificationService {
 
       console.error(
         "❌ Critical error in background notification processing:",
-        errorMessage
+        errorMessage,
       );
 
       // Enhanced system error logging with recovery information
@@ -1056,7 +1057,7 @@ export class EnhancedNotificationService {
         calendar?: any;
         category?: any;
       };
-    }
+    },
   ): Promise<NotificationDeliveryResult> {
     try {
       await this.sendNotification(notification);
@@ -1089,7 +1090,7 @@ export class EnhancedNotificationService {
         category?: any;
       };
     },
-    result: NotificationDeliveryResult
+    result: NotificationDeliveryResult,
   ): Promise<void> {
     const existingRetry = this.retryQueue.get(notification.id);
     const retryCount = existingRetry ? existingRetry.retryCount + 1 : 1;
@@ -1122,13 +1123,13 @@ export class EnhancedNotificationService {
       notification.minutesBefore,
       retryCount <= maxRetries && result.shouldRetry
         ? "retry_scheduled"
-        : "failed"
+        : "failed",
     );
 
     // Schedule retry if appropriate
     if (result.shouldRetry && retryCount <= maxRetries) {
       const nextRetryAt = new Date(
-        Date.now() + (result.retryAfterMinutes || 5) * 60 * 1000
+        Date.now() + (result.retryAfterMinutes || 5) * 60 * 1000,
       );
 
       this.retryQueue.set(notification.id, {
@@ -1145,7 +1146,7 @@ export class EnhancedNotificationService {
     } else {
       // Max retries reached or non-retryable error
       console.error(
-        `❌ Notification ${notification.id} failed permanently after ${retryCount} attempts: ${result.error}`
+        `❌ Notification ${notification.id} failed permanently after ${retryCount} attempts: ${result.error}`,
       );
 
       // Remove from retry queue if it was there
@@ -1172,7 +1173,7 @@ export class EnhancedNotificationService {
     }
 
     console.log(
-      `🔄 Processing ${retriesToProcess.length} notification retries`
+      `🔄 Processing ${retriesToProcess.length} notification retries`,
     );
 
     // Process each retry with enhanced error handling
@@ -1203,7 +1204,7 @@ export class EnhancedNotificationService {
 
         if (!notification) {
           console.warn(
-            `⚠️ Notification ${notificationId} not found for retry, removing from queue`
+            `⚠️ Notification ${notificationId} not found for retry, removing from queue`,
           );
           this.retryQueue.delete(notificationId);
           continue;
@@ -1216,7 +1217,7 @@ export class EnhancedNotificationService {
           notification.event.start < now
         ) {
           console.log(
-            `⏭️ Skipping retry for notification ${notificationId} - no longer valid`
+            `⏭️ Skipping retry for notification ${notificationId} - no longer valid`,
           );
           this.retryQueue.delete(notificationId);
 
@@ -1224,7 +1225,7 @@ export class EnhancedNotificationService {
           if (notification.event.start < now) {
             await this.handleEventMovedToPast(
               notification.eventId,
-              notification.event.start
+              notification.event.start,
             );
           }
 
@@ -1245,7 +1246,7 @@ export class EnhancedNotificationService {
       } catch (error) {
         console.error(
           `❌ Error processing retry for notification ${notificationId}:`,
-          error
+          error,
         );
 
         // Enhanced retry error handling
@@ -1271,7 +1272,7 @@ export class EnhancedNotificationService {
           // Log permanent failure
           await this.logNotificationPermanentFailure(
             notificationId,
-            updatedRetryInfo
+            updatedRetryInfo,
           );
         }
       }
@@ -1287,7 +1288,7 @@ export class EnhancedNotificationService {
   private async logProcessingMetrics(
     processed: number,
     failed: number,
-    skipped: number
+    skipped: number,
   ): Promise<void> {
     try {
       await this.executeWithDatabaseRetry(async () => {
@@ -1315,7 +1316,7 @@ export class EnhancedNotificationService {
    */
   private async logNotificationPermanentFailure(
     notificationId: string,
-    retryInfo: NotificationRetryInfo
+    retryInfo: NotificationRetryInfo,
   ): Promise<void> {
     try {
       await this.executeWithDatabaseRetry(async () => {
@@ -1442,14 +1443,14 @@ export class EnhancedNotificationService {
         calendar?: any;
         category?: any;
       };
-    }
+    },
   ): Promise<void> {
     const { event } = notification;
     const user = event.user;
     const userSettings = user.settings;
 
     console.log(
-      `📧 Sending ${notification.notificationType} notification for event "${event.title}" to ${user.email}`
+      `📧 Sending ${notification.notificationType} notification for event "${event.title}" to ${user.email}`,
     );
 
     try {
@@ -1459,7 +1460,7 @@ export class EnhancedNotificationService {
         userSettings?.emailNotifications === false
       ) {
         console.log(
-          `⏭️ Skipping email notification - user has email notifications disabled`
+          `⏭️ Skipping email notification - user has email notifications disabled`,
         );
         await this.markNotificationAsSent(notification.id, "skipped");
         await this.logNotification(
@@ -1468,7 +1469,7 @@ export class EnhancedNotificationService {
           notification.notificationType,
           notification.minutesBefore,
           "skipped",
-          "User has email notifications disabled"
+          "User has email notifications disabled",
         );
         return;
       }
@@ -1478,7 +1479,7 @@ export class EnhancedNotificationService {
         userSettings?.browserNotifications === false
       ) {
         console.log(
-          `⏭️ Skipping browser notification - user has browser notifications disabled`
+          `⏭️ Skipping browser notification - user has browser notifications disabled`,
         );
         await this.markNotificationAsSent(notification.id, "skipped");
         await this.logNotification(
@@ -1487,7 +1488,7 @@ export class EnhancedNotificationService {
           notification.notificationType,
           notification.minutesBefore,
           "skipped",
-          "User has browser notifications disabled"
+          "User has browser notifications disabled",
         );
         return;
       }
@@ -1497,13 +1498,13 @@ export class EnhancedNotificationService {
         await this.sendEmailNotification(
           event,
           user,
-          notification.minutesBefore
+          notification.minutesBefore,
         );
       } else if (notification.notificationType === "browser") {
         await this.sendBrowserNotification(
           event,
           user,
-          notification.minutesBefore
+          notification.minutesBefore,
         );
       }
 
@@ -1516,11 +1517,11 @@ export class EnhancedNotificationService {
         user.id,
         notification.notificationType,
         notification.minutesBefore,
-        "sent"
+        "sent",
       );
 
       console.log(
-        `✅ Successfully sent ${notification.notificationType} notification for event "${event.title}"`
+        `✅ Successfully sent ${notification.notificationType} notification for event "${event.title}"`,
       );
     } catch (error) {
       const errorMessage =
@@ -1528,7 +1529,7 @@ export class EnhancedNotificationService {
 
       console.error(
         `❌ Failed to send notification for event "${event.title}":`,
-        errorMessage
+        errorMessage,
       );
 
       // Log the failed notification (but don't mark as sent so it can be retried)
@@ -1538,7 +1539,7 @@ export class EnhancedNotificationService {
         notification.notificationType,
         notification.minutesBefore,
         "failed",
-        errorMessage
+        errorMessage,
       );
 
       throw error;
@@ -1558,12 +1559,12 @@ export class EnhancedNotificationService {
       category?: any;
     },
     user: User & { settings?: UserSettings | null },
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<void> {
     // Validate Resend configuration
     if (!this.resend) {
       const error = new Error(
-        "Email service not configured - RESEND_API_KEY missing"
+        "Email service not configured - RESEND_API_KEY missing",
       );
       console.error(`❌ ${error.message} for user ${user.email}`);
       throw error;
@@ -1588,7 +1589,7 @@ export class EnhancedNotificationService {
       const emailContent = await this.generateEnhancedEmailContent(
         event,
         user,
-        minutesBefore
+        minutesBefore,
       );
 
       // Prepare email with enhanced formatting
@@ -1604,7 +1605,7 @@ export class EnhancedNotificationService {
       });
 
       console.log(
-        `✅ Email notification sent successfully to ${user.email} for event "${event.title}" - Resend ID: ${result.data?.id}`
+        `✅ Email notification sent successfully to ${user.email} for event "${event.title}" - Resend ID: ${result.data?.id}`,
       );
 
       // Log successful delivery metrics
@@ -1612,14 +1613,14 @@ export class EnhancedNotificationService {
         user.id,
         event.id,
         "success",
-        result.data?.id
+        result.data?.id,
       );
     } catch (error) {
       // Enhanced error handling with specific error types
       const enhancedError = this.enhanceEmailError(error, user, event);
       console.error(
         `❌ Failed to send email notification to ${user.email} for event "${event.title}":`,
-        enhancedError.message
+        enhancedError.message,
       );
 
       // Log failed delivery metrics
@@ -1628,7 +1629,7 @@ export class EnhancedNotificationService {
         event.id,
         "failed",
         undefined,
-        enhancedError.message
+        enhancedError.message,
       );
 
       throw enhancedError;
@@ -1649,7 +1650,7 @@ export class EnhancedNotificationService {
       category?: any;
     },
     user: User & { settings?: UserSettings | null },
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<{ html: string; text: string }> {
     try {
       // Get user preferences for formatting
@@ -1663,7 +1664,7 @@ export class EnhancedNotificationService {
         event,
         timeFormat,
         timezone,
-        minutesBefore
+        minutesBefore,
       );
 
       // Generate HTML version using React Email template with caching
@@ -1671,7 +1672,7 @@ export class EnhancedNotificationService {
         event,
         user,
         formattedDetails,
-        userTheme as "light" | "dark" | "system"
+        userTheme as "light" | "dark" | "system",
       );
 
       // Generate plain text version for better deliverability
@@ -1684,7 +1685,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       console.error("Failed to generate email content:", error);
       throw new Error(
-        `Email content generation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Email content generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -1701,7 +1702,7 @@ export class EnhancedNotificationService {
     event: CalendarEvent & { calendar?: any; category?: any },
     timeFormat: string,
     timezone: string,
-    minutesBefore: number
+    minutesBefore: number,
   ) {
     // Format time until event with more precision
     const timeUntilEvent = this.formatTimeUntilEventEnhanced(event.start);
@@ -1742,14 +1743,14 @@ export class EnhancedNotificationService {
     event: CalendarEvent,
     user: User,
     formattedDetails: any,
-    userTheme: "light" | "dark" | "system"
+    userTheme: "light" | "dark" | "system",
   ): Promise<string> {
     // Create cache key for template rendering (for performance)
     const cacheKey = this.generateTemplateCacheKey(
       event,
       user,
       formattedDetails,
-      userTheme
+      userTheme,
     );
 
     // Check cache first (simple in-memory cache for this session)
@@ -1774,7 +1775,7 @@ export class EnhancedNotificationService {
         userTheme,
         userName: user.name,
         userEmail: user.email,
-      })
+      }),
     );
 
     // Cache the rendered template (with size limit)
@@ -1803,7 +1804,7 @@ export class EnhancedNotificationService {
    */
   private generatePlainTextEmail(
     event: CalendarEvent,
-    formattedDetails: any
+    formattedDetails: any,
   ): string {
     const lines = [
       "📅 ROCANI - Event Reminder",
@@ -1835,7 +1836,7 @@ export class EnhancedNotificationService {
       "",
       "---",
       "This reminder was sent because you have email notifications enabled.",
-      "You can manage your notification preferences in your calendar settings."
+      "You can manage your notification preferences in your calendar settings.",
     );
 
     return lines.join("\n");
@@ -1849,7 +1850,7 @@ export class EnhancedNotificationService {
    */
   private generateEmailSubject(
     event: CalendarEvent,
-    minutesBefore: number
+    minutesBefore: number,
   ): string {
     const reminderText = this.formatReminderText(minutesBefore);
     return `📅 Reminder: ${event.title} (${reminderText})`;
@@ -1886,7 +1887,7 @@ export class EnhancedNotificationService {
         if (attempt <= maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
           console.warn(
-            `⚠️ Email send attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`
+            `⚠️ Email send attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`,
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
@@ -1906,7 +1907,7 @@ export class EnhancedNotificationService {
   private enhanceEmailError(
     error: unknown,
     user: User,
-    event: CalendarEvent
+    event: CalendarEvent,
   ): Error {
     const originalMessage =
       error instanceof Error ? error.message : "Unknown error";
@@ -1932,13 +1933,13 @@ export class EnhancedNotificationService {
       errorLower.includes("unauthorized")
     ) {
       return new Error(
-        "Email service authentication failed - check RESEND_API_KEY"
+        "Email service authentication failed - check RESEND_API_KEY",
       );
     }
 
     if (errorLower.includes("network") || errorLower.includes("connection")) {
       return new Error(
-        `Network error sending email to ${user.email}: ${originalMessage}`
+        `Network error sending email to ${user.email}: ${originalMessage}`,
       );
     }
 
@@ -1948,7 +1949,7 @@ export class EnhancedNotificationService {
 
     // Generic enhanced error
     return new Error(
-      `Email delivery failed for event "${event.title}" to ${user.email}: ${originalMessage}`
+      `Email delivery failed for event "${event.title}" to ${user.email}: ${originalMessage}`,
     );
   }
 
@@ -1961,7 +1962,7 @@ export class EnhancedNotificationService {
    */
   private async executeWithDatabaseRetry<T>(
     operation: () => Promise<T>,
-    maxRetries: number = 3
+    maxRetries: number = 3,
   ): Promise<T> {
     let lastError: Error | null = null;
 
@@ -1976,7 +1977,7 @@ export class EnhancedNotificationService {
         if (this.isRetryableDatabaseError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
           console.warn(
-            `⚠️ Database operation attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`
+            `⚠️ Database operation attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`,
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
@@ -1984,7 +1985,7 @@ export class EnhancedNotificationService {
 
         // Non-retryable error or max retries reached
         console.error(
-          `❌ Database operation failed after ${attempt} attempts: ${lastError.message}`
+          `❌ Database operation failed after ${attempt} attempts: ${lastError.message}`,
         );
         throw lastError;
       }
@@ -2123,7 +2124,7 @@ export class EnhancedNotificationService {
    */
   public async handleConcurrentNotificationUpdate<T>(
     eventId: string,
-    updateOperation: () => Promise<T>
+    updateOperation: () => Promise<T>,
   ): Promise<T> {
     const lockKey = `notification_update_${eventId}`;
     const maxWaitTime = 30000; // 30 seconds max wait
@@ -2147,7 +2148,7 @@ export class EnhancedNotificationService {
     ) {
       if (Date.now() - startTime > maxWaitTime) {
         throw new Error(
-          `Timeout waiting for notification update lock for event ${eventId}`
+          `Timeout waiting for notification update lock for event ${eventId}`,
         );
       }
 
@@ -2186,7 +2187,7 @@ export class EnhancedNotificationService {
       eventId: string;
       eventStart: Date;
       notifications: NotificationConfig[];
-    }>
+    }>,
   ): Promise<Array<CreateNotificationResult & { eventId: string }>> {
     const results: Array<CreateNotificationResult & { eventId: string }> = [];
 
@@ -2203,14 +2204,14 @@ export class EnhancedNotificationService {
               this.updateNotificationsForEvent(
                 update.eventId,
                 update.eventStart,
-                update.notifications
-              )
+                update.notifications,
+              ),
           );
           return { ...result, eventId: update.eventId };
         } catch (error) {
           console.error(
             `❌ Failed to update notifications for event ${update.eventId}:`,
-            error
+            error,
           );
           return {
             eventId: update.eventId,
@@ -2379,7 +2380,7 @@ export class EnhancedNotificationService {
   private formatTimeWithPreference(
     date: Date,
     timeFormat: string,
-    timezone: string
+    timezone: string,
   ): string {
     const is24Hour = timeFormat === "24h";
 
@@ -2472,7 +2473,7 @@ export class EnhancedNotificationService {
     event: CalendarEvent,
     user: User,
     formattedDetails: any,
-    userTheme: string
+    userTheme: string,
   ): string {
     // Create a hash-like key based on relevant data
     const keyData = {
@@ -2501,7 +2502,7 @@ export class EnhancedNotificationService {
     eventId: string,
     status: "success" | "failed",
     resendId?: string,
-    errorMessage?: string
+    errorMessage?: string,
   ): void {
     const logData = {
       userId,
@@ -2528,12 +2529,12 @@ export class EnhancedNotificationService {
   private async sendBrowserNotification(
     event: CalendarEvent,
     user: User,
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<void> {
     // For now, just log browser notifications
     // In a real implementation, you would send this via WebSocket or push notification
     console.log(
-      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}"`
+      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}"`,
     );
   }
 
@@ -2544,7 +2545,7 @@ export class EnhancedNotificationService {
    */
   private async markNotificationAsSent(
     notificationId: string,
-    status: string
+    status: string,
   ): Promise<void> {
     await prisma.eventNotification.update({
       where: { id: notificationId },
@@ -2570,7 +2571,7 @@ export class EnhancedNotificationService {
     notificationType: string,
     minutesBefore: number,
     status: string,
-    errorMessage?: string
+    errorMessage?: string,
   ): Promise<void> {
     try {
       await prisma.notificationLog.create({
@@ -2636,7 +2637,7 @@ export class EnhancedNotificationService {
    */
   public getRetryQueueInfo(): NotificationRetryInfo[] {
     return Array.from(this.retryQueue.values()).sort(
-      (a, b) => a.nextRetryAt.getTime() - b.nextRetryAt.getTime()
+      (a, b) => a.nextRetryAt.getTime() - b.nextRetryAt.getTime(),
     );
   }
 
@@ -2670,11 +2671,11 @@ export class EnhancedNotificationService {
   }> {
     const startTime = Date.now();
     const retentionCutoff = new Date(
-      Date.now() - retentionDays * 24 * 60 * 60 * 1000
+      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
     );
 
     console.log(
-      `🧹 Starting notification cleanup - retaining logs newer than ${retentionCutoff.toISOString()}`
+      `🧹 Starting notification cleanup - retaining logs newer than ${retentionCutoff.toISOString()}`,
     );
 
     try {
@@ -2688,7 +2689,7 @@ export class EnhancedNotificationService {
       });
 
       console.log(
-        `✅ Deleted ${deletedLogsResult.count} old notification logs`
+        `✅ Deleted ${deletedLogsResult.count} old notification logs`,
       );
 
       // Step 2: Clean up old sent notifications that are no longer needed
@@ -2713,7 +2714,7 @@ export class EnhancedNotificationService {
         });
 
       console.log(
-        `✅ Deleted ${deletedNotificationsResult.count} old sent notifications`
+        `✅ Deleted ${deletedNotificationsResult.count} old sent notifications`,
       );
 
       // Step 3: Perform database maintenance tasks
@@ -2723,7 +2724,7 @@ export class EnhancedNotificationService {
 
       // Log cleanup performance metrics
       console.log(
-        `🎯 Cleanup completed in ${cleanupDuration}ms - Logs: ${deletedLogsResult.count}, Notifications: ${deletedNotificationsResult.count}`
+        `🎯 Cleanup completed in ${cleanupDuration}ms - Logs: ${deletedLogsResult.count}, Notifications: ${deletedNotificationsResult.count}`,
       );
 
       // Store last cleanup stats for monitoring
@@ -2757,7 +2758,7 @@ export class EnhancedNotificationService {
 
       console.error(
         `❌ Cleanup failed after ${cleanupDuration}ms:`,
-        errorMessage
+        errorMessage,
       );
 
       // Log cleanup failure
@@ -2810,7 +2811,7 @@ export class EnhancedNotificationService {
         } catch (error) {
           console.warn(
             `⚠️ Failed to analyze table ${table}:`,
-            error instanceof Error ? error.message : "Unknown error"
+            error instanceof Error ? error.message : "Unknown error",
           );
         }
       }
@@ -2834,7 +2835,7 @@ export class EnhancedNotificationService {
           } catch (error) {
             console.warn(
               `⚠️ Failed to reindex ${index}:`,
-              error instanceof Error ? error.message : "Unknown error"
+              error instanceof Error ? error.message : "Unknown error",
             );
           }
         }
@@ -2853,7 +2854,7 @@ export class EnhancedNotificationService {
           } catch (error) {
             console.warn(
               `⚠️ Failed to vacuum table ${table}:`,
-              error instanceof Error ? error.message : "Unknown error"
+              error instanceof Error ? error.message : "Unknown error",
             );
           }
         }
@@ -2864,7 +2865,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       console.error(
         "❌ Database maintenance failed:",
-        error instanceof Error ? error.message : "Unknown error"
+        error instanceof Error ? error.message : "Unknown error",
       );
       return maintenanceResults;
     }
@@ -2959,7 +2960,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       console.error(
         "Failed to log cleanup statistics:",
-        error instanceof Error ? error.message : "Unknown error"
+        error instanceof Error ? error.message : "Unknown error",
       );
       // Don't throw here as logging failure shouldn't break cleanup
     }
@@ -2973,7 +2974,7 @@ export class EnhancedNotificationService {
    */
   public scheduleAutomaticCleanup(
     intervalHours: number = 24,
-    retentionDays: number = 30
+    retentionDays: number = 30,
   ): void {
     // Clear any existing cleanup timer
     if (this.cleanupTimer) {
@@ -2983,7 +2984,7 @@ export class EnhancedNotificationService {
     const intervalMs = intervalHours * 60 * 60 * 1000;
 
     console.log(
-      `⏰ Scheduling automatic cleanup every ${intervalHours} hours with ${retentionDays} day retention`
+      `⏰ Scheduling automatic cleanup every ${intervalHours} hours with ${retentionDays} day retention`,
     );
 
     this.cleanupTimer = setInterval(async () => {
@@ -2992,12 +2993,12 @@ export class EnhancedNotificationService {
         const result = await this.cleanupOldNotifications(retentionDays);
 
         console.log(
-          `✅ Scheduled cleanup completed: ${result.deletedLogs} logs, ${result.deletedNotifications} notifications deleted in ${result.cleanupDuration}ms`
+          `✅ Scheduled cleanup completed: ${result.deletedLogs} logs, ${result.deletedNotifications} notifications deleted in ${result.cleanupDuration}ms`,
         );
       } catch (error) {
         console.error(
           "❌ Scheduled cleanup failed:",
-          error instanceof Error ? error.message : "Unknown error"
+          error instanceof Error ? error.message : "Unknown error",
         );
       }
     }, intervalMs);
@@ -3010,7 +3011,7 @@ export class EnhancedNotificationService {
       } catch (error) {
         console.error(
           "❌ Initial cleanup failed:",
-          error instanceof Error ? error.message : "Unknown error"
+          error instanceof Error ? error.message : "Unknown error",
         );
       }
     }, 30000); // 30 seconds delay
@@ -3109,7 +3110,7 @@ export class EnhancedNotificationService {
           try {
             // Parse the status field to extract cleanup metrics
             const statusMatch = log.status.match(
-              /deleted_logs=(\d+), deleted_notifications=(\d+), duration=(\d+)ms/
+              /deleted_logs=(\d+), deleted_notifications=(\d+), duration=(\d+)ms/,
             );
             if (
               statusMatch &&
@@ -3137,31 +3138,32 @@ export class EnhancedNotificationService {
 
       if (notificationLogCount > 100000) {
         recommendedActions.push(
-          "Consider reducing retention period - notification log table is large"
+          "Consider reducing retention period - notification log table is large",
         );
       }
 
       if (eventNotificationCount > 50000) {
         recommendedActions.push(
-          "High number of event notifications - consider cleanup of old sent notifications"
+          "High number of event notifications - consider cleanup of old sent notifications",
         );
       }
 
       const daysSinceOldestLog = oldestLog
         ? Math.floor(
-            (Date.now() - oldestLog.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+            (Date.now() - oldestLog.createdAt.getTime()) /
+              (1000 * 60 * 60 * 24),
           )
         : 0;
 
       if (daysSinceOldestLog > 90) {
         recommendedActions.push(
-          `Oldest logs are ${daysSinceOldestLog} days old - consider running cleanup`
+          `Oldest logs are ${daysSinceOldestLog} days old - consider running cleanup`,
         );
       }
 
       if (cleanupHistory.length === 0) {
         recommendedActions.push(
-          "No recent cleanup operations found - consider enabling automatic cleanup"
+          "No recent cleanup operations found - consider enabling automatic cleanup",
         );
       }
 
@@ -3184,7 +3186,7 @@ export class EnhancedNotificationService {
       throw new Error(
         `Failed to retrieve cleanup metrics: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
     }
   }
@@ -3269,7 +3271,7 @@ export class EnhancedNotificationService {
             error,
             count: info.count,
             lastOccurrence: info.lastOccurrence,
-          })
+          }),
         ),
       };
     } catch (error) {
@@ -3284,7 +3286,7 @@ export class EnhancedNotificationService {
    * @returns Array of notifications for the event
    */
   public async getNotificationsForEvent(
-    eventId: string
+    eventId: string,
   ): Promise<EventNotification[]> {
     try {
       const notifications = await prisma.eventNotification.findMany({
@@ -3307,14 +3309,14 @@ export class EnhancedNotificationService {
    */
   public validateNotificationConfigs(
     eventStart: Date,
-    notifications: NotificationConfig[]
+    notifications: NotificationConfig[],
   ): Array<{ config: NotificationConfig; isValid: boolean; error?: string }> {
     return notifications.map((config) => {
       try {
         const result =
           NotificationCalculator.calculateNotificationTimeWithValidation(
             eventStart,
-            config.minutesBefore
+            config.minutesBefore,
           );
 
         return {
@@ -3340,18 +3342,18 @@ export class EnhancedNotificationService {
     eventId: string,
     notifications: NotificationConfig[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<CreateNotificationResult> {
     try {
       // Get the recurring event
       const recurringEvent = await prisma.calendarEvent.findUnique({
         where: { id: eventId },
-        select: { 
-          id: true, 
-          userId: true, 
-          start: true, 
+        select: {
+          id: true,
+          userId: true,
+          start: true,
           end: true,
-          recurrence: true 
+          recurrence: true,
         },
       });
 
@@ -3361,26 +3363,33 @@ export class EnhancedNotificationService {
 
       if (!recurringEvent.recurrence) {
         // Not a recurring event, use regular notification creation
-        return this.createNotificationsForEvent(eventId, recurringEvent.start, notifications);
+        return this.createNotificationsForEvent(
+          eventId,
+          recurringEvent.start,
+          notifications,
+        );
       }
 
       // Parse recurrence rule and generate instances
       const { RecurrenceEngine } = await import("./recurrence");
-      
+
       try {
         const instances = RecurrenceEngine.generateInstances(
           {
             id: eventId,
             start: recurringEvent.start,
             end: recurringEvent.end,
-            recurrence: recurringEvent.recurrence
+            recurrence: recurringEvent.recurrence,
           },
           startDate,
-          endDate
+          endDate,
         );
 
         const allCreated: EventNotification[] = [];
-        const allSkipped: Array<{ config: NotificationConfig; reason: string }> = [];
+        const allSkipped: Array<{
+          config: NotificationConfig;
+          reason: string;
+        }> = [];
 
         // Create notifications for each occurrence
         for (const instance of instances) {
@@ -3389,16 +3398,16 @@ export class EnhancedNotificationService {
             const result = await this.createNotificationsForEvent(
               eventId,
               instance.date,
-              notifications
+              notifications,
             );
-            
+
             allCreated.push(...result.created);
             allSkipped.push(...result.skipped);
           }
         }
 
         console.log(
-          `✓ Created ${allCreated.length} notifications for ${instances.length} occurrences of recurring event ${eventId}`
+          `✓ Created ${allCreated.length} notifications for ${instances.length} occurrences of recurring event ${eventId}`,
         );
 
         return {
@@ -3408,10 +3417,17 @@ export class EnhancedNotificationService {
       } catch (parseError) {
         console.error("Failed to parse recurrence rule:", parseError);
         // Fall back to single event notification
-        return this.createNotificationsForEvent(eventId, recurringEvent.start, notifications);
+        return this.createNotificationsForEvent(
+          eventId,
+          recurringEvent.start,
+          notifications,
+        );
       }
     } catch (error) {
-      console.error("Failed to create notifications for recurring event:", error);
+      console.error(
+        "Failed to create notifications for recurring event:",
+        error,
+      );
       throw error;
     }
   }

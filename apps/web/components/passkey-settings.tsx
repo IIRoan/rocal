@@ -68,7 +68,7 @@ export function PasskeySettings({
       }
       return Array.isArray(data)
         ? data.filter(
-            (passkey) => passkey && typeof passkey === "object" && passkey.id
+            (passkey) => passkey && typeof passkey === "object" && passkey.id,
           )
         : [];
     },
@@ -93,13 +93,13 @@ export function PasskeySettings({
           await authClient.passkey.listUserPasskeys();
         const validPasskeys = Array.isArray(refreshedData)
           ? refreshedData.filter(
-              (passkey) => passkey && typeof passkey === "object" && passkey.id
+              (passkey) => passkey && typeof passkey === "object" && passkey.id,
             )
           : [];
 
         // Check if the passkey was actually added by looking for it in the refreshed list
         const wasAdded = validPasskeys.some(
-          (passkey) => passkey && passkey.name === passkeyNameToAdd
+          (passkey) => passkey && passkey.name === passkeyNameToAdd,
         );
 
         if (wasAdded) {
@@ -193,7 +193,9 @@ export function PasskeySettings({
                 {passkeyLoading && passkeys.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Loading passkeys...</p>
+                    <p className="text-xs text-muted-foreground">
+                      Loading passkeys...
+                    </p>
                   </div>
                 ) : passkeys.length === 0 ? (
                   <div className="px-4 py-6 text-center border-t border-border/50">
@@ -202,7 +204,8 @@ export function PasskeySettings({
                       No passkeys found
                     </p>
                     <p className="text-[10px] text-muted-foreground/50">
-                      Add your first passkey to enable passwordless authentication
+                      Add your first passkey to enable passwordless
+                      authentication
                     </p>
                   </div>
                 ) : (
@@ -230,12 +233,16 @@ export function PasskeySettings({
                                 <p className="text-[10px] text-muted-foreground/60">
                                   Added{" "}
                                   {passkey?.createdAt
-                                    ? new Date(passkey.createdAt).toLocaleDateString()
+                                    ? new Date(
+                                        passkey.createdAt,
+                                      ).toLocaleDateString()
                                     : "Unknown date"}
                                 </p>
                               </div>
                               <button
-                                onClick={() => deletePasskeyMutation.mutate(passkey.id)}
+                                onClick={() =>
+                                  deletePasskeyMutation.mutate(passkey.id)
+                                }
                                 className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -270,7 +277,9 @@ export function PasskeySettings({
                   <div className="flex gap-2">
                     <Button
                       onClick={addPasskey}
-                      disabled={addPasskeyMutation.isPending || !passkeyName.trim()}
+                      disabled={
+                        addPasskeyMutation.isPending || !passkeyName.trim()
+                      }
                       size="sm"
                       className="flex-1"
                     >

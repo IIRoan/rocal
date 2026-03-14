@@ -5,11 +5,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import {
-  Key,
-  ChevronRight,
-  ArrowLeft,
-} from "lucide-react";
+import { Key, ChevronRight, ArrowLeft } from "lucide-react";
 import type { PaletteView } from "./constants";
 
 interface SecuritySettingsProps {
@@ -57,7 +53,9 @@ export function SecuritySettings({
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
               {/* Authentication Section */}
-              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Authentication</div>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                Authentication
+              </div>
               <div className="p-1">
                 <button
                   type="button"

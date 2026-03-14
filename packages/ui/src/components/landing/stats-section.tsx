@@ -13,7 +13,7 @@ const stats = [
     label: "Events Scheduled",
     description: "Meetings and events organized through Rocani",
     color: "text-primary",
-    bgColor: "bg-primary/10"
+    bgColor: "bg-primary/10",
   },
   {
     icon: Clock,
@@ -21,7 +21,7 @@ const stats = [
     label: "Hours Saved",
     description: "Time saved monthly through smart scheduling",
     color: "text-accent",
-    bgColor: "bg-accent/10"
+    bgColor: "bg-accent/10",
   },
   {
     icon: Users,
@@ -29,7 +29,7 @@ const stats = [
     label: "Active Users",
     description: "Professionals using Rocani daily",
     color: "text-[var(--chart-2)]",
-    bgColor: "bg-[var(--chart-2)]/10"
+    bgColor: "bg-[var(--chart-2)]/10",
   },
   {
     icon: Zap,
@@ -37,7 +37,7 @@ const stats = [
     label: "Faster Scheduling",
     description: "Average time reduction in meeting coordination",
     color: "text-success",
-    bgColor: "bg-success/10"
+    bgColor: "bg-success/10",
   },
   {
     icon: TrendingUp,
@@ -45,7 +45,7 @@ const stats = [
     label: "Productivity Boost",
     description: "Average productivity increase reported by users",
     color: "text-[var(--chart-3)]",
-    bgColor: "bg-[var(--chart-3)]/10"
+    bgColor: "bg-[var(--chart-3)]/10",
   },
   {
     icon: Award,
@@ -53,8 +53,8 @@ const stats = [
     label: "User Rating",
     description: "Based on 10,000+ reviews across app stores",
     color: "text-warning",
-    bgColor: "bg-warning/10"
-  }
+    bgColor: "bg-warning/10",
+  },
 ];
 
 export function StatsSection() {
@@ -123,8 +123,8 @@ export function StatsSection() {
               Recognized as the #1 Smart Calendar Platform
             </h3>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Winner of multiple productivity awards and consistently rated as the
-              top calendar solution by G2, ProductHunt, and TechRadar.
+              Winner of multiple productivity awards and consistently rated as
+              the top calendar solution by G2, ProductHunt, and TechRadar.
             </p>
           </div>
         </div>

@@ -5,14 +5,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import {
-  Sun,
-  Moon,
-  Monitor,
-  Layout,
-  Check,
-  ArrowLeft,
-} from "lucide-react";
+import { Sun, Moon, Monitor, Layout, Check, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { PaletteView } from "./constants";
 
@@ -49,8 +42,14 @@ export function AppearanceSettings({
         <VisuallyHidden>
           <DialogTitle>Appearance Settings</DialogTitle>
         </VisuallyHidden>
-        <TransitionContainer direction={transitionDirection} viewKey="appearance">
-          <div className="flex flex-col" style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}>
+        <TransitionContainer
+          direction={transitionDirection}
+          viewKey="appearance"
+        >
+          <div
+            className="flex flex-col"
+            style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}
+          >
             {/* Header */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
               <button
@@ -63,12 +62,29 @@ export function AppearanceSettings({
             </div>
             <div className="flex-1 overflow-y-auto py-2">
               {/* Theme Section */}
-              <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Theme</div>
+              <div className="px-3 py-1 text-xs font-medium text-muted-foreground">
+                Theme
+              </div>
               <div className="px-2 pb-1">
                 {[
-                  { value: "light", icon: Sun, label: "Light Theme", color: "text-amber-500" },
-                  { value: "dark", icon: Moon, label: "Dark Theme", color: "text-slate-400" },
-                  { value: "system", icon: Monitor, label: "System Theme", color: "text-muted-foreground" },
+                  {
+                    value: "light",
+                    icon: Sun,
+                    label: "Light Theme",
+                    color: "text-amber-500",
+                  },
+                  {
+                    value: "dark",
+                    icon: Moon,
+                    label: "Dark Theme",
+                    color: "text-slate-400",
+                  },
+                  {
+                    value: "system",
+                    icon: Monitor,
+                    label: "System Theme",
+                    color: "text-muted-foreground",
+                  },
                 ].map((item) => (
                   <button
                     key={item.value}
@@ -88,7 +104,9 @@ export function AppearanceSettings({
               </div>
 
               {/* Default View Section */}
-              <div className="px-3 py-1 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">Default View</div>
+              <div className="px-3 py-1 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                Default View
+              </div>
               <div className="px-2">
                 {["month", "week", "day", "agenda"].map((view) => (
                   <button
@@ -100,7 +118,9 @@ export function AppearanceSettings({
                     <div className="flex items-center justify-center w-6 h-6 shrink-0">
                       <Layout className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <span className="text-sm flex-1 capitalize">{view} View</span>
+                    <span className="text-sm flex-1 capitalize">
+                      {view} View
+                    </span>
                     {localSettings.defaultView === view && (
                       <Check className="h-4 w-4 text-primary shrink-0" />
                     )}

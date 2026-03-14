@@ -89,7 +89,7 @@ export function CalendarManagement({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [deletingCalendar, setDeletingCalendar] = useState<Calendar | null>(
-    null
+    null,
   );
   const [deleteAction, setDeleteAction] =
     useState<CalendarDeleteAction>("delete_events");
@@ -128,7 +128,7 @@ export function CalendarManagement({
       await calendarApiService.deleteCalendarAdvanced(
         data.id,
         data.action,
-        data.targetId
+        data.targetId,
       );
     },
     onSuccess: async () => {
@@ -163,7 +163,7 @@ export function CalendarManagement({
 
       if (response.eventsCreated > 0) {
         setSuccess(
-          `Successfully imported ${response.eventsCreated} events from ${importFile?.name}`
+          `Successfully imported ${response.eventsCreated} events from ${importFile?.name}`,
         );
         await refetchCalendars();
         queryClient.invalidateQueries({ queryKey: ["events"] });
@@ -207,7 +207,7 @@ export function CalendarManagement({
 
     // Validate color format
     const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-      newCalendar.color
+      newCalendar.color,
     );
     const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
     if (!allowedColors.includes(newCalendar.color) && !isHexColor) {
@@ -265,7 +265,7 @@ export function CalendarManagement({
 
   const validateEditCalendarForm = (
     name: string,
-    currentCalendarId: string
+    currentCalendarId: string,
   ) => {
     const errors: { name?: string; color?: string; general?: string } = {};
 
@@ -292,7 +292,7 @@ export function CalendarManagement({
 
   const handleUpdateCalendar = async (
     calendar: Calendar,
-    updates: Partial<UpdateCalendarRequest>
+    updates: Partial<UpdateCalendarRequest>,
   ) => {
     setError(null);
     setValidationErrors({});
@@ -374,7 +374,7 @@ export function CalendarManagement({
   };
 
   const availableTargetCalendars = calendars.filter(
-    (c) => c.id !== deletingCalendar?.id
+    (c) => c.id !== deletingCalendar?.id,
   );
 
   return (
@@ -766,8 +766,8 @@ export function CalendarManagement({
               Delete Calendar
             </DialogTitle>
             <DialogDescription>
-              You&apos;re about to delete &quot;{deletingCalendar?.name}&quot;. What would you
-              like to do with existing events?
+              You&apos;re about to delete &quot;{deletingCalendar?.name}&quot;.
+              What would you like to do with existing events?
             </DialogDescription>
           </DialogHeader>
 

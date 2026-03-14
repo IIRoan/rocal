@@ -113,9 +113,10 @@ export const EventReminderEmail = ({
   const withAlpha20 = (hex: string): string => {
     if (!hex.startsWith("#")) return `${colors.accent}20`;
     // Normalize #RGB to #RRGGBB
-    const normalized = hex.length === 4
-      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-      : hex;
+    const normalized =
+      hex.length === 4
+        ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+        : hex;
     return `${normalized}20`;
   };
 
@@ -127,9 +128,7 @@ export const EventReminderEmail = ({
       const d = new Date(dateStr);
       if (!Number.isNaN(d.getTime())) {
         return {
-          month: d
-            .toLocaleString("en-US", { month: "short" })
-            .toUpperCase(),
+          month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
           day: String(d.getDate()).padStart(2, "0"),
         };
       }
@@ -369,7 +368,9 @@ export const EventReminderEmail = ({
                   >
                     Date:
                   </span>
-                  <span style={{ color: colors.mutedForeground }}>{eventDate}</span>
+                  <span style={{ color: colors.mutedForeground }}>
+                    {eventDate}
+                  </span>
                 </Section>
 
                 <Section
@@ -390,7 +391,9 @@ export const EventReminderEmail = ({
                   >
                     Time:
                   </span>
-                  <span style={{ color: colors.mutedForeground }}>{eventTime}</span>
+                  <span style={{ color: colors.mutedForeground }}>
+                    {eventTime}
+                  </span>
                 </Section>
 
                 {eventLocation && (

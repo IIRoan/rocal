@@ -40,7 +40,7 @@ export const subscriptionsRoute = new Elysia()
         tags: ["Calendar Subscriptions"],
         summary: "Get all calendar subscriptions for user",
       },
-    }
+    },
   )
 
   .post(
@@ -89,23 +89,23 @@ export const subscriptionsRoute = new Elysia()
 
         if (!response.ok) {
           console.error(
-            `❌ HTTP error fetching calendar: ${response.status} ${response.statusText}`
+            `❌ HTTP error fetching calendar: ${response.status} ${response.statusText}`,
           );
           if (response.status >= 500) {
             throw new Error(
-              `The calendar server is currently unavailable (${response.status}). Please try again later or contact the calendar provider.`
+              `The calendar server is currently unavailable (${response.status}). Please try again later or contact the calendar provider.`,
             );
           } else if (response.status === 404) {
             throw new Error(
-              `Calendar not found at the provided URL. Please check the URL and try again.`
+              `Calendar not found at the provided URL. Please check the URL and try again.`,
             );
           } else if (response.status === 403 || response.status === 401) {
             throw new Error(
-              `Access denied to the calendar. The calendar may be private or require authentication.`
+              `Access denied to the calendar. The calendar may be private or require authentication.`,
             );
           } else {
             throw new Error(
-              `Failed to fetch calendar: ${response.status} ${response.statusText}`
+              `Failed to fetch calendar: ${response.status} ${response.statusText}`,
             );
           }
         }
@@ -143,10 +143,10 @@ export const subscriptionsRoute = new Elysia()
         console.error("💥 Complete error details:", error);
         console.error(
           "💥 Error stack:",
-          error instanceof Error ? error.stack : "No stack trace"
+          error instanceof Error ? error.stack : "No stack trace",
         );
         throw new Error(
-          `Unable to fetch or parse calendar from URL: ${error instanceof Error ? error.message : "Unknown error"}`
+          `Unable to fetch or parse calendar from URL: ${error instanceof Error ? error.message : "Unknown error"}`,
         );
       }
 
@@ -178,7 +178,7 @@ export const subscriptionsRoute = new Elysia()
         description:
           "Creates a new calendar subscription and validates the URL by attempting to fetch and parse it.",
       },
-    }
+    },
   )
 
   .put(
@@ -223,14 +223,14 @@ export const subscriptionsRoute = new Elysia()
         name: t.Optional(t.String()),
         isActive: t.Optional(t.Boolean()),
         syncIntervalMinutes: t.Optional(
-          t.Number({ minimum: 5, maximum: 1440 })
+          t.Number({ minimum: 5, maximum: 1440 }),
         ),
       }),
       detail: {
         tags: ["Calendar Subscriptions"],
         summary: "Update calendar subscription",
       },
-    }
+    },
   )
 
   .delete(
@@ -294,7 +294,7 @@ export const subscriptionsRoute = new Elysia()
         description:
           "Deletes a subscription. If deleteEvents is true, also deletes all synced events. Otherwise, events are kept but lose their sync association.",
       },
-    }
+    },
   )
 
   .post(
@@ -329,7 +329,7 @@ export const subscriptionsRoute = new Elysia()
         tags: ["Calendar Subscriptions"],
         summary: "Manually trigger subscription sync",
       },
-    }
+    },
   )
 
   .post(
@@ -387,7 +387,7 @@ export const subscriptionsRoute = new Elysia()
 
           if (existingEvent) {
             errors.push(
-              `Event "${parsedEvent.title}" with UID ${parsedEvent.uid} already exists in calendar`
+              `Event "${parsedEvent.title}" with UID ${parsedEvent.uid} already exists in calendar`,
             );
             continue;
           }
@@ -395,7 +395,7 @@ export const subscriptionsRoute = new Elysia()
           const eventData = convertParsedEventToCalendarEvent(
             parsedEvent,
             user.id,
-            calendarId
+            calendarId,
             // No subscriptionId for manual import
           );
 
@@ -406,7 +406,7 @@ export const subscriptionsRoute = new Elysia()
           createdEvents.push(createdEvent);
         } catch (error) {
           errors.push(
-            `Failed to create event "${parsedEvent.title}": ${error instanceof Error ? error.message : "Unknown error"}`
+            `Failed to create event "${parsedEvent.title}": ${error instanceof Error ? error.message : "Unknown error"}`,
           );
         }
       }
@@ -432,7 +432,7 @@ export const subscriptionsRoute = new Elysia()
         description:
           "Manually imports events from an ICS file content into a specific calendar.",
       },
-    }
+    },
   );
 
 // Sync function for individual subscription
@@ -525,7 +525,7 @@ export async function syncCalendarSubscription(subscription: any) {
     });
 
     const currentEventsByUid = new Map(
-      currentEvents.map((event) => [event.externalId!, event])
+      currentEvents.map((event) => [event.externalId!, event]),
     );
 
     const newEventUids = new Set(parseResult.events.map((event) => event.uid));
@@ -540,7 +540,7 @@ export async function syncCalendarSubscription(subscription: any) {
           parsedEvent,
           subscription.userId,
           subscription.calendarId,
-          subscription.id
+          subscription.id,
         );
 
         await prisma.calendarEvent.create({ data: eventData });

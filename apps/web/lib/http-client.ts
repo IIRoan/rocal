@@ -251,7 +251,7 @@ export class HttpClient {
             console.log(`HTTP Client - Transforming ${key}:`, {
               original: value,
               transformed: dateValue.toString(),
-              iso: dateValue.toISOString()
+              iso: dateValue.toISOString(),
             });
           }
           transformed[key] = dateValue;

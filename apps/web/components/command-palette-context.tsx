@@ -14,7 +14,10 @@ interface CommandPaletteContextType {
   isOpen: boolean;
   openPalette: () => void;
   closePalette: () => void;
-  openEventEditor: (event?: CalendarEvent, options?: EventEditorOptions) => void;
+  openEventEditor: (
+    event?: CalendarEvent,
+    options?: EventEditorOptions,
+  ) => void;
   openCalendarManagement: () => void;
   eventEditorMode: EventEditorMode;
   popoverAnchorPosition: { x: number; y: number } | null;
@@ -59,8 +62,12 @@ export function CommandPaletteProvider({
   const [isOpen, setIsOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
   const [initialView, setInitialView] = useState<string>("main");
-  const [eventEditorMode, setEventEditorMode] = useState<EventEditorMode>("modal");
-  const [popoverAnchorPosition, setPopoverAnchorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [eventEditorMode, setEventEditorMode] =
+    useState<EventEditorMode>("modal");
+  const [popoverAnchorPosition, setPopoverAnchorPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 
   const openPalette = () => {
@@ -77,7 +84,10 @@ export function CommandPaletteProvider({
     setPreviewEvent(null);
   };
 
-  const openEventEditor = (event?: CalendarEvent, options?: EventEditorOptions) => {
+  const openEventEditor = (
+    event?: CalendarEvent,
+    options?: EventEditorOptions,
+  ) => {
     setEventToEdit(event || null);
     setEventEditorMode(options?.mode || "modal");
     setPopoverAnchorPosition(options?.anchorPosition || null);

@@ -17,7 +17,8 @@ interface MobileDashboardProps {
 }
 
 export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
-  const { openCalendarManagement, openPalette, openEventEditor } = useCommandPaletteContext();
+  const { openCalendarManagement, openPalette, openEventEditor } =
+    useCommandPaletteContext();
 
   // Get calendar data for mobile wrapper
   const calendarProps = {
@@ -30,7 +31,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
       const startTime = new Date();
       startTime.setSeconds(0);
       startTime.setMilliseconds(0);
-      
+
       const newEvent = {
         id: "",
         title: "",
@@ -42,7 +43,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      
+
       openEventEditor(newEvent);
     },
   };
@@ -66,10 +67,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
 
       {/* Mobile Layout - Hidden on desktop */}
       <div className="md:hidden h-screen">
-        <MobileCalendarWrapper
-          {...calendarProps}
-          className="h-full"
-        />
+        <MobileCalendarWrapper {...calendarProps} className="h-full" />
       </div>
     </>
   );

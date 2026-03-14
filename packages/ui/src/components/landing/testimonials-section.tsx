@@ -14,44 +14,49 @@ const testimonials = [
     company: "TechFlow",
     avatar: "SC",
     rating: 5,
-    content: "Rocani has transformed how our team manages meetings. The AI scheduling feature alone saves us hours every week. It's like having a personal assistant for everyone.",
-    featured: true
+    content:
+      "Rocani has transformed how our team manages meetings. The AI scheduling feature alone saves us hours every week. It's like having a personal assistant for everyone.",
+    featured: true,
   },
   {
     name: "Marcus Rodriguez",
-    role: "Startup Founder", 
+    role: "Startup Founder",
     company: "InnovateLab",
     avatar: "MR",
     rating: 5,
-    content: "The time analytics feature helped me realize I was spending 40% of my time in unnecessary meetings. Now I'm more productive than ever.",
-    featured: false
+    content:
+      "The time analytics feature helped me realize I was spending 40% of my time in unnecessary meetings. Now I'm more productive than ever.",
+    featured: false,
   },
   {
     name: "Emily Watson",
     role: "Engineering Lead",
     company: "DataSync",
-    avatar: "EW", 
+    avatar: "EW",
     rating: 5,
-    content: "Finally, a calendar that understands timezone complexity. Our distributed team coordination has never been smoother.",
-    featured: false
+    content:
+      "Finally, a calendar that understands timezone complexity. Our distributed team coordination has never been smoother.",
+    featured: false,
   },
   {
     name: "David Kim",
     role: "Operations Director",
     company: "ScaleUp Inc",
     avatar: "DK",
-    rating: 5, 
-    content: "The team collaboration features are outstanding. Shared calendars and event coordination happen seamlessly now.",
-    featured: true
+    rating: 5,
+    content:
+      "The team collaboration features are outstanding. Shared calendars and event coordination happen seamlessly now.",
+    featured: true,
   },
   {
     name: "Lisa Thompson",
-    role: "Marketing Director", 
+    role: "Marketing Director",
     company: "BrandForward",
     avatar: "LT",
     rating: 5,
-    content: "Smart reminders have eliminated the chaos of missed meetings. The contextual notifications are incredibly helpful.",
-    featured: false
+    content:
+      "Smart reminders have eliminated the chaos of missed meetings. The contextual notifications are incredibly helpful.",
+    featured: false,
   },
   {
     name: "James Park",
@@ -59,9 +64,10 @@ const testimonials = [
     company: "NextGen Solutions",
     avatar: "JP",
     rating: 5,
-    content: "Rocani scaled with our company from 10 to 200 employees. The enterprise features and security are top-notch.",
-    featured: true
-  }
+    content:
+      "Rocani scaled with our company from 10 to 200 employees. The enterprise features and security are top-notch.",
+    featured: true,
+  },
 ];
 
 export function TestimonialsSection() {
@@ -90,8 +96,8 @@ export function TestimonialsSection() {
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Join thousands of teams who have transformed their scheduling and time
-            management with Rocani.
+            Join thousands of teams who have transformed their scheduling and
+            time management with Rocani.
           </p>
         </div>
 
@@ -110,21 +116,23 @@ export function TestimonialsSection() {
                 <div className="space-y-4">
                   {/* Quote Icon */}
                   <Quote className="h-8 w-8 text-primary/40" />
-                  
+
                   {/* Rating */}
                   <div className="flex gap-1">
                     {renderStars(testimonial.rating)}
                   </div>
-                  
+
                   {/* Content */}
                   <p className="text-muted-foreground leading-relaxed">
                     "{testimonial.content}"
                   </p>
-                  
+
                   {/* Author */}
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={`/avatars/${testimonial.avatar.toLowerCase()}.jpg`} />
+                      <AvatarImage
+                        src={`/avatars/${testimonial.avatar.toLowerCase()}.jpg`}
+                      />
                       <AvatarFallback className="bg-primary/10 text-primary font-medium">
                         {testimonial.avatar}
                       </AvatarFallback>
@@ -148,15 +156,23 @@ export function TestimonialsSection() {
         <div className="mt-16 pt-12 border-t border-border/50">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             <div>
-              <div className="text-3xl font-bold text-foreground mb-2">10k+</div>
+              <div className="text-3xl font-bold text-foreground mb-2">
+                10k+
+              </div>
               <div className="text-sm text-muted-foreground">Active Teams</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-foreground mb-2">4.9/5</div>
-              <div className="text-sm text-muted-foreground">Average Rating</div>
+              <div className="text-3xl font-bold text-foreground mb-2">
+                4.9/5
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Average Rating
+              </div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-foreground mb-2">99.9%</div>
+              <div className="text-3xl font-bold text-foreground mb-2">
+                99.9%
+              </div>
               <div className="text-sm text-muted-foreground">Uptime</div>
             </div>
           </div>

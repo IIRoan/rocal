@@ -2,13 +2,22 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import { validateCalendarForm, handleCalendarCreate, handleCalendarUpdate, handleCalendarDelete, resetCalendarForm } from "@/components/command-palette/calendar-utils";
+import {
+  validateCalendarForm,
+  handleCalendarCreate,
+  handleCalendarUpdate,
+  handleCalendarDelete,
+  resetCalendarForm,
+} from "@/components/command-palette/calendar-utils";
 import type { Calendar } from "@workspace/ui/components/calendar/types";
 
 interface UseCalendarFormProps {
   calendars: Calendar[];
   calendarData: any;
-  onSuccess?: (action: 'create' | 'update' | 'delete', calendar?: Calendar) => void;
+  onSuccess?: (
+    action: "create" | "update" | "delete",
+    calendar?: Calendar,
+  ) => void;
 }
 
 interface CalendarFormErrors {
@@ -23,14 +32,14 @@ interface UseCalendarFormReturn {
   editingCalendar: Calendar | null;
   validationErrors: CalendarFormErrors;
   saving: boolean;
-  
+
   // Actions
   setCalendarName: (name: string) => void;
   setCalendarColor: (color: string) => void;
   setEditingCalendar: (calendar: Calendar | null) => void;
   setValidationErrors: (errors: CalendarFormErrors) => void;
   setSaving: (saving: boolean) => void;
-  
+
   // Form operations
   resetForm: () => void;
   validateForm: () => boolean;
@@ -49,7 +58,9 @@ export function useCalendarForm({
   const [calendarName, setCalendarName] = useState("");
   const [calendarColor, setCalendarColor] = useState("#3b82f6");
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
-  const [validationErrors, setValidationErrors] = useState<CalendarFormErrors>({});
+  const [validationErrors, setValidationErrors] = useState<CalendarFormErrors>(
+    {},
+  );
   const [saving, setSaving] = useState(false);
 
   // Reset form to initial state
@@ -62,7 +73,12 @@ export function useCalendarForm({
 
   // Validate the form
   const validateForm = useCallback(() => {
-    const errors = validateCalendarForm(calendarName, calendarColor, calendars, editingCalendar);
+    const errors = validateCalendarForm(
+      calendarName,
+      calendarColor,
+      calendars,
+      editingCalendar,
+    );
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   }, [calendarName, calendarColor, calendars, editingCalendar]);
@@ -81,7 +97,7 @@ export function useCalendarForm({
 
       toast.success(`Calendar "${calendarName}" created`);
       resetForm();
-      onSuccess?.('create', newCalendar);
+      onSuccess?.("create", newCalendar);
     } catch (error: any) {
       console.error("Failed to create calendar:", error);
       if (error.message && error.message.includes("already exists")) {
@@ -94,7 +110,14 @@ export function useCalendarForm({
     } finally {
       setSaving(false);
     }
-  }, [calendarName, calendarColor, calendarData, validateForm, resetForm, onSuccess]);
+  }, [
+    calendarName,
+    calendarColor,
+    calendarData,
+    validateForm,
+    resetForm,
+    onSuccess,
+  ]);
 
   // Update calendar
   const updateCalendar = useCallback(async () => {
@@ -102,14 +125,17 @@ export function useCalendarForm({
 
     setSaving(true);
     try {
-      const updatedCalendar = await calendarData.updateCalendar(editingCalendar.id, {
-        name: calendarName.trim(),
-        color: calendarColor,
-      });
+      const updatedCalendar = await calendarData.updateCalendar(
+        editingCalendar.id,
+        {
+          name: calendarName.trim(),
+          color: calendarColor,
+        },
+      );
 
       toast.success(`Calendar "${calendarName}" updated`);
       resetForm();
-      onSuccess?.('update', updatedCalendar);
+      onSuccess?.("update", updatedCalendar);
     } catch (error: any) {
       console.error("Failed to update calendar:", error);
       if (error.message && error.message.includes("already exists")) {
@@ -122,22 +148,33 @@ export function useCalendarForm({
     } finally {
       setSaving(false);
     }
-  }, [editingCalendar, calendarName, calendarColor, calendarData, validateForm, resetForm, onSuccess]);
+  }, [
+    editingCalendar,
+    calendarName,
+    calendarColor,
+    calendarData,
+    validateForm,
+    resetForm,
+    onSuccess,
+  ]);
 
   // Delete calendar
-  const deleteCalendar = useCallback(async (calendar: Calendar) => {
-    setSaving(true);
-    try {
-      await calendarData.deleteCalendar(calendar.id);
-      toast.success(`Calendar "${calendar.name}" deleted`);
-      onSuccess?.('delete', calendar);
-    } catch (error: any) {
-      console.error("Failed to delete calendar:", error);
-      toast.error("Failed to delete calendar");
-    } finally {
-      setSaving(false);
-    }
-  }, [calendarData, onSuccess]);
+  const deleteCalendar = useCallback(
+    async (calendar: Calendar) => {
+      setSaving(true);
+      try {
+        await calendarData.deleteCalendar(calendar.id);
+        toast.success(`Calendar "${calendar.name}" deleted`);
+        onSuccess?.("delete", calendar);
+      } catch (error: any) {
+        console.error("Failed to delete calendar:", error);
+        toast.error("Failed to delete calendar");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [calendarData, onSuccess],
+  );
 
   // Start editing a calendar
   const startEdit = useCallback((calendar: Calendar) => {
@@ -159,14 +196,14 @@ export function useCalendarForm({
     editingCalendar,
     validationErrors,
     saving,
-    
+
     // Actions
     setCalendarName,
     setCalendarColor,
     setEditingCalendar,
     setValidationErrors,
     setSaving,
-    
+
     // Form operations
     resetForm,
     validateForm,
@@ -216,14 +253,20 @@ export function useColorSelector({
 }: UseColorSelectorProps = {}): UseColorSelectorReturn {
   const [selectedColor, setSelectedColorState] = useState(initialColor);
 
-  const setSelectedColor = useCallback((color: string) => {
-    setSelectedColorState(color);
-    onColorChange?.(color);
-  }, [onColorChange]);
+  const setSelectedColor = useCallback(
+    (color: string) => {
+      setSelectedColorState(color);
+      onColorChange?.(color);
+    },
+    [onColorChange],
+  );
 
-  const isPresetColor = useCallback((color: string) => {
-    return presetColors.includes(color);
-  }, [presetColors]);
+  const isPresetColor = useCallback(
+    (color: string) => {
+      return presetColors.includes(color);
+    },
+    [presetColors],
+  );
 
   return {
     selectedColor,

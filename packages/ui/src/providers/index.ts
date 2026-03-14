@@ -1,8 +1,8 @@
 // Providers
 export { ThemeProvider } from "./theme-provider";
-export { 
+export {
   LoadingProvider,
   useLoading,
   useLoadingOperation,
-  useComponentLoading
+  useComponentLoading,
 } from "./loading-provider";

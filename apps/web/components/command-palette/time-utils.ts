@@ -13,12 +13,12 @@ export const formatTimeForInput = (date: Date) => {
 };
 
 export const validateTime = (timeString: string): TimeValidationResult => {
-  if (!timeString || timeString.trim() === '') {
-    return { isValid: false, error: 'Time is required' };
+  if (!timeString || timeString.trim() === "") {
+    return { isValid: false, error: "Time is required" };
   }
 
   // Clean the input - remove any non-digit or colon characters
-  const cleaned = timeString.replace(/[^\d:]/g, '');
+  const cleaned = timeString.replace(/[^\d:]/g, "");
 
   // Handle various input formats
   let formattedTime = cleaned;
@@ -28,9 +28,9 @@ export const validateTime = (timeString: string): TimeValidationResult => {
     // Just hours: "9" -> "09:00"
     const hours = parseInt(cleaned, 10);
     if (hours >= 0 && hours <= 23) {
-      formattedTime = `${hours.toString().padStart(2, '0')}:00`;
+      formattedTime = `${hours.toString().padStart(2, "0")}:00`;
     } else {
-      return { isValid: false, error: 'Hours must be between 0-23' };
+      return { isValid: false, error: "Hours must be between 0-23" };
     }
   } else if (/^\d{3,4}$/.test(cleaned)) {
     // HHMM format: "930" -> "09:30" or "1430" -> "14:30"
@@ -44,9 +44,9 @@ export const validateTime = (timeString: string): TimeValidationResult => {
     }
 
     if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-      formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      formattedTime = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
     } else {
-      return { isValid: false, error: 'Invalid time format' };
+      return { isValid: false, error: "Invalid time format" };
     }
   }
 
@@ -55,30 +55,30 @@ export const validateTime = (timeString: string): TimeValidationResult => {
   const match = formattedTime.match(timeRegex);
 
   if (!match) {
-    return { isValid: false, error: 'Use HH:MM format (e.g. 09:30)' };
+    return { isValid: false, error: "Use HH:MM format (e.g. 09:30)" };
   }
 
-  const hours = parseInt(match[1] || '0', 10);
-  const minutes = parseInt(match[2] || '0', 10);
+  const hours = parseInt(match[1] || "0", 10);
+  const minutes = parseInt(match[2] || "0", 10);
 
   if (hours < 0 || hours > 23) {
-    return { isValid: false, error: 'Hours must be between 0-23' };
+    return { isValid: false, error: "Hours must be between 0-23" };
   }
 
   if (minutes < 0 || minutes > 59) {
-    return { isValid: false, error: 'Minutes must be between 0-59' };
+    return { isValid: false, error: "Minutes must be between 0-59" };
   }
 
   return {
     isValid: true,
-    time: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    time: `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`,
   };
 };
 
 export const timeToMinutes = (timeString: string): number => {
-  const [hoursStr, minutesStr] = timeString.split(':');
-  const hours = parseInt(hoursStr || '0', 10);
-  const minutes = parseInt(minutesStr || '0', 10);
+  const [hoursStr, minutesStr] = timeString.split(":");
+  const hours = parseInt(hoursStr || "0", 10);
+  const minutes = parseInt(minutesStr || "0", 10);
   return hours * 60 + minutes;
 };
 
@@ -86,19 +86,24 @@ export const minutesToTime = (totalMinutes: number): string => {
   const normalizedMinutes = Math.max(0, totalMinutes % (24 * 60));
   const hours = Math.floor(normalizedMinutes / 60);
   const minutes = normalizedMinutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 };
 
-export const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement | null>, selectedTime: string) => {
+export const scrollToSelectedTime = (
+  dropdownRef: React.RefObject<HTMLDivElement | null>,
+  selectedTime: string,
+) => {
   if (!dropdownRef.current) return;
 
   // Try to find exact match first
-  const selectedButton = dropdownRef.current.querySelector(`[data-time-value="${selectedTime}"]`) as HTMLElement;
+  const selectedButton = dropdownRef.current.querySelector(
+    `[data-time-value="${selectedTime}"]`,
+  ) as HTMLElement;
   if (selectedButton) {
     // Scroll to the selected time with center alignment
     selectedButton.scrollIntoView({
-      block: 'center',
-      behavior: 'smooth'
+      block: "center",
+      behavior: "smooth",
     });
     return;
   }
@@ -110,11 +115,13 @@ export const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement
   const roundedMinutes = Math.floor(selectedMinutes / 15) * 15;
   const roundedTime = minutesToTime(roundedMinutes);
 
-  const closestButton = dropdownRef.current.querySelector(`[data-time-value="${roundedTime}"]`) as HTMLElement;
+  const closestButton = dropdownRef.current.querySelector(
+    `[data-time-value="${roundedTime}"]`,
+  ) as HTMLElement;
   if (closestButton) {
     closestButton.scrollIntoView({
-      block: 'center',
-      behavior: 'smooth'
+      block: "center",
+      behavior: "smooth",
     });
   } else {
     // Fallback: scroll to approximate position based on time
@@ -124,7 +131,7 @@ export const scrollToSelectedTime = (dropdownRef: React.RefObject<HTMLDivElement
     const scrollPosition = (timeIndex / totalOptions) * container.scrollHeight;
     container.scrollTo({
       top: scrollPosition,
-      behavior: 'smooth'
+      behavior: "smooth",
     });
   }
 };
@@ -138,12 +145,13 @@ export const generateAllTimeOptions = (timeFormat?: string) => {
       const formattedMinute = minute.toString().padStart(2, "0");
       const value = `${formattedHour}:${formattedMinute}`;
       const date = new Date(2000, 0, 1, hour, minute);
-      
+
       // Use 24h format if explicitly set to "24h", otherwise use 12h format
-      const label = timeFormat === "24h"
-        ? `${formattedHour}:${formattedMinute}`
-        : format(date, "h:mm a");
-      
+      const label =
+        timeFormat === "24h"
+          ? `${formattedHour}:${formattedMinute}`
+          : format(date, "h:mm a");
+
       options.push({ value, label });
     }
   }

@@ -56,7 +56,7 @@ function TimeGrid({
     if (open && containerRef.current && scrollToIndex >= 0) {
       const timer = setTimeout(() => {
         const button = containerRef.current?.querySelector(
-          `[data-time-index="${scrollToIndex}"]`
+          `[data-time-index="${scrollToIndex}"]`,
         ) as HTMLElement;
         if (button && containerRef.current) {
           button.scrollIntoView({ behavior: "instant", block: "center" });
@@ -71,10 +71,15 @@ function TimeGrid({
       ref={containerRef}
       className={cn(
         "overflow-y-auto overscroll-contain",
-        compact ? "max-h-[300px]" : "h-full"
+        compact ? "max-h-[300px]" : "h-full",
       )}
     >
-      <div className={cn("grid gap-2 p-3", compact ? "grid-cols-4" : "grid-cols-3")}>
+      <div
+        className={cn(
+          "grid gap-2 p-3",
+          compact ? "grid-cols-4" : "grid-cols-3",
+        )}
+      >
         {timeOptions.map((time, index) => {
           const timeString = formatTime(time);
           const isSelected =
@@ -97,7 +102,7 @@ function TimeGrid({
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : isCurrentTime
                     ? "bg-primary/20 text-primary ring-2 ring-primary hover:bg-primary/30"
-                    : "bg-accent hover:bg-accent/80 text-accent-foreground"
+                    : "bg-accent hover:bg-accent/80 text-accent-foreground",
               )}
             >
               {timeString}
@@ -120,7 +125,13 @@ interface TimeInputProps {
   open?: boolean;
 }
 
-function TimeInput({ value, onChange, onSubmit, isValid, open }: TimeInputProps) {
+function TimeInput({
+  value,
+  onChange,
+  onSubmit,
+  isValid,
+  open,
+}: TimeInputProps) {
   const hhRef = useRef<HTMLInputElement>(null);
   const mmRef = useRef<HTMLInputElement>(null);
   const hours = value.split(":")[0] || "";
@@ -154,7 +165,11 @@ function TimeInput({ value, onChange, onSubmit, isValid, open }: TimeInputProps)
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && minutes.length === 0 && e.currentTarget === mmRef.current) {
+    if (
+      e.key === "Backspace" &&
+      minutes.length === 0 &&
+      e.currentTarget === mmRef.current
+    ) {
       e.preventDefault();
       onChange(hours);
       hhRef.current?.focus();
@@ -188,7 +203,11 @@ function TimeInput({ value, onChange, onSubmit, isValid, open }: TimeInputProps)
         value={minutes}
         onChange={handleMinutesChange}
         onKeyDown={handleKeyDown}
-        className={cn(INPUT_STYLES, "focus:text-primary", hours.length < 2 && "opacity-50")}
+        className={cn(
+          INPUT_STYLES,
+          "focus:text-primary",
+          hours.length < 2 && "opacity-50",
+        )}
         autoComplete="off"
         maxLength={2}
         disabled={hours.length < 2}
@@ -222,13 +241,14 @@ export function ShadcnAutocomleteTimePicker({
   const selectedIndex = timeOptions.findIndex(
     (time) =>
       time.getHours() === selectedTime.getHours() &&
-      time.getMinutes() === selectedTime.getMinutes()
+      time.getMinutes() === selectedTime.getMinutes(),
   );
 
   const getScrollToIndex = useCallback(() => {
     if (selectedIndex !== -1) return selectedIndex;
 
-    const selectedMinutes = selectedTime.getHours() * 60 + selectedTime.getMinutes();
+    const selectedMinutes =
+      selectedTime.getHours() * 60 + selectedTime.getMinutes();
     let closestIndex = 0;
     let closestDiff = Infinity;
 
@@ -275,7 +295,7 @@ export function ShadcnAutocomleteTimePicker({
       aria-expanded={open}
       className={cn(
         "outline-none text-foreground font-semibold active:opacity-70 transition-opacity",
-        className
+        className,
       )}
     >
       {currentTimeString}
@@ -285,7 +305,10 @@ export function ShadcnAutocomleteTimePicker({
       variant={variant}
       role="combobox"
       aria-expanded={open}
-      className={cn("w-full justify-start font-normal cursor-pointer", className)}
+      className={cn(
+        "w-full justify-start font-normal cursor-pointer",
+        className,
+      )}
     >
       <Clock className="mr-2 h-4 w-4 flex-shrink-0" data-testid="ClockIcon" />
       {currentTimeString}
@@ -329,7 +352,7 @@ export function ShadcnAutocomleteTimePicker({
                 "h-11 min-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
                 customTimeInput.length === 5
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-muted/30 text-muted-foreground"
+                  : "bg-muted/30 text-muted-foreground",
               )}
             >
               Apply
@@ -376,7 +399,7 @@ export function ShadcnAutocomleteTimePicker({
               "h-11 min-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-colors",
               customTimeInput.length === 5
                 ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-muted/30 text-muted-foreground"
+                : "bg-muted/30 text-muted-foreground",
             )}
           >
             Apply

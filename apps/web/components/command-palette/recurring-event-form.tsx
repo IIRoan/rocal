@@ -11,13 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import {
-  RotateCcw,
-} from "lucide-react";
-import type {
-  RecurrenceRule,
-  RecurrenceFrequency,
-} from "@/lib/types/calendar";
+import { RotateCcw } from "lucide-react";
+import type { RecurrenceRule, RecurrenceFrequency } from "@/lib/types/calendar";
 
 interface RecurringEventFormProps {
   isRecurring: boolean;
@@ -50,7 +45,6 @@ export function RecurringEventForm({
       onRecurrenceRuleChange(customRule);
     }
   }, [isRecurring, recurrenceRule, customRule, onRecurrenceRuleChange]);
-
 
   const handleCustomRuleUpdate = (updates: Partial<RecurrenceRule>) => {
     const newRule = { ...customRule, ...updates };
@@ -245,10 +239,14 @@ export function RecurringEventForm({
               className="w-16 h-9"
             />
             <span className="text-sm text-muted-foreground">
-              {customRule.frequency === "daily" && (customRule.interval === 1 ? "day" : "days")}
-              {customRule.frequency === "weekly" && (customRule.interval === 1 ? "week" : "weeks")}
-              {customRule.frequency === "monthly" && (customRule.interval === 1 ? "month" : "months")}
-              {customRule.frequency === "yearly" && (customRule.interval === 1 ? "year" : "years")}
+              {customRule.frequency === "daily" &&
+                (customRule.interval === 1 ? "day" : "days")}
+              {customRule.frequency === "weekly" &&
+                (customRule.interval === 1 ? "week" : "weeks")}
+              {customRule.frequency === "monthly" &&
+                (customRule.interval === 1 ? "month" : "months")}
+              {customRule.frequency === "yearly" &&
+                (customRule.interval === 1 ? "year" : "years")}
             </span>
           </div>
 
@@ -264,13 +262,16 @@ export function RecurringEventForm({
                 onChange={(e) => {
                   const day = parseInt(e.target.value);
                   handleCustomRuleUpdate({
-                    byMonthDay: day && day >= 1 && day <= 31 ? [day] : undefined,
+                    byMonthDay:
+                      day && day >= 1 && day <= 31 ? [day] : undefined,
                   });
                 }}
                 placeholder="15"
                 className="w-16 h-9"
               />
-              <span className="text-sm text-muted-foreground">of the month</span>
+              <span className="text-sm text-muted-foreground">
+                of the month
+              </span>
             </div>
           )}
 
@@ -307,7 +308,8 @@ export function RecurringEventForm({
                 onChange={(e) => {
                   const day = parseInt(e.target.value);
                   handleCustomRuleUpdate({
-                    byMonthDay: day && day >= 1 && day <= 31 ? [day] : undefined,
+                    byMonthDay:
+                      day && day >= 1 && day <= 31 ? [day] : undefined,
                   });
                 }}
                 placeholder="Day"

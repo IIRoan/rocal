@@ -87,26 +87,40 @@ export function StickyMiniCalendar({
   const days = useMemo(() => {
     const monthStart = startOfMonth(displayMonth);
     const monthEnd = endOfMonth(displayMonth);
-    const gridStart = startOfWeek(monthStart, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const gridStart = startOfWeek(monthStart, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    const gridEnd = endOfWeek(monthEnd, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [displayMonth, weekStartDay]);
 
   // Current week days for the day strip
   const currentWeekDays = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const weekStart = startOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    const weekEnd = endOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
     return eachDayOfInterval({ start: weekStart, end: weekEnd });
   }, [currentDate, weekStartDay]);
 
   const weekStart = useMemo(
-    () => startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 }),
-    [currentDate, weekStartDay]
+    () =>
+      startOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      }),
+    [currentDate, weekStartDay],
   );
 
   const weekEnd = useMemo(
-    () => endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 }),
-    [currentDate, weekStartDay]
+    () =>
+      endOfWeek(currentDate, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      }),
+    [currentDate, weekStartDay],
   );
 
   // All-day and multi-day events for the current week
@@ -126,8 +140,12 @@ export function StickyMiniCalendar({
   }, [events, currentDate]);
 
   useEffect(() => {
-    const monthStart = startOfWeek(startOfMonth(displayMonth), { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-    const monthEnd = endOfWeek(endOfMonth(displayMonth), { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    const monthStart = startOfWeek(startOfMonth(displayMonth), {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+    const monthEnd = endOfWeek(endOfMonth(displayMonth), {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
     onDisplayMonthChange?.({ start: monthStart, end: monthEnd });
   }, [displayMonth, onDisplayMonthChange, weekStartDay]);
 
@@ -139,12 +157,12 @@ export function StickyMiniCalendar({
   return (
     <>
       {/* Fixed position header that stays at top */}
-      <div 
+      <div
         ref={headerRef}
         className={cn(
           "fixed top-0 left-0 right-0 z-50",
           "bg-background/95 backdrop-blur-sm",
-          className
+          className,
         )}
       >
         {/* Compact month navigation header */}
@@ -186,7 +204,9 @@ export function StickyMiniCalendar({
                   "relative rounded-full text-[10px] font-medium transition-all touch-manipulation",
                   "flex items-center justify-center h-5 w-5 mx-auto",
                   !isCurrentMonth && "text-muted-foreground/30",
-                  isCurrentMonth && !isSelected && "hover:bg-accent/50 text-foreground/80",
+                  isCurrentMonth &&
+                    !isSelected &&
+                    "hover:bg-accent/50 text-foreground/80",
                   isSelected && "text-primary font-semibold",
                   isCurrentDay && !isSelected && "text-primary font-semibold",
                 )}
@@ -213,7 +233,9 @@ export function StickyMiniCalendar({
         {/* All-day events section for day view */}
         {showAllDayEvents && dayAllDayEventsList.length > 0 && (
           <div className="px-3 py-2">
-            <div className="text-xs text-muted-foreground mb-1 font-medium">All day</div>
+            <div className="text-xs text-muted-foreground mb-1 font-medium">
+              All day
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {dayAllDayEventsList.map((event) => {
                 const eventStart = new Date(event.start);
@@ -246,92 +268,114 @@ export function StickyMiniCalendar({
             <div className="flex relative">
               {/* Time column spacer - matches timeline width */}
               <div className="w-11 flex-shrink-0" />
-              
+
               {/* Day columns with all-day/multi-day events */}
               {currentWeekDays.map((day) => {
                 const isSelected = isSameDay(day, currentDate);
                 const isCurrentDay = isToday(day);
-              const dayAllDayEvents = sortEvents(
-                allDayEvents.filter((event) => eventOverlapsRange(event, day, day, "day"))
-              );
+                const dayAllDayEvents = sortEvents(
+                  allDayEvents.filter((event) =>
+                    eventOverlapsRange(event, day, day, "day"),
+                  ),
+                );
 
-              return (
-                <div
-                  key={day.toString()}
-                  className={cn(
-                    "flex-1 min-w-0 text-center py-0.5 border-l border-border/50 first:border-l-0",
-                    isSelected && "text-primary",
-                    !isSelected && isCurrentDay && "bg-primary/10",
-                    !isSelected && !isCurrentDay && "hover:bg-accent/30 active:bg-accent/50",
-                    !workingDays.includes(day.getDay()) && [0, 6].includes(day.getDay()) && "bg-muted/30"
-                  )}
-                  onClick={() => setCurrentDate(day)}
-                >
-                  {/* Day header */}
-                  <span className={cn(
-                    "text-[9px] font-medium uppercase leading-none",
-                    isSelected ? "text-primary/70" : "text-muted-foreground"
-                  )}>
-                    {format(day, "EEE").slice(0, 3)}
-                  </span>
-                  
-                  <span className={cn(
-                    "text-xs font-semibold leading-tight block",
-                    isSelected ? "text-primary" : isCurrentDay ? "text-primary" : "text-foreground"
-                  )}>
-                    {format(day, "d")}
-                  </span>
-
-                  
-
-                  {/* Compact all-day/multi-day events */}
-                  {dayAllDayEvents.length > 0 && (
-                    <div className="px-0.5 space-y-0.5 mt-0.5">
-                      {dayAllDayEvents.slice(0, 3).map((event) => {
-                        const { start: eStartDay, end: eEndDay } = getEventInterval(event, "day");
-                        const weekStartDay = startOfDay(weekStart);
-                        const weekEndDay = endOfDay(weekEnd);
-                        const visibleStart = isBefore(eStartDay, weekStartDay) ? weekStartDay : eStartDay;
-                        const visibleEnd = isBefore(weekEndDay, eEndDay) ? weekEndDay : eEndDay;
-                        const isFirstSegmentDay = isSameDay(day, visibleStart);
-                        const isLastSegmentDay = isSameDay(day, visibleEnd);
-                        const shouldShowTitle = isFirstSegmentDay;
-
-                        return (
-                          <EventItem
-                            key={`spanning-${event.id}-${day.toString()}`}
-                            onClick={(e) => handleEventClick(event, e)}
-                            event={event}
-                            view="month"
-                            isFirstDay={isFirstSegmentDay}
-                            isLastDay={isLastSegmentDay}
-                            className="text-[9px] py-0.5 h-[18px]"
-                            timezone={timezone}
-                          >
-                            <div 
-                              className={cn(
-                                "truncate px-0.5",
-                                !shouldShowTitle && "invisible"
-                              )} 
-                              aria-hidden={!shouldShowTitle}
-                            >
-                              {event.title}
-                            </div>
-                          </EventItem>
-                        );
-                      })}
-                      {dayAllDayEvents.length > 3 && (
-                        <div className="text-[8px] text-muted-foreground px-1">
-                          +{dayAllDayEvents.length - 3} more
-                        </div>
+                return (
+                  <div
+                    key={day.toString()}
+                    className={cn(
+                      "flex-1 min-w-0 text-center py-0.5 border-l border-border/50 first:border-l-0",
+                      isSelected && "text-primary",
+                      !isSelected && isCurrentDay && "bg-primary/10",
+                      !isSelected &&
+                        !isCurrentDay &&
+                        "hover:bg-accent/30 active:bg-accent/50",
+                      !workingDays.includes(day.getDay()) &&
+                        [0, 6].includes(day.getDay()) &&
+                        "bg-muted/30",
+                    )}
+                    onClick={() => setCurrentDate(day)}
+                  >
+                    {/* Day header */}
+                    <span
+                      className={cn(
+                        "text-[9px] font-medium uppercase leading-none",
+                        isSelected
+                          ? "text-primary/70"
+                          : "text-muted-foreground",
                       )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    >
+                      {format(day, "EEE").slice(0, 3)}
+                    </span>
+
+                    <span
+                      className={cn(
+                        "text-xs font-semibold leading-tight block",
+                        isSelected
+                          ? "text-primary"
+                          : isCurrentDay
+                            ? "text-primary"
+                            : "text-foreground",
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+
+                    {/* Compact all-day/multi-day events */}
+                    {dayAllDayEvents.length > 0 && (
+                      <div className="px-0.5 space-y-0.5 mt-0.5">
+                        {dayAllDayEvents.slice(0, 3).map((event) => {
+                          const { start: eStartDay, end: eEndDay } =
+                            getEventInterval(event, "day");
+                          const weekStartDay = startOfDay(weekStart);
+                          const weekEndDay = endOfDay(weekEnd);
+                          const visibleStart = isBefore(eStartDay, weekStartDay)
+                            ? weekStartDay
+                            : eStartDay;
+                          const visibleEnd = isBefore(weekEndDay, eEndDay)
+                            ? weekEndDay
+                            : eEndDay;
+                          const isFirstSegmentDay = isSameDay(
+                            day,
+                            visibleStart,
+                          );
+                          const isLastSegmentDay = isSameDay(day, visibleEnd);
+                          const shouldShowTitle = isFirstSegmentDay;
+
+                          return (
+                            <EventItem
+                              key={`spanning-${event.id}-${day.toString()}`}
+                              onClick={(e) => handleEventClick(event, e)}
+                              event={event}
+                              view="month"
+                              isFirstDay={isFirstSegmentDay}
+                              isLastDay={isLastSegmentDay}
+                              className="text-[9px] py-0.5 h-[18px]"
+                              timezone={timezone}
+                            >
+                              <div
+                                className={cn(
+                                  "truncate px-0.5",
+                                  !shouldShowTitle && "invisible",
+                                )}
+                                aria-hidden={!shouldShowTitle}
+                              >
+                                {event.title}
+                              </div>
+                            </EventItem>
+                          );
+                        })}
+                        {dayAllDayEvents.length > 3 && (
+                          <div className="text-[8px] text-muted-foreground px-1">
+                            +{dayAllDayEvents.length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
         )}
       </div>
 
