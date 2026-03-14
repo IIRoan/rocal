@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { RiCheckLine, RiAddLine, RiSettings3Line } from "@remixicon/react";
+import { RiCheckLine, RiAddLine, RiSettings3Line, RiLayoutLeft2Line, RiSkipLeftLine } from "@remixicon/react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -12,17 +12,16 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarTrigger,
+  SidebarMenuButton,
+  SidebarRail,
+  useSidebar,
 } from "../ui/sidebar";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -165,52 +164,142 @@ export function AppSidebar({
   }
 
   // Desktop version - use Sidebar wrapper
+  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onCreateEvent, events, onMiniCalendarMonthChange, props }} />;
+}
+
+function AppSidebarDesktop({
+  user,
+  onLogout,
+  onOpenSettings,
+  onOpenCalendarManagement,
+  onCreateEvent,
+  events,
+  onMiniCalendarMonthChange,
+  props,
+}: {
+  user?: { name: string; email: string; avatar?: string };
+  onLogout?: () => void;
+  onOpenSettings?: () => void;
+  onOpenCalendarManagement?: () => void;
+  onCreateEvent?: () => void;
+  events?: CalendarEvent[];
+  onMiniCalendarMonthChange?: (dateRange: { start: Date; end: Date }) => void;
+  props: React.ComponentProps<typeof Sidebar>;
+}) {
+  const { calendars, toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
+  const { state, toggleSidebar } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
   return (
-    <Sidebar variant="inset" {...props} className="max-lg:p-3 lg:pe-1">
+    <Sidebar variant="inset" collapsible="icon" {...props} className="max-lg:p-3 lg:pe-1">
       <SidebarHeader>
         <div className="flex justify-between items-center gap-2">
           <a className="inline-flex" href="/">
             <LogoSvg width="32" height="32" className="text-foreground/80" />
           </a>
-          <SidebarTrigger className="text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! hidden md:flex" />
+          {!isCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={toggleSidebar}
+              title="Collapse sidebar"
+            >
+              <RiLayoutLeft2Line size={16} />
+            </Button>
+          )}
         </div>
+        {isCollapsed && (
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={toggleSidebar}
+              title="Expand sidebar"
+            >
+              <RiSkipLeftLine size={16} />
+            </Button>
+          </div>
+        )}
       </SidebarHeader>
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">
         {onCreateEvent && (
-          <SidebarGroup className="px-1 mb-2">
-            <Button onClick={onCreateEvent} className="w-full gap-2" size="sm">
-              <RiAddLine size={16} />
-              <span>New Event</span>
-            </Button>
+          <div className={isCollapsed ? "flex justify-center py-2" : "px-2 mb-2"}>
+            {isCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onCreateEvent}
+                    variant="default"
+                    size="icon"
+                    className="h-8 w-8"
+                  >
+                    <RiAddLine size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">New Event</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button onClick={onCreateEvent} className="w-full gap-2" size="sm">
+                <RiAddLine size={16} />
+                <span>New Event</span>
+              </Button>
+            )}
+          </div>
+        )}
+        {!isCollapsed && (
+          <SidebarGroup className="px-2">
+            <SidebarCalendar
+              events={events}
+              onDisplayMonthChange={onMiniCalendarMonthChange}
+            />
           </SidebarGroup>
         )}
-        <SidebarGroup className="px-1">
-          <SidebarCalendar
-            events={events}
-            onDisplayMonthChange={onMiniCalendarMonthChange}
-          />
-        </SidebarGroup>
-        <SidebarGroup className="px-1 mt-3 pt-4 border-t">
-          <div className="flex items-center justify-between">
-            <SidebarGroupLabel className="uppercase text-muted-foreground/65">
-              Calendars
-            </SidebarGroupLabel>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={onOpenCalendarManagement}
-                title="Calendar Settings"
-              >
-                <RiSettings3Line size={14} />
-              </Button>
+        <div className={isCollapsed ? "mt-2 pt-2 border-t" : "mt-2 pt-2 border-t"}>
+          {!isCollapsed && (
+            <div className="flex items-center justify-between px-2">
+              <SidebarGroupLabel className="uppercase text-muted-foreground/65">
+                Calendars
+              </SidebarGroupLabel>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={onOpenCalendarManagement}
+                  title="Calendar Settings"
+                >
+                  <RiSettings3Line size={14} />
+                </Button>
+              </div>
             </div>
-          </div>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {calendars.map((calendar) => (
-                <SidebarMenuItem key={calendar.id}>
+          )}
+          <div className={isCollapsed ? "flex flex-col items-center gap-1 mt-2" : "px-2"}>
+            {calendars.map((calendar) => (
+              <div key={calendar.id} className={isCollapsed ? "" : ""}>
+                {isCollapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-sidebar-accent transition-colors"
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
+                      >
+                        <span
+                          className={`size-3 rounded-full transition-opacity ${
+                            !isCalendarVisible(calendar.id) && "opacity-40"
+                          }`}
+                          style={{
+                            backgroundColor: calendar.color?.startsWith("#")
+                              ? calendar.color
+                              : `var(--color-event-${calendar.color || "default"})`,
+                          }}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{calendar.name}</TooltipContent>
+                  </Tooltip>
+                ) : (
                   <SidebarMenuButton
                     asChild
                     className="relative rounded-md [&>svg]:size-auto justify-between has-focus-visible:border-ring has-focus-visible:ring-ring/50 has-focus-visible:ring-[3px]"
@@ -247,11 +336,11 @@ export function AppSidebar({
                       ></span>
                     </span>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </SidebarContent>
       <SidebarFooter className="gap-1">
         <NavUser
@@ -266,6 +355,7 @@ export function AppSidebar({
           onOpenSettings={onOpenSettings}
         />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
