@@ -12,6 +12,7 @@ import {
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Button } from "@workspace/ui/components/ui/button";
+import { Label } from "@workspace/ui/components/ui/label";
 import {
   ArrowLeft,
   RefreshCw,
@@ -164,12 +165,14 @@ export function PasskeySettings({
         <div className="flex flex-col">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onBack}
-              className="p-1 rounded hover:bg-muted/50 transition-colors"
+              className="p-1 h-auto"
             >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-            </button>
+            </Button>
             <span className="text-sm font-medium">Passkeys</span>
           </div>
 
@@ -178,16 +181,16 @@ export function PasskeySettings({
               <>
                 {/* Add Passkey Button */}
                 <div className="p-1">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => setShowAddPasskey(true)}
                     disabled={passkeyLoading}
-                    className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                    className="w-full justify-start h-auto px-3 py-2 font-normal"
                   >
                     <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm flex-1">Add New Passkey</span>
+                    <span className="text-sm flex-1 text-left">Add New Passkey</span>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                  </button>
+                  </Button>
                 </div>
 
                 {passkeyLoading && passkeys.length === 0 ? (
@@ -239,14 +242,16 @@ export function PasskeySettings({
                                     : "Unknown date"}
                                 </p>
                               </div>
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() =>
                                   deletePasskeyMutation.mutate(passkey.id)
                                 }
-                                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
+                                className="p-1.5 h-auto hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive shrink-0"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              </Button>
                             </div>
                           );
                         })}
@@ -262,9 +267,9 @@ export function PasskeySettings({
                 </div>
                 <div className="px-4 py-3 space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                    <Label className="block text-xs font-medium text-muted-foreground mb-1.5">
                       Passkey Name
-                    </label>
+                    </Label>
                     <Input
                       type="text"
                       value={passkeyName}

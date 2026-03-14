@@ -220,7 +220,7 @@ export function SubscriptionManagement({
         return (
           <Badge
             variant="secondary"
-            className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0"
+            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-[10px] px-1.5 py-0"
           >
             Synced
           </Badge>
@@ -264,12 +264,14 @@ export function SubscriptionManagement({
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
             {onBack && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onBack}
-                className="p-1 rounded hover:bg-muted/50 transition-colors"
+                className="p-1 h-auto"
               >
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
+              </Button>
             )}
             <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-medium">Subscriptions</span>
@@ -286,9 +288,9 @@ export function SubscriptionManagement({
 
           {success && (
             <div className="px-4 py-2 border-b border-border/50">
-              <Alert className="py-2 border-green-200 bg-green-50">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                <AlertDescription className="text-xs text-green-800">
+              <Alert className="py-2 border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950">
+                <CheckCircle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                <AlertDescription className="text-xs text-emerald-800 dark:text-emerald-200">
                   {success}
                 </AlertDescription>
               </Alert>
@@ -301,32 +303,32 @@ export function SubscriptionManagement({
               Actions
             </div>
             <div className="p-1">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setShowCreateForm(!showCreateForm);
                   setValidationErrors({});
                   setLocalError(null);
                   setSuccess(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                className="w-full justify-start h-auto px-3 py-2 font-normal"
               >
                 <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-sm">New Subscription</span>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() =>
                   queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
                 }
                 disabled={loading}
-                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-50"
+                className="w-full justify-start h-auto px-3 py-2 font-normal"
               >
                 <RefreshCw
                   className={`h-4 w-4 text-muted-foreground shrink-0 ${loading ? "animate-spin" : ""}`}
                 />
                 <span className="text-sm">Refresh</span>
-              </button>
+              </Button>
             </div>
 
             {showCreateForm && (
@@ -489,7 +491,7 @@ export function SubscriptionManagement({
                   {subscriptions.map((subscription: CalendarSubscription) => (
                     <div
                       key={subscription.id}
-                      className="px-3 py-2 mb-1 rounded-md border border-border/30 hover:bg-accent/20 transition-colors"
+                      className="px-3 py-2 mb-1 rounded-md border border-border/50 hover:bg-accent/20 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0 space-y-1">

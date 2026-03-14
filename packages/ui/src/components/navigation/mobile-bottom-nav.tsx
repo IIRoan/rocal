@@ -68,7 +68,7 @@ export function MobileBottomNav({
           <button
             type="button"
             onClick={onOpenSidebar}
-            className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:bg-accent/60 transition-colors touch-manipulation"
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:bg-accent/60 transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Calendar size={20} />
             <span className="text-[10px] font-medium">Calendars</span>
@@ -78,7 +78,7 @@ export function MobileBottomNav({
           <button
             type="button"
             onClick={onOpenAddEvent}
-            className="flex flex-1 flex-col items-center justify-center gap-1 text-primary active:bg-primary/10 transition-colors touch-manipulation"
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-primary active:bg-primary/10 transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Plus size={18} />
@@ -93,7 +93,7 @@ export function MobileBottomNav({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:bg-accent/60 transition-colors touch-manipulation outline-none"
+                className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:bg-accent/60 transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {getViewIcon(currentView)}
                 <span className="text-[10px] font-medium capitalize">

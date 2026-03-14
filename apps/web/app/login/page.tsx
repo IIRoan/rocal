@@ -5,6 +5,7 @@ import { signIn, authClient, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { Lock, Github, Key, Shield, Check } from "lucide-react";
 import { Logo } from "@workspace/ui/components/layout";
+import { Button } from "@workspace/ui/components/ui/button";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -135,16 +136,18 @@ export default function LoginPage() {
             {isPasskeySupported ? (
               <>
                 {/* GitHub first */}
-                <button
+                <Button
                   onClick={handleGitHubLogin}
                   disabled={isLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900 border border-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  variant="outline"
+                  className="w-full"
                   aria-busy={isLoading}
                 >
                   {isLoading ? (
                     <>
                       <div
-                        className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                        style={{ borderTopColor: "currentColor", opacity: 1 }}
                         aria-hidden="true"
                       />
                       <span>Signing in…</span>
@@ -155,7 +158,7 @@ export default function LoginPage() {
                       <span>Continue with GitHub</span>
                     </>
                   )}
-                </button>
+                </Button>
 
                 <div className="flex items-center gap-2 my-2">
                   <div className="h-px flex-1 bg-border" />
@@ -164,10 +167,10 @@ export default function LoginPage() {
                 </div>
 
                 {/* Passkey second */}
-                <button
+                <Button
                   onClick={handlePasskeyLogin}
                   disabled={passkeyLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full"
                   aria-busy={passkeyLoading}
                 >
                   {passkeyLoading ? (
@@ -184,7 +187,7 @@ export default function LoginPage() {
                       <span>Continue with Passkey</span>
                     </>
                   )}
-                </button>
+                </Button>
               </>
             ) : (
               <div className="text-center space-y-3">
@@ -194,16 +197,18 @@ export default function LoginPage() {
                 <p className="text-sm text-muted-foreground">
                   This browser does not support passkeys.
                 </p>
-                <button
+                <Button
                   onClick={handleGitHubLogin}
                   disabled={isLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900 border border-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  variant="outline"
+                  className="w-full"
                   aria-busy={isLoading}
                 >
                   {isLoading ? (
                     <>
                       <div
-                        className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                        style={{ borderTopColor: "currentColor", opacity: 1 }}
                         aria-hidden="true"
                       />
                       <span>Signing in…</span>
@@ -214,7 +219,7 @@ export default function LoginPage() {
                       <span>Continue with GitHub</span>
                     </>
                   )}
-                </button>
+                </Button>
               </div>
             )}
           </div>

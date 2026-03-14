@@ -196,11 +196,11 @@ export function CalendarSkeleton({
               {/* Current time indicator skeleton */}
               <div className="absolute left-0 top-32 w-full flex items-center z-10">
                 <Skeleton
-                  className="h-0.5 w-full bg-red-400"
+                  className="h-0.5 w-full bg-primary"
                   variant="shimmer"
                 />
                 <Skeleton
-                  className="h-3 w-3 rounded-full bg-red-400 -ml-1.5"
+                  className="h-3 w-3 rounded-full bg-primary -ml-1.5"
                   variant="shimmer"
                 />
               </div>

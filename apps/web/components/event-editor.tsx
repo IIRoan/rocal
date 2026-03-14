@@ -85,6 +85,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { Calendar as CalendarUI } from "@workspace/ui/components/ui/calendar";
+import { Switch } from "@workspace/ui/components/ui/switch";
 import {
   Bell,
   RotateCcw,
@@ -701,7 +702,7 @@ function MobileEventEditorBody({
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
               {eventForm.selectedEvent?.isSynced && (
-                <span className="inline-flex items-center rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-500 mt-0.5">
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary mt-0.5">
                   Synced
                 </span>
               )}
@@ -759,7 +760,7 @@ function MobileEventEditorBody({
                   style={{
                     backgroundColor:
                       calendars.find((c) => c.id === eventForm.eventCalendarId)
-                        ?.color || "#3b82f6",
+                        ?.color || "hsl(var(--primary))",
                   }}
                 />
               </div>
@@ -863,7 +864,7 @@ function MobileEventEditorBody({
                         backgroundColor:
                           calendars.find(
                             (c) => c.id === eventForm.eventCalendarId,
-                          )?.color || "#3b82f6",
+                          )?.color || "hsl(var(--primary))",
                       }}
                     />
                     <SelectValue />
@@ -1115,27 +1116,12 @@ function MobileEventEditorBody({
                     <span className="text-sm font-medium text-foreground">
                       All day
                     </span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={eventForm.eventAllDay}
-                      onClick={() =>
-                        eventForm.setEventAllDay(!eventForm.eventAllDay)
+                    <Switch
+                      checked={eventForm.eventAllDay}
+                      onCheckedChange={(checked) =>
+                        eventForm.setEventAllDay(checked)
                       }
-                      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 ${
-                        eventForm.eventAllDay
-                          ? "bg-primary"
-                          : "bg-input dark:bg-input/80"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-6 w-6 transform rounded-full bg-background shadow-sm ring-1 ring-black/5 dark:ring-white/10 transition-transform duration-200 ${
-                          eventForm.eventAllDay
-                            ? "translate-x-5.5"
-                            : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
+                    />
                   </div>
                 )}
               </div>
@@ -1225,6 +1211,21 @@ function EventEditorFooter({
   desktop,
   onClose,
 }: FooterProps) {
+  const handleDelete = () => {
+    const isRecurringEvent = !!(
+      eventForm.selectedEvent?.recurrence ||
+      eventForm.selectedEvent?.isRecurringInstance ||
+      eventForm.selectedEvent?.parentEventId ||
+      (eventForm.selectedEvent?.id &&
+        eventForm.selectedEvent.id.includes("_"))
+    );
+    if (isRecurringEvent) {
+      eventForm.setShowRecurringDeleteModal(true);
+    } else {
+      handleEventDelete();
+    }
+  };
+
   if (desktop) {
     return (
       <div className="px-3 py-2 border-t border-border/50 flex flex-row items-center gap-2 shrink-0">
@@ -1232,65 +1233,45 @@ function EventEditorFooter({
           <>
             {eventForm.selectedEvent?.id &&
               !eventForm.selectedEvent.isSynced && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const isRecurringEvent = !!(
-                      eventForm.selectedEvent?.recurrence ||
-                      eventForm.selectedEvent?.isRecurringInstance ||
-                      eventForm.selectedEvent?.parentEventId ||
-                      (eventForm.selectedEvent?.id &&
-                        eventForm.selectedEvent.id.includes("_"))
-                    );
-                    if (isRecurringEvent) {
-                      eventForm.setShowRecurringDeleteModal(true);
-                    } else {
-                      handleEventDelete();
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors cursor-pointer"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" /> Delete
-                </button>
+                </Button>
               )}
             <div className="flex-1" />
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-md transition-colors cursor-pointer"
-            >
+            <Button variant="ghost" size="sm" onClick={onClose}>
               Close
-            </button>
+            </Button>
             {eventForm.selectedEvent?.id &&
               !eventForm.selectedEvent.isSynced && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => eventForm.setEventViewMode("edit")}
-                  className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-md transition-colors cursor-pointer"
+                  className="text-primary hover:bg-primary/10"
                 >
                   <Edit3 className="h-4 w-4" /> Edit
-                </button>
+                </Button>
               )}
           </>
         ) : (
           <>
             <div className="flex-1" />
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-md transition-colors cursor-pointer"
-            >
+            <Button variant="ghost" size="sm" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              size="sm"
               onClick={handleEventSave}
               disabled={
                 eventForm.eventSaving ||
                 !eventForm.eventCalendarId ||
                 !eventForm.eventTitle.trim()
               }
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
               {eventForm.eventSaving ? (
                 <>
@@ -1303,7 +1284,7 @@ function EventEditorFooter({
                   Save
                 </>
               )}
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -1311,72 +1292,48 @@ function EventEditorFooter({
   }
 
   return (
-    <div className="px-4 py-3 border-t border-border/40 bg-muted/30 flex flex-row gap-3 shrink-0">
+    <div className="px-4 py-3 border-t border-border/50 bg-muted/30 flex flex-row gap-3 shrink-0">
       {isViewMode ? (
         <>
           {eventForm.selectedEvent?.id && !eventForm.selectedEvent.isSynced && (
-            <button
-              type="button"
-              onClick={() => {
-                const isRecurringEvent = !!(
-                  eventForm.selectedEvent?.recurrence ||
-                  eventForm.selectedEvent?.isRecurringInstance ||
-                  eventForm.selectedEvent?.parentEventId ||
-                  (eventForm.selectedEvent?.id &&
-                    eventForm.selectedEvent.id.includes("_"))
-                );
-                if (isRecurringEvent) {
-                  eventForm.setShowRecurringDeleteModal(true);
-                } else {
-                  handleEventDelete();
-                }
-              }}
-              className="inline-flex items-center justify-center h-10 px-4 text-sm font-medium text-destructive border border-destructive/30 bg-transparent hover:bg-destructive/10 rounded-lg transition-colors"
+            <Button
+              variant="outline"
+              onClick={handleDelete}
+              className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </button>
+            </Button>
           )}
           <div className="flex-1" />
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center justify-center h-10 px-4 text-sm font-medium text-foreground border border-border bg-background hover:bg-muted rounded-lg transition-colors"
-          >
+          <Button variant="outline" onClick={onBack}>
             Close
-          </button>
+          </Button>
           {eventForm.selectedEvent?.id && !eventForm.selectedEvent.isSynced && (
-            <button
-              type="button"
-              onClick={() => eventForm.setEventViewMode("edit")}
-              className="inline-flex items-center justify-center h-10 px-4 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
-            >
+            <Button onClick={() => eventForm.setEventViewMode("edit")}>
               <Edit3 className="h-4 w-4 mr-2" /> Edit
-            </button>
+            </Button>
           )}
         </>
       ) : (
         <>
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={
               eventForm.selectedEvent?.id
                 ? () => eventForm.setEventViewMode("view")
                 : onBack
             }
-            className="inline-flex items-center justify-center h-10 px-4 text-sm font-medium text-foreground border border-border bg-background hover:bg-muted rounded-lg transition-colors"
           >
             Cancel
-          </button>
+          </Button>
           <div className="flex-1" />
-          <button
-            type="button"
+          <Button
             onClick={handleEventSave}
             disabled={
               eventForm.eventSaving ||
               !eventForm.eventCalendarId ||
               !eventForm.eventTitle.trim()
             }
-            className="inline-flex items-center justify-center h-10 px-6 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none rounded-lg transition-colors"
           >
             {eventForm.eventSaving ? (
               <>
@@ -1389,7 +1346,7 @@ function EventEditorFooter({
                 Save
               </>
             )}
-          </button>
+          </Button>
         </>
       )}
     </div>
