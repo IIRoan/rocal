@@ -67,16 +67,16 @@ export const LOADING_MESSAGES = {
 
   // Initial app loading
   STARTUP: [
-    "Starting Rocal...",
+    "Starting Solace...",
     "Initializing application...",
     "Loading your workspace...",
     "Preparing your calendar app...",
-    "Setting up Rocal...",
+    "Setting up Solace...",
     "Launching your calendar...",
     "Getting your calendar ready...",
     "Booting up your schedule...",
     "Initializing your workspace...",
-    "Welcome to Rocal...",
+    "Welcome to Solace...",
   ],
 
   // Fun/engaging messages
