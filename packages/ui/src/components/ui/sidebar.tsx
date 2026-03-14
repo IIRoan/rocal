@@ -6,7 +6,7 @@ import { VariantProps, cva } from "class-variance-authority";
 
 // Slot from radix-ui is a namespace, extract the component
 const SlotComponent = Slot.Slot;
-import { RiLayoutLeft2Line, RiSkipLeftLine } from "@remixicon/react";
+import { ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
 
 import { useIsMobile } from "../../hooks/use-mobile";
 import { cn } from "../../lib/utils";
@@ -292,9 +292,13 @@ function SidebarTrigger({
       {...props}
     >
       {!isOutsideSidebar ? (
-        <RiSkipLeftLine className="size-5" size={20} />
+        <span className="size-5">
+          <ArrowLineRightIcon size={20} />
+        </span>
       ) : (
-        <RiLayoutLeft2Line className="size-5" size={20} />
+        <span className="size-5">
+          <ArrowLineLeftIcon size={20} />
+        </span>
       )}
       <span className="sr-only">
         {isOutsideSidebar ? "Collapse sidebar" : "Expand sidebar"}

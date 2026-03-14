@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { RiCheckLine, RiAddLine, RiSettings3Line, RiLayoutLeft2Line, RiSkipLeftLine } from "@remixicon/react";
+import { CheckIcon, PlusIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -73,7 +73,7 @@ export function AppSidebar({
                 className="w-full gap-2"
                 size="sm"
               >
-                <RiAddLine size={16} />
+                <PlusIcon size={16} />
                 <span>New Event</span>
               </Button>
             </div>
@@ -100,7 +100,7 @@ export function AppSidebar({
                   onClick={onOpenCalendarManagement}
                   title="Calendar Settings"
                 >
-                  <RiSettings3Line size={14} />
+                  <GearSixIcon size={14} />
                 </Button>
               </div>
             </div>
@@ -205,7 +205,7 @@ function AppSidebarDesktop({
               onClick={toggleSidebar}
               title="Collapse sidebar"
             >
-              <RiLayoutLeft2Line size={16} />
+              <ArrowLineLeftIcon size={16} />
             </Button>
           )}
         </div>
@@ -218,7 +218,7 @@ function AppSidebarDesktop({
               onClick={toggleSidebar}
               title="Expand sidebar"
             >
-              <RiSkipLeftLine size={16} />
+              <ArrowLineRightIcon size={16} />
             </Button>
           </div>
         )}
@@ -235,14 +235,14 @@ function AppSidebarDesktop({
                     size="icon"
                     className="h-8 w-8"
                   >
-                    <RiAddLine size={16} />
+                    <PlusIcon size={16} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">New Event</TooltipContent>
               </Tooltip>
             ) : (
               <Button onClick={onCreateEvent} className="w-full gap-2" size="sm">
-                <RiAddLine size={16} />
+                <PlusIcon size={16} />
                 <span>New Event</span>
               </Button>
             )}
@@ -270,7 +270,7 @@ function AppSidebarDesktop({
                   onClick={onOpenCalendarManagement}
                   title="Calendar Settings"
                 >
-                  <RiSettings3Line size={14} />
+                  <GearSixIcon size={14} />
                 </Button>
               </div>
             </div>
@@ -314,11 +314,9 @@ function AppSidebarDesktop({
                             toggleCalendarVisibility(calendar.id)
                           }
                         />
-                        <RiCheckLine
-                          className="peer-not-data-[state=checked]:invisible"
-                          size={16}
-                          aria-hidden="true"
-                        />
+                        <span className="peer-not-data-[state=checked]:invisible" aria-hidden="true">
+                          <CheckIcon size={16} />
+                        </span>
                         <label
                           htmlFor={calendar.id}
                           className="peer-not-data-[state=checked]:line-through peer-not-data-[state=checked]:text-muted-foreground/65 after:absolute after:inset-0"

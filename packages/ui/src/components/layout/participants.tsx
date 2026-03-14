@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { RiMoreFill } from "@remixicon/react";
+import { DotsThreeIcon } from "@phosphor-icons/react";
 
 export function Participants() {
   return (
@@ -37,7 +37,9 @@ export function Participants() {
         className="flex size-6 items-center justify-center rounded-full text-xs ring-1 ring-background border-transparent shadow-none text-muted-foreground/80 dark:bg-background dark:hover:bg-background dark:border-transparent"
         size="icon"
       >
-        <RiMoreFill className="size-4" size={16} />
+        <span className="size-4">
+          <DotsThreeIcon size={16} />
+        </span>
       </Button>
     </div>
   );

@@ -23,6 +23,7 @@ import {
   ChevronRightIcon,
   Loader2,
 } from "lucide-react";
+import { ListIcon } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 import {
@@ -717,21 +718,7 @@ export function EventCalendar({
                     className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5"
                     onClick={onSidebarToggle}
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M3 12h18" />
-                      <path d="M3 18h18" />
-                    </svg>
+                    <ListIcon size={16} />
                     <span className="sr-only">Toggle Sidebar</span>
                   </Button>
                 )}
