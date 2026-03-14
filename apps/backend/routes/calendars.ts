@@ -69,7 +69,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           },
         },
       },
-    }
+    },
   )
 
   .post(
@@ -83,7 +83,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (!name?.trim()) {
         throw new ValidationError(
           "Calendar name is required and cannot be empty",
-          "name"
+          "name",
         );
       }
 
@@ -94,7 +94,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (!allowedColors.includes(color) && !isHexColor) {
         throw new ValidationError(
           `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
-          "color"
+          "color",
         );
       }
 
@@ -102,7 +102,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (name.trim().length > 100) {
         throw new ValidationError(
           "Calendar name cannot exceed 100 characters",
-          "name"
+          "name",
         );
       }
 
@@ -117,7 +117,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (existingCalendar) {
         throw new ValidationError(
           "A calendar with this name already exists",
-          "name"
+          "name",
         );
       }
 
@@ -162,7 +162,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           t.Boolean({
             description:
               "Whether this should be the default calendar (default: false)",
-          })
+          }),
         ),
       }),
       detail: {
@@ -198,7 +198,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           },
         },
       },
-    }
+    },
   )
 
   .put(
@@ -225,13 +225,13 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         if (!body.name?.trim()) {
           throw new ValidationError(
             "Calendar name is required and cannot be empty",
-            "name"
+            "name",
           );
         }
         if (body.name.trim().length > 100) {
           throw new ValidationError(
             "Calendar name cannot exceed 100 characters",
-            "name"
+            "name",
           );
         }
 
@@ -247,7 +247,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         if (existingNameCalendar) {
           throw new ValidationError(
             "A calendar with this name already exists",
-            "name"
+            "name",
           );
         }
       }
@@ -256,13 +256,13 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (body.color !== undefined) {
         const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
         const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-          body.color
+          body.color,
         );
 
         if (!allowedColors.includes(body.color) && !isHexColor) {
           throw new ValidationError(
             `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
-            "color"
+            "color",
           );
         }
       }
@@ -319,23 +319,23 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
             minLength: 1,
             maxLength: 100,
             description: "Calendar name (1-100 characters)",
-          })
+          }),
         ),
         color: t.Optional(
           t.String({
             description:
               "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
-          })
+          }),
         ),
         isVisible: t.Optional(
           t.Boolean({
             description: "Whether the calendar is visible",
-          })
+          }),
         ),
         isDefault: t.Optional(
           t.Boolean({
             description: "Whether this should be the default calendar",
-          })
+          }),
         ),
       }),
       detail: {
@@ -358,7 +358,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           },
         },
       },
-    }
+    },
   )
 
   .delete(
@@ -391,7 +391,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (calendarCount <= 1) {
         throw new ValidationError(
           "Cannot delete the last calendar. Create another calendar first.",
-          "calendarId"
+          "calendarId",
         );
       }
 
@@ -407,7 +407,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           if (!targetCalendarId) {
             throw new ValidationError(
               "Target calendar ID is required when moving events",
-              "targetCalendarId"
+              "targetCalendarId",
             );
           }
 
@@ -422,14 +422,14 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           if (!targetCalendar) {
             throw new ValidationError(
               "Target calendar not found or access denied",
-              "targetCalendarId"
+              "targetCalendarId",
             );
           }
 
           if (targetCalendarId === id) {
             throw new ValidationError(
               "Cannot move events to the same calendar being deleted",
-              "targetCalendarId"
+              "targetCalendarId",
             );
           }
 
@@ -502,12 +502,12 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           t.Union([t.Literal("delete_events"), t.Literal("move_events")], {
             description:
               "What to do with events: delete_events (default), or move_events",
-          })
+          }),
         ),
         targetCalendarId: t.Optional(
           t.String({
             description: "Target calendar ID when using move_events action",
-          })
+          }),
         ),
       }),
       detail: {
@@ -546,5 +546,5 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           },
         },
       },
-    }
+    },
   );

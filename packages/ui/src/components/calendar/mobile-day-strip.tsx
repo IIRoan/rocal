@@ -46,12 +46,12 @@ export function MobileDayStrip({
       const selected = selectedDayRef.current;
       const containerRect = container.getBoundingClientRect();
       const selectedRect = selected.getBoundingClientRect();
-      
+
       // Only scroll if the selected day is not fully visible
-      const isVisible = 
+      const isVisible =
         selectedRect.left >= containerRect.left &&
         selectedRect.right <= containerRect.right;
-      
+
       if (!isVisible) {
         selected.scrollIntoView({
           behavior: "smooth",
@@ -67,8 +67,13 @@ export function MobileDayStrip({
   };
 
   return (
-    <div className={cn("bg-background/95 backdrop-blur-sm border-b border-border/50", className)}>
-      <div 
+    <div
+      className={cn(
+        "bg-background/95 backdrop-blur-sm border-b border-border/50",
+        className,
+      )}
+    >
+      <div
         ref={scrollContainerRef}
         className="flex overflow-x-auto scrollbar-hide px-2 py-1.5 gap-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -88,23 +93,37 @@ export function MobileDayStrip({
                 "flex-shrink-0 flex flex-col items-center justify-center min-w-[44px] h-[52px] rounded-lg transition-all touch-manipulation",
                 "relative",
                 isSelected && "bg-primary text-primary-foreground shadow-md",
-                !isSelected && isCurrentDay && "bg-accent/60 ring-1.5 ring-primary/40",
-                !isSelected && !isCurrentDay && "hover:bg-accent/30 active:bg-accent/50",
+                !isSelected &&
+                  isCurrentDay &&
+                  "bg-accent/60 ring-1.5 ring-primary/40",
+                !isSelected &&
+                  !isCurrentDay &&
+                  "hover:bg-accent/30 active:bg-accent/50",
               )}
             >
               {/* Day abbreviation */}
-              <span className={cn(
-                "text-[10px] font-medium uppercase",
-                isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
-              )}>
+              <span
+                className={cn(
+                  "text-[10px] font-medium uppercase",
+                  isSelected
+                    ? "text-primary-foreground/70"
+                    : "text-muted-foreground",
+                )}
+              >
                 {format(day, "EEE").slice(0, 3)}
               </span>
-              
+
               {/* Day number */}
-              <span className={cn(
-                "text-base font-semibold leading-tight",
-                isSelected ? "text-primary-foreground" : isCurrentDay ? "text-primary" : "text-foreground"
-              )}>
+              <span
+                className={cn(
+                  "text-base font-semibold leading-tight",
+                  isSelected
+                    ? "text-primary-foreground"
+                    : isCurrentDay
+                      ? "text-primary"
+                      : "text-foreground",
+                )}
+              >
                 {format(day, "d")}
               </span>
 
@@ -116,9 +135,17 @@ export function MobileDayStrip({
                       key={i}
                       className={cn(
                         "w-1 h-1 rounded-full",
-                        isSelected ? "bg-primary-foreground/50" : event.color ? "" : "bg-primary/50"
+                        isSelected
+                          ? "bg-primary-foreground/50"
+                          : event.color
+                            ? ""
+                            : "bg-primary/50",
                       )}
-                      style={!isSelected && event.color ? { backgroundColor: event.color } : undefined}
+                      style={
+                        !isSelected && event.color
+                          ? { backgroundColor: event.color }
+                          : undefined
+                      }
                     />
                   ))}
                 </div>

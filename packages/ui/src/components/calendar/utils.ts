@@ -1,4 +1,11 @@
-import { isSameDay, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter } from "date-fns";
+import {
+  isSameDay,
+  startOfDay,
+  endOfDay,
+  isWithinInterval,
+  isBefore,
+  isAfter,
+} from "date-fns";
 
 import type {
   CalendarEvent,
@@ -224,7 +231,9 @@ export function getAllEventsForDay(
   const dayStart = startOfDay(day);
   const dayEnd = endOfDay(day);
 
-  return events.filter((event) => eventOverlapsRange(event, dayStart, dayEnd, "day"));
+  return events.filter((event) =>
+    eventOverlapsRange(event, dayStart, dayEnd, "day"),
+  );
 }
 
 /**

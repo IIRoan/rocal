@@ -80,7 +80,9 @@ export function MobileDayView({
         if (!isSameDay(eventStart, eventEnd)) return false;
         return eventOverlapsRange(event, dayStart, dayEnd, "time");
       })
-      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      .sort(
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      );
   }, [currentDate, events]);
 
   const positionedEvents = useMemo(() => {
@@ -169,7 +171,7 @@ export function MobileDayView({
         if (otherEvent.id === event.id) return false;
         const otherStart = new Date(otherEvent.start);
         const otherEnd = new Date(otherEvent.end);
-        
+
         return areIntervalsOverlapping(
           { start: adjustedStart, end: adjustedEnd },
           { start: otherStart, end: otherEnd },
@@ -177,7 +179,7 @@ export function MobileDayView({
       });
 
       const overlappingColumns = overlappingEvents.length + 1;
-      
+
       let width: number;
       let left: number;
 
@@ -196,7 +198,7 @@ export function MobileDayView({
       } else {
         const baseWidth = 0.72;
         const widthDecrement = 0.06;
-        width = Math.max(0.55, baseWidth - (columnIndex * widthDecrement));
+        width = Math.max(0.55, baseWidth - columnIndex * widthDecrement);
         const offsetIncrement = 0.1;
         left = Math.min(columnIndex * offsetIncrement, 0.35);
       }
@@ -231,9 +233,9 @@ export function MobileDayView({
       const now = new Date();
       const currentHour = getHours(now);
       const currentMinute = getMinutes(now);
-      
+
       let targetHour: number;
-      
+
       if (isSameDay(currentDate, now)) {
         // If it's today, scroll to current time
         targetHour = currentHour + currentMinute / 60;
@@ -278,84 +280,84 @@ export function MobileDayView({
 
         {/* Events column */}
         <div className="ml-11 relative">
-            {/* Positioned events */}
-            {positionedEvents.map((positionedEvent) => (
-              <div
-                key={positionedEvent.event.id}
-                className="absolute z-10 px-1"
-                style={{
-                  top: `${positionedEvent.top}px`,
-                  height: `${positionedEvent.height}px`,
-                  left: `${positionedEvent.left * 100}%`,
-                  width: `${positionedEvent.width * 100}%`,
-                  zIndex: positionedEvent.zIndex,
-                }}
-              >
-                <DraggableEvent
-                  event={positionedEvent.event}
-                  view="day"
-                  onClick={(e) => handleEventClick(positionedEvent.event, e)}
-                  showTime
-                  height={positionedEvent.height}
-                  timeFormat={timeFormat}
-                  timezone={timezone}
-                />
-              </div>
-            ))}
+          {/* Positioned events */}
+          {positionedEvents.map((positionedEvent) => (
+            <div
+              key={positionedEvent.event.id}
+              className="absolute z-10 px-1"
+              style={{
+                top: `${positionedEvent.top}px`,
+                height: `${positionedEvent.height}px`,
+                left: `${positionedEvent.left * 100}%`,
+                width: `${positionedEvent.width * 100}%`,
+                zIndex: positionedEvent.zIndex,
+              }}
+            >
+              <DraggableEvent
+                event={positionedEvent.event}
+                view="day"
+                onClick={(e) => handleEventClick(positionedEvent.event, e)}
+                showTime
+                height={positionedEvent.height}
+                timeFormat={timeFormat}
+                timezone={timezone}
+              />
+            </div>
+          ))}
 
-            {/* Current time indicator - enhanced for mobile */}
-            {currentTimeVisible && (
-              <div
-                className="pointer-events-none absolute right-2 left-0 z-20"
-                style={{ top: `${currentTimePosition}%` }}
-              >
-                <div className="relative flex items-center">
-                  <div className="bg-primary text-primary-foreground absolute -left-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
-                    {format(new Date(), timeFormat === "24h" ? "HH:mm" : "h:mm")}
-                  </div>
-                  <div className="bg-primary h-[2px] w-full shadow-sm"></div>
-                  <div className="bg-primary absolute -right-1 h-2.5 w-2.5 rounded-full shadow-sm"></div>
+          {/* Current time indicator - enhanced for mobile */}
+          {currentTimeVisible && (
+            <div
+              className="pointer-events-none absolute right-2 left-0 z-20"
+              style={{ top: `${currentTimePosition}%` }}
+            >
+              <div className="relative flex items-center">
+                <div className="bg-primary text-primary-foreground absolute -left-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm">
+                  {format(new Date(), timeFormat === "24h" ? "HH:mm" : "h:mm")}
                 </div>
+                <div className="bg-primary h-[2px] w-full shadow-sm"></div>
+                <div className="bg-primary absolute -right-1 h-2.5 w-2.5 rounded-full shadow-sm"></div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Time grid cells for creating events */}
-            {hours.map((hour) => {
-              const hourValue = getHours(hour);
-              return (
-                <div
-                  key={hour.toString()}
-                  className="relative border-b border-border/50"
-                  style={{ height: MobileCellHeight }}
-                >
-                  {[0, 1, 2, 3].map((quarter) => {
-                    const quarterHourTime = hourValue + quarter * 0.25;
-                    return (
-                      <DroppableCell
-                        key={`${hour.toString()}-${quarter}`}
-                        id={`mobile-day-cell-${currentDate.toISOString()}-${quarterHourTime}`}
-                        date={currentDate}
-                        time={quarterHourTime}
-                        className={cn(
-                          "absolute w-full h-[15px]",
-                          quarter === 0 && "top-0",
-                          quarter === 1 && "top-1/4",
-                          quarter === 2 && "top-1/2",
-                          quarter === 3 && "top-3/4",
-                        )}
-                        onClick={() => {
-                          const startTime = new Date(currentDate);
-                          startTime.setHours(hourValue);
-                          startTime.setMinutes(quarter * 15);
-                          onEventCreate(startTime);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+          {/* Time grid cells for creating events */}
+          {hours.map((hour) => {
+            const hourValue = getHours(hour);
+            return (
+              <div
+                key={hour.toString()}
+                className="relative border-b border-border/50"
+                style={{ height: MobileCellHeight }}
+              >
+                {[0, 1, 2, 3].map((quarter) => {
+                  const quarterHourTime = hourValue + quarter * 0.25;
+                  return (
+                    <DroppableCell
+                      key={`${hour.toString()}-${quarter}`}
+                      id={`mobile-day-cell-${currentDate.toISOString()}-${quarterHourTime}`}
+                      date={currentDate}
+                      time={quarterHourTime}
+                      className={cn(
+                        "absolute w-full h-[15px]",
+                        quarter === 0 && "top-0",
+                        quarter === 1 && "top-1/4",
+                        quarter === 2 && "top-1/2",
+                        quarter === 3 && "top-3/4",
+                      )}
+                      onClick={() => {
+                        const startTime = new Date(currentDate);
+                        startTime.setHours(hourValue);
+                        startTime.setMinutes(quarter * 15);
+                        onEventCreate(startTime);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

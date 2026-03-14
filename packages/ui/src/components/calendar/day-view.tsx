@@ -64,7 +64,9 @@ export function DayView({
     const dayEnd = addHours(dayStart, 24);
     return events
       .filter((event) => eventOverlapsRange(event, dayStart, dayEnd, "time"))
-      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      .sort(
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      );
   }, [currentDate, events]);
 
   // Filter all-day events
@@ -180,7 +182,7 @@ export function DayView({
         if (otherEvent.id === event.id) return false;
         const otherStart = new Date(otherEvent.start);
         const otherEnd = new Date(otherEvent.end);
-        
+
         return areIntervalsOverlapping(
           { start: adjustedStart, end: adjustedEnd },
           { start: otherStart, end: otherEnd },
@@ -188,7 +190,7 @@ export function DayView({
       });
 
       const overlappingColumns = overlappingEvents.length + 1;
-      
+
       // Use improved width and positioning calculation
       let width: number;
       let left: number;
@@ -200,13 +202,13 @@ export function DayView({
       } else if (overlappingColumns <= 3) {
         // For 2-3 overlapping events, use equal distribution with small gaps
         width = (1 / overlappingColumns) * 0.95; // 95% to leave small gap
-        left = columnIndex * (1 / overlappingColumns) + (columnIndex * 0.01); // Add small offset
+        left = columnIndex * (1 / overlappingColumns) + columnIndex * 0.01; // Add small offset
       } else {
         // For more than 3 overlapping events, use cascading layout with better spacing
         const baseWidth = 0.75; // Start with 75% width
         const widthDecrement = Math.min(0.1, 0.5 / overlappingColumns); // Decrease width more gradually
-        width = baseWidth - (columnIndex * widthDecrement);
-        
+        width = baseWidth - columnIndex * widthDecrement;
+
         // Stagger positioning with better spacing
         const offsetIncrement = Math.min(0.15, 0.8 / overlappingColumns);
         left = columnIndex * offsetIncrement;

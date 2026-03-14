@@ -1,6 +1,6 @@
 /**
  * Standalone Notification Server
- * 
+ *
  * Processes scheduled notifications independently from the main backend.
  * Checks the database for notifications that need sending and sends them using Resend API.
  */
@@ -16,18 +16,24 @@ let Resend: any = null;
 // Load environment variables
 const envResult = dotenv.config();
 if (envResult.error) {
-  console.warn('⚠️ Could not load .env file:', envResult.error.message);
+  console.warn("⚠️ Could not load .env file:", envResult.error.message);
 } else {
-  console.log('✅ Environment variables loaded from .env');
+  console.log("✅ Environment variables loaded from .env");
 }
 
-console.log('🔧 Environment check:');
-console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '✅ Set' : '❌ Missing');
-console.log('- RESEND_API_KEY:', process.env.RESEND_API_KEY ? '✅ Set' : '❌ Missing');
+console.log("🔧 Environment check:");
+console.log(
+  "- DATABASE_URL:",
+  process.env.DATABASE_URL ? "✅ Set" : "❌ Missing",
+);
+console.log(
+  "- RESEND_API_KEY:",
+  process.env.RESEND_API_KEY ? "✅ Set" : "❌ Missing",
+);
 
 // Initialize Prisma client with optimized settings for low memory usage
 const prisma = new PrismaClient({
-  log: ['error'], // Only log errors to reduce overhead
+  log: ["error"], // Only log errors to reduce overhead
   datasources: {
     db: {
       url: process.env.DATABASE_URL,
@@ -90,7 +96,9 @@ class NotificationServer {
   constructor() {
     // Don't initialize heavy dependencies yet - lazy load on first use
     if (!process.env.RESEND_API_KEY) {
-      console.warn("⚠️ RESEND_API_KEY not found - email notifications will be disabled");
+      console.warn(
+        "⚠️ RESEND_API_KEY not found - email notifications will be disabled",
+      );
     }
 
     // Graceful shutdown handlers
@@ -133,15 +141,18 @@ class NotificationServer {
       // Calculate delay to next minute boundary
       const now = new Date();
       const secondsUntilNextMinute = 60 - now.getSeconds();
-      const msUntilNextMinute = secondsUntilNextMinute * 1000 - now.getMilliseconds();
+      const msUntilNextMinute =
+        secondsUntilNextMinute * 1000 - now.getMilliseconds();
 
       console.log(
-        `⏰ Aligning notification timer to minute boundary. Current time: ${now.toISOString()}, delay: ${msUntilNextMinute}ms`
+        `⏰ Aligning notification timer to minute boundary. Current time: ${now.toISOString()}, delay: ${msUntilNextMinute}ms`,
       );
 
       // Run immediately if we're at the start of a minute
       if (msUntilNextMinute < 1000) {
-        console.log("🚀 Running notification check immediately (already at minute boundary)");
+        console.log(
+          "🚀 Running notification check immediately (already at minute boundary)",
+        );
         this.processScheduledNotifications().catch((error) => {
           console.error("❌ Initial notification processing failed:", error);
           this.failedCount++;
@@ -150,7 +161,9 @@ class NotificationServer {
 
       // Set up timer to run at the start of each minute
       this.alignmentTimer = setTimeout(() => {
-        console.log("🎯 Timer aligned! Starting minute-boundary notification checks");
+        console.log(
+          "🎯 Timer aligned! Starting minute-boundary notification checks",
+        );
 
         // Run the first aligned execution
         this.processScheduledNotifications().catch((error) => {
@@ -172,7 +185,10 @@ class NotificationServer {
             await this.processScheduledNotifications();
             await this.processRetryQueue();
           } catch (error) {
-            console.error("❌ Background notification processing failed:", error);
+            console.error(
+              "❌ Background notification processing failed:",
+              error,
+            );
             this.failedCount++;
             this.errors.push({
               notificationId: "system",
@@ -227,11 +243,13 @@ class NotificationServer {
 
       console.log("✅ Notification server stopped successfully");
       console.log(
-        `📊 Final statistics: Processed=${this.processedCount}, Failed=${this.failedCount}, RetryQueue=${this.retryQueue.size}`
+        `📊 Final statistics: Processed=${this.processedCount}, Failed=${this.failedCount}, RetryQueue=${this.retryQueue.size}`,
       );
 
       if (this.retryQueue.size > 0) {
-        console.warn(`⚠️ ${this.retryQueue.size} notifications remain in retry queue`);
+        console.warn(
+          `⚠️ ${this.retryQueue.size} notifications remain in retry queue`,
+        );
       }
     } catch (error) {
       console.error("❌ Error stopping notification server:", error);
@@ -245,7 +263,7 @@ class NotificationServer {
   private async shutdown(): Promise<void> {
     console.log("🛑 Shutting down notification server...");
     this.stop();
-    
+
     // Disconnect from database
     try {
       await prisma.$disconnect();
@@ -253,7 +271,7 @@ class NotificationServer {
     } catch (error) {
       console.error("❌ Error closing database connection:", error);
     }
-    
+
     console.log("✅ Notification server stopped gracefully");
     process.exit(0);
   }
@@ -274,47 +292,49 @@ class NotificationServer {
       now.getHours(),
       now.getMinutes(),
       0,
-      0
+      0,
     );
 
     try {
       // Query for notifications that should be sent
-      const notificationsToSend = await this.executeWithDatabaseRetry(async () => {
-        return await prisma.eventNotification.findMany({
-          where: {
-            notificationTime: {
-              lte: currentMinute,
-            },
-            isEnabled: true,
-            isSent: false,
-            event: {
-              start: {
-                gte: now, // Only include notifications for future events
+      const notificationsToSend = await this.executeWithDatabaseRetry(
+        async () => {
+          return await prisma.eventNotification.findMany({
+            where: {
+              notificationTime: {
+                lte: currentMinute,
               },
-            },
-          },
-          include: {
-            event: {
-              include: {
-                user: {
-                  include: {
-                    settings: true,
-                  },
+              isEnabled: true,
+              isSent: false,
+              event: {
+                start: {
+                  gte: now, // Only include notifications for future events
                 },
-                calendar: true,
-                category: true,
               },
             },
-          },
-          orderBy: {
-            notificationTime: "asc",
-          },
-        });
-      });
+            include: {
+              event: {
+                include: {
+                  user: {
+                    include: {
+                      settings: true,
+                    },
+                  },
+                  calendar: true,
+                  category: true,
+                },
+              },
+            },
+            orderBy: {
+              notificationTime: "asc",
+            },
+          });
+        },
+      );
 
       if (notificationsToSend.length > 0) {
         console.log(
-          `🔍 Processing ${notificationsToSend.length} scheduled notifications for ${currentMinute.toISOString()}`
+          `🔍 Processing ${notificationsToSend.length} scheduled notifications for ${currentMinute.toISOString()}`,
         );
       }
 
@@ -327,7 +347,10 @@ class NotificationServer {
         try {
           // Check if event is still valid (not moved to past)
           if (notification.event.start < now) {
-            await this.handleEventMovedToPast(notification.eventId, notification.event.start);
+            await this.handleEventMovedToPast(
+              notification.eventId,
+              notification.event.start,
+            );
             skippedThisRun++;
             continue;
           }
@@ -343,7 +366,10 @@ class NotificationServer {
             await this.handleNotificationFailure(notification, result);
           }
         } catch (error) {
-          console.error(`❌ Error processing notification ${notification.id}:`, error);
+          console.error(
+            `❌ Error processing notification ${notification.id}:`,
+            error,
+          );
           failedThisRun++;
           this.failedCount++;
         }
@@ -351,7 +377,11 @@ class NotificationServer {
 
       if (processedThisRun > 0 || failedThisRun > 0 || skippedThisRun > 0) {
         this.lastProcessedAt = new Date();
-        await this.logProcessingMetrics(processedThisRun, failedThisRun, skippedThisRun);
+        await this.logProcessingMetrics(
+          processedThisRun,
+          failedThisRun,
+          skippedThisRun,
+        );
       }
     } catch (error) {
       console.error("❌ Error in processScheduledNotifications:", error);
@@ -362,12 +392,15 @@ class NotificationServer {
   /**
    * Send notification with retry logic
    */
-  private async sendNotificationWithRetry(notification: any): Promise<NotificationDeliveryResult> {
+  private async sendNotificationWithRetry(
+    notification: any,
+  ): Promise<NotificationDeliveryResult> {
     try {
       await this.sendNotification(notification);
       return { success: true, shouldRetry: false };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       const shouldRetry = this.shouldRetryError(error);
       const retryAfterMinutes = this.calculateRetryDelay(error);
 
@@ -389,13 +422,19 @@ class NotificationServer {
 
     // Check user notification preferences
     const userSettings = user.settings;
-    if (notificationType === "email" && userSettings?.emailNotifications === false) {
+    if (
+      notificationType === "email" &&
+      userSettings?.emailNotifications === false
+    ) {
       console.log(`⏭️ Email notifications disabled for user ${user.email}`);
       await this.markNotificationAsSent(notification.id, "skipped");
       return;
     }
 
-    if (notificationType === "browser" && userSettings?.browserNotifications === false) {
+    if (
+      notificationType === "browser" &&
+      userSettings?.browserNotifications === false
+    ) {
       console.log(`⏭️ Browser notifications disabled for user ${user.email}`);
       await this.markNotificationAsSent(notification.id, "skipped");
       return;
@@ -414,16 +453,16 @@ class NotificationServer {
         user.id,
         notificationType,
         minutesBefore,
-        "sent"
+        "sent",
       );
 
       console.log(
-        `✅ Sent ${notificationType} notification for event "${event.title}" to ${user.email}`
+        `✅ Sent ${notificationType} notification for event "${event.title}" to ${user.email}`,
       );
     } catch (error) {
       console.error(
         `❌ Failed to send ${notificationType} notification for event "${event.title}" to ${user.email}:`,
-        error
+        error,
       );
       throw error;
     }
@@ -432,7 +471,11 @@ class NotificationServer {
   /**
    * Send email notification using Resend
    */
-  private async sendEmailNotification(event: any, user: any, minutesBefore: number): Promise<void> {
+  private async sendEmailNotification(
+    event: any,
+    user: any,
+    minutesBefore: number,
+  ): Promise<void> {
     // Lazy load Resend client on first email send
     await this.loadResendClient();
 
@@ -451,7 +494,11 @@ class NotificationServer {
     }
 
     try {
-      const emailContent = await this.generateEmailContent(event, user, minutesBefore);
+      const emailContent = await this.generateEmailContent(
+        event,
+        user,
+        minutesBefore,
+      );
       const subject = this.generateEmailSubject(event, minutesBefore);
       const fromAddress = this.getFromAddress();
 
@@ -475,13 +522,18 @@ class NotificationServer {
   private async generateEmailContent(
     event: any,
     user: any,
-    minutesBefore: number
+    minutesBefore: number,
   ): Promise<{ html: string; text: string }> {
     const userSettings = user.settings;
     const timeFormat = userSettings?.timeFormat || "12h";
     const timezone = userSettings?.timezone || "UTC";
 
-    const formattedDetails = this.formatEventDetailsForEmail(event, timeFormat, timezone, minutesBefore);
+    const formattedDetails = this.formatEventDetailsForEmail(
+      event,
+      timeFormat,
+      timezone,
+      minutesBefore,
+    );
 
     // Generate HTML content
     const html = await this.renderEmailTemplate(event, user, formattedDetails);
@@ -522,26 +574,36 @@ class NotificationServer {
   /**
    * Render email template
    */
-  private async renderEmailTemplate(event: any, user: any, formattedDetails: any): Promise<string> {
+  private async renderEmailTemplate(
+    event: any,
+    user: any,
+    formattedDetails: any,
+  ): Promise<string> {
     await this.loadEmailDependencies();
     const userSettings = user.settings;
 
     return await renderEmail!(
       EventReminderEmail({
         eventTitle: event.title,
-        eventDate: formattedDetails.formattedStartTime.split(' at ')[0] || formattedDetails.formattedStartTime,
-        eventTime: formattedDetails.formattedStartTime.split(' at ')[1] || formattedDetails.formattedStartTime,
+        eventDate:
+          formattedDetails.formattedStartTime.split(" at ")[0] ||
+          formattedDetails.formattedStartTime,
+        eventTime:
+          formattedDetails.formattedStartTime.split(" at ")[1] ||
+          formattedDetails.formattedStartTime,
         eventLocation: event.location,
         categoryName: event.category?.name,
-        categoryColor: event.category?.color || 'blue',
+        categoryColor: event.category?.color || "blue",
         description: event.description,
-        timeUntilEvent: formattedDetails.reminderText.replace('Your event starts ', '').replace('Your event is starting now!', 'now'),
+        timeUntilEvent: formattedDetails.reminderText
+          .replace("Your event starts ", "")
+          .replace("Your event is starting now!", "now"),
         duration: formattedDetails.duration,
         reminderText: formattedDetails.reminderText,
-        userName: user.name || user.email?.split('@')[0],
+        userName: user.name || user.email?.split("@")[0],
         userEmail: user.email,
-        userTheme: userSettings?.theme || 'light',
-      })
+        userTheme: userSettings?.theme || "light",
+      }),
     );
   }
 
@@ -554,19 +616,19 @@ class NotificationServer {
     text += `Event Details:\n`;
     text += `Start: ${formattedDetails.formattedStartTime}\n`;
     text += `End: ${formattedDetails.formattedEndTime}\n`;
-    
+
     if (event.description) {
       text += `Description: ${event.description}\n`;
     }
-    
+
     if (event.location) {
       text += `Location: ${event.location}\n`;
     }
-    
+
     if (formattedDetails.duration) {
       text += `Duration: ${formattedDetails.duration}\n`;
     }
-    
+
     return text;
   }
 
@@ -577,14 +639,22 @@ class NotificationServer {
     event: any,
     timeFormat: string,
     timezone: string,
-    minutesBefore: number
+    minutesBefore: number,
   ) {
     const startTime = new Date(event.start);
     const endTime = new Date(event.end);
-    
+
     return {
-      formattedStartTime: this.formatTimeWithPreference(startTime, timeFormat, timezone),
-      formattedEndTime: this.formatTimeWithPreference(endTime, timeFormat, timezone),
+      formattedStartTime: this.formatTimeWithPreference(
+        startTime,
+        timeFormat,
+        timezone,
+      ),
+      formattedEndTime: this.formatTimeWithPreference(
+        endTime,
+        timeFormat,
+        timezone,
+      ),
       reminderText: this.formatReminderText(minutesBefore),
       duration: this.calculateEventDuration(startTime, endTime),
     };
@@ -593,7 +663,11 @@ class NotificationServer {
   /**
    * Format time with user preference
    */
-  private formatTimeWithPreference(date: Date, timeFormat: string, timezone: string): string {
+  private formatTimeWithPreference(
+    date: Date,
+    timeFormat: string,
+    timezone: string,
+  ): string {
     const options: Intl.DateTimeFormatOptions = {
       year: "numeric",
       month: "long",
@@ -603,7 +677,7 @@ class NotificationServer {
       hour12: timeFormat === "12h",
       timeZone: timezone,
     };
-    
+
     return date.toLocaleString("en-US", options);
   }
 
@@ -614,7 +688,7 @@ class NotificationServer {
     const durationMs = end.getTime() - start.getTime();
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours > 0 && minutes > 0) {
       return `${hours}h ${minutes}m`;
     } else if (hours > 0) {
@@ -622,7 +696,7 @@ class NotificationServer {
     } else if (minutes > 0) {
       return `${minutes}m`;
     }
-    
+
     return undefined;
   }
 
@@ -637,7 +711,7 @@ class NotificationServer {
     } else {
       const hours = Math.floor(minutesBefore / 60);
       const remainingMinutes = minutesBefore % 60;
-      
+
       if (remainingMinutes === 0) {
         return `Your event starts in ${hours} hour${hours !== 1 ? "s" : ""}`;
       } else {
@@ -673,13 +747,19 @@ class NotificationServer {
 
     try {
       const result = await this.resend.emails.send(emailData);
-      
+
       if (result.error) {
-        const errorMessage = result.error.message || result.error.name || JSON.stringify(result.error) || 'Unknown Resend API error';
+        const errorMessage =
+          result.error.message ||
+          result.error.name ||
+          JSON.stringify(result.error) ||
+          "Unknown Resend API error";
         throw new Error(`Resend API error: ${errorMessage}`);
       }
-      
-      console.log(`📧 Email sent successfully to ${emailData.to}, ID: ${result.data?.id}`);
+
+      console.log(
+        `📧 Email sent successfully to ${emailData.to}, ID: ${result.data?.id}`,
+      );
       return result;
     } catch (error) {
       console.error(`❌ Failed to send email to ${emailData.to}:`, error);
@@ -690,16 +770,25 @@ class NotificationServer {
   /**
    * Send browser notification (placeholder)
    */
-  private async sendBrowserNotification(event: any, user: any, minutesBefore: number): Promise<void> {
+  private async sendBrowserNotification(
+    event: any,
+    user: any,
+    minutesBefore: number,
+  ): Promise<void> {
     // Browser notifications would typically be handled via WebSocket or push notifications
     // For now, we'll just log it
-    console.log(`🔔 Browser notification would be sent to ${user.email} for event: ${event.title}`);
+    console.log(
+      `🔔 Browser notification would be sent to ${user.email} for event: ${event.title}`,
+    );
   }
 
   /**
    * Mark notification as sent
    */
-  private async markNotificationAsSent(notificationId: string, status: string): Promise<void> {
+  private async markNotificationAsSent(
+    notificationId: string,
+    status: string,
+  ): Promise<void> {
     await prisma.eventNotification.update({
       where: { id: notificationId },
       data: {
@@ -718,7 +807,7 @@ class NotificationServer {
     notificationType: string,
     minutesBefore: number,
     status: string,
-    errorMessage?: string
+    errorMessage?: string,
   ): Promise<void> {
     try {
       await prisma.notificationLog.create({
@@ -739,7 +828,10 @@ class NotificationServer {
   /**
    * Handle notification failure
    */
-  private async handleNotificationFailure(notification: any, result: NotificationDeliveryResult): Promise<void> {
+  private async handleNotificationFailure(
+    notification: any,
+    result: NotificationDeliveryResult,
+  ): Promise<void> {
     const error: NotificationError = {
       notificationId: notification.id,
       eventId: notification.eventId,
@@ -760,13 +852,17 @@ class NotificationServer {
         eventId: notification.eventId,
         userId: notification.event.userId,
         retryCount: 1,
-        nextRetryAt: new Date(Date.now() + result.retryAfterMinutes * 60 * 1000),
+        nextRetryAt: new Date(
+          Date.now() + result.retryAfterMinutes * 60 * 1000,
+        ),
         lastError: result.error || "Unknown error",
         originalNotificationTime: notification.notificationTime,
       };
 
       this.retryQueue.set(notification.id, retryInfo);
-      console.log(`🔄 Scheduled retry for notification ${notification.id} in ${result.retryAfterMinutes} minutes`);
+      console.log(
+        `🔄 Scheduled retry for notification ${notification.id} in ${result.retryAfterMinutes} minutes`,
+      );
     }
 
     await this.logNotification(
@@ -775,7 +871,7 @@ class NotificationServer {
       notification.notificationType,
       notification.minutesBefore,
       "failed",
-      result.error
+      result.error,
     );
   }
 
@@ -785,7 +881,7 @@ class NotificationServer {
   private async processRetryQueue(): Promise<void> {
     const now = new Date();
     const retryItems = Array.from(this.retryQueue.values()).filter(
-      (item) => item.nextRetryAt <= now
+      (item) => item.nextRetryAt <= now,
     );
 
     for (const retryItem of retryItems) {
@@ -820,19 +916,26 @@ class NotificationServer {
           // Update retry info
           retryItem.retryCount++;
           retryItem.lastError = result.error || "Unknown error";
-          
+
           if (retryItem.retryCount >= 3) {
             // Max retries reached
             this.retryQueue.delete(retryItem.notificationId);
-            console.log(`❌ Max retries reached for notification ${retryItem.notificationId}`);
+            console.log(
+              `❌ Max retries reached for notification ${retryItem.notificationId}`,
+            );
           } else if (result.shouldRetry && result.retryAfterMinutes) {
-            retryItem.nextRetryAt = new Date(Date.now() + result.retryAfterMinutes * 60 * 1000);
+            retryItem.nextRetryAt = new Date(
+              Date.now() + result.retryAfterMinutes * 60 * 1000,
+            );
           } else {
             this.retryQueue.delete(retryItem.notificationId);
           }
         }
       } catch (error) {
-        console.error(`❌ Error processing retry for notification ${retryItem.notificationId}:`, error);
+        console.error(
+          `❌ Error processing retry for notification ${retryItem.notificationId}:`,
+          error,
+        );
         this.retryQueue.delete(retryItem.notificationId);
       }
     }
@@ -841,7 +944,10 @@ class NotificationServer {
   /**
    * Handle event moved to past
    */
-  private async handleEventMovedToPast(eventId: string, eventStart: Date): Promise<void> {
+  private async handleEventMovedToPast(
+    eventId: string,
+    eventStart: Date,
+  ): Promise<void> {
     try {
       const result = await prisma.eventNotification.deleteMany({
         where: {
@@ -854,10 +960,15 @@ class NotificationServer {
       });
 
       if (result.count > 0) {
-        console.log(`🧹 Cleaned up ${result.count} future notifications for past event ${eventId}`);
+        console.log(
+          `🧹 Cleaned up ${result.count} future notifications for past event ${eventId}`,
+        );
       }
     } catch (error) {
-      console.error(`❌ Failed to clean up notifications for past event ${eventId}:`, error);
+      console.error(
+        `❌ Failed to clean up notifications for past event ${eventId}:`,
+        error,
+      );
     }
   }
 
@@ -867,7 +978,10 @@ class NotificationServer {
   private shouldRetryError(error: unknown): boolean {
     if (!error) return false;
 
-    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    const errorMessage =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : String(error).toLowerCase();
 
     // Network/connection errors - retry
     if (
@@ -886,7 +1000,11 @@ class NotificationServer {
     }
 
     // Server errors (5xx) - retry
-    if (errorMessage.includes("500") || errorMessage.includes("502") || errorMessage.includes("503")) {
+    if (
+      errorMessage.includes("500") ||
+      errorMessage.includes("502") ||
+      errorMessage.includes("503")
+    ) {
       return true;
     }
 
@@ -908,7 +1026,10 @@ class NotificationServer {
    * Calculate retry delay
    */
   private calculateRetryDelay(error: unknown): number {
-    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    const errorMessage =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : String(error).toLowerCase();
 
     // Rate limiting - longer delay
     if (errorMessage.includes("rate limit") || errorMessage.includes("429")) {
@@ -931,7 +1052,10 @@ class NotificationServer {
   /**
    * Execute with database retry
    */
-  private async executeWithDatabaseRetry<T>(operation: () => Promise<T>, maxRetries: number = 3): Promise<T> {
+  private async executeWithDatabaseRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+  ): Promise<T> {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -939,13 +1063,16 @@ class NotificationServer {
         return await operation();
       } catch (error) {
         lastError = error;
-        
+
         if (attempt === maxRetries || !this.isRetryableDatabaseError(error)) {
           throw error;
         }
 
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.warn(`Database operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`, error);
+        console.warn(
+          `Database operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`,
+          error,
+        );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -959,7 +1086,10 @@ class NotificationServer {
   private isRetryableDatabaseError(error: unknown): boolean {
     if (!error) return false;
 
-    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    const errorMessage =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : String(error).toLowerCase();
 
     return (
       errorMessage.includes("connection") ||
@@ -978,22 +1108,28 @@ class NotificationServer {
       // Test database connection
       await prisma.$queryRaw`SELECT 1`;
       console.log("✅ Database connection verified");
-      
+
       // Verify required environment variables
-      const requiredEnvVars = ['DATABASE_URL'];
-      const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-      
+      const requiredEnvVars = ["DATABASE_URL"];
+      const missingVars = requiredEnvVars.filter(
+        (varName) => !process.env[varName],
+      );
+
       if (missingVars.length > 0) {
-        throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+        throw new Error(
+          `Missing required environment variables: ${missingVars.join(", ")}`,
+        );
       }
-      
+
       // Test email service if configured
       if (this.resend) {
         console.log("✅ Email service configured");
       } else {
-        console.log("⚠️ Email service not configured - notifications will be logged only");
+        console.log(
+          "⚠️ Email service not configured - notifications will be logged only",
+        );
       }
-      
+
       console.log("🎯 Notification server health check passed");
     } catch (error) {
       console.error("❌ Health check failed:", error);
@@ -1027,7 +1163,7 @@ class NotificationServer {
   private async logProcessingMetrics(
     processed: number,
     failed: number,
-    skipped: number
+    skipped: number,
   ): Promise<void> {
     try {
       await prisma.notificationLog.create({
@@ -1050,13 +1186,16 @@ class NotificationServer {
    */
   private scheduleAutomaticCleanup(): void {
     // Run cleanup every 24 hours
-    this.cleanupTimer = setInterval(async () => {
-      try {
-        await this.cleanupOldNotifications();
-      } catch (error) {
-        console.error("❌ Automatic cleanup failed:", error);
-      }
-    }, 24 * 60 * 60 * 1000);
+    this.cleanupTimer = setInterval(
+      async () => {
+        try {
+          await this.cleanupOldNotifications();
+        } catch (error) {
+          console.error("❌ Automatic cleanup failed:", error);
+        }
+      },
+      24 * 60 * 60 * 1000,
+    );
 
     console.log("🧹 Automatic cleanup scheduled every 24 hours");
   }
@@ -1064,8 +1203,12 @@ class NotificationServer {
   /**
    * Cleanup old notifications
    */
-  private async cleanupOldNotifications(retentionDays: number = 30): Promise<void> {
-    const retentionCutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  private async cleanupOldNotifications(
+    retentionDays: number = 30,
+  ): Promise<void> {
+    const retentionCutoff = new Date(
+      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+    );
     const now = new Date();
 
     try {
@@ -1079,28 +1222,30 @@ class NotificationServer {
       });
 
       // Delete old sent notifications
-      const deletedSentNotifications = await prisma.eventNotification.deleteMany({
-        where: {
-          isSent: true,
-          createdAt: {
-            lt: retentionCutoff,
-          },
-        },
-      });
-
-      // Delete stale notifications for past events (events that have already ended)
-      const deletedStaleNotifications = await prisma.eventNotification.deleteMany({
-        where: {
-          event: {
-            end: {
-              lt: now, // Events that have already ended
+      const deletedSentNotifications =
+        await prisma.eventNotification.deleteMany({
+          where: {
+            isSent: true,
+            createdAt: {
+              lt: retentionCutoff,
             },
           },
-        },
-      });
+        });
+
+      // Delete stale notifications for past events (events that have already ended)
+      const deletedStaleNotifications =
+        await prisma.eventNotification.deleteMany({
+          where: {
+            event: {
+              end: {
+                lt: now, // Events that have already ended
+              },
+            },
+          },
+        });
 
       console.log(
-        `🧹 Cleanup completed: Deleted ${deletedLogs.count} logs, ${deletedSentNotifications.count} old sent notifications, and ${deletedStaleNotifications.count} stale notifications for past events`
+        `🧹 Cleanup completed: Deleted ${deletedLogs.count} logs, ${deletedSentNotifications.count} old sent notifications, and ${deletedStaleNotifications.count} stale notifications for past events`,
       );
     } catch (error) {
       console.error("❌ Cleanup failed:", error);
@@ -1111,8 +1256,11 @@ class NotificationServer {
    * Enhance email error
    */
   private enhanceEmailError(error: unknown, user: any, event: any): Error {
-    const baseMessage = error instanceof Error ? error.message : "Unknown email error";
-    return new Error(`Email delivery failed for user ${user.email}, event "${event.title}": ${baseMessage}`);
+    const baseMessage =
+      error instanceof Error ? error.message : "Unknown email error";
+    return new Error(
+      `Email delivery failed for user ${user.email}, event "${event.title}": ${baseMessage}`,
+    );
   }
 
   /**
@@ -1187,9 +1335,11 @@ class NotificationServer {
    */
   private getNextRetryTime(): Date | undefined {
     if (this.retryQueue.size === 0) return undefined;
-    
-    const nextRetryTimes = Array.from(this.retryQueue.values()).map(item => item.nextRetryAt);
-    return new Date(Math.min(...nextRetryTimes.map(date => date.getTime())));
+
+    const nextRetryTimes = Array.from(this.retryQueue.values()).map(
+      (item) => item.nextRetryAt,
+    );
+    return new Date(Math.min(...nextRetryTimes.map((date) => date.getTime())));
   }
 }
 
@@ -1215,13 +1365,16 @@ const server = Bun.serve({
           headers: { "Content-Type": "application/json" },
         });
       } catch (error) {
-        return new Response(JSON.stringify({
-          status: "unhealthy",
-          error: error instanceof Error ? error.message : "Unknown error"
-        }), {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({
+            status: "unhealthy",
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       }
     }
 

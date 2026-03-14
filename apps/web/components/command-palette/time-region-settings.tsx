@@ -57,7 +57,10 @@ export function TimeRegionSettings({
           <VisuallyHidden>
             <DialogTitle>Time & Region Settings</DialogTitle>
           </VisuallyHidden>
-          <TransitionContainer direction={transitionDirection} viewKey={currentView}>
+          <TransitionContainer
+            direction={transitionDirection}
+            viewKey={currentView}
+          >
             <div className="flex flex-col">
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -71,7 +74,9 @@ export function TimeRegionSettings({
               </div>
               <div className="flex-1 overflow-y-auto min-h-0">
                 {/* Timezone */}
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Timezone</div>
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                  Timezone
+                </div>
                 <div className="p-1">
                   <button
                     type="button"
@@ -83,7 +88,7 @@ export function TimeRegionSettings({
                       <div className="text-sm">Timezone</div>
                       <div className="text-xs text-muted-foreground truncate">
                         {ALL_TIMEZONES.find(
-                          (tz) => tz.value === localSettings.timezone
+                          (tz) => tz.value === localSettings.timezone,
                         )?.label || localSettings.timezone}
                       </div>
                     </div>
@@ -92,7 +97,9 @@ export function TimeRegionSettings({
                 </div>
 
                 {/* Time Format */}
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">Time Format</div>
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                  Time Format
+                </div>
                 <div className="p-1">
                   {[
                     { value: "12h", label: "12 Hour (1:00 PM)" },
@@ -131,7 +138,10 @@ export function TimeRegionSettings({
           <VisuallyHidden>
             <DialogTitle>Timezone Selection</DialogTitle>
           </VisuallyHidden>
-          <TransitionContainer direction={transitionDirection} viewKey={currentView}>
+          <TransitionContainer
+            direction={transitionDirection}
+            viewKey={currentView}
+          >
             <div className="flex flex-col">
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -169,7 +179,7 @@ export function TimeRegionSettings({
                           .includes(timezoneSearch.toLowerCase()) ||
                         tz.value
                           .toLowerCase()
-                          .includes(timezoneSearch.toLowerCase())
+                          .includes(timezoneSearch.toLowerCase()),
                     )
                       .slice(0, 20)
                       .map((tz) => (
@@ -197,35 +207,41 @@ export function TimeRegionSettings({
                       ))}
                   </div>
                 ) : (
-                  Object.entries(TIMEZONE_GROUPS).map(([groupName, timezones]) => (
-                    <div key={groupName}>
-                      <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground">{groupName}</div>
-                      <div className="p-1">
-                        {timezones.map((tz) => (
-                          <button
-                            key={tz.value}
-                            type="button"
-                            onClick={() => {
-                              updateSetting("timezone", tz.value);
-                              goBack("time-region");
-                            }}
-                            className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                          >
-                            <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm truncate">{tz.label}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {tz.value}
+                  Object.entries(TIMEZONE_GROUPS).map(
+                    ([groupName, timezones]) => (
+                      <div key={groupName}>
+                        <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                          {groupName}
+                        </div>
+                        <div className="p-1">
+                          {timezones.map((tz) => (
+                            <button
+                              key={tz.value}
+                              type="button"
+                              onClick={() => {
+                                updateSetting("timezone", tz.value);
+                                goBack("time-region");
+                              }}
+                              className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                            >
+                              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm truncate">
+                                  {tz.label}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {tz.value}
+                                </div>
                               </div>
-                            </div>
-                            {localSettings.timezone === tz.value && (
-                              <Check className="h-4 w-4 text-primary shrink-0" />
-                            )}
-                          </button>
-                        ))}
+                              {localSettings.timezone === tz.value && (
+                                <Check className="h-4 w-4 text-primary shrink-0" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ),
+                  )
                 )}
               </div>
             </div>

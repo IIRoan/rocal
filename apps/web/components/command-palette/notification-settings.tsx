@@ -7,11 +7,7 @@ import {
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Switch } from "@workspace/ui/components/ui/switch";
 import { Input } from "@workspace/ui/components/ui/input";
-import {
-  Mail,
-  Clock,
-  ArrowLeft,
-} from "lucide-react";
+import { Mail, Clock, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { PaletteView } from "./constants";
 
@@ -48,7 +44,10 @@ export function NotificationSettings({
         <VisuallyHidden>
           <DialogTitle>Notification Settings</DialogTitle>
         </VisuallyHidden>
-        <TransitionContainer direction={transitionDirection} viewKey="notifications">
+        <TransitionContainer
+          direction={transitionDirection}
+          viewKey="notifications"
+        >
           <div className="flex flex-col">
             {/* Header */}
             <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -62,13 +61,15 @@ export function NotificationSettings({
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
               {/* Notification Types Section */}
-              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Notification Types</div>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                Notification Types
+              </div>
               <div className="p-1">
                 <div
                   onClick={() =>
                     updateSetting(
                       "emailNotifications",
-                      !localSettings.emailNotifications
+                      !localSettings.emailNotifications,
                     )
                   }
                   className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer hover:bg-accent/30 transition-colors"
@@ -88,7 +89,9 @@ export function NotificationSettings({
               </div>
 
               {/* Default Reminder Section */}
-              <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">Default Reminder</div>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                Default Reminder
+              </div>
               <div className="px-4 py-3">
                 <div className="flex items-center gap-3 mb-2">
                   <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -105,7 +108,7 @@ export function NotificationSettings({
                   onChange={(e) =>
                     updateSetting(
                       "defaultReminder",
-                      e.target.value ? parseInt(e.target.value) : null
+                      e.target.value ? parseInt(e.target.value) : null,
                     )
                   }
                   placeholder="No default reminder"

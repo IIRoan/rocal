@@ -12,11 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import {
-  Calendar,
-  Check,
-  ArrowLeft,
-} from "lucide-react";
+import { Calendar, Check, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { WORKING_DAYS, type PaletteView } from "./constants";
 
@@ -55,7 +51,10 @@ export function CalendarDefaultsSettings({
         <VisuallyHidden>
           <DialogTitle>Calendar Defaults</DialogTitle>
         </VisuallyHidden>
-        <TransitionContainer direction={transitionDirection} viewKey="calendar-defaults">
+        <TransitionContainer
+          direction={transitionDirection}
+          viewKey="calendar-defaults"
+        >
           <div className="flex flex-col">
             {/* Header */}
             <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -77,7 +76,9 @@ export function CalendarDefaultsSettings({
                   </div>
                   <Select
                     value={String(localSettings.weekStartDay)}
-                    onValueChange={(value) => updateSetting("weekStartDay", Number(value))}
+                    onValueChange={(value) =>
+                      updateSetting("weekStartDay", Number(value))
+                    }
                   >
                     <SelectTrigger className="w-[120px] h-9 text-sm">
                       <SelectValue />
@@ -94,7 +95,9 @@ export function CalendarDefaultsSettings({
               </div>
 
               {/* Working Days */}
-              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Working Days</div>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                Working Days
+              </div>
               <div className="p-1">
                 {WORKING_DAYS.map((day) => (
                   <button
@@ -110,7 +113,7 @@ export function CalendarDefaultsSettings({
                       }
                       updateSetting(
                         "workingDays",
-                        JSON.stringify(currentWorkingDays.sort())
+                        JSON.stringify(currentWorkingDays.sort()),
                       );
                     }}
                     className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"

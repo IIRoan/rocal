@@ -15,71 +15,85 @@ import { Card, CardContent } from "../ui/card";
 const faqs = [
   {
     question: "How does Rocani's AI scheduling work?",
-    answer: "Our AI analyzes your calendar patterns, preferences, and availability to automatically suggest the best meeting times. It considers factors like time zones, working hours, travel time between meetings, and even your productivity patterns to optimize your schedule.",
-    category: "Features"
+    answer:
+      "Our AI analyzes your calendar patterns, preferences, and availability to automatically suggest the best meeting times. It considers factors like time zones, working hours, travel time between meetings, and even your productivity patterns to optimize your schedule.",
+    category: "Features",
   },
   {
     question: "Can I use Rocani with my existing calendar?",
-    answer: "Absolutely! Rocani seamlessly integrates with Google Calendar, Microsoft Outlook, Apple Calendar, and other popular calendar platforms. Your existing events sync automatically, and changes made in either platform are reflected everywhere.",
-    category: "Integration"
+    answer:
+      "Absolutely! Rocani seamlessly integrates with Google Calendar, Microsoft Outlook, Apple Calendar, and other popular calendar platforms. Your existing events sync automatically, and changes made in either platform are reflected everywhere.",
+    category: "Integration",
   },
   {
     question: "Is there a free version available?",
-    answer: "Yes! Our Personal plan is free forever for individuals. It includes up to 3 calendars, basic scheduling features, mobile app access, and 1GB storage. Perfect for personal use and trying out Rocani's core features.",
-    category: "Pricing"
+    answer:
+      "Yes! Our Personal plan is free forever for individuals. It includes up to 3 calendars, basic scheduling features, mobile app access, and 1GB storage. Perfect for personal use and trying out Rocani's core features.",
+    category: "Pricing",
   },
   {
     question: "How secure is my data with Rocani?",
-    answer: "Security is our top priority. We use enterprise-grade encryption, comply with GDPR and SOC 2 standards, and never sell your data. All calendar information is encrypted both in transit and at rest. You maintain full ownership of your data.",
-    category: "Security"
+    answer:
+      "Security is our top priority. We use enterprise-grade encryption, comply with GDPR and SOC 2 standards, and never sell your data. All calendar information is encrypted both in transit and at rest. You maintain full ownership of your data.",
+    category: "Security",
   },
   {
     question: "Can teams of different sizes use Rocani?",
-    answer: "Yes! Rocani scales from individual users to enterprise teams of thousands. Our Personal plan is great for individuals, Professional for small teams and freelancers, and Team plan includes advanced admin controls and enterprise features.",
-    category: "Plans"
+    answer:
+      "Yes! Rocani scales from individual users to enterprise teams of thousands. Our Personal plan is great for individuals, Professional for small teams and freelancers, and Team plan includes advanced admin controls and enterprise features.",
+    category: "Plans",
   },
   {
     question: "What happens if I want to cancel my subscription?",
-    answer: "You can cancel anytime with no penalties. We provide full data export in standard formats, and your account remains active until the end of your billing period. No questions asked, though we'd love feedback on how we can improve!",
-    category: "Billing"
+    answer:
+      "You can cancel anytime with no penalties. We provide full data export in standard formats, and your account remains active until the end of your billing period. No questions asked, though we'd love feedback on how we can improve!",
+    category: "Billing",
   },
   {
     question: "Does Rocani work offline?",
-    answer: "Our mobile apps offer offline capabilities, allowing you to view your calendar and create events without an internet connection. Changes sync automatically once you're back online. The web app requires internet connectivity.",
-    category: "Features"
+    answer:
+      "Our mobile apps offer offline capabilities, allowing you to view your calendar and create events without an internet connection. Changes sync automatically once you're back online. The web app requires internet connectivity.",
+    category: "Features",
   },
   {
     question: "How does time zone handling work?",
-    answer: "Rocani automatically detects and handles time zones intelligently. When scheduling with people in different time zones, it shows local times for each participant and suggests meeting times that work best for everyone involved.",
-    category: "Features"
+    answer:
+      "Rocani automatically detects and handles time zones intelligently. When scheduling with people in different time zones, it shows local times for each participant and suggests meeting times that work best for everyone involved.",
+    category: "Features",
   },
   {
     question: "Can I customize notifications and reminders?",
-    answer: "Yes! You have full control over notifications. Set custom reminder times, choose notification methods (email, push, SMS), and create smart reminders that adapt based on meeting location, travel time, and importance level.",
-    category: "Customization"
+    answer:
+      "Yes! You have full control over notifications. Set custom reminder times, choose notification methods (email, push, SMS), and create smart reminders that adapt based on meeting location, travel time, and importance level.",
+    category: "Customization",
   },
   {
     question: "Is there an API available for custom integrations?",
-    answer: "Yes, we offer a comprehensive REST API and webhooks for custom integrations. Our API documentation includes examples and SDKs for popular programming languages. Perfect for connecting with internal tools or building custom workflows.",
-    category: "Integration"
-  }
+    answer:
+      "Yes, we offer a comprehensive REST API and webhooks for custom integrations. Our API documentation includes examples and SDKs for popular programming languages. Perfect for connecting with internal tools or building custom workflows.",
+    category: "Integration",
+  },
 ];
 
-const categories = ["All", ...Array.from(new Set(faqs.map(faq => faq.category)))];
+const categories = [
+  "All",
+  ...Array.from(new Set(faqs.map((faq) => faq.category))),
+];
 
 export function FAQSection() {
   const [selectedCategory, setSelectedCategory] = React.useState("All");
   const [openItems, setOpenItems] = React.useState<string[]>([]);
 
-  const filteredFAQs = selectedCategory === "All" 
-    ? faqs 
-    : faqs.filter(faq => faq.category === selectedCategory);
+  const filteredFAQs =
+    selectedCategory === "All"
+      ? faqs
+      : faqs.filter((faq) => faq.category === selectedCategory);
 
   const toggleItem = (index: string) => {
-    setOpenItems(prev => 
+    setOpenItems((prev) =>
       prev.includes(index)
-        ? prev.filter(item => item !== index)
-        : [...prev, index]
+        ? prev.filter((item) => item !== index)
+        : [...prev, index],
     );
   };
 
@@ -124,9 +138,12 @@ export function FAQSection() {
           {filteredFAQs.map((faq, index) => {
             const itemId = `${selectedCategory}-${index}`;
             const isOpen = openItems.includes(itemId);
-            
+
             return (
-              <Card key={itemId} className="bg-card/50 backdrop-blur-sm border-border/50">
+              <Card
+                key={itemId}
+                className="bg-card/50 backdrop-blur-sm border-border/50"
+              >
                 <Collapsible>
                   <CollapsibleTrigger
                     onClick={() => toggleItem(itemId)}
@@ -155,7 +172,7 @@ export function FAQSection() {
                       </div>
                     </CardContent>
                   </CollapsibleTrigger>
-                  
+
                   <CollapsibleContent>
                     <div className="px-6 pb-6">
                       <div className="pl-12">
@@ -179,10 +196,10 @@ export function FAQSection() {
                 Still have questions?
               </h3>
               <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-                Our support team is here to help. Get in touch and we'll get back
-                to you as soon as possible.
+                Our support team is here to help. Get in touch and we'll get
+                back to you as soon as possible.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button className="rounded-full px-6 group">
                   Contact Support

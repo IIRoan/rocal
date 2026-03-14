@@ -93,7 +93,13 @@ export interface MobileEventCalendarProps {
     notifications: EventNotification[],
   ) => Promise<void>;
   // Command palette integration
-  onEventEdit?: (event: CalendarEvent, options?: { mode?: "modal" | "popover"; anchorPosition?: { x: number; y: number } }) => void;
+  onEventEdit?: (
+    event: CalendarEvent,
+    options?: {
+      mode?: "modal" | "popover";
+      anchorPosition?: { x: number; y: number };
+    },
+  ) => void;
   // Mobile specific
   onSidebarToggle?: () => void;
   // View change handler
@@ -132,12 +138,12 @@ export function MobileEventCalendar({
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
   const isMobile = useIsMobile();
-  
+
   // Initialize view from sessionStorage or fallback to smart default
   const [view, setViewState] = useState<CalendarView>(() => {
-    if (typeof window !== 'undefined') {
-      const savedView = sessionStorage.getItem('calendar-view-selection');
-      if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
+    if (typeof window !== "undefined") {
+      const savedView = sessionStorage.getItem("calendar-view-selection");
+      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
         return savedView as CalendarView;
       }
     }
@@ -147,16 +153,16 @@ export function MobileEventCalendar({
 
   // Update view when isMobile status changes and no saved preference exists
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedViewData = sessionStorage.getItem('calendar-view-selection');
+    if (typeof window !== "undefined") {
+      const savedViewData = sessionStorage.getItem("calendar-view-selection");
       let validSavedView = null;
-      
+
       // Check if we have saved data and it's not expired
       if (savedViewData) {
         try {
           const parsedData = JSON.parse(savedViewData);
           const now = new Date().getTime();
-          
+
           // Only use the saved view if it hasn't expired
           if (parsedData.expires && parsedData.expires > now) {
             validSavedView = parsedData.view;
@@ -164,20 +170,20 @@ export function MobileEventCalendar({
             setViewState(parsedData.view);
           } else {
             // Clear expired data
-            sessionStorage.removeItem('calendar-view-selection');
+            sessionStorage.removeItem("calendar-view-selection");
           }
         } catch (e) {
           // Handle legacy format or invalid JSON
-          console.warn('Invalid calendar view data in sessionStorage');
-          sessionStorage.removeItem('calendar-view-selection');
+          console.warn("Invalid calendar view data in sessionStorage");
+          sessionStorage.removeItem("calendar-view-selection");
         }
       }
-      
+
       if (!validSavedView && isMobile) {
         // On mobile, always default to day view regardless of initialView
-        setViewState('day');
+        setViewState("day");
         // Notify parent about the view change
-        onViewChange?.('day');
+        onViewChange?.("day");
       }
     }
   }, [isMobile, onViewChange]);
@@ -185,15 +191,18 @@ export function MobileEventCalendar({
   // Custom setView function that also saves to sessionStorage with expiration and notifies parent
   const setView = (newView: CalendarView) => {
     setViewState(newView);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       // Save view with expiration time (1 hour from now)
       const expirationTime = new Date();
       expirationTime.setHours(expirationTime.getHours() + 1);
       const viewData = {
         view: newView,
-        expires: expirationTime.getTime()
+        expires: expirationTime.getTime(),
       };
-      sessionStorage.setItem('calendar-view-selection', JSON.stringify(viewData));
+      sessionStorage.setItem(
+        "calendar-view-selection",
+        JSON.stringify(viewData),
+      );
     }
     // Notify parent component about view change
     onViewChange?.(newView);
@@ -216,13 +225,16 @@ export function MobileEventCalendar({
   useEffect(() => {
     if (initialView && initialView !== view) {
       setViewState(initialView);
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const expirationTime = new Date();
         expirationTime.setHours(expirationTime.getHours() + 1);
-        sessionStorage.setItem('calendar-view-selection', JSON.stringify({
-          view: initialView,
-          expires: expirationTime.getTime(),
-        }));
+        sessionStorage.setItem(
+          "calendar-view-selection",
+          JSON.stringify({
+            view: initialView,
+            expires: expirationTime.getTime(),
+          }),
+        );
       }
     }
   }, [initialView, view]);
@@ -271,7 +283,7 @@ export function MobileEventCalendar({
   // Navigation handlers
   const handlePrevious = () => {
     let newDate: Date;
-    
+
     if (view === "month") {
       newDate = subMonths(currentDate, 1);
     } else if (view === "week") {
@@ -283,13 +295,13 @@ export function MobileEventCalendar({
     } else {
       newDate = subMonths(currentDate, 1);
     }
-    
+
     if (newDate) setCurrentDate(newDate);
   };
 
   const handleNext = () => {
     let newDate: Date;
-    
+
     if (view === "month") {
       newDate = addMonths(currentDate, 1);
     } else if (view === "week") {
@@ -301,7 +313,7 @@ export function MobileEventCalendar({
     } else {
       newDate = addMonths(currentDate, 1);
     }
-    
+
     if (newDate) setCurrentDate(newDate);
   };
 
@@ -370,7 +382,7 @@ export function MobileEventCalendar({
       return savedEvent || event;
     } catch (error: any) {
       console.error("Failed to save event:", error);
-      
+
       const errorMessage = error?.message || "Failed to save event";
       const isNetworkError =
         error?.error === "Network Error" ||
@@ -532,22 +544,25 @@ export function MobileEventCalendar({
             "--event-height": `${compactView ? Math.round(EventHeight * 0.75) : EventHeight}px`,
             "--event-gap": `${compactView ? Math.round(EventGap * 0.5) : EventGap}px`,
             // Enhanced mobile-responsive week cell height
-            "--week-cells-height": `${compactView 
-              ? Math.round(WeekCellsHeight * 0.85) 
-              : typeof window !== 'undefined' && window.innerWidth < 640 
-                ? Math.round(WeekCellsHeight * 0.9) // Slightly more compact on mobile
-                : WeekCellsHeight}px`,
+            "--week-cells-height": `${
+              compactView
+                ? Math.round(WeekCellsHeight * 0.85)
+                : typeof window !== "undefined" && window.innerWidth < 640
+                  ? Math.round(WeekCellsHeight * 0.9) // Slightly more compact on mobile
+                  : WeekCellsHeight
+            }px`,
           } as React.CSSProperties
         }
       >
-        <CalendarDndProvider onEventUpdate={handleEventUpdate} timezone={timezone}>
+        <CalendarDndProvider
+          onEventUpdate={handleEventUpdate}
+          timezone={timezone}
+        >
           {/* Desktop-only calendar header - hidden on mobile since we have mobile nav */}
           <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4">
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
-                <h2 className="font-semibold text-xl">
-                  {viewTitle}
-                </h2>
+                <h2 className="font-semibold text-xl">{viewTitle}</h2>
               </div>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -657,8 +672,8 @@ export function MobileEventCalendar({
                 timezone={timezone}
               />
             )}
-            {view === "week" && (
-              isMobile ? (
+            {view === "week" &&
+              (isMobile ? (
                 <MobileWeekView
                   currentDate={currentDate}
                   events={events}
@@ -682,10 +697,9 @@ export function MobileEventCalendar({
                   workingDays={workingDays}
                   timezone={timezone}
                 />
-              )
-            )}
-            {view === "day" && (
-              isMobile ? (
+              ))}
+            {view === "day" &&
+              (isMobile ? (
                 <MobileDayView
                   currentDate={currentDate}
                   events={events}
@@ -708,8 +722,7 @@ export function MobileEventCalendar({
                   workingDays={workingDays}
                   timezone={timezone}
                 />
-              )
-            )}
+              ))}
             {view === "agenda" && (
               <AgendaView
                 currentDate={currentDate}

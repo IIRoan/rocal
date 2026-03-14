@@ -47,7 +47,7 @@ function DialogOverlay({
         "supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:data-[state=open]:backdrop-blur-md",
         // Respect reduced motion
         "motion-reduce:transition-none",
-        className
+        className,
       )}
       style={{
         position: "fixed",
@@ -111,7 +111,11 @@ function DialogContent({
 
   // Radius per variant
   const radius =
-    variant === "spotlight" ? "rounded-lg" : variant === "center" ? "rounded-xl" : "rounded-lg md:rounded-xl";
+    variant === "spotlight"
+      ? "rounded-lg"
+      : variant === "center"
+        ? "rounded-xl"
+        : "rounded-lg md:rounded-xl";
 
   return (
     <DialogPortal>
@@ -128,7 +132,7 @@ function DialogContent({
           animationClasses,
           // Reduce motion support
           "motion-reduce:transition-none",
-          className
+          className,
         )}
         {...props}
       >
@@ -163,7 +167,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="alert-dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto",
-        className
+        className,
       )}
       {...props}
     />

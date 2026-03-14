@@ -5,13 +5,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import {
-  RotateCcw,
-  Check,
-  X,
-  ArrowLeft,
-  AlertTriangle,
-} from "lucide-react";
+import { RotateCcw, Check, X, ArrowLeft, AlertTriangle } from "lucide-react";
 import type { PaletteView } from "./constants";
 
 interface AccountSettingsProps {
@@ -63,9 +57,11 @@ export function AccountSettings({
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 p-1">
               {!showResetConfirm ? (
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Danger Zone</div>
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                  Danger Zone
+                </div>
               ) : null}
-              
+
               {!showResetConfirm ? (
                 <button
                   type="button"

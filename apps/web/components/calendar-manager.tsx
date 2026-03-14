@@ -98,7 +98,9 @@ export function CalendarManager({
               </div>
               <div className="flex-1 overflow-y-auto min-h-0">
                 {/* Actions Section */}
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">Actions</div>
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                  Actions
+                </div>
                 <div className="p-1">
                   <button
                     type="button"
@@ -130,7 +132,9 @@ export function CalendarManager({
                 </div>
 
                 {/* Your Calendars Section */}
-                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">Your Calendars</div>
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                  Your Calendars
+                </div>
                 <div className="p-1">
                   {calendars.map((calendar) => (
                     <button
@@ -152,7 +156,9 @@ export function CalendarManager({
                       <div className="flex-1 min-w-0">
                         <div className="text-sm truncate">{calendar.name}</div>
                         {calendar.isDefault && (
-                          <div className="text-xs text-muted-foreground">Default</div>
+                          <div className="text-xs text-muted-foreground">
+                            Default
+                          </div>
                         )}
                       </div>
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
@@ -194,7 +200,10 @@ export function CalendarManager({
               <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
                 {/* Calendar Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="calendar-name" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="calendar-name"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     NAME
                   </Label>
                   <Input
@@ -261,19 +270,21 @@ export function CalendarManager({
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => handleCalendarCreate(
-                    calendarName,
-                    calendarColor,
-                    calendars,
-                    calendarData,
-                    {
-                      setCalendarValidationErrors,
-                      setCalendarSaving,
-                      setCalendarName,
-                      setCalendarColor,
-                    },
-                    () => goBack("calendars")
-                  )}
+                  onClick={() =>
+                    handleCalendarCreate(
+                      calendarName,
+                      calendarColor,
+                      calendars,
+                      calendarData,
+                      {
+                        setCalendarValidationErrors,
+                        setCalendarSaving,
+                        setCalendarName,
+                        setCalendarColor,
+                      },
+                      () => goBack("calendars"),
+                    )
+                  }
                   disabled={calendarSaving || !calendarName.trim()}
                   className="h-8"
                 >
@@ -324,7 +335,10 @@ export function CalendarManager({
               <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
                 {/* Calendar Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="calendar-name" className="text-xs font-medium text-muted-foreground">
+                  <Label
+                    htmlFor="calendar-name"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
                     NAME
                   </Label>
                   <Input
@@ -384,12 +398,14 @@ export function CalendarManager({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleCalendarDelete(
-                      editingCalendar,
-                      calendarData,
-                      setCalendarSaving,
-                      () => goBack("calendars")
-                    )}
+                    onClick={() =>
+                      handleCalendarDelete(
+                        editingCalendar,
+                        calendarData,
+                        setCalendarSaving,
+                        () => goBack("calendars"),
+                      )
+                    }
                     disabled={calendarSaving}
                     className="h-8 text-destructive hover:text-destructive"
                   >
@@ -412,19 +428,21 @@ export function CalendarManager({
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => handleCalendarUpdate(
-                      calendarName,
-                      calendarColor,
-                      calendars,
-                      editingCalendar,
-                      calendarData,
-                      {
-                        setCalendarValidationErrors,
-                        setCalendarSaving,
-                        setEditingCalendar,
-                      },
-                      () => goBack("calendars")
-                    )}
+                    onClick={() =>
+                      handleCalendarUpdate(
+                        calendarName,
+                        calendarColor,
+                        calendars,
+                        editingCalendar,
+                        calendarData,
+                        {
+                          setCalendarValidationErrors,
+                          setCalendarSaving,
+                          setEditingCalendar,
+                        },
+                        () => goBack("calendars"),
+                      )
+                    }
                     disabled={calendarSaving || !calendarName.trim()}
                     className="h-8"
                   >

@@ -38,11 +38,17 @@ const formatTimeWithOptionalMinutesTZ = (
   timezone?: string,
 ) => {
   if (!timezone) return formatTimeWithOptionalMinutes(date, timeFormat);
-  const token = timeFormat === "24h" ? (getMinutes(date) === 0 ? "H" : "H:mm") : (getMinutes(date) === 0 ? "ha" : "h:mma");
+  const token =
+    timeFormat === "24h"
+      ? getMinutes(date) === 0
+        ? "H"
+        : "H:mm"
+      : getMinutes(date) === 0
+        ? "ha"
+        : "h:mma";
   const str = formatInTimeZone(date, timezone, token);
   return timeFormat === "12h" ? str.toLowerCase() : str;
 };
-
 
 interface EventWrapperProps {
   event: CalendarEvent;
@@ -212,7 +218,11 @@ export function EventItem({
 
     // For short events (less than 45 minutes), only show start time
     if (durationMinutes < 45) {
-      return formatTimeWithOptionalMinutesTZ(displayStart, timeFormat, timezone);
+      return formatTimeWithOptionalMinutesTZ(
+        displayStart,
+        timeFormat,
+        timezone,
+      );
     }
 
     // For longer events, show both start and end time
@@ -258,8 +268,8 @@ export function EventItem({
           "py-0.5 sm:py-1",
           durationMinutes < 45 ? "items-center" : "flex-col",
           // Enhanced mobile typography and sizing with better text wrapping
-          view === "week" 
-            ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal" 
+          view === "week"
+            ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal"
             : "text-[13px]",
           className,
         )}
@@ -272,12 +282,15 @@ export function EventItem({
         {durationMinutes < 45 ? (
           // Short events - mobile optimized layout
           <div className="flex items-start gap-0.5 w-full min-w-0">
-            <span className={cn(
-              "font-medium flex-1 min-w-0",
-              // On mobile, allow text wrapping for very narrow events
-              view === "week" ? "break-words hyphens-auto sm:truncate" : "truncate"
-            )} 
-            title={event.title} // Tooltip for full title on hover/long press
+            <span
+              className={cn(
+                "font-medium flex-1 min-w-0",
+                // On mobile, allow text wrapping for very narrow events
+                view === "week"
+                  ? "break-words hyphens-auto sm:truncate"
+                  : "truncate",
+              )}
+              title={event.title} // Tooltip for full title on hover/long press
             >
               {event.title}
             </span>
@@ -286,12 +299,15 @@ export function EventItem({
           // Longer events - mobile optimized layout
           <>
             <div className="flex items-start gap-0.5 w-full min-w-0">
-              <span className={cn(
-                "font-medium flex-1 min-w-0",
-                // On mobile, allow text wrapping for week view
-                view === "week" ? "break-words hyphens-auto leading-tight sm:truncate" : "truncate"
-              )}
-              title={event.title} // Tooltip for full title on hover/long press
+              <span
+                className={cn(
+                  "font-medium flex-1 min-w-0",
+                  // On mobile, allow text wrapping for week view
+                  view === "week"
+                    ? "break-words hyphens-auto leading-tight sm:truncate"
+                    : "truncate",
+                )}
+                title={event.title} // Tooltip for full title on hover/long press
               >
                 {event.title}
               </span>
@@ -322,9 +338,7 @@ export function EventItem({
         <span className="truncate">{event.title}</span>
       </div>
       {!event.allDay && (
-        <div className="text-xs opacity-70">
-          {getEventTime()}
-        </div>
+        <div className="text-xs opacity-70">{getEventTime()}</div>
       )}
       {event.location && (
         <div className="text-xs opacity-70">
@@ -332,7 +346,9 @@ export function EventItem({
         </div>
       )}
       {event.description && (
-        <div className="my-1 text-xs opacity-90">{formatEventDescription(event.description)}</div>
+        <div className="my-1 text-xs opacity-90">
+          {formatEventDescription(event.description)}
+        </div>
       )}
     </button>
   );
