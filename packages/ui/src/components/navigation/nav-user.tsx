@@ -1,10 +1,8 @@
 import {
-  RiExpandUpDownLine,
-  RiUserLine,
-  RiGroupLine,
-  RiSparklingLine,
-  RiLogoutCircleLine,
-} from "@remixicon/react";
+  CaretDownIcon,
+  GearSixIcon,
+  SignOutIcon,
+} from "@phosphor-icons/react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
@@ -17,6 +15,7 @@ import {
 } from "../ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { useDropdownShortcuts } from "../../hooks";
+import { cn } from "../../lib/utils";
 
 export function NavUser({
   user,
@@ -49,7 +48,7 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground [&>svg]:size-5"
+              className="group data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="size-8">
                 <AvatarImage src={user.avatar} alt={user.name} />
@@ -60,7 +59,9 @@ export function NavUser({
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
               </div>
-              <RiExpandUpDownLine className="ml-auto size-5 text-muted-foreground/80" />
+              <span className="ml-auto size-5 text-muted-foreground/80 transition-transform duration-200 group-data-[state=open]:rotate-180">
+                <CaretDownIcon size={20} />
+              </span>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -74,10 +75,9 @@ export function NavUser({
                 className="gap-3 focus:bg-sidebar-accent"
                 onClick={onOpenSettings}
               >
-                <RiGroupLine
-                  size={20}
-                  className="size-5 text-muted-foreground/80"
-                />
+                <span className="size-5 text-muted-foreground/80">
+                  <GearSixIcon size={20} />
+                </span>
                 Settings
                 <DropdownMenuShortcut>⌘+S</DropdownMenuShortcut>
               </DropdownMenuItem>
@@ -85,10 +85,9 @@ export function NavUser({
                 className="gap-3 focus:bg-sidebar-accent"
                 onClick={onLogout}
               >
-                <RiLogoutCircleLine
-                  size={20}
-                  className="size-5 text-muted-foreground/80"
-                />
+                <span className="size-5 text-muted-foreground/80">
+                  <SignOutIcon size={20} />
+                </span>
                 Logout
                 <DropdownMenuShortcut>⌘+L</DropdownMenuShortcut>
               </DropdownMenuItem>
