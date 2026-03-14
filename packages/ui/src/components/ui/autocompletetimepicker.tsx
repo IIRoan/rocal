@@ -27,6 +27,7 @@ interface TimePickerProps {
   placeholder?: string;
   className?: string;
   inline?: boolean;
+  variant?: "outline" | "ghost";
 }
 
 interface TimeGridProps {
@@ -205,6 +206,7 @@ export function ShadcnAutocomleteTimePicker({
   placeholder = "Select time...",
   className,
   inline = false,
+  variant = "outline",
 }: TimePickerProps) {
   const [open, setOpen] = useState(false);
   const [customTimeInput, setCustomTimeInput] = useState("");
@@ -280,7 +282,7 @@ export function ShadcnAutocomleteTimePicker({
     </button>
   ) : (
     <Button
-      variant="outline"
+      variant={variant}
       role="combobox"
       aria-expanded={open}
       className={cn("w-full justify-start font-normal cursor-pointer", className)}
