@@ -5,6 +5,7 @@ import { CalendarEvent } from "./types";
 import { EventItem } from "./event-item";
 import { cn } from "../../lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { getEventColorClasses, getEventColorStyles } from "./utils";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -86,57 +87,50 @@ export function EventDots({
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
-              "w-full h-full relative overflow-hidden rounded border",
-              "bg-gradient-to-r from-blue-500/20 to-purple-500/20",
-              "hover:from-blue-500/30 hover:to-purple-500/30",
-              "border-blue-500/40 hover:border-blue-500/60",
-              "transition-all duration-200 ease-out",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
-              "min-h-[20px]",
+              "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] rounded",
+              "min-h-[20px] sm:min-h-[24px]",
             )}
             onClick={(e) => {
               e.stopPropagation();
             }}
             title={`${events.length} events at the same time`}
           >
-            <div
-              className={cn(
-                "flex items-center justify-between font-medium h-full",
-                "px-1 text-[10px] leading-tight",
-                style?.height && parseInt(style.height as string) < 30
-                  ? "px-0.5 text-[9px]"
-                  : "px-1 text-[10px]",
-              )}
-            >
-              {/* Show title for normal height events, count for very short ones */}
-              {style?.height && parseInt(style.height as string) < 20 ? (
-                <span className="truncate flex-1 text-left min-w-0 font-bold">
-                  {events.length} events
-                </span>
-              ) : (
-                <span className="truncate flex-1 text-left min-w-0">
-                  {primaryEvent.title}
-                </span>
-              )}
-
-              <div
-                className={cn(
-                  "flex items-center gap-1 ml-1 flex-shrink-0",
-                  style?.height &&
-                    parseInt(style.height as string) < 25 &&
-                    "hidden sm:flex",
-                )}
-              >
-                <span className="text-[8px] opacity-70">+{remainingCount}</span>
-                <ChevronDown
+            <div className="flex h-full w-full min-w-0 items-stretch">
+              {/* Show first 2 events as separate styled event items */}
+              {events.slice(0, 2).map((event, index) => (
+                <div
+                  key={event.id || index}
                   className={cn(
-                    "opacity-60",
-                    style?.height && parseInt(style.height as string) < 30
-                      ? "w-2 h-2"
-                      : "w-3 h-3",
+                    "flex-1 min-w-0 flex items-center px-1.5 border-r border-white/10 last:border-r-0",
+                    "text-[10px] sm:text-[13px]",
+                    "leading-tight",
+                    index === 0 && "rounded-l",
+                    index === 1 && "rounded-r",
+                    getEventColorClasses(event.color),
                   )}
-                />
-              </div>
+                  style={getEventColorStyles(event.color)}
+                >
+                  <span className="truncate">{event.title}</span>
+                </div>
+              ))}
+
+              {/* Show count if more than 2 events */}
+              {events.length > 2 && (
+                <div
+                  className={cn(
+                    "flex items-center justify-center min-w-[30px] rounded-r",
+                    "text-[8px] sm:text-[10px] font-bold",
+                    "px-1.5",
+                    "bg-slate-600/20 hover:bg-slate-600/30",
+                    "text-slate-900 dark:text-slate-100",
+                    style?.height && parseInt(style.height as string) < 30
+                      ? "py-0.5"
+                      : "py-1",
+                  )}
+                >
+                  +{events.length - 2}
+                </div>
+              )}
             </div>
           </button>
         </DropdownMenuTrigger>
