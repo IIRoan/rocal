@@ -175,24 +175,53 @@ export function CalendarProvider({
     }
   };
 
-  // Initialize calendars and local visibility state
+  // Initialize calendars and local visibility state, and sync when calendars change
   useEffect(() => {
-    if (initialCalendars.length > 0 && !hasInitialized.current) {
-      setCalendars(initialCalendars);
+    if (initialCalendars.length > 0) {
+      // Check if calendars have actually changed (by id and content)
+      const hasChanges =
+        calendars.length !== initialCalendars.length ||
+        calendars.some((cal, i) => {
+          const newCal = initialCalendars.find((c) => c.id === cal.id);
+          return (
+            !newCal ||
+            newCal.name !== cal.name ||
+            newCal.color !== cal.color ||
+            newCal.isVisible !== cal.isVisible ||
+            newCal.isDefault !== cal.isDefault
+          );
+        }) ||
+        initialCalendars.some(
+          (newCal) => !calendars.find((c) => c.id === newCal.id)
+        );
 
-      // Load visibility state from localStorage first
-      const storedVisibility = loadVisibilityFromStorage();
+      if (hasChanges || !hasInitialized.current) {
+        setCalendars(initialCalendars);
 
-      // Initialize local visibility state, prioritizing stored values but defaulting to server state
-      const initialVisibility: Record<string, boolean> = {};
-      initialCalendars.forEach((calendar) => {
-        // Use stored value if available, otherwise use server state (defaults to true)
-        initialVisibility[calendar.id] =
-          storedVisibility[calendar.id] ?? calendar.isVisible;
-      });
-      setLocalVisibilityState(initialVisibility);
+        // Load visibility state from localStorage first
+        const storedVisibility = loadVisibilityFromStorage();
 
-      hasInitialized.current = true;
+        // Initialize local visibility state, prioritizing stored values but defaulting to server state
+        const initialVisibility: Record<string, boolean> = {};
+        initialCalendars.forEach((calendar) => {
+          // Use stored value if available, otherwise use server state (defaults to true)
+          initialVisibility[calendar.id] =
+            storedVisibility[calendar.id] ?? calendar.isVisible;
+        });
+        setLocalVisibilityState(initialVisibility);
+
+        // Clean up localStorage - remove visibility for deleted calendars
+        const currentIds = new Set(initialCalendars.map((c) => c.id));
+        const cleanedStoredVisibility: Record<string, boolean> = {};
+        Object.entries(storedVisibility).forEach(([id, visible]) => {
+          if (currentIds.has(id)) {
+            cleanedStoredVisibility[id] = visible;
+          }
+        });
+        saveVisibilityToStorage(cleanedStoredVisibility);
+
+        hasInitialized.current = true;
+      }
     }
   }, [initialCalendars]);
 

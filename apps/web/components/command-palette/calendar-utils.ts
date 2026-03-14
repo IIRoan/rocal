@@ -159,7 +159,9 @@ export const handleCalendarDelete = async (
 ) => {
   setCalendarSaving(true);
   try {
-    await calendarData.deleteCalendar(calendar.id);
+    // Use deleteCalendarAdvanced to properly handle associated events
+    // Default action is "delete_events" which will remove all events in the calendar
+    await calendarData.deleteCalendar(calendar.id, "delete_events");
     toast.success(`Calendar "${calendar.name}" deleted`);
     goBack("calendars" as PaletteView);
   } catch (error: any) {
