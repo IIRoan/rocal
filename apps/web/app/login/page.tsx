@@ -90,7 +90,7 @@ export default function LoginPage() {
             width={56}
             height={56}
             className="text-primary"
-            aria-label="Rocal"
+            aria-label="Solace"
           />
           <div
             className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -117,7 +117,7 @@ export default function LoginPage() {
               width={56}
               height={56}
               className="text-primary"
-              aria-label="Rocal"
+              aria-label="Solace"
             />
             <h1 className="text-xl font-semibold text-foreground">Sign in</h1>
             <p className="text-sm text-muted-foreground">Welcome back</p>
