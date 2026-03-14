@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { Bell, Plus, X, ChevronDown } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   Drawer,
   DrawerContent,
@@ -42,7 +38,8 @@ const TIME_OPTIONS = [
 
 function formatTimeShort(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
-  if (minutes < 1440) return `${minutes / 60} hour${minutes / 60 > 1 ? "s" : ""}`;
+  if (minutes < 1440)
+    return `${minutes / 60} hour${minutes / 60 > 1 ? "s" : ""}`;
   const days = minutes / 1440;
   return `${days} day${days > 1 ? "s" : ""}`;
 }
@@ -82,7 +79,7 @@ function ReminderRow({
             "flex items-center justify-center h-9 rounded-lg text-sm font-medium transition-colors",
             option.value === value
               ? "bg-primary text-primary-foreground"
-              : "bg-muted/50 hover:bg-muted active:bg-muted/80"
+              : "bg-muted/50 hover:bg-muted active:bg-muted/80",
           )}
         >
           {option.label}
@@ -181,8 +178,8 @@ export function NotificationManager({
   const handleSelect = (index: number, value: number) => {
     onChange(
       notifications.map((n, i) =>
-        i === index ? { ...n, minutesBefore: value } : n
-      )
+        i === index ? { ...n, minutesBefore: value } : n,
+      ),
     );
   };
 
@@ -221,7 +218,7 @@ export function NotificationManager({
         disabled={loading}
         className={cn(
           "flex items-center gap-2 w-full text-left group cursor-pointer",
-          "disabled:opacity-50 disabled:cursor-not-allowed"
+          "disabled:opacity-50 disabled:cursor-not-allowed",
         )}
       >
         <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">

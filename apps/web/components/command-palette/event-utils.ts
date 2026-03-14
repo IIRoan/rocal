@@ -18,7 +18,7 @@ export const resetEventForm = (
     setEventCalendarId: (id: string) => void;
     setEventReminder: (reminder: number | null) => void;
     setEventNotifications: (notifications: EventNotification[]) => void;
-  }
+  },
 ) => {
   const startDate = new Date();
   const endDate = new Date();
@@ -53,7 +53,7 @@ export const validateEventForm = (
   eventEndDate: Date,
   eventAllDay: boolean,
   eventStartTime: string,
-  eventEndTime: string
+  eventEndTime: string,
 ) => {
   if (!eventTitle.trim()) return "Title is required";
   if (!eventCalendarId) return "Please select a calendar";

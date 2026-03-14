@@ -14,49 +14,50 @@ interface LogoSpinnerProps {
   enableCycling?: boolean;
 }
 
-export function LogoSpinner({ 
-  size = "md", 
+export function LogoSpinner({
+  size = "md",
   className,
   showText = true,
   text,
   messageContext = "PAGE_LOAD",
-  enableCycling = true
+  enableCycling = true,
 }: LogoSpinnerProps) {
   // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
-    enabled: enableCycling && !text && showText
+    enabled: enableCycling && !text && showText,
   });
-  
+
   // Use static text if provided, otherwise use cycling message
   const displayText = text || message;
 
   const sizeClasses = {
     sm: "h-8 w-8",
-    md: "h-12 w-12", 
+    md: "h-12 w-12",
     lg: "h-16 w-16",
-    xl: "h-20 w-20"
+    xl: "h-20 w-20",
   };
 
   return (
     <div className={cn("flex flex-col items-center gap-3", className)}>
       {/* Logo with subtle pulse */}
-      <Logo 
-        className={cn(
-          "text-primary animate-pulse",
-          sizeClasses[size]
-        )}
+      <Logo
+        className={cn("text-primary animate-pulse", sizeClasses[size])}
         fill="currentColor"
-        style={{ animationDuration: '2s' }}
+        style={{ animationDuration: "2s" }}
       />
 
       {/* Loading text */}
       {showText && (
         <div className="flex flex-col items-center gap-1.5">
-          <p className={cn(
-            "text-sm font-medium text-muted-foreground transition-opacity duration-300",
-            isTransitioning && enableCycling && !text ? "opacity-50" : "opacity-100"
-          )}>
+          <p
+            className={cn(
+              "text-sm font-medium text-muted-foreground transition-opacity duration-300",
+              isTransitioning && enableCycling && !text
+                ? "opacity-50"
+                : "opacity-100",
+            )}
+          >
             {displayText}
           </p>
         </div>
@@ -74,23 +75,25 @@ interface PageLoadingOverlayProps {
   enableCycling?: boolean;
 }
 
-export function PageLoadingOverlay({ 
+export function PageLoadingOverlay({
   isLoading = true,
   message,
   messageContext = "PAGE_LOAD",
   className,
-  enableCycling = true
+  enableCycling = true,
 }: PageLoadingOverlayProps) {
   if (!isLoading) return null;
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm",
-      "animate-fade-in",
-      className
-    )}>
-      <LogoSpinner 
-        size="lg" 
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm",
+        "animate-fade-in",
+        className,
+      )}
+    >
+      <LogoSpinner
+        size="lg"
         text={message}
         messageContext={messageContext}
         enableCycling={enableCycling}
@@ -108,41 +111,42 @@ interface InlineLogoSpinnerProps {
   enableCycling?: boolean;
 }
 
-export function InlineLogoSpinner({ 
+export function InlineLogoSpinner({
   className,
   size = "sm",
   text,
   messageContext = "PAGE_LOAD",
-  enableCycling = false
+  enableCycling = false,
 }: InlineLogoSpinnerProps) {
   // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !text,
-    cycleInterval: 3000
+    cycleInterval: 3000,
   });
-  
+
   const displayText = text || message;
-  
+
   const sizeClasses = {
     sm: "h-4 w-4",
-    md: "h-6 w-6"
+    md: "h-6 w-6",
   };
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Logo 
-        className={cn(
-          "text-primary animate-pulse",
-          sizeClasses[size]
-        )}
+      <Logo
+        className={cn("text-primary animate-pulse", sizeClasses[size])}
         fill="currentColor"
-        style={{ animationDuration: '2s' }}
+        style={{ animationDuration: "2s" }}
       />
-      <span className={cn(
-        "text-sm text-muted-foreground transition-opacity duration-300",
-        isTransitioning && enableCycling && !text ? "opacity-50" : "opacity-100"
-      )}>
+      <span
+        className={cn(
+          "text-sm text-muted-foreground transition-opacity duration-300",
+          isTransitioning && enableCycling && !text
+            ? "opacity-50"
+            : "opacity-100",
+        )}
+      >
         {displayText}
       </span>
     </div>

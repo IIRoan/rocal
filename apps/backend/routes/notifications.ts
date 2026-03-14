@@ -52,10 +52,10 @@ function rateLimit(limit: { requests: number; windowMs: number }) {
     if (current.count >= limit.requests) {
       set.status = 429;
       set.headers["Retry-After"] = Math.ceil(
-        (current.resetTime - now) / 1000
+        (current.resetTime - now) / 1000,
       ).toString();
       throw new ValidationError(
-        `Rate limit exceeded. Try again in ${Math.ceil((current.resetTime - now) / 1000)} seconds.`
+        `Rate limit exceeded. Try again in ${Math.ceil((current.resetTime - now) / 1000)} seconds.`,
       );
     }
 
@@ -72,7 +72,7 @@ function validateNotificationConfig(config: any): void {
     !["email", "browser"].includes(config.notificationType)
   ) {
     throw new ValidationError(
-      "Invalid notification type. Must be 'email' or 'browser'."
+      "Invalid notification type. Must be 'email' or 'browser'.",
     );
   }
 
@@ -83,7 +83,7 @@ function validateNotificationConfig(config: any): void {
   if (config.minutesBefore > 43200) {
     // 30 days in minutes
     throw new ValidationError(
-      "minutesBefore cannot exceed 30 days (43200 minutes)."
+      "minutesBefore cannot exceed 30 days (43200 minutes).",
     );
   }
 
@@ -266,7 +266,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           429: { description: "Rate limit exceeded" },
         },
       },
-    }
+    },
   )
 
   .put(
@@ -305,12 +305,12 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
 
         // Check for duplicate notification configurations
         const configKeys = notifications.map(
-          (n) => `${n.notificationType}-${n.minutesBefore}`
+          (n) => `${n.notificationType}-${n.minutesBefore}`,
         );
         const uniqueKeys = new Set(configKeys);
         if (configKeys.length !== uniqueKeys.size) {
           throw new ValidationError(
-            "Duplicate notification configurations are not allowed"
+            "Duplicate notification configurations are not allowed",
           );
         }
 
@@ -368,7 +368,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           }
 
           const notificationTime = new Date(
-            event.start.getTime() - config.minutesBefore * 60 * 1000
+            event.start.getTime() - config.minutesBefore * 60 * 1000,
           );
           if (notificationTime <= now) {
             skippedConfigurations.push({
@@ -437,7 +437,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
               [t.Literal("browser"), t.Literal("email")],
               {
                 description: "Type of notification",
-              }
+              },
             ),
             minutesBefore: t.Integer({
               description: "Minutes before event to send notification",
@@ -451,7 +451,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           {
             description: "Array of notification settings",
             maxItems: 20, // Reasonable limit
-          }
+          },
         ),
       }),
       detail: {
@@ -468,7 +468,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           429: { description: "Rate limit exceeded" },
         },
       },
-    }
+    },
   )
 
   .delete(
@@ -562,7 +562,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           429: { description: "Rate limit exceeded" },
         },
       },
-    }
+    },
   );
 
 // Status, debug, and cleanup routes removed - handled by separate notification server

@@ -3,13 +3,7 @@
 import React from "react";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Label } from "@workspace/ui/components/ui/label";
-import { 
-  RotateCcw, 
-  Edit3, 
-  Trash2,
-  Calendar,
-  ArrowRight
-} from "lucide-react";
+import { RotateCcw, Edit3, Trash2, Calendar, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
 
@@ -23,7 +17,7 @@ interface RecurringEventOptionsProps {
   onDeleteThisOnly: (occurrenceDate: string) => void;
   onDeleteThisAndFuture: (occurrenceDate: string) => void;
   onCancel: () => void;
-  mode: 'edit' | 'delete';
+  mode: "edit" | "delete";
   onFallbackDelete?: () => void; // Fallback for non-recurring events
 }
 
@@ -40,46 +34,46 @@ export function RecurringEventOptions({
   mode,
   onFallbackDelete,
 }: RecurringEventOptionsProps) {
-  const isEdit = mode === 'edit';
+  const isEdit = mode === "edit";
   const Icon = isEdit ? Edit3 : Trash2;
-  const actionWord = isEdit ? 'Edit' : 'Delete';
-  const actionColor = isEdit ? 'primary' : 'destructive';
+  const actionWord = isEdit ? "Edit" : "Delete";
+  const actionColor = isEdit ? "primary" : "destructive";
 
   // For recurring instances, we need the occurrence date
   // If this is a recurring instance with a synthetic ID, extract the date from the ID
   // Format: parentEventId_occurrenceDate
   let occurrenceDate = event.start.toISOString();
-  
-  if (isRecurringInstance && event.id.includes('_')) {
+
+  if (isRecurringInstance && event.id.includes("_")) {
     // Extract the date part from the synthetic ID
-    const parts = event.id.split('_');
+    const parts = event.id.split("_");
     if (parts.length > 1) {
       // Join all parts after the first one in case the parent ID contains underscores
-      const datePart = parts.slice(1).join('_');
+      const datePart = parts.slice(1).join("_");
       if (datePart) {
         occurrenceDate = datePart;
       }
     }
   }
-  
-  console.log('RecurringEventOptions:', {
+
+  console.log("RecurringEventOptions:", {
     eventId: event.id,
     isRecurringInstance,
     occurrenceDate,
     eventStart: event.start,
-    parentEventId: event.parentEventId
+    parentEventId: event.parentEventId,
   });
 
   // Check if this is actually a recurring event
   const actuallyRecurring = !!(
-    event.recurrence || 
-    event.isRecurringInstance || 
+    event.recurrence ||
+    event.isRecurringInstance ||
     event.parentEventId ||
-    (event.id && event.id.includes('_'))
+    (event.id && event.id.includes("_"))
   );
 
   // If not actually recurring and we have fallback, show simple option
-  if (!actuallyRecurring && onFallbackDelete && mode === 'delete') {
+  if (!actuallyRecurring && onFallbackDelete && mode === "delete") {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-2">
@@ -120,11 +114,14 @@ export function RecurringEventOptions({
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-2 text-lg font-semibold">
-          <Icon className={`h-5 w-5 ${isEdit ? 'text-primary' : 'text-destructive'}`} />
+          <Icon
+            className={`h-5 w-5 ${isEdit ? "text-primary" : "text-destructive"}`}
+          />
           {actionWord} Recurring Event
         </div>
         <p className="text-sm text-muted-foreground">
-          This is a recurring event. How would you like to {actionWord.toLowerCase()} it?
+          This is a recurring event. How would you like to{" "}
+          {actionWord.toLowerCase()} it?
         </p>
       </div>
 
@@ -148,7 +145,8 @@ export function RecurringEventOptions({
                 {actionWord} this occurrence only
               </div>
               <div className="text-xs text-muted-foreground">
-                {format(event.start, "EEEE, MMMM d, yyyy")} at {format(event.start, "h:mm a")}
+                {format(event.start, "EEEE, MMMM d, yyyy")} at{" "}
+                {format(event.start, "h:mm a")}
               </div>
             </div>
           </div>
@@ -196,9 +194,7 @@ export function RecurringEventOptions({
           <div className="flex items-center gap-3">
             <RotateCcw className="h-4 w-4 text-muted-foreground" />
             <div>
-              <div className="font-medium">
-                {actionWord} entire series
-              </div>
+              <div className="font-medium">{actionWord} entire series</div>
               <div className="text-xs text-muted-foreground">
                 All occurrences of this recurring event
               </div>

@@ -102,7 +102,7 @@ export function useEventForm({
   calendarsRef.current = calendars;
   // Event editor state
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
+    null,
   );
   const [eventViewMode, setEventViewMode] = useState<"view" | "edit">("view");
   const [eventTitle, setEventTitle] = useState("");
@@ -118,7 +118,7 @@ export function useEventForm({
   const [eventSaving, setEventSaving] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(
-    null
+    null,
   );
   const [showRecurringDeleteModal, setShowRecurringDeleteModal] =
     useState(false);
@@ -180,7 +180,7 @@ export function useEventForm({
       setEventAllDay(event.allDay || false);
       setEventLocation(event.location || "");
       setEventCalendarId(
-        event.calendarId || calendarsRef.current?.[0]?.id || ""
+        event.calendarId || calendarsRef.current?.[0]?.id || "",
       );
       setEventReminder(event.reminder ?? null);
 
@@ -241,7 +241,7 @@ export function useEventForm({
         ]);
       }
     },
-    [queryClient]
+    [queryClient],
   );
 
   // Reset form to initial state
@@ -303,7 +303,7 @@ export function useEventForm({
         setTimeErrors((prev) => ({ ...prev, start: validation.error }));
       }
     },
-    [eventEndTime]
+    [eventEndTime],
   );
 
   // Handle end time change with validation
@@ -330,7 +330,7 @@ export function useEventForm({
         setTimeErrors((prev) => ({ ...prev, end: validation.error }));
       }
     },
-    [eventStartTime]
+    [eventStartTime],
   );
 
   // Handle notification changes
@@ -338,7 +338,7 @@ export function useEventForm({
     (notifications: EventNotification[]) => {
       setEventNotifications(notifications);
     },
-    []
+    [],
   );
 
   // Save event
@@ -351,7 +351,7 @@ export function useEventForm({
         eventEndDate,
         eventAllDay,
         eventStartTime,
-        eventEndTime
+        eventEndTime,
       );
       if (validationError) {
         toast.error(validationError);
@@ -365,7 +365,7 @@ export function useEventForm({
             await validateRecurrenceMutation.mutateAsync(recurrenceRule);
           if (!validation.valid) {
             toast.error(
-              `Invalid recurrence rule: ${validation.errors.join(", ")}`
+              `Invalid recurrence rule: ${validation.errors.join(", ")}`,
             );
             return;
           }
@@ -378,13 +378,13 @@ export function useEventForm({
 
       // Validate for duplicate notifications
       const enabledNotifications = eventNotifications.filter(
-        (n) => n.isEnabled
+        (n) => n.isEnabled,
       );
       const notificationTimes = enabledNotifications.map(
-        (n) => n.minutesBefore
+        (n) => n.minutesBefore,
       );
       const duplicateTimes = notificationTimes.filter(
-        (time, index) => notificationTimes.indexOf(time) !== index
+        (time, index) => notificationTimes.indexOf(time) !== index,
       );
 
       if (duplicateTimes.length > 0) {
@@ -396,7 +396,7 @@ export function useEventForm({
               " before";
 
         toast.error(
-          `Cannot have multiple notifications for the same time: ${timeText}`
+          `Cannot have multiple notifications for the same time: ${timeText}`,
         );
         return;
       }
@@ -420,7 +420,7 @@ export function useEventForm({
       }
 
       const selectedCalendar = calendars.find(
-        (cal) => cal.id === eventCalendarId
+        (cal) => cal.id === eventCalendarId,
       );
       const calendarColor = selectedCalendar?.color || "blue";
 
@@ -447,7 +447,7 @@ export function useEventForm({
       if (eventReminder && eventReminder > 0) {
         const existingNotification = finalNotifications.find(
           (n) =>
-            n.minutesBefore === eventReminder && n.notificationType === "email"
+            n.minutesBefore === eventReminder && n.notificationType === "email",
         );
 
         if (!existingNotification) {
@@ -504,7 +504,7 @@ export function useEventForm({
               notificationType: n.notificationType,
               minutesBefore: Math.max(
                 0,
-                Math.min(43200, Number(n.minutesBefore) || 0)
+                Math.min(43200, Number(n.minutesBefore) || 0),
               ),
               isEnabled: !!n.isEnabled,
             }))
@@ -535,7 +535,7 @@ export function useEventForm({
             } catch (notifError) {
               console.warn(
                 "Failed to update event notifications (non-fatal):",
-                notifError
+                notifError,
               );
               // Do not block saving the event on notification failures
               toast.warning?.("Saved event without notifications", {
@@ -608,7 +608,7 @@ export function useEventForm({
       resetForm,
       validateRecurrenceMutation,
       updateNotificationsMutation,
-    ]
+    ],
   );
 
   // Delete event
@@ -633,7 +633,7 @@ export function useEventForm({
         setEventSaving(false);
       }
     },
-    [selectedEvent, eventTitle, onEventSaved, onClose, resetForm]
+    [selectedEvent, eventTitle, onEventSaved, onClose, resetForm],
   );
 
   // Delete recurring event - this instance only
@@ -697,7 +697,7 @@ export function useEventForm({
       } catch (error: any) {
         console.error("Failed to delete recurring event occurrence:", error);
         toast.error(
-          `Failed to delete event occurrence: ${error.message || "Unknown error"}`
+          `Failed to delete event occurrence: ${error.message || "Unknown error"}`,
         );
       } finally {
         setEventSaving(false);
@@ -709,7 +709,7 @@ export function useEventForm({
       onEventSaved,
       onClose,
       deleteRecurringEventMutation,
-    ]
+    ],
   );
 
   // Delete recurring event - entire series
@@ -758,7 +758,7 @@ export function useEventForm({
       onEventSaved,
       onClose,
       deleteRecurringEventMutation,
-    ]
+    ],
   );
 
   return {

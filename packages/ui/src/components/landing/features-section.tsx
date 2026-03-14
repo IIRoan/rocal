@@ -89,7 +89,10 @@ export function FeaturesSection() {
       <div className="max-w-7xl mx-auto">
         {/* Enhanced Section Header */}
         <div className="text-center mb-20">
-          <Badge variant="secondary" className="rounded-full px-6 py-3 mb-6 text-sm font-medium shadow-lg">
+          <Badge
+            variant="secondary"
+            className="rounded-full px-6 py-3 mb-6 text-sm font-medium shadow-lg"
+          >
             ✨ Features
           </Badge>
           <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-8 leading-tight">
@@ -114,12 +117,12 @@ export function FeaturesSection() {
               className="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 bg-card/60 backdrop-blur-sm border border-border/50 relative overflow-hidden hover:border-primary/20"
               style={{
                 animationDelay: `${index * 100}ms`,
-                animation: 'fadeInUp 0.6s ease-out forwards'
+                animation: "fadeInUp 0.6s ease-out forwards",
               }}
             >
               {/* Hover gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              
+
               <CardContent className="p-8 relative z-10">
                 <div className="flex flex-col items-start gap-6">
                   <div
@@ -137,7 +140,7 @@ export function FeaturesSection() {
                   </div>
                 </div>
               </CardContent>
-              
+
               {/* Animated border on hover */}
               <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/50 to-accent/50 opacity-0 group-hover:opacity-20 transition-opacity duration-500 blur-sm" />
             </Card>
@@ -149,9 +152,11 @@ export function FeaturesSection() {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-success/10 border border-success/20">
               <CheckCircle className="h-5 w-5 text-success animate-pulse" />
-              <span className="font-medium text-success">Free forever for personal use</span>
+              <span className="font-medium text-success">
+                Free forever for personal use
+              </span>
             </div>
-            
+
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Start with our generous free plan, then scale as your team grows.
               No hidden fees, no surprises.

@@ -2,10 +2,7 @@
 
 import React from "react";
 import { Button } from "@workspace/ui/components/ui/button";
-import { 
-  Trash2,
-  AlertTriangle
-} from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,14 +36,15 @@ export function RecurringDeleteModal({
             Delete Recurring Event
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
               &quot;{eventTitle}&quot; is a recurring event.
             </p>
             <p className="text-sm text-muted-foreground">
-              Would you like to delete just this occurrence or the entire series?
+              Would you like to delete just this occurrence or the entire
+              series?
             </p>
           </div>
 

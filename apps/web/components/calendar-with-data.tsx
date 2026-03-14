@@ -89,10 +89,10 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const initializedRef = useRef(false);
   React.useEffect(() => {
     if (!initializedRef.current && !settingsLoading) {
-      console.log('CalendarWithData - Setting initial date range:', {
+      console.log("CalendarWithData - Setting initial date range:", {
         start: defaultDateRange.start.toISOString(),
         end: defaultDateRange.end.toISOString(),
-        view: initialView
+        view: initialView,
       });
       calendarData.setDateRange(defaultDateRange);
       initializedRef.current = true;
@@ -162,18 +162,24 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     }
 
     return transformedEventsList;
-  }, [calendarData.events, calendarData.calendars, visibleCalendarIds, previewEvent]); // Add calendars + previewEvent to deps
-
+  }, [
+    calendarData.events,
+    calendarData.calendars,
+    visibleCalendarIds,
+    previewEvent,
+  ]); // Add calendars + previewEvent to deps
 
   // Show calendar skeleton and overlay until ALL core elements are ready:
   // - settings
   // - calendars & categories
   // - initial events (first load)
-  const isStructureLoading = settingsLoading || 
+  const isStructureLoading =
+    settingsLoading ||
     (calendarData.calendarsLoading && calendarData.calendars.length === 0) ||
     (calendarData.categoriesLoading && calendarData.categories.length === 0);
 
-  const isInitialEventsLoading = calendarData.eventsLoading && calendarData.events.length === 0;
+  const isInitialEventsLoading =
+    calendarData.eventsLoading && calendarData.events.length === 0;
 
   const isAllInitialLoading = isStructureLoading || isInitialEventsLoading;
 
@@ -189,7 +195,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     return (
       <>
         <CalendarSkeleton view={initialView} className={className} />
-        <PageLoadingOverlay 
+        <PageLoadingOverlay
           isLoading={true}
           messageContext={overlayContext}
           enableCycling={true}
@@ -207,7 +213,9 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       events={transformedEvents}
       categories={calendarData.categories}
       loading={false}
-      eventsLoading={calendarData.eventsLoading && calendarData.events.length === 0}
+      eventsLoading={
+        calendarData.eventsLoading && calendarData.events.length === 0
+      }
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}

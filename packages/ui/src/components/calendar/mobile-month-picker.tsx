@@ -26,7 +26,11 @@ interface MobileMonthPickerProps {
   events?: CalendarEvent[];
 }
 
-export function MobileMonthPicker({ className, onDateSelect, events = [] }: MobileMonthPickerProps) {
+export function MobileMonthPicker({
+  className,
+  onDateSelect,
+  events = [],
+}: MobileMonthPickerProps) {
   const { currentDate, setCurrentDate } = useCalendarContext();
   const [displayMonth, setDisplayMonth] = useState(currentDate);
 
@@ -40,7 +44,10 @@ export function MobileMonthPicker({ className, onDateSelect, events = [] }: Mobi
 
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-    return eachDayOfInterval({ start: weekStart, end: addMonths(weekStart, 0) }).slice(0, 7);
+    return eachDayOfInterval({
+      start: weekStart,
+      end: addMonths(weekStart, 0),
+    }).slice(0, 7);
   }, []);
 
   const handlePreviousMonth = () => {
@@ -57,7 +64,12 @@ export function MobileMonthPicker({ className, onDateSelect, events = [] }: Mobi
   };
 
   return (
-    <div className={cn("bg-background/95 backdrop-blur-sm border-b border-border/50 px-3 py-2", className)}>
+    <div
+      className={cn(
+        "bg-background/95 backdrop-blur-sm border-b border-border/50 px-3 py-2",
+        className,
+      )}
+    >
       {/* Compact month navigation header */}
       <div className="flex items-center justify-between mb-1.5">
         <button
@@ -109,7 +121,9 @@ export function MobileMonthPicker({ className, onDateSelect, events = [] }: Mobi
                 "relative rounded-full text-xs font-medium transition-all touch-manipulation",
                 "flex items-center justify-center h-6 w-6 mx-auto",
                 !isCurrentMonth && "text-muted-foreground/30",
-                isCurrentMonth && !isSelected && "hover:bg-accent/50 text-foreground/80",
+                isCurrentMonth &&
+                  !isSelected &&
+                  "hover:bg-accent/50 text-foreground/80",
                 isSelected && "bg-primary text-primary-foreground",
                 isCurrentDay && !isSelected && "text-primary font-semibold",
               )}

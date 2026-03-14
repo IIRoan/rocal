@@ -4,44 +4,48 @@ import { useEffect, useState } from "react";
 import { endOfWeek, isSameDay, isWithinInterval, startOfWeek } from "date-fns";
 import { StartHour, EndHour } from "../components/calendar/constants";
 
-function getCurrentTimeInTimezone(timezone?: string): { hours: number; minutes: number; date: Date } {
+function getCurrentTimeInTimezone(timezone?: string): {
+  hours: number;
+  minutes: number;
+  date: Date;
+} {
   if (!timezone) {
     const now = new Date();
     return {
       hours: now.getHours(),
       minutes: now.getMinutes(),
-      date: now
+      date: now,
     };
   }
 
   // Use Intl.DateTimeFormat to get current time in the specified timezone
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-US', {
+  const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
 
   const timeString = formatter.format(now);
-  const [hoursStr, minutesStr] = timeString.split(':');
-  const hours = parseInt(hoursStr || '0', 10);
-  const minutes = parseInt(minutesStr || '0', 10);
+  const [hoursStr, minutesStr] = timeString.split(":");
+  const hours = parseInt(hoursStr || "0", 10);
+  const minutes = parseInt(minutesStr || "0", 10);
 
   // Create a date object representing today in the specified timezone
-  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  const dateFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
-  
+
   const dateString = dateFormatter.format(now);
-  const [monthStr, dayStr, yearStr] = dateString.split('/');
+  const [monthStr, dayStr, yearStr] = dateString.split("/");
   const timezoneDate = new Date(
-    parseInt(yearStr || '2025', 10), 
-    parseInt(monthStr || '1', 10) - 1, 
-    parseInt(dayStr || '1', 10)
+    parseInt(yearStr || "2025", 10),
+    parseInt(monthStr || "1", 10) - 1,
+    parseInt(dayStr || "1", 10),
   );
 
   return { hours, minutes, date: timezoneDate };
@@ -57,13 +61,20 @@ export function useCurrentTimeIndicator(
 
   useEffect(() => {
     const calculateTimePosition = () => {
-      const { hours, minutes, date: timezoneDate } = getCurrentTimeInTimezone(timezone);
-      
+      const {
+        hours,
+        minutes,
+        date: timezoneDate,
+      } = getCurrentTimeInTimezone(timezone);
+
       console.log("Timezone:", timezone);
-      console.log("Current time in timezone:", `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+      console.log(
+        "Current time in timezone:",
+        `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`,
+      );
       console.log("Local browser time:", new Date().toLocaleTimeString());
       console.log("StartHour:", StartHour, "EndHour:", EndHour);
-      
+
       const totalMinutes = (hours - StartHour) * 60 + minutes;
       const dayStartMinutes = 0;
       // EndHour is 23, but we need to include the full 24th hour (23:00-23:59)
@@ -78,8 +89,9 @@ export function useCurrentTimeIndicator(
 
       // Calculate position as percentage of day
       const position =
-        ((totalMinutes - dayStartMinutes) / (dayEndMinutes - dayStartMinutes)) * 100;
-        
+        ((totalMinutes - dayStartMinutes) / (dayEndMinutes - dayStartMinutes)) *
+        100;
+
       console.log("- calculated position:", position + "%");
 
       // Check if current day is in view based on the calendar view

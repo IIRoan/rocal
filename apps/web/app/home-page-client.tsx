@@ -33,7 +33,9 @@ export function HomePageClient() {
       <div className="flex flex-col items-center gap-6 text-center">
         <Logo width={64} height={64} className="text-primary" />
         <h1 className="text-3xl font-semibold">Rocal</h1>
-        <p className="text-muted-foreground">The smart way to manage your time</p>
+        <p className="text-muted-foreground">
+          The smart way to manage your time
+        </p>
         <Button size="lg" onClick={() => router.push("/login")}>
           Go to Login
         </Button>

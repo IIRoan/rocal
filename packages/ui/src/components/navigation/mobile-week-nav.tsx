@@ -4,7 +4,19 @@ import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays, addMonths, subMonths, isSameDay, isSameMonth } from "date-fns";
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  subWeeks,
+  addDays,
+  subDays,
+  addMonths,
+  subMonths,
+  isSameDay,
+  isSameMonth,
+} from "date-fns";
 import { CalendarView } from "../calendar/types";
 import { AgendaDaysToShow } from "../calendar/constants";
 
@@ -43,7 +55,7 @@ export function MobileWeekNav({
     }
     onDateChange(newDate);
   };
-  
+
   const handleNext = () => {
     let newDate: Date;
     switch (currentView) {
@@ -64,42 +76,42 @@ export function MobileWeekNav({
     }
     onDateChange(newDate);
   };
-  
+
   const handleToday = () => {
     onDateChange(new Date());
     onTodayClick?.();
   };
-  
+
   const getDisplayText = () => {
     switch (currentView) {
       case "day":
         return {
           main: format(currentDate, "EEEE, MMM d"),
-          sub: format(currentDate, "yyyy")
+          sub: format(currentDate, "yyyy"),
         };
       case "week":
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
         return {
           main: `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`,
-          sub: `Week ${format(currentDate, "w")}`
+          sub: `Week ${format(currentDate, "w")}`,
         };
       case "month":
         return {
           main: format(currentDate, "MMMM yyyy"),
-          sub: ""
+          sub: "",
         };
       case "agenda":
         const agendaEnd = addDays(currentDate, AgendaDaysToShow - 1);
         if (isSameMonth(currentDate, agendaEnd)) {
           return {
             main: format(currentDate, "MMMM yyyy"),
-            sub: `${AgendaDaysToShow} days`
+            sub: `${AgendaDaysToShow} days`,
           };
         } else {
           return {
             main: `${format(currentDate, "MMM")} - ${format(agendaEnd, "MMM yyyy")}`,
-            sub: `${AgendaDaysToShow} days`
+            sub: `${AgendaDaysToShow} days`,
           };
         }
       default:
@@ -107,11 +119,11 @@ export function MobileWeekNav({
         const defaultWeekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
         return {
           main: `${format(defaultWeekStart, "MMM d")} - ${format(defaultWeekEnd, "MMM d, yyyy")}`,
-          sub: `Week ${format(currentDate, "w")}`
+          sub: `Week ${format(currentDate, "w")}`,
         };
     }
   };
-  
+
   const isToday = () => {
     const today = new Date();
     switch (currentView) {
@@ -130,7 +142,7 @@ export function MobileWeekNav({
         return false;
     }
   };
-  
+
   const displayText = getDisplayText();
   const isCurrentPeriod = isToday();
 
@@ -138,7 +150,7 @@ export function MobileWeekNav({
     <div
       className={cn(
         "sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border md:hidden",
-        className
+        className,
       )}
     >
       <div className="flex items-center justify-between px-4 py-3 safe-area-inset-top">
@@ -150,18 +162,16 @@ export function MobileWeekNav({
         >
           <ChevronLeft size={20} />
         </Button>
-        
+
         <div className="flex-1 text-center">
-          <div className="text-sm font-medium">
-            {displayText.main}
-          </div>
+          <div className="text-sm font-medium">{displayText.main}</div>
           {displayText.sub && (
             <div className="text-xs text-muted-foreground mt-0.5">
               {displayText.sub}
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center gap-2">
           {!isCurrentPeriod && (
             <Button

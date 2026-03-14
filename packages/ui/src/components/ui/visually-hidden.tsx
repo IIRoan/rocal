@@ -9,7 +9,7 @@ const VisuallyHidden = React.forwardRef<
     ref={ref}
     className={cn(
       "sr-only absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0",
-      className
+      className,
     )}
     {...props}
   />

@@ -149,10 +149,9 @@ export interface UserSettings {
   updatedAt: Date;
 }
 
-export interface UpdateSettingsRequest
-  extends Partial<
-    Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
-  > {
+export interface UpdateSettingsRequest extends Partial<
+  Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
+> {
   userId?: string;
 }
 

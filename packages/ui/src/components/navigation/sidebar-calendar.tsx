@@ -45,7 +45,9 @@ export function SidebarCalendar({
   }, [currentDate, setCurrentDate]);
 
   useEffect(() => {
-    const monthStart = startOfWeek(startOfMonth(calendarMonth), { weekStartsOn: 1 });
+    const monthStart = startOfWeek(startOfMonth(calendarMonth), {
+      weekStartsOn: 1,
+    });
     const monthEnd = endOfWeek(endOfMonth(calendarMonth), { weekStartsOn: 1 });
     onDisplayMonthChange?.({ start: monthStart, end: monthEnd });
   }, [calendarMonth, onDisplayMonthChange]);
@@ -111,7 +113,9 @@ export function SidebarCalendar({
                 "relative size-8 rounded-full text-sm transition-colors",
                 "flex items-center justify-center",
                 !isCurrentMonth && "text-muted-foreground/35",
-                isCurrentMonth && !isSelected && "hover:bg-accent text-foreground",
+                isCurrentMonth &&
+                  !isSelected &&
+                  "hover:bg-accent text-foreground",
                 isSelected && "text-primary font-semibold",
                 isCurrentDay && !isSelected && "text-primary font-semibold",
               )}

@@ -50,11 +50,8 @@ export function AppSidebar({
   isMobile = false,
   ...props
 }: AppSidebarProps) {
-  const {
-    calendars,
-    toggleCalendarVisibility,
-    isCalendarVisible,
-  } = useCalendarContext();
+  const { calendars, toggleCalendarVisibility, isCalendarVisible } =
+    useCalendarContext();
 
   // Mobile version - render content directly without Sidebar wrapper
   if (isMobile) {
@@ -112,7 +109,10 @@ export function AppSidebar({
             {/* Calendar List */}
             <div className="space-y-2">
               {calendars.map((calendar) => (
-                <div key={calendar.id} className="flex items-center justify-between gap-3 p-2 rounded-md hover:bg-accent group">
+                <div
+                  key={calendar.id}
+                  className="flex items-center justify-between gap-3 p-2 rounded-md hover:bg-accent group"
+                >
                   <div className="flex items-center gap-3 flex-1">
                     <Checkbox
                       id={calendar.id}
@@ -178,11 +178,7 @@ export function AppSidebar({
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">
         {onCreateEvent && (
           <SidebarGroup className="px-1 mb-2">
-            <Button
-              onClick={onCreateEvent}
-              className="w-full gap-2"
-              size="sm"
-            >
+            <Button onClick={onCreateEvent} className="w-full gap-2" size="sm">
               <RiAddLine size={16} />
               <span>New Event</span>
             </Button>

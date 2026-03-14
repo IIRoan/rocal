@@ -36,7 +36,10 @@ export function DashboardSkeleton({ className }: { className?: string }) {
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded">
-                  <Skeleton className="h-3 w-3 rounded-full" variant="shimmer" />
+                  <Skeleton
+                    className="h-3 w-3 rounded-full"
+                    variant="shimmer"
+                  />
                   <Skeleton className="h-4 flex-1" variant="wave" />
                   <Skeleton className="h-4 w-4" variant="shimmer" />
                 </div>
@@ -50,7 +53,10 @@ export function DashboardSkeleton({ className }: { className?: string }) {
             <div className="space-y-2">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded">
-                  <Skeleton className="h-3 w-3 rounded-full" variant="shimmer" />
+                  <Skeleton
+                    className="h-3 w-3 rounded-full"
+                    variant="shimmer"
+                  />
                   <Skeleton className="h-4 flex-1" variant="wave" />
                 </div>
               ))}
@@ -65,7 +71,10 @@ export function DashboardSkeleton({ className }: { className?: string }) {
         <div className="border-b border-border p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Skeleton className="h-8 w-8 rounded md:hidden" variant="shimmer" />
+              <Skeleton
+                className="h-8 w-8 rounded md:hidden"
+                variant="shimmer"
+              />
               <div className="space-y-1">
                 <Skeleton className="h-6 w-32" variant="shimmer" />
                 <Skeleton className="h-4 w-24" variant="shimmer" />
@@ -108,12 +117,14 @@ export function SettingsDialogSkeleton({ className }: { className?: string }) {
       {/* Settings content */}
       <div className="space-y-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="space-y-2" style={{ animationDelay: `${i * 0.1}s` }}>
+          <div
+            key={i}
+            className="space-y-2"
+            style={{ animationDelay: `${i * 0.1}s` }}
+          >
             <Skeleton className="h-4 w-32" variant="shimmer" />
             <Skeleton className="h-10 w-full rounded" variant="wave" />
-            {i % 3 === 0 && (
-              <Skeleton className="h-3 w-48" variant="shimmer" />
-            )}
+            {i % 3 === 0 && <Skeleton className="h-3 w-48" variant="shimmer" />}
           </div>
         ))}
       </div>
@@ -143,25 +154,37 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
       {/* Event form fields */}
       <div className="space-y-4">
         {/* Title */}
-        <div className="space-y-2 animate-slide-in" style={{ animationDelay: '0.1s' }}>
+        <div
+          className="space-y-2 animate-slide-in"
+          style={{ animationDelay: "0.1s" }}
+        >
           <Skeleton className="h-4 w-12" variant="shimmer" />
           <Skeleton className="h-10 w-full rounded" variant="wave" />
         </div>
 
         {/* Description */}
-        <div className="space-y-2 animate-slide-in" style={{ animationDelay: '0.2s' }}>
+        <div
+          className="space-y-2 animate-slide-in"
+          style={{ animationDelay: "0.2s" }}
+        >
           <Skeleton className="h-4 w-20" variant="shimmer" />
           <Skeleton className="h-20 w-full rounded" variant="wave" />
         </div>
 
         {/* Calendar selection */}
-        <div className="space-y-2 animate-slide-in" style={{ animationDelay: '0.3s' }}>
+        <div
+          className="space-y-2 animate-slide-in"
+          style={{ animationDelay: "0.3s" }}
+        >
           <Skeleton className="h-4 w-16" variant="shimmer" />
           <Skeleton className="h-10 w-full rounded" variant="wave" />
         </div>
 
         {/* Date and time fields */}
-        <div className="grid grid-cols-2 gap-4 animate-slide-in" style={{ animationDelay: '0.4s' }}>
+        <div
+          className="grid grid-cols-2 gap-4 animate-slide-in"
+          style={{ animationDelay: "0.4s" }}
+        >
           <div className="space-y-2">
             <Skeleton className="h-4 w-20" variant="shimmer" />
             <Skeleton className="h-10 w-full rounded" variant="wave" />
@@ -172,7 +195,10 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 animate-slide-in" style={{ animationDelay: '0.5s' }}>
+        <div
+          className="grid grid-cols-2 gap-4 animate-slide-in"
+          style={{ animationDelay: "0.5s" }}
+        >
           <div className="space-y-2">
             <Skeleton className="h-4 w-16" variant="shimmer" />
             <Skeleton className="h-10 w-full rounded" variant="wave" />
@@ -184,30 +210,46 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
         </div>
 
         {/* All day toggle */}
-        <div className="flex items-center space-x-2 animate-slide-in" style={{ animationDelay: '0.6s' }}>
+        <div
+          className="flex items-center space-x-2 animate-slide-in"
+          style={{ animationDelay: "0.6s" }}
+        >
           <Skeleton className="h-4 w-4 rounded" variant="shimmer" />
           <Skeleton className="h-4 w-24" variant="shimmer" />
         </div>
 
         {/* Location */}
-        <div className="space-y-2 animate-slide-in" style={{ animationDelay: '0.7s' }}>
+        <div
+          className="space-y-2 animate-slide-in"
+          style={{ animationDelay: "0.7s" }}
+        >
           <Skeleton className="h-4 w-16" variant="shimmer" />
           <Skeleton className="h-10 w-full rounded" variant="wave" />
         </div>
 
         {/* Color selection */}
-        <div className="space-y-2 animate-slide-in" style={{ animationDelay: '0.8s' }}>
+        <div
+          className="space-y-2 animate-slide-in"
+          style={{ animationDelay: "0.8s" }}
+        >
           <Skeleton className="h-4 w-12" variant="shimmer" />
           <div className="flex gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-8 rounded-full" variant="shimmer" />
+              <Skeleton
+                key={i}
+                className="h-8 w-8 rounded-full"
+                variant="shimmer"
+              />
             ))}
           </div>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between pt-4 border-t border-border animate-scale-in" style={{ animationDelay: '0.9s' }}>
+      <div
+        className="flex justify-between pt-4 border-t border-border animate-scale-in"
+        style={{ animationDelay: "0.9s" }}
+      >
         <Skeleton className="h-10 w-16 rounded" variant="shimmer" />
         <div className="flex gap-2">
           <Skeleton className="h-10 w-16 rounded" variant="shimmer" />
@@ -221,7 +263,12 @@ export function EventEditorSkeleton({ className }: { className?: string }) {
 // Mobile calendar skeleton
 export function MobileCalendarSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("h-screen flex flex-col bg-background animate-fade-in", className)}>
+    <div
+      className={cn(
+        "h-screen flex flex-col bg-background animate-fade-in",
+        className,
+      )}
+    >
       {/* Mobile header */}
       <div className="flex items-center justify-between p-4 border-b border-border safe-area-inset-top">
         <div className="flex items-center gap-3">
@@ -273,18 +320,18 @@ export function MobileCalendarSkeleton({ className }: { className?: string }) {
 }
 
 // List skeleton for generic lists
-export function ListSkeleton({ 
-  itemCount = 5, 
-  className 
-}: { 
-  itemCount?: number; 
-  className?: string; 
+export function ListSkeleton({
+  itemCount = 5,
+  className,
+}: {
+  itemCount?: number;
+  className?: string;
 }) {
   return (
     <div className={cn("space-y-3 animate-fade-in", className)}>
       {Array.from({ length: itemCount }).map((_, i) => (
-        <div 
-          key={i} 
+        <div
+          key={i}
           className="flex items-center gap-4 p-4 rounded-lg border border-border animate-slide-in"
           style={{ animationDelay: `${i * 0.1}s` }}
         >
@@ -301,32 +348,32 @@ export function ListSkeleton({
 }
 
 // Form skeleton for generic forms
-export function FormSkeleton({ 
-  fieldCount = 6, 
-  className 
-}: { 
-  fieldCount?: number; 
-  className?: string; 
+export function FormSkeleton({
+  fieldCount = 6,
+  className,
+}: {
+  fieldCount?: number;
+  className?: string;
 }) {
   return (
     <div className={cn("space-y-4 animate-fade-in", className)}>
       {Array.from({ length: fieldCount }).map((_, i) => (
-        <div 
-          key={i} 
+        <div
+          key={i}
           className="space-y-2 animate-slide-in"
           style={{ animationDelay: `${i * 0.1}s` }}
         >
           <Skeleton className="h-4 w-20" variant="shimmer" />
-          <Skeleton 
-            className={`w-full rounded ${i % 3 === 2 ? 'h-20' : 'h-10'}`} 
-            variant="wave" 
+          <Skeleton
+            className={`w-full rounded ${i % 3 === 2 ? "h-20" : "h-10"}`}
+            variant="wave"
           />
           {i % 4 === 0 && (
             <Skeleton className="h-3 w-48 text-xs" variant="shimmer" />
           )}
         </div>
       ))}
-      
+
       {/* Form actions */}
       <div className="flex justify-end gap-2 pt-4 border-t border-border animate-scale-in">
         <Skeleton className="h-10 w-16 rounded" variant="shimmer" />

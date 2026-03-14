@@ -46,7 +46,7 @@ export function EventDots({
       setIsExpanded(false);
       onClick?.(event);
     }),
-    isExpanded
+    isExpanded,
   );
 
   if (events.length === 0) return null;
@@ -92,20 +92,22 @@ export function EventDots({
               "border-blue-500/40 hover:border-blue-500/60",
               "transition-all duration-200 ease-out",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
-              "min-h-[20px]"
+              "min-h-[20px]",
             )}
             onClick={(e) => {
               e.stopPropagation();
             }}
             title={`${events.length} events at the same time`}
           >
-            <div className={cn(
-              "flex items-center justify-between font-medium h-full",
-              "px-1 text-[10px] leading-tight",
-              style?.height && parseInt(style.height as string) < 30 
-                ? "px-0.5 text-[9px]" 
-                : "px-1 text-[10px]"
-            )}>
+            <div
+              className={cn(
+                "flex items-center justify-between font-medium h-full",
+                "px-1 text-[10px] leading-tight",
+                style?.height && parseInt(style.height as string) < 30
+                  ? "px-0.5 text-[9px]"
+                  : "px-1 text-[10px]",
+              )}
+            >
               {/* Show title for normal height events, count for very short ones */}
               {style?.height && parseInt(style.height as string) < 20 ? (
                 <span className="truncate flex-1 text-left min-w-0 font-bold">
@@ -116,27 +118,31 @@ export function EventDots({
                   {primaryEvent.title}
                 </span>
               )}
-              
-              <div className={cn(
-                "flex items-center gap-1 ml-1 flex-shrink-0",
-                style?.height && parseInt(style.height as string) < 25 && "hidden sm:flex"
-              )}>
-                <span className="text-[8px] opacity-70">
-                  +{remainingCount}
-                </span>
-                <ChevronDown className={cn(
-                  "opacity-60",
-                  style?.height && parseInt(style.height as string) < 30
-                    ? "w-2 h-2"
-                    : "w-3 h-3"
-                )} />
+
+              <div
+                className={cn(
+                  "flex items-center gap-1 ml-1 flex-shrink-0",
+                  style?.height &&
+                    parseInt(style.height as string) < 25 &&
+                    "hidden sm:flex",
+                )}
+              >
+                <span className="text-[8px] opacity-70">+{remainingCount}</span>
+                <ChevronDown
+                  className={cn(
+                    "opacity-60",
+                    style?.height && parseInt(style.height as string) < 30
+                      ? "w-2 h-2"
+                      : "w-3 h-3",
+                  )}
+                />
               </div>
             </div>
           </button>
         </DropdownMenuTrigger>
-        
-        <DropdownMenuContent 
-          className="w-72" 
+
+        <DropdownMenuContent
+          className="w-72"
           align="start"
           side="bottom"
           onCloseAutoFocus={(e) => {
@@ -148,7 +154,7 @@ export function EventDots({
             // Only show shortcuts for first 9 events
             const showShortcut = index < 9;
             const shortcutNumber = index + 1;
-            
+
             return (
               <DropdownMenuItem
                 key={event.id || index}
@@ -169,7 +175,9 @@ export function EventDots({
                   )}
                 </div>
                 {showShortcut && (
-                  <DropdownMenuShortcut>⌘+{shortcutNumber}</DropdownMenuShortcut>
+                  <DropdownMenuShortcut>
+                    ⌘+{shortcutNumber}
+                  </DropdownMenuShortcut>
                 )}
               </DropdownMenuItem>
             );
@@ -181,26 +189,31 @@ export function EventDots({
 }
 
 // Utility function to group events by exact time matching
-export function groupEventsByExactTime(events: CalendarEvent[]): CalendarEvent[][] {
+export function groupEventsByExactTime(
+  events: CalendarEvent[],
+): CalendarEvent[][] {
   const groups: Map<string, CalendarEvent[]> = new Map();
-  
+
   events.forEach((event) => {
     const startTime = new Date(event.start).getTime();
     const endTime = new Date(event.end).getTime();
     const timeKey = `${startTime}-${endTime}`;
-    
+
     if (!groups.has(timeKey)) {
       groups.set(timeKey, []);
     }
     groups.get(timeKey)!.push(event);
   });
-  
+
   // Return groups, with single events as individual arrays
   return Array.from(groups.values());
 }
 
 // Utility function to check if events have identical times
-export function haveSameExactTime(event1: CalendarEvent, event2: CalendarEvent): boolean {
+export function haveSameExactTime(
+  event1: CalendarEvent,
+  event2: CalendarEvent,
+): boolean {
   return (
     new Date(event1.start).getTime() === new Date(event2.start).getTime() &&
     new Date(event1.end).getTime() === new Date(event2.end).getTime()

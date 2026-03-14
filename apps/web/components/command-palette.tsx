@@ -75,7 +75,7 @@ export function CommandPalette({
   const { settings, loading, updateSettings, resetSettings } = useSettings();
 
   const [currentView, setCurrentView] = useState<PaletteView>(
-    initialView as PaletteView
+    initialView as PaletteView,
   );
   const [transitionDirection, setTransitionDirection] = useState<
     "forward" | "back"
@@ -151,12 +151,12 @@ export function CommandPalette({
   // Add keyboard shortcuts for navigation items (Ctrl+1 through Ctrl+8) - always at top level
   useNumberedShortcuts(
     NAVIGATION_ITEMS.map((item) => () => goForward(item.id as PaletteView)),
-    open && currentView === "main"
+    open && currentView === "main",
   );
 
   const updateSetting = async <K extends keyof UserSettings>(
     key: K,
-    value: UserSettings[K]
+    value: UserSettings[K],
   ) => {
     if (!localSettings || saving) return;
 
@@ -208,19 +208,22 @@ export function CommandPalette({
 
   // Command mode handling - hooks must be at component level
   const isCommandMode = searchQuery.trim().startsWith(">");
-  const commandQuery = isCommandMode ? searchQuery.trim().slice(1).trim().toLowerCase() : "";
-  
+  const commandQuery = isCommandMode
+    ? searchQuery.trim().slice(1).trim().toLowerCase()
+    : "";
+
   const matchingCommands = useMemo(() => {
     if (!isCommandMode) return [];
     if (!commandQuery) return COMMANDS;
-    return COMMANDS.filter(cmd => 
-      cmd.command.includes(commandQuery) || 
-      cmd.label.toLowerCase().includes(commandQuery)
+    return COMMANDS.filter(
+      (cmd) =>
+        cmd.command.includes(commandQuery) ||
+        cmd.label.toLowerCase().includes(commandQuery),
     );
   }, [isCommandMode, commandQuery]);
 
   // Execute a command action
-  const executeCommand = (cmd: typeof COMMANDS[0]) => {
+  const executeCommand = (cmd: (typeof COMMANDS)[0]) => {
     const { action, payload } = cmd.execute;
     switch (action) {
       // Immediate actions that close the palette
@@ -264,7 +267,7 @@ export function CommandPalette({
   // Auto-execute if exact command match
   useEffect(() => {
     if (isCommandMode && commandQuery && currentView === "main") {
-      const exactMatch = COMMANDS.find(cmd => cmd.command === commandQuery);
+      const exactMatch = COMMANDS.find((cmd) => cmd.command === commandQuery);
       if (exactMatch) {
         const timer = setTimeout(() => {
           executeCommand(exactMatch);
@@ -282,7 +285,7 @@ export function CommandPalette({
     return SEARCH_INDEX.filter((item) => {
       const labelMatch = item.label.toLowerCase().includes(query);
       const descriptionMatch = item.description.toLowerCase().includes(query);
-      const keywordsMatch = item.keywords?.some(k => k.includes(query));
+      const keywordsMatch = item.keywords?.some((k) => k.includes(query));
       return labelMatch || descriptionMatch || keywordsMatch;
     });
   }, [isCommandMode, debouncedQuery]);
@@ -299,7 +302,9 @@ export function CommandPalette({
   // Scroll selected item into view
   useEffect(() => {
     if (listRef.current && currentListLength > 0) {
-      const selectedElement = listRef.current.querySelector(`[data-index="${selectedIndex}"]`);
+      const selectedElement = listRef.current.querySelector(
+        `[data-index="${selectedIndex}"]`,
+      );
       if (selectedElement) {
         selectedElement.scrollIntoView({ block: "nearest" });
       }
@@ -320,9 +325,7 @@ export function CommandPalette({
           <div className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">
-                Loading...
-              </p>
+              <p className="text-xs text-muted-foreground">Loading...</p>
             </div>
           </div>
         </DialogContent>
@@ -350,7 +353,11 @@ export function CommandPalette({
   }
 
   // Calendar management
-  if (currentView === "calendars" || currentView === "calendar-create" || currentView === "calendar-edit") {
+  if (
+    currentView === "calendars" ||
+    currentView === "calendar-create" ||
+    currentView === "calendar-edit"
+  ) {
     return (
       <CalendarManager
         open={open}
@@ -375,19 +382,29 @@ export function CommandPalette({
           <VisuallyHidden>
             <DialogTitle>Command Palette</DialogTitle>
           </VisuallyHidden>
-          <TransitionContainer direction={transitionDirection} viewKey={currentView}>
-            <div className="flex flex-col" style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}>
+          <TransitionContainer
+            direction={transitionDirection}
+            viewKey={currentView}
+          >
+            <div
+              className="flex flex-col"
+              style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
+            >
               {/* Search Header - GitHub style */}
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
                 {isCommandMode ? (
-                  <span className="text-sm font-medium text-primary">Command</span>
+                  <span className="text-sm font-medium text-primary">
+                    Command
+                  </span>
                 ) : (
                   <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                 )}
                 <Input
                   ref={searchInputRef}
                   type="text"
-                  placeholder={isCommandMode ? "Type a command..." : "Search or jump to..."}
+                  placeholder={
+                    isCommandMode ? "Type a command..." : "Search or jump to..."
+                  }
                   value={searchQuery}
                   onChange={(e) => {
                     e.stopPropagation();
@@ -401,7 +418,9 @@ export function CommandPalette({
                       setSearchQuery("");
                     } else if (e.key === "ArrowDown") {
                       e.preventDefault();
-                      setSelectedIndex((prev) => Math.min(prev + 1, currentListLength - 1));
+                      setSelectedIndex((prev) =>
+                        Math.min(prev + 1, currentListLength - 1),
+                      );
                     } else if (e.key === "ArrowUp") {
                       e.preventDefault();
                       setSelectedIndex((prev) => Math.max(prev - 1, 0));
@@ -410,7 +429,10 @@ export function CommandPalette({
                       if (isCommandMode) {
                         executeCommand(matchingCommands[selectedIndex]);
                       } else {
-                        goForward(filteredItems[selectedIndex].targetView as PaletteView);
+                        goForward(
+                          filteredItems[selectedIndex]
+                            .targetView as PaletteView,
+                        );
                       }
                     }
                   }}
@@ -426,7 +448,11 @@ export function CommandPalette({
                     onClick={() => setSearchQuery("")}
                     className="p-1 rounded hover:bg-muted/50 transition-colors"
                   >
-                    <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 16 16" fill="currentColor">
+                    <svg
+                      className="h-4 w-4 text-muted-foreground"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                    >
                       <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
                     </svg>
                   </button>
@@ -448,13 +474,17 @@ export function CommandPalette({
                           type="button"
                           onClick={() => executeCommand(cmd)}
                           className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
-                            index === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"
+                            index === selectedIndex
+                              ? "bg-accent/50"
+                              : "hover:bg-accent/50"
                           }`}
                         >
                           <div className="flex items-center justify-center w-6 h-6 shrink-0">
                             <cmd.icon className="h-4 w-4 text-muted-foreground" />
                           </div>
-                          <span className="text-sm flex-1 truncate">{cmd.label}</span>
+                          <span className="text-sm flex-1 truncate">
+                            {cmd.label}
+                          </span>
                           <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
                             {cmd.description}
                           </span>
@@ -474,15 +504,21 @@ export function CommandPalette({
                         key={item.id}
                         data-index={index}
                         type="button"
-                        onClick={() => goForward(item.targetView as PaletteView)}
+                        onClick={() =>
+                          goForward(item.targetView as PaletteView)
+                        }
                         className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
-                          index === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"
+                          index === selectedIndex
+                            ? "bg-accent/50"
+                            : "hover:bg-accent/50"
                         }`}
                       >
                         <div className="flex items-center justify-center w-6 h-6 shrink-0">
                           <item.icon className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <span className="text-sm flex-1 truncate">{item.label}</span>
+                        <span className="text-sm flex-1 truncate">
+                          {item.label}
+                        </span>
                         <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
                           {item.description}
                         </span>
@@ -495,11 +531,21 @@ export function CommandPalette({
               {/* Footer Tip - GitHub style */}
               <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between">
                 <span>
-                  Type <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">&gt;</kbd> for commands
+                  Type{" "}
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                    &gt;
+                  </kbd>{" "}
+                  for commands
                 </span>
                 <span className="hidden sm:flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↑↓</kbd> to navigate
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↵</kbd> to select
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                    ↑↓
+                  </kbd>{" "}
+                  to navigate
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                    ↵
+                  </kbd>{" "}
+                  to select
                 </span>
               </div>
             </div>
@@ -660,7 +706,10 @@ export function CommandPalette({
         <VisuallyHidden>
           <DialogTitle>Settings</DialogTitle>
         </VisuallyHidden>
-        <TransitionContainer direction={transitionDirection} viewKey={currentView}>
+        <TransitionContainer
+          direction={transitionDirection}
+          viewKey={currentView}
+        >
           <div className="flex flex-col">
             <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
               <button

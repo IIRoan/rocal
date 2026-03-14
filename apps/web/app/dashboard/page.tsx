@@ -4,12 +4,12 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@workspace/ui/components/layout";
 import { MobileCalendarWrapper } from "@workspace/ui/components";
-import { 
-  SidebarInset, 
+import {
+  SidebarInset,
   SidebarProvider,
   DashboardSkeleton,
   MobileCalendarSkeleton,
-  PageLoadingOverlay
+  PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { CommandPalette } from "@/components/command-palette";
@@ -26,7 +26,8 @@ import { useMemo, useEffect } from "react";
 
 function SidebarWithContext() {
   const { data: session } = useSession();
-  const { openCalendarManagement, openPalette, openEventEditor } = useCommandPaletteContext();
+  const { openCalendarManagement, openPalette, openEventEditor } =
+    useCommandPaletteContext();
   const { isCalendarVisible } = useCalendarContext();
   const { settings } = useSettings();
   const calendarData = useSharedCalendarData();
@@ -40,7 +41,9 @@ function SidebarWithContext() {
   }, [calendarData.calendars, isCalendarVisible]);
 
   const transformedEvents = useMemo(() => {
-    const calendarMap = new Map(calendarData.calendars.map((cal) => [cal.id, cal]));
+    const calendarMap = new Map(
+      calendarData.calendars.map((cal) => [cal.id, cal]),
+    );
     return calendarData.events
       .filter((event) => visibleCalendarIds.has(event.calendarId))
       .map((event) => {
@@ -66,19 +69,20 @@ function SidebarWithContext() {
     const startTime = new Date();
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
-    
+
     const newEvent = {
       id: undefined as any,
       title: "",
       start: startTime,
       end: new Date(startTime.getTime() + 60 * 60 * 1000),
       allDay: false,
-      calendarId: settings?.defaultCalendarId || calendarData.calendars?.[0]?.id || "",
+      calendarId:
+        settings?.defaultCalendarId || calendarData.calendars?.[0]?.id || "",
       userId: "",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     openEventEditor(newEvent);
   };
 
@@ -101,7 +105,8 @@ function SidebarWithContext() {
 
 function MobileLayoutContent() {
   const { data: session } = useSession();
-  const { openCalendarManagement, openEventEditor, openPalette } = useCommandPaletteContext();
+  const { openCalendarManagement, openEventEditor, openPalette } =
+    useCommandPaletteContext();
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
     useCommandPalette();
   // Import calendar data hooks
@@ -122,7 +127,7 @@ function MobileLayoutContent() {
     const startTime = new Date();
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
-    
+
     const newEvent = {
       id: undefined as any,
       title: "",
@@ -134,7 +139,7 @@ function MobileLayoutContent() {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     openEventEditor(newEvent);
   };
 
@@ -190,20 +195,28 @@ function MobileLayoutContent() {
   // Show mobile calendar skeleton when initial loading
   // Wait for settings and calendar structure (calendars + categories) to be loaded
   // Events can load separately without blocking the UI
-  const isInitialLoading = settingsLoading || 
+  const isInitialLoading =
+    settingsLoading ||
     (calendarData.calendarsLoading && calendarData.calendars.length === 0) ||
     (calendarData.categoriesLoading && calendarData.categories.length === 0);
-    
-  const isInitialEventsLoading = calendarData.eventsLoading && calendarData.events.length === 0;
+
+  const isInitialEventsLoading =
+    calendarData.eventsLoading && calendarData.events.length === 0;
   const isAllInitialLoading = isInitialLoading || isInitialEventsLoading;
-  
+
   if (isAllInitialLoading) {
     return (
       <>
         <MobileCalendarSkeleton />
-        <PageLoadingOverlay 
-          isLoading={true} 
-          messageContext={settingsLoading ? "SETTINGS_LOAD" : (isInitialLoading ? "CALENDAR_LOAD" : "DATA_SYNC")}
+        <PageLoadingOverlay
+          isLoading={true}
+          messageContext={
+            settingsLoading
+              ? "SETTINGS_LOAD"
+              : isInitialLoading
+                ? "CALENDAR_LOAD"
+                : "DATA_SYNC"
+          }
           enableCycling={true}
         />
       </>
@@ -219,7 +232,7 @@ function MobileLayoutContent() {
       }}
       onLogout={handleLogout}
       onOpenSettings={() => {
-        console.log('Dashboard onOpenSettings called - using openPalette');
+        console.log("Dashboard onOpenSettings called - using openPalette");
         openPalette();
       }}
       onOpenCalendarManagement={openCalendarManagement}
@@ -229,7 +242,9 @@ function MobileLayoutContent() {
       events={transformedEvents}
       categories={calendarData.categories}
       loading={false}
-      eventsLoading={calendarData.eventsLoading && calendarData.events.length === 0}
+      eventsLoading={
+        calendarData.eventsLoading && calendarData.events.length === 0
+      }
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}
@@ -260,8 +275,11 @@ function MobileLayoutContent() {
 function DashboardContent() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
-  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen, initialQuery } =
-    useCommandPalette();
+  const {
+    open: commandPaletteOpen,
+    setOpen: setCommandPaletteOpen,
+    initialQuery,
+  } = useCommandPalette();
   const handleLogout = async () => {
     try {
       await signOut();
@@ -283,8 +301,8 @@ function DashboardContent() {
     return (
       <>
         <DashboardSkeleton />
-        <PageLoadingOverlay 
-          isLoading={true} 
+        <PageLoadingOverlay
+          isLoading={true}
           messageContext="AUTH_FLOW"
           enableCycling={true}
         />
@@ -296,8 +314,8 @@ function DashboardContent() {
     return (
       <>
         <DashboardSkeleton />
-        <PageLoadingOverlay 
-          isLoading={true} 
+        <PageLoadingOverlay
+          isLoading={true}
           messageContext="AUTH_FLOW"
           enableCycling={true}
         />

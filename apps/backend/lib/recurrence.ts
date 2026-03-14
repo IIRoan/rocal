@@ -87,8 +87,6 @@ export class RecurrenceEngine {
     const rule = this.parseRecurrenceRule(baseEvent.recurrence);
     if (!rule) return [];
 
-
-
     const instances: RecurrenceInstance[] = [];
     const eventStart = baseEvent.start;
     const eventDuration = baseEvent.end.getTime() - baseEvent.start.getTime();
@@ -99,11 +97,11 @@ export class RecurrenceEngine {
 
     // Add the original event if it falls within range
     if (currentDate >= rangeStart && currentDate <= rangeEnd) {
-      const isDeleted = exceptions.some((ex) =>
-        isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
+      const isDeleted = exceptions.some(
+        (ex) =>
+          isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
       );
       if (isDeleted) {
-
       } else {
         instances.push({
           date: new Date(currentDate),
@@ -125,11 +123,11 @@ export class RecurrenceEngine {
 
       // Check if this instance falls within our range
       if (currentDate >= rangeStart && currentDate <= rangeEnd) {
-        const isDeleted = exceptions.some((ex) =>
-          isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
+        const isDeleted = exceptions.some(
+          (ex) =>
+            isSameDay(ex.exceptionDate, currentDate) && ex.type === "deleted",
         );
         if (isDeleted) {
-
         } else {
           instances.push({
             date: new Date(currentDate),
@@ -139,7 +137,6 @@ export class RecurrenceEngine {
         }
       }
     }
-
 
     return instances;
   }
@@ -166,7 +163,7 @@ export class RecurrenceEngine {
             nextDate = addDays(nextDate, 1);
             daysChecked++;
           }
-          
+
           // Fallback to regular daily if no weekday found
           return addDays(currentDate, rule.interval);
         } else {
@@ -263,7 +260,9 @@ export class RecurrenceEngine {
 
     if (rule.byWeekDay) {
       if (rule.frequency !== "weekly" && rule.frequency !== "daily") {
-        errors.push("byWeekDay can only be used with weekly or daily frequency");
+        errors.push(
+          "byWeekDay can only be used with weekly or daily frequency",
+        );
       } else if (
         !Array.isArray(rule.byWeekDay) ||
         rule.byWeekDay.some((d) => d < 0 || d > 6)

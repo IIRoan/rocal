@@ -62,19 +62,23 @@ export interface UseCalendarDataReturn {
   createEvent: (event: CreateEventRequest) => Promise<CalendarEvent>;
   updateEvent: (
     id: string,
-    event: UpdateEventRequest
+    event: UpdateEventRequest,
   ) => Promise<CalendarEvent>;
   deleteEvent: (id: string) => Promise<void>;
   createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
   updateCalendar: (
     id: string,
-    calendar: UpdateCalendarRequest
+    calendar: UpdateCalendarRequest,
   ) => Promise<Calendar>;
-  deleteCalendar: (id: string, action?: string, targetCalendarId?: string) => Promise<void>;
+  deleteCalendar: (
+    id: string,
+    action?: string,
+    targetCalendarId?: string,
+  ) => Promise<void>;
   createCategory: (category: CreateCategoryRequest) => Promise<EventCategory>;
   updateCategory: (
     id: string,
-    category: UpdateCategoryRequest
+    category: UpdateCategoryRequest,
   ) => Promise<EventCategory>;
   deleteCategory: (id: string) => Promise<void>;
 
@@ -86,14 +90,14 @@ export interface UseCalendarDataReturn {
   loadNotifications: (eventId: string) => Promise<EventNotification[]>;
   updateNotifications: (
     eventId: string,
-    notifications: EventNotification[]
+    notifications: EventNotification[],
   ) => Promise<void>;
 }
 
 // Validate and clean events: remove duplicates, drop invalid/out-of-range
 function validateAndCleanEvents(
   items: CalendarEvent[],
-  range: DateRange
+  range: DateRange,
 ): { cleanedEvents: CalendarEvent[]; issues: string[]; valid: boolean } {
   const seen = new Set<string>();
   const cleaned: CalendarEvent[] = [];
@@ -139,7 +143,7 @@ function validateAndCleanEvents(
 }
 
 export function useCalendarData(
-  options: UseCalendarDataOptions = {}
+  options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
   const {
     initialDateRange,
@@ -148,7 +152,7 @@ export function useCalendarData(
   } = options;
 
   const [currentDateRange, setCurrentDateRange] = useState<DateRange | null>(
-    initialDateRange || null
+    initialDateRange || null,
   );
 
   const queryClient = useQueryClient();
@@ -175,11 +179,11 @@ export function useCalendarData(
       if (!currentDateRange) return [];
       const res = await calendarApiService.getEvents(
         currentDateRange.start,
-        currentDateRange.end
+        currentDateRange.end,
       );
       const { cleanedEvents } = validateAndCleanEvents(
         res.events,
-        currentDateRange
+        currentDateRange,
       );
       return cleanedEvents;
     },
@@ -236,7 +240,15 @@ export function useCalendarData(
   });
 
   const deleteCalendarMutation = useMutation({
-    mutationFn: ({ id, action, targetCalendarId }: { id: string; action?: string; targetCalendarId?: string }) =>
+    mutationFn: ({
+      id,
+      action,
+      targetCalendarId,
+    }: {
+      id: string;
+      action?: string;
+      targetCalendarId?: string;
+    }) =>
       calendarApiService.deleteCalendarAdvanced(id, action, targetCalendarId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
@@ -284,7 +296,7 @@ export function useCalendarData(
         await eventsQuery.refetch();
       }
     },
-    [eventsQuery]
+    [eventsQuery],
   );
 
   const refetchCalendars = useCallback(async () => {
@@ -352,14 +364,14 @@ export function useCalendarData(
         }));
         await calendarApiService.updateEventNotifications(
           eventId,
-          notificationData
+          notificationData,
         );
       } catch (error) {
         console.error("Failed to update event notifications:", error);
         throw error;
       }
     },
-    []
+    [],
   );
 
   return {
@@ -401,7 +413,11 @@ export function useCalendarData(
     updateCalendar: (id, calendar) =>
       updateCalendarMutation.mutateAsync({ id, calendar }),
     deleteCalendar: async (id, action = "delete_events", targetCalendarId) => {
-      await deleteCalendarMutation.mutateAsync({ id, action, targetCalendarId });
+      await deleteCalendarMutation.mutateAsync({
+        id,
+        action,
+        targetCalendarId,
+      });
     },
     createCategory: (category) => createCategoryMutation.mutateAsync(category),
     updateCategory: (id, category) =>

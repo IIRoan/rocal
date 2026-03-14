@@ -30,7 +30,7 @@ export async function ensureAuthenticatedUser(user: any, request: Request) {
 
   // 3. Failure
   console.error(
-    "ensureAuthenticatedUser: User context missing and fallback failed"
+    "ensureAuthenticatedUser: User context missing and fallback failed",
   );
   throw new Error("User context missing");
 }
