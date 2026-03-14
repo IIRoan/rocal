@@ -55,7 +55,7 @@ export function StickyMiniCalendar({
   className,
 }: StickyMiniCalendarProps) {
   const { currentDate, setCurrentDate } = useCalendarContext();
-  const [displayMonth, setDisplayMonth] = useState(currentDate);
+  const [displayMonth, setDisplayMonth] = useState(new Date());
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
 
@@ -177,7 +177,7 @@ export function StickyMiniCalendar({
             onClick={() => setDisplayMonth(currentDate)}
             className="text-[10px] font-semibold"
           >
-            {format(displayMonth, "MMM yyyy")}
+            {format(displayMonth, "MMMM yyyy")}
           </button>
           <button
             onClick={() => setDisplayMonth(addMonths(displayMonth, 1))}
