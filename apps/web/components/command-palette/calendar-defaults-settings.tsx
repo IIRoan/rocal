@@ -67,6 +67,35 @@ export function CalendarDefaultsSettings({
               <span className="text-sm font-medium">Calendar Defaults</span>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Default View - Dropdown */}
+              <div className="px-4 py-3 border-b border-border/50">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm">Default view</span>
+                  </div>
+                  <Select
+                    value={localSettings.defaultView}
+                    onValueChange={(value) =>
+                      updateSetting(
+                        "defaultView",
+                        value as "month" | "week" | "day" | "agenda",
+                      )
+                    }
+                  >
+                    <SelectTrigger className="w-[120px] h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="month">Month</SelectItem>
+                      <SelectItem value="week">Week</SelectItem>
+                      <SelectItem value="day">Day</SelectItem>
+                      <SelectItem value="agenda">Agenda</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* First Day of Week - Dropdown */}
               <div className="px-4 py-3 border-b border-border/50">
                 <div className="flex items-center justify-between gap-3">
