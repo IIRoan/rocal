@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 
@@ -22,6 +23,7 @@ interface MobileBottomNavProps {
   onOpenAddEvent?: () => void;
   currentView?: CalendarView;
   onViewChange?: (view: CalendarView) => void;
+  onToday?: () => void;
   className?: string;
 }
 
@@ -56,6 +58,7 @@ export function MobileBottomNav({
   onOpenAddEvent,
   currentView = "month",
   onViewChange,
+  onToday,
   className,
 }: MobileBottomNavProps) {
   return (
@@ -107,6 +110,11 @@ export function MobileBottomNav({
               sideOffset={8}
               className="w-40 rounded-xl mb-1"
             >
+              <DropdownMenuItem onClick={() => onToday?.()} className="gap-2">
+                <Calendar size={16} />
+                Today
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               {VIEW_OPTIONS.map(({ value, label, icon }) => (
                 <DropdownMenuItem
                   key={value}

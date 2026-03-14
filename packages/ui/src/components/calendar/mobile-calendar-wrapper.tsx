@@ -41,6 +41,7 @@ export function MobileCalendarWrapper({
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  const hasInitializedMobileDate = React.useRef(false);
 
   const [currentView, setCurrentView] = useState<CalendarView>(() => {
     if (typeof window !== "undefined") {
@@ -63,7 +64,17 @@ export function MobileCalendarWrapper({
     }
   }, [isMobile]);
 
+  // On mobile, always start at current week on boot
+  React.useEffect(() => {
+    if (isMobile && !hasInitializedMobileDate.current) {
+      hasInitializedMobileDate.current = true;
+      const today = new Date();
+      setCurrentDate(today);
+    }
+  }, [isMobile, setCurrentDate]);
+
   const handleDateChange = (date: Date) => setCurrentDate(date);
+  const handleToday = () => setCurrentDate(new Date());
   const handleOpenSidebar = () => setIsSidebarOpen(true);
   const handleCloseSidebar = () => setIsSidebarOpen(false);
   const handleOpenAddEvent = () => {
@@ -138,6 +149,7 @@ export function MobileCalendarWrapper({
         onOpenAddEvent={handleOpenAddEvent}
         currentView={currentView}
         onViewChange={handleViewChange}
+        onToday={handleToday}
         className="md:hidden"
       />
 
