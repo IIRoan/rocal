@@ -38,6 +38,7 @@ import {
 } from "@workspace/ui/components/ui/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
+import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/ui/radio-group";
 import { SubscriptionManagement } from "./subscription-management";
 import {
   Plus,
@@ -396,9 +397,9 @@ export function CalendarManagement({
           )}
 
           {success && (
-            <Alert className="border-green-200 bg-green-50">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
+            <Alert className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950">
+              <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <AlertDescription className="text-emerald-800 dark:text-emerald-200">
                 {success}
               </AlertDescription>
             </Alert>
@@ -487,12 +488,12 @@ export function CalendarManagement({
                       placeholder="Enter calendar name"
                       className={
                         validationErrors.name
-                          ? "border-red-500 focus-visible:ring-red-500"
+                          ? "border-destructive focus-visible:ring-destructive"
                           : ""
                       }
                     />
                     {validationErrors.name && (
-                      <p className="text-sm text-red-600 flex items-center gap-1">
+                      <p className="text-sm text-destructive flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
                         {validationErrors.name}
                       </p>
@@ -519,7 +520,7 @@ export function CalendarManagement({
                       presetColors={PRESET_COLORS}
                     />
                     {validationErrors.color && (
-                      <p className="text-sm text-red-600 flex items-center gap-1">
+                      <p className="text-sm text-destructive flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
                         {validationErrors.color}
                       </p>
@@ -634,7 +635,7 @@ export function CalendarManagement({
                             size="sm"
                             onClick={() => setDeletingCalendar(calendar)}
                             title="Delete calendar"
-                            className="text-red-600 hover:text-red-700"
+                            className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -681,12 +682,12 @@ export function CalendarManagement({
                   }}
                   className={
                     validationErrors.name
-                      ? "border-red-500 focus-visible:ring-red-500"
+                      ? "border-destructive focus-visible:ring-destructive"
                       : ""
                   }
                 />
                 {validationErrors.name && (
-                  <p className="text-sm text-red-600 flex items-center gap-1">
+                  <p className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {validationErrors.name}
                   </p>
@@ -713,7 +714,7 @@ export function CalendarManagement({
                   presetColors={PRESET_COLORS}
                 />
                 {validationErrors.color && (
-                  <p className="text-sm text-red-600 flex items-center gap-1">
+                  <p className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {validationErrors.color}
                   </p>
@@ -762,7 +763,7 @@ export function CalendarManagement({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Delete Calendar
             </DialogTitle>
             <DialogDescription>
@@ -772,77 +773,64 @@ export function CalendarManagement({
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <input
-                  type="radio"
-                  id="delete_events"
-                  name="deleteAction"
-                  value="delete_events"
-                  checked={deleteAction === "delete_events"}
-                  onChange={(e) =>
-                    setDeleteAction(e.target.value as CalendarDeleteAction)
-                  }
-                  className="mt-1"
-                />
-                <div className="space-y-1">
-                  <label
-                    htmlFor="delete_events"
-                    className="font-medium cursor-pointer"
-                  >
-                    Delete calendar and all events (default)
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    Permanently delete the calendar and all its events
-                  </p>
+            <RadioGroup
+              value={deleteAction}
+              onValueChange={(value) =>
+                setDeleteAction(value as CalendarDeleteAction)
+              }
+            >
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem value="delete_events" id="delete_events" className="mt-1" />
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="delete_events"
+                      className="font-medium cursor-pointer"
+                    >
+                      Delete calendar and all events (default)
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete the calendar and all its events
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-start space-x-3">
-                <input
-                  type="radio"
-                  id="move_events"
-                  name="deleteAction"
-                  value="move_events"
-                  checked={deleteAction === "move_events"}
-                  onChange={(e) =>
-                    setDeleteAction(e.target.value as CalendarDeleteAction)
-                  }
-                  className="mt-1"
-                />
-                <div className="space-y-1">
-                  <label
-                    htmlFor="move_events"
-                    className="font-medium cursor-pointer"
-                  >
-                    Move events to another calendar
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    Select a calendar to move events to
-                  </p>
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem value="move_events" id="move_events" className="mt-1" />
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="move_events"
+                      className="font-medium cursor-pointer"
+                    >
+                      Move events to another calendar
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Select a calendar to move events to
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {deleteAction === "move_events" && (
-                <div className="ml-7">
-                  <Select
-                    value={targetCalendarId}
-                    onValueChange={setTargetCalendarId}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select target calendar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTargetCalendars.map((cal) => (
-                        <SelectItem key={cal.id} value={cal.id}>
-                          {cal.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+                {deleteAction === "move_events" && (
+                  <div className="ml-7">
+                    <Select
+                      value={targetCalendarId}
+                      onValueChange={setTargetCalendarId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select target calendar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTargetCalendars.map((cal) => (
+                          <SelectItem key={cal.id} value={cal.id}>
+                            {cal.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </RadioGroup>
           </div>
 
           <DialogFooter>
@@ -895,7 +883,7 @@ export function CalendarManagement({
                       {importResult.eventsTotal}
                     </span>
                   </div>
-                  <div className="flex justify-between text-green-600">
+                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                     <span>Events Created:</span>
                     <span className="font-medium">
                       {importResult.eventsCreated}
@@ -906,13 +894,13 @@ export function CalendarManagement({
 
               {importResult.errors && importResult.errors.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-red-600 flex items-center gap-2">
+                  <h4 className="font-medium text-sm text-destructive flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
                     Errors ({importResult.errors.length})
                   </h4>
-                  <div className="max-h-40 overflow-y-auto text-xs space-y-1 p-2 border rounded-md bg-red-50">
+                  <div className="max-h-40 overflow-y-auto text-xs space-y-1 p-2 border rounded-md bg-destructive/10">
                     {importResult.errors.map((err, i) => (
-                      <div key={i} className="text-red-700">
+                      <div key={i} className="text-destructive">
                         {err}
                       </div>
                     ))}

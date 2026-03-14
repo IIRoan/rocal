@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Button } from "./button";
 import { Input } from "./input";
+import { Label } from "./label";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { cn } from "../../lib/utils";
 
@@ -79,9 +80,9 @@ export function ColorPicker({
         <PopoverContent className="w-64 p-3">
           <div className="space-y-3">
             <div>
-              <label className="text-sm font-medium mb-2 block">
+              <Label className="text-sm font-medium mb-2 block">
                 Custom Color
-              </label>
+              </Label>
               <Input
                 type="text"
                 value={inputValue}
@@ -92,9 +93,9 @@ export function ColorPicker({
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">
+              <Label className="text-sm font-medium mb-2 block">
                 Preset Colors
-              </label>
+              </Label>
               <div className="grid grid-cols-6 gap-2">
                 {presetColors.map((color) => (
                   <button
