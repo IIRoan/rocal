@@ -166,29 +166,29 @@ export function StickyMiniCalendar({
         )}
       >
         {/* Compact month navigation header */}
-        <div className="flex items-center justify-between px-3 pt-1.5 pb-0.5">
+        <div className="flex items-center justify-between px-3 pt-1 pb-0">
           <button
             onClick={() => setDisplayMonth(subMonths(displayMonth, 1))}
-            className="p-1 rounded-md hover:bg-accent active:bg-accent/80 transition-colors touch-manipulation"
+            className="p-0.5 rounded-md hover:bg-accent active:bg-accent/80 transition-colors touch-manipulation"
           >
-            <ChevronLeft size={14} className="text-muted-foreground" />
+            <ChevronLeft size={12} className="text-muted-foreground" />
           </button>
           <button
             onClick={() => setDisplayMonth(currentDate)}
-            className="text-xs font-semibold"
+            className="text-[10px] font-semibold"
           >
-            {format(displayMonth, "MMMM yyyy")}
+            {format(displayMonth, "MMM yyyy")}
           </button>
           <button
             onClick={() => setDisplayMonth(addMonths(displayMonth, 1))}
-            className="p-1 rounded-md hover:bg-accent active:bg-accent/80 transition-colors touch-manipulation"
+            className="p-0.5 rounded-md hover:bg-accent active:bg-accent/80 transition-colors touch-manipulation"
           >
-            <ChevronRight size={14} className="text-muted-foreground" />
+            <ChevronRight size={12} className="text-muted-foreground" />
           </button>
         </div>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-0.5 px-3 pb-1.5">
+        {/* Calendar grid - more compact */}
+        <div className="grid grid-cols-7 gap-0 px-2 pb-0.5">
           {days.map((day) => {
             const isSelected = isSameDay(day, currentDate);
             const isCurrentMonth = isSameMonth(day, displayMonth);
@@ -201,8 +201,8 @@ export function StickyMiniCalendar({
                 key={day.toString()}
                 onClick={() => setCurrentDate(day)}
                 className={cn(
-                  "relative rounded-full text-[10px] font-medium transition-all touch-manipulation",
-                  "flex items-center justify-center h-5 w-5 mx-auto",
+                  "relative rounded-full text-[9px] font-medium transition-all touch-manipulation",
+                  "flex items-center justify-center h-4 w-4 mx-auto",
                   !isCurrentMonth && "text-muted-foreground/30",
                   isCurrentMonth &&
                     !isSelected &&
@@ -213,7 +213,7 @@ export function StickyMiniCalendar({
               >
                 <span className="relative z-10">{format(day, "d")}</span>
                 {hasEvents && (
-                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                  <span className="absolute -bottom-0 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
                     {dayEvents.slice(0, 3).map((event, i) => (
                       <span
                         key={`${event.id || "event"}-${i}`}
@@ -232,11 +232,11 @@ export function StickyMiniCalendar({
 
         {/* All-day events section for day view */}
         {showAllDayEvents && dayAllDayEventsList.length > 0 && (
-          <div className="px-3 py-2">
-            <div className="text-xs text-muted-foreground mb-1 font-medium">
+          <div className="px-2 py-1">
+            <div className="text-[9px] text-muted-foreground mb-0.5 font-medium">
               All day
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {dayAllDayEventsList.map((event) => {
                 const eventStart = new Date(event.start);
                 const eventEnd = new Date(event.end);
@@ -252,7 +252,7 @@ export function StickyMiniCalendar({
                     isFirstDay={isFirstDay}
                     isLastDay={isLastDay}
                     timezone={timezone}
-                    className="text-xs"
+                    className="text-[10px]"
                   >
                     <div>{event.title}</div>
                   </EventItem>
@@ -264,7 +264,7 @@ export function StickyMiniCalendar({
 
         {/* Horizontal day strip with multi-day events - current week (only for week view) */}
         {showDayStrip && (
-          <div className="px-0 py-0.5">
+          <div className="px-0 py-0">
             <div className="flex relative">
               {/* Time column spacer - matches timeline width */}
               <div className="w-11 flex-shrink-0" />
@@ -283,7 +283,7 @@ export function StickyMiniCalendar({
                   <div
                     key={day.toString()}
                     className={cn(
-                      "flex-1 min-w-0 text-center py-0.5 border-l border-border/50 first:border-l-0",
+                      "flex-1 min-w-0 text-center py-0 border-l border-border/50 first:border-l-0",
                       isSelected && "text-primary",
                       !isSelected && isCurrentDay && "bg-primary/10",
                       !isSelected &&
@@ -298,7 +298,7 @@ export function StickyMiniCalendar({
                     {/* Day header */}
                     <span
                       className={cn(
-                        "text-[9px] font-medium uppercase leading-none",
+                        "text-[8px] font-medium uppercase leading-none",
                         isSelected
                           ? "text-primary/70"
                           : "text-muted-foreground",
@@ -309,7 +309,7 @@ export function StickyMiniCalendar({
 
                     <span
                       className={cn(
-                        "text-xs font-semibold leading-tight block",
+                        "text-[10px] font-semibold leading-tight block",
                         isSelected
                           ? "text-primary"
                           : isCurrentDay
@@ -322,8 +322,8 @@ export function StickyMiniCalendar({
 
                     {/* Compact all-day/multi-day events */}
                     {dayAllDayEvents.length > 0 && (
-                      <div className="px-0.5 space-y-0.5 mt-0.5">
-                        {dayAllDayEvents.slice(0, 3).map((event) => {
+                      <div className="px-0.5 space-y-0.5 mt-0">
+                        {dayAllDayEvents.slice(0, 2).map((event) => {
                           const { start: eStartDay, end: eEndDay } =
                             getEventInterval(event, "day");
                           const weekStartDay = startOfDay(weekStart);
@@ -349,7 +349,7 @@ export function StickyMiniCalendar({
                               view="month"
                               isFirstDay={isFirstSegmentDay}
                               isLastDay={isLastSegmentDay}
-                              className="text-[9px] py-0.5 h-[18px]"
+                              className="text-[8px] py-0 h-[14px]"
                               timezone={timezone}
                             >
                               <div
@@ -364,9 +364,9 @@ export function StickyMiniCalendar({
                             </EventItem>
                           );
                         })}
-                        {dayAllDayEvents.length > 3 && (
-                          <div className="text-[8px] text-muted-foreground px-1">
-                            +{dayAllDayEvents.length - 3} more
+                        {dayAllDayEvents.length > 2 && (
+                          <div className="text-[7px] text-muted-foreground px-1">
+                            +{dayAllDayEvents.length - 2}
                           </div>
                         )}
                       </div>
@@ -380,7 +380,7 @@ export function StickyMiniCalendar({
       </div>
 
       {/* Spacer element to push content below fixed header */}
-      <div style={{ height: headerHeight || 80 }} className="flex-shrink-0" />
+      <div style={{ height: headerHeight || 60 }} className="flex-shrink-0" />
     </>
   );
 }
