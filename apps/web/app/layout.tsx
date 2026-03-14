@@ -18,20 +18,20 @@ const fontMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rocal",
+  title: "Solace",
   description: "Calendar",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Rocal",
+    title: "Solace",
   },
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "Rocal",
+    "apple-mobile-web-app-title": "Solace",
     "mobile-web-app-capable": "yes",
-    "application-name": "Rocal",
+    "application-name": "Solace",
     "msapplication-TileColor": "#000000",
     "msapplication-tap-highlight": "no",
   },

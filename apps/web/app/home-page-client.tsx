@@ -32,7 +32,7 @@ export function HomePageClient() {
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4">
       <div className="flex flex-col items-center gap-6 text-center">
         <Logo width={64} height={64} className="text-primary" />
-        <h1 className="text-3xl font-semibold">Rocal</h1>
+        <h1 className="text-3xl font-semibold">Solace</h1>
         <p className="text-muted-foreground">
           The smart way to manage your time
         </p>

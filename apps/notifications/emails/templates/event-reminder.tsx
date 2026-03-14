@@ -207,7 +207,7 @@ export const EventReminderEmail = ({
                   letterSpacing: "-0.025em",
                 }}
               >
-                Rocal
+                Solace
               </Heading>
             </div>
             <Text
