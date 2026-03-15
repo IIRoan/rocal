@@ -179,7 +179,7 @@ model UserSettings {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Display preferences
   theme                String   @default("light") // light, dark, system
-  defaultView          String   @default("month") // month, week, day, agenda
+  defaultView          String   @default("week") // month, week, day, agenda
   weekStartDay         Int      @default(1) // 0 = Sunday, 1 = Monday
   // Time & Timezone
   timezone             String   @default("UTC") // IANA timezone identifier
