@@ -353,7 +353,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\Users\\Roan\\Documents\\rocal\\apps\\backend\\generated\\prisma",
+      "value": "/var/home/roan/Documents/rocal/apps/backend/generated/prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -362,7 +362,7 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "windows",
+        "value": "rhel-openssl-3.0.x",
         "native": true
       },
       {
@@ -371,12 +371,11 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\Users\\Roan\\Documents\\rocal\\apps\\backend\\prisma\\schema.prisma",
+    "sourceFilePath": "/var/home/roan/Documents/rocal/apps/backend/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": null,
-    "schemaEnvPath": "../../.env"
+    "rootEnvPath": null
   },
   "relativePath": "../../prisma",
   "clientVersion": "6.19.0",
@@ -385,6 +384,7 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": true,
   "inlineDatasources": {
     "db": {
       "url": {
