@@ -4,7 +4,7 @@ import * as React from "react";
 import { CheckIcon, PlusIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
 import { Sparkles } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { CalendarEvent } from "../calendar/types";
+import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
 import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
@@ -68,11 +68,7 @@ function AiResponseContent({ response }: { response: string }) {
 }
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  user?: {
-    name: string;
-    email: string;
-    avatar?: string;
-  };
+  user?: User;
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
@@ -198,7 +194,7 @@ export function AppSidebar({
             </div>
           </div>
 
-          {onAiSubmit && onAiQueryChange && (
+          {user?.hasAiAccess && onAiSubmit && onAiQueryChange && (
             <div className="p-4 border-t space-y-3">
               <div className="flex items-center justify-between px-1">
                 <div className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider flex items-center gap-1.5">
@@ -281,7 +277,7 @@ function AppSidebarDesktop({
   onMiniCalendarMonthChange,
   props,
 }: {
-  user?: { name: string; email: string; avatar?: string };
+  user?: User;
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
@@ -449,7 +445,7 @@ function AppSidebarDesktop({
           </div>
         </div>
 
-        {!isCollapsed && onAiSubmit && onAiQueryChange && (
+        {!isCollapsed && user?.hasAiAccess && onAiSubmit && onAiQueryChange && (
           <div className="mt-4 pt-4 border-t px-2 space-y-3">
             <div className="flex items-center justify-between px-1">
               <div className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider flex items-center gap-1.5">

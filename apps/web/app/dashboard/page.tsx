@@ -188,6 +188,7 @@ function SidebarWithContext() {
         name: session?.user.name || "Unknown User",
         email: session?.user.email || "",
         avatar: session?.user.image || undefined,
+        hasAiAccess: !!(session?.user as any)?.hasAiAccess,
       }}
       onLogout={handleLogout}
       onOpenSettings={openPalette}
@@ -330,6 +331,7 @@ function MobileLayoutContent() {
         name: session?.user.name || "Unknown User",
         email: session?.user.email || "",
         avatar: session?.user.image || undefined,
+        hasAiAccess: !!(session?.user as any)?.hasAiAccess,
       }}
       onLogout={handleLogout}
       onOpenSettings={() => {

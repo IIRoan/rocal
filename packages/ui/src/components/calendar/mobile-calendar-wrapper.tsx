@@ -12,17 +12,13 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "../ui/sheet";
 import { SidebarProvider } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
-import { CalendarView } from "./types";
-import { cn } from "../../lib/utils";
 import { useIsMobile } from "../../hooks/use-mobile";
 import { StickyMiniCalendar } from "./sticky-mini-calendar";
+import { CalendarView, User } from "./types";
+import { cn } from "../../lib/utils";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
-  user?: {
-    name: string;
-    email: string;
-    avatar?: string;
-  };
+  user?: User;
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
@@ -136,6 +132,7 @@ export function MobileCalendarWrapper({
         {children || (
           <MobileEventCalendar
             {...props}
+            user={user}
             initialView={currentView}
             onSidebarToggle={handleOpenSidebar}
             onViewChange={handleCalendarViewChange}

@@ -32,7 +32,7 @@ import {
   WeekCellsHeight,
 } from "./constants";
 import { addHoursToDate, addMinutesToDate } from "./utils";
-import { CalendarEvent, CalendarView } from "./types";
+import { CalendarEvent, CalendarView, User } from "./types";
 import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
@@ -104,6 +104,7 @@ export interface MobileEventCalendarProps {
   onSidebarToggle?: () => void;
   // View change handler
   onViewChange?: (view: CalendarView) => void;
+  user?: User;
 }
 
 export function MobileEventCalendar({
@@ -134,6 +135,7 @@ export function MobileEventCalendar({
   onEventEdit,
   onSidebarToggle,
   onViewChange,
+  user,
 }: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
