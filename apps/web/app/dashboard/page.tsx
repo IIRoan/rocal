@@ -22,7 +22,43 @@ import { useCommandPalette as useCommandPaletteContext } from "@/components/comm
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
+
+type CalendarAssistantResponse = {
+  reply: string;
+  createdEvent: {
+    id: string;
+    title: string;
+    description?: string | null;
+    start: string;
+    end: string;
+    allDay?: boolean;
+    location?: string | null;
+    calendarId: string;
+  } | null;
+  updatedEvent: {
+    id: string;
+    title: string;
+    description?: string | null;
+    start: string;
+    end: string;
+    allDay?: boolean;
+    location?: string | null;
+    calendarId: string;
+  } | null;
+  deletedEventId: string | null;
+  events?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    start: string;
+    end: string;
+    allDay?: boolean;
+    location?: string | null;
+    calendarId: string;
+  }>;
+  error?: string;
+};
 
 function SidebarWithContext() {
   const { data: session } = useSession();
@@ -31,6 +67,9 @@ function SidebarWithContext() {
   const { isCalendarVisible } = useCalendarContext();
   const { settings } = useSettings();
   const calendarData = useSharedCalendarData();
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const visibleCalendarIds = useMemo(() => {
     return new Set(
@@ -86,6 +125,63 @@ function SidebarWithContext() {
     openEventEditor(newEvent);
   };
 
+  const handleAiSubmit = async () => {
+    const query = aiQuery.trim();
+    if (!query || aiLoading) return;
+
+    setAiLoading(true);
+    setAiResponse("");
+
+    try {
+      const response = await fetch("/api/calendar-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          timezone: settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+          now: new Date().toISOString(),
+          calendars: calendarData.calendars.map((calendar) => ({
+            id: calendar.id,
+            name: calendar.name,
+            color: calendar.color,
+            isDefault: !!calendar.isDefault,
+          })),
+          events: [],
+        }),
+      });
+
+      const responseText = await response.text();
+      let data: CalendarAssistantResponse;
+
+      try {
+        data = JSON.parse(responseText) as CalendarAssistantResponse;
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", parseError);
+        console.error("Response text:", responseText);
+        throw new Error("I received an invalid response. Please try again.");
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.reply || data?.error || "Calendar assistant request failed");
+      }
+
+      // If actions were performed server-side, refresh calendar data
+      if (data.createdEvent || data.updatedEvent || data.deletedEventId) {
+        await calendarData.refetch();
+      }
+
+      setAiResponse(data.reply);
+      setAiQuery("");
+    } catch (error: any) {
+      setAiResponse(
+        error?.message ||
+          "I can only help with calendar event actions and calendar event info.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <AppSidebar
       user={{
@@ -97,6 +193,11 @@ function SidebarWithContext() {
       onOpenSettings={openPalette}
       onOpenCalendarManagement={openCalendarManagement}
       onCreateEvent={handleCreateEvent}
+      aiQuery={aiQuery}
+      onAiQueryChange={setAiQuery}
+      onAiSubmit={handleAiSubmit}
+      aiLoading={aiLoading}
+      aiResponse={aiResponse}
       events={transformedEvents}
       onMiniCalendarMonthChange={calendarData.setDateRange}
     />
