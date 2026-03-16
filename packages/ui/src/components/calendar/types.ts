@@ -1,3 +1,11 @@
+export interface User {
+  id?: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  hasAiAccess?: boolean;
+}
+
 export type CalendarView = "month" | "week" | "day" | "agenda";
 
 export interface Calendar {
