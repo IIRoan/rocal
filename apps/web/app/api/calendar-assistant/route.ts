@@ -1,7 +1,9 @@
 import { generateText, stepCountIs, tool } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
+import { PrismaClient } from "../../../../../apps/backend/generated/prisma";
 
+const prisma = new PrismaClient();
 const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const DEFAULT_SEARCH_BACK_DAYS = 60;
 const DEFAULT_SEARCH_FORWARD_DAYS = 400;
@@ -447,11 +449,39 @@ export async function POST(req: Request) {
       return Response.json({ error: "OPENROUTER_API_KEY is missing" }, { status: 500 });
     }
 
+    const cookies = req.headers.get("cookie") || "";
+
+    // 1. Verify session and check hasAiAccess flag
+    const authResponse = await fetch(`${backendUrl}/api/user`, {
+      headers: { Cookie: cookies },
+    });
+
+    if (!authResponse.ok) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await authResponse.json();
+
+    // Check database for latest hasAiAccess status
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { hasAiAccess: true },
+    });
+
+    if (!dbUser?.hasAiAccess) {
+      return Response.json({
+        reply: "You do not have access to the AI Calendar features. Please contact an admin to enable this for your account.",
+        createdEvent: null,
+        updatedEvent: null,
+        deletedEventId: null,
+        events: [],
+      }, { status: 403 });
+    }
+
     const query = body.query.replace(/[\u0000-\u001F\u007F]/g, " ").trim();
     const lowered = query.toLowerCase();
     const now = new Date(body.now || Date.now());
     const timezone = body.timezone || "UTC";
-    const cookies = req.headers.get("cookie") || "";
     const defaultCalendarId = body.calendars.find((calendar) => calendar.isDefault)?.id || body.calendars[0]?.id || "";
 
     const dangerousPatterns = [

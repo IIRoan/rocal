@@ -30,6 +30,15 @@ export const auth = betterAuth({
       origin: frontendUrl,
     }),
   ],
+  user: {
+    additionalFields: {
+      hasAiAccess: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+      },
+    },
+  },
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
