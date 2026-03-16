@@ -236,6 +236,7 @@ export function useCalendarData(
     }) => calendarApiService.updateCalendar(id, calendar),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 
