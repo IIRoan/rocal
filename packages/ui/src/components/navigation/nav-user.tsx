@@ -16,17 +16,14 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { useDropdownShortcuts } from "../../hooks";
 import { cn } from "../../lib/utils";
+import { User } from "../calendar/types";
 
 export function NavUser({
   user,
   onLogout,
   onOpenSettings,
 }: {
-  user: {
-    name: string;
-    email: string;
-    avatar?: string;
-  };
+  user: User;
   onLogout?: () => void;
   onOpenSettings?: () => void;
 }) {
