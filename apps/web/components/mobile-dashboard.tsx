@@ -6,13 +6,10 @@ import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
+import { User } from "@workspace/ui/components/calendar/types";
 
 interface MobileDashboardProps {
-  user: {
-    name: string;
-    email: string;
-    avatar?: string;
-  };
+  user: User;
   onLogout: () => void;
 }
 
