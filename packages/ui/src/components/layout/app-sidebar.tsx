@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CheckIcon, PlusIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
+import { Sparkles } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -21,7 +22,46 @@ import {
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={`${part}-${index}`}>{part.slice(1, -1)}</em>;
+    }
+
+    return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+  });
+}
+
+function AiResponseContent({ response }: { response: string }) {
+  const lines = response
+    .split(/\r?\n/)
+    .filter((line, index, all) => line.trim() || !!all[index - 1]?.trim());
+
+  return (
+    <div className="space-y-1">
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+        const isBullet = trimmed.startsWith("- ") || trimmed.startsWith("* ");
+
+        return (
+          <div key={`${trimmed}-${index}`} className={isBullet ? "flex gap-2" : undefined}>
+            {isBullet && <span aria-hidden="true">•</span>}
+            <span>{renderInlineMarkdown(isBullet ? trimmed.slice(2) : line)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -33,6 +73,11 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
   onCreateEvent?: () => void;
+  aiQuery?: string;
+  onAiQueryChange?: (value: string) => void;
+  onAiSubmit?: () => void;
+  aiLoading?: boolean;
+  aiResponse?: string;
   events?: CalendarEvent[];
   onMiniCalendarMonthChange?: (dateRange: { start: Date; end: Date }) => void;
   isMobile?: boolean;
@@ -44,6 +89,11 @@ export function AppSidebar({
   onOpenSettings,
   onOpenCalendarManagement,
   onCreateEvent,
+  aiQuery,
+  onAiQueryChange,
+  onAiSubmit,
+  aiLoading,
+  aiResponse,
   events,
   onMiniCalendarMonthChange,
   isMobile = false,
@@ -143,6 +193,41 @@ export function AppSidebar({
               ))}
             </div>
           </div>
+
+          {onAiSubmit && onAiQueryChange && (
+            <div className="p-4 border-t space-y-2">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI Calendar
+              </div>
+              <Textarea
+                value={aiQuery || ""}
+                onChange={(e) => onAiQueryChange(e.target.value)}
+                placeholder="Ask to add, delete, or list events"
+                className="min-h-[72px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onAiSubmit();
+                  }
+                }}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={onAiSubmit}
+                  disabled={!!aiLoading || !(aiQuery || "").trim()}
+                >
+                  {aiLoading ? "..." : "Go"}
+                </Button>
+              </div>
+              {aiResponse && (
+                <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  <AiResponseContent response={aiResponse} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -164,7 +249,7 @@ export function AppSidebar({
   }
 
   // Desktop version - use Sidebar wrapper
-  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onCreateEvent, events, onMiniCalendarMonthChange, props }} />;
+  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onCreateEvent, aiQuery, onAiQueryChange, onAiSubmit, aiLoading, aiResponse, events, onMiniCalendarMonthChange, props }} />;
 }
 
 function AppSidebarDesktop({
@@ -173,6 +258,11 @@ function AppSidebarDesktop({
   onOpenSettings,
   onOpenCalendarManagement,
   onCreateEvent,
+  aiQuery,
+  onAiQueryChange,
+  onAiSubmit,
+  aiLoading,
+  aiResponse,
   events,
   onMiniCalendarMonthChange,
   props,
@@ -182,6 +272,11 @@ function AppSidebarDesktop({
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
   onCreateEvent?: () => void;
+  aiQuery?: string;
+  onAiQueryChange?: (value: string) => void;
+  onAiSubmit?: () => void;
+  aiLoading?: boolean;
+  aiResponse?: string;
   events?: CalendarEvent[];
   onMiniCalendarMonthChange?: (dateRange: { start: Date; end: Date }) => void;
   props: React.ComponentProps<typeof Sidebar>;
@@ -339,6 +434,42 @@ function AppSidebarDesktop({
             ))}
           </div>
         </div>
+
+        {!isCollapsed && onAiSubmit && onAiQueryChange && (
+          <div className="mt-2 pt-2 border-t px-2 space-y-2">
+            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-1 flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI Calendar
+            </div>
+            <Textarea
+              value={aiQuery || ""}
+              onChange={(e) => onAiQueryChange(e.target.value)}
+              placeholder="Ask to add, delete, or list events"
+              className="min-h-[72px] resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onAiSubmit();
+                }
+              }}
+            />
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                className="h-8 px-2"
+                onClick={onAiSubmit}
+                disabled={!!aiLoading || !(aiQuery || "").trim()}
+              >
+                {aiLoading ? "..." : "Go"}
+              </Button>
+            </div>
+            {aiResponse && (
+              <div className="text-xs text-muted-foreground leading-relaxed px-1 whitespace-pre-wrap">
+                <AiResponseContent response={aiResponse} />
+              </div>
+            )}
+          </div>
+        )}
       </SidebarContent>
       <SidebarFooter className="gap-1">
         <NavUser
