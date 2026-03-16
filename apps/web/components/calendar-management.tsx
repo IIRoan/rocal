@@ -40,6 +40,7 @@ import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
 import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/ui/radio-group";
 import { SubscriptionManagement } from "./subscription-management";
+import { useCalendarContext } from "@workspace/ui/components/calendar";
 import {
   Plus,
   Trash2,
@@ -85,6 +86,7 @@ export function CalendarManagement({
   const queryClient = useQueryClient();
   const { calendars, refetchCalendars, updateCalendar, createCalendar } =
     useCalendarData();
+  const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
   const { openCalendarManagement } = useCommandPalette();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -344,7 +346,7 @@ export function CalendarManagement({
   };
 
   const handleToggleVisibility = (calendar: Calendar) => {
-    handleUpdateCalendar(calendar, { isVisible: !calendar.isVisible });
+    toggleCalendarVisibility(calendar.id);
   };
 
   const handleSetDefault = (calendar: Calendar) => {
@@ -581,7 +583,7 @@ export function CalendarManagement({
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {calendar.isVisible ? "Visible" : "Hidden"}
+                              {isCalendarVisible(calendar.id) ? "Visible" : "Hidden"}
                             </div>
                           </div>
                         </div>
@@ -592,12 +594,12 @@ export function CalendarManagement({
                             size="sm"
                             onClick={() => handleToggleVisibility(calendar)}
                             title={
-                              calendar.isVisible
+                              isCalendarVisible(calendar.id)
                                 ? "Hide calendar"
                                 : "Show calendar"
                             }
                           >
-                            {calendar.isVisible ? (
+                            {isCalendarVisible(calendar.id) ? (
                               <Eye className="h-4 w-4" />
                             ) : (
                               <EyeOff className="h-4 w-4" />

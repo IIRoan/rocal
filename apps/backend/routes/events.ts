@@ -72,9 +72,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         where: {
           userId: user.id,
           recurrence: null,
-          calendar: {
-            isVisible: true, // Only fetch events from visible calendars
-          },
           OR: [
             {
               start: { gte: startDate, lte: endDate },
@@ -100,9 +97,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           userId: user.id,
           recurrence: { not: null },
           parentEventId: null, // Only get parent events, not instances
-          calendar: {
-            isVisible: true, // Only fetch events from visible calendars
-          },
         },
         include: {
           category: true,
@@ -200,9 +194,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           userId: user.id,
           parentEventId: { not: null },
           start: { gte: startDate, lte: endDate },
-          calendar: {
-            isVisible: true, // Only fetch events from visible calendars
-          },
         },
         include: {
           category: true,

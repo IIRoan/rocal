@@ -47,15 +47,19 @@ function AiResponseContent({ response }: { response: string }) {
     .filter((line, index, all) => line.trim() || !!all[index - 1]?.trim());
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2 py-0.5">
       {lines.map((line, index) => {
         const trimmed = line.trim();
         const isBullet = trimmed.startsWith("- ") || trimmed.startsWith("* ");
 
         return (
-          <div key={`${trimmed}-${index}`} className={isBullet ? "flex gap-2" : undefined}>
-            {isBullet && <span aria-hidden="true">•</span>}
-            <span>{renderInlineMarkdown(isBullet ? trimmed.slice(2) : line)}</span>
+          <div key={`${trimmed}-${index}`} className={isBullet ? "flex gap-2 items-start" : "leading-relaxed"}>
+            {isBullet && (
+              <span className="mt-1.5 size-1 rounded-full bg-primary/40 shrink-0" aria-hidden="true" />
+            )}
+            <span className="text-[12px] text-foreground/85">
+              {renderInlineMarkdown(isBullet ? trimmed.slice(2) : line)}
+            </span>
           </div>
         );
       })}
@@ -195,34 +199,44 @@ export function AppSidebar({
           </div>
 
           {onAiSubmit && onAiQueryChange && (
-            <div className="p-4 border-t space-y-2">
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI Calendar
+            <div className="p-4 border-t space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <div className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 fill-primary/10" />
+                  Assistant
+                </div>
               </div>
-              <Textarea
-                value={aiQuery || ""}
-                onChange={(e) => onAiQueryChange(e.target.value)}
-                placeholder="Ask to add, delete, or list events"
-                className="min-h-[72px] resize-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onAiSubmit();
-                  }
-                }}
-              />
-              <div className="flex justify-end">
+
+              <div className="relative group/ai-input">
+                <Textarea
+                  value={aiQuery || ""}
+                  onChange={(e) => onAiQueryChange(e.target.value)}
+                  placeholder="Message assistant..."
+                  className="min-h-[80px] w-full resize-none bg-accent/30 border-none focus-visible:ring-1 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 text-[13px] rounded-xl px-3 py-2.5 pr-10 transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onAiSubmit();
+                    }
+                  }}
+                />
                 <Button
-                  size="sm"
+                  size="icon"
+                  variant="ghost"
+                  className="absolute bottom-1.5 right-1.5 h-7 w-7 text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
                   onClick={onAiSubmit}
                   disabled={!!aiLoading || !(aiQuery || "").trim()}
                 >
-                  {aiLoading ? "..." : "Go"}
+                  {aiLoading ? (
+                    <div className="size-3.5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  ) : (
+                    <ArrowLineRightIcon size={16} weight="bold" />
+                  )}
                 </Button>
               </div>
+
               {aiResponse && (
-                <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                <div className="relative px-2.5 py-2.5 bg-primary/[0.03] border border-primary/10 rounded-xl overflow-hidden">
                   <AiResponseContent response={aiResponse} />
                 </div>
               )}
@@ -436,35 +450,47 @@ function AppSidebarDesktop({
         </div>
 
         {!isCollapsed && onAiSubmit && onAiQueryChange && (
-          <div className="mt-2 pt-2 border-t px-2 space-y-2">
-            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-1 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" />
-              AI Calendar
+          <div className="mt-4 pt-4 border-t px-2 space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <div className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 fill-primary/10" />
+                Assistant
+              </div>
             </div>
-            <Textarea
-              value={aiQuery || ""}
-              onChange={(e) => onAiQueryChange(e.target.value)}
-              placeholder="Ask to add, delete, or list events"
-              className="min-h-[72px] resize-none"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  onAiSubmit();
-                }
-              }}
-            />
-            <div className="flex justify-end">
+            
+            <div className="relative group/ai-input">
+              <Textarea
+                value={aiQuery || ""}
+                onChange={(e) => onAiQueryChange(e.target.value)}
+                placeholder="Message assistant..."
+                className="min-h-[80px] w-full resize-none bg-accent/30 border-none focus-visible:ring-1 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 text-[13px] rounded-xl px-3 py-2.5 pr-10 transition-all group-hover/ai-input:bg-accent/50"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onAiSubmit();
+                  }
+                }}
+              />
               <Button
-                size="sm"
-                className="h-8 px-2"
+                size="icon"
+                variant="ghost"
+                className="absolute bottom-1.5 right-1.5 h-7 w-7 text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
                 onClick={onAiSubmit}
                 disabled={!!aiLoading || !(aiQuery || "").trim()}
               >
-                {aiLoading ? "..." : "Go"}
+                {aiLoading ? (
+                  <div className="size-3.5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                ) : (
+                  <ArrowLineRightIcon size={16} weight="bold" />
+                )}
               </Button>
             </div>
+
             {aiResponse && (
-              <div className="text-xs text-muted-foreground leading-relaxed px-1 whitespace-pre-wrap">
+              <div className="relative px-2.5 py-2.5 bg-primary/[0.03] border border-primary/10 rounded-xl overflow-hidden group/response">
+                <div className="absolute top-0 right-0 p-1 opacity-0 group-hover/response:opacity-100 transition-opacity">
+                   <Sparkles className="h-3 w-3 text-primary/20" />
+                </div>
                 <AiResponseContent response={aiResponse} />
               </div>
             )}
