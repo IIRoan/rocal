@@ -1,10 +1,10 @@
 [build]
 builder = "RAILPACK"
 rootDirectory = "."
-buildCommand = "bun install && cd apps/notifications && bun run build:emails && go build -o notifications main.go"
+buildCommand = "bun install && bun run build:notifications"
 
 [deploy]
-startCommand = "cd apps/notifications && ./notifications"
+startCommand = "bun run start:notifications"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
