@@ -1,7 +1,7 @@
 [build]
 builder = "RAILPACK"
 rootDirectory = "."
-buildCommand = "cd packages/ui && bun install --frozen-lockfile && cd ../../apps/web && bun install --frozen-lockfile && bun run build"
+buildCommand = "bun install && bun --cwd apps/web run build"
 
 [deploy]
 startCommand = "cd apps/web && bunx serve out -p $PORT"
