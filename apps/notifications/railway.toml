@@ -1,9 +1,9 @@
 [build]
-builder = "RAILPACK"
-watchPatterns = ["apps/notifications/**", "bun.lockb"]
+builder = "NIXPACKS"
+watchPatterns = ["apps/notifications/**", "go.mod", "go.sum"]
 
 [deploy]
-startCommand = "bun run prisma:deploy && bun server.ts"
+startCommand = "go mod tidy && go run main.go"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
