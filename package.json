@@ -12,6 +12,8 @@
     "build:backend": "cd apps/backend && bun run build",
     "start:backend": "cd apps/backend && ./server",
     "build:web": "cd apps/web && bun run build",
+    "build:notifications": "cd apps/notifications && bun run build",
+    "start:notifications": "cd apps/notifications && ./notifications",
     "dev": "cd apps/backend && bun run dev & cd apps/web && bun run dev & cd apps/notifications && bun run dev",
     "dev:frontend": "cd apps/web && bun run dev",
     "dev:backend": "cd apps/backend && bun run dev",
