@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
+import { createLogger, installGlobalConsoleLogger } from "@workspace/logger";
 import { auth } from "./lib/auth";
 import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
@@ -12,6 +13,10 @@ import { subscriptionsRoute } from "./routes/subscriptions";
 import { calendarAssistantRoute } from "./routes/calendar-assistant";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
+
+installGlobalConsoleLogger("backend");
+
+const logger = createLogger("backend");
 
 // Better Auth middleware
 const betterAuth = new Elysia({ name: "better-auth" })
@@ -27,7 +32,7 @@ const betterAuth = new Elysia({ name: "better-auth" })
         session: session?.session,
       };
     } catch (error) {
-      console.error("Auth Middleware Error:", error);
+      logger.error("Auth Middleware Error:", error);
       return {
         user: null,
         session: null,
@@ -188,6 +193,6 @@ app.get("/", ({ query, redirect }) => {
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server is running on http://localhost:${port}`);
-  console.log(`📝 API documentation: http://localhost:${port}/api/swagger`);
+  logger.ok(`Server is running on http://localhost:${port}`);
+  logger.info(`API documentation: http://localhost:${port}/api/swagger`);
 });

@@ -1,9 +1,8 @@
 [build]
-builder = "NIXPACKS"
+builder = "RAILPACK"
 watchPatterns = ["apps/notifications/**", "go.mod", "go.sum"]
 
 [deploy]
-startCommand = "go mod tidy && go run main.go"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

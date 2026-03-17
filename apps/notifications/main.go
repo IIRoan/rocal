@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,33 +15,9 @@ import (
 	"github.com/resend/resend-go/v2"
 	"github.com/robfig/cron/v3"
 
+	"notifications/internal/logger"
 	"notifications/templates"
 )
-
-type serviceLogger struct {
-	logger *log.Logger
-}
-
-func newServiceLogger() serviceLogger {
-	return serviceLogger{
-		logger: log.New(os.Stdout, "", 0),
-	}
-}
-
-func (l serviceLogger) log(level string, message string, args ...any) {
-	ts := time.Now().Format("15:04:05")
-	if len(args) > 0 {
-		message = fmt.Sprintf(message, args...)
-	}
-	l.logger.Printf("%s %-4s %s", ts, level, message)
-}
-
-func (l serviceLogger) Debug(message string, args ...any) { l.log("DEBUG", message, args...) }
-func (l serviceLogger) Info(message string, args ...any)  { l.log("INFO", message, args...) }
-func (l serviceLogger) OK(message string, args ...any)    { l.log("OK", message, args...) }
-func (l serviceLogger) Warn(message string, args ...any)  { l.log("WARN", message, args...) }
-func (l serviceLogger) Err(message string, args ...any)   { l.log("ERR", message, args...) }
-func (l serviceLogger) Step(message string, args ...any)  { l.log("STEP", message, args...) }
 
 type NotificationStatus struct {
 	IsRunning            bool                `json:"isRunning"`
@@ -88,7 +63,7 @@ type NotificationServer struct {
 	lastProcessedAt *time.Time
 	resend          *resend.Client
 	maxErrors       int
-	log             serviceLogger
+	log             logger.Logger
 }
 
 func NewNotificationServer() *NotificationServer {
@@ -96,21 +71,21 @@ func NewNotificationServer() *NotificationServer {
 		cron:      cron.New(cron.WithSeconds()),
 		maxErrors: 50,
 		errors:    make([]NotificationError, 0),
-		log:       newServiceLogger(),
+		log:       logger.New("notifications"),
 	}
 }
 
 func loadEnv() {
-	logger := newServiceLogger()
+	log := logger.New("notifications")
 	if err := godotenv.Load(); err != nil {
-		logger.Warn("Could not load .env file: %v", err)
+		log.Warn("Could not load .env file: %v", err)
 	} else {
-		logger.OK("Environment variables loaded from .env")
+		log.OK("Environment variables loaded from .env")
 	}
 
-	logger.Step("Environment check")
-	logger.Info("DATABASE_URL present: %t", os.Getenv("DATABASE_URL") != "")
-	logger.Info("RESEND_API_KEY present: %t", os.Getenv("RESEND_API_KEY") != "")
+	log.Step("Environment check")
+	log.Info("DATABASE_URL present: %t", os.Getenv("DATABASE_URL") != "")
+	log.Info("RESEND_API_KEY present: %t", os.Getenv("RESEND_API_KEY") != "")
 }
 
 func (ns *NotificationServer) initResend() {
