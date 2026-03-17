@@ -25,6 +25,7 @@ export interface CalendarEvent {
   description?: string;
   start: Date;
   end: Date;
+  timezone?: string | null;
   allDay?: boolean;
   color?: EventColor;
   label?: string;

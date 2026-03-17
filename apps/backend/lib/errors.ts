@@ -1,4 +1,7 @@
 import { Elysia } from "elysia";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:errors");
 
 // Custom error types
 export class ValidationError extends Error {
@@ -67,7 +70,7 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
     const timestamp = new Date().toISOString();
 
     // Log error for debugging (in production, use proper logging)
-    console.error(`[${timestamp}] Error:`, {
+    logger.error(`[${timestamp}] Error:`, {
       code,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,

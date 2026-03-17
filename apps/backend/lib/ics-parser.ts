@@ -1,5 +1,8 @@
 import * as ical from "node-ical";
 import { CalendarEvent, Prisma } from "../generated/prisma/index.js";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:ics-parser");
 
 type VEvent = any;
 type VCalendar = any;
@@ -39,7 +42,7 @@ function convertTimezoneToUserTimezone(
     // Avoid manual conversion here to prevent double-offset errors.
     return date;
   } catch (error) {
-    console.warn(
+    logger.warn(
       `Failed to convert timezone from ${sourceTimezone} to ${userTimezone}:`,
       error,
     );
@@ -136,10 +139,10 @@ function parseVEvent(
   calendarTimezone?: string,
 ): ParsedICSEvent | null {
   try {
-    console.log("🔍 Parsing vEvent:", vEvent.uid, vEvent.summary);
+    logger.info("🔍 Parsing vEvent:", vEvent.uid, vEvent.summary);
 
     if (!vEvent.uid || !vEvent.start || !vEvent.end || !vEvent.summary) {
-      console.warn("⚠️ Missing required fields in vEvent:", {
+      logger.warn("⚠️ Missing required fields in vEvent:", {
         uid: !!vEvent.uid,
         start: !!vEvent.start,
         end: !!vEvent.end,
@@ -149,7 +152,7 @@ function parseVEvent(
     }
 
     // Debug: Log the raw vEvent data to understand timezone handling
-    console.log("📊 Raw vEvent data:", {
+    logger.info("📊 Raw vEvent data:", {
       uid: vEvent.uid,
       summary: vEvent.summary,
       start: {
@@ -194,7 +197,7 @@ function parseVEvent(
     // For all-day events, timezone is not applicable
 
     // Handle date/time parsing with proper timezone handling
-    console.log("🕐 Processing start time:", start, typeof start);
+    logger.info("🕐 Processing start time:", start, typeof start);
     try {
       if (typeof start === "string") {
         const startStr = start as string;
@@ -204,23 +207,23 @@ function parseVEvent(
         if (!isNaN(date.getTime())) {
           start = date;
           allDay = allDay || isAllDayFromStart;
-          console.log("📅 Parsed string start date:", start, "allDay:", allDay);
+          logger.info("📅 Parsed string start date:", start, "allDay:", allDay);
         } else {
           throw new Error(`Invalid start date string: ${start}`);
         }
       } else if (start instanceof Date) {
         // Date object from ICS library - use as-is
         start = vEvent.start;
-        console.log("📅 Using Date object start:", start);
+        logger.info("📅 Using Date object start:", start);
       } else {
         throw new Error(`Unexpected start date type: ${typeof start}`);
       }
     } catch (error) {
-      console.error("❌ Error parsing start date:", error);
+      logger.error("❌ Error parsing start date:", error);
       throw error;
     }
 
-    console.log("🕐 Processing end time:", end, typeof end);
+    logger.info("🕐 Processing end time:", end, typeof end);
     try {
       if (typeof end === "string") {
         const date = new Date(end);
@@ -230,7 +233,7 @@ function parseVEvent(
             // For all-day events, subtract 1 day from end date as ICS format uses exclusive end dates
             end = new Date(end.getTime() - 24 * 60 * 60 * 1000);
           }
-          console.log("📅 Parsed string end date:", end);
+          logger.info("📅 Parsed string end date:", end);
         } else {
           throw new Error(`Invalid end date string: ${end}`);
         }
@@ -241,12 +244,12 @@ function parseVEvent(
           // Ensure exclusive end is converted to inclusive for all-day
           end = new Date(end.getTime() - 24 * 60 * 60 * 1000);
         }
-        console.log("📅 Using Date object end:", end);
+        logger.info("📅 Using Date object end:", end);
       } else {
         throw new Error(`Unexpected end date type: ${typeof end}`);
       }
     } catch (error) {
-      console.error("❌ Error parsing end date:", error);
+      logger.error("❌ Error parsing end date:", error);
       throw error;
     }
 
@@ -261,21 +264,21 @@ function parseVEvent(
     let recurrence: string | undefined;
     if (vEvent.rrule) {
       try {
-        console.log(
+        logger.info(
           "📅 Processing RRULE for event:",
           vEvent.uid,
           vEvent.summary,
         );
-        console.log("📋 Raw RRULE from ICS:", vEvent.rrule);
+        logger.info("📋 Raw RRULE from ICS:", vEvent.rrule);
 
         // Convert RRULE to our internal format
         const parsedRule = parseRRule(vEvent.rrule);
-        console.log("🔄 Parsed RRULE result:", parsedRule);
+        logger.info("🔄 Parsed RRULE result:", parsedRule);
 
         // Validate the parsed rule has required fields
         if (parsedRule.frequency && parsedRule.interval) {
           recurrence = JSON.stringify(parsedRule);
-          console.log(
+          logger.info(
             "✅ Final recurrence JSON for",
             vEvent.uid,
             ":",
@@ -287,19 +290,19 @@ function parseVEvent(
             // Keep as is
           }
         } else {
-          console.warn(
+          logger.warn(
             `❌ Invalid RRULE - missing frequency or interval for ${vEvent.uid}:`,
             parsedRule,
           );
         }
       } catch (error) {
-        console.warn(
+        logger.warn(
           `💥 Failed to parse RRULE for event ${vEvent.uid}: ${error}`,
         );
       }
     }
 
-    console.log(
+    logger.ok(
       "✅ Successfully parsed event:",
       vEvent.uid,
       vEvent.summary,
@@ -318,12 +321,12 @@ function parseVEvent(
       timezone: sourceTimezone,
     };
   } catch (error) {
-    console.error(
+    logger.error(
       "💥 Fatal error parsing vEvent:",
       vEvent?.uid || "unknown",
       error,
     );
-    console.error(
+    logger.error(
       "📊 vEvent data that caused error:",
       JSON.stringify(vEvent, null, 2),
     );

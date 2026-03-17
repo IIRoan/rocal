@@ -5,6 +5,9 @@ import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
 import { requireAuth } from "../lib/auth-guard";
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:recurring");
 
 export const recurringRoutes = new Elysia({ prefix: "/recurring" })
   .use(requireAuth)
@@ -431,7 +434,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
       const { id } = params;
       const { deleteScope, occurrenceDate } = query;
 
-      console.log("🗑️ DELETE RECURRING EVENT REQUEST:", {
+      logger.info("🗑️ DELETE RECURRING EVENT REQUEST:", {
         eventId: id,
         deleteScope,
         occurrenceDate,
@@ -461,7 +464,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
           }
 
           const exceptionDate = new Date(occurrenceDate);
-          console.log("📅 Creating RecurrenceException:", {
+          logger.info("📅 Creating RecurrenceException:", {
             parentEventId: id,
             exceptionDate: exceptionDate.toISOString(),
             originalOccurrenceDate: occurrenceDate,
@@ -482,18 +485,18 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
 
           let exception;
           if (existingException) {
-            console.log(
+            logger.warn(
               "⚠️ RecurrenceException already exists:",
               existingException,
             );
 
             // If it's already deleted, that's fine - just return success
             if (existingException.type === "deleted") {
-              console.log("✅ Occurrence already deleted, returning success");
+              logger.ok("✅ Occurrence already deleted, returning success");
               exception = existingException;
             } else {
               // If it's a different type (e.g., "modified"), update it to "deleted"
-              console.log("🔄 Updating existing exception to deleted type");
+              logger.info("🔄 Updating existing exception to deleted type");
               exception = await prisma.recurrenceException.update({
                 where: {
                   parentEventId_exceptionDate: {
@@ -515,7 +518,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
                 type: "deleted",
               },
             });
-            console.log("✅ New RecurrenceException created:", exception);
+            logger.ok("✅ New RecurrenceException created:", exception);
           }
 
           return {
