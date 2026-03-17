@@ -153,8 +153,9 @@ export function MobileCalendarWrapper({
       {/* Mobile Sidebar Drawer */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
         <SheetContent
-          side="left"
-          className="w-[85vw] max-w-80 p-0 safe-area-inset-top safe-area-inset-bottom"
+          side="bottom"
+          showClose={false}
+          className="w-full h-[100dvh] p-0 border-none rounded-none sm:max-w-none safe-area-inset-top safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>

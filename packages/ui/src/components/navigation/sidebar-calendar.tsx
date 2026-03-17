@@ -63,35 +63,35 @@ export function SidebarCalendar({
   const weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
-    <div className={cn("w-full max-w-[18rem]", className)}>
-      <div className="flex items-center justify-between mb-2 px-1">
+    <div className={cn("w-full", className)}>
+      <div className="flex items-center justify-between mb-4 px-1">
         <button
           onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
-          className="p-1.5 rounded-md hover:bg-accent transition-colors"
+          className="p-2 rounded-full hover:bg-accent transition-colors"
           aria-label="Previous month"
         >
-          <ChevronLeft size={16} className="text-muted-foreground" />
+          <ChevronLeft size={20} className="text-muted-foreground" />
         </button>
         <button
           onClick={() => setCalendarMonth(currentDate)}
-          className="text-sm font-semibold"
+          className="text-[15px] font-bold tracking-tight"
         >
           {format(calendarMonth, "MMMM yyyy")}
         </button>
         <button
           onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
-          className="p-1.5 rounded-md hover:bg-accent transition-colors"
+          className="p-2 rounded-full hover:bg-accent transition-colors"
           aria-label="Next month"
         >
-          <ChevronRight size={16} className="text-muted-foreground" />
+          <ChevronRight size={20} className="text-muted-foreground" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-1 px-1">
+      <div className="grid grid-cols-7 gap-1 mb-2 px-1">
         {weekdayLabels.map((label, index) => (
           <div
             key={`${label}-${index}`}
-            className="h-8 flex items-center justify-center text-xs font-medium text-muted-foreground/80"
+            className="aspect-square flex items-center justify-center text-[11px] font-black text-muted-foreground/50 uppercase"
           >
             {label}
           </div>
@@ -110,32 +110,32 @@ export function SidebarCalendar({
               key={day.toISOString()}
               onClick={() => setCurrentDate(day)}
               className={cn(
-                "relative size-8 rounded-full text-sm transition-colors",
-                "flex items-center justify-center",
-                !isCurrentMonth && "text-muted-foreground/35",
+                "relative aspect-square rounded-[12px] text-[14px] transition-all active:scale-90",
+                "flex flex-col items-center justify-center gap-1",
+                !isCurrentMonth && "text-muted-foreground/20",
                 isCurrentMonth &&
                   !isSelected &&
-                  "hover:bg-accent text-foreground",
-                isSelected && "text-primary font-semibold",
-                isCurrentDay && !isSelected && "text-primary font-semibold",
+                  "hover:bg-accent/50 text-foreground font-medium",
+                isSelected && "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20",
+                isCurrentDay && !isSelected && "text-primary font-black",
               )}
             >
-              {format(day, "d")}
+              <span>{format(day, "d")}</span>
               {dayEvents.length > 0 && (
-                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                <div className="flex items-center gap-0.5 mt-[-2px]">
                   {dayEvents.slice(0, 3).map((event, i) => (
-                    <span
+                    <div
                       key={`${event.id || "event"}-${i}`}
-                      className="w-1 h-1 rounded-full"
+                      className={cn(
+                        "w-1 h-1 rounded-full",
+                        isSelected ? "bg-white/60" : ""
+                      )}
                       style={{
-                        backgroundColor: resolveEventColorValue(event.color),
+                        backgroundColor: isSelected ? undefined : resolveEventColorValue(event.color),
                       }}
                     />
                   ))}
-                </span>
-              )}
-              {isSelected && (
-                <span className="absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded bg-primary/75" />
+                </div>
               )}
             </button>
           );
