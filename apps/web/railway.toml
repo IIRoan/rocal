@@ -1,7 +1,7 @@
 [build]
 builder = "RAILPACK"
 rootDirectory = "."
-buildCommand = "bun install && bun --filter web run build"
+buildCommand = "bun install && bun run build:web"
 
 [deploy]
 startCommand = "cd apps/web && bunx serve out -p $PORT"
