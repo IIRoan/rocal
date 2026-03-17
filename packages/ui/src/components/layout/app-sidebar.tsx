@@ -20,6 +20,14 @@ import {
   useSidebar,
 } from "../ui/sidebar";
 import { SheetClose } from "../ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
@@ -105,26 +113,57 @@ export function AppSidebar({
 
   // Mobile version - Full-screen immersive dashboard
   if (isMobile) {
+    const initials = user?.name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase() || "GU";
+
     return (
       <div className="fixed inset-0 z-[100] flex flex-col h-[100dvh] w-full bg-background overflow-hidden overscroll-none">
         {/* Immersive Header */}
         <div className="flex items-center justify-between pt-6 pb-2 px-6 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center shadow-sm">
-              <LogoSvg width="24" height="24" className="text-primary" />
-            </div>
+   <div className="flex items-center justify-center size-10">
+  <LogoSvg className="size-full text-primary" />
+</div>
             <h1 className="text-xl font-extrabold tracking-tight text-foreground">Workspace</h1>
           </div>
           
-          <SheetClose asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 px-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 font-bold text-[14px] transition-all active:scale-95"
-            >
-              Done
-            </Button>
-          </SheetClose>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center justify-center transition-all active:scale-90 outline-none">
+                <Avatar className="size-10 rounded-xl shadow-none">
+                  <AvatarImage src={user?.avatar} alt={user?.name} className="rounded-xl" />
+                  <AvatarFallback className="rounded-xl bg-transparent text-primary font-bold text-sm">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-2xl border-primary/5">
+              <div className="flex flex-col gap-1 p-3 mb-1">
+                <p className="text-sm font-bold text-foreground leading-none">{user?.name || "Guest User"}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{user?.email || "guest@example.com"}</p>
+              </div>
+              <DropdownMenuSeparator className="bg-primary/5" />
+              <DropdownMenuItem 
+                className="rounded-xl h-11 px-3 font-bold text-sm gap-3 focus:bg-primary/5 focus:text-primary transition-colors cursor-pointer"
+                onClick={onOpenSettings}
+              >
+                <GearSixIcon size={18} weight="bold" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-primary/5" />
+              <DropdownMenuItem 
+                className="rounded-xl h-11 px-3 font-bold text-sm gap-3 focus:bg-destructive/5 text-destructive focus:text-destructive transition-colors cursor-pointer"
+                onClick={onLogout}
+              >
+                <ArrowLineLeftIcon size={18} weight="bold" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Scrollable Dashboard Content */}
@@ -256,19 +295,16 @@ export function AppSidebar({
           )}
         </div>
 
-        {/* Refined Footer - Consistency with AppShell */}
+        {/* Global Action Bar Footer */}
         <div className="p-6 bg-background border-t border-border/50 shrink-0">
-          <NavUser
-            user={
-              user || {
-                name: "Guest User",
-                email: "guest@example.com",
-                avatar: "",
-              }
-            }
-            onLogout={onLogout}
-            onOpenSettings={onOpenSettings}
-          />
+          <SheetClose asChild>
+            <Button 
+              variant="secondary"
+              className="w-full h-14 rounded-[22px] bg-muted/50 text-foreground hover:bg-muted/80 font-bold text-base transition-all active:scale-[0.97] border-none shadow-none"
+            >
+              Back to Calendar
+            </Button>
+          </SheetClose>
         </div>
       </div>
     );
