@@ -1,4 +1,7 @@
 import { PrismaClient } from "../generated/prisma";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:prisma");
 
 // Global Prisma client instance to prevent multiple connections
 declare global {
@@ -41,7 +44,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch (error) {
-    console.error("Database connection failed:", error);
+    logger.error("Database connection failed:", error);
     return false;
   }
 }
@@ -67,7 +70,7 @@ export const db = {
     try {
       return await queryFn();
     } catch (error) {
-      console.error("Database query failed:", error);
+      logger.error("Database query failed:", error);
       return fallback || null;
     }
   },

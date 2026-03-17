@@ -193,6 +193,7 @@ export function AppSidebar({
               <SidebarCalendar
                 events={events}
                 onDisplayMonthChange={onMiniCalendarMonthChange}
+                isMobile={true}
               />
             </div>
           </div>
@@ -382,17 +383,16 @@ function AppSidebarDesktop({
       </SidebarHeader>
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">
         {onCreateEvent && (
-          <div className={isCollapsed ? "flex justify-center py-2" : "px-3 mb-4"}>
+          <div className={isCollapsed ? "flex justify-center py-2" : "px-3 mb-3"}>
             {isCollapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     onClick={onCreateEvent}
-                    variant="secondary"
+                    className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/10 transition-all active:scale-95 border-none"
                     size="icon"
-                    className="h-9 w-9 rounded-xl bg-primary/[0.08] text-primary hover:bg-primary/15 border-none shadow-none transition-all"
                   >
-                    <Plus size={18} strokeWidth={2.5} />
+                    <Plus size={20} strokeWidth={3} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">New Event</TooltipContent>
@@ -400,14 +400,12 @@ function AppSidebarDesktop({
             ) : (
               <Button
                 onClick={onCreateEvent}
-                variant="secondary"
-                className="w-full gap-2 rounded-xl bg-primary/[0.08] text-primary hover:bg-primary/15 border-none shadow-none font-semibold transition-all h-10 px-4 flex items-center justify-start group/new-event"
-                size="sm"
+                className="w-full h-11 justify-start gap-3 px-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/10 transition-all active:scale-[0.98] border-none group"
               >
-                <div className="size-5 rounded-lg bg-primary/10 flex items-center justify-center group-hover/new-event:bg-primary/20 transition-colors">
-                  <Plus size={14} strokeWidth={3} />
+                <div className="flex items-center justify-center size-6 rounded-xl bg-white/20 group-hover:bg-white/30 transition-colors">
+                  <Plus size={16} strokeWidth={3} />
                 </div>
-                <span>New Event</span>
+                <span className="font-bold text-[14px] tracking-tight text-white">New Event</span>
               </Button>
             )}
           </div>

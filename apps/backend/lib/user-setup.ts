@@ -1,4 +1,7 @@
 import { prisma } from "./prisma";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:user-setup");
 
 /**
  * Ensures user has default calendars set up.
@@ -13,7 +16,7 @@ export async function ensureUserCalendars(userId: string) {
 
     // If user has no calendars, create default ones
     if (existingCalendars.length === 0) {
-      console.log(`Creating default calendars for user ${userId}`);
+      logger.info(`Creating default calendars for user ${userId}`);
 
       await prisma.calendar.createMany({
         data: [
@@ -41,10 +44,10 @@ export async function ensureUserCalendars(userId: string) {
         ],
       });
 
-      console.log(`Created default calendars for user ${userId}`);
+      logger.ok(`Created default calendars for user ${userId}`);
     }
   } catch (error) {
-    console.error(`Failed to ensure calendars for user ${userId}:`, error);
+    logger.error(`Failed to ensure calendars for user ${userId}:`, error);
     // Don't throw - this shouldn't break the app if calendar setup fails
   }
 }

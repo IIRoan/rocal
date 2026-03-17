@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/resend/resend-go/v2"
 	"github.com/robfig/cron/v3"
 
@@ -54,9 +56,21 @@ type UserData struct {
 	TimeZone string
 }
 
+type NotificationData struct {
+	ID                    string
+	EventID               string
+	UserID                string
+	NotificationType      string
+	MinutesBefore         int
+	NotificationTime      time.Time
+	NotificationDateLocal string
+	NotificationTimezone  string
+}
+
 type NotificationServer struct {
 	isRunning       bool
 	cron            *cron.Cron
+	db              *sql.DB
 	processedCount  int
 	failedCount     int
 	errors          []NotificationError
@@ -97,11 +111,48 @@ func (ns *NotificationServer) initResend() {
 
 	ns.resend = resend.NewClient(apiKey)
 	ns.log.OK("Resend client initialized")
+	if from := strings.TrimSpace(os.Getenv("FROM_EMAIL")); from == "" {
+		ns.log.Warn("FROM_EMAIL not configured; set it to an address on your verified Resend domain")
+	} else {
+		ns.log.Info("Using FROM_EMAIL sender: %s", from)
+	}
+}
+
+func (ns *NotificationServer) initDB() error {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return fmt.Errorf("DATABASE_URL not found")
+	}
+
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	ns.db = db
+	ns.log.OK("Database connection initialized")
+	return nil
 }
 
 func (ns *NotificationServer) Start() error {
 	if ns.isRunning {
 		return nil
+	}
+
+	if err := ns.initDB(); err != nil {
+		return err
 	}
 
 	ns.isRunning = true
@@ -131,6 +182,12 @@ func (ns *NotificationServer) Stop() {
 	ns.isRunning = false
 	ctx := ns.cron.Stop()
 	<-ctx.Done()
+	if ns.db != nil {
+		if err := ns.db.Close(); err != nil {
+			ns.log.Warn("Failed to close database connection: %v", err)
+		}
+		ns.db = nil
+	}
 	ns.log.OK("Notification server stopped")
 }
 
@@ -152,12 +209,221 @@ func (ns *NotificationServer) addError(message string) {
 
 func (ns *NotificationServer) processScheduledNotifications() error {
 	now := time.Now()
+	currentMinute := now.Truncate(time.Minute)
 	ns.lastProcessedAt = &now
-	ns.log.Info("Notification tick executed")
+
+	if ns.db == nil {
+		return fmt.Errorf("database service not configured")
+	}
+
+	notifications, err := ns.fetchDueNotifications(currentMinute)
+	if err != nil {
+		return err
+	}
+
+	if len(notifications) == 0 {
+		ns.log.Info("Notification tick executed - no due email notifications")
+		return nil
+	}
+
+	ns.log.Info("Processing %d due email notification(s)", len(notifications))
+
+	processed := 0
+	failed := 0
+	for _, item := range notifications {
+		if err := ns.sendEmailNotification(context.Background(), item.Event, item.User, item.Notification.MinutesBefore, item.Notification.EventID); err != nil {
+			failed++
+			ns.failedCount++
+			ns.addError(err.Error())
+			ns.log.Err("Failed to send notification %s for event %s: %v", item.Notification.ID, item.Notification.EventID, err)
+			if logErr := ns.insertNotificationLog(item.Notification, item.User, "failed"); logErr != nil {
+				ns.log.Warn("Failed to write notification failure log for %s: %v", item.Notification.ID, logErr)
+			}
+			continue
+		}
+
+		if err := ns.markNotificationSent(item.Notification.ID); err != nil {
+			failed++
+			ns.failedCount++
+			ns.addError(err.Error())
+			ns.log.Err("Notification %s email was sent but could not be marked as sent: %v", item.Notification.ID, err)
+			continue
+		}
+
+		if err := ns.insertNotificationLog(item.Notification, item.User, "sent"); err != nil {
+			ns.log.Warn("Failed to write notification success log for %s: %v", item.Notification.ID, err)
+		}
+
+		processed++
+	}
+
+	ns.log.OK("Notification processing complete: %d sent, %d failed", processed, failed)
 	return nil
 }
 
-func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int) (*EmailContent, error) {
+type dueNotification struct {
+	Notification NotificationData
+	Event        EventData
+	User         UserData
+}
+
+func (ns *NotificationServer) fetchDueNotifications(currentMinute time.Time) ([]dueNotification, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	rows, err := ns.db.QueryContext(ctx, `
+		SELECT
+			en.id,
+			en.event_id,
+			ce.user_id,
+			en.notification_type,
+			en.minutes_before,
+			en.notification_time,
+			en.notification_date_local,
+			en.notification_timezone,
+			ce.title,
+			ce.start,
+			ce."end",
+			ce.location,
+			ce.description,
+			ec.name,
+			ec.color,
+			u.name,
+			u.email,
+			COALESCE(us.timezone, 'UTC')
+		FROM event_notification en
+		INNER JOIN calendar_event ce ON ce.id = en.event_id
+		INNER JOIN "user" u ON u.id = ce.user_id
+		LEFT JOIN user_settings us ON us.user_id = u.id
+		LEFT JOIN event_category ec ON ec.id = ce.category_id
+		WHERE en.notification_time <= $1
+		  AND en.is_enabled = TRUE
+		  AND en.is_sent = FALSE
+		  AND en.notification_type = 'email'
+		ORDER BY en.notification_time ASC
+	`, currentMinute)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query due notifications: %w", err)
+	}
+	defer rows.Close()
+
+	results := make([]dueNotification, 0)
+	for rows.Next() {
+		var item dueNotification
+		var location sql.NullString
+		var description sql.NullString
+		var categoryName sql.NullString
+		var categoryColor sql.NullString
+
+		if err := rows.Scan(
+			&item.Notification.ID,
+			&item.Notification.EventID,
+			&item.Notification.UserID,
+			&item.Notification.NotificationType,
+			&item.Notification.MinutesBefore,
+			&item.Notification.NotificationTime,
+			&item.Notification.NotificationDateLocal,
+			&item.Notification.NotificationTimezone,
+			&item.Event.Title,
+			&item.Event.Start,
+			&item.Event.End,
+			&location,
+			&description,
+			&categoryName,
+			&categoryColor,
+			&item.User.Name,
+			&item.User.Email,
+			&item.User.TimeZone,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan due notification: %w", err)
+		}
+
+		item.Event.Location = nullableString(location)
+		item.Event.Description = nullableString(description)
+		item.Event.CategoryName = nullableString(categoryName)
+		item.Event.CategoryColor = nullableString(categoryColor)
+
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while reading due notifications: %w", err)
+	}
+
+	return results, nil
+}
+
+func nullableString(value sql.NullString) string {
+	if value.Valid {
+		return value.String
+	}
+	return ""
+}
+
+func (ns *NotificationServer) markNotificationSent(notificationID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := ns.db.ExecContext(ctx, `
+		UPDATE event_notification
+		SET is_sent = TRUE, updated_at = NOW()
+		WHERE id = $1 AND is_sent = FALSE
+	`, notificationID)
+	if err != nil {
+		return fmt.Errorf("failed to mark notification as sent: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to read notification update result: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("notification was not updated as sent")
+	}
+
+	return nil
+}
+
+func (ns *NotificationServer) insertNotificationLog(notification NotificationData, user UserData, status string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := ns.db.ExecContext(ctx, `
+		INSERT INTO notification_log (
+			id,
+			event_id,
+			user_id,
+			notification_type,
+			minutes_before,
+			sent_at,
+			status,
+			created_at
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			NOW(),
+			$6,
+			NOW()
+		)
+	`,
+		fmt.Sprintf("%d", time.Now().UnixNano()),
+		notification.EventID,
+		notification.UserID,
+		notification.NotificationType,
+		notification.MinutesBefore,
+		status,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert notification log: %w", err)
+	}
+
+	return nil
+}
+
+func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int, eventID string) (*EmailContent, error) {
 	formattedDetails, err := ns.formatEventDetailsForEmail(event, user.TimeZone, minutesBefore)
 	if err != nil {
 		return nil, err
@@ -177,6 +443,8 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		UserName:       user.Name,
 		UserEmail:      user.Email,
 		UserTheme:      "light",
+		EventUrl:       fmt.Sprintf("https://solace.onl/event/%s", eventID),
+		CalendarUrl:    "https://solace.onl/calendar",
 	}
 
 	html, err := templates.RenderEventReminder(templateData)
@@ -272,7 +540,7 @@ func (ns *NotificationServer) generateEmailSubject(event EventData, minutesBefor
 	return fmt.Sprintf("Reminder: %s", event.Title)
 }
 
-func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event EventData, user UserData, minutesBefore int) error {
+func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event EventData, user UserData, minutesBefore int, eventID string) error {
 	if ns.resend == nil {
 		return fmt.Errorf("email service not configured")
 	}
@@ -280,13 +548,18 @@ func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event E
 		return fmt.Errorf("user email is required")
 	}
 
-	content, err := ns.generateEmailContent(event, user, minutesBefore)
+	content, err := ns.generateEmailContent(event, user, minutesBefore, eventID)
+	if err != nil {
+		return err
+	}
+
+	fromAddress, err := ns.getFromAddress()
 	if err != nil {
 		return err
 	}
 
 	params := &resend.SendEmailRequest{
-		From:    ns.getFromAddress(),
+		From:    fromAddress,
 		To:      []string{user.Email},
 		Subject: ns.generateEmailSubject(event, minutesBefore),
 		Html:    content.HTML,
@@ -303,23 +576,53 @@ func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event E
 	return nil
 }
 
-func (ns *NotificationServer) getFromAddress() string {
-	from := os.Getenv("FROM_EMAIL")
+func (ns *NotificationServer) getFromAddress() (string, error) {
+	from := strings.TrimSpace(os.Getenv("FROM_EMAIL"))
 	if from == "" {
-		from = "Notifications <onboarding@resend.dev>"
+		return "", fmt.Errorf("FROM_EMAIL is not configured; set it to an address on your verified Resend domain")
 	}
-	return from
+	return from, nil
 }
 
 func (ns *NotificationServer) GetStatus() *NotificationStatus {
+	pendingCount := 0
+	if ns.db != nil {
+		count, err := ns.countPendingNotifications()
+		if err != nil {
+			ns.log.Warn("Failed to count pending notifications: %v", err)
+		} else {
+			pendingCount = count
+		}
+	}
+
 	return &NotificationStatus{
 		IsRunning:            ns.isRunning,
-		PendingNotifications: 0,
+		PendingNotifications: pendingCount,
 		LastProcessedAt:      ns.lastProcessedAt,
 		ProcessedCount:       ns.processedCount,
 		FailedCount:          ns.failedCount,
 		Errors:               ns.errors,
 	}
+}
+
+func (ns *NotificationServer) countPendingNotifications() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var count int
+	err := ns.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM event_notification
+		WHERE is_enabled = TRUE
+		  AND is_sent = FALSE
+		  AND notification_type = 'email'
+		  AND notification_time >= NOW()
+	`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count pending notifications: %w", err)
+	}
+
+	return count, nil
 }
 
 func (ns *NotificationServer) statusHandler(w http.ResponseWriter, r *http.Request) {

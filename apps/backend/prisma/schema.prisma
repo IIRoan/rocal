@@ -244,6 +244,8 @@ model EventNotification {
   notificationType String        @map("notification_type") // 'browser', 'email'
   minutesBefore    Int           @map("minutes_before")
   notificationTime DateTime      @map("notification_time") // Exact time to send notification
+  notificationDateLocal String   @map("notification_date_local")
+  notificationTimezone  String   @default("UTC") @map("notification_timezone")
   isEnabled        Boolean       @default(true) @map("is_enabled")
   isSent           Boolean       @default(false) @map("is_sent")
   createdAt        DateTime      @default(now()) @map("created_at")

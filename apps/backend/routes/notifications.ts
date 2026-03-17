@@ -9,6 +9,8 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import { NotificationCalculator } from "../lib/notification-calculator";
+import { createLogger } from "@workspace/logger";
 
 // Rate limiting configuration
 const RATE_LIMITS = {
@@ -21,6 +23,7 @@ const RATE_LIMITS = {
 
 // Simple in-memory rate limiter (for production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const logger = createLogger("backend:notifications");
 
 /**
  * Rate limiting middleware
@@ -106,7 +109,7 @@ async function validateEventOwnership(eventId: string, userId: string) {
 
   const event = await prisma.calendarEvent.findFirst({
     where: { id: eventId, userId },
-    select: { id: true, start: true, title: true, isSynced: true },
+    select: { id: true, start: true, timezone: true, title: true, isSynced: true },
   });
 
   if (!event) {
@@ -120,6 +123,20 @@ async function validateEventOwnership(eventId: string, userId: string) {
 
   return event;
 }
+
+type NotificationRow = {
+  id: string;
+  eventId: string;
+  notificationType: string;
+  minutesBefore: number;
+  notificationTime: Date;
+  notificationDateLocal: string;
+  notificationTimezone: string;
+  isEnabled: boolean;
+  isSent: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
   .use(requireAuth)
@@ -151,26 +168,25 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         }
 
         // Get notifications for the event
-        const notifications = await prisma.eventNotification.findMany({
-          where: {
-            eventId,
-            event: {
-              userId: user.id,
-            },
-          },
-          orderBy: [{ notificationType: "asc" }, { minutesBefore: "asc" }],
-          select: {
-            id: true,
-            eventId: true,
-            notificationType: true,
-            minutesBefore: true,
-            notificationTime: true,
-            isEnabled: true,
-            isSent: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        });
+        const notifications = await prisma.$queryRaw<NotificationRow[]>`
+          SELECT
+            en.id,
+            en.event_id AS "eventId",
+            en.notification_type AS "notificationType",
+            en.minutes_before AS "minutesBefore",
+            en.notification_time AS "notificationTime",
+            en.notification_date_local AS "notificationDateLocal",
+            en.notification_timezone AS "notificationTimezone",
+            en.is_enabled AS "isEnabled",
+            en.is_sent AS "isSent",
+            en.created_at AS "createdAt",
+            en.updated_at AS "updatedAt"
+          FROM public.event_notification en
+          INNER JOIN public.calendar_event ce ON ce.id = en.event_id
+          WHERE en.event_id = ${eventId}
+            AND ce.user_id = ${user.id}
+          ORDER BY en.notification_type ASC, en.minutes_before ASC
+        `;
 
         return {
           success: true,
@@ -179,6 +195,8 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
             notifications: notifications.map((n) => ({
               ...n,
               notificationTime: n.notificationTime.toISOString(),
+              notificationDateLocal: n.notificationDateLocal,
+              notificationTimezone: n.notificationTimezone,
               createdAt: n.createdAt.toISOString(),
               updatedAt: n.updatedAt.toISOString(),
             })),
@@ -193,7 +211,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         ) {
           throw error;
         }
-        console.error("Failed to get event notifications:", error);
+        logger.error("Failed to get event notifications:", error);
         throw new ValidationError("Failed to retrieve event notifications");
       }
     },
@@ -325,6 +343,8 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           notificationType: string;
           minutesBefore: number;
           notificationTime: Date;
+          notificationDateLocal: string;
+          notificationTimezone: string;
           isEnabled: boolean;
         }>;
         const skippedConfigurations: Array<{
@@ -367,10 +387,12 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
             continue;
           }
 
-          const notificationTime = new Date(
-            event.start.getTime() - config.minutesBefore * 60 * 1000,
+          const schedule = NotificationCalculator.buildNotificationSchedule(
+            event.start,
+            config.minutesBefore,
+            event.timezone,
           );
-          if (notificationTime <= now) {
+          if (schedule.notificationTime <= now) {
             skippedConfigurations.push({
               notificationType: config.notificationType,
               minutesBefore: config.minutesBefore,
@@ -379,17 +401,43 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
             continue;
           }
 
-          const notification = await prisma.eventNotification.create({
-            data: {
-              eventId,
-              notificationType: config.notificationType,
-              minutesBefore: config.minutesBefore,
-              notificationTime,
-              isEnabled: true,
-              isSent: false,
-            },
-          });
-          createdNotifications.push(notification as any);
+          const notificationId = crypto.randomUUID();
+          await prisma.$executeRaw`
+            INSERT INTO public.event_notification (
+              id,
+              event_id,
+              notification_type,
+              minutes_before,
+              notification_time,
+              notification_date_local,
+              notification_timezone,
+              is_enabled,
+              is_sent,
+              created_at,
+              updated_at
+            ) VALUES (
+              ${notificationId},
+              ${eventId},
+              ${config.notificationType},
+              ${config.minutesBefore},
+              ${schedule.notificationTime},
+              ${schedule.notificationDateLocal},
+              ${schedule.notificationTimezone},
+              true,
+              false,
+              NOW(),
+              NOW()
+            )
+          `;
+          createdNotifications.push({
+            id: notificationId,
+            notificationType: config.notificationType,
+            minutesBefore: config.minutesBefore,
+            notificationTime: schedule.notificationTime,
+            notificationDateLocal: schedule.notificationDateLocal,
+            notificationTimezone: schedule.notificationTimezone,
+            isEnabled: true,
+          } as any);
         }
 
         return {
@@ -405,7 +453,9 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
                 type: n.notificationType,
                 minutesBefore: n.minutesBefore,
                 notificationTime: n.notificationTime.toISOString(),
-                isEnabled: true,
+                notificationDateLocal: n.notificationDateLocal,
+                notificationTimezone: n.notificationTimezone,
+                isEnabled: n.isEnabled,
               })),
               skippedConfigurations,
             },
@@ -419,7 +469,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         ) {
           throw error;
         }
-        console.error("Failed to update event notifications:", error);
+        logger.error("Failed to update event notifications:", error);
         throw new ValidationError("Failed to update event notifications");
       }
     },
@@ -517,7 +567,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         ) {
           throw error;
         }
-        console.error("Failed to delete event notifications:", error);
+        logger.error("Failed to delete event notifications:", error);
         throw new ValidationError("Failed to delete event notifications");
       }
     },

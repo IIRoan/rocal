@@ -25,6 +25,7 @@ export interface CalendarEvent {
   description?: string | null;
   start: Date;
   end: Date;
+  timezone?: string | null;
   allDay?: boolean;
   location?: string | null;
   color?: string | null;
@@ -78,6 +79,7 @@ export interface CreateEventRequest {
   description?: string;
   start: string; // ISO date string
   end: string; // ISO date string
+  timezone?: string;
   allDay?: boolean;
   location?: string;
   color?: EventColor;

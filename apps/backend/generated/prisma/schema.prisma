@@ -237,16 +237,18 @@ model RecurrenceException {
 }
 
 model EventNotification {
-  id               String        @id @default(cuid())
-  eventId          String        @map("event_id")
-  event            CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  notificationType String        @map("notification_type") // 'browser', 'email'
-  minutesBefore    Int           @map("minutes_before")
-  notificationTime DateTime      @map("notification_time") // Exact time to send notification
-  isEnabled        Boolean       @default(true) @map("is_enabled")
-  isSent           Boolean       @default(false) @map("is_sent")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id                    String        @id @default(cuid())
+  eventId               String        @map("event_id")
+  event                 CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  notificationType      String        @map("notification_type") // 'browser', 'email'
+  minutesBefore         Int           @map("minutes_before")
+  notificationTime      DateTime      @map("notification_time") // Exact time to send notification
+  notificationDateLocal String        @map("notification_date_local")
+  notificationTimezone  String        @default("UTC") @map("notification_timezone")
+  isEnabled             Boolean       @default(true) @map("is_enabled")
+  isSent                Boolean       @default(false) @map("is_sent")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
 
   // Optimized indexes for enhanced notification system
   @@index([notificationTime, isEnabled, isSent], name: "idx_event_notification_time_enabled_sent")

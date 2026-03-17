@@ -17,7 +17,34 @@ export interface NotificationTimeResult {
   error?: string;
 }
 
+export interface NotificationScheduleResult {
+  notificationTime: Date;
+  notificationDateLocal: string;
+  notificationTimezone: string;
+}
+
 export class NotificationCalculator {
+  static buildNotificationSchedule(
+    eventStart: Date,
+    minutesBefore: number,
+    timezone?: string | null,
+  ): NotificationScheduleResult {
+    const notificationTime = this.calculateNotificationTime(
+      eventStart,
+      minutesBefore,
+    );
+    const notificationTimezone = timezone?.trim() || "UTC";
+
+    return {
+      notificationTime,
+      notificationDateLocal: this.formatLocalDateTime(
+        notificationTime,
+        notificationTimezone,
+      ),
+      notificationTimezone,
+    };
+  }
+
   /**
    * Calculate exact notification time based on event start time and minutes before
    * @param eventStart - The start time of the event
@@ -126,6 +153,29 @@ export class NotificationCalculator {
     const rounded = new Date(date);
     rounded.setSeconds(0, 0); // Set seconds and milliseconds to 0
     return rounded;
+  }
+
+  static formatLocalDateTime(date: Date, timezone: string): string {
+    if (!date || isNaN(date.getTime())) {
+      throw new Error("Invalid date provided");
+    }
+
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: timezone || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    });
+
+    const parts = formatter.formatToParts(date);
+    const lookup = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((part) => part.type === type)?.value;
+
+    return `${lookup("year")}-${lookup("month")}-${lookup("day")}T${lookup("hour")}:${lookup("minute")}:${lookup("second")}`;
   }
 
   /**

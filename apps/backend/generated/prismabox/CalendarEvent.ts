@@ -112,6 +112,8 @@ export const CalendarEventRelations = t.Object(
           notificationType: t.String(),
           minutesBefore: t.Integer(),
           notificationTime: t.Date(),
+          notificationDateLocal: t.String(),
+          notificationTimezone: t.String(),
           isEnabled: t.Boolean(),
           isSent: t.Boolean(),
           createdAt: t.Date(),

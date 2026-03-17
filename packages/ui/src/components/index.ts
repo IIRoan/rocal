@@ -1,5 +1,6 @@
 // Component exports
 export * from "./ui";
+export * from "./email/email-primitives";
 export * from "./layout";
 export * from "./navigation";
 export * from "./landing";
