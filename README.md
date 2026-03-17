@@ -1,31 +1,47 @@
-# shadcn/ui monorepo template
+# Solace
 
-This template is for creating a monorepo with shadcn/ui.
+A monorepo application with three main services: web frontend, API backend, and notifications service.
 
-## Usage
+## Project Structure
 
+- **apps/web** - Next.js frontend with shadcn/ui components
+- **apps/backend** - Elysia.js API server with authentication and database
+- **apps/notifications** - Go service for scheduled email notifications
+- **packages/ui** - Shared UI component library
+- **packages/logger** - Shared logging utilities
+- **packages/eslint-config** - ESLint configurations
+- **packages/typescript-config** - TypeScript configurations
+
+## Technology Stack
+
+- Frontend: Next.js, React, Tailwind CSS, shadcn/ui
+- Backend: Elysia.js, Bun, Prisma, PostgreSQL
+- Notifications: Go, Resend API, HTML templates
+- Authentication: Better Auth with passkey support
+- Database: PostgreSQL with Prisma ORM
+
+## Development
+
+Install dependencies for all apps:
 ```bash
-pnpm dlx shadcn@latest init
+bun run install:all
 ```
 
-## Adding components
-
-To add components to your app, run the following command at the root of your `web` app:
-
+Start all services in development:
 ```bash
-pnpm dlx shadcn@latest add button -c apps/web
+bun run dev
 ```
 
-This will place the ui components in the `packages/ui/src/components` directory.
+Start individual services:
+```bash
+bun run dev:frontend
+bun run dev:backend
+bun run dev:notifications
+```
 
-## Tailwind
+## Building
 
-Your `tailwind.config.ts` and `globals.css` are already set up to use the components from the `ui` package.
-
-## Using components
-
-To use the components in your app, import them from the `ui` package.
-
-```tsx
-import { Button } from "@workspace/ui/components/button";
+Build all applications:
+```bash
+bun run build
 ```
