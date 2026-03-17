@@ -2,6 +2,10 @@
   "name": "solace",
   "version": "0.0.1",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "install:all": "cd apps/backend && bun install && cd ../web && bun install && cd ../notifications && bun install",
     "build": "cd apps/backend && bun run build && cd ../web && bun run build && cd ../notifications && bun run build",
