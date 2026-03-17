@@ -142,13 +142,6 @@ function SidebarWithContext() {
           query,
           timezone: settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
           now: new Date().toISOString(),
-          calendars: calendarData.calendars.map((calendar) => ({
-            id: calendar.id,
-            name: calendar.name,
-            color: calendar.color,
-            isDefault: !!calendar.isDefault,
-          })),
-          events: [],
         }),
       });
 

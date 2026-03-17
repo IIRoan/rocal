@@ -1,10 +1,9 @@
+import { Elysia } from "elysia";
 import { generateText, stepCountIs, tool } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
-import { PrismaClient } from "../../../../../apps/backend/generated/prisma";
+import { prisma } from "../lib/prisma";
 
-const prisma = new PrismaClient();
-const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const DEFAULT_SEARCH_BACK_DAYS = 60;
 const DEFAULT_SEARCH_FORWARD_DAYS = 400;
 const MAX_FETCH_WINDOW_DAYS = 550;
@@ -40,7 +39,6 @@ const requestSchema = z.object({
   query: z.string().min(1).max(500),
   timezone: z.string().min(1).max(100).optional(),
   now: z.string().datetime().optional(),
-  calendars: z.array(calendarSchema).max(50).default([]),
   events: z.array(eventSchema).max(300).default([]),
 });
 
@@ -141,6 +139,32 @@ function normalizeText(value: string) {
     .toLowerCase()
     .replace(/[’']/g, "")
     .replace(/\b(events?|schedule|calendar|meetings?)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeQuery(query: string): string {
+  return query
+    // Remove control characters
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+    // Remove potential prompt injection patterns (more comprehensive)
+    .replace(/ignore\s+(all\s+)?previous/gi, "")
+    .replace(/system\s+prompt/gi, "")
+    .replace(/reveal\s+system/gi, "")
+    .replace(/developer\s+instructions/gi, "")
+    .replace(/bypass|jailbreak/gi, "")
+    .replace(/you\s+are\s+now/gi, "")
+    .replace(/new\s+instructions/gi, "")
+    .replace(/act\s+as/gi, "")
+    .replace(/pretend\s+to\s+be/gi, "")
+    .replace(/roleplay/gi, "")
+    .replace(/hypothetical/gi, "")
+    .replace(/imagine/gi, "")
+    .replace(/what\s+if/gi, "")
+    .replace(/\[\s*system\s*\]/gi, "")
+    .replace(/\{\s*system\s*\}/gi, "")
+    .replace(/\<\s*system\s*\>/gi, "")
+    // Remove excessive whitespace
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -366,13 +390,23 @@ function formatEventResult(event: BackendEvent) {
   };
 }
 
-async function fetchEvents(start: Date, end: Date, cookies: string) {
+function buildSameOriginUrl(request: Request, path: string): string {
+  try {
+    return new URL(path, request.url).toString();
+  } catch (error) {
+    throw new Error(`Invalid URL construction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+async function fetchEvents(start: Date, end: Date, cookies: string, request: Request) {
   clampSearchWindow(start, end);
-  const url = `${backendUrl}/api/events?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+  const url = buildSameOriginUrl(
+    request,
+    `/api/events?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`,
+  );
   const response = await fetch(url, {
     method: "GET",
     headers: { "Content-Type": "application/json", Cookie: cookies },
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -393,11 +427,10 @@ async function fetchEvents(start: Date, end: Date, cookies: string) {
   })) as BackendEvent[];
 }
 
-async function createEventOnBackend(input: CreateEventInput, cookies: string) {
-  const response = await fetch(`${backendUrl}/api/events`, {
+async function createEventOnBackend(input: CreateEventInput, cookies: string, request: Request) {
+  const response = await fetch(buildSameOriginUrl(request, "/api/events"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookies },
-    credentials: "include",
     body: JSON.stringify(input),
   });
 
@@ -410,11 +443,10 @@ async function createEventOnBackend(input: CreateEventInput, cookies: string) {
   return (data.event || data) as BackendEvent;
 }
 
-async function updateEventOnBackend(eventId: string, updates: UpdateEventInput, cookies: string) {
-  const response = await fetch(`${backendUrl}/api/events/${eventId}`, {
+async function updateEventOnBackend(eventId: string, updates: UpdateEventInput, cookies: string, request: Request) {
+  const response = await fetch(buildSameOriginUrl(request, `/api/events/${eventId}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: cookies },
-    credentials: "include",
     body: JSON.stringify(updates),
   });
 
@@ -427,11 +459,10 @@ async function updateEventOnBackend(eventId: string, updates: UpdateEventInput, 
   return (data.event || data) as BackendEvent;
 }
 
-async function deleteEventOnBackend(eventId: string, cookies: string) {
-  const response = await fetch(`${backendUrl}/api/events/${eventId}`, {
+async function deleteEventOnBackend(eventId: string, cookies: string, request: Request) {
+  const response = await fetch(buildSameOriginUrl(request, `/api/events/${eventId}`), {
     method: "DELETE",
     headers: { "Content-Type": "application/json", Cookie: cookies },
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -440,49 +471,65 @@ async function deleteEventOnBackend(eventId: string, cookies: string) {
   }
 }
 
-export async function POST(req: Request) {
+export const calendarAssistantRoute = new Elysia({ prefix: "/calendar-assistant" }).post("/", async ({ body, request, set }) => {
   try {
-    const body = requestSchema.parse(await req.json());
+    const parsedBody = requestSchema.parse(body);
     const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
-      return Response.json({ error: "OPENROUTER_API_KEY is missing" }, { status: 500 });
+      set.status = 500;
+      return { error: "OPENROUTER_API_KEY is missing" };
     }
 
-    const cookies = req.headers.get("cookie") || "";
-
-    // 1. Verify session and check hasAiAccess flag
-    const authResponse = await fetch(`${backendUrl}/api/user`, {
+    const cookies = request.headers.get("cookie") || "";
+    const authResponse = await fetch(buildSameOriginUrl(request, "/api/user"), {
       headers: { Cookie: cookies },
     });
 
     if (!authResponse.ok) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+      set.status = 401;
+      return { error: "Unauthorized" };
     }
 
     const user = await authResponse.json();
-
-    // Check database for latest hasAiAccess status
+    
+    // Validate user ID before database operations
+    if (!user?.id || typeof user.id !== 'string') {
+      set.status = 401;
+      return { error: "Invalid user authentication" };
+    }
+    
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: { hasAiAccess: true },
     });
 
     if (!dbUser?.hasAiAccess) {
-      return Response.json({
+      set.status = 403;
+      return {
         reply: "You do not have access to the AI Calendar features. Please contact an admin to enable this for your account.",
         createdEvent: null,
         updatedEvent: null,
         deletedEventId: null,
         events: [],
-      }, { status: 403 });
+      };
     }
 
-    const query = body.query.replace(/[\u0000-\u001F\u007F]/g, " ").trim();
+    const query = sanitizeQuery(parsedBody.query);
     const lowered = query.toLowerCase();
-    const now = new Date(body.now || Date.now());
-    const timezone = body.timezone || "UTC";
-    const defaultCalendarId = body.calendars.find((calendar) => calendar.isDefault)?.id || body.calendars[0]?.id || "";
+    const now = new Date(parsedBody.now || Date.now());
+    const timezone = parsedBody.timezone || "UTC";
+    const availableCalendars = await prisma.calendar.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        isDefault: true,
+      },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    });
+    const defaultCalendarId = availableCalendars.find((calendar) => calendar.isDefault)?.id || availableCalendars[0]?.id || "";
 
     const dangerousPatterns = [
       "ignore previous",
@@ -494,16 +541,23 @@ export async function POST(req: Request) {
       "jailbreak",
       "you are now",
       "new instructions",
+      "act as",
+      "pretend to be",
+      "roleplay",
+      "hypothetical",
+      "imagine",
+      "what if",
     ];
 
     if (dangerousPatterns.some((pattern) => lowered.includes(pattern))) {
-      return Response.json({
+      set.status = 400;
+      return {
         reply: "I can only help with calendar tasks like checking schedules or managing events.",
         createdEvent: null,
         updatedEvent: null,
         deletedEventId: null,
         events: [],
-      });
+      };
     }
 
     const openrouter = createOpenRouter({ apiKey });
@@ -526,9 +580,8 @@ export async function POST(req: Request) {
 
 Current time: ${now.toISOString()}
 Timezone: ${timezone}
-Available calendars: ${JSON.stringify(body.calendars)}
+Available calendars: ${JSON.stringify(availableCalendars)}
 Default calendar ID: ${defaultCalendarId || "none"}
-Client provided preview events count: ${body.events.length}
 
 Rules:
 1. Backend tools are the source of truth. Do not rely on preview events for schedule answers.
@@ -550,7 +603,7 @@ Rules:
           }),
           execute: async ({ rangeQuery, startDate, endDate, search }) => {
             const range = resolveDateRange({ rangeQuery, startDate, endDate, now });
-            const events = (await fetchEvents(range.start, range.end, cookies)).filter((event) => eventMatchesSearch(event, search));
+            const events = (await fetchEvents(range.start, range.end, cookies, request)).filter((event) => eventMatchesSearch(event, search));
             cacheEvents(eventCache, events);
             fetchedEvents.push(...events);
 
@@ -581,7 +634,7 @@ Rules:
                   label: "broad search window",
                 };
 
-            const events = (await fetchEvents(range.start, range.end, cookies)).filter((event) => eventMatchesSearch(event, searchQuery));
+            const events = (await fetchEvents(range.start, range.end, cookies, request)).filter((event) => eventMatchesSearch(event, searchQuery));
             cacheEvents(eventCache, events);
             fetchedEvents.push(...events);
 
@@ -625,32 +678,42 @@ Rules:
               return { error: `Could not parse end time: ${endDateTime}` };
             }
 
+            // Validate that end time is after start time
+            if (end <= start) {
+              return { error: "End time must be after start time" };
+            }
+
             const resolvedCalendarId = calendarId || defaultCalendarId;
             if (!resolvedCalendarId) {
               return { error: "No calendar is available for creating events." };
             }
 
-            createdEvent = await createEventOnBackend(
-              {
-                title,
-                description,
-                start: (allDay ? startOfDay(start) : start).toISOString(),
-                end: (allDay ? endOfDay(end) : end).toISOString(),
-                allDay: !!allDay,
-                location,
-                calendarId: resolvedCalendarId,
-              },
-              cookies,
-            );
+            try {
+              createdEvent = await createEventOnBackend(
+                {
+                  title,
+                  description,
+                  start: (allDay ? startOfDay(start) : start).toISOString(),
+                  end: (allDay ? endOfDay(end) : end).toISOString(),
+                  allDay: !!allDay,
+                  location,
+                  calendarId: resolvedCalendarId,
+                },
+                cookies,
+                request,
+              );
 
-            if (createdEvent) {
-              eventCache.set(createdEvent.id, createdEvent);
+              if (createdEvent) {
+                eventCache.set(createdEvent.id, createdEvent);
+              }
+
+              return {
+                success: true,
+                event: createdEvent ? formatEventResult(createdEvent) : null,
+              };
+            } catch (error: any) {
+              return { error: `Failed to create event: ${error.message}` };
             }
-
-            return {
-              success: true,
-              event: createdEvent ? formatEventResult(createdEvent) : null,
-            };
           },
         }),
         update_event: tool({
@@ -666,9 +729,20 @@ Rules:
             calendarId: z.string().optional(),
           }),
           execute: async ({ eventId, title, description, startDateTime, endDateTime, allDay, location, calendarId }) => {
-            const existingEvent = eventCache.get(eventId);
+            // First verify the event exists by fetching it from cache or backend
+            let existingEvent = eventCache.get(eventId);
             if (!existingEvent) {
-              return { error: `Event ${eventId} is not loaded. Search for it first.` };
+              // Try to fetch the event directly from backend
+              try {
+                const events = await fetchEvents(startOfDay(new Date()), endOfDay(addDays(new Date(), 1)), cookies, request);
+                existingEvent = events.find(e => e.id === eventId);
+                if (!existingEvent) {
+                  return { error: `Event ${eventId} not found. Please search for the event first.` };
+                }
+                eventCache.set(eventId, existingEvent);
+              } catch (error) {
+                return { error: `Could not verify event ${eventId}: ${error instanceof Error ? error.message : 'Unknown error'}` };
+              }
             }
 
             const updates: UpdateEventInput = {};
@@ -688,36 +762,78 @@ Rules:
               return { error: `Could not parse end time: ${endDateTime}` };
             }
 
+            // Validate time range if both start and end are provided
+            if (parsedStart && parsedEnd && parsedStart >= parsedEnd) {
+              return { error: "End time must be after start time" };
+            }
+            // Validate end time is after existing start time if only end is updated
+            if (parsedEnd && !parsedStart) {
+              if (new Date(existingEvent.start) >= parsedEnd) {
+                return { error: "End time must be after start time" };
+              }
+            }
+            // Validate start time is before existing end time if only start is updated
+            if (parsedStart && !parsedEnd) {
+              if (parsedStart >= new Date(existingEvent.end)) {
+                return { error: "Start time must be before end time" };
+              }
+            }
+
             if (parsedStart) updates.start = parsedStart.toISOString();
             if (parsedEnd) updates.end = parsedEnd.toISOString();
 
-            updatedEvent = await updateEventOnBackend(eventId, updates, cookies);
-            eventCache.set(eventId, updatedEvent);
+            try {
+              updatedEvent = await updateEventOnBackend(eventId, updates, cookies, request);
+              // Only update cache after successful backend operation
+              eventCache.set(eventId, updatedEvent);
 
-            return {
-              success: true,
-              event: formatEventResult(updatedEvent),
-            };
+              return {
+                success: true,
+                event: formatEventResult(updatedEvent),
+              };
+            } catch (error: any) {
+              return { error: `Failed to update event: ${error.message}` };
+            }
           },
         }),
         delete_event: tool({
           description: "Delete an event after identifying its id.",
           inputSchema: z.object({ eventId: z.string() }),
           execute: async ({ eventId }) => {
-            const existingEvent = eventCache.get(eventId);
+            // First verify the event exists and get its title
+            let existingEvent = eventCache.get(eventId);
+            let eventTitle = "Event";
+            
             if (!existingEvent) {
-              return { error: `Event ${eventId} is not loaded. Search for it first.` };
+              // Try to fetch the event directly from backend
+              try {
+                const events = await fetchEvents(startOfDay(new Date()), endOfDay(addDays(new Date(), 1)), cookies, request);
+                existingEvent = events.find(e => e.id === eventId);
+                if (!existingEvent) {
+                  return { error: `Event ${eventId} not found. Please search for the event first.` };
+                }
+                eventTitle = existingEvent.title;
+              } catch (error) {
+                return { error: `Could not verify event ${eventId}: ${error instanceof Error ? error.message : 'Unknown error'}` };
+              }
+            } else {
+              eventTitle = existingEvent.title;
             }
 
-            await deleteEventOnBackend(eventId, cookies);
-            deletedEventId = eventId;
-            eventCache.delete(eventId);
+            try {
+              await deleteEventOnBackend(eventId, cookies, request);
+              // Only update cache after successful backend operation
+              deletedEventId = eventId;
+              eventCache.delete(eventId);
 
-            return {
-              success: true,
-              deletedEventId: eventId,
-              title: existingEvent.title,
-            };
+              return {
+                success: true,
+                deletedEventId: eventId,
+                title: eventTitle,
+              };
+            } catch (error: any) {
+              return { error: `Failed to delete event: ${error.message}` };
+            }
           },
         }),
       },
@@ -725,28 +841,26 @@ Rules:
 
     const uniqueFetchedEvents = Array.from(new Map(fetchedEvents.map((event) => [event.id, event])).values());
 
-    return Response.json({
+    return {
       reply: result.text,
       createdEvent,
       updatedEvent,
       deletedEventId,
       events: uniqueFetchedEvents,
-    });
+    };
   } catch (error: any) {
     const reply = error?.message?.includes("parse")
       ? "I had trouble understanding that calendar request. Try rephrasing it with a clearer date or time."
       : "Something went wrong while handling that calendar request.";
 
-    return Response.json(
-      {
-        reply,
-        createdEvent: null,
-        updatedEvent: null,
-        deletedEventId: null,
-        events: [],
-        error: error?.message || "Unknown error",
-      },
-      { status: 400 },
-    );
+    set.status = 400;
+    return {
+      reply,
+      createdEvent: null,
+      updatedEvent: null,
+      deletedEventId: null,
+      events: [],
+      error: error?.message || "Unknown error",
+    };
   }
-}
+});
