@@ -9,3 +9,6 @@ healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
+
+[variables]
+RAILPACK_PACKAGES = "go"
