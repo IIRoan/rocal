@@ -169,19 +169,14 @@ export function AppSidebar({
         {/* Scrollable Dashboard Content */}
         <div className="flex-1 overflow-auto px-6 pb-10  space-y-2">
           {/* Main Action Hub */}
-          <div className="space-y-4">
+          <div className="flex justify-center py-2">
             {onCreateEvent && (
               <Button
                 onClick={onCreateEvent}
-                className="w-full h-16 gap-4 rounded-[24px] bg-primary text-primary-foreground hover:bg-primary/95 border-none shadow-xl shadow-primary/20 font-bold transition-all justify-start px-6 active:scale-[0.98]"
+                className="h-20 w-20 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 border-none shadow-2xl shadow-primary/30 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 group"
               >
-                <div className="size-8 rounded-xl bg-white/20 flex items-center justify-center shadow-inner">
-                  <Plus size={20} strokeWidth={3} />
-                </div>
-                <div className="flex flex-col items-start text-left">
-                  <span className="text-[16px]">Create New Event</span>
-                  <span className="text-[11px] font-medium opacity-70">Schedule something new</span>
-                </div>
+                <Plus size={32} strokeWidth={3} className="transition-transform group-active:rotate-90" />
+                <span className="text-[10px] font-black uppercase tracking-widest opacity-80">New</span>
               </Button>
             )}
           </div>
@@ -350,6 +345,22 @@ function AppSidebarDesktop({
 
   return (
     <Sidebar variant="inset" collapsible="icon" {...props} className="max-lg:p-3 lg:pe-1">
+      {onCreateEvent && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={onCreateEvent}
+                className="h-14 w-14 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl shadow-primary/30 transition-all hover:scale-110 active:scale-95 border-none group"
+                size="icon"
+              >
+                <Plus size={28} strokeWidth={2.5} className="transition-transform group-hover:rotate-90" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="font-bold">Create New Event</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
       <SidebarHeader>
         <div className="flex justify-between items-center gap-2">
           <a className="inline-flex" href="/">
@@ -382,34 +393,6 @@ function AppSidebarDesktop({
         )}
       </SidebarHeader>
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">
-        {onCreateEvent && (
-          <div className={isCollapsed ? "flex justify-center py-2" : "px-3 mb-3"}>
-            {isCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={onCreateEvent}
-                    className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/10 transition-all active:scale-95 border-none"
-                    size="icon"
-                  >
-                    <Plus size={20} strokeWidth={3} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">New Event</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                onClick={onCreateEvent}
-                className="w-full h-11 justify-start gap-3 px-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/10 transition-all active:scale-[0.98] border-none group"
-              >
-                <div className="flex items-center justify-center size-6 rounded-xl bg-white/20 group-hover:bg-white/30 transition-colors">
-                  <Plus size={16} strokeWidth={3} />
-                </div>
-                <span className="font-bold text-[14px] tracking-tight text-white">New Event</span>
-              </Button>
-            )}
-          </div>
-        )}
         {!isCollapsed && (
           <SidebarGroup className="px-2">
             <SidebarCalendar
