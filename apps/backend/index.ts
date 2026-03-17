@@ -9,6 +9,7 @@ import { settingsRoutes } from "./routes/settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
+import { calendarAssistantRoute } from "./routes/calendar-assistant";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 
@@ -162,7 +163,8 @@ export const createAPI = (prefix = "") => {
     .use(settingsRoutes)
     .use(notificationsRoutes)
     .use(recurringRoutes)
-    .use(subscriptionsRoute);
+    .use(subscriptionsRoute)
+    .use(calendarAssistantRoute);
 };
 
 // Start the server when this file is run directly

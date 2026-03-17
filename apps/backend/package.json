@@ -21,6 +21,7 @@
     "typescript": "5"
   },
   "dependencies": {
+    "@openrouter/ai-sdk-provider": "^2.3.1",
     "@better-auth/core": "^1.5.5",
     "@better-auth/passkey": "^1.5.5",
     "@better-auth/utils": "^0.3.1",
@@ -30,6 +31,7 @@
     "@react-email/components": "^0.4.0",
     "@react-email/render": "^1.1.4",
     "@types/ical": "^0.8.3",
+    "ai": "^6.0.116",
     "better-auth": "^1.5.5",
     "better-call": "^2.0.2",
     "date-fns": "^4.1.0",
@@ -38,6 +40,7 @@
     "node-ical": "^0.20.1",
     "prismabox": "^1.1.24",
     "react": "^19.2.1",
-    "resend": "^4.7.0"
+    "resend": "^4.7.0",
+    "zod": "^3.25.76"
   }
 }
