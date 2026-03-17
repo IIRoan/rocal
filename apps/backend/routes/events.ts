@@ -5,9 +5,28 @@ import { ensureUserCalendars } from "../lib/user-setup";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { requireAuth } from "../lib/auth-guard";
+import { createLogger } from "@workspace/logger";
 
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+
+const logger = createLogger("backend:events");
+
+async function resolveEventTimezone(
+  userId: string,
+  requestedTimezone?: string,
+): Promise<string> {
+  if (requestedTimezone?.trim()) {
+    return requestedTimezone.trim();
+  }
+
+  const userSettings = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { timezone: true },
+  });
+
+  return userSettings?.timezone || "UTC";
+}
 
 export const eventsRoutes = new Elysia({ prefix: "/events" })
   .use(requireAuth)
@@ -27,11 +46,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           if (session?.user?.id) {
             user = session.user;
           } else {
-            console.error("User missing in events handler and fallback failed");
+            logger.error("User missing in events handler and fallback failed");
             throw new Error("User context missing");
           }
         } catch (e) {
-          console.error(
+          logger.error(
             "User missing in events handler and fallback failed",
             e,
           );
@@ -171,7 +190,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             }
           }
         } catch (error) {
-          console.error(
+          logger.error(
             `Error generating instances for event ${recurringEvent.id}:`,
             error,
           );
@@ -400,7 +419,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               );
             }
           } catch (recurrenceError) {
-            console.error("Recurrence validation error:", recurrenceError);
+            logger.error("Recurrence validation error:", recurrenceError);
             throw new ValidationError(
               "Invalid recurrence rule format",
               "recurrence",
@@ -485,6 +504,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           body.reminder = reminderValue;
         }
 
+        const eventTimezone = await resolveEventTimezone(user.id, body.timezone);
+
         // Create the event
         const event = await prisma.calendarEvent.create({
           data: {
@@ -492,6 +513,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             description: body.description?.trim() || null,
             start: startDate,
             end: endDate,
+            timezone: eventTimezone,
             allDay: body.allDay || false,
             location: body.location?.trim() || null,
             color: body.color || null,
@@ -516,43 +538,58 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             });
 
             if (userSettings?.emailNotifications !== false) {
-              // Calculate notification time
-              const { NotificationCalculator } =
-                await import("../lib/notification-calculator");
-              const notificationTime =
-                NotificationCalculator.calculateNotificationTime(
+              const notificationSchedule =
+                NotificationCalculator.buildNotificationSchedule(
                   startDate,
                   body.reminder,
+                  eventTimezone,
                 );
 
-              // Only create if notification is in the future
-              if (notificationTime > new Date()) {
-                await prisma.eventNotification.create({
-                  data: {
-                    eventId: event.id,
-                    notificationType: "email",
-                    notificationTime,
-                    minutesBefore: body.reminder,
-                    isSent: false,
-                  },
-                });
+              if (notificationSchedule.notificationTime > new Date()) {
+                await prisma.$executeRaw`
+                  INSERT INTO public.event_notification (
+                    id,
+                    event_id,
+                    notification_type,
+                    minutes_before,
+                    notification_time,
+                    notification_date_local,
+                    notification_timezone,
+                    is_enabled,
+                    is_sent,
+                    created_at,
+                    updated_at
+                  ) VALUES (
+                    ${crypto.randomUUID()},
+                    ${event.id},
+                    ${"email"},
+                    ${body.reminder},
+                    ${notificationSchedule.notificationTime},
+                    ${notificationSchedule.notificationDateLocal},
+                    ${notificationSchedule.notificationTimezone},
+                    true,
+                    false,
+                    NOW(),
+                    NOW()
+                  )
+                `;
               } else {
-                console.log(
+                logger.info(
                   `Skipping creating past notification for event ${event.id}`,
                 );
               }
 
-              console.log(`✓ Created notification for event ${event.id}`);
+              logger.ok(`Created notification for event ${event.id}`);
             }
           }
         } catch (notificationError) {
-          console.error("Failed to create notifications:", notificationError);
+          logger.error("Failed to create notifications:", notificationError);
           // Don't fail the event creation if notifications fail
         }
 
         return event;
       } catch (error) {
-        console.error("Event creation error:", error);
+        logger.error("Event creation error:", error);
         throw error;
       }
     },
@@ -599,6 +636,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         categoryId: t.Optional(
           t.String({
             description: "ID of the event category (must belong to user)",
+          }),
+        ),
+        timezone: t.Optional(
+          t.String({
+            description: "IANA timezone identifier for the event",
           }),
         ),
         reminder: t.Optional(
@@ -684,7 +726,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         ) {
           // Extract parent event ID from instance ID
           const parentEventId = id.split("_")[0];
-          console.log(
+          logger.info(
             `Redirecting edit request from instance ${id} to parent ${parentEventId}`,
           );
 
@@ -735,6 +777,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             );
           }
         }
+
+        const eventTimezone =
+          body.timezone !== undefined
+            ? await resolveEventTimezone(user.id, body.timezone)
+            : existingEvent.timezone;
 
         // Use existing dates if not provided in update
         let finalStartDate = startDate || existingEvent.start;
@@ -880,6 +927,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         if (body.allDay !== undefined) {
           updateData.allDay = body.allDay;
         }
+        if (body.timezone !== undefined) {
+          updateData.timezone = eventTimezone;
+        }
         if (body.location !== undefined) {
           updateData.location = body.location?.trim() || null;
         }
@@ -916,7 +966,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                 );
               }
             } catch (recurrenceError) {
-              console.error("Recurrence validation error:", recurrenceError);
+              logger.error("Recurrence validation error:", recurrenceError);
               throw new ValidationError(
                 "Invalid recurrence rule format",
                 "recurrence",
@@ -997,33 +1047,49 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
             // Create new notifications based on configurations
             if (notificationConfigs.length > 0) {
-              const { NotificationCalculator } =
-                await import("../lib/notification-calculator");
               const now = new Date();
               for (const config of notificationConfigs) {
-                const notificationTime =
-                  NotificationCalculator.calculateNotificationTime(
+                const notificationSchedule =
+                  NotificationCalculator.buildNotificationSchedule(
                     finalStartDate,
                     config.minutesBefore,
+                    eventTimezone,
                   );
-                // Skip past notification times
-                if (notificationTime <= now) continue;
-                await prisma.eventNotification.create({
-                  data: {
-                    eventId: id,
-                    notificationType: config.notificationType,
-                    notificationTime,
-                    minutesBefore: config.minutesBefore,
-                    isSent: false,
-                  },
-                });
+                if (notificationSchedule.notificationTime <= now) continue;
+                await prisma.$executeRaw`
+                  INSERT INTO public.event_notification (
+                    id,
+                    event_id,
+                    notification_type,
+                    minutes_before,
+                    notification_time,
+                    notification_date_local,
+                    notification_timezone,
+                    is_enabled,
+                    is_sent,
+                    created_at,
+                    updated_at
+                  ) VALUES (
+                    ${crypto.randomUUID()},
+                    ${id},
+                    ${config.notificationType},
+                    ${config.minutesBefore},
+                    ${notificationSchedule.notificationTime},
+                    ${notificationSchedule.notificationDateLocal},
+                    ${notificationSchedule.notificationTimezone},
+                    ${config.isEnabled},
+                    false,
+                    NOW(),
+                    NOW()
+                  )
+                `;
               }
             }
 
-            console.log(`✓ Updated notifications for event ${id}`);
+            logger.ok(`Updated notifications for event ${id}`);
           }
         } catch (notificationError) {
-          console.error(
+          logger.error(
             "Failed to update notifications with enhanced service:",
             notificationError,
           );
@@ -1032,7 +1098,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         return updatedEvent;
       } catch (error: any) {
-        console.error("Event update error:", error);
+        logger.error("Event update error:", error);
 
         // Handle optimistic locking conflict
         if (
@@ -1074,6 +1140,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         end: t.Optional(
           t.String({
             description: "End date in ISO 8601 format",
+          }),
+        ),
+        timezone: t.Optional(
+          t.String({
+            description: "IANA timezone identifier for the event",
           }),
         ),
         allDay: t.Optional(
@@ -1190,7 +1261,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         ) {
           // Extract parent event ID from instance ID
           const parentEventId = id.split("_")[0];
-          console.log(
+          logger.info(
             `Redirecting delete request from instance ${id} to parent ${parentEventId}`,
           );
 
@@ -1221,8 +1292,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         const deletedNotifications = await prisma.eventNotification.deleteMany({
           where: { eventId: id },
         });
-        console.log(
-          `✓ Deleted ${deletedNotifications.count} notifications for event ${id}`,
+        logger.ok(
+          `Deleted ${deletedNotifications.count} notifications for event ${id}`,
         );
 
         // Clean up notification logs
@@ -1242,7 +1313,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           deletedEventId: id,
         };
       } catch (error) {
-        console.error("Event deletion error:", error);
+        logger.error("Event deletion error:", error);
         throw error;
       }
     },
@@ -1375,8 +1446,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               await prisma.eventNotification.deleteMany({
                 where: { eventId: { in: eventIds } },
               });
-            console.log(
-              `✓ Deleted ${deletedNotifications.count} notifications for ${eventIds.length} events`,
+            logger.ok(
+              `Deleted ${deletedNotifications.count} notifications for ${eventIds.length} events`,
             );
 
             // Clean up notification logs
@@ -1434,32 +1505,48 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
                   });
 
                   if (userSettings?.emailNotifications !== false) {
-                    const { NotificationCalculator } =
-                      await import("../lib/notification-calculator");
-
-                    const notificationTime =
-                      NotificationCalculator.calculateNotificationTime(
+                    const notificationSchedule =
+                      NotificationCalculator.buildNotificationSchedule(
                         duplicated.start,
                         event.reminder,
+                        duplicated.timezone,
                       );
 
-                    await prisma.eventNotification.create({
-                      data: {
-                        eventId: duplicated.id,
-                        notificationType: "email",
-                        notificationTime,
-                        minutesBefore: event.reminder,
-                        isSent: false,
-                      },
-                    });
+                    await prisma.$executeRaw`
+                      INSERT INTO public.event_notification (
+                        id,
+                        event_id,
+                        notification_type,
+                        minutes_before,
+                        notification_time,
+                        notification_date_local,
+                        notification_timezone,
+                        is_enabled,
+                        is_sent,
+                        created_at,
+                        updated_at
+                      ) VALUES (
+                        ${crypto.randomUUID()},
+                        ${duplicated.id},
+                        ${"email"},
+                        ${event.reminder},
+                        ${notificationSchedule.notificationTime},
+                        ${notificationSchedule.notificationDateLocal},
+                        ${notificationSchedule.notificationTimezone},
+                        true,
+                        false,
+                        NOW(),
+                        NOW()
+                      )
+                    `;
 
-                    console.log(
-                      `✓ Created notification for duplicated event ${duplicated.id}`,
+                    logger.ok(
+                      `Created notification for duplicated event ${duplicated.id}`,
                     );
                   }
                 }
               } catch (notificationError) {
-                console.error(
+                logger.error(
                   "Failed to create notifications for duplicated event:",
                   notificationError,
                 );
@@ -1484,7 +1571,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             );
         }
       } catch (error) {
-        console.error("Bulk operation error:", error);
+        logger.error("Bulk operation error:", error);
         throw error;
       }
     },

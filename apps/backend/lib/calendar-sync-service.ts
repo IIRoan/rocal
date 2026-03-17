@@ -1,5 +1,8 @@
 import { prisma } from "./prisma";
 import { syncCalendarSubscription } from "../routes/subscriptions";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:calendar-sync");
 
 export class CalendarSyncService {
   private static instance: CalendarSyncService;
@@ -24,7 +27,7 @@ export class CalendarSyncService {
     // Run initial sync after a short delay
     setTimeout(() => {
       this.syncAllActiveSubscriptions().catch((error) => {
-        console.error("Initial sync failed:", error);
+        logger.error("Initial sync failed:", error);
       });
     }, 5000);
 
@@ -34,7 +37,7 @@ export class CalendarSyncService {
         try {
           await this.syncAllActiveSubscriptions();
         } catch (error) {
-          console.error("Scheduled sync failed:", error);
+          logger.error("Scheduled sync failed:", error);
         }
       },
       15 * 60 * 1000,
@@ -109,7 +112,7 @@ export class CalendarSyncService {
             await syncCalendarSubscription(subscription);
             results.success++;
           } catch (error) {
-            console.error(
+            logger.error(
               `Failed to sync subscription ${subscription.id} (${subscription.name}):`,
               error,
             );
@@ -128,7 +131,7 @@ export class CalendarSyncService {
       // Clean up old sync logs (keep last 50 per subscription)
       await this.cleanupOldSyncLogs();
     } catch (error) {
-      console.error("Error during scheduled sync:", error);
+      logger.error("Error during scheduled sync:", error);
     }
   }
 
@@ -177,7 +180,7 @@ export class CalendarSyncService {
         }
       }
     } catch (error) {
-      console.error("Error cleaning up sync logs:", error);
+      logger.error("Error cleaning up sync logs:", error);
     }
   }
 

@@ -1,4 +1,7 @@
 import { auth } from "./auth";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:auth-utils");
 
 /**
  * Ensures that a user is authenticated and returns the user object.
@@ -25,11 +28,11 @@ export async function ensureAuthenticatedUser(user: any, request: Request) {
       return session.user;
     }
   } catch (error) {
-    console.error("ensureAuthenticatedUser: Session fallback failed", error);
+    logger.error("ensureAuthenticatedUser: Session fallback failed", error);
   }
 
   // 3. Failure
-  console.error(
+  logger.error(
     "ensureAuthenticatedUser: User context missing and fallback failed",
   );
   throw new Error("User context missing");

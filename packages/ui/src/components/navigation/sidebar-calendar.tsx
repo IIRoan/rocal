@@ -24,12 +24,14 @@ interface SidebarCalendarProps {
   events?: CalendarEvent[];
   onDisplayMonthChange?: (dateRange: { start: Date; end: Date }) => void;
   className?: string;
+  isMobile?: boolean;
 }
 
 export function SidebarCalendar({
   events = [],
   onDisplayMonthChange,
   className,
+  isMobile = false,
 }: SidebarCalendarProps) {
   const { currentDate, setCurrentDate } = useCalendarContext();
   const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
@@ -110,28 +112,41 @@ export function SidebarCalendar({
               key={day.toISOString()}
               onClick={() => setCurrentDate(day)}
               className={cn(
-                "relative aspect-square rounded-[12px] text-[14px] transition-all active:scale-90",
-                "flex flex-col items-center justify-center gap-1",
-                !isCurrentMonth && "text-muted-foreground/20",
-                isCurrentMonth &&
-                  !isSelected &&
-                  "hover:bg-accent/50 text-foreground font-medium",
-                isSelected && "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20",
-                isCurrentDay && !isSelected && "text-primary font-black",
+                "relative flex items-center justify-center transition-transform",
+                isMobile 
+                  ? "aspect-square rounded-[12px] text-[14px] active:scale-90 flex-col gap-1" 
+                  : "h-8 w-8 mx-auto rounded-lg text-[13px] font-medium",
+                !isCurrentMonth && "text-muted-foreground/30",
+                isCurrentMonth && !isSelected && !isCurrentDay && "text-foreground hover:bg-accent/60",
+                isCurrentDay && !isSelected && "ring-2 ring-inset ring-foreground/20 text-foreground font-bold hover:bg-accent/60",
+                isCurrentDay && isSelected && "ring-2 ring-inset ring-foreground/40",
               )}
             >
-              <span>{format(day, "d")}</span>
+              {isSelected && (
+                <div className={cn(
+                  "absolute inset-0.5 rounded-md bg-primary shadow-sm",
+                  isMobile && "inset-0 rounded-[12px]"
+                )} />
+              )}
+              <span className="relative z-10 text-inherit data-[selected=true]:text-primary-foreground">
+                <span className={cn(isSelected && "text-primary-foreground")}>
+                  {format(day, "d")}
+                </span>
+              </span>
               {dayEvents.length > 0 && (
-                <div className="flex items-center gap-0.5 mt-[-2px]">
+                <div className={cn(
+                  "flex items-center justify-center z-10",
+                  isMobile ? "gap-0.5 mt-[-2px]" : "absolute bottom-[6px] gap-[2px] w-full"
+                )}>
                   {dayEvents.slice(0, 3).map((event, i) => (
                     <div
                       key={`${event.id || "event"}-${i}`}
                       className={cn(
-                        "w-1 h-1 rounded-full",
-                        isSelected ? "bg-white/60" : ""
+                        "rounded-full",
+                        isMobile ? "w-1 h-1" : "w-1 h-1"
                       )}
                       style={{
-                        backgroundColor: isSelected ? undefined : resolveEventColorValue(event.color),
+                        backgroundColor: isSelected ? 'white' : resolveEventColorValue(event.color),
                       }}
                     />
                   ))}

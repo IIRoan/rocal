@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/notifications",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:emails": "tsx ./email-source/render-emails.tsx",
+    "build": "bun run build:emails && go build -o notifications main.go",
+    "dev": "bun run build:emails && go run main.go",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@react-email/render": "^1.4.0",
+    "@workspace/ui": "workspace:*",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3"
+  }
+}

@@ -8,6 +8,9 @@ import {
 import { requireAuth } from "../lib/auth-guard";
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:subscriptions");
 
 export const subscriptionsRoute = new Elysia()
   .use(requireAuth)
@@ -88,7 +91,7 @@ export const subscriptionsRoute = new Elysia()
         });
 
         if (!response.ok) {
-          console.error(
+          logger.error(
             `❌ HTTP error fetching calendar: ${response.status} ${response.statusText}`,
           );
           if (response.status >= 500) {
@@ -111,8 +114,11 @@ export const subscriptionsRoute = new Elysia()
         }
 
         const icsContent = await response.text();
-        console.log("📄 Fetched ICS content length:", icsContent.length);
-        console.log("📄 First 200 chars of ICS:", icsContent.substring(0, 200));
+        logger.info("📄 Fetched ICS content length:", icsContent.length);
+        logger.info(
+          "📄 First 200 chars of ICS:",
+          icsContent.substring(0, 200),
+        );
 
         // Get user settings for timezone
         let userSettings = await prisma.userSettings.findUnique({
@@ -130,18 +136,18 @@ export const subscriptionsRoute = new Elysia()
 
         testParseResult = parseICSFile(icsContent, userTimezone);
 
-        console.log("✅ ICS parsing completed:", {
+        logger.ok("✅ ICS parsing completed:", {
           eventsFound: testParseResult.events.length,
           errorsCount: testParseResult.errors.length,
           calendarName: testParseResult.calendarName,
         });
 
         if (testParseResult.errors.length > 0) {
-          console.warn("⚠️ ICS parsing warnings:", testParseResult.errors);
+          logger.warn("⚠️ ICS parsing warnings:", testParseResult.errors);
         }
       } catch (error) {
-        console.error("💥 Complete error details:", error);
-        console.error(
+        logger.error("💥 Complete error details:", error);
+        logger.error(
           "💥 Error stack:",
           error instanceof Error ? error.stack : "No stack trace",
         );
@@ -364,7 +370,7 @@ export const subscriptionsRoute = new Elysia()
       }
 
       const userTimezone = userSettings.timezone || "UTC";
-      console.log("🔍 Parsing ICS content with user timezone:", userTimezone);
+      logger.info("🔍 Parsing ICS content with user timezone:", userTimezone);
       const parseResult = parseICSFile(icsContent, userTimezone);
 
       if (parseResult.events.length === 0) {
@@ -509,7 +515,7 @@ export async function syncCalendarSubscription(subscription: any) {
     }
 
     const userTimezone = userSettings.timezone || "UTC";
-    console.log("🔍 Parsing ICS content with user timezone:", userTimezone);
+    logger.info("🔍 Parsing ICS content with user timezone:", userTimezone);
     const parseResult = parseICSFile(icsContent, userTimezone);
 
     let eventsAdded = 0;
