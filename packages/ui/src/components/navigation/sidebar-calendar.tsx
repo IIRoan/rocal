@@ -143,10 +143,11 @@ export function SidebarCalendar({
                       key={`${event.id || "event"}-${i}`}
                       className={cn(
                         "rounded-full",
-                        isMobile ? "w-1 h-1" : "w-1 h-1"
+                        isMobile ? "w-1 h-1" : "w-1 h-1",
+                        isSelected && "dark:bg-black bg-white"
                       )}
                       style={{
-                        backgroundColor: isSelected ? 'white' : resolveEventColorValue(event.color),
+                        backgroundColor: isSelected ? undefined : resolveEventColorValue(event.color),
                       }}
                     />
                   ))}
