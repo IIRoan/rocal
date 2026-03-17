@@ -2,7 +2,6 @@
 builder = "RAILPACK"
 rootDirectory = "."
 buildCommand = "cd packages/ui && bun install --frozen-lockfile && cd ../../apps/web && bun install --frozen-lockfile && bun run build"
-watchPatterns = ["apps/web/**", "packages/ui/**", "packages/typescript-config/**", "bun.lockb"]
 
 [deploy]
 startCommand = "cd apps/web && bunx serve out -p $PORT"

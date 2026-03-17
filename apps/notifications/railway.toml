@@ -1,6 +1,5 @@
 [build]
 builder = "RAILPACK"
-watchPatterns = ["apps/notifications/**", "go.mod", "go.sum"]
 
 [deploy]
 healthcheckPath = "/health"

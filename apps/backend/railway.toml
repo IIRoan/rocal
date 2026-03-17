@@ -1,11 +1,6 @@
 [build]
 builder = "RAILPACK"
 buildCommand = "bun run build"
-watchPatterns = [
-  "apps/backend/**",
-  "packages/typescript-config/**",
-  "pnpm-lock.yaml"
-]
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
