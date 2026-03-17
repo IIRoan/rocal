@@ -1,12 +1,12 @@
 [build]
 builder = "RAILPACK"
 rootDirectory = "."
-buildCommand = "bun install && cd apps/backend && bun run build"
+buildCommand = "bun install && bun --filter backend run build"
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
-startCommand = "cd apps/backend && ./server"
+startCommand = "bun --filter backend run start"
 
 # Health check
 [deploy.healthcheck]
