@@ -5,8 +5,8 @@ import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
 
-const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+const backendUrl = process.env.BACKEND_URL || "http://localhost:4001";
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:4000";
 const isProduction = process.env.NODE_ENV === "production";
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")

@@ -88,7 +88,7 @@ export const createAPI = (prefix = "") => {
         origin:
           process.env.FRONTEND_URL ||
           process.env.NEXT_PUBLIC_APP_URL ||
-          "http://localhost:3000",
+          "http://localhost:4000",
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [
@@ -166,7 +166,7 @@ export const createAPI = (prefix = "") => {
 };
 
 // Start the server when this file is run directly
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const port = process.env.PORT ? parseInt(process.env.PORT) : 4001;
 const app = createAPI("/api");
 
 // Handle OAuth errors at root (better-auth redirects here on error)
@@ -174,7 +174,7 @@ app.get("/", ({ query, redirect }) => {
   const frontendUrl =
     process.env.FRONTEND_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    "http://localhost:3000";
+    "http://localhost:4000";
 
   // If there's an OAuth error, redirect to frontend with error
   if (query.error) {
