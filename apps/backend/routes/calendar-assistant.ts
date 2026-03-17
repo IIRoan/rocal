@@ -3,6 +3,7 @@ import { generateText, stepCountIs, tool } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { requireAuth } from "../lib/auth-guard";
 
 const DEFAULT_SEARCH_BACK_DAYS = 60;
 const DEFAULT_SEARCH_FORWARD_DAYS = 400;
@@ -269,8 +270,8 @@ function parseDateTime(input: string, now: Date) {
 
   const combined = value.match(/^(.*?)(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)$/i);
   if (combined) {
-    const datePart = parseNaturalDate(combined[1], now);
-    const timePart = parseTimeParts(combined[2]);
+    const datePart = parseNaturalDate(combined[1]!, now);
+    const timePart = parseTimeParts(combined[2]!);
     if (datePart && timePart) {
       datePart.setHours(timePart.hours, timePart.minutes, 0, 0);
       return datePart;
@@ -414,7 +415,7 @@ async function fetchEvents(start: Date, end: Date, cookies: string, request: Req
     throw new Error(`Failed to fetch events (${response.status}): ${errorText.slice(0, 180)}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { events?: BackendEvent[] };
   return (data.events || []).map((event: BackendEvent) => ({
     id: event.id,
     title: event.title,
@@ -439,8 +440,8 @@ async function createEventOnBackend(input: CreateEventInput, cookies: string, re
     throw new Error(`Failed to create event (${response.status}): ${errorText.slice(0, 180)}`);
   }
 
-  const data = await response.json();
-  return (data.event || data) as BackendEvent;
+  const data = await response.json() as { event?: BackendEvent } | BackendEvent;
+  return (data as any).event || data as BackendEvent;
 }
 
 async function updateEventOnBackend(eventId: string, updates: UpdateEventInput, cookies: string, request: Request) {
@@ -455,8 +456,8 @@ async function updateEventOnBackend(eventId: string, updates: UpdateEventInput, 
     throw new Error(`Failed to update event (${response.status}): ${errorText.slice(0, 180)}`);
   }
 
-  const data = await response.json();
-  return (data.event || data) as BackendEvent;
+  const data = await response.json() as { event?: BackendEvent } | BackendEvent;
+  return (data as any).event || data as BackendEvent;
 }
 
 async function deleteEventOnBackend(eventId: string, cookies: string, request: Request) {
@@ -471,7 +472,9 @@ async function deleteEventOnBackend(eventId: string, cookies: string, request: R
   }
 }
 
-export const calendarAssistantRoute = new Elysia({ prefix: "/calendar-assistant" }).post("/", async ({ body, request, set }) => {
+export const calendarAssistantRoute = new Elysia({ prefix: "/calendar-assistant" })
+  .use(requireAuth)
+  .post("/", async ({ body, request, set, user }: any) => {
   try {
     const parsedBody = requestSchema.parse(body);
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -481,23 +484,13 @@ export const calendarAssistantRoute = new Elysia({ prefix: "/calendar-assistant"
       return { error: "OPENROUTER_API_KEY is missing" };
     }
 
-    const cookies = request.headers.get("cookie") || "";
-    const authResponse = await fetch(buildSameOriginUrl(request, "/api/user"), {
-      headers: { Cookie: cookies },
-    });
-
-    if (!authResponse.ok) {
+    // Use the authenticated user from middleware instead of making internal request
+    if (!user?.id || typeof user.id !== 'string') {
       set.status = 401;
       return { error: "Unauthorized" };
     }
 
-    const user = await authResponse.json();
-    
-    // Validate user ID before database operations
-    if (!user?.id || typeof user.id !== 'string') {
-      set.status = 401;
-      return { error: "Invalid user authentication" };
-    }
+    const cookies = request.headers.get("cookie") || "";
     
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
@@ -603,7 +596,7 @@ Rules:
           }),
           execute: async ({ rangeQuery, startDate, endDate, search }) => {
             const range = resolveDateRange({ rangeQuery, startDate, endDate, now });
-            const events = (await fetchEvents(range.start, range.end, cookies, request)).filter((event) => eventMatchesSearch(event, search));
+            const events = (await fetchEvents(range.start, range.end, cookies, request)).filter((event: BackendEvent) => eventMatchesSearch(event, search));
             cacheEvents(eventCache, events);
             fetchedEvents.push(...events);
 
@@ -634,7 +627,7 @@ Rules:
                   label: "broad search window",
                 };
 
-            const events = (await fetchEvents(range.start, range.end, cookies, request)).filter((event) => eventMatchesSearch(event, searchQuery));
+            const events = (await fetchEvents(range.start, range.end, cookies, request)).filter((event: BackendEvent) => eventMatchesSearch(event, searchQuery));
             cacheEvents(eventCache, events);
             fetchedEvents.push(...events);
 
@@ -735,7 +728,7 @@ Rules:
               // Try to fetch the event directly from backend
               try {
                 const events = await fetchEvents(startOfDay(new Date()), endOfDay(addDays(new Date(), 1)), cookies, request);
-                existingEvent = events.find(e => e.id === eventId);
+                existingEvent = events.find((e: BackendEvent) => e.id === eventId);
                 if (!existingEvent) {
                   return { error: `Event ${eventId} not found. Please search for the event first.` };
                 }
@@ -785,11 +778,13 @@ Rules:
             try {
               updatedEvent = await updateEventOnBackend(eventId, updates, cookies, request);
               // Only update cache after successful backend operation
-              eventCache.set(eventId, updatedEvent);
+              if (updatedEvent) {
+                eventCache.set(eventId, updatedEvent);
+              }
 
               return {
                 success: true,
-                event: formatEventResult(updatedEvent),
+                event: updatedEvent ? formatEventResult(updatedEvent) : null,
               };
             } catch (error: any) {
               return { error: `Failed to update event: ${error.message}` };
@@ -808,7 +803,7 @@ Rules:
               // Try to fetch the event directly from backend
               try {
                 const events = await fetchEvents(startOfDay(new Date()), endOfDay(addDays(new Date(), 1)), cookies, request);
-                existingEvent = events.find(e => e.id === eventId);
+                existingEvent = events.find((e: BackendEvent) => e.id === eventId);
                 if (!existingEvent) {
                   return { error: `Event ${eventId} not found. Please search for the event first.` };
                 }
