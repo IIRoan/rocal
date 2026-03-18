@@ -22,7 +22,9 @@ import { useCommandPalette as useCommandPaletteContext } from "@/components/comm
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import { useMemo, useEffect, useState } from "react";
+import { calendarApiService } from "@/lib/calendar-api-service";
+import { useMemo, useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 
 type CalendarAssistantResponse = {
   reply: string;
@@ -59,6 +61,63 @@ type CalendarAssistantResponse = {
   }>;
   error?: string;
 };
+
+function EventDeepLinkHandler() {
+  const searchParams = useSearchParams();
+  const eventId = searchParams.get("eventId");
+  const { data: session, isPending } = useSession();
+  const { openEventEditor } = useCommandPaletteContext();
+  const calendarData = useSharedCalendarData();
+  const handledEventIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!eventId || handledEventIdRef.current === eventId) {
+      return;
+    }
+
+    if (isPending || !session?.user) {
+      return;
+    }
+
+    let cancelled = false;
+    handledEventIdRef.current = eventId;
+
+    const openLinkedEvent = async () => {
+      try {
+        const existingEvent = calendarData.events.find((event) => event.id === eventId);
+        const event = existingEvent || (await calendarApiService.getEvent(eventId));
+
+        if (cancelled) return;
+
+        if (event?.start) {
+          calendarData.setDateRange({
+            start: event.start,
+            end: event.end,
+          });
+        }
+
+        openEventEditor(event, { eventViewMode: "view" });
+      } catch (error) {
+        console.error("Failed to open event from email link:", error);
+        handledEventIdRef.current = eventId;
+      }
+    };
+
+    void openLinkedEvent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    eventId,
+    isPending,
+    session?.user,
+    calendarData,
+    openEventEditor,
+  ]);
+
+  return null;
+}
 
 function SidebarWithContext() {
   const { data: session } = useSession();
@@ -376,8 +435,11 @@ function DashboardContent() {
   const {
     open: commandPaletteOpen,
     setOpen: setCommandPaletteOpen,
+    openPalette,
     initialQuery,
   } = useCommandPalette();
+  const searchParams = useSearchParams();
+  const paletteHandledRef = useRef<string | null>(null);
   const handleLogout = async () => {
     try {
       await signOut();
@@ -391,9 +453,27 @@ function DashboardContent() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isPending && !session?.user) {
-      router.replace("/login");
+      const currentPath =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : "/dashboard";
+      router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
     }
   }, [isPending, session?.user, router]);
+
+  useEffect(() => {
+    const palette = searchParams.get("palette");
+    if (!palette || paletteHandledRef.current === palette) {
+      return;
+    }
+
+    if (isPending || !session?.user) {
+      return;
+    }
+
+    paletteHandledRef.current = palette;
+    openPalette(palette === "settings" ? "settings" : "");
+  }, [searchParams, isPending, session?.user, openPalette]);
 
   if (isPending) {
     return (
@@ -426,6 +506,7 @@ function DashboardContent() {
       <CalendarDataProvider>
         <CalendarProviderWrapper>
           <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
+            <EventDeepLinkHandler />
             {/* Mobile Layout */}
             <div className="md:hidden min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom">
               <MobileLayoutContent />

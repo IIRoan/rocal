@@ -10,21 +10,24 @@ import (
 
 // EmailTemplateData holds the data for email templates
 type EmailTemplateData struct {
-	EventTitle      string
-	EventDate       string
-	EventTime       string
-	EventLocation   string
-	CategoryName    string
-	CategoryColor   string
-	Description     string
-	TimeUntilEvent  string
-	Duration        string
-	ReminderText    string
-	UserName        string
-	UserEmail       string
-	UserTheme       string
-	EventUrl        string
-	CalendarUrl     string
+	EventTitle     string
+	EventDate      string
+	EventTime      string
+	EventLocation  string
+	CalendarName   string
+	CategoryName   string
+	CategoryColor  string
+	Description    string
+	TimeUntilEvent string
+	Duration       string
+	ReminderText   string
+	UserName       string
+	UserEmail      string
+	UserTheme      string
+	EventUrl       string
+	CalendarUrl    string
+	SettingsUrl    string
+	PrivacyUrl     string
 }
 
 // EventReminderEmail returns the HTML template for event reminders
@@ -33,7 +36,7 @@ func EventReminderEmail() *template.Template {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to parse email template: %v", err))
 	}
-	
+
 	return tmpl
 }
 
@@ -49,20 +52,23 @@ func templatePath(name string) string {
 // RenderEventReminder renders the event reminder email template
 func RenderEventReminder(data EmailTemplateData) (string, error) {
 	tmpl := EventReminderEmail()
-	
+
 	var buf strings.Builder
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute email template: %w", err)
 	}
-	
+
 	return buf.String(), nil
 }
 
 // GeneratePlainTextEmail generates plain text version of the email
 func GeneratePlainTextEmail(data EmailTemplateData) string {
-	text := fmt.Sprintf("Event Reminder: %s\n\n", data.EventTitle)
-	text += fmt.Sprintf("%s\n\n", data.ReminderText)
-	text += "Event Details:\n"
+	text := ""
+	if data.TimeUntilEvent != "" {
+		text += fmt.Sprintf("%s\n", data.TimeUntilEvent)
+	}
+	text += fmt.Sprintf("%s\n\n", data.EventTitle)
+	text += "Details:\n"
 	text += fmt.Sprintf("Date: %s\n", data.EventDate)
 	text += fmt.Sprintf("Time: %s\n", data.EventTime)
 
@@ -70,21 +76,16 @@ func GeneratePlainTextEmail(data EmailTemplateData) string {
 		text += fmt.Sprintf("Location: %s\n", data.EventLocation)
 	}
 
-	if data.CategoryName != "" {
-		text += fmt.Sprintf("Category: %s\n", data.CategoryName)
-	}
-
 	if data.Duration != "" {
 		text += fmt.Sprintf("Duration: %s\n", data.Duration)
 	}
 
-	if data.Description != "" {
-		text += fmt.Sprintf("Description: %s\n", data.Description)
-	}
-
+	text += fmt.Sprintf("Open event: %s\n", data.EventUrl)
 	text += "\n"
-	text += fmt.Sprintf("Hi %s, this reminder was sent to %s\n", data.UserName, data.UserEmail)
-	text += "Solace Calendar"
+	text += "This reminder was sent because email notifications are enabled for your account.\n"
+	text += fmt.Sprintf("Settings: %s\n", data.SettingsUrl)
+	text += fmt.Sprintf("Privacy: %s\n", data.PrivacyUrl)
+	text += fmt.Sprintf("Calendar: %s\n", data.CalendarUrl)
 
 	return text
 }

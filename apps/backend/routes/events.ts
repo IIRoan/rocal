@@ -709,6 +709,78 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
     },
   )
 
+  .get(
+    "/:id",
+    async ({ params, user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
+      try {
+        const { id } = params;
+
+        const include = {
+          category: true,
+          calendar: true,
+        };
+
+        let event = await prisma.calendarEvent.findFirst({
+          where: {
+            id,
+            userId: user.id,
+          },
+          include,
+        });
+
+        if (!event && id.includes("_")) {
+          const parentEventId = id.split("_")[0];
+          event = await prisma.calendarEvent.findFirst({
+            where: {
+              id: parentEventId,
+              userId: user.id,
+            },
+            include,
+          });
+        }
+
+        if (!event) {
+          throw new ValidationError("Event not found or access denied");
+        }
+
+        return event;
+      } catch (error) {
+        logger.error("Event fetch error:", error);
+        throw error;
+      }
+    },
+    {
+      params: t.Object({
+        id: t.String({
+          description: "Event ID to fetch",
+        }),
+      }),
+      detail: {
+        tags: ["Events"],
+        summary: "Get a calendar event by ID",
+        description:
+          "Fetches a single calendar event for the authenticated user, including its calendar and category",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Event retrieved successfully",
+          },
+          400: {
+            description: "Validation error",
+          },
+          401: {
+            description: "Unauthorized",
+          },
+          404: {
+            description: "Event not found",
+          },
+        },
+      },
+    },
+  )
+
   .put(
     "/:id",
     async ({ params, body, user, request }: any) => {

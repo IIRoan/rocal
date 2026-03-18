@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
+	"net/mail"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -44,7 +47,9 @@ type EventData struct {
 	Title         string
 	Start         time.Time
 	End           time.Time
+	AllDay        bool
 	Location      string
+	CalendarName  string
 	Description   string
 	CategoryName  string
 	CategoryColor string
@@ -100,6 +105,9 @@ func loadEnv() {
 	log.Step("Environment check")
 	log.Info("DATABASE_URL present: %t", os.Getenv("DATABASE_URL") != "")
 	log.Info("RESEND_API_KEY present: %t", os.Getenv("RESEND_API_KEY") != "")
+	if from, err := resolveBaseFromAddress(); err == nil && from != "" {
+		log.Info("Using email sender address: %s", from)
+	}
 }
 
 func (ns *NotificationServer) initResend() {
@@ -111,10 +119,12 @@ func (ns *NotificationServer) initResend() {
 
 	ns.resend = resend.NewClient(apiKey)
 	ns.log.OK("Resend client initialized")
-	if from := strings.TrimSpace(os.Getenv("FROM_EMAIL")); from == "" {
-		ns.log.Warn("FROM_EMAIL not configured; set it to an address on your verified Resend domain")
+	if from, err := resolveBaseFromAddress(); err != nil {
+		ns.log.Warn("%v", err)
+	} else if from == "" {
+		ns.log.Warn("EMAIL_FROM_ADDRESS or FROM_EMAIL not configured; set it to an address on your verified Resend domain")
 	} else {
-		ns.log.Info("Using FROM_EMAIL sender: %s", from)
+		ns.log.Info("Using email sender address: %s", from)
 	}
 }
 
@@ -284,8 +294,10 @@ func (ns *NotificationServer) fetchDueNotifications(currentMinute time.Time) ([]
 			ce.title,
 			ce.start,
 			ce."end",
+			ce.all_day,
 			ce.location,
 			ce.description,
+			c.name,
 			ec.name,
 			ec.color,
 			u.name,
@@ -293,6 +305,7 @@ func (ns *NotificationServer) fetchDueNotifications(currentMinute time.Time) ([]
 			COALESCE(us.timezone, 'UTC')
 		FROM event_notification en
 		INNER JOIN calendar_event ce ON ce.id = en.event_id
+		INNER JOIN calendar c ON c.id = ce.calendar_id
 		INNER JOIN "user" u ON u.id = ce.user_id
 		LEFT JOIN user_settings us ON us.user_id = u.id
 		LEFT JOIN event_category ec ON ec.id = ce.category_id
@@ -327,8 +340,10 @@ func (ns *NotificationServer) fetchDueNotifications(currentMinute time.Time) ([]
 			&item.Event.Title,
 			&item.Event.Start,
 			&item.Event.End,
+			&item.Event.AllDay,
 			&location,
 			&description,
+			&item.Event.CalendarName,
 			&categoryName,
 			&categoryColor,
 			&item.User.Name,
@@ -434,6 +449,7 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		EventDate:      formattedDetails.EventDate,
 		EventTime:      formattedDetails.EventTime,
 		EventLocation:  event.Location,
+		CalendarName:   event.CalendarName,
 		CategoryName:   event.CategoryName,
 		CategoryColor:  event.CategoryColor,
 		Description:    event.Description,
@@ -443,8 +459,10 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		UserName:       user.Name,
 		UserEmail:      user.Email,
 		UserTheme:      "light",
-		EventUrl:       fmt.Sprintf("https://solace.onl/event/%s", eventID),
-		CalendarUrl:    "https://solace.onl/calendar",
+		EventUrl:       buildFrontendURL("/dashboard", map[string]string{"eventId": eventID}),
+		CalendarUrl:    buildFrontendURL("/dashboard", nil),
+		SettingsUrl:    buildFrontendURL("/settings", nil),
+		PrivacyUrl:     buildFrontendURL("/privacy", nil),
 	}
 
 	html, err := templates.RenderEventReminder(templateData)
@@ -477,17 +495,29 @@ func (ns *NotificationServer) formatEventDetailsForEmail(event EventData, timezo
 	}
 
 	start := event.Start.In(loc)
+	end := event.End.In(loc)
+	eventTime := "All day"
+	if !event.AllDay {
+		if end.After(start) {
+			eventTime = fmt.Sprintf("%s - %s", start.Format("3:04 PM"), end.Format("3:04 PM"))
+		} else {
+			eventTime = start.Format("3:04 PM")
+		}
+	}
 
 	return &formattedEventDetails{
-		EventDate:      start.Format("January 2, 2006"),
-		EventTime:      start.Format("3:04 PM"),
+		EventDate:      start.Format("Monday, Jan 2"),
+		EventTime:      eventTime,
 		TimeUntilEvent: strings.TrimPrefix(ns.formatReminderText(minutesBefore), "Your event starts in "),
 		ReminderText:   ns.formatReminderText(minutesBefore),
-		Duration:       ns.calculateEventDuration(event.Start, event.End),
+		Duration:       ns.calculateEventDuration(event.Start, event.End, event.AllDay),
 	}, nil
 }
 
-func (ns *NotificationServer) calculateEventDuration(start, end time.Time) string {
+func (ns *NotificationServer) calculateEventDuration(start, end time.Time, allDay bool) string {
+	if allDay {
+		return "All day"
+	}
 	if end.Before(start) || end.Equal(start) {
 		return ""
 	}
@@ -534,10 +564,10 @@ func (ns *NotificationServer) formatReminderText(minutesBefore int) string {
 
 func (ns *NotificationServer) generateEmailSubject(event EventData, minutesBefore int) string {
 	if minutesBefore <= 0 {
-		return fmt.Sprintf("Starting now: %s", event.Title)
+		return fmt.Sprintf("%s starting now", event.Title)
 	}
 
-	return fmt.Sprintf("Reminder: %s", event.Title)
+	return fmt.Sprintf("%s in %s", event.Title, ns.formatReminderSummary(minutesBefore))
 }
 
 func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event EventData, user UserData, minutesBefore int, eventID string) error {
@@ -553,7 +583,7 @@ func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event E
 		return err
 	}
 
-	fromAddress, err := ns.getFromAddress()
+	fromAddress, err := ns.getFromAddress(event, minutesBefore)
 	if err != nil {
 		return err
 	}
@@ -576,12 +606,133 @@ func (ns *NotificationServer) sendEmailNotification(ctx context.Context, event E
 	return nil
 }
 
-func (ns *NotificationServer) getFromAddress() (string, error) {
-	from := strings.TrimSpace(os.Getenv("FROM_EMAIL"))
-	if from == "" {
-		return "", fmt.Errorf("FROM_EMAIL is not configured; set it to an address on your verified Resend domain")
+func (ns *NotificationServer) getFromAddress(event EventData, minutesBefore int) (string, error) {
+	from, err := resolveBaseFromAddress()
+	if err != nil {
+		return "", err
 	}
-	return from, nil
+	if from == "" {
+		return "", fmt.Errorf("EMAIL_FROM_ADDRESS or FROM_EMAIL is not configured; set it to an address on your verified Resend domain")
+	}
+
+	displayName := ns.senderDisplayName(event, minutesBefore)
+	if displayName == "" {
+		return from, nil
+	}
+
+	return (&mail.Address{Name: displayName, Address: from}).String(), nil
+}
+
+func (ns *NotificationServer) senderDisplayName(event EventData, minutesBefore int) string {
+	title := sanitizeMailFragment(event.Title)
+	if title == "" {
+		title = "reminder"
+	}
+
+	if minutesBefore <= 0 {
+		return fmt.Sprintf("%s starting now", title)
+	}
+
+	return fmt.Sprintf("%s in %s", title, ns.formatReminderSummary(minutesBefore))
+}
+
+func (ns *NotificationServer) formatReminderSummary(minutesBefore int) string {
+	if minutesBefore <= 0 {
+		return "starting now"
+	}
+
+	if minutesBefore < 60 {
+		if minutesBefore == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", minutesBefore)
+	}
+
+	hours := minutesBefore / 60
+	remainingMinutes := minutesBefore % 60
+	if remainingMinutes == 0 {
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+
+	if hours == 1 {
+		return fmt.Sprintf("1 hour %d minutes", remainingMinutes)
+	}
+
+	return fmt.Sprintf("%d hours %d minutes", hours, remainingMinutes)
+}
+
+func sanitizeMailFragment(value string) string {
+	value = strings.NewReplacer(
+		"<", " ",
+		">", " ",
+		"\"", " ",
+		"'", " ",
+		":", " ",
+		",", " ",
+		";", " ",
+		"(", " ",
+		")", " ",
+		"[", " ",
+		"]", " ",
+		"{", " ",
+		"}", " ",
+		"/", " ",
+		"\\", " ",
+		"|", " ",
+		"@", " ",
+	).Replace(value)
+
+	return strings.TrimSpace(strings.Join(strings.Fields(value), " "))
+}
+
+func resolveBaseFromAddress() (string, error) {
+	raw := strings.TrimSpace(os.Getenv("EMAIL_FROM_ADDRESS"))
+	if raw == "" {
+		raw = strings.TrimSpace(os.Getenv("FROM_EMAIL"))
+	}
+	if raw == "" {
+		return "", nil
+	}
+
+	parsed, err := mail.ParseAddress(raw)
+	if err == nil && parsed.Address != "" {
+		return parsed.Address, nil
+	}
+
+	if strings.Contains(raw, "@") {
+		return raw, nil
+	}
+
+	return "", fmt.Errorf("EMAIL_FROM_ADDRESS or FROM_EMAIL must contain a valid email address")
+}
+
+func buildFrontendURL(path string, query map[string]string) string {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_URL")), "/")
+	if base == "" {
+		base = strings.TrimRight(strings.TrimSpace(os.Getenv("NEXT_PUBLIC_APP_URL")), "/")
+	}
+	if base == "" {
+		base = "http://localhost:4000"
+	}
+
+	u, err := url.Parse(base)
+	if err != nil {
+		return base + path
+	}
+
+	u.Path = strings.TrimRight(u.Path, "/") + path
+	if len(query) > 0 {
+		values := u.Query()
+		for key, value := range query {
+			values.Set(key, value)
+		}
+		u.RawQuery = values.Encode()
+	}
+
+	return u.String()
 }
 
 func (ns *NotificationServer) GetStatus() *NotificationStatus {
@@ -648,10 +799,93 @@ func (ns *NotificationServer) healthHandler(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+func (ns *NotificationServer) sendTestEmail(recipient string) error {
+	recipient = strings.TrimSpace(recipient)
+	if recipient == "" {
+		return fmt.Errorf("test recipient is required; use --test-to, pass a positional email after --test, or set TEST_EMAIL")
+	}
+
+	ns.initResend()
+	if ns.resend == nil {
+		return fmt.Errorf("email service not configured")
+	}
+
+	now := time.Now()
+	start := now.Add(90 * time.Minute)
+	end := start.Add(45 * time.Minute)
+	testEvent := EventData{
+		Title:         "Manual reminder test",
+		Start:         start,
+		End:           end,
+		AllDay:        false,
+		Location:      "Test location",
+		CalendarName:  "Solace test calendar",
+		Description:   "This is a manually triggered reminder email for smoke-testing the notification pipeline.",
+		CategoryName:  "Test",
+		CategoryColor: "#ff6b35",
+	}
+	testUser := UserData{
+		Name:     "Test Recipient",
+		Email:    recipient,
+		TimeZone: "Europe/Amsterdam",
+	}
+
+	content, err := ns.generateEmailContent(testEvent, testUser, 30, "manual-test-event")
+	if err != nil {
+		return err
+	}
+
+	fromAddress, err := ns.getFromAddress(testEvent, 30)
+	if err != nil {
+		return err
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    fromAddress,
+		To:      []string{recipient},
+		Subject: ns.generateEmailSubject(testEvent, 30),
+		Html:    content.HTML,
+		Text:    content.Text,
+	}
+
+	response, err := ns.resend.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("failed to send test email with resend: %w", err)
+	}
+
+	ns.log.OK("Test email sent successfully: %s", response.Id)
+	return nil
+}
+
 func main() {
+	testMode := flag.Bool("test", false, "send a manual test reminder email and exit")
+	testTo := flag.String("test-to", "", "recipient email address for --test mode")
+	flag.Parse()
+
 	loadEnv()
 
 	server := NewNotificationServer()
+	if *testMode {
+		recipient := strings.TrimSpace(*testTo)
+		if recipient == "" && len(flag.Args()) > 0 {
+			recipient = strings.TrimSpace(flag.Args()[0])
+		}
+		if recipient == "" {
+			recipient = strings.TrimSpace(os.Getenv("TEST_EMAIL"))
+		}
+
+		if err := server.sendTestEmail(recipient); err != nil {
+			server.log.Err("Failed to send test email: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if len(flag.Args()) > 0 {
+		server.log.Err("unexpected arguments: %v", flag.Args())
+		os.Exit(1)
+	}
+
 	if err := server.Start(); err != nil {
 		server.log.Err("Failed to start notification server: %v", err)
 		os.Exit(1)
