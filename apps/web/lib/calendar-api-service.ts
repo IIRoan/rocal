@@ -87,6 +87,15 @@ export class CalendarApiService {
     }
   }
 
+  async getEvent(id: string): Promise<CalendarEvent> {
+    try {
+      const response = await this.client.get<CalendarEvent>(`/api/events/${id}`);
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to fetch event");
+    }
+  }
+
   async createEvent(event: CreateEventRequest): Promise<CalendarEvent> {
     try {
       const response = await this.client.post<CalendarEvent>(
