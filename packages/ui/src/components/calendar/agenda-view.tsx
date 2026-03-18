@@ -16,6 +16,10 @@ interface AgendaViewProps {
   onEventCreate?: (startTime: Date) => void;
   timeFormat?: "12h" | "24h";
   timezone?: string;
+  // Context menu actions
+  onEventEdit?: (event: CalendarEvent) => void;
+  onEventDelete?: (event: CalendarEvent) => void;
+  onEventView?: (event: CalendarEvent) => void;
 }
 
 export function AgendaView({
@@ -24,6 +28,9 @@ export function AgendaView({
   onEventSelect,
   timeFormat = "12h",
   timezone,
+  onEventEdit,
+  onEventDelete,
+  onEventView,
 }: AgendaViewProps) {
   // Show events for the next days based on constant
   const days = useMemo(() => {
@@ -80,6 +87,9 @@ export function AgendaView({
                     onClick={(e) => handleEventClick(event, e)}
                     timeFormat={timeFormat}
                     timezone={timezone}
+                    onEdit={onEventEdit}
+                    onDelete={onEventDelete}
+                    onView={onEventView}
                   />
                 ))}
               </div>

@@ -31,6 +31,10 @@ interface DayViewProps {
   timeFormat?: "12h" | "24h";
   timezone?: string;
   workingDays?: number[];
+  // Context menu actions
+  onEventEdit?: (event: CalendarEvent) => void;
+  onEventDelete?: (event: CalendarEvent) => void;
+  onEventView?: (event: CalendarEvent) => void;
 }
 
 interface PositionedEvent {
@@ -50,6 +54,9 @@ export function DayView({
   compactView = false,
   timeFormat = "12h",
   timezone,
+  onEventEdit,
+  onEventDelete,
+  onEventView,
 }: DayViewProps) {
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
@@ -265,6 +272,9 @@ export function DayView({
                     isFirstDay={isFirstDay}
                     isLastDay={isLastDay}
                     timezone={timezone}
+                    onEdit={onEventEdit}
+                    onDelete={onEventDelete}
+                    onView={onEventView}
                   >
                     {/* Always show the title in day view for better usability */}
                     <div>{event.title}</div>
@@ -315,6 +325,9 @@ export function DayView({
                   height={positionedEvent.height}
                   timeFormat={timeFormat}
                   timezone={timezone}
+                  onEdit={onEventEdit}
+                  onDelete={onEventDelete}
+                  onView={onEventView}
                 />
               </div>
             </div>

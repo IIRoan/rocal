@@ -53,6 +53,9 @@ export function DroppableCell({
       style={style}
       title={formattedTime ? `${formattedTime}` : undefined}
       data-dragging={isOver && activeEvent ? true : undefined}
+      data-calendar-cell="true"
+      data-cell-date={date.toISOString()}
+      data-cell-time={time ?? ""}
     >
       {children}
     </div>

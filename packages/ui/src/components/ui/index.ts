@@ -18,6 +18,13 @@ export {
   CollapsibleTrigger,
 } from "./collapsible";
 export {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "./context-menu";
+export {
   Dialog,
   DialogContent,
   DialogDescription,

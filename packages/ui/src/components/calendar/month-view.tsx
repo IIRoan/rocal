@@ -41,6 +41,10 @@ interface MonthViewProps {
   weekStartDay?: number;
   workingDays?: number[];
   timezone?: string;
+  // Context menu actions
+  onEventEdit?: (event: CalendarEvent) => void;
+  onEventDelete?: (event: CalendarEvent) => void;
+  onEventView?: (event: CalendarEvent) => void;
 }
 
 export function MonthView({
@@ -54,6 +58,9 @@ export function MonthView({
   weekStartDay = 0,
   workingDays = [1, 2, 3, 4, 5],
   timezone,
+  onEventEdit,
+  onEventDelete,
+  onEventView,
 }: MonthViewProps) {
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
@@ -224,6 +231,9 @@ export function MonthView({
                                 isLastDay={isLastDay}
                                 timeFormat={timeFormat}
                                 timezone={timezone}
+                                onEdit={onEventEdit}
+                                onDelete={onEventDelete}
+                                onView={onEventView}
                               >
                                 <div className="invisible" aria-hidden={true}>
                                   {!event.allDay && (
@@ -256,6 +266,9 @@ export function MonthView({
                               isLastDay={isLastDay}
                               timeFormat={timeFormat}
                               timezone={timezone}
+                              onEdit={onEventEdit}
+                              onDelete={onEventDelete}
+                              onView={onEventView}
                             />
                           </div>
                         );
@@ -306,6 +319,9 @@ export function MonthView({
                                       isLastDay={isLastDay}
                                       timeFormat={timeFormat}
                                       timezone={timezone}
+                                      onEdit={onEventEdit}
+                                      onDelete={onEventDelete}
+                                      onView={onEventView}
                                     />
                                   );
                                 })}
