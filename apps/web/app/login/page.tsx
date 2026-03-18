@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { signIn, authClient, useSession } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Github, Key, Shield, Check } from "lucide-react";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -15,13 +15,26 @@ export default function LoginPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const { data: session, isPending } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next");
+
+  const getRedirectTarget = useCallback(() => {
+    const fallback = "/dashboard";
+    if (!nextPath) return fallback;
+
+    if (!nextPath.startsWith("/")) {
+      return fallback;
+    }
+
+    return nextPath;
+  }, [nextPath]);
 
   // Monitor session changes and redirect when authenticated
   const handleSessionRedirect = useCallback(() => {
     if (session?.user) {
-      router.replace("/dashboard");
+      router.replace(getRedirectTarget());
     }
-  }, [session, router]);
+  }, [session, router, getRedirectTarget]);
 
   // Check if user is already logged in and redirect
   useEffect(() => {
@@ -49,7 +62,7 @@ export default function LoginPage() {
 
       if (result?.data?.user || result?.user) {
         setTimeout(() => {
-          router.replace("/dashboard");
+          router.replace(getRedirectTarget());
         }, 100);
       } else {
         setTimeout(() => {
@@ -70,9 +83,10 @@ export default function LoginPage() {
       setIsLoading(true);
       const frontendUrl =
         process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const callbackTarget = new URL(getRedirectTarget(), frontendUrl).toString();
       await signIn.social({
         provider: "github",
-        callbackURL: `${frontendUrl}/dashboard`,
+        callbackURL: callbackTarget,
       });
     } catch (error) {
       console.error("Login failed:", error);
