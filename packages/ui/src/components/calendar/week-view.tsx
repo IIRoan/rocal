@@ -48,6 +48,10 @@ interface WeekViewProps {
   weekStartDay?: number;
   workingDays?: number[];
   timezone?: string;
+  // Context menu actions
+  onEventEdit?: (event: CalendarEvent) => void;
+  onEventDelete?: (event: CalendarEvent) => void;
+  onEventView?: (event: CalendarEvent) => void;
 }
 
 interface PositionedEvent {
@@ -70,6 +74,9 @@ export function WeekView({
   weekStartDay = 0,
   workingDays = [1, 2, 3, 4, 5],
   timezone,
+  onEventEdit,
+  onEventDelete,
+  onEventView,
 }: WeekViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const days = useMemo(() => {
@@ -418,6 +425,9 @@ export function WeekView({
                         isLastDay={isLastSegmentDay}
                         className="text-xs"
                         timezone={timezone}
+                        onEdit={onEventEdit}
+                        onDelete={onEventDelete}
+                        onView={onEventView}
                       >
                         {/* Show title only on the first visible day in the current week */}
                         <div
@@ -494,6 +504,9 @@ export function WeekView({
                         height={positionedEvent.height}
                         timeFormat={timeFormat}
                         timezone={timezone}
+                        onEdit={onEventEdit}
+                        onDelete={onEventDelete}
+                        onView={onEventView}
                       />
                     )}
                   </div>

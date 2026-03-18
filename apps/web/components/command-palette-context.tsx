@@ -8,6 +8,7 @@ export type EventEditorMode = "modal" | "popover";
 export interface EventEditorOptions {
   mode?: EventEditorMode;
   anchorPosition?: { x: number; y: number };
+  eventViewMode?: "view" | "edit";
 }
 
 interface CommandPaletteContextType {
@@ -50,6 +51,7 @@ interface CommandPaletteProviderProps {
     initialView?: string;
     eventEditorMode?: EventEditorMode;
     popoverAnchorPosition?: { x: number; y: number } | null;
+    initialEventViewMode?: "view" | "edit";
     previewEvent?: CalendarEvent | null;
     updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   }>;
@@ -68,6 +70,9 @@ export function CommandPaletteProvider({
     x: number;
     y: number;
   } | null>(null);
+  const [initialEventViewMode, setInitialEventViewMode] = useState<
+    "view" | "edit"
+  >("view");
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 
   const openPalette = () => {
@@ -81,6 +86,7 @@ export function CommandPaletteProvider({
     setInitialView("main");
     setEventEditorMode("modal");
     setPopoverAnchorPosition(null);
+    setInitialEventViewMode("view");
     setPreviewEvent(null);
   };
 
@@ -91,6 +97,7 @@ export function CommandPaletteProvider({
     setEventToEdit(event || null);
     setEventEditorMode(options?.mode || "modal");
     setPopoverAnchorPosition(options?.anchorPosition || null);
+    setInitialEventViewMode(options?.eventViewMode || "view");
     // Create preview event for popover mode (timeline clicks)
     if (options?.mode === "popover" && event) {
       setPreviewEvent({ ...event, isPreview: true });
@@ -137,6 +144,7 @@ export function CommandPaletteProvider({
         initialView={initialView}
         eventEditorMode={eventEditorMode}
         popoverAnchorPosition={popoverAnchorPosition}
+        initialEventViewMode={initialEventViewMode}
         previewEvent={previewEvent}
         updatePreviewEvent={updatePreviewEvent}
         onEventSaved={() => {

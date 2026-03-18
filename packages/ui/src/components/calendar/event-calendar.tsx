@@ -21,13 +21,18 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  Eye,
   Loader2,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { ListIcon } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 import {
   AgendaDaysToShow,
+  DefaultStartHour,
   EventGap,
   EventHeight,
   WeekCellsHeight,
@@ -49,6 +54,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
@@ -98,6 +104,7 @@ export interface EventCalendarProps {
     options?: {
       mode?: "modal" | "popover";
       anchorPosition?: { x: number; y: number };
+      eventViewMode?: "view" | "edit";
     },
   ) => void;
   // Custom sidebar toggle handler for mobile
@@ -132,6 +139,11 @@ export function EventCalendar({
   onEventEdit,
   onSidebarToggle,
 }: EventCalendarProps) {
+  type ContextTarget =
+    | { type: "event"; event: CalendarEvent }
+    | { type: "timeline"; startTime: Date }
+    | { type: "general" };
+
   // Use the shared calendar context instead of local state
   const { currentDate, setCurrentDate } = useCalendarContext();
 
@@ -163,6 +175,16 @@ export function EventCalendar({
       );
     }
   };
+
+  const [contextTarget, setContextTarget] = useState<ContextTarget>({
+    type: "general",
+  });
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({
+    x: 0,
+    y: 0,
+  });
+  const contextMenuRafRef = useRef<number | null>(null);
 
   // Add keyboard shortcuts for view changes
   useDropdownShortcuts([
@@ -348,6 +370,70 @@ export function EventCalendar({
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (contextMenuRafRef.current !== null) {
+        cancelAnimationFrame(contextMenuRafRef.current);
+      }
+    };
+  }, []);
+
+  const reopenContextMenuAt = (target: ContextTarget, x: number, y: number) => {
+    setContextTarget(target);
+    setContextMenuPosition({ x, y });
+    setContextMenuOpen(false);
+
+    if (contextMenuRafRef.current !== null) {
+      cancelAnimationFrame(contextMenuRafRef.current);
+    }
+
+    contextMenuRafRef.current = requestAnimationFrame(() => {
+      setContextMenuOpen(true);
+      contextMenuRafRef.current = null;
+    });
+  };
+
+  const handleCalendarContextMenuCapture = (
+    e: React.MouseEvent<HTMLDivElement>,
+  ) => {
+    e.preventDefault();
+    lastClickPositionRef.current = { x: e.clientX, y: e.clientY };
+
+    const target = e.target as HTMLElement;
+    const eventElement = target.closest<HTMLElement>("[data-event-id]");
+
+    if (eventElement?.dataset.eventId) {
+      const event = events.find((item) => item.id === eventElement.dataset.eventId);
+      if (event) {
+        reopenContextMenuAt({ type: "event", event }, e.clientX, e.clientY);
+        return;
+      }
+    }
+
+    const cellElement = target.closest<HTMLElement>("[data-calendar-cell='true']");
+    if (cellElement?.dataset.cellDate) {
+      const startTime = new Date(cellElement.dataset.cellDate);
+      const timeValue = Number(cellElement.dataset.cellTime);
+
+      if (!Number.isNaN(timeValue)) {
+        const hours = Math.floor(timeValue);
+        const minutes = Math.round((timeValue - hours) * 60);
+        startTime.setHours(hours, minutes, 0, 0);
+      } else {
+        startTime.setHours(DefaultStartHour, 0, 0, 0);
+      }
+
+      reopenContextMenuAt(
+        { type: "timeline", startTime },
+        e.clientX,
+        e.clientY,
+      );
+      return;
+    }
+
+    reopenContextMenuAt({ type: "general" }, e.clientX, e.clientY);
+  };
 
   const handleEventSelect = (event: CalendarEvent) => {
     // Open command palette with event to edit (always modal for existing events)
@@ -698,6 +784,7 @@ export function EventCalendar({
             "--week-cells-height": `${compactView ? Math.round(WeekCellsHeight * 0.85) : WeekCellsHeight}px`,
           } as React.CSSProperties
         }
+        onContextMenuCapture={handleCalendarContextMenuCapture}
       >
         <CalendarDndProvider
           onEventUpdate={handleEventUpdate}
@@ -819,6 +906,9 @@ export function EventCalendar({
                 weekStartDay={weekStartDay}
                 workingDays={workingDays}
                 timezone={timezone}
+                onEventEdit={onEventEdit}
+                onEventDelete={(event) => handleEventDelete(event.id)}
+                onEventView={onEventEdit}
               />
             )}
             {view === "week" && (
@@ -832,6 +922,9 @@ export function EventCalendar({
                 weekStartDay={weekStartDay}
                 workingDays={workingDays}
                 timezone={timezone}
+                onEventEdit={onEventEdit}
+                onEventDelete={(event) => handleEventDelete(event.id)}
+                onEventView={onEventEdit}
               />
             )}
             {view === "day" && (
@@ -843,6 +936,9 @@ export function EventCalendar({
                 compactView={compactView}
                 timeFormat={timeFormat}
                 timezone={timezone}
+                onEventEdit={onEventEdit}
+                onEventDelete={(event) => handleEventDelete(event.id)}
+                onEventView={onEventEdit}
               />
             )}
             {view === "agenda" && (
@@ -852,6 +948,9 @@ export function EventCalendar({
                 onEventSelect={handleEventSelect}
                 timeFormat={timeFormat}
                 timezone={timezone}
+                onEventEdit={onEventEdit}
+                onEventDelete={(event) => handleEventDelete(event.id)}
+                onEventView={onEventEdit}
               />
             )}
           </div>
@@ -859,6 +958,93 @@ export function EventCalendar({
           {/* Event editing now handled by command palette */}
         </CalendarDndProvider>
       </div>
+
+      <DropdownMenu open={contextMenuOpen} onOpenChange={setContextMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-hidden="true"
+            tabIndex={-1}
+            className="fixed size-px opacity-0 pointer-events-none"
+            style={{
+              left: contextMenuPosition.x,
+              top: contextMenuPosition.y,
+            }}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-44">
+          {contextTarget.type === "event" ? (
+            contextTarget.event.isSynced ? (
+              <>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onEventEdit?.(contextTarget.event, {
+                      mode: "modal",
+                      eventViewMode: "view",
+                    })
+                  }
+                >
+                  <Eye className="size-4" />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  Synced calendar event - cannot edit
+                </div>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onEventEdit?.(contextTarget.event, {
+                      mode: "modal",
+                      eventViewMode: "view",
+                    })
+                  }
+                >
+                  <Eye className="size-4" />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    onEventEdit?.(contextTarget.event, {
+                      mode: "modal",
+                      eventViewMode: "edit",
+                    })
+                  }
+                >
+                  <Pencil className="size-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => handleEventDelete(contextTarget.event.id)}
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )
+          ) : (
+            <DropdownMenuItem
+              onClick={() => {
+                if (contextTarget.type === "timeline") {
+                  handleEventCreate(new Date(contextTarget.startTime));
+                  return;
+                }
+
+                const startTime = new Date(currentDate);
+                startTime.setHours(DefaultStartHour, 0, 0, 0);
+                handleEventCreate(startTime);
+              }}
+            >
+              <Plus className="size-4" />
+              Create event
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </ErrorBoundary>
   );
 }
