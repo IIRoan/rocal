@@ -372,23 +372,30 @@ export function WeekView({
           return (
             <div
               key={day.toString()}
-              className={`data-today:text-[var(--calendar-accent)] data-today:bg-[var(--calendar-accent-bg)] data-today:rounded data-today:font-semibold text-muted-foreground/70 text-center text-xs transition-colors flex flex-col ${
-                workingDays.includes(day.getDay())
-                  ? "bg-[var(--calendar-workday)]"
-                  : !workingDays.includes(day.getDay()) &&
-                      [0, 6].includes(day.getDay())
-                    ? "bg-[var(--calendar-weekend)]"
-                    : ""
+              className={`text-muted-foreground/70 text-center text-xs transition-colors flex justify-center items-center py-2 ${
+                isToday(day)
+                  ? "text-[var(--calendar-accent)] font-semibold"
+                  : ""
               }`}
               data-today={isToday(day) || undefined}
             >
-              {/* Day header */}
-              <div className="py-2">
-                {/* Enhanced mobile-first day display */}
-                <span className="sm:hidden font-medium" aria-hidden="true">
-                  {format(day, "E")[0]} {format(day, "d")}
-                </span>
-                <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
+              <div className="relative inline-block">
+                {/* Day header */}
+                <div>
+                  {/* Enhanced mobile-first day display */}
+                  <span className="sm:hidden font-medium" aria-hidden="true">
+                    {format(day, "E")[0]} {format(day, "d")}
+                  </span>
+                  <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
+                </div>
+                {/* Today underline */}
+                <div
+                  className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-200 ${
+                    isToday(day)
+                      ? "bg-[var(--calendar-accent)] w-full"
+                      : "bg-transparent w-0"
+                  }`}
+                />
               </div>
 
               {/* All-day events integrated into day header */}
@@ -449,7 +456,7 @@ export function WeekView({
         })}
       </div>
 
-      <div className="grid flex-1 grid-cols-8 overflow-hidden">
+      <div className="grid flex-1 grid-cols-8">
         <div className="border-border/70 border-r grid auto-cols-fr">
           {hours.map((hour, index) => (
             <div
@@ -469,12 +476,9 @@ export function WeekView({
           <div
             key={day.toString()}
             className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
-              workingDays.includes(day.getDay())
-                ? "bg-[var(--calendar-workday)]"
-                : !workingDays.includes(day.getDay()) &&
-                    [0, 6].includes(day.getDay())
-                  ? "bg-[var(--calendar-weekend)]"
-                  : ""
+              isToday(day)
+                ? "bg-[var(--calendar-accent-bg)]/20"
+                : ""
             }`}
             data-today={isToday(day) || undefined}
           >
