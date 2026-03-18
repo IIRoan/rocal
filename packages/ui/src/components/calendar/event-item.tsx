@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
-import { Cloud } from "lucide-react";
 
 import {
   getBorderRadiusClasses,
@@ -147,6 +146,7 @@ function EventWrapper({
       onClick={onClick}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
+      data-event-id={event.id}
       {...dndListeners}
       {...dndAttributes}
     >
@@ -172,6 +172,10 @@ interface EventItemProps {
   onTouchStart?: (e: React.TouchEvent) => void;
   timeFormat?: "12h" | "24h";
   timezone?: string;
+  // Context menu actions
+  onEdit?: (event: CalendarEvent) => void;
+  onDelete?: (event: CalendarEvent) => void;
+  onView?: (event: CalendarEvent) => void;
 }
 
 export function EventItem({
@@ -229,82 +233,67 @@ export function EventItem({
     return `${formatTimeWithOptionalMinutesTZ(displayStart, timeFormat, timezone)} - ${formatTimeWithOptionalMinutesTZ(displayEnd, timeFormat, timezone)}`;
   };
 
-  if (view === "month") {
-    return (
-      <EventWrapper
-        event={event}
-        isFirstDay={isFirstDay}
-        isLastDay={isLastDay}
-        isDragging={isDragging}
-        onClick={onClick}
-        className={cn(
-          "mt-[var(--event-gap)] h-[var(--event-height)] items-center text-[10px] sm:text-[13px]",
-          className,
-        )}
-        currentTime={currentTime}
-        dndListeners={dndListeners}
-        dndAttributes={dndAttributes}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
-      >
-        {children || (
-          <span className="truncate flex items-center gap-1">
-            <span className="truncate">{event.title}</span>
-          </span>
-        )}
-      </EventWrapper>
-    );
-  }
-
-  if (view === "week" || view === "day") {
-    return (
-      <EventWrapper
-        event={event}
-        isFirstDay={isFirstDay}
-        isLastDay={isLastDay}
-        isDragging={isDragging}
-        onClick={onClick}
-        className={cn(
-          "py-0.5 sm:py-1",
-          durationMinutes < 45 ? "items-center" : "flex-col",
-          // Enhanced mobile typography and sizing with better text wrapping
-          view === "week"
-            ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal"
-            : "text-[13px]",
-          className,
-        )}
-        currentTime={currentTime}
-        dndListeners={dndListeners}
-        dndAttributes={dndAttributes}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
-      >
-        {durationMinutes < 45 ? (
-          // Short events - mobile optimized layout
-          <div className="flex items-start gap-0.5 w-full min-w-0">
-            <span
-              className={cn(
-                "font-medium flex-1 min-w-0",
-                // On mobile, allow text wrapping for very narrow events
-                view === "week"
-                  ? "break-words hyphens-auto sm:truncate"
-                  : "truncate",
-              )}
-              title={event.title} // Tooltip for full title on hover/long press
-            >
-              {event.title}
+  // Render the event content based on view
+  const renderEventContent = () => {
+    if (view === "month") {
+      return (
+        <EventWrapper
+          event={event}
+          isFirstDay={isFirstDay}
+          isLastDay={isLastDay}
+          isDragging={isDragging}
+          onClick={onClick}
+          className={cn(
+            "mt-[var(--event-gap)] h-[var(--event-height)] items-center text-[10px] sm:text-[13px]",
+            className,
+          )}
+          currentTime={currentTime}
+          dndListeners={dndListeners}
+          dndAttributes={dndAttributes}
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
+        >
+          {children || (
+            <span className="truncate flex items-center gap-1">
+              <span className="truncate">{event.title}</span>
             </span>
-          </div>
-        ) : (
-          // Longer events - mobile optimized layout
-          <>
+          )}
+        </EventWrapper>
+      );
+    }
+
+    if (view === "week" || view === "day") {
+      return (
+        <EventWrapper
+          event={event}
+          isFirstDay={isFirstDay}
+          isLastDay={isLastDay}
+          isDragging={isDragging}
+          onClick={onClick}
+          className={cn(
+            "py-0.5 sm:py-1",
+            durationMinutes < 45 ? "items-center" : "flex-col",
+            // Enhanced mobile typography and sizing with better text wrapping
+            view === "week"
+              ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal"
+              : "text-[13px]",
+            className,
+          )}
+          currentTime={currentTime}
+          dndListeners={dndListeners}
+          dndAttributes={dndAttributes}
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
+        >
+          {durationMinutes < 45 ? (
+            // Short events - mobile optimized layout
             <div className="flex items-start gap-0.5 w-full min-w-0">
               <span
                 className={cn(
                   "font-medium flex-1 min-w-0",
-                  // On mobile, allow text wrapping for week view
+                  // On mobile, allow text wrapping for very narrow events
                   view === "week"
-                    ? "break-words hyphens-auto leading-tight sm:truncate"
+                    ? "break-words hyphens-auto sm:truncate"
                     : "truncate",
                 )}
                 title={event.title} // Tooltip for full title on hover/long press
@@ -312,44 +301,65 @@ export function EventItem({
                 {event.title}
               </span>
             </div>
-          </>
-        )}
-      </EventWrapper>
-    );
-  }
+          ) : (
+            // Longer events - mobile optimized layout
+            <>
+              <div className="flex items-start gap-0.5 w-full min-w-0">
+                <span
+                  className={cn(
+                    "font-medium flex-1 min-w-0",
+                    // On mobile, allow text wrapping for week view
+                    view === "week"
+                      ? "break-words hyphens-auto leading-tight sm:truncate"
+                      : "truncate",
+                  )}
+                  title={event.title} // Tooltip for full title on hover/long press
+                >
+                  {event.title}
+                </span>
+              </div>
+            </>
+          )}
+        </EventWrapper>
+      );
+    }
 
-  // Agenda view - kept separate since it's significantly different
-  return (
-    <button
-      className={cn(
-        "focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded p-2 text-left transition outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90",
-        getEventColorClasses(eventColor),
-        className,
-      )}
-      style={getEventColorStyles(eventColor)}
-      data-past-event={isPast(new Date(event.end)) || undefined}
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      {...dndListeners}
-      {...dndAttributes}
-    >
-      <div className="text-sm font-medium flex items-center gap-2">
-        <span className="truncate">{event.title}</span>
-      </div>
-      {!event.allDay && (
-        <div className="text-xs opacity-70">{getEventTime()}</div>
-      )}
-      {event.location && (
-        <div className="text-xs opacity-70">
-          <span>{event.location}</span>
+    // Agenda view - kept separate since it's significantly different
+    return (
+      <button
+        className={cn(
+          "focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded p-2 text-left transition outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90",
+          getEventColorClasses(eventColor),
+          className,
+        )}
+        style={getEventColorStyles(eventColor)}
+        data-past-event={isPast(new Date(event.end)) || undefined}
+        data-event-id={event.id}
+        onClick={onClick}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        {...dndListeners}
+        {...dndAttributes}
+      >
+        <div className="text-sm font-medium flex items-center gap-2">
+          <span className="truncate">{event.title}</span>
         </div>
-      )}
-      {event.description && (
-        <div className="my-1 text-xs opacity-90">
-          {formatEventDescription(event.description)}
-        </div>
-      )}
-    </button>
-  );
+        {!event.allDay && (
+          <div className="text-xs opacity-70">{getEventTime()}</div>
+        )}
+        {event.location && (
+          <div className="text-xs opacity-70">
+            <span>{event.location}</span>
+          </div>
+        )}
+        {event.description && (
+          <div className="my-1 text-xs opacity-90">
+            {formatEventDescription(event.description)}
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  return renderEventContent();
 }

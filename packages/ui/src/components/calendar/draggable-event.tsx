@@ -22,6 +22,10 @@ interface DraggableEventProps {
   "aria-hidden"?: boolean | "true" | "false";
   timeFormat?: "12h" | "24h";
   timezone?: string;
+  // Context menu actions
+  onEdit?: (event: CalendarEvent) => void;
+  onDelete?: (event: CalendarEvent) => void;
+  onView?: (event: CalendarEvent) => void;
 }
 
 export function DraggableEvent({
@@ -37,6 +41,9 @@ export function DraggableEvent({
   "aria-hidden": ariaHidden,
   timeFormat = "12h",
   timezone,
+  onEdit,
+  onDelete,
+  onView,
 }: DraggableEventProps) {
   const { activeId } = useCalendarDnd();
   const elementRef = useRef<HTMLDivElement>(null);
@@ -142,6 +149,9 @@ export function DraggableEvent({
         aria-hidden={ariaHidden}
         timeFormat={timeFormat}
         timezone={timezone}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onView={onView}
       />
     </div>
   );

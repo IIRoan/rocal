@@ -115,6 +115,7 @@ interface EventEditorProps {
   localSettings: UserSettings;
   editorMode?: EventEditorMode;
   anchorPosition?: { x: number; y: number } | null;
+  initialEventViewMode?: "view" | "edit";
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
 }
 
@@ -127,6 +128,7 @@ export function EventEditor({
   localSettings,
   editorMode = "modal",
   anchorPosition = null,
+  initialEventViewMode = "view",
   updatePreviewEvent,
 }: EventEditorProps) {
   const calendarData = useSharedCalendarData();
@@ -158,12 +160,19 @@ export function EventEditor({
   useEffect(() => {
     if (eventToEdit && open) {
       eventForm.loadEventData(eventToEdit);
+      if (
+        eventToEdit.id &&
+        initialEventViewMode === "edit" &&
+        !eventToEdit.isSynced
+      ) {
+        eventForm.setEventViewMode("edit");
+      }
       // Auto-expand fields if they have data
       if (eventToEdit.description) setShowDescription(true);
       if (eventToEdit.location) setShowLocation(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventToEdit, open]);
+  }, [eventToEdit, open, initialEventViewMode]);
 
   // Sync form changes to preview event in real-time (popover mode only)
   // Guard against infinite loops by diff-checking the outgoing payload

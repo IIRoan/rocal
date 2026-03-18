@@ -54,6 +54,7 @@ interface CommandPaletteProps {
   initialSearchQuery?: string;
   eventEditorMode?: EventEditorMode;
   popoverAnchorPosition?: { x: number; y: number } | null;
+  initialEventViewMode?: "view" | "edit";
   previewEvent?: CalendarEvent | null;
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
 }
@@ -67,6 +68,7 @@ export function CommandPalette({
   initialSearchQuery = "",
   eventEditorMode = "modal",
   popoverAnchorPosition = null,
+  initialEventViewMode = "view",
   previewEvent = null,
   updatePreviewEvent,
 }: CommandPaletteProps) {
@@ -347,6 +349,7 @@ export function CommandPalette({
         localSettings={localSettings}
         editorMode={eventEditorMode}
         anchorPosition={popoverAnchorPosition}
+        initialEventViewMode={initialEventViewMode}
         updatePreviewEvent={updatePreviewEvent}
       />
     );
