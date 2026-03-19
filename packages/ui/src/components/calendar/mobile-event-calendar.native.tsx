@@ -25,6 +25,7 @@ import type { CalendarEvent, CalendarView } from "./types";
 import { AgendaDaysToShow } from "./constants";
 import { eventOverlapsRange } from "./utils";
 import { MobileDayViewNative } from "./mobile-day-view.native";
+import { MobileAgendaViewNative } from "./mobile-agenda-view.native";
 import { MobileMonthViewNative } from "./mobile-month-view.native";
 import { MobileWeekViewNative } from "./mobile-week-view.native";
 import {
@@ -54,6 +55,7 @@ export function MobileEventCalendar({
   defaultCalendarId = null,
   weekStartDay = 1,
   workingDays = [1, 2, 3, 4, 5],
+  timeFormat = "24h",
   timezone,
   showHeader = true,
   showViewSwitch = true,
@@ -136,14 +138,6 @@ export function MobileEventCalendar({
     [events, dateRange],
   );
 
-  const selectedDayEvents = useMemo(
-    () =>
-      rangeEvents.filter((event) =>
-        eventOverlapsRange(event, startOfDay(selectedDate), endOfDaySafe(selectedDate)),
-      ),
-    [rangeEvents, selectedDate],
-  );
-
   const daysForStrip = useMemo(() => {
     const start =
       view === "week"
@@ -203,8 +197,6 @@ export function MobileEventCalendar({
       setCreating(false);
     }
   };
-
-  const visibleEvents = view === "day" ? rangeEvents : selectedDayEvents;
 
   return (
     <View style={styles.container}>
@@ -296,6 +288,7 @@ export function MobileEventCalendar({
             }}
             timezone={timezone}
             workingDays={workingDays}
+            timeFormat={timeFormat}
           />
         ) : null}
 
@@ -318,24 +311,18 @@ export function MobileEventCalendar({
             weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
             timezone={timezone}
             workingDays={workingDays}
+            timeFormat={timeFormat}
           />
         ) : null}
 
         {view === "agenda" ? (
-          <ScrollView contentContainerStyle={[styles.eventsList, { paddingBottom: contentInsetBottom }]}>
-            {visibleEvents.map((event) => (
-              <View key={event.id} style={styles.eventCard}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventMeta}>
-                  {format(new Date(event.start), "EEE d MMM, HH:mm")} - {format(new Date(event.end), "HH:mm")}
-                </Text>
-                {!!event.location && <Text style={styles.eventMeta}>{event.location}</Text>}
-              </View>
-            ))}
-            {!loading && visibleEvents.length === 0 ? (
-              <Text style={styles.emptyText}>No events for this range.</Text>
-            ) : null}
-          </ScrollView>
+          <MobileAgendaViewNative
+            currentDate={currentDate}
+            events={rangeEvents}
+            onEventSelect={() => {}}
+            timeFormat={timeFormat}
+            timezone={timezone}
+          />
         ) : null}
       </View>
 
