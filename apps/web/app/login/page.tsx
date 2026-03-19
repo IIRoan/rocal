@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { signIn, authClient, useSession } from "@/lib/auth-client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Github, Key, Shield, Check } from "lucide-react";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
 
-export default function LoginPage() {
+function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,14 +29,12 @@ export default function LoginPage() {
     return nextPath;
   }, [nextPath]);
 
-  // Monitor session changes and redirect when authenticated
   const handleSessionRedirect = useCallback(() => {
     if (session?.user) {
       router.replace(getRedirectTarget());
     }
   }, [session, router, getRedirectTarget]);
 
-  // Check if user is already logged in and redirect
   useEffect(() => {
     if (!isPending) {
       setIsCheckingSession(false);
@@ -44,7 +42,6 @@ export default function LoginPage() {
     }
   }, [session, isPending, handleSessionRedirect]);
 
-  // Check if passkeys are supported (but don't auto-trigger)
   useEffect(() => {
     if (typeof window !== "undefined" && window.PublicKeyCredential) {
       setIsPasskeySupported(true);
@@ -95,7 +92,6 @@ export default function LoginPage() {
     }
   };
 
-  // Loading state while checking session
   if (isPending || isCheckingSession) {
     return (
       <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex items-center justify-center px-4 py-6 sm:py-8">
@@ -149,7 +145,6 @@ export default function LoginPage() {
           <div className="space-y-3">
             {isPasskeySupported ? (
               <>
-                {/* GitHub first */}
                 <Button
                   onClick={handleGitHubLogin}
                   disabled={isLoading}
@@ -180,7 +175,6 @@ export default function LoginPage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
 
-                {/* Passkey second */}
                 <Button
                   onClick={handlePasskeyLogin}
                   disabled={passkeyLoading}
@@ -240,5 +234,39 @@ export default function LoginPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+function LoginLoading() {
+  return (
+    <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex items-center justify-center px-4 py-6 sm:py-8">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <Logo
+          width={56}
+          height={56}
+          className="text-primary"
+          aria-label="Solace"
+        />
+        <div
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+            aria-hidden="true"
+          />
+          <span>Loading…</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
   );
 }
