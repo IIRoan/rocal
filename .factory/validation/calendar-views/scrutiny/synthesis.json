@@ -1,0 +1,45 @@
+{
+  "milestone": "calendar-views",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "cd apps/mobile ; bun run typecheck ; if ($?) { cd ../.. ; cd apps/mobile ; bun run lint }", "exitCode": 0 },
+    "typecheck": { "passed": true, "command": "cd apps/mobile ; bun run typecheck", "exitCode": 0 },
+    "lint": { "passed": true, "command": "cd apps/mobile ; bun run lint", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Added documentation for using hitSlop to meet touch target requirements on small UI elements.",
+      "sourceFeature": "calendar-week-view"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Do not assume `jq` is available (especially on Windows). Recommend using Python or Node.js scripts for JSON parsing.",
+      "evidence": "calendar-day-view worker had to fall back to a Python one-liner because jq was missing.",
+      "isSystemic": true
+    },
+    {
+      "target": "services.yaml",
+      "suggestion": "Update command definitions to avoid using `&&` for chaining, as it is not universally supported in PowerShell. Consider splitting chained commands or using PowerShell-compatible syntax like `; if ($?) { ... }`.",
+      "evidence": "calendar-day-view worker had to manually split the `test` command from services.yaml because of syntax errors on Windows.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Worker executed .factory/init.sh directly.",
+      "reason": "Internal script, not meant to be documented for manual worker execution."
+    }
+  ],
+  "previousRound": null
+}

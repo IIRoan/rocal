@@ -1,0 +1,33 @@
+{
+  "featureId": "calendar-week-view",
+  "reviewedAt": "2026-03-20T00:00:00Z",
+  "commitId": "1e2d40ec27b5b36ad3e1ddb71632ebe43f2335aa",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The mobile week view was successfully ported to use NativeWind v5 Tailwind classes. It correctly implements the 7-day columns, time grid, overlapping positioned events, and current time indicator. Touch targets are appropriately sized using `min-h-11` and `hitSlop`. One minor omission is that all-day events are filtered out but not rendered in the header as they are in the web version.",
+    "issues": [
+      {
+        "file": "packages/ui/src/components/calendar/mobile-week-view.native.tsx",
+        "line": 139,
+        "severity": "non_blocking",
+        "description": "All-day and multi-day events are filtered out of the day grid but are not rendered anywhere in the week view, unlike the web version which renders them in the day header."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "commands",
+      "observation": "Worker executed `.factory/init.sh` directly. This script is not documented in AGENTS.md or services.yaml commands. Services.yaml lists `install` as `cd apps/mobile && bun install`.",
+      "evidence": "Transcript shows execution of `sh \"C:/Users/Roan/Documents/rocal/.factory/init.sh\"` during verification."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Worker used React Native's `hitSlop` property to achieve the 44pt touch target requirement on the 13px quarter-hour cells without altering the grid layout. This is an elegant pattern for mobile that isn't documented in the shared knowledge base but should be.",
+      "evidence": "packages/ui/src/components/calendar/mobile-week-view.native.tsx line 309 uses `hitSlop={16}`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Passed review. The component meets all requirements, using NativeWind classes correctly and matching the web layout's structure. Missing all-day event rendering noted as a non-blocking issue."
+}
