@@ -25,6 +25,7 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useMemo, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 type CalendarAssistantResponse = {
   reply: string;
@@ -535,5 +536,18 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
-  return <DashboardContent />;
+  return (
+    <Suspense fallback={
+      <>
+        <DashboardSkeleton />
+        <PageLoadingOverlay
+          isLoading={true}
+          messageContext="AUTH_FLOW"
+          enableCycling={true}
+        />
+      </>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
 }
