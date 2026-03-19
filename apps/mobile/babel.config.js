@@ -13,6 +13,7 @@ module.exports = function (api) {
             '@workspace/calendar-client': '../../packages/calendar-client/src/index.ts',
             '@workspace/calendar-core': '../../packages/calendar-core/src/index.ts',
             '@workspace/ui/components/calendar': '../../packages/ui/src/components/calendar/index.ts',
+            '@workspace/ui/components/mobile': '../../packages/ui/src/components/mobile/index.ts',
           },
           extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
         },

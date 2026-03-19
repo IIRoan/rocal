@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --bun next dev",
+    "dev": "bun --bun next dev --webpack",
     "build": "bun --bun next build --webpack",
     "start": "bun --bun next start",
     "lint": "eslint .",
