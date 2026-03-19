@@ -55,7 +55,6 @@ import {
 import { ThemeToggle } from "../layout/theme-toggle";
 import { useDropdownShortcuts } from "../../hooks";
 import {
-  mobileCalendarTokens,
   type SharedMobileEventCalendarProps,
 } from "./mobile-calendar-shared";
 
@@ -600,9 +599,6 @@ export function MobileEventCalendar({
                     <Button
                       variant="outline"
                       className="gap-1.5 max-sm:h-8 max-sm:px-2! max-sm:gap-1"
-                      style={{
-                        borderColor: mobileCalendarTokens.colors.border,
-                      }}
                       disabled={loading}
                     >
                       <span className="capitalize">{view}</span>

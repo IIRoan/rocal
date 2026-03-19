@@ -1,12 +1,5 @@
 import React, { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import {
   addDays,
   addMonths,
@@ -21,6 +14,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
+
 import type { CalendarEvent, CalendarView } from "./types";
 import { AgendaDaysToShow } from "./constants";
 import { eventOverlapsRange } from "./utils";
@@ -28,13 +22,10 @@ import { MobileDayViewNative } from "./mobile-day-view.native";
 import { MobileAgendaViewNative } from "./mobile-agenda-view.native";
 import { MobileMonthViewNative } from "./mobile-month-view.native";
 import { MobileWeekViewNative } from "./mobile-week-view.native";
-import {
-  mobileCalendarTokens,
-  type SharedMobileEventCalendarProps,
-} from "./mobile-calendar-shared";
+import { cn } from "../../lib/utils";
+import { type SharedMobileEventCalendarProps } from "./mobile-calendar-shared";
 
-export interface MobileEventCalendarProps
-  extends SharedMobileEventCalendarProps {
+export interface MobileEventCalendarProps extends SharedMobileEventCalendarProps {
   events?: CalendarEvent[];
   error?: { message?: string } | null;
 }
@@ -64,7 +55,6 @@ export function MobileEventCalendar({
 }: MobileEventCalendarProps) {
   const [uncontrolledView, setUncontrolledView] = useState<CalendarView>(initialView);
   const [uncontrolledCurrentDate, setUncontrolledCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [creating, setCreating] = useState(false);
 
   const view = controlledView ?? uncontrolledView;
@@ -138,29 +128,30 @@ export function MobileEventCalendar({
     [events, dateRange],
   );
 
-  const daysForStrip = useMemo(() => {
-    const start =
-      view === "week"
-        ? startOfWeek(currentDate, {
-            weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-          })
-        : startOfDay(currentDate);
-    const count = view === "week" ? 7 : view === "agenda" ? AgendaDaysToShow : 1;
-    return Array.from({ length: count }, (_, index) => addDays(start, index));
+  const daysForWeekStrip = useMemo(() => {
+    if (view !== "week") return [];
+    const start = startOfWeek(currentDate, {
+      weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+    });
+
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }, [currentDate, view, weekStartDay]);
 
   const headerTitle = useMemo(() => {
     if (view === "month") return format(currentDate, "MMMM yyyy");
+
     if (view === "week") {
-      const start = daysForStrip[0] || currentDate;
-      const end = daysForStrip[daysForStrip.length - 1] || currentDate;
+      const start = daysForWeekStrip[0] || currentDate;
+      const end = daysForWeekStrip[daysForWeekStrip.length - 1] || currentDate;
       return `${format(start, "MMM d")} - ${format(end, "MMM d")}`;
     }
+
     if (view === "agenda") {
-      return `${format(daysForStrip[0] || currentDate, "MMM d")} onward`;
+      return `${format(currentDate, "MMM d")} onward`;
     }
+
     return format(currentDate, "EEEE, MMM d");
-  }, [currentDate, view, daysForStrip]);
+  }, [currentDate, view, daysForWeekStrip]);
 
   const navigate = (direction: -1 | 1) => {
     if (view === "month") {
@@ -199,28 +190,48 @@ export function MobileEventCalendar({
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-background">
       {showHeader ? (
-        <View style={styles.header}>
-          <Pressable onPress={() => navigate(-1)} style={styles.navButton}>
-            <Text style={styles.navText}>{"<"}</Text>
+        <View className="flex-row items-center justify-between px-4 pb-2 pt-2">
+          <Pressable
+            onPress={() => navigate(-1)}
+            className="min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-card"
+            accessibilityRole="button"
+            accessibilityLabel="Previous"
+          >
+            <Text className="text-lg font-bold text-foreground">{"<"}</Text>
           </Pressable>
-          <Text style={styles.title}>{headerTitle}</Text>
-          <Pressable onPress={() => navigate(1)} style={styles.navButton}>
-            <Text style={styles.navText}>{">"}</Text>
+
+          <Text className="text-base font-bold text-foreground">{headerTitle}</Text>
+
+          <Pressable
+            onPress={() => navigate(1)}
+            className="min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-card"
+            accessibilityRole="button"
+            accessibilityLabel="Next"
+          >
+            <Text className="text-lg font-bold text-foreground">{">"}</Text>
           </Pressable>
         </View>
       ) : null}
 
       {showViewSwitch ? (
-        <View style={styles.viewSwitch}>
+        <View className="mx-4 mb-2 flex-row rounded-xl border border-border bg-muted/35 p-1">
           {views.map((item) => (
             <Pressable
               key={item}
               onPress={() => setView(item)}
-              style={[styles.viewSwitchItem, view === item && styles.viewSwitchItemActive]}
+              className={cn(
+                "min-h-11 flex-1 items-center justify-center rounded-lg",
+                view === item ? "bg-primary" : "bg-transparent",
+              )}
             >
-              <Text style={[styles.viewSwitchText, view === item && styles.viewSwitchTextActive]}>
+              <Text
+                className={cn(
+                  "text-xs font-semibold uppercase",
+                  view === item ? "text-primary-foreground" : "text-muted-foreground",
+                )}
+              >
                 {item}
               </Text>
             </Pressable>
@@ -228,44 +239,70 @@ export function MobileEventCalendar({
         </View>
       ) : null}
 
-      {(view === "week" || view === "agenda") && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayStrip}>
-          {daysForStrip.map((day) => {
-            const selected = isSameDay(day, selectedDate);
-            const count = rangeEvents.filter((event) => isSameDay(new Date(event.start), day)).length;
-            return (
-              <Pressable
-                key={day.toISOString()}
-                onPress={() => setSelectedDate(day)}
-                style={[styles.dayPill, selected && styles.dayPillActive]}
-              >
-                <Text style={[styles.dayPillWeekday, selected && styles.dayPillTextActive]}>
-                  {format(day, "EEE")}
-                </Text>
-                <Text style={[styles.dayPillDate, selected && styles.dayPillTextActive]}>
-                  {format(day, "d")}
-                </Text>
-                <Text style={[styles.dayPillCount, selected && styles.dayPillTextActive]}>{count}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
+      {showViewSwitch && view === "week" ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}
+        >
+          <View className="flex-row gap-2">
+            {daysForWeekStrip.map((day) => {
+              const selected = isSameDay(day, currentDate);
+              const count = rangeEvents.filter((event) =>
+                eventOverlapsRange(event, startOfDay(day), endOfDaySafe(day), "day"),
+              ).length;
 
-      <View style={styles.content}>
+              return (
+                <Pressable
+                  key={day.toISOString()}
+                  onPress={() => setCurrentDate(day)}
+                  className={cn(
+                    "min-h-11 w-[68px] items-center justify-center rounded-xl border px-2 py-1",
+                    selected
+                      ? "border-primary bg-primary"
+                      : "border-border bg-muted/35",
+                  )}
+                >
+                  <Text
+                    className={cn(
+                      "text-[10px] font-semibold uppercase",
+                      selected ? "text-primary-foreground/75" : "text-muted-foreground",
+                    )}
+                  >
+                    {format(day, "EEE")}
+                  </Text>
+                  <Text
+                    className={cn(
+                      "text-base font-bold",
+                      selected ? "text-primary-foreground" : "text-foreground",
+                    )}
+                  >
+                    {format(day, "d")}
+                  </Text>
+                  <Text
+                    className={cn(
+                      "text-[10px] font-medium",
+                      selected ? "text-primary-foreground/75" : "text-muted-foreground",
+                    )}
+                  >
+                    {count}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      ) : null}
+
+      <View className="flex-1">
         {view === "month" ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: contentInsetBottom }}>
+          <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: contentInsetBottom }}>
             <MobileMonthViewNative
               currentDate={currentDate}
-              selectedDate={selectedDate}
+              selectedDate={currentDate}
               events={rangeEvents}
               weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
-              onSelectDate={(day) => {
-                setSelectedDate(day);
-                if (!isSameDay(day, currentDate)) {
-                  setCurrentDate(day);
-                }
-              }}
+              onSelectDate={setCurrentDate}
             />
           </ScrollView>
         ) : null}
@@ -276,7 +313,7 @@ export function MobileEventCalendar({
             events={rangeEvents}
             onEventSelect={() => {}}
             onEventCreate={(startTime) => {
-              setSelectedDate(startTime);
+              setCurrentDate(startTime);
               if (!onCreateEvent || !defaultCalendarId) return;
               void onCreateEvent({
                 title: "New event",
@@ -298,7 +335,7 @@ export function MobileEventCalendar({
             events={rangeEvents}
             onEventSelect={() => {}}
             onEventCreate={(startTime) => {
-              setSelectedDate(startTime);
+              setCurrentDate(startTime);
               if (!onCreateEvent || !defaultCalendarId) return;
               void onCreateEvent({
                 title: "New event",
@@ -327,17 +364,24 @@ export function MobileEventCalendar({
       </View>
 
       {loading ? (
-        <View style={styles.loadingOverlay}>
+        <View className="absolute right-3 top-3 flex-row items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5">
           <ActivityIndicator size="small" />
-          <Text style={styles.loadingText}>Loading events...</Text>
+          <Text className="text-xs text-muted-foreground">Loading events...</Text>
         </View>
       ) : null}
 
-      {!!error?.message && <Text style={styles.errorText}>{error.message}</Text>}
+      {!!error?.message ? <Text className="px-3 pb-2 text-xs text-destructive">{error.message}</Text> : null}
 
       {showCreateButton ? (
-        <Pressable style={styles.createButton} onPress={() => void handleQuickCreate()}>
-          <Text style={styles.createButtonText}>{creating ? "..." : "+"}</Text>
+        <Pressable
+          className="absolute bottom-4 right-4 h-14 w-14 items-center justify-center rounded-full bg-primary"
+          onPress={() => void handleQuickCreate()}
+          accessibilityRole="button"
+          accessibilityLabel="Add event"
+        >
+          <Text className="mt-[-2px] text-3xl font-semibold text-primary-foreground">
+            {creating ? "..." : "+"}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -349,125 +393,3 @@ function endOfDaySafe(date: Date) {
   end.setHours(23, 59, 59, 999);
   return end;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: mobileCalendarTokens.colors.background },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: mobileCalendarTokens.spacing.md,
-    paddingVertical: mobileCalendarTokens.spacing.md,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  navButton: {
-    width: mobileCalendarTokens.sizes.iconButton,
-    height: mobileCalendarTokens.sizes.iconButton,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: mobileCalendarTokens.radius.md,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  navText: { fontSize: 20, color: mobileCalendarTokens.colors.text, fontWeight: "700" },
-  title: {
-    fontSize: mobileCalendarTokens.typography.heading.size,
-    fontWeight: mobileCalendarTokens.typography.heading.weight,
-    color: mobileCalendarTokens.colors.text,
-  },
-  viewSwitch: {
-    flexDirection: "row",
-    marginHorizontal: mobileCalendarTokens.spacing.md,
-    marginBottom: mobileCalendarTokens.spacing.sm,
-    borderRadius: mobileCalendarTokens.radius.lg,
-    backgroundColor: mobileCalendarTokens.colors.surfaceMuted,
-    padding: 4,
-  },
-  viewSwitchItem: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: mobileCalendarTokens.radius.sm,
-    alignItems: "center",
-  },
-  viewSwitchItemActive: { backgroundColor: mobileCalendarTokens.colors.surface },
-  viewSwitchText: {
-    textTransform: "capitalize",
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  viewSwitchTextActive: { color: mobileCalendarTokens.colors.text },
-  dayStrip: {
-    paddingHorizontal: mobileCalendarTokens.spacing.md,
-    paddingBottom: mobileCalendarTokens.spacing.sm,
-    gap: mobileCalendarTokens.spacing.sm,
-  },
-  dayPill: {
-    width: mobileCalendarTokens.sizes.dayPillWidth,
-    borderRadius: mobileCalendarTokens.radius.lg,
-    backgroundColor: mobileCalendarTokens.colors.surfaceMuted,
-    paddingVertical: 8,
-    alignItems: "center",
-    gap: 2,
-  },
-  dayPillActive: { backgroundColor: mobileCalendarTokens.colors.primary },
-  dayPillWeekday: { fontSize: 11, color: mobileCalendarTokens.colors.textMuted, fontWeight: "700" },
-  dayPillDate: { fontSize: 16, fontWeight: "700", color: mobileCalendarTokens.colors.text },
-  dayPillCount: { fontSize: 10, color: mobileCalendarTokens.colors.textMuted },
-  dayPillTextActive: { color: mobileCalendarTokens.colors.textOnPrimary },
-  content: { flex: 1 },
-  monthGrid: { padding: mobileCalendarTokens.spacing.md, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  monthCell: {
-    width: "13.2%",
-    minHeight: 72,
-    borderRadius: mobileCalendarTokens.radius.lg,
-    padding: 8,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    justifyContent: "space-between",
-  },
-  monthCellMuted: { opacity: 0.5 },
-  monthDate: { fontSize: 12, fontWeight: "700", color: mobileCalendarTokens.colors.text },
-  monthCount: { fontSize: 10, color: mobileCalendarTokens.colors.accentStrong, fontWeight: "600" },
-  eventsList: { paddingHorizontal: mobileCalendarTokens.spacing.md, gap: 10 },
-  eventCard: {
-    borderRadius: mobileCalendarTokens.radius.lg,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    padding: 12,
-  },
-  eventTitle: { fontSize: 14, fontWeight: "700", color: mobileCalendarTokens.colors.text },
-  eventMeta: { marginTop: 2, fontSize: 12, color: mobileCalendarTokens.colors.textSubtle },
-  emptyText: { marginTop: 20, textAlign: "center", color: mobileCalendarTokens.colors.textMuted },
-  loadingOverlay: {
-    position: "absolute",
-    top: 76,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: mobileCalendarTokens.radius.pill,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  loadingText: { fontSize: 12, color: mobileCalendarTokens.colors.textSubtle },
-  errorText: { color: mobileCalendarTokens.colors.danger, fontSize: 12, paddingHorizontal: 12, paddingBottom: 8 },
-  createButton: {
-    position: "absolute",
-    right: 16,
-    bottom: 18,
-    width: mobileCalendarTokens.sizes.fab,
-    height: mobileCalendarTokens.sizes.fab,
-    borderRadius: mobileCalendarTokens.sizes.fab / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileCalendarTokens.colors.primary,
-  },
-  createButtonText: { color: mobileCalendarTokens.colors.textOnPrimary, fontSize: 28, marginTop: -2 },
-});

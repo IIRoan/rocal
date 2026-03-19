@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { mobileCalendarTokens } from "../calendar/mobile-calendar-shared";
+import { mobileCalendarTokens } from "./mobile-design-tokens";
 
 interface MobileAccountScreenProps {
   userName?: string | null;

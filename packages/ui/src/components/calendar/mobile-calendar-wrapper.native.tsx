@@ -1,26 +1,21 @@
 import React from "react";
-import {
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { calendarApiService, type UserSettings } from "@workspace/calendar-client";
+
 import { MobileEventCalendar } from "./mobile-event-calendar.native";
 import { StickyMiniCalendarNative } from "./sticky-mini-calendar.native";
 import { useSharedCalendarData } from "./calendar-data-provider";
 import { MobileSidebarDrawer } from "../layout/mobile-sidebar-drawer.native";
 import type { CalendarView } from "./types";
 import {
-  mobileCalendarTokens,
   nextMobileCalendarView,
   parseWorkingDays,
   sharedMobileViewLabels,
   type SharedMobileCalendarWrapperProps,
 } from "./mobile-calendar-shared";
+import { cn } from "../../lib/utils";
 
 type MobileCalendarWrapperProps = SharedMobileCalendarWrapperProps;
 
@@ -31,7 +26,7 @@ const defaultSettings: Pick<UserSettings, "defaultView" | "weekStartDay" | "time
   workingDays: "[1,2,3,4,5]",
 };
 
-const drawerWidth = Math.min(Dimensions.get("window").width * 0.88, 380);
+const VIEW_OPTIONS: CalendarView[] = ["month", "week", "day", "agenda"];
 
 export function MobileCalendarWrapper({
   user,
@@ -115,10 +110,6 @@ export function MobileCalendarWrapper({
     calendarData.calendars[0]?.id ||
     null;
 
-  const openDrawer = React.useCallback(() => {
-    setDrawerOpen(true);
-  }, []);
-
   const handleQuickCreate = React.useCallback(async () => {
     if (!effectiveDefaultCalendarId) return;
     const createEvent = onCreateEvent ?? calendarData.createEvent;
@@ -162,27 +153,53 @@ export function MobileCalendarWrapper({
     [calendarData, calendarVisibility],
   );
 
-  const handleDrawerCreateEvent = React.useCallback(() => {
-    if (onOpenAddEvent) {
-      onOpenAddEvent();
-      return;
-    }
-
-    void handleQuickCreate();
-  }, [handleQuickCreate, onOpenAddEvent]);
-
   const showMiniCalendar = view === "day" || view === "week" || view === "agenda";
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topBar}>
-        <View style={styles.topCopy}>
-          <Text style={styles.topEyebrow}>Workspace</Text>
-          <Text style={styles.topTitle}>{format(currentDate, view === "day" ? "EEEE, MMM d" : "MMMM yyyy")}</Text>
+    <View className="flex-1 bg-background">
+      <View className="flex-row items-center justify-between px-4 pb-2 pt-2">
+        <View>
+          <Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Workspace
+          </Text>
+          <Text className="text-lg font-bold text-foreground">
+            {format(currentDate, view === "day" ? "EEEE, MMM d" : "MMMM yyyy")}
+          </Text>
         </View>
-        <Pressable style={styles.topAction} onPress={openDrawer}>
-          <Text style={styles.topActionText}>Menu</Text>
+
+        <Pressable
+          className="min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-card px-3"
+          onPress={() => setDrawerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
+          <Text className="text-xs font-semibold uppercase text-foreground">Menu</Text>
         </Pressable>
+      </View>
+
+      <View className="mx-4 mb-2 flex-row rounded-xl border border-border bg-muted/35 p-1">
+        {VIEW_OPTIONS.map((option) => {
+          const active = view === option;
+          return (
+            <Pressable
+              key={option}
+              onPress={() => setView(option)}
+              className={cn(
+                "min-h-11 flex-1 items-center justify-center rounded-lg",
+                active ? "bg-primary" : "bg-transparent",
+              )}
+            >
+              <Text
+                className={cn(
+                  "text-xs font-semibold uppercase",
+                  active ? "text-primary-foreground" : "text-muted-foreground",
+                )}
+              >
+                {sharedMobileViewLabels[option]}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {showMiniCalendar ? (
@@ -212,26 +229,39 @@ export function MobileCalendarWrapper({
         weekStartDay={effectiveWeekStartDay}
         workingDays={effectiveWorkingDays}
         timezone={effectiveTimezone}
+        showHeader={false}
         showViewSwitch={false}
         showCreateButton={false}
-        contentInsetBottom={112}
+        contentInsetBottom={120}
       />
 
-      <View style={styles.bottomBar}>
-        <Pressable style={styles.bottomButton} onPress={() => setCurrentDate(new Date())}>
-          <Text style={styles.bottomButtonLabel}>Today</Text>
-        </Pressable>
+      <View className="absolute bottom-3 left-3 right-3 flex-row items-center gap-2 rounded-2xl border border-border bg-card/95 p-2">
         <Pressable
-          style={styles.bottomButtonPrimary}
+          className="min-h-11 flex-1 items-center justify-center rounded-xl bg-muted/35"
+          onPress={() => setCurrentDate(new Date())}
+        >
+          <Text className="text-xs font-semibold uppercase text-foreground">Today</Text>
+        </Pressable>
+
+        <Pressable
+          className="min-h-11 min-w-11 items-center justify-center rounded-xl bg-primary px-4"
           onPress={() => (onOpenAddEvent ? onOpenAddEvent() : void handleQuickCreate())}
         >
-          <Text style={styles.bottomButtonPrimaryLabel}>Add</Text>
+          <Text className="text-xl font-bold text-primary-foreground">+</Text>
         </Pressable>
-        <Pressable style={styles.bottomButton} onPress={() => setView(nextMobileCalendarView(view))}>
-          <Text style={styles.bottomButtonLabel}>{sharedMobileViewLabels[view]}</Text>
+
+        <Pressable
+          className="min-h-11 flex-1 items-center justify-center rounded-xl bg-muted/35"
+          onPress={() => setView(nextMobileCalendarView(view))}
+        >
+          <Text className="text-xs font-semibold uppercase text-foreground">{sharedMobileViewLabels[view]}</Text>
         </Pressable>
-        <Pressable style={styles.bottomButton} onPress={openDrawer}>
-          <Text style={styles.bottomButtonLabel}>Menu</Text>
+
+        <Pressable
+          className="min-h-11 flex-1 items-center justify-center rounded-xl bg-muted/35"
+          onPress={() => setDrawerOpen(true)}
+        >
+          <Text className="text-xs font-semibold uppercase text-foreground">Menu</Text>
         </Pressable>
       </View>
 
@@ -247,285 +277,10 @@ export function MobileCalendarWrapper({
         currentDate={currentDate}
         onCurrentDateChange={setCurrentDate}
         onMiniCalendarMonthChange={onDateRangeChange ?? calendarData.setDateRange}
-        onCreateEvent={handleDrawerCreateEvent}
+        onCreateEvent={onOpenAddEvent ? onOpenAddEvent : () => void handleQuickCreate()}
         onOpenSettings={onOpenSettings}
         onOpenCalendarManagement={onOpenCalendarManagement}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: mobileCalendarTokens.spacing.lg,
-    paddingTop: mobileCalendarTokens.spacing.sm,
-    paddingBottom: mobileCalendarTokens.spacing.xs,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  topCopy: {
-    gap: 2,
-  },
-  topEyebrow: {
-    color: mobileCalendarTokens.colors.accent,
-    fontSize: mobileCalendarTokens.typography.eyebrow.size,
-    fontWeight: mobileCalendarTokens.typography.eyebrow.weight,
-    textTransform: "uppercase",
-    letterSpacing: mobileCalendarTokens.typography.eyebrow.letterSpacing,
-  },
-  topTitle: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: mobileCalendarTokens.typography.title.size,
-    fontWeight: mobileCalendarTokens.typography.title.weight,
-  },
-  topAction: {
-    borderRadius: mobileCalendarTokens.radius.pill,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  topActionText: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: mobileCalendarTokens.typography.body.size,
-    fontWeight: mobileCalendarTokens.typography.body.weight,
-  },
-  bottomBar: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 10,
-    borderRadius: mobileCalendarTokens.radius.nav,
-    backgroundColor: mobileCalendarTokens.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  bottomButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: mobileCalendarTokens.sizes.bottomBarMinHeight,
-    borderRadius: mobileCalendarTokens.radius.lg,
-    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
-  },
-  bottomButtonPrimary: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: mobileCalendarTokens.sizes.bottomBarMinHeight,
-    borderRadius: mobileCalendarTokens.radius.lg,
-    backgroundColor: mobileCalendarTokens.colors.primary,
-  },
-  bottomButtonLabel: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: mobileCalendarTokens.typography.body.size,
-    fontWeight: mobileCalendarTokens.typography.body.weight,
-  },
-  bottomButtonPrimaryLabel: {
-    color: mobileCalendarTokens.colors.textOnPrimary,
-    fontSize: mobileCalendarTokens.typography.body.size,
-    fontWeight: mobileCalendarTokens.typography.body.weight,
-  },
-  drawerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: mobileCalendarTokens.colors.overlay,
-  },
-  drawerPanel: {
-    width: drawerWidth,
-    height: "100%",
-    backgroundColor: mobileCalendarTokens.colors.background,
-    borderLeftWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingTop: 56,
-  },
-  drawerHandle: {
-    position: "absolute",
-    top: 12,
-    alignSelf: "center",
-    width: 44,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: mobileCalendarTokens.colors.border,
-  },
-  drawerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  drawerEyebrow: {
-    color: mobileCalendarTokens.colors.accent,
-    fontSize: mobileCalendarTokens.typography.eyebrow.size,
-    fontWeight: mobileCalendarTokens.typography.eyebrow.weight,
-    textTransform: "uppercase",
-    letterSpacing: mobileCalendarTokens.typography.eyebrow.letterSpacing,
-  },
-  drawerTitle: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  drawerClose: {
-    borderRadius: mobileCalendarTokens.radius.pill,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  drawerCloseText: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: mobileCalendarTokens.typography.body.size,
-    fontWeight: mobileCalendarTokens.typography.body.weight,
-  },
-  drawerContent: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 120,
-  },
-  sectionTitle: {
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: mobileCalendarTokens.typography.sectionTitle.size,
-    fontWeight: mobileCalendarTokens.typography.sectionTitle.weight,
-    textTransform: "uppercase",
-    letterSpacing: mobileCalendarTokens.typography.sectionTitle.letterSpacing,
-    marginTop: 4,
-  },
-  segmented: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  segmentButton: {
-    borderRadius: mobileCalendarTokens.radius.md,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  segmentButtonActive: {
-    backgroundColor: mobileCalendarTokens.colors.primary,
-    borderColor: mobileCalendarTokens.colors.primary,
-  },
-  segmentText: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: mobileCalendarTokens.typography.body.size,
-    fontWeight: mobileCalendarTokens.typography.body.weight,
-  },
-  segmentTextActive: {
-    color: mobileCalendarTokens.colors.textOnPrimary,
-  },
-  workdayGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  workdayPill: {
-    borderRadius: mobileCalendarTokens.radius.pill,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  workdayPillActive: {
-    backgroundColor: mobileCalendarTokens.colors.primary,
-    borderColor: mobileCalendarTokens.colors.primary,
-  },
-  workdayPillText: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  workdayPillTextActive: {
-    color: mobileCalendarTokens.colors.textOnPrimary,
-  },
-  calendarCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderRadius: mobileCalendarTokens.radius.xxl,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    padding: 16,
-  },
-  calendarCardMuted: {
-    opacity: 0.65,
-  },
-  calendarSwatch: {
-    width: 16,
-    height: 16,
-    borderRadius: 999,
-  },
-  calendarCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  calendarTitle: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  calendarMeta: {
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: 13,
-  },
-  calendarState: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  infoCard: {
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderRadius: mobileCalendarTokens.radius.xl,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    padding: 14,
-    gap: 4,
-  },
-  infoCardText: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  infoCardSubtext: {
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  accountRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderRadius: mobileCalendarTokens.radius.xl,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  accountLabel: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-});
