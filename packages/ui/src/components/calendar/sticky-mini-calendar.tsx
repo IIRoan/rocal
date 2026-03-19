@@ -264,7 +264,7 @@ export function StickyMiniCalendar({
 
         {/* Horizontal day strip with multi-day events - current week (only for week view) */}
         {showDayStrip && (
-          <div className="px-0 py-0">
+          <div className="px-0 py-0 border-b border-border/50">
             <div className="flex relative">
               {/* Time column spacer - matches timeline width */}
               <div className="w-11 flex-shrink-0" />
@@ -283,15 +283,9 @@ export function StickyMiniCalendar({
                   <div
                     key={day.toString()}
                     className={cn(
-                      "flex-1 min-w-0 text-center py-0 border-l border-border/50 first:border-l-0",
+                      "flex-1 min-w-0 text-center relative border-r border-border/50 last:border-r-0 pb-1",
                       isSelected && "text-primary",
-                      !isSelected && isCurrentDay && "bg-primary/10",
-                      !isSelected &&
-                        !isCurrentDay &&
-                        "hover:bg-accent/30 active:bg-accent/50",
-                      !workingDays.includes(day.getDay()) &&
-                        [0, 6].includes(day.getDay()) &&
-                        "bg-muted/30",
+                      !isSelected && "hover:bg-accent/30 active:bg-accent/50",
                     )}
                     onClick={() => setCurrentDate(day)}
                   >
@@ -319,6 +313,16 @@ export function StickyMiniCalendar({
                     >
                       {format(day, "d")}
                     </span>
+
+                    {/* Today indicator line */}
+                    <div
+                      className={cn(
+                        "h-0.5 rounded-full mx-auto mt-1 transition-all duration-200",
+                        isCurrentDay
+                          ? "bg-primary w-5"
+                          : "bg-transparent w-0",
+                      )}
+                    />
 
                     {/* Compact all-day/multi-day events */}
                     {dayAllDayEvents.length > 0 && (
