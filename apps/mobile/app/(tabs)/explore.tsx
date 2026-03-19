@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSharedCalendarData } from '@workspace/ui/components/calendar';
 
@@ -6,18 +7,20 @@ export default function SettingsScreen() {
   const { calendars, categories, eventsLoading, eventsError } = useSharedCalendarData();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Calendar setup</Text>
-      <Text style={styles.subtitle}>Mobile now uses shared calendar packages.</Text>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Calendar setup</Text>
+        <Text style={styles.subtitle}>Mobile now uses shared calendar packages.</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Status</Text>
-        <Text style={styles.row}>Calendars: {calendars.length}</Text>
-        <Text style={styles.row}>Categories: {categories.length}</Text>
-        <Text style={styles.row}>Sync: {eventsLoading ? 'Loading' : 'Ready'}</Text>
-        {!!eventsError && <Text style={styles.error}>{eventsError.message}</Text>}
-      </View>
-    </ScrollView>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Status</Text>
+          <Text style={styles.row}>Calendars: {calendars.length}</Text>
+          <Text style={styles.row}>Categories: {categories.length}</Text>
+          <Text style={styles.row}>Sync: {eventsLoading ? 'Loading' : 'Ready'}</Text>
+          {!!eventsError && <Text style={styles.error}>{eventsError.message}</Text>}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

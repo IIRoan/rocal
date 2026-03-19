@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -40,10 +41,12 @@ export default function RootLayout() {
   const [queryClient] = useState(() => getQueryClient());
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <CalendarDataProvider>
-        <RootLayoutContent />
-      </CalendarDataProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <CalendarDataProvider>
+          <RootLayoutContent />
+        </CalendarDataProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
