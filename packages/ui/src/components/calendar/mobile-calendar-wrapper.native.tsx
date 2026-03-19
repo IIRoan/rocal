@@ -1,21 +1,18 @@
 import React from "react";
 import {
-  Animated,
   Dimensions,
-  PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { format } from "date-fns";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { calendarApiService, type UserSettings } from "@workspace/calendar-client";
 import { MobileEventCalendar } from "./mobile-event-calendar.native";
 import { StickyMiniCalendarNative } from "./sticky-mini-calendar.native";
 import { useSharedCalendarData } from "./calendar-data-provider";
+import { MobileSidebarDrawer } from "../layout/mobile-sidebar-drawer.native";
 import type { CalendarView } from "./types";
 import {
   mobileCalendarTokens,
@@ -37,9 +34,11 @@ const defaultSettings: Pick<UserSettings, "defaultView" | "weekStartDay" | "time
 const drawerWidth = Math.min(Dimensions.get("window").width * 0.88, 380);
 
 export function MobileCalendarWrapper({
+  user,
   initialView = "day",
   defaultCalendarId,
   weekStartDay = 1,
+  onOpenCalendarManagement,
   onOpenAddEvent,
   onOpenSettings,
   onCreateEvent,
@@ -51,13 +50,11 @@ export function MobileCalendarWrapper({
   timezone,
 }: MobileCalendarWrapperProps) {
   const calendarData = useSharedCalendarData();
-  const queryClient = useQueryClient();
   const [view, setView] = React.useState<CalendarView>(initialView);
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [calendarVisibility, setCalendarVisibility] = React.useState<Record<string, boolean>>({});
   const [savingCalendarId, setSavingCalendarId] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const slideX = React.useRef(new Animated.Value(drawerWidth)).current;
 
   const settingsQuery = useQuery({
     queryKey: ["mobile-user-settings"],
@@ -94,13 +91,6 @@ export function MobileCalendarWrapper({
     });
   }, [calendarData.calendars]);
 
-  const settingsMutation = useMutation({
-    mutationFn: (updates: Partial<UserSettings>) => calendarApiService.updateUserSettings(updates),
-    onSuccess: (updatedSettings) => {
-      queryClient.setQueryData(["mobile-user-settings"], updatedSettings);
-    },
-  });
-
   const sourceEvents = events ?? calendarData.events;
 
   const visibleEvents = React.useMemo(() => {
@@ -125,50 +115,9 @@ export function MobileCalendarWrapper({
     calendarData.calendars[0]?.id ||
     null;
 
-  const animateDrawer = React.useCallback(
-    (open: boolean) => {
-      Animated.spring(slideX, {
-        toValue: open ? 0 : drawerWidth,
-        useNativeDriver: true,
-        bounciness: 0,
-      }).start(({ finished }) => {
-        if (finished) {
-          setDrawerOpen(open);
-        }
-      });
-    },
-    [slideX],
-  );
-
   const openDrawer = React.useCallback(() => {
     setDrawerOpen(true);
-    slideX.setValue(drawerWidth);
-    animateDrawer(true);
-  }, [animateDrawer, slideX]);
-
-  const closeDrawer = React.useCallback(() => {
-    animateDrawer(false);
-  }, [animateDrawer]);
-
-  const panResponder = React.useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 8,
-        onPanResponderMove: (_, gesture) => {
-          if (gesture.dx > 0) {
-            slideX.setValue(Math.min(drawerWidth, gesture.dx));
-          }
-        },
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx > drawerWidth * 0.25 || gesture.vx > 0.8) {
-            closeDrawer();
-          } else {
-            animateDrawer(true);
-          }
-        },
-      }),
-    [animateDrawer, closeDrawer, slideX],
-  );
+  }, []);
 
   const handleQuickCreate = React.useCallback(async () => {
     if (!effectiveDefaultCalendarId) return;
@@ -213,12 +162,14 @@ export function MobileCalendarWrapper({
     [calendarData, calendarVisibility],
   );
 
-  const handleUpdateSettings = React.useCallback(
-    async (updates: Partial<UserSettings>) => {
-      await settingsMutation.mutateAsync(updates);
-    },
-    [settingsMutation],
-  );
+  const handleDrawerCreateEvent = React.useCallback(() => {
+    if (onOpenAddEvent) {
+      onOpenAddEvent();
+      return;
+    }
+
+    void handleQuickCreate();
+  }, [handleQuickCreate, onOpenAddEvent]);
 
   const showMiniCalendar = view === "day" || view === "week" || view === "agenda";
 
@@ -229,8 +180,8 @@ export function MobileCalendarWrapper({
           <Text style={styles.topEyebrow}>Workspace</Text>
           <Text style={styles.topTitle}>{format(currentDate, view === "day" ? "EEEE, MMM d" : "MMMM yyyy")}</Text>
         </View>
-        <Pressable style={styles.topAction} onPress={onOpenSettings ?? openDrawer}>
-          <Text style={styles.topActionText}>Settings</Text>
+        <Pressable style={styles.topAction} onPress={openDrawer}>
+          <Text style={styles.topActionText}>Menu</Text>
         </Pressable>
       </View>
 
@@ -279,129 +230,29 @@ export function MobileCalendarWrapper({
         <Pressable style={styles.bottomButton} onPress={() => setView(nextMobileCalendarView(view))}>
           <Text style={styles.bottomButtonLabel}>{sharedMobileViewLabels[view]}</Text>
         </Pressable>
-        <Pressable style={styles.bottomButton} onPress={onOpenSettings ?? openDrawer}>
+        <Pressable style={styles.bottomButton} onPress={openDrawer}>
           <Text style={styles.bottomButtonLabel}>Menu</Text>
         </Pressable>
       </View>
 
-      {drawerOpen ? (
-        <View style={styles.drawerOverlay} pointerEvents="box-none">
-          <Pressable style={styles.backdrop} onPress={closeDrawer} />
-          <Animated.View
-            style={[styles.drawerPanel, { transform: [{ translateX: slideX }] }]}
-            {...panResponder.panHandlers}
-          >
-            <View style={styles.drawerHandle} />
-            <View style={styles.drawerHeader}>
-              <View>
-                <Text style={styles.drawerEyebrow}>Workspace</Text>
-                <Text style={styles.drawerTitle}>Settings</Text>
-              </View>
-              <Pressable style={styles.drawerClose} onPress={closeDrawer}>
-                <Text style={styles.drawerCloseText}>Done</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.drawerContent}>
-              <SectionTitle title="View" />
-              <View style={styles.segmented}>
-                {(["day", "week", "month", "agenda"] as CalendarView[]).map((option) => (
-                  <Pressable
-                    key={option}
-                    style={[styles.segmentButton, settings.defaultView === option ? styles.segmentButtonActive : null]}
-                    onPress={() => void handleUpdateSettings({ defaultView: option })}
-                  >
-                    <Text style={[styles.segmentText, settings.defaultView === option ? styles.segmentTextActive : null]}>
-                      {sharedMobileViewLabels[option]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <SectionTitle title="Week Start" />
-              <View style={styles.segmented}>
-                {[0, 1].map((option) => (
-                  <Pressable
-                    key={option}
-                    style={[styles.segmentButton, effectiveWeekStartDay === option ? styles.segmentButtonActive : null]}
-                    onPress={() => void handleUpdateSettings({ weekStartDay: option })}
-                  >
-                    <Text style={[styles.segmentText, effectiveWeekStartDay === option ? styles.segmentTextActive : null]}>
-                      {option === 0 ? "Sun" : "Mon"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <SectionTitle title="Working Days" />
-              <View style={styles.workdayGrid}>
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, index) => {
-                  const active = effectiveWorkingDays.includes(index);
-                  const next = active
-                    ? effectiveWorkingDays.filter((day) => day !== index)
-                    : [...effectiveWorkingDays, index].sort((a, b) => a - b);
-                  return (
-                    <Pressable
-                      key={label}
-                      style={[styles.workdayPill, active ? styles.workdayPillActive : null]}
-                      onPress={() => void handleUpdateSettings({ workingDays: JSON.stringify(next) })}
-                    >
-                      <Text style={[styles.workdayPillText, active ? styles.workdayPillTextActive : null]}>
-                        {label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <SectionTitle title="Calendars" />
-              {calendarData.calendars.map((calendar) => {
-                const isVisible = calendarVisibility[calendar.id] ?? calendar.isVisible;
-                const color =
-                  calendar.color?.startsWith("#")
-                    ? calendar.color
-                    : mobileCalendarTokens.colors.accentStrong;
-                return (
-                  <Pressable
-                    key={calendar.id}
-                    style={[styles.calendarCard, !isVisible && styles.calendarCardMuted]}
-                    onPress={() => void handleToggleCalendar(calendar.id)}
-                  >
-                    <View style={[styles.calendarSwatch, { backgroundColor: color }]} />
-                    <View style={styles.calendarCopy}>
-                      <Text style={styles.calendarTitle}>{calendar.name}</Text>
-                      <Text style={styles.calendarMeta}>
-                        {isVisible ? "Visible in mobile views" : "Hidden from mobile views"}
-                      </Text>
-                    </View>
-                    <Text style={styles.calendarState}>
-                      {savingCalendarId === calendar.id ? "..." : isVisible ? "On" : "Off"}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-
-              <SectionTitle title="Timezone" />
-              <View style={styles.infoCard}>
-                <Text style={styles.infoCardText}>{effectiveTimezone}</Text>
-                <Text style={styles.infoCardSubtext}>Timezone editing can be added next, but the native calendar now respects the saved setting.</Text>
-              </View>
-
-              <SectionTitle title="Account" />
-              <View style={styles.accountRow}>
-                <Text style={styles.accountLabel}>Data sync</Text>
-                <Switch value={!calendarData.eventsLoading} disabled />
-              </View>
-            </ScrollView>
-          </Animated.View>
-        </View>
-      ) : null}
+      <MobileSidebarDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        user={user}
+        calendars={calendarData.calendars}
+        calendarVisibility={calendarVisibility}
+        savingCalendarId={savingCalendarId}
+        onToggleCalendar={(calendarId) => void handleToggleCalendar(calendarId)}
+        events={visibleEvents}
+        currentDate={currentDate}
+        onCurrentDateChange={setCurrentDate}
+        onMiniCalendarMonthChange={onDateRangeChange ?? calendarData.setDateRange}
+        onCreateEvent={handleDrawerCreateEvent}
+        onOpenSettings={onOpenSettings}
+        onOpenCalendarManagement={onOpenCalendarManagement}
+      />
     </View>
   );
-}
-
-function SectionTitle({ title }: { title: string }) {
-  return <Text style={styles.sectionTitle}>{title}</Text>;
 }
 
 const styles = StyleSheet.create({
