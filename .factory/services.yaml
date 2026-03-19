@@ -1,0 +1,8 @@
+commands:
+  install: cd apps/mobile && bun install
+  typecheck: cd apps/mobile && bun run typecheck
+  lint: cd apps/mobile && bun run lint
+  typecheck_ui: cd packages/ui && bun run typecheck
+  build_web: cd apps/web && bun run build
+
+services: {}

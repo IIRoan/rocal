@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename)
 const nextConfig = {
   output: 'export',
   allowedDevOrigins: ['192.168.88.242'],
-  transpilePackages: ['@workspace/ui'],
+  transpilePackages: ['@workspace/ui', 'nativewind', 'react-native-css-interop'],
   turbopack: {
     resolveAlias: {
       '@workspace/ui/globals.css': path.resolve(__dirname, '../../packages/ui/src/styles/globals.css'),

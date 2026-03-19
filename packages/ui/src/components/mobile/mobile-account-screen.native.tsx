@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { mobileCalendarTokens } from "../calendar/mobile-calendar-design";
 
 interface MobileAccountScreenProps {
   userName?: string | null;
@@ -80,7 +81,7 @@ export function MobileAccountScreen({
           ]}
         >
           {signingOut ? (
-            <ActivityIndicator color="#f8fafc" />
+            <ActivityIndicator color={mobileCalendarTokens.colors.textOnPrimary} />
           ) : (
             <Text style={styles.signOutButtonText}>Sign out</Text>
           )}
@@ -93,7 +94,7 @@ export function MobileAccountScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f7fb",
+    backgroundColor: mobileCalendarTokens.colors.background,
   },
   content: {
     padding: 16,
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroEyebrow: {
-    color: "#0f766e",
+    color: mobileCalendarTokens.colors.accent,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.8,
@@ -114,37 +115,37 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#0f172a",
+    color: mobileCalendarTokens.colors.text,
   },
   heroSubtitle: {
     fontSize: 14,
     lineHeight: 20,
-    color: "#475569",
+    color: mobileCalendarTokens.colors.textSubtle,
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#dbe4f0",
+    borderColor: mobileCalendarTokens.colors.border,
     padding: 16,
     gap: 6,
   },
   cardLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#64748b",
+    color: mobileCalendarTokens.colors.textMuted,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#0f172a",
+    color: mobileCalendarTokens.colors.text,
   },
   cardBody: {
     fontSize: 14,
     lineHeight: 20,
-    color: "#475569",
+    color: mobileCalendarTokens.colors.textSubtle,
   },
   metricsRow: {
     flexDirection: "row",
@@ -157,20 +158,20 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#0f172a",
+    color: mobileCalendarTokens.colors.text,
   },
   metricLabel: {
     fontSize: 13,
-    color: "#64748b",
+    color: mobileCalendarTokens.colors.textMuted,
   },
   error: {
     marginTop: 8,
     fontSize: 13,
-    color: "#dc2626",
+    color: mobileCalendarTokens.colors.danger,
   },
   signOutButton: {
     alignItems: "center",
-    backgroundColor: "#0f172a",
+    backgroundColor: mobileCalendarTokens.colors.primary,
     borderRadius: 18,
     justifyContent: "center",
     minHeight: 52,
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   signOutButtonText: {
-    color: "#f8fafc",
+    color: mobileCalendarTokens.colors.textOnPrimary,
     fontSize: 15,
     fontWeight: "700",
   },

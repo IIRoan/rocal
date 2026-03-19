@@ -27,32 +27,15 @@ import { AgendaDaysToShow } from "./constants";
 import { eventOverlapsRange } from "./utils";
 import { MobileDayViewNative } from "./mobile-day-view.native";
 import { MobileWeekViewNative } from "./mobile-week-view.native";
+import {
+  mobileCalendarTokens,
+  type SharedMobileEventCalendarProps,
+} from "./mobile-calendar-design";
 
-export interface MobileEventCalendarProps {
-  initialView?: CalendarView;
-  view?: CalendarView;
-  onViewChange?: (view: CalendarView) => void;
-  currentDate?: Date;
-  onCurrentDateChange?: (date: Date) => void;
+export interface MobileEventCalendarProps
+  extends SharedMobileEventCalendarProps {
   events?: CalendarEvent[];
-  loading?: boolean;
   error?: { message?: string } | null;
-  onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
-  onCreateEvent?: (event: {
-    title: string;
-    start: string;
-    end: string;
-    allDay: boolean;
-    calendarId: string;
-  }) => Promise<unknown>;
-  defaultCalendarId?: string | null;
-  weekStartDay?: number;
-  workingDays?: number[];
-  timezone?: string;
-  showHeader?: boolean;
-  showViewSwitch?: boolean;
-  showCreateButton?: boolean;
-  contentInsetBottom?: number;
 }
 
 const views: CalendarView[] = ["month", "week", "day", "agenda"];
@@ -396,79 +379,97 @@ function endOfDaySafe(date: Date) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f7fb" },
+  container: { flex: 1, backgroundColor: mobileCalendarTokens.colors.background },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#f4f7fb",
+    paddingHorizontal: mobileCalendarTokens.spacing.md,
+    paddingVertical: mobileCalendarTokens.spacing.md,
+    backgroundColor: mobileCalendarTokens.colors.background,
   },
   navButton: {
-    width: 40,
-    height: 40,
+    width: mobileCalendarTokens.sizes.iconButton,
+    height: mobileCalendarTokens.sizes.iconButton,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
+    borderRadius: mobileCalendarTokens.radius.md,
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderWidth: 1,
-    borderColor: "#dbe4f0",
+    borderColor: mobileCalendarTokens.colors.border,
   },
-  navText: { fontSize: 20, color: "#0f172a", fontWeight: "700" },
-  title: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  navText: { fontSize: 20, color: mobileCalendarTokens.colors.text, fontWeight: "700" },
+  title: {
+    fontSize: mobileCalendarTokens.typography.heading.size,
+    fontWeight: mobileCalendarTokens.typography.heading.weight,
+    color: mobileCalendarTokens.colors.text,
+  },
   viewSwitch: {
     flexDirection: "row",
-    marginHorizontal: 12,
-    marginBottom: 8,
-    borderRadius: 16,
-    backgroundColor: "#e8eef5",
+    marginHorizontal: mobileCalendarTokens.spacing.md,
+    marginBottom: mobileCalendarTokens.spacing.sm,
+    borderRadius: mobileCalendarTokens.radius.lg,
+    backgroundColor: mobileCalendarTokens.colors.surfaceMuted,
     padding: 4,
   },
-  viewSwitchItem: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
-  viewSwitchItemActive: { backgroundColor: "#ffffff" },
-  viewSwitchText: { textTransform: "capitalize", color: "#64748b", fontSize: 13, fontWeight: "600" },
-  viewSwitchTextActive: { color: "#0f172a" },
-  dayStrip: { paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
+  viewSwitchItem: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: mobileCalendarTokens.radius.sm,
+    alignItems: "center",
+  },
+  viewSwitchItemActive: { backgroundColor: mobileCalendarTokens.colors.surface },
+  viewSwitchText: {
+    textTransform: "capitalize",
+    color: mobileCalendarTokens.colors.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  viewSwitchTextActive: { color: mobileCalendarTokens.colors.text },
+  dayStrip: {
+    paddingHorizontal: mobileCalendarTokens.spacing.md,
+    paddingBottom: mobileCalendarTokens.spacing.sm,
+    gap: mobileCalendarTokens.spacing.sm,
+  },
   dayPill: {
-    width: 68,
-    borderRadius: 16,
-    backgroundColor: "#e8eef5",
+    width: mobileCalendarTokens.sizes.dayPillWidth,
+    borderRadius: mobileCalendarTokens.radius.lg,
+    backgroundColor: mobileCalendarTokens.colors.surfaceMuted,
     paddingVertical: 8,
     alignItems: "center",
     gap: 2,
   },
-  dayPillActive: { backgroundColor: "#0f172a" },
-  dayPillWeekday: { fontSize: 11, color: "#64748b", fontWeight: "700" },
-  dayPillDate: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  dayPillCount: { fontSize: 10, color: "#64748b" },
-  dayPillTextActive: { color: "#ffffff" },
+  dayPillActive: { backgroundColor: mobileCalendarTokens.colors.primary },
+  dayPillWeekday: { fontSize: 11, color: mobileCalendarTokens.colors.textMuted, fontWeight: "700" },
+  dayPillDate: { fontSize: 16, fontWeight: "700", color: mobileCalendarTokens.colors.text },
+  dayPillCount: { fontSize: 10, color: mobileCalendarTokens.colors.textMuted },
+  dayPillTextActive: { color: mobileCalendarTokens.colors.textOnPrimary },
   content: { flex: 1 },
-  monthGrid: { padding: 12, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  monthGrid: { padding: mobileCalendarTokens.spacing.md, flexDirection: "row", flexWrap: "wrap", gap: 8 },
   monthCell: {
     width: "13.2%",
     minHeight: 72,
-    borderRadius: 16,
+    borderRadius: mobileCalendarTokens.radius.lg,
     padding: 8,
-    backgroundColor: "#ffffff",
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderWidth: 1,
-    borderColor: "#dbe4f0",
+    borderColor: mobileCalendarTokens.colors.border,
     justifyContent: "space-between",
   },
   monthCellMuted: { opacity: 0.5 },
-  monthDate: { fontSize: 12, fontWeight: "700", color: "#0f172a" },
-  monthCount: { fontSize: 10, color: "#2563eb", fontWeight: "600" },
-  eventsList: { paddingHorizontal: 12, gap: 10 },
+  monthDate: { fontSize: 12, fontWeight: "700", color: mobileCalendarTokens.colors.text },
+  monthCount: { fontSize: 10, color: mobileCalendarTokens.colors.accentStrong, fontWeight: "600" },
+  eventsList: { paddingHorizontal: mobileCalendarTokens.spacing.md, gap: 10 },
   eventCard: {
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
+    borderRadius: mobileCalendarTokens.radius.lg,
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderWidth: 1,
-    borderColor: "#dbe4f0",
+    borderColor: mobileCalendarTokens.colors.border,
     padding: 12,
   },
-  eventTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  eventMeta: { marginTop: 2, fontSize: 12, color: "#475569" },
-  emptyText: { marginTop: 20, textAlign: "center", color: "#64748b" },
+  eventTitle: { fontSize: 14, fontWeight: "700", color: mobileCalendarTokens.colors.text },
+  eventMeta: { marginTop: 2, fontSize: 12, color: mobileCalendarTokens.colors.textSubtle },
+  emptyText: { marginTop: 20, textAlign: "center", color: mobileCalendarTokens.colors.textMuted },
   loadingOverlay: {
     position: "absolute",
     top: 76,
@@ -476,25 +477,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: 999,
-    backgroundColor: "#ffffff",
+    borderRadius: mobileCalendarTokens.radius.pill,
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderWidth: 1,
-    borderColor: "#dbe4f0",
+    borderColor: mobileCalendarTokens.colors.border,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  loadingText: { fontSize: 12, color: "#475569" },
-  errorText: { color: "#dc2626", fontSize: 12, paddingHorizontal: 12, paddingBottom: 8 },
+  loadingText: { fontSize: 12, color: mobileCalendarTokens.colors.textSubtle },
+  errorText: { color: mobileCalendarTokens.colors.danger, fontSize: 12, paddingHorizontal: 12, paddingBottom: 8 },
   createButton: {
     position: "absolute",
     right: 16,
     bottom: 18,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: mobileCalendarTokens.sizes.fab,
+    height: mobileCalendarTokens.sizes.fab,
+    borderRadius: mobileCalendarTokens.sizes.fab / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0f172a",
+    backgroundColor: mobileCalendarTokens.colors.primary,
   },
-  createButtonText: { color: "#fff", fontSize: 28, marginTop: -2 },
+  createButtonText: { color: mobileCalendarTokens.colors.textOnPrimary, fontSize: 28, marginTop: -2 },
 });

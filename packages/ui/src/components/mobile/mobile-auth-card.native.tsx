@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { mobileCalendarTokens } from "../calendar/mobile-calendar-design";
 
 interface MobileAuthCardProps {
   appName?: string;
@@ -60,7 +61,7 @@ export function MobileAuthCard({
                 ]}
               >
                 {loading ? (
-                  <ActivityIndicator color="#f8fafc" />
+                  <ActivityIndicator color={mobileCalendarTokens.colors.textOnPrimary} />
                 ) : (
                   <Text style={styles.primaryButtonText}>{ctaLabel}</Text>
                 )}
@@ -80,7 +81,7 @@ export function MobileAuthCard({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f4f7fb",
+    backgroundColor: mobileCalendarTokens.colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     padding: 24,
-    backgroundColor: "#f4f7fb",
+    backgroundColor: mobileCalendarTokens.colors.background,
   },
   accentOrb: {
     position: "absolute",
@@ -98,17 +99,17 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 999,
-    backgroundColor: "#dbeafe",
+    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
     opacity: 0.7,
   },
   card: {
-    backgroundColor: "#ffffff",
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#dbe4f0",
+    borderColor: mobileCalendarTokens.colors.border,
     padding: 24,
     gap: 24,
-    shadowColor: "#0f172a",
+    shadowColor: mobileCalendarTokens.colors.text,
     shadowOpacity: 0.08,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 16 },
@@ -118,19 +119,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   eyebrow: {
-    color: "#0f766e",
+    color: mobileCalendarTokens.colors.accent,
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
   title: {
-    color: "#0f172a",
+    color: mobileCalendarTokens.colors.text,
     fontSize: 32,
     fontWeight: "700",
   },
   subtitle: {
-    color: "#475569",
+    color: mobileCalendarTokens.colors.textSubtle,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -138,12 +139,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   error: {
-    color: "#dc2626",
+    color: mobileCalendarTokens.colors.danger,
     fontSize: 14,
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#0f172a",
+    backgroundColor: mobileCalendarTokens.colors.primary,
     borderRadius: 18,
     justifyContent: "center",
     minHeight: 54,
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   primaryButtonText: {
-    color: "#f8fafc",
+    color: mobileCalendarTokens.colors.textOnPrimary,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   footerText: {
-    color: "#475569",
+    color: mobileCalendarTokens.colors.textSubtle,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",

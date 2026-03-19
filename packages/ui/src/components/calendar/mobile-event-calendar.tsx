@@ -54,45 +54,20 @@ import {
 } from "../ui/dropdown-menu";
 import { ThemeToggle } from "../layout/theme-toggle";
 import { useDropdownShortcuts } from "../../hooks";
+import {
+  mobileCalendarTokens,
+  type SharedMobileEventCalendarProps,
+} from "./mobile-calendar-design";
 
-export interface MobileEventCalendarProps {
+export interface MobileEventCalendarProps
+  extends SharedMobileEventCalendarProps {
   className?: string;
-  initialView?: CalendarView;
-  // Data props
   events?: CalendarEvent[];
-  categories?: any[];
-  loading?: boolean;
-  eventsLoading?: boolean;
-  error?: any;
-  // Event handlers
-  onCreateEvent?: (event: any) => Promise<any>;
-  onUpdateEvent?: (id: string, event: any) => Promise<any>;
-  onDeleteEvent?: (id: string) => Promise<void>;
-  onCreateCategory?: (category: any) => Promise<any>;
-  // Date range change handler
-  onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
-  // Settings
-  showWeekNumbers?: boolean;
-  compactView?: boolean;
-  timeFormat?: "12h" | "24h";
-  defaultReminder?: number | null;
-  defaultEventDuration?: number;
-  defaultCalendarId?: string | null;
-  weekStartDay?: number;
-  workingDays?: number[];
-  timezone?: string;
-  // Theme settings
-  themeSettings?: {
-    currentTheme: "light" | "dark" | "system";
-    updateTheme: (theme: "light" | "dark" | "system") => Promise<void>;
-  };
-  // Notification handlers
   onLoadNotifications?: (eventId: string) => Promise<EventNotification[]>;
   onUpdateNotifications?: (
     eventId: string,
     notifications: EventNotification[],
   ) => Promise<void>;
-  // Command palette integration
   onEventEdit?: (
     event: CalendarEvent,
     options?: {
@@ -100,10 +75,6 @@ export interface MobileEventCalendarProps {
       anchorPosition?: { x: number; y: number };
     },
   ) => void;
-  // Mobile specific
-  onSidebarToggle?: () => void;
-  // View change handler
-  onViewChange?: (view: CalendarView) => void;
   user?: User;
 }
 
@@ -629,6 +600,9 @@ export function MobileEventCalendar({
                     <Button
                       variant="outline"
                       className="gap-1.5 max-sm:h-8 max-sm:px-2! max-sm:gap-1"
+                      style={{
+                        borderColor: mobileCalendarTokens.colors.border,
+                      }}
                       disabled={loading}
                     >
                       <span className="capitalize">{view}</span>

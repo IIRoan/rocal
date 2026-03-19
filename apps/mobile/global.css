@@ -2,3 +2,332 @@
 @import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css";
 @import "nativewind/theme";
+
+/* Dark mode via class on root element */
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   SOLACE DESIGN SYSTEM
+   ============================================
+   Warm, vibrant color palette with clear hierarchy
+   Enhanced contrast for icons and text
+   Subtle animation system throughout
+   ============================================ */
+
+:root {
+  /* Core Background - warm undertones */
+  --background: oklch(0.9821 0 0);
+  --foreground: oklch(0.2435 0 0);
+
+  /* Card & surfaces - pure white for contrast */
+  --card: oklch(0.9911 0 0);
+  --card-foreground: oklch(0.2435 0 0);
+
+  /* Popover */
+  --popover: oklch(0.9911 0 0);
+  --popover-foreground: oklch(0.2435 0 0);
+
+  /* Primary - warm amber/ochre - THE SIGNATURE COLOR */
+  --primary: oklch(0.4341 0.0392 41.9938);
+  --primary-foreground: oklch(1 0 0);
+
+  /* Secondary - warm cream/gold accent */
+  --secondary: oklch(0.92 0.0651 74.3695);
+  --secondary-foreground: oklch(0.3499 0.0685 40.8288);
+
+  /* Muted - warm gray with better icon contrast */
+  --muted: oklch(0.9521 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+
+  /* Accent - warm highlight */
+  --accent: oklch(0.931 0 0);
+  --accent-foreground: oklch(0.2435 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.6271 0.1936 33.339);
+  --destructive-foreground: oklch(1 0 0);
+
+  /* Borders & Inputs - slightly more visible */
+  --border: oklch(0.86 0 0);
+  --input: oklch(0.8822 0 0);
+
+  /* Ring focus */
+  --ring: oklch(0.4341 0.0392 41.9938);
+
+  /* Charts - vibrant and distinct */
+  --chart-1: oklch(0.4341 0.0392 41.9938);
+  --chart-2: oklch(0.92 0.0651 74.3695);
+  --chart-3: oklch(0.931 0 0);
+  --chart-4: oklch(0.9367 0.0523 75.5009);
+  --chart-5: oklch(0.4338 0.0437 41.6746);
+
+  /* Sidebar */
+  --sidebar: oklch(0.9881 0 0);
+  --sidebar-foreground: oklch(0.2645 0 0);
+  --sidebar-primary: oklch(0.325 0 0);
+  --sidebar-primary-foreground: oklch(0.9881 0 0);
+  --sidebar-accent: oklch(0.9761 0 0);
+  --sidebar-accent-foreground: oklch(0.325 0 0);
+  --sidebar-border: oklch(0.9401 0 0);
+  --sidebar-ring: oklch(0.7731 0 0);
+
+  /* Typography */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+
+  /* Spacing & Radius */
+  --radius: 0.5rem;
+  --spacing: 0.25rem;
+
+  /* Shadows */
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  --tracking-normal: 0em;
+
+  /* Calendar */
+  --calendar-accent: var(--primary);
+  --calendar-accent-bg: oklch(0.85 0.02 42);
+  --calendar-workday: oklch(0.975 0.005 42);
+  --calendar-weekend: oklch(0.96 0.005 42);
+
+  /* Events - vibrant and colorful */
+  --event-sky: oklch(0.86 0.09 250);
+  --event-sky-foreground: oklch(0.28 0.12 250);
+  --event-violet: oklch(0.86 0.09 285);
+  --event-violet-foreground: oklch(0.28 0.12 285);
+  --event-orange: oklch(0.86 0.09 65);
+  --event-orange-foreground: oklch(0.28 0.12 65);
+  --event-rose: oklch(0.86 0.09 15);
+  --event-rose-foreground: oklch(0.28 0.12 15);
+  --event-emerald: oklch(0.86 0.09 150);
+  --event-emerald-foreground: oklch(0.28 0.12 150);
+  --event-default: var(--event-sky);
+  --event-default-foreground: var(--event-sky-foreground);
+
+  /* Status */
+  --success: oklch(0.78 0.12 150);
+  --success-foreground: oklch(0.995 0.002 286);
+  --warning: oklch(0.84 0.14 85);
+  --warning-foreground: var(--foreground);
+
+  /* Info */
+  --info: oklch(0.72 0.16 250);
+  --info-foreground: oklch(0.995 0.002 286);
+  --info-bg: oklch(0.95 0.03 250);
+  --info-border: oklch(0.83 0.09 250);
+}
+
+.dark {
+  /* Core Background - rich dark with cool undertones */
+  --background: oklch(0.1776 0 0);
+  --foreground: oklch(0.9491 0 0);
+
+  /* Card & surfaces */
+  --card: oklch(0.2134 0 0);
+  --card-foreground: oklch(0.9491 0 0);
+
+  /* Popover */
+  --popover: oklch(0.2134 0 0);
+  --popover-foreground: oklch(0.9491 0 0);
+
+  /* Primary - warm gold in dark mode */
+  --primary: oklch(0.9247 0.0524 66.1732);
+  --primary-foreground: oklch(0.2029 0.024 200.1962);
+
+  /* Secondary */
+  --secondary: oklch(0.3163 0.019 63.6992);
+  --secondary-foreground: oklch(0.9247 0.0524 66.1732);
+
+  /* Muted - better icon visibility */
+  --muted: oklch(0.252 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+
+  /* Accent */
+  --accent: oklch(0.285 0 0);
+  --accent-foreground: oklch(0.9491 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.6271 0.1936 33.339);
+  --destructive-foreground: oklch(1 0 0);
+
+  /* Borders & Inputs */
+  --border: oklch(0.3 0.0115 91.7467);
+  --input: oklch(0.4017 0 0);
+
+  /* Ring focus */
+  --ring: oklch(0.9247 0.0524 66.1732);
+
+  /* Charts */
+  --chart-1: oklch(0.9247 0.0524 66.1732);
+  --chart-2: oklch(0.3163 0.019 63.6992);
+  --chart-3: oklch(0.285 0 0);
+  --chart-4: oklch(0.3481 0.0219 67.0001);
+  --chart-5: oklch(0.9245 0.0533 67.0855);
+
+  /* Sidebar */
+  --sidebar: oklch(0.2103 0.0059 285.8852);
+  --sidebar-foreground: oklch(0.9674 0.0013 286.3752);
+  --sidebar-primary: oklch(0.4882 0.2172 264.3763);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.2739 0.0055 286.0326);
+  --sidebar-accent-foreground: oklch(0.9674 0.0013 286.3752);
+  --sidebar-border: oklch(0.2739 0.0055 286.0326);
+  --sidebar-ring: oklch(0.8711 0.0055 286.286);
+
+  /* Shadows */
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  /* Calendar */
+  --calendar-accent: var(--primary);
+  --calendar-accent-bg: oklch(0.25 0.02 66);
+  --calendar-workday: oklch(0.185 0.005 0);
+  --calendar-weekend: oklch(0.16 0.008 0);
+
+  /* Events - vibrant in dark mode */
+  --event-sky: oklch(0.45 0.15 250);
+  --event-sky-foreground: oklch(0.9 0.06 250);
+  --event-violet: oklch(0.45 0.15 285);
+  --event-violet-foreground: oklch(0.9 0.06 285);
+  --event-orange: oklch(0.45 0.15 65);
+  --event-orange-foreground: oklch(0.9 0.06 65);
+  --event-rose: oklch(0.45 0.15 15);
+  --event-rose-foreground: oklch(0.9 0.06 15);
+  --event-emerald: oklch(0.45 0.15 150);
+  --event-emerald-foreground: oklch(0.9 0.06 150);
+  --event-default: var(--event-sky);
+  --event-default-foreground: var(--event-sky-foreground);
+
+  /* Status */
+  --success: oklch(0.68 0.15 150);
+  --success-foreground: var(--foreground);
+  --warning: oklch(0.72 0.16 85);
+  --warning-foreground: oklch(0.12 0.01 286);
+
+  /* Info */
+  --info: oklch(0.78 0.18 250);
+  --info-foreground: var(--foreground);
+  --info-bg: oklch(0.26 0.03 250);
+  --info-border: oklch(0.38 0.09 250);
+}
+
+/* Tailwind color aliases */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-foreground: var(--input-foreground);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  /* Calendar */
+  --color-calendar-accent: var(--calendar-accent);
+  --color-calendar-accent-bg: var(--calendar-accent-bg);
+  --color-calendar-workday: var(--calendar-workday);
+  --color-calendar-weekend: var(--calendar-weekend);
+
+  /* Events */
+  --color-event-sky: var(--event-sky);
+  --color-event-sky-foreground: var(--event-sky-foreground);
+  --color-event-violet: var(--event-violet);
+  --color-event-violet-foreground: var(--event-violet-foreground);
+  --color-event-orange: var(--event-orange);
+  --color-event-orange-foreground: var(--event-orange-foreground);
+  --color-event-rose: var(--event-rose);
+  --color-event-rose-foreground: var(--event-rose-foreground);
+  --color-event-emerald: var(--event-emerald);
+  --color-event-emerald-foreground: var(--event-emerald-foreground);
+  --color-event-default: var(--event-default);
+  --color-event-default-foreground: var(--event-default-foreground);
+
+  /* Event color utility mapping used in UI controls (e.g., selects) */
+  --color-blue-400: var(--event-sky);
+  --color-emerald-400: var(--event-emerald);
+  --color-orange-400: var(--event-orange);
+  --color-violet-400: var(--event-violet);
+  --color-rose-400: var(--event-rose);
+}

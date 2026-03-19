@@ -23,6 +23,7 @@ import {
 import type { CalendarEvent } from "./types";
 import { eventOverlapsRange, isMultiDayEvent } from "./utils";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
+import { mobileCalendarTokens } from "./mobile-calendar-design";
 
 const MOBILE_START_HOUR = 0;
 const MOBILE_END_HOUR = 23;
@@ -302,12 +303,12 @@ export function MobileWeekViewNative({
 
 function resolveEventBackground(color?: string | null) {
   if (color?.startsWith("#")) return `${color}22`;
-  return "#dbeafe";
+  return mobileCalendarTokens.colors.surfaceAccent;
 }
 
 function resolveEventBorder(color?: string | null) {
   if (color?.startsWith("#")) return color;
-  return "#60a5fa";
+  return mobileCalendarTokens.colors.accentStrong;
 }
 
 const styles = StyleSheet.create({
@@ -316,9 +317,9 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    backgroundColor: "#f8fafc",
+    backgroundColor: mobileCalendarTokens.colors.background,
     borderBottomWidth: 1,
-    borderColor: "#d9e2ec",
+    borderColor: mobileCalendarTokens.colors.border,
   },
   timeHeaderSpacer: {
     width: TIME_COLUMN_WIDTH,
@@ -329,31 +330,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 10,
     borderLeftWidth: 1,
-    borderColor: "#d9e2ec",
+    borderColor: mobileCalendarTokens.colors.border,
   },
   dayHeaderWorkday: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: mobileCalendarTokens.colors.background,
   },
   dayHeaderToday: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
   },
   dayHeaderWeekday: {
-    color: "#64748b",
+    color: mobileCalendarTokens.colors.textMuted,
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
   },
   dayHeaderWeekdayToday: {
-    color: "#2563eb",
+    color: mobileCalendarTokens.colors.accentStrong,
   },
   dayHeaderDate: {
     marginTop: 2,
-    color: "#0f172a",
+    color: mobileCalendarTokens.colors.text,
     fontSize: 16,
     fontWeight: "700",
   },
   dayHeaderDateToday: {
-    color: "#2563eb",
+    color: mobileCalendarTokens.colors.accentStrong,
   },
   verticalScroll: {
     flex: 1,
@@ -366,7 +367,7 @@ const styles = StyleSheet.create({
   },
   timeColumn: {
     width: TIME_COLUMN_WIDTH,
-    backgroundColor: "#f8fafc",
+    backgroundColor: mobileCalendarTokens.colors.background,
   },
   timeCell: {
     height: MOBILE_CELL_HEIGHT,
@@ -376,26 +377,26 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     marginTop: -8,
-    backgroundColor: "#f8fafc",
+    backgroundColor: mobileCalendarTokens.colors.background,
     paddingHorizontal: 2,
-    color: "#64748b",
+    color: mobileCalendarTokens.colors.textMuted,
     fontSize: 10,
     fontWeight: "600",
   },
   dayColumn: {
     width: DAY_COLUMN_WIDTH,
     position: "relative",
-    backgroundColor: "#ffffff",
+    backgroundColor: mobileCalendarTokens.colors.surface,
     borderLeftWidth: 1,
-    borderColor: "#d9e2ec",
+    borderColor: mobileCalendarTokens.colors.border,
   },
   dayColumnToday: {
-    backgroundColor: "#f8fbff",
+    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
   },
   gridHourCell: {
     height: MOBILE_CELL_HEIGHT,
     borderBottomWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: mobileCalendarTokens.colors.border,
     position: "relative",
   },
   tapTarget: {
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   eventTitle: {
-    color: "#0f172a",
+    color: mobileCalendarTokens.colors.text,
     fontSize: 11,
     fontWeight: "700",
   },
@@ -428,12 +429,12 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 999,
-    backgroundColor: "#ef4444",
+    backgroundColor: mobileCalendarTokens.colors.danger,
     marginLeft: -4,
   },
   currentTimeBar: {
     flex: 1,
     height: 2,
-    backgroundColor: "#ef4444",
+    backgroundColor: mobileCalendarTokens.colors.danger,
   },
 });
