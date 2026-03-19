@@ -1,0 +1,21 @@
+{
+  "milestone": "calendar-views",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CAL-001",
+    "VAL-CAL-002",
+    "VAL-CAL-003",
+    "VAL-CAL-004"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}

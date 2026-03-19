@@ -1,0 +1,74 @@
+{
+  "groupId": "calendar-views",
+  "testedAt": "2026-03-20T00:00:00.000Z",
+  "isolation": {
+    "type": "static-checks-only"
+  },
+  "toolsUsed": ["static analysis", "typecheck", "lint", "grep"],
+  "assertions": [
+    {
+      "id": "VAL-CAL-001",
+      "title": "Month, Week, Day, and Agenda views each have a dedicated mobile component that compiles without type errors and renders the same structural layout.",
+      "status": "pass",
+      "steps": [
+        { "action": "Run typecheck", "expected": "No errors", "observed": "tsc --noEmit exited with code 0" },
+        { "action": "Review mobile-month-view.native.tsx, etc.", "expected": "Structural parity with web components using layout primitives", "observed": "Used expected mobile layout elements with proper class composition" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "notes": "Typecheck passed cleanly; mobile-*.native.tsx components exist and use layout primitives and NativeWind classes to maintain layout parity."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CAL-002",
+      "title": "Calendar event cards use shared Tailwind classes for colors, spacing, and typography - no inline styles or hardcoded values.",
+      "status": "pass",
+      "steps": [
+        { "action": "Inspect event rendering code", "expected": "Tailwind token usage without inline styles", "observed": "No inline colors, usage of EVENT_BG_CLASSES, etc. mapping to Tailwind classes like bg-event-sky/35" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "notes": "Verified via manual code review that event colors are mapped to EVENT_BG_CLASSES and EVENT_TEXT_CLASSES tokens (e.g., bg-event-sky/35, text-event-sky-foreground)."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CAL-003",
+      "title": "View switching (month↔week↔day↔agenda) is implemented and visually indicated using token-based styling.",
+      "status": "pass",
+      "steps": [
+        { "action": "Inspect mobile-calendar-wrapper.native.tsx", "expected": "Segmented control with active/inactive states based on theme tokens", "observed": "Found map over VIEW_OPTIONS assigning bg-primary to active view and bg-transparent to inactive" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "notes": "Verified via manual code review that mobile-calendar-wrapper uses a View with VIEW_OPTIONS, applying bg-primary and text-primary-foreground to the active option."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CAL-004",
+      "title": "No drag-and-drop code is included in mobile calendar components.",
+      "status": "pass",
+      "steps": [
+        { "action": "Grep native calendar components for drag/drop", "expected": "Zero results", "observed": "No matches found" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "notes": "Grep for 'dnd|drag|drop' in packages/ui/src/components/calendar/*.native.tsx returned zero results."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions for the Calendar Views area via static analysis. All passed successfully."
+}
