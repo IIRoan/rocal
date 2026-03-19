@@ -15,7 +15,6 @@ import {
   endOfWeek,
   format,
   isSameDay,
-  isSameMonth,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -26,6 +25,7 @@ import type { CalendarEvent, CalendarView } from "./types";
 import { AgendaDaysToShow } from "./constants";
 import { eventOverlapsRange } from "./utils";
 import { MobileDayViewNative } from "./mobile-day-view.native";
+import { MobileMonthViewNative } from "./mobile-month-view.native";
 import { MobileWeekViewNative } from "./mobile-week-view.native";
 import {
   mobileCalendarTokens,
@@ -262,34 +262,19 @@ export function MobileEventCalendar({
 
       <View style={styles.content}>
         {view === "month" ? (
-          <ScrollView contentContainerStyle={[styles.monthGrid, { paddingBottom: contentInsetBottom }]}>
-            {Array.from({ length: 42 }, (_, index) => {
-              const start = startOfWeek(startOfMonth(currentDate), {
-                weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-              });
-              const day = addDays(start, index);
-              const inMonth = day.getMonth() === currentDate.getMonth();
-              const count = rangeEvents.filter((event) =>
-                eventOverlapsRange(event, startOfDay(day), endOfDaySafe(day)),
-              ).length;
-
-              return (
-                <Pressable
-                  key={day.toISOString()}
-                  onPress={() => {
-                    setSelectedDate(day);
-                    if (!isSameMonth(day, currentDate)) {
-                      setCurrentDate(day);
-                    }
-                    setView("day");
-                  }}
-                  style={[styles.monthCell, !inMonth && styles.monthCellMuted]}
-                >
-                  <Text style={styles.monthDate}>{format(day, "d")}</Text>
-                  {!!count && <Text style={styles.monthCount}>{count} events</Text>}
-                </Pressable>
-              );
-            })}
+          <ScrollView contentContainerStyle={{ paddingBottom: contentInsetBottom }}>
+            <MobileMonthViewNative
+              currentDate={currentDate}
+              selectedDate={selectedDate}
+              events={rangeEvents}
+              weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+              onSelectDate={(day) => {
+                setSelectedDate(day);
+                if (!isSameDay(day, currentDate)) {
+                  setCurrentDate(day);
+                }
+              }}
+            />
           </ScrollView>
         ) : null}
 
