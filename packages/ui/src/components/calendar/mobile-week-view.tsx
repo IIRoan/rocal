@@ -313,7 +313,7 @@ export function MobileWeekView({
       {/* Week grid - day strip and all-day events handled by StickyMiniCalendar */}
       <div className="relative">
         {/* Time grid with events */}
-        <div className="flex pt-3">
+        <div className="flex">
           {/* Time column - all hours shown, time label ON the hour line */}
           <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
             {hours.map((hour, index) => (
@@ -337,9 +337,6 @@ export function MobileWeekView({
               className={cn(
                 "flex-1 min-w-0 relative border-r border-border/50 last:border-r-0",
                 isToday(day) && "bg-primary/5",
-                !workingDays.includes(day.getDay()) &&
-                  [0, 6].includes(day.getDay()) &&
-                  "bg-muted/30",
               )}
             >
               {/* Positioned events */}
