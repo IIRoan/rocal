@@ -1,13 +1,15 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { expo } from "@better-auth/expo";
 import { passkey } from "@better-auth/passkey";
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
 
-const backendUrl = process.env.BACKEND_URL || "http://localhost:4001";
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:4000";
+const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 const isProduction = process.env.NODE_ENV === "production";
+const mobileScheme = process.env.MOBILE_APP_SCHEME || "solacemobile";
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -24,12 +26,16 @@ const getRpId = (url: string) => {
 
 export const auth = betterAuth({
   plugins: [
+    expo(),
     passkey({
       rpID: getRpId(frontendUrl),
       rpName: "Rocani",
       origin: frontendUrl,
     }),
   ],
+  emailAndPassword: {
+    enabled: false,
+  },
   user: {
     additionalFields: {
       hasAiAccess: {
@@ -55,7 +61,14 @@ export const auth = betterAuth({
       : {},
   baseURL: backendUrl,
   basePath: "/api/auth",
-  trustedOrigins: [frontendUrl],
+  trustedOrigins: [
+    frontendUrl,
+    `${mobileScheme}://`,
+    `${mobileScheme}://*`,
+    ...(isProduction
+      ? []
+      : ["exp://", "exp://**", "exp://192.168.*.*:*/**", "exp://10.*.*.*:*/**"]),
+  ],
   session: {
     cookieCache: {
       enabled: true,
@@ -72,6 +85,6 @@ export const auth = betterAuth({
     },
   },
   socialProviderConfig: {
-    redirectURL: frontendUrl,
+    redirectURL: backendUrl,
   },
 }) as any;

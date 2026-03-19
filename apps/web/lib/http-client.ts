@@ -27,7 +27,7 @@ export class HttpClient {
     }
 
     // Fallback to localhost backend
-    const fallbackUrl = "http://localhost:4001";
+    const fallbackUrl = "http://localhost:3001";
 
     this.baseURL = envUrl || fallbackUrl;
     this.timeout = options.timeout || 10000; // 10 seconds

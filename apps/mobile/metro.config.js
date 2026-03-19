@@ -23,6 +23,7 @@ config.resolver.extraNodeModules = {
   'react/jsx-runtime': path.resolve(projectRoot, 'node_modules/react/jsx-runtime'),
   'react/jsx-dev-runtime': path.resolve(projectRoot, 'node_modules/react/jsx-dev-runtime'),
   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
+  zod: path.resolve(workspaceRoot, 'node_modules/.bun/zod@4.3.6/node_modules/zod'),
   semver: path.resolve(
     workspaceRoot,
     'node_modules/.bun/semver@7.7.3/node_modules/semver',

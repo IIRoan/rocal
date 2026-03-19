@@ -1,50 +1,34 @@
-# Welcome to your Expo app 👋
+# Mobile App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Environment
 
-## Get started
+Create `apps/mobile/.env` with:
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```env
+EXPO_PUBLIC_API_URL=http://192.168.88.242:3001/api/
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`EXPO_PUBLIC_API_URL` is required for local device testing so the app does not fall back to `localhost`.
 
-## Learn more
+Accepted formats:
 
-To learn more about developing your project with Expo, look at the following resources:
+- `http://192.168.88.242:3001`
+- `http://192.168.88.242:3001/api/`
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The mobile app normalizes either form to the backend base URL and then uses:
 
-## Join the community
+- auth via `/api/auth`
+- app API calls via `/api/...`
 
-Join our community of developers creating universal apps.
+If you change `.env`, restart Expo so the new value is picked up.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Start
+
+```bash
+bun run start
+```
+
+## Files
+
+- `.env.example`: example local config
+- `.env`: local device-specific config, ignored by git

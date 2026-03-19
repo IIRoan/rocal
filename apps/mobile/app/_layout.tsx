@@ -1,17 +1,23 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Href, Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
+import { createLogger, installGlobalConsoleLogger } from '@workspace/logger';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { apiBaseUrl, authClient, probeBackendReachability } from '@/lib/auth-client';
 import { CalendarDataProvider } from '@workspace/ui/components/calendar';
+import { setHttpClientAuthCookieProvider, setHttpClientBaseURL } from '@workspace/calendar-client';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+const logger = createLogger('mobile:root');
 
 // Singleton QueryClient instance
 let queryClientInstance: QueryClient | null = null;
@@ -25,14 +31,91 @@ function getQueryClient() {
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
+  const pathname = usePathname();
+  const { data: session, isPending } = authClient.useSession();
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+  useEffect(() => {
+    installGlobalConsoleLogger('mobile');
+    logger.info('Mobile app logger installed', {
+      apiBaseUrl,
+    });
+
+    setHttpClientBaseURL(apiBaseUrl);
+    setHttpClientAuthCookieProvider(() => authClient.getCookie());
+    logger.info('Configured shared calendar HTTP client for mobile', {
+      baseURL: apiBaseUrl,
+      hasCookieProvider: true,
+    });
+
+    void probeBackendReachability('app-startup');
+
+    return () => {
+      logger.info('Clearing shared calendar HTTP client configuration');
+      setHttpClientBaseURL(null);
+      setHttpClientAuthCookieProvider(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    logger.debug('Session state changed', {
+      pathname,
+      isPending,
+      isAuthenticated: Boolean(session?.user),
+      userId: session?.user?.id ?? null,
+      userEmail: session?.user?.email ?? null,
+    });
+  }, [isPending, pathname, session?.user]);
+
+  if (isPending) {
+    return (
+      <View
+        style={[
+          styles.loadingScreen,
+          { backgroundColor: colorScheme === 'dark' ? '#020617' : '#f8fafc' },
+        ]}>
+        <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#e2e8f0' : '#0f172a'} />
+      </View>
+    );
+  }
+
+  const isAuthRoute = pathname === '/sign-in' || pathname === '/sign-up';
+
+  if (!session?.user && !isAuthRoute) {
+    logger.warn('Redirecting unauthenticated user to sign-in', {
+      pathname,
+    });
+    return <Redirect href={'/sign-in' as Href} />;
+  }
+
+  const navigator = (
+    <>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack.Screen name="sign-up" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
+    </>
+  );
+
+  const content =
+    session?.user && isAuthRoute ? (
+      <Redirect href="/(tabs)" />
+    ) : (
+      navigator
+    );
+
+  if (session?.user && isAuthRoute) {
+    logger.info('Redirecting authenticated user away from auth route', {
+      pathname,
+      userId: session.user.id,
+    });
+  }
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      {session?.user ? <CalendarDataProvider>{content}</CalendarDataProvider> : content}
     </ThemeProvider>
   );
 }
@@ -43,10 +126,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <CalendarDataProvider>
-          <RootLayoutContent />
-        </CalendarDataProvider>
+        <RootLayoutContent />
       </QueryClientProvider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
