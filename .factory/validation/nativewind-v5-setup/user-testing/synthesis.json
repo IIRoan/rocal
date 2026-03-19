@@ -1,0 +1,25 @@
+{
+  "milestone": "nativewind-v5-setup",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 1,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-SETUP-001",
+    "VAL-SETUP-002",
+    "VAL-SETUP-003"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-SETUP-004",
+      "reason": "Hardcoded hex values found in apps/mobile/app/_layout.tsx and packages/ui/src/components/calendar/mobile-calendar-design.ts"
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}

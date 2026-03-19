@@ -11,3 +11,6 @@ The mobile app is validated by the user on a physical device or simulator. Worke
 ## Validation Concurrency
 
 Not applicable — user performs visual verification manually. No automated UI testing.
+
+## Flow Validator Guidance: static-checks
+Since the user handles visual verification manually and these assertions only require static checks (typechecking, diffing, code review), the flow validator should read the files, perform typechecks and linting locally, and report the findings.

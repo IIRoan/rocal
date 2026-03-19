@@ -1,0 +1,66 @@
+{
+  "groupId": "setup-group",
+  "testedAt": "2026-03-19T23:10:00.000Z",
+  "isolation": {
+    "scope": "local repo apps/mobile and packages/ui",
+    "commands": ["bun run typecheck", "bun run lint", "diff global.css", "grep hex/rgb"]
+  },
+  "toolsUsed": ["Read", "Grep", "Execute"],
+  "assertions": [
+    {
+      "id": "VAL-SETUP-001",
+      "title": "NativeWind v5 is installed and configured with Tailwind v4 engine",
+      "status": "pass",
+      "steps": [
+        { "action": "Review metro.config.js", "expected": "withNativewind wrapper present", "observed": "withNativewind(config) used" },
+        { "action": "Review babel.config.js", "expected": "No nativewind/babel preset", "observed": "Only babel-preset-expo used" },
+        { "action": "Review app/_layout.tsx", "expected": "global.css imported", "observed": "import '../global.css' present" },
+        { "action": "Review package.json", "expected": "nativewind v5 and tailwindcss v4 present", "observed": "nativewind ^5.0.0-preview.3 and tailwindcss ^4.2.2 present" }
+      ],
+      "evidence": {
+        "files": ["metro.config.js", "babel.config.js", "app/_layout.tsx", "package.json"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETUP-002",
+      "title": "Mobile global.css design tokens match web",
+      "status": "pass",
+      "steps": [
+        { "action": "Diff apps/mobile/global.css against packages/ui/src/styles/globals.css", "expected": "Tokens identical", "observed": ":root, .dark, and @theme inline blocks match exactly with the same oklch variables." }
+      ],
+      "evidence": {
+        "files": ["apps/mobile/global.css", "packages/ui/src/styles/globals.css"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETUP-003",
+      "title": "TypeScript compilation passes with zero errors",
+      "status": "pass",
+      "steps": [
+        { "action": "Run bun run typecheck in apps/mobile", "expected": "tsc --noEmit exits 0", "observed": "Process exited with code 0" },
+        { "action": "Run bun run typecheck in packages/ui", "expected": "tsc --noEmit exits 0", "observed": "Process exited with code 0" }
+      ],
+      "evidence": {
+        "terminal": ["nativewind-v5-setup/setup-group/VAL-SETUP-003-typecheck.txt"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETUP-004",
+      "title": "Dark mode wired without hardcoded color values",
+      "status": "fail",
+      "steps": [
+        { "action": "Search for hardcoded hex/rgb/oklch colors in component files", "expected": "No raw hex/rgb literals found", "observed": "Hardcoded hex colors found in apps/mobile/app/_layout.tsx and packages/ui/src/components/calendar/mobile-calendar-design.ts" }
+      ],
+      "evidence": {
+        "grepOutput": ["nativewind-v5-setup/setup-group/VAL-SETUP-004-grep.txt"]
+      },
+      "issues": "Hardcoded values found: apps/mobile/app/_layout.tsx uses 'backgroundColor: colorScheme === 'dark' ? '#020617' : '#f8fafc''. packages/ui/src/components/calendar/mobile-calendar-design.ts contains numerous hex literals for color definitions."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions: 3 passed, 1 failed. VAL-SETUP-004 failed because hardcoded hex literals are present in apps/mobile/app/_layout.tsx and packages/ui/src/components/calendar/mobile-calendar-design.ts."
+}
