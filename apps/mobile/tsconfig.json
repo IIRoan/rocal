@@ -6,7 +6,8 @@
     "paths": {
       "@/*": ["./*"],
       "@workspace/calendar-core": ["../../packages/calendar-core/src/index.ts"],
-      "@workspace/calendar-client": ["../../packages/calendar-client/src/index.ts"]
+      "@workspace/calendar-client": ["../../packages/calendar-client/src/index.ts"],
+      "@workspace/ui/components/calendar": ["../../packages/ui/src/components/calendar/index.ts"]
     }
   },
   "include": [

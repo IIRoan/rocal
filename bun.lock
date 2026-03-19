@@ -57,6 +57,9 @@
         "@react-navigation/bottom-tabs": "^7.4.0",
         "@react-navigation/elements": "^2.6.3",
         "@react-navigation/native": "^7.1.8",
+        "@tanstack/react-query": "^5.90.12",
+        "@workspace/calendar-client": "workspace:*",
+        "@workspace/ui": "workspace:*",
         "expo": "^55.0.0",
         "expo-constants": "~55.0.9",
         "expo-font": "~55.0.4",
@@ -159,6 +162,24 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/calendar-client": {
+      "name": "@workspace/calendar-client",
+      "version": "0.0.0",
+      "dependencies": {
+        "date-fns": "^4.1.0",
+      },
+      "peerDependencies": {
+        "@tanstack/react-query": "^5.90.12",
+        "react": "^19.2.0",
+      },
+    },
+    "packages/calendar-core": {
+      "name": "@workspace/calendar-core",
+      "version": "0.0.0",
+      "dependencies": {
+        "date-fns": "^4.1.0",
+      },
+    },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
       "version": "0.0.0",
@@ -196,6 +217,7 @@
         "@dnd-kit/modifiers": "^9.0.0",
         "@dnd-kit/utilities": "^3.2.2",
         "@phosphor-icons/react": "^2.1.10",
+        "@workspace/calendar-client": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
@@ -206,9 +228,7 @@
         "next": "^15.4.8",
         "next-themes": "^0.4.6",
         "radix-ui": "^1.4.3",
-        "react": "^19.2.1",
         "react-day-picker": "^9.8.0",
-        "react-dom": "^19.2.1",
         "react-use-measure": "^2.1.7",
         "rooks": "^8.4.0",
         "shadcn": "^2.9.2",
@@ -223,11 +243,17 @@
         "@types/node": "^20.19.9",
         "@types/react": "^19.1.8",
         "@types/react-dom": "^19.1.6",
+        "@workspace/eslint-config": "workspace:*",
         "autoprefixer": "^10.4.22",
         "eslint": "^9.20.1",
         "minimatch": "^10.1.1",
         "tailwindcss": "^4.1.11",
         "typescript": "^5.8.3",
+      },
+      "peerDependencies": {
+        "@tanstack/react-query": "^5.90.12",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
       },
     },
   },
@@ -1187,6 +1213,10 @@
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.11.1", "", { "os": "win32", "cpu": "x64" }, "sha512-lrW200hZdbfRtztbygyaq/6jP6AKE8qQN2KvPcJ+x7wiD038YtnYtZ82IMNJ69GJibV7bwL3y9FgK+5w/pYt6g=="],
 
     "@vercel/oidc": ["@vercel/oidc@3.1.0", "", {}, "sha512-Fw28YZpRnA3cAHHDlkt7xQHiJ0fcL+NRcIqsocZQUSmbzeIKRpwttJjik5ZGanXP+vlA4SbTg+AbA3bP363l+w=="],
+
+    "@workspace/calendar-client": ["@workspace/calendar-client@workspace:packages/calendar-client"],
+
+    "@workspace/calendar-core": ["@workspace/calendar-core@workspace:packages/calendar-core"],
 
     "@workspace/eslint-config": ["@workspace/eslint-config@workspace:packages/eslint-config"],
 
@@ -2887,6 +2917,8 @@
     "@typescript-eslint/typescript-estree/semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
 
     "@typescript-eslint/visitor-keys/eslint-visitor-keys": ["eslint-visitor-keys@5.0.1", "", {}, "sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA=="],
+
+    "@workspace/eslint-config/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@workspace/logger/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
