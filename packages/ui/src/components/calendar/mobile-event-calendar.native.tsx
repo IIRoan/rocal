@@ -30,7 +30,7 @@ import { MobileWeekViewNative } from "./mobile-week-view.native";
 import {
   mobileCalendarTokens,
   type SharedMobileEventCalendarProps,
-} from "./mobile-calendar-design";
+} from "./mobile-calendar-shared";
 
 export interface MobileEventCalendarProps
   extends SharedMobileEventCalendarProps {

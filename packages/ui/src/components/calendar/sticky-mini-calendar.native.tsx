@@ -25,7 +25,7 @@ import {
   resolveEventColorValue,
   sortEvents,
 } from "./utils";
-import { mobileCalendarTokens } from "./mobile-calendar-design";
+import { mobileCalendarTokens } from "./mobile-calendar-shared";
 
 interface StickyMiniCalendarNativeProps {
   currentDate: Date;

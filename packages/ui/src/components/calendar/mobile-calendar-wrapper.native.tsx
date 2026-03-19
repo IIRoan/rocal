@@ -23,9 +23,9 @@ import {
   parseWorkingDays,
   sharedMobileViewLabels,
   type SharedMobileCalendarWrapperProps,
-} from "./mobile-calendar-design";
+} from "./mobile-calendar-shared";
 
-interface MobileCalendarWrapperProps extends SharedMobileCalendarWrapperProps {}
+type MobileCalendarWrapperProps = SharedMobileCalendarWrapperProps;
 
 const defaultSettings: Pick<UserSettings, "defaultView" | "weekStartDay" | "timezone" | "workingDays"> = {
   defaultView: "day",

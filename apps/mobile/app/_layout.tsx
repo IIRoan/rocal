@@ -3,7 +3,7 @@ import { Href, Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 import '../global.css';
@@ -69,12 +69,11 @@ function RootLayoutContent() {
 
   if (isPending) {
     return (
-      <View
-        style={[
-          styles.loadingScreen,
-          { backgroundColor: colorScheme === 'dark' ? '#020617' : '#f8fafc' },
-        ]}>
-        <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#e2e8f0' : '#0f172a'} />
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator
+          size="large"
+          color={colorScheme === 'dark' ? DarkTheme.colors.text : DefaultTheme.colors.text}
+        />
       </View>
     );
   }
@@ -132,11 +131,3 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingScreen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

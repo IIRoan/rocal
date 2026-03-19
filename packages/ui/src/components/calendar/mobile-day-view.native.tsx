@@ -19,7 +19,7 @@ import {
 import type { CalendarEvent } from "./types";
 import { eventOverlapsRange, isMultiDayEvent } from "./utils";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
-import { mobileCalendarTokens } from "./mobile-calendar-design";
+import { mobileCalendarTokens } from "./mobile-calendar-shared";
 
 const MOBILE_START_HOUR = 0;
 const MOBILE_END_HOUR = 23;

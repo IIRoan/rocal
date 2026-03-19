@@ -57,7 +57,7 @@ import { useDropdownShortcuts } from "../../hooks";
 import {
   mobileCalendarTokens,
   type SharedMobileEventCalendarProps,
-} from "./mobile-calendar-design";
+} from "./mobile-calendar-shared";
 
 export interface MobileEventCalendarProps
   extends SharedMobileEventCalendarProps {

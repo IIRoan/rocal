@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { mobileCalendarTokens } from "../calendar/mobile-calendar-design";
+import { mobileCalendarTokens } from "../calendar/mobile-calendar-shared";
 
 interface MobileAuthCardProps {
   appName?: string;
