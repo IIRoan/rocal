@@ -10,6 +10,12 @@
       ],
       "@workspace/ui/*": [
         "../../packages/ui/src/*"
+      ],
+      "@workspace/calendar-client": [
+        "../../packages/calendar-client/src/index.ts"
+      ],
+      "@workspace/calendar-core": [
+        "../../packages/calendar-core/src/index.ts"
       ]
     }
   },

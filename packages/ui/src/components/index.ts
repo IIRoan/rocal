@@ -35,7 +35,22 @@ export {
 
 // Calendar constants, utilities and types
 export * from "./calendar/constants";
-export * from "./calendar/utils";
+export {
+  getEventColorClasses,
+  getEventColorStyles,
+  resolveEventColorValue,
+  getBorderRadiusClasses,
+  isMultiDayEvent,
+  getEventInterval,
+  eventOverlapsRange,
+  getEventsForDay,
+  sortEvents,
+  getSpanningEventsForDay,
+  getAllEventsForDay,
+  getAgendaEventsForDay,
+  addHoursToDate,
+  addMinutesToDate,
+} from "./calendar/utils";
 
 // Calendar types (with explicit exports to avoid conflicts)
 export type {

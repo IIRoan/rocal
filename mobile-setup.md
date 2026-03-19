@@ -48,11 +48,15 @@ packages/
 3. Move shared constants (`AgendaDaysToShow`, `EventHeight`, etc.).
 4. Replace direct browser storage usage with adapter interfaces.
 
+Status: done
+
 ### Phase 2: Share the data layer
 1. Extract `apps/web/lib/calendar-api-service.ts` into `packages/calendar-client`.
 2. Extract the calendar query hook logic from `apps/web/hooks/use-calendar-data.ts`.
 3. Keep API calls pointing at `apps/backend`.
 4. Make auth/session access injectable so web and mobile can differ.
+
+Status: done
 
 ### Phase 3: Create Expo app
 1. Add `apps/mobile` with Expo Router.
@@ -65,6 +69,8 @@ packages/
    - settings/calendars
 3. Use shared core + client packages.
 4. Implement native storage for preferences and cached date/view state.
+
+Status: in progress
 
 ### Phase 4: Solve auth
 Recommended approach:

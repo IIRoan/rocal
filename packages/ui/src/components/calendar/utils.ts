@@ -1,112 +1,15 @@
 import {
+  endOfDay,
   isSameDay,
   startOfDay,
-  endOfDay,
-  isWithinInterval,
-  isBefore,
-  isAfter,
 } from "date-fns";
+import type { CalendarEvent } from "./types";
+import {
+  getEventInterval,
+  isMultiDayEvent,
+} from "../../../../calendar-core/src/index";
+export * from "../../../../calendar-core/src/index";
 
-import type {
-  CalendarEvent,
-  EventColor,
-} from "@workspace/ui/components/index.ts";
-
-/**
- * Check if a string is a valid hex color
- */
-function isHexColor(color: string): boolean {
-  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
-}
-
-/**
- * Get CSS classes for event colors
- */
-export function getEventColorClasses(color?: EventColor | string): string {
-  const eventColor = color || "sky";
-
-  // Handle hex colors
-  if (isHexColor(eventColor)) {
-    return "shadow-sm";
-  }
-
-  // Handle predefined colors
-  switch (eventColor) {
-    case "blue":
-    case "sky":
-      return "bg-event-sky hover:bg-event-sky/80 text-event-sky-foreground shadow-sm";
-    case "violet":
-      return "bg-event-violet hover:bg-event-violet/80 text-event-violet-foreground shadow-sm";
-    case "rose":
-      return "bg-event-rose hover:bg-event-rose/80 text-event-rose-foreground shadow-sm";
-    case "emerald":
-      return "bg-event-emerald hover:bg-event-emerald/80 text-event-emerald-foreground shadow-sm";
-    case "orange":
-      return "bg-event-orange hover:bg-event-orange/80 text-event-orange-foreground shadow-sm";
-    default:
-      return "bg-event-default hover:bg-event-default/80 text-event-default-foreground shadow-sm";
-  }
-}
-
-/**
- * Get inline styles for hex colors
- */
-export function getEventColorStyles(
-  color?: EventColor | string,
-): React.CSSProperties {
-  const eventColor = color || "sky";
-
-  if (isHexColor(eventColor)) {
-    return {
-      backgroundColor: eventColor,
-      color: getContrastColor(eventColor),
-    };
-  }
-
-  return {};
-}
-
-/**
- * Resolve an event color value to a CSS color string for indicator dots.
- */
-export function resolveEventColorValue(color?: EventColor | string): string {
-  if (!color) {
-    return "var(--color-event-default)";
-  }
-
-  if (isHexColor(color)) {
-    return color;
-  }
-
-  if (color === "blue") {
-    return "var(--color-event-sky)";
-  }
-
-  return `var(--color-event-${color})`;
-}
-
-/**
- * Get contrasting text color for a given background color
- */
-function getContrastColor(hexColor: string): string {
-  // Remove # if present
-  const hex = hexColor.replace("#", "");
-
-  // Convert to RGB
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-
-  // Calculate luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  // Return black or white based on luminance
-  return luminance > 0.5 ? "#000000" : "#ffffff";
-}
-
-/**
- * Get CSS classes for border radius based on event position in multi-day events
- */
 export function getBorderRadiusClasses(
   isFirstDay: boolean,
   isLastDay: boolean,
@@ -122,44 +25,6 @@ export function getBorderRadiusClasses(
   }
 }
 
-/**
- * Check if an event is a multi-day event
- */
-export function isMultiDayEvent(event: CalendarEvent): boolean {
-  const eventStart = startOfDay(new Date(event.start));
-  const eventEnd = startOfDay(new Date(event.end));
-  return event.allDay || !isSameDay(eventStart, eventEnd);
-}
-
-/**
- * Normalize an event's interval for overlap checks.
- * - For day-level granularity: compare on day boundaries and treat end as endOfDay
- * - For time-level granularity: use actual start/end
- */
-export function getEventInterval(
-  event: CalendarEvent,
-  granularity: "day" | "time" = "day",
-): { start: Date; end: Date } {
-  const rawStart = new Date(event.start);
-  const rawEnd = new Date(event.end);
-
-  if (granularity === "time") {
-    // Use precise times; guard against inverted ranges
-    const start = rawStart <= rawEnd ? rawStart : rawEnd;
-    const end = rawEnd >= rawStart ? rawEnd : rawStart;
-    return { start, end };
-  }
-
-  // Day-level comparisons: inclusive of the final day
-  const start = startOfDay(rawStart);
-  const end = endOfDay(rawEnd);
-  return { start, end };
-}
-
-/**
- * Check if an event overlaps a target range [start, end]
- * Uses day-level or time-level semantics.
- */
 export function eventOverlapsRange(
   event: CalendarEvent,
   rangeStart: Date,
@@ -173,9 +38,6 @@ export function eventOverlapsRange(
   return start <= rEnd && end >= rStart;
 }
 
-/**
- * Filter events for a specific day
- */
 export function getEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -188,9 +50,6 @@ export function getEventsForDay(
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }
 
-/**
- * Sort events with multi-day events first, then by start time
- */
 export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
   return [...events].sort((a, b) => {
     const aIsMultiDay = isMultiDayEvent(a);
@@ -203,9 +62,6 @@ export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
   });
 }
 
-/**
- * Get multi-day events that span across a specific day (but don't start on that day)
- */
 export function getSpanningEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -221,9 +77,6 @@ export function getSpanningEventsForDay(
   });
 }
 
-/**
- * Get all events visible on a specific day (starting, ending, or spanning)
- */
 export function getAllEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -236,9 +89,6 @@ export function getAllEventsForDay(
   );
 }
 
-/**
- * Get all events for a day (for agenda view)
- */
 export function getAgendaEventsForDay(
   events: CalendarEvent[],
   day: Date,
@@ -256,18 +106,12 @@ export function getAgendaEventsForDay(
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }
 
-/**
- * Add hours to a date
- */
 export function addHoursToDate(date: Date, hours: number): Date {
   const result = new Date(date);
   result.setHours(result.getHours() + hours);
   return result;
 }
 
-/**
- * Add minutes to a date
- */
 export function addMinutesToDate(date: Date, minutes: number): Date {
   const result = new Date(date);
   result.setMinutes(result.getMinutes() + minutes);

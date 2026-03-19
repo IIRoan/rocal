@@ -1,4 +1,4 @@
-import type { ApiError } from "./types/calendar";
+import type { ApiError } from "./types";
 
 export interface HttpClientOptions {
   baseURL?: string;
@@ -19,20 +19,14 @@ export class HttpClient {
   private retryDelay: number;
 
   constructor(options: HttpClientOptions = {}) {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    // Debug logging
-    if (typeof window !== "undefined") {
-      console.log("NEXT_PUBLIC_API_URL in browser:", envUrl);
-    }
-
-    // Fallback to localhost backend
+    const envUrl =
+      process.env.NEXT_PUBLIC_API_URL || process.env.EXPO_PUBLIC_API_URL;
     const fallbackUrl = "http://localhost:4001";
 
     this.baseURL = envUrl || fallbackUrl;
-    this.timeout = options.timeout || 10000; // 10 seconds
+    this.timeout = options.timeout || 10000;
     this.retries = options.retries || 3;
-    this.retryDelay = options.retryDelay || 1000; // 1 second
+    this.retryDelay = options.retryDelay || 1000;
   }
 
   private async delay(ms: number): Promise<void> {
@@ -40,7 +34,6 @@ export class HttpClient {
   }
 
   private isRetryableError(error: any): boolean {
-    // Retry on network errors, timeouts, and 5xx server errors
     if (error.name === "TypeError" || error.name === "AbortError") {
       return true;
     }
@@ -49,7 +42,6 @@ export class HttpClient {
       return true;
     }
 
-    // Retry on specific 4xx errors that might be transient
     if (error.status === 408 || error.status === 429) {
       return true;
     }
@@ -60,14 +52,11 @@ export class HttpClient {
   private async parseErrorResponse(response: Response): Promise<ApiError> {
     try {
       const errorText = await response.text();
-      console.error(`HTTP ${response.status} Error Response:`, errorText);
 
-      // Try to parse as JSON
       let errorData: any;
       try {
         errorData = JSON.parse(errorText);
       } catch {
-        // If not JSON, create a structured error
         errorData = {
           error: "HTTP Error",
           message:
@@ -75,18 +64,14 @@ export class HttpClient {
         };
       }
 
-      const apiError: ApiError = {
+      return {
         error: errorData.error || "HTTP Error",
         message:
           errorData.message || response.statusText || `HTTP ${response.status}`,
         statusCode: response.status,
         details: errorData.details || [],
       };
-
-      console.error(`API Error [${response.url}]:`, apiError);
-      return apiError;
-    } catch (parseError) {
-      console.error("Failed to parse error response:", parseError);
+    } catch {
       return {
         error: "HTTP Error",
         message: response.statusText || `HTTP ${response.status}`,
@@ -110,11 +95,9 @@ export class HttpClient {
     let lastError: any;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
-      // Create a fresh controller and timeout for each attempt
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      // Wire external AbortSignal (if provided) to our internal controller
       const externalSignal = (fetchOptions as RequestInit).signal as
         | AbortSignal
         | undefined;
@@ -132,9 +115,8 @@ export class HttpClient {
 
       const requestOptions: RequestInit = {
         ...fetchOptions,
-        // Use our controller's signal so we still manage retries/timeouts
         signal: controller.signal,
-        credentials: "include", // Include cookies for session authentication
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(fetchOptions as RequestInit).headers,
@@ -144,18 +126,15 @@ export class HttpClient {
       try {
         const response = await fetch(fullUrl, requestOptions);
         clearTimeout(timeoutId);
-        // Clean up external abort listener to avoid leaks
         if (abortListener && externalSignal) {
           externalSignal.removeEventListener("abort", abortListener);
           abortListener = null;
         }
 
         if (!response.ok) {
-          // Capture Retry-After header (if any) before consuming body
           const retryAfterHeader = response.headers.get("retry-after");
           const error = await this.parseErrorResponse(response);
 
-          // Don't retry authentication errors
           if (response.status === 401 || response.status === 403) {
             throw error;
           }
@@ -164,7 +143,6 @@ export class HttpClient {
           if (attempt < retries && retryable) {
             let delayMs = this.retryDelay * Math.pow(2, attempt);
 
-            // Respect Retry-After for 429/503 if server provides it
             if (retryAfterHeader) {
               const seconds = parseInt(retryAfterHeader, 10);
               if (!isNaN(seconds)) {
@@ -177,7 +155,6 @@ export class HttpClient {
               }
             }
 
-            // Add small jitter to avoid thundering herd
             const jitter = Math.floor(Math.random() * 250);
             await this.delay(Math.max(0, delayMs) + jitter);
             continue;
@@ -186,32 +163,27 @@ export class HttpClient {
           throw error;
         }
 
-        // Handle empty responses (like DELETE operations)
         const contentType = response.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
           return {} as T;
         }
 
         const data = await response.json();
-
-        // Transform date strings to Date objects
         return this.transformDates(data);
       } catch (error: any) {
         clearTimeout(timeoutId);
-        // Clean up external abort listener to avoid leaks
         if (abortListener && externalSignal) {
           externalSignal.removeEventListener("abort", abortListener);
           abortListener = null;
         }
         lastError = error;
 
-        // Don't retry authentication errors
         if (error?.statusCode === 401 || error?.statusCode === 403) {
           throw error;
         }
 
         if (attempt < retries && this.isRetryableError(error)) {
-          let delayMs = this.retryDelay * Math.pow(2, attempt);
+          const delayMs = this.retryDelay * Math.pow(2, attempt);
           const jitter = Math.floor(Math.random() * 250);
           await this.delay(delayMs + jitter);
           continue;
@@ -236,7 +208,6 @@ export class HttpClient {
     if (typeof obj === "object") {
       const transformed: any = {};
       for (const [key, value] of Object.entries(obj)) {
-        // Transform common date field names
         if (
           (key === "start" ||
             key === "end" ||
@@ -245,16 +216,7 @@ export class HttpClient {
             key === "syncedAt") &&
           typeof value === "string"
         ) {
-          const dateValue = new Date(value);
-          // Debug date transformation for synced events
-          if (key === "start" || key === "end") {
-            console.log(`HTTP Client - Transforming ${key}:`, {
-              original: value,
-              transformed: dateValue.toString(),
-              iso: dateValue.toISOString(),
-            });
-          }
-          transformed[key] = dateValue;
+          transformed[key] = new Date(value);
         } else {
           transformed[key] = this.transformDates(value);
         }
@@ -290,5 +252,4 @@ export class HttpClient {
   }
 }
 
-// Default instance
 export const httpClient = new HttpClient();
