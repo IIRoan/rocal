@@ -1,11 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import {
   addHours,
   areIntervalsOverlapping,
@@ -23,13 +17,33 @@ import {
 import type { CalendarEvent } from "./types";
 import { eventOverlapsRange, isMultiDayEvent } from "./utils";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
-import { mobileCalendarTokens } from "./mobile-calendar-shared";
+import { cn } from "../../lib/utils";
 
 const MOBILE_START_HOUR = 0;
 const MOBILE_END_HOUR = 23;
 const MOBILE_CELL_HEIGHT = 52;
-const TIME_COLUMN_WIDTH = 52;
-const DAY_COLUMN_WIDTH = 92;
+
+const EVENT_BG_CLASSES: Record<string, string> = {
+  blue: "bg-event-sky/35 border-event-sky/70",
+  sky: "bg-event-sky/35 border-event-sky/70",
+  violet: "bg-event-violet/35 border-event-violet/70",
+  purple: "bg-event-violet/35 border-event-violet/70",
+  orange: "bg-event-orange/35 border-event-orange/70",
+  rose: "bg-event-rose/35 border-event-rose/70",
+  emerald: "bg-event-emerald/35 border-event-emerald/70",
+  green: "bg-event-emerald/35 border-event-emerald/70",
+};
+
+const EVENT_TEXT_CLASSES: Record<string, string> = {
+  blue: "text-event-sky-foreground",
+  sky: "text-event-sky-foreground",
+  violet: "text-event-violet-foreground",
+  purple: "text-event-violet-foreground",
+  orange: "text-event-orange-foreground",
+  rose: "text-event-rose-foreground",
+  emerald: "text-event-emerald-foreground",
+  green: "text-event-emerald-foreground",
+};
 
 interface MobileWeekViewProps {
   currentDate: Date;
@@ -137,7 +151,7 @@ export function MobileWeekViewNative({
           const startHour = getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
           const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
           const top = startHour * MOBILE_CELL_HEIGHT;
-          const height = Math.max((endHour - startHour) * MOBILE_CELL_HEIGHT, 24);
+          const height = Math.max((endHour - startHour) * MOBILE_CELL_HEIGHT, 44);
           const overlaps =
             (dayEvents[dayIndex] ?? []).filter((other) => {
               if (other.id === event.id) return false;
@@ -147,8 +161,12 @@ export function MobileWeekViewNative({
               );
             }).length + 1;
           const columnIndex = eventColumnMap.get(event) ?? 0;
+          const columnsForLayout = Math.max(overlaps, columnIndex + 1);
           const gap = 0.02;
-          const width = overlaps === 1 ? 0.96 : Math.max(0.28, (1 - gap * (overlaps + 1)) / overlaps);
+          const width =
+            columnsForLayout === 1
+              ? 0.96
+              : Math.max(0.18, (1 - gap * (columnsForLayout + 1)) / columnsForLayout);
           const left = gap + columnIndex * (width + gap);
 
           result.push({
@@ -196,36 +214,50 @@ export function MobileWeekViewNative({
   }, [currentDate]);
 
   return (
-    <View style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <View className="flex-1">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1">
         <View>
-          <View style={styles.headerRow}>
-            <View style={styles.timeHeaderSpacer} />
+          <View className="flex-row border-b border-border/70 bg-background/95">
+            <View className="w-[52px]" />
             {days.map((day) => (
               <View
                 key={day.toISOString()}
-                style={[
-                  styles.dayHeader,
-                  isToday(day) ? styles.dayHeaderToday : null,
-                  workingDays.includes(day.getDay()) ? styles.dayHeaderWorkday : null,
-                ]}
+                className={cn(
+                  "w-[92px] items-center justify-center border-l border-border/60 py-2",
+                  workingDays.includes(day.getDay()) ? "bg-background" : "bg-muted/20",
+                  isToday(day) && "bg-primary/10",
+                )}
               >
-                <Text style={[styles.dayHeaderWeekday, isToday(day) ? styles.dayHeaderWeekdayToday : null]}>
+                <Text
+                  className={cn(
+                    "text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground/80",
+                    isToday(day) && "text-primary",
+                  )}
+                >
                   {format(day, "EEE")}
                 </Text>
-                <Text style={[styles.dayHeaderDate, isToday(day) ? styles.dayHeaderDateToday : null]}>
+                <Text
+                  className={cn(
+                    "mt-0.5 text-base font-bold text-foreground",
+                    isToday(day) && "text-primary",
+                  )}
+                >
                   {format(day, "d")}
                 </Text>
               </View>
             ))}
           </View>
 
-          <ScrollView ref={scrollRef} style={styles.verticalScroll} contentContainerStyle={styles.verticalContent}>
-            <View style={styles.timelineRow}>
-              <View style={styles.timeColumn}>
+          <ScrollView
+            ref={scrollRef}
+            className="flex-1"
+            contentContainerStyle={{ paddingBottom: 16 }}
+          >
+            <View className="flex-row">
+              <View className="w-[52px] border-r border-border/70 bg-background">
                 {hours.map((hour) => (
-                  <View key={hour.toISOString()} style={styles.timeCell}>
-                    <Text style={styles.timeLabel}>
+                  <View key={hour.toISOString()} className="h-[52px] items-end justify-start pr-2">
+                    <Text className="mt-[-6px] bg-background px-0.5 text-[10px] font-medium text-muted-foreground/80">
                       {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
                     </Text>
                   </View>
@@ -235,27 +267,48 @@ export function MobileWeekViewNative({
               {days.map((day, dayIndex) => (
                 <View
                   key={day.toISOString()}
-                  style={[styles.dayColumn, isToday(day) ? styles.dayColumnToday : null]}
+                  className={cn(
+                    "relative w-[92px] border-r border-border/70 bg-card",
+                    isToday(day) && "bg-primary/5",
+                  )}
                 >
                   {(positionedEvents[dayIndex] ?? []).map((positionedEvent) => (
                     <Pressable
                       key={positionedEvent.event.id}
                       onPress={() => onEventSelect(positionedEvent.event)}
-                      style={[
-                        styles.eventCard,
-                        {
-                          top: positionedEvent.top,
-                          height: positionedEvent.height,
-                          left: `${positionedEvent.left * 100}%`,
-                          width: `${positionedEvent.width * 100}%`,
-                          zIndex: positionedEvent.zIndex,
-                          backgroundColor: resolveEventBackground(positionedEvent.event.color),
-                          borderColor: resolveEventBorder(positionedEvent.event.color),
-                        },
-                      ]}
+                      className={cn(
+                        "absolute min-h-11 overflow-hidden rounded-lg border px-1.5 py-1",
+                        getEventBackgroundClass(positionedEvent.event.color),
+                      )}
+                      style={{
+                        top: positionedEvent.top,
+                        height: positionedEvent.height,
+                        left: `${positionedEvent.left * 100}%`,
+                        width: `${positionedEvent.width * 100}%`,
+                        zIndex: positionedEvent.zIndex,
+                      }}
+                      accessibilityRole="button"
                     >
-                      <Text style={styles.eventTitle} numberOfLines={1}>
+                      <Text
+                        className={cn(
+                          "text-[10px] font-bold",
+                          getEventTextClass(positionedEvent.event.color),
+                        )}
+                        numberOfLines={1}
+                      >
                         {positionedEvent.event.title}
+                      </Text>
+                      <Text
+                        className={cn(
+                          "mt-0.5 text-[9px] font-medium",
+                          getEventTextClass(positionedEvent.event.color),
+                        )}
+                        numberOfLines={1}
+                      >
+                        {format(
+                          new Date(positionedEvent.event.start),
+                          timeFormat === "24h" ? "HH:mm" : "h:mm a",
+                        )}
                       </Text>
                     </Pressable>
                   ))}
@@ -263,24 +316,27 @@ export function MobileWeekViewNative({
                   {currentTimeVisible && isToday(day) ? (
                     <View
                       pointerEvents="none"
-                      style={[styles.currentTimeLine, { top: `${currentTimePosition}%` }]}
+                      className="absolute left-0 right-0 z-30 flex-row items-center"
+                      style={{ top: `${currentTimePosition}%` }}
                     >
-                      <View style={styles.currentTimeDot} />
-                      <View style={styles.currentTimeBar} />
+                      <View className="-ml-1 size-2 rounded-full bg-destructive" />
+                      <View className="h-0.5 flex-1 bg-destructive" />
                     </View>
                   ) : null}
 
                   {hours.map((hour) => {
                     const hourValue = getHours(hour);
                     return (
-                      <View key={hour.toISOString()} style={styles.gridHourCell}>
+                      <View key={hour.toISOString()} className="relative h-[52px] border-b border-border/60">
                         {[0, 1, 2, 3].map((quarter) => (
                           <Pressable
                             key={`${hour.toISOString()}-${quarter}`}
-                            style={[
-                              styles.tapTarget,
-                              { top: quarter * (MOBILE_CELL_HEIGHT / 4), height: MOBILE_CELL_HEIGHT / 4 },
-                            ]}
+                            className="absolute left-0 right-0"
+                            style={{
+                              top: quarter * (MOBILE_CELL_HEIGHT / 4),
+                              height: MOBILE_CELL_HEIGHT / 4,
+                            }}
+                            hitSlop={16}
                             onPress={() => {
                               const startTime = new Date(day);
                               startTime.setHours(hourValue, quarter * 15, 0, 0);
@@ -301,140 +357,12 @@ export function MobileWeekViewNative({
   );
 }
 
-function resolveEventBackground(color?: string | null) {
-  if (color?.startsWith("#")) return `${color}22`;
-  return mobileCalendarTokens.colors.surfaceAccent;
+function getEventBackgroundClass(color?: string | null) {
+  if (!color) return "bg-event-default/35 border-event-default/70";
+  return EVENT_BG_CLASSES[color.toLowerCase()] ?? "bg-event-default/35 border-event-default/70";
 }
 
-function resolveEventBorder(color?: string | null) {
-  if (color?.startsWith("#")) return color;
-  return mobileCalendarTokens.colors.accentStrong;
+function getEventTextClass(color?: string | null) {
+  if (!color) return "text-event-default-foreground";
+  return EVENT_TEXT_CLASSES[color.toLowerCase()] ?? "text-event-default-foreground";
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: "row",
-    backgroundColor: mobileCalendarTokens.colors.background,
-    borderBottomWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  timeHeaderSpacer: {
-    width: TIME_COLUMN_WIDTH,
-  },
-  dayHeader: {
-    width: DAY_COLUMN_WIDTH,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderLeftWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  dayHeaderWorkday: {
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  dayHeaderToday: {
-    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
-  },
-  dayHeaderWeekday: {
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  dayHeaderWeekdayToday: {
-    color: mobileCalendarTokens.colors.accentStrong,
-  },
-  dayHeaderDate: {
-    marginTop: 2,
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  dayHeaderDateToday: {
-    color: mobileCalendarTokens.colors.accentStrong,
-  },
-  verticalScroll: {
-    flex: 1,
-  },
-  verticalContent: {
-    paddingBottom: 16,
-  },
-  timelineRow: {
-    flexDirection: "row",
-  },
-  timeColumn: {
-    width: TIME_COLUMN_WIDTH,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  timeCell: {
-    height: MOBILE_CELL_HEIGHT,
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-    paddingRight: 8,
-  },
-  timeLabel: {
-    marginTop: -8,
-    backgroundColor: mobileCalendarTokens.colors.background,
-    paddingHorizontal: 2,
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  dayColumn: {
-    width: DAY_COLUMN_WIDTH,
-    position: "relative",
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderLeftWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  dayColumnToday: {
-    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
-  },
-  gridHourCell: {
-    height: MOBILE_CELL_HEIGHT,
-    borderBottomWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    position: "relative",
-  },
-  tapTarget: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-  },
-  eventCard: {
-    position: "absolute",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 5,
-    overflow: "hidden",
-  },
-  eventTitle: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  currentTimeLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    zIndex: 30,
-  },
-  currentTimeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: mobileCalendarTokens.colors.danger,
-    marginLeft: -4,
-  },
-  currentTimeBar: {
-    flex: 1,
-    height: 2,
-    backgroundColor: mobileCalendarTokens.colors.danger,
-  },
-});
