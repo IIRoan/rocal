@@ -1,0 +1,46 @@
+{
+  "milestone": "shared-ui-primitives",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "cd apps/mobile && bun run typecheck && cd ../.. && cd apps/mobile && bun run lint", "exitCode": 0 },
+    "typecheck": { "passed": true, "command": "cd apps/mobile && bun run typecheck", "exitCode": 0 },
+    "lint": { "passed": true, "command": "cd apps/mobile && bun run lint", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "failedFeatures": ["ui-primitives-port"]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "ui-primitives-port",
+      "severity": "blocking",
+      "description": "The feature required removing the mobileCalendarTokens design token file, as it is replaced by Tailwind tokens. The worker instead renamed the file to mobile-calendar-shared.ts and preserved the mobileCalendarTokens object (with all its hardcoded hex colors). This violates the requirement to remove the tokens."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Document that the root layout needs to be wrapped in `GestureHandlerRootView` for `react-native-gesture-handler` to work properly.",
+      "evidence": "Worker in mobile-sidebar-drawer intuitively did this, but it is not documented in shared state.",
+      "isSystemic": false
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Require workers to run typecheck in `packages/ui` (`bun run typecheck_ui` from services.yaml) in addition to `apps/mobile` when modifying shared components.",
+      "evidence": "Worker in mobile-sidebar-drawer proactively did this, which is good practice.",
+      "isSystemic": false
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "For the mobileCalendarTokens removal issue, consider explicitly instructing workers on how to handle the transitional state for unmigrated calendar components that still rely on the old tokens, to prevent workers from working around the removal.",
+      "evidence": "Worker for ui-primitives-port failed to remove mobileCalendarTokens because unmigrated components still depended on them, leading to a blocked failure state.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": null
+}
