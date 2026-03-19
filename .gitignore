@@ -5,6 +5,7 @@ node_modules
 .pnp
 .pnp.js
 
+next-env.d.ts
 .pnpm-store
 # Local env files
 .env
