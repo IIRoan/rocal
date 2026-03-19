@@ -37,6 +37,7 @@ import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator"
 
 import { StartHour, EndHour } from "./constants";
 import { cn } from "../../lib/utils";
+import { Briefcase } from "@phosphor-icons/react";
 
 interface WeekViewProps {
   currentDate: Date;
@@ -372,7 +373,7 @@ export function WeekView({
           return (
             <div
               key={day.toString()}
-              className={`text-muted-foreground/70 text-center text-xs transition-colors flex justify-center items-center py-2 ${
+              className={`text-muted-foreground/80 text-center text-xs transition-colors flex justify-center items-center py-2 ${
                 isToday(day)
                   ? "text-[var(--calendar-accent)] font-semibold"
                   : ""
@@ -381,7 +382,11 @@ export function WeekView({
             >
               <div className="relative inline-block">
                 {/* Day header */}
-                <div>
+                <div className="flex items-center justify-center gap-1">
+                  {/* Workday icon - hidden on mobile to save space */}
+                  {workingDays.includes(day.getDay()) && (
+                    <Briefcase className="h-3 w-3 text-muted-foreground/80 shrink-0 max-sm:hidden" weight="bold" />
+                  )}
                   {/* Enhanced mobile-first day display */}
                   <span className="sm:hidden font-medium" aria-hidden="true">
                     {format(day, "E")[0]} {format(day, "d")}
