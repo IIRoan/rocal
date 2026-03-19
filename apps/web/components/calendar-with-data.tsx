@@ -97,7 +97,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       calendarData.setDateRange(defaultDateRange);
       initializedRef.current = true;
     }
-  }, [defaultDateRange, settingsLoading, calendarData]); // Add dependencies to ensure proper initialization
+  }, [defaultDateRange, settingsLoading, calendarData, initialView]); // Add dependencies to ensure proper initialization
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(

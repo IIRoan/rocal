@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
@@ -156,45 +156,48 @@ export function CommandPalette({
     open && currentView === "main",
   );
 
-  const updateSetting = async <K extends keyof UserSettings>(
-    key: K,
-    value: UserSettings[K],
-  ) => {
-    if (!localSettings || saving) return;
+  const updateSetting = useCallback(
+    async <K extends keyof UserSettings>(
+      key: K,
+      value: UserSettings[K],
+    ) => {
+      if (!localSettings || saving) return;
 
-    const newSettings = { ...localSettings, [key]: value };
-    setLocalSettings(newSettings);
+      const newSettings = { ...localSettings, [key]: value };
+      setLocalSettings(newSettings);
 
-    setSaving(true);
-    try {
-      const updateData: UpdateSettingsRequest = {
-        theme: newSettings.theme,
-        defaultView: newSettings.defaultView,
-        weekStartDay: newSettings.weekStartDay,
-        timezone: newSettings.timezone,
-        timeFormat: newSettings.timeFormat,
-        workingHoursStart: newSettings.workingHoursStart,
-        workingHoursEnd: newSettings.workingHoursEnd,
-        workingDays: newSettings.workingDays,
-        emailNotifications: newSettings.emailNotifications,
-        browserNotifications: newSettings.browserNotifications,
-        reminderSound: newSettings.reminderSound,
-        defaultReminder: newSettings.defaultReminder,
-        defaultEventDuration: newSettings.defaultEventDuration,
-        defaultCalendarId: newSettings.defaultCalendarId,
-        compactView: newSettings.compactView,
-        showWeekNumbers: newSettings.showWeekNumbers,
-        showDeclinedEvents: newSettings.showDeclinedEvents,
-      };
+      setSaving(true);
+      try {
+        const updateData: UpdateSettingsRequest = {
+          theme: newSettings.theme,
+          defaultView: newSettings.defaultView,
+          weekStartDay: newSettings.weekStartDay,
+          timezone: newSettings.timezone,
+          timeFormat: newSettings.timeFormat,
+          workingHoursStart: newSettings.workingHoursStart,
+          workingHoursEnd: newSettings.workingHoursEnd,
+          workingDays: newSettings.workingDays,
+          emailNotifications: newSettings.emailNotifications,
+          browserNotifications: newSettings.browserNotifications,
+          reminderSound: newSettings.reminderSound,
+          defaultReminder: newSettings.defaultReminder,
+          defaultEventDuration: newSettings.defaultEventDuration,
+          defaultCalendarId: newSettings.defaultCalendarId,
+          compactView: newSettings.compactView,
+          showWeekNumbers: newSettings.showWeekNumbers,
+          showDeclinedEvents: newSettings.showDeclinedEvents,
+        };
 
-      await updateSettings(updateData);
-    } catch (err: any) {
-      console.error("Failed to save settings:", err);
-      setLocalSettings(localSettings);
-    } finally {
-      setSaving(false);
-    }
-  };
+        await updateSettings(updateData);
+      } catch (err: any) {
+        console.error("Failed to save settings:", err);
+        setLocalSettings(localSettings);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [localSettings, saving, updateSettings],
+  );
 
   const handleReset = async () => {
     setSaving(true);
@@ -225,46 +228,52 @@ export function CommandPalette({
   }, [isCommandMode, commandQuery]);
 
   // Execute a command action
-  const executeCommand = (cmd: (typeof COMMANDS)[0]) => {
-    const { action, payload } = cmd.execute;
-    switch (action) {
-      // Immediate actions that close the palette
-      case "setTheme":
-        if (payload?.theme) {
-          updateSetting("theme", payload.theme as "light" | "dark" | "system");
-          onOpenChange(false);
-        }
-        break;
-      // Action commands - take user directly to the item/setting
-      case "newEvent":
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("events");
-        break;
-      case "newCalendar":
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("calendar-create");
-        break;
-      case "openCalendars":
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("calendars");
-        break;
-      case "newPasskey":
-        setPasskeyAddMode(true);
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("passkeys");
-        break;
-      case "openPasskeys":
-        setPasskeyAddMode(false);
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("passkeys");
-        break;
-    }
-  };
+  const executeCommand = useCallback(
+    (cmd: (typeof COMMANDS)[0]) => {
+      const { action, payload } = cmd.execute;
+      switch (action) {
+        // Immediate actions that close the palette
+        case "setTheme":
+          if (payload?.theme) {
+            updateSetting(
+              "theme",
+              payload.theme as "light" | "dark" | "system",
+            );
+            onOpenChange(false);
+          }
+          break;
+        // Action commands - take user directly to the item/setting
+        case "newEvent":
+          setTransitionDirection("forward");
+          setSearchQuery("");
+          setCurrentView("events");
+          break;
+        case "newCalendar":
+          setTransitionDirection("forward");
+          setSearchQuery("");
+          setCurrentView("calendar-create");
+          break;
+        case "openCalendars":
+          setTransitionDirection("forward");
+          setSearchQuery("");
+          setCurrentView("calendars");
+          break;
+        case "newPasskey":
+          setPasskeyAddMode(true);
+          setTransitionDirection("forward");
+          setSearchQuery("");
+          setCurrentView("passkeys");
+          break;
+        case "openPasskeys":
+          setPasskeyAddMode(false);
+          setTransitionDirection("forward");
+          setSearchQuery("");
+          setCurrentView("passkeys");
+          break;
+      }
+    },
+    [onOpenChange, updateSetting],
+  );
 
   // Auto-execute if exact command match
   useEffect(() => {
@@ -277,7 +286,7 @@ export function CommandPalette({
         return () => clearTimeout(timer);
       }
     }
-  }, [isCommandMode, commandQuery, currentView]);
+  }, [isCommandMode, commandQuery, currentView, executeCommand]);
 
   // Filter search items (only when not in command mode)
   const filteredItems = useMemo(() => {

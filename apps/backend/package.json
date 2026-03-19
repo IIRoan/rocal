@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "build": "prisma generate && bun build --compile --minify-whitespace --minify-syntax --target bun-linux-x64 --outfile server index.ts",
+    "lint": "tsc --noEmit",
     "dev": "bun --watch index.ts",
     "start": "./server",
     "start:dev": "bun index.ts",

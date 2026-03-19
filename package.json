@@ -7,19 +7,23 @@
     "packages/*"
   ],
   "scripts": {
-    "install:all": "cd apps/backend && bun install && cd ../web && bun install && cd ../notifications && bun install",
+    "install:all": "bun install",
     "build": "cd apps/backend && bun run build && cd ../web && bun run build && cd ../notifications && bun run build",
     "build:backend": "cd apps/backend && bun run build",
     "start:backend": "cd apps/backend && ./server",
     "build:web": "cd apps/web && bun run build",
     "build:notifications": "cd apps/notifications && bun run build",
     "start:notifications": "cd apps/notifications && ./notifications",
-    "dev": "cd apps/backend && bun run dev & cd apps/web && bun run dev & cd apps/notifications && bun run dev",
+    "dev": "cd apps/backend && bun run dev & cd apps/web && bun run dev & cd apps/notifications && bun run dev & cd apps/mobile && bun run start",
     "dev:frontend": "cd apps/web && bun run dev",
     "dev:backend": "cd apps/backend && bun run dev",
     "dev:notifications": "cd apps/notifications && bun run dev",
-    "lint": "cd apps/backend && bun run lint & cd apps/web && bun run lint & cd apps/notifications && bun run lint",
-    "typecheck": "cd apps/backend && bun run typecheck & cd apps/web && bun run typecheck & cd apps/notifications && bun run typecheck",
+    "dev:mobile": "cd apps/mobile && bun run start",
+    "lint": "bun scripts/run-workspaces.ts lint",
+    "lint:mobile": "cd apps/mobile && bun run lint",
+    "typecheck": "bun scripts/run-workspaces.ts typecheck",
+    "typecheck:mobile": "cd apps/mobile && bun run typecheck",
+    "check": "bun scripts/run-workspaces.ts lint && bun scripts/run-workspaces.ts typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {

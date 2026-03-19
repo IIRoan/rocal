@@ -1,27 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../packages/typescript-config/nextjs.json",
   "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true,
-    "esModuleInterop": true,
-    "incremental": false,
-    "isolatedModules": true,
-    "lib": [
-      "es2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "module": "ESNext",
-    "moduleDetection": "force",
-    "moduleResolution": "Bundler",
-    "noUncheckedIndexedAccess": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
     "strict": false,
-    "target": "ES2022",
-    "allowJs": true,
-    "jsx": "react-jsx",
-    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -30,12 +11,7 @@
       "@workspace/ui/*": [
         "../../packages/ui/src/*"
       ]
-    },
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    }
   },
   "include": [
     "next-env.d.ts",
