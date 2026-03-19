@@ -1,28 +1,24 @@
 {
   "milestone": "shared-ui-primitives",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "assertionsSummary": {
     "total": 7,
-    "passed": 6,
-    "failed": 1,
+    "passed": 7,
+    "failed": 0,
     "blocked": 0
   },
   "passedAssertions": [
     "VAL-PRIM-001",
+    "VAL-PRIM-002",
     "VAL-PRIM-003",
     "VAL-PRIM-004",
     "VAL-SETUP-004",
     "VAL-NAV-001",
     "VAL-NAV-002"
   ],
-  "failedAssertions": [
-    {
-      "id": "VAL-PRIM-002",
-      "reason": "packages/ui/src/components/ui/color-picker.tsx contains hardcoded hex values for default swatches. While not structural CSS, this violates the strict 'no hardcoded colors' assertion for primitive files."
-    }
-  ],
+  "failedAssertions": [],
   "blockedAssertions": [],
   "appliedUpdates": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/shared-ui-primitives/user-testing/synthesis-round-1.json"
 }
