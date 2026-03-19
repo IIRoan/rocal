@@ -1,0 +1,44 @@
+{
+  "groupId": "navigation",
+  "testedAt": "2026-03-19T00:00:00Z",
+  "isolation": {
+    "type": "static-checks",
+    "directory": "C:\\Users\\Roan\\Documents\\rocal"
+  },
+  "toolsUsed": ["static-code-review", "typecheck", "lint"],
+  "assertions": [
+    {
+      "id": "VAL-NAV-001",
+      "title": "Sidebar is implemented as a swipe-from-left drawer using React Native Gesture Handler or equivalent; gesture configuration exists in code.",
+      "status": "pass",
+      "steps": [
+        { "action": "Review mobile-sidebar-drawer.native.tsx for gesture usage", "expected": "Uses React Native Gesture Handler or Expo Router drawer", "observed": "Imports Gesture, GestureDetector from react-native-gesture-handler and implements PanGesture for edgeSwipeGesture and drawerPanGesture" },
+        { "action": "Verify drawer swipe configuration", "expected": "Swipe-from-left Drawer", "observed": "Drawer translates from -DRAWER_WIDTH to 0" }
+      ],
+      "evidence": {
+        "staticCheck": "packages/ui/src/components/layout/mobile-sidebar-drawer.native.tsx",
+        "typecheck": "shared-ui-primitives/navigation/VAL-NAV-typecheck.txt",
+        "lint": "shared-ui-primitives/navigation/VAL-NAV-lint.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-NAV-002",
+      "title": "Drawer content mirrors web sidebar content: navigation links, workspace info, user avatar \u2014 using the same Tailwind classes and tokens.",
+      "status": "pass",
+      "steps": [
+        { "action": "Compare mobile-sidebar-drawer.native.tsx with web app-sidebar.tsx", "expected": "Matching navigation links, workspace info, user avatar", "observed": "Both use the same structure for Workspace info, User Avatar, Calendar Preview (SidebarCalendar), and Calendars list." },
+        { "action": "Verify Tailwind classes and tokens", "expected": "Shared tailwind classes and tokens without hardcoded colors", "observed": "Mobile uses same classes e.g. 'text-xl font-extrabold tracking-tight text-foreground', 'size-10 rounded-xl shadow-none', 'text-muted-foreground' as web." }
+      ],
+      "evidence": {
+        "staticCheck": "packages/ui/src/components/layout/mobile-sidebar-drawer.native.tsx and packages/ui/src/components/layout/app-sidebar.tsx",
+        "typecheck": "shared-ui-primitives/navigation/VAL-NAV-typecheck.txt",
+        "lint": "shared-ui-primitives/navigation/VAL-NAV-lint.txt"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 2 assertions via static code review and compilation checks: 2 passed. Verified PanGesture implementation for swipe-from-left drawer and confirmed styling/content parity between mobile drawer and web sidebar."
+}

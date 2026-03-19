@@ -1,0 +1,132 @@
+{
+  "groupId": "primitives",
+  "testedAt": "2026-03-19T00:00:00Z",
+  "isolation": {
+    "type": "static-checks",
+    "workingDirectory": "C:\\Users\\Roan\\Documents\\rocal"
+  },
+  "toolsUsed": [
+    "Glob",
+    "Read",
+    "Grep"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-PRIM-001",
+      "title": "Shared primitives use matching Tailwind classes",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Read button.tsx and button.native.tsx",
+          "expected": "Classes match",
+          "observed": "Classes match exactly via buttonVariants"
+        },
+        {
+          "action": "Read card.tsx and card.native.tsx",
+          "expected": "Classes match",
+          "observed": "Classes match exactly"
+        },
+        {
+          "action": "Read input.tsx and input.native.tsx",
+          "expected": "Classes match",
+          "observed": "Classes match exactly"
+        }
+      ],
+      "evidence": {
+        "filesReviewed": [
+          "packages/ui/src/components/ui/button.native.tsx",
+          "packages/ui/src/components/ui/card.native.tsx",
+          "packages/ui/src/components/ui/input.native.tsx"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-PRIM-002",
+      "title": "No hardcoded colors in UI primitives",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Grep for hardcoded colors in packages/ui/src/components",
+          "expected": "No matches in primitives",
+          "observed": "Found matches in color-picker.tsx"
+        }
+      ],
+      "evidence": {
+        "grepResults": "packages/ui/src/components/ui/color-picker.tsx contains DEFAULT_PRESET_COLORS with hex codes."
+      },
+      "issues": "packages/ui/src/components/ui/color-picker.tsx contains hardcoded hex values for default swatches. While not structural CSS, this violates the strict 'no hardcoded colors' assertion for primitive files."
+    },
+    {
+      "id": "VAL-PRIM-003",
+      "title": "Touch targets meet 44pt minimum",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Check interactive primitives for hitSlop or min-h/w",
+          "expected": "44pt targets",
+          "observed": "Button, Switch, Tabs use min-h-11 min-w-11 and hitSlop={4}; Input uses min-h-11"
+        }
+      ],
+      "evidence": {
+        "filesReviewed": [
+          "packages/ui/src/components/ui/button.native.tsx",
+          "packages/ui/src/components/ui/input.native.tsx",
+          "packages/ui/src/components/ui/switch.native.tsx",
+          "packages/ui/src/components/ui/tabs.native.tsx"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-PRIM-004",
+      "title": "className prop merged correctly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Review className handling in native primitives",
+          "expected": "cn() utility used",
+          "observed": "cn() utility is consistently used to merge className props"
+        }
+      ],
+      "evidence": {
+        "filesReviewed": [
+          "packages/ui/src/components/ui/button.native.tsx",
+          "packages/ui/src/components/ui/card.native.tsx",
+          "packages/ui/src/components/ui/input.native.tsx",
+          "packages/ui/src/components/ui/switch.native.tsx",
+          "packages/ui/src/components/ui/tabs.native.tsx"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETUP-004",
+      "title": "Dark mode wired without hardcoded colors",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Check global.css for dark mode setup",
+          "expected": "Dark mode wired with tokens",
+          "observed": "@custom-variant dark and .dark class define oklch tokens"
+        },
+        {
+          "action": "Check components for dark mode classes",
+          "expected": "No raw colors, uses dark: variant",
+          "observed": "Components correctly use standard dark: modifier on Tailwind classes"
+        }
+      ],
+      "evidence": {
+        "filesReviewed": [
+          "apps/mobile/global.css",
+          "apps/mobile/app/_layout.tsx",
+          "packages/ui/src/components/ui/switch.native.tsx"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 5 assertions: 4 passed, 1 failed (VAL-PRIM-002: hardcoded hex colors found in color-picker.tsx default swatches)."
+}
