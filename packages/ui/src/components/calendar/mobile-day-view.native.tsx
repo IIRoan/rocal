@@ -1,14 +1,9 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import {
   addHours,
   areIntervalsOverlapping,
+  differenceInMinutes,
   eachHourOfInterval,
   format,
   getHours,
@@ -19,12 +14,38 @@ import {
 import type { CalendarEvent } from "./types";
 import { eventOverlapsRange, isMultiDayEvent } from "./utils";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
-import { mobileCalendarTokens } from "./mobile-calendar-shared";
+import { cn } from "../../lib/utils";
 
 const MOBILE_START_HOUR = 0;
 const MOBILE_END_HOUR = 23;
 const MOBILE_CELL_HEIGHT = 60;
-const TIME_COLUMN_WIDTH = 52;
+
+const EVENT_BG_CLASSES: Record<string, string> = {
+  blue: "bg-event-sky/35 border-event-sky/70 dark:bg-event-sky/45 dark:border-event-sky/80",
+  sky: "bg-event-sky/35 border-event-sky/70 dark:bg-event-sky/45 dark:border-event-sky/80",
+  violet:
+    "bg-event-violet/35 border-event-violet/70 dark:bg-event-violet/45 dark:border-event-violet/80",
+  purple:
+    "bg-event-violet/35 border-event-violet/70 dark:bg-event-violet/45 dark:border-event-violet/80",
+  orange:
+    "bg-event-orange/35 border-event-orange/70 dark:bg-event-orange/45 dark:border-event-orange/80",
+  rose: "bg-event-rose/35 border-event-rose/70 dark:bg-event-rose/45 dark:border-event-rose/80",
+  emerald:
+    "bg-event-emerald/35 border-event-emerald/70 dark:bg-event-emerald/45 dark:border-event-emerald/80",
+  green:
+    "bg-event-emerald/35 border-event-emerald/70 dark:bg-event-emerald/45 dark:border-event-emerald/80",
+};
+
+const EVENT_TEXT_CLASSES: Record<string, string> = {
+  blue: "text-event-sky-foreground",
+  sky: "text-event-sky-foreground",
+  violet: "text-event-violet-foreground",
+  purple: "text-event-violet-foreground",
+  orange: "text-event-orange-foreground",
+  rose: "text-event-rose-foreground",
+  emerald: "text-event-emerald-foreground",
+  green: "text-event-emerald-foreground",
+};
 
 interface MobileDayViewProps {
   currentDate: Date;
@@ -65,19 +86,16 @@ export function MobileDayViewNative({
     });
   }, [currentDate]);
 
-  const allDayEvents = useMemo(
-    () =>
-      events.filter((event) => {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end);
-        return (
-          event.allDay ||
-          isMultiDayEvent(event) ||
-          (isSameDay(eventStart, currentDate) && isSameDay(eventEnd, currentDate) && false)
-        );
-      }).filter((event) => eventOverlapsRange(event, currentDate, currentDate, "day")),
-    [events, currentDate],
-  );
+  const allDayEvents = useMemo(() => {
+    const dayStart = startOfDay(currentDate);
+    const dayEnd = addHours(dayStart, 24);
+
+    return events.filter(
+      (event) =>
+        (event.allDay || isMultiDayEvent(event)) &&
+        eventOverlapsRange(event, dayStart, dayEnd, "day"),
+    );
+  }, [events, currentDate]);
 
   const timeEvents = useMemo(() => {
     const dayStart = startOfDay(currentDate);
@@ -94,10 +112,22 @@ export function MobileDayViewNative({
   const positionedEvents = useMemo(() => {
     const result: PositionedEvent[] = [];
     const dayStart = startOfDay(currentDate);
+    const sortedEvents = [...timeEvents].sort((a, b) => {
+      const aStart = new Date(a.start);
+      const bStart = new Date(b.start);
+      const aEnd = new Date(a.end);
+      const bEnd = new Date(b.end);
+
+      if (aStart < bStart) return -1;
+      if (aStart > bStart) return 1;
+
+      return differenceInMinutes(bEnd, bStart) - differenceInMinutes(aEnd, aStart);
+    });
+
     const columns: { event: CalendarEvent; start: Date; end: Date }[][] = [];
     const eventColumnMap = new Map<CalendarEvent, number>();
 
-    for (const event of timeEvents) {
+    for (const event of sortedEvents) {
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
       const adjustedStart = isSameDay(currentDate, eventStart) ? eventStart : dayStart;
@@ -126,7 +156,7 @@ export function MobileDayViewNative({
       }
     }
 
-    for (const event of timeEvents) {
+    for (const event of sortedEvents) {
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
       const adjustedStart = isSameDay(currentDate, eventStart) ? eventStart : dayStart;
@@ -134,18 +164,23 @@ export function MobileDayViewNative({
       const startHour = getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
       const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
       const top = startHour * MOBILE_CELL_HEIGHT;
-      const height = Math.max((endHour - startHour) * MOBILE_CELL_HEIGHT, 26);
-      const overlappingColumns =
-        timeEvents.filter((other) => {
+      const height = Math.max((endHour - startHour) * MOBILE_CELL_HEIGHT, 44);
+      const overlaps =
+        sortedEvents.filter((other) => {
           if (other.id === event.id) return false;
           return areIntervalsOverlapping(
             { start: adjustedStart, end: adjustedEnd },
             { start: new Date(other.start), end: new Date(other.end) },
           );
         }).length + 1;
+
       const columnIndex = eventColumnMap.get(event) ?? 0;
-      const gap = overlappingColumns === 1 ? 0.02 : 0.015;
-      const width = overlappingColumns === 1 ? 0.96 : Math.max(0.28, (1 - gap * (overlappingColumns + 1)) / overlappingColumns);
+      const columnsForLayout = Math.max(overlaps, columnIndex + 1);
+      const gap = columnsForLayout === 1 ? 0.02 : 0.015;
+      const width =
+        columnsForLayout === 1
+          ? 0.96
+          : Math.max(0.2, (1 - gap * (columnsForLayout + 1)) / columnsForLayout);
       const left = gap + columnIndex * (width + gap);
 
       result.push({
@@ -191,26 +226,33 @@ export function MobileDayViewNative({
   }, [currentDate]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-background dark:bg-background">
       {!workingDays.includes(currentDate.getDay()) ? (
-        <View style={styles.nonWorkingBanner}>
-          <Text style={styles.nonWorkingBannerText}>Non-working day</Text>
+        <View className="border-y border-border/70 bg-muted/30 px-3 py-2 dark:bg-muted/20">
+          <Text className="text-xs font-bold text-muted-foreground">Non-working day</Text>
         </View>
       ) : null}
+
       {allDayEvents.length > 0 ? (
-        <View style={styles.allDaySection}>
-          <Text style={styles.allDayLabel}>All day</Text>
-          <View style={styles.allDayEvents}>
+        <View className="border-y border-border/70 bg-muted/35 px-3 py-2 dark:bg-muted/20">
+          <Text className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            All day
+          </Text>
+          <View className="mt-1 gap-1.5">
             {allDayEvents.map((event) => (
               <Pressable
                 key={event.id}
                 onPress={() => onEventSelect(event)}
-                style={[
-                  styles.allDayChip,
-                  { backgroundColor: resolveEventBackground(event.color) },
-                ]}
+                className={cn(
+                  "min-h-11 rounded-lg border px-2.5 py-2",
+                  getEventBackgroundClass(event.color),
+                )}
+                accessibilityRole="button"
               >
-                <Text style={styles.allDayChipText} numberOfLines={1}>
+                <Text
+                  className={cn("text-xs font-semibold", getEventTextClass(event.color))}
+                  numberOfLines={1}
+                >
                   {event.title}
                 </Text>
               </Pressable>
@@ -219,40 +261,53 @@ export function MobileDayViewNative({
         </View>
       ) : null}
 
-      <ScrollView ref={scrollRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.timeline}>
-          <View style={styles.timeColumn}>
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 16 }}
+      >
+        <View className="flex-row">
+          <View className="w-[52px] border-r border-border/70 bg-background dark:bg-background">
             {hours.map((hour) => (
-              <View key={hour.toISOString()} style={styles.timeCell}>
-                <Text style={styles.timeLabel}>
+              <View key={hour.toISOString()} className="h-[60px] items-end justify-start pr-2">
+                <Text className="mt-[-6px] bg-background px-0.5 text-[10px] font-medium text-muted-foreground/80 dark:bg-background">
                   {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
                 </Text>
               </View>
             ))}
           </View>
 
-          <View style={styles.gridColumn}>
+          <View className="relative flex-1 bg-card dark:bg-card">
             {positionedEvents.map((positionedEvent) => (
               <Pressable
                 key={positionedEvent.event.id}
                 onPress={() => onEventSelect(positionedEvent.event)}
-                style={[
-                  styles.eventCard,
-                  {
-                    top: positionedEvent.top,
-                    height: positionedEvent.height,
-                    left: `${positionedEvent.left * 100}%`,
-                    width: `${positionedEvent.width * 100}%`,
-                    zIndex: positionedEvent.zIndex,
-                    backgroundColor: resolveEventBackground(positionedEvent.event.color),
-                    borderColor: resolveEventBorder(positionedEvent.event.color),
-                  },
-                ]}
+                className={cn(
+                  "absolute min-h-11 overflow-hidden rounded-lg border px-2 py-1.5",
+                  getEventBackgroundClass(positionedEvent.event.color),
+                )}
+                style={{
+                  top: positionedEvent.top,
+                  height: positionedEvent.height,
+                  left: `${positionedEvent.left * 100}%`,
+                  width: `${positionedEvent.width * 100}%`,
+                  zIndex: positionedEvent.zIndex,
+                }}
+                accessibilityRole="button"
               >
-                <Text style={styles.eventTitle} numberOfLines={1}>
+                <Text
+                  className={cn("text-[11px] font-bold", getEventTextClass(positionedEvent.event.color))}
+                  numberOfLines={1}
+                >
                   {positionedEvent.event.title}
                 </Text>
-                <Text style={styles.eventMeta} numberOfLines={1}>
+                <Text
+                  className={cn(
+                    "mt-0.5 text-[10px] font-medium",
+                    getEventTextClass(positionedEvent.event.color),
+                  )}
+                  numberOfLines={1}
+                >
                   {format(new Date(positionedEvent.event.start), timeFormat === "24h" ? "HH:mm" : "h:mm a")}
                 </Text>
               </Pressable>
@@ -261,24 +316,24 @@ export function MobileDayViewNative({
             {currentTimeVisible ? (
               <View
                 pointerEvents="none"
-                style={[styles.currentTimeLine, { top: `${currentTimePosition}%` }]}
+                className="absolute left-0 right-0 z-30 flex-row items-center"
+                style={{ top: `${currentTimePosition}%` }}
               >
-                <View style={styles.currentTimeDot} />
-                <View style={styles.currentTimeBar} />
+                <View className="-ml-1 size-2 rounded-full bg-destructive" />
+                <View className="h-0.5 flex-1 bg-destructive" />
               </View>
             ) : null}
 
             {hours.map((hour) => {
               const hourValue = getHours(hour);
               return (
-                <View key={hour.toISOString()} style={styles.gridHourCell}>
+                <View key={hour.toISOString()} className="relative h-[60px] border-b border-border/60 dark:border-border/50">
                   {[0, 1, 2, 3].map((quarter) => (
                     <Pressable
                       key={`${hour.toISOString()}-${quarter}`}
-                      style={[
-                        styles.tapTarget,
-                        { top: quarter * (MOBILE_CELL_HEIGHT / 4), height: MOBILE_CELL_HEIGHT / 4 },
-                      ]}
+                      className="absolute left-0 right-0"
+                      style={{ top: quarter * (MOBILE_CELL_HEIGHT / 4), height: MOBILE_CELL_HEIGHT / 4 }}
+                      hitSlop={16}
                       onPress={() => {
                         const startTime = new Date(currentDate);
                         startTime.setHours(hourValue, quarter * 15, 0, 0);
@@ -296,146 +351,15 @@ export function MobileDayViewNative({
   );
 }
 
-function resolveEventBackground(color?: string | null) {
-  if (color?.startsWith("#")) return `${color}22`;
-  return mobileCalendarTokens.colors.surfaceAccent;
+function getEventBackgroundClass(color?: string | null) {
+  if (!color) return "bg-event-default/35 border-event-default/70 dark:bg-event-default/45 dark:border-event-default/80";
+  return (
+    EVENT_BG_CLASSES[color.toLowerCase()] ??
+    "bg-event-default/35 border-event-default/70 dark:bg-event-default/45 dark:border-event-default/80"
+  );
 }
 
-function resolveEventBorder(color?: string | null) {
-  if (color?.startsWith("#")) return color;
-  return mobileCalendarTokens.colors.accentStrong;
+function getEventTextClass(color?: string | null) {
+  if (!color) return "text-event-default-foreground";
+  return EVENT_TEXT_CLASSES[color.toLowerCase()] ?? "text-event-default-foreground";
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  nonWorkingBanner: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  nonWorkingBannerText: {
-    color: mobileCalendarTokens.colors.accentStrong,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  allDaySection: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    backgroundColor: mobileCalendarTokens.colors.background,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  allDayLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: mobileCalendarTokens.colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  allDayEvents: {
-    gap: 6,
-  },
-  allDayChip: {
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.accentStrong,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  allDayChipText: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 16,
-  },
-  timeline: {
-    flexDirection: "row",
-  },
-  timeColumn: {
-    width: TIME_COLUMN_WIDTH,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  timeCell: {
-    height: MOBILE_CELL_HEIGHT,
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-    paddingRight: 8,
-  },
-  timeLabel: {
-    marginTop: -8,
-    backgroundColor: mobileCalendarTokens.colors.background,
-    paddingHorizontal: 2,
-    color: mobileCalendarTokens.colors.textMuted,
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  gridColumn: {
-    flex: 1,
-    position: "relative",
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderLeftWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-  },
-  gridHourCell: {
-    height: MOBILE_CELL_HEIGHT,
-    borderBottomWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    position: "relative",
-  },
-  tapTarget: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-  },
-  eventCard: {
-    position: "absolute",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    overflow: "hidden",
-  },
-  eventTitle: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  eventMeta: {
-    marginTop: 2,
-    color: mobileCalendarTokens.colors.textSubtle,
-    fontSize: 10,
-    fontWeight: "500",
-  },
-  currentTimeLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    zIndex: 30,
-  },
-  currentTimeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: mobileCalendarTokens.colors.danger,
-    marginLeft: -4,
-  },
-  currentTimeBar: {
-    flex: 1,
-    height: 2,
-    backgroundColor: mobileCalendarTokens.colors.danger,
-  },
-});
