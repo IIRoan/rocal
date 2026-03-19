@@ -1,15 +1,25 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const { withNativewind } = require('nativewind/metro');
 
 // Find the project and workspace directories
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(__dirname, '../..');
+const workspacePackages = [
+  'packages/calendar-client',
+  'packages/calendar-core',
+  'packages/logger',
+  'packages/ui',
+].map((relativePath) => path.resolve(workspaceRoot, relativePath));
+const workspaceNodeModules = path.resolve(workspaceRoot, 'node_modules');
+const bunStore = path.resolve(workspaceNodeModules, '.bun');
 
 // Create the default Expo config for Metro
 const config = getDefaultConfig(projectRoot);
 
-// Add the workspace root to watch folders for monorepo support
-config.watchFolders = [workspaceRoot];
+// Watch only the shared packages the mobile app consumes plus Bun's package store.
+// Bun installs app deps as symlinks into the root .bun store, so Metro must see that target.
+config.watchFolders = [...workspacePackages, workspaceNodeModules, bunStore];
 
 // Configure resolver for monorepo
 config.resolver.nodeModulesPaths = [
@@ -44,4 +54,4 @@ config.resolver.unstable_enablePackageExports = true;
 // Limit max workers to prevent "too many open files" error on Windows
 config.maxWorkers = 1;
 
-module.exports = config;
+module.exports = withNativewind(config);

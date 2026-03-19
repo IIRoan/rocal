@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
+import '../global.css';
 import { createLogger, installGlobalConsoleLogger } from '@workspace/logger';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
