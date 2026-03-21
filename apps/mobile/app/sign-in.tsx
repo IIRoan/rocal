@@ -3,15 +3,9 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createLogger } from '@workspace/logger';
-import { Button } from '../../../packages/ui/src/components/ui/button.native';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../../../packages/ui/src/components/ui/card.native';
-import { Input } from '../../../packages/ui/src/components/ui/input.native';
+import { Button } from '@workspace/ui/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/ui/card';
+import { Input } from '@workspace/ui/components/ui/input';
 
 import { probeBackendReachability, signInWithGitHub } from '@/lib/auth-client';
 

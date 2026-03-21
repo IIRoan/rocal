@@ -18,6 +18,10 @@
       ],
       "@workspace/ui/components/mobile": [
         "../../packages/ui/src/components/mobile/index.ts"
+      ],
+      "@workspace/ui/components/ui/*": [
+        "../../packages/ui/src/components/ui/*.native.tsx",
+        "../../packages/ui/src/components/ui/*.tsx"
       ]
     }
   },
