@@ -1,0 +1,34 @@
+{
+  "featureId": "auth-screens",
+  "reviewedAt": "2026-03-21T14:15:00.000Z",
+  "commitId": "76d2b72b6922913c262390516b14ee13efd28db7",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The implementation successfully replicates the web auth UI and meets all design requirements (Tailwind classes, NativeWind v5 primitives, dark mode, keyboard avoidance). However, it uses hardcoded relative paths bypassing the workspace alias to import shared UI primitives (e.g., `../../../packages/ui/src/components/ui/button.native`). This breaks monorepo conventions and should use `@workspace/ui/components/ui/button`.",
+    "issues": [
+      {
+        "file": "apps/mobile/app/sign-in.tsx",
+        "line": 5,
+        "severity": "blocking",
+        "description": "Hardcoded relative import paths to monorepo packages bypassing the workspace alias (`../../../packages/ui/src/components/ui/button.native`). Should use `@workspace/ui/components/ui/button`. Explicitly including `.native` in the import is also an anti-pattern in React Native / Expo."
+      },
+      {
+        "file": "apps/mobile/app/sign-up.tsx",
+        "line": 6,
+        "severity": "blocking",
+        "description": "Hardcoded relative import paths to monorepo packages bypassing the workspace alias (`../../../packages/ui/src/components/ui/button.native`). Should use `@workspace/ui/components/ui/button`. Explicitly including `.native` in the import is also an anti-pattern in React Native / Expo."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Worker bypassed the `@workspace/ui` import alias and hardcoded relative paths with explicit `.native` extensions to fix a TypeScript error. AGENTS.md or library files should clarify how to import shared UI primitives in the mobile app (i.e. use `@workspace/ui/components/...` without `.native` extensions) and ensure tsconfig handles `.native` resolution if needed.",
+      "evidence": "apps/mobile/app/sign-in.tsx:5 — `import { Button } from '../../../packages/ui/src/components/ui/button.native';`. Transcript shows the worker explicitly switched to these imports to pass `tsc`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to monorepo import convention violations. The UI implementation itself is solid, but imports must be fixed to use proper workspace aliases."
+}
