@@ -321,7 +321,7 @@ export function StickyMiniCalendarNative({
   );
 }
 
-function isHexColor(color?: string | null): color is string {
+function isHexColor(color?: string | null): boolean {
   return !!color && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
 }
 

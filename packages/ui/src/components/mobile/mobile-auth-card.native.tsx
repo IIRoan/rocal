@@ -1,15 +1,13 @@
 import React from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { mobileCalendarTokens } from "./mobile-design-tokens";
+import { cn } from "../../lib/utils";
 
 interface MobileAuthCardProps {
   appName?: string;
@@ -33,43 +31,47 @@ export function MobileAuthCard({
   onSubmit,
 }: MobileAuthCardProps) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "right", "bottom", "left"]}>
       <KeyboardAvoidingView
-        style={styles.keyboardView}
+        className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.shell}>
-          <View style={styles.accentOrb} />
-          <View style={styles.card}>
-            <View style={styles.header}>
-              <Text style={styles.eyebrow}>{appName}</Text>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
+        <View className="relative flex-1 justify-center bg-background px-6 py-8">
+          <View className="absolute right-[-40px] top-[88px] size-[180px] rounded-full bg-primary/15" />
+          <View className="gap-6 rounded-[28px] border border-border bg-card p-6 shadow-sm">
+            <View className="gap-2">
+              <Text className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                {appName}
+              </Text>
+              <Text className="text-[32px] font-bold text-foreground">{title}</Text>
+              <Text className="text-[15px] leading-[22px] text-muted-foreground">{subtitle}</Text>
             </View>
 
-            <View style={styles.form}>
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View className="gap-3">
+              {error ? <Text className="text-sm text-destructive">{error}</Text> : null}
 
               <Pressable
                 accessibilityRole="button"
                 disabled={loading}
                 onPress={onSubmit}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  pressed && !loading ? styles.primaryButtonPressed : null,
-                  loading ? styles.primaryButtonDisabled : null,
-                ]}
+                className="min-h-11 items-center justify-center rounded-[18px] bg-primary px-4"
+                style={({ pressed }) => ({
+                  opacity: loading ? 0.7 : pressed ? 0.9 : 1,
+                })}
               >
-                {loading ? (
-                  <ActivityIndicator color={mobileCalendarTokens.colors.textOnPrimary} />
-                ) : (
-                  <Text style={styles.primaryButtonText}>{ctaLabel}</Text>
-                )}
+                <Text
+                  className={cn(
+                    "text-base font-bold text-primary-foreground",
+                    loading && "opacity-90"
+                  )}
+                >
+                  {loading ? "Connecting…" : ctaLabel}
+                </Text>
               </Pressable>
             </View>
 
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{footer}</Text>
+            <View className="items-center justify-center">
+              <Text className="text-center text-sm leading-5 text-muted-foreground">{footer}</Text>
             </View>
           </View>
         </View>
@@ -77,97 +79,3 @@ export function MobileAuthCard({
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  shell: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: mobileCalendarTokens.colors.background,
-  },
-  accentOrb: {
-    position: "absolute",
-    top: 88,
-    right: -40,
-    width: 180,
-    height: 180,
-    borderRadius: 999,
-    backgroundColor: mobileCalendarTokens.colors.surfaceAccent,
-    opacity: 0.7,
-  },
-  card: {
-    backgroundColor: mobileCalendarTokens.colors.surface,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: mobileCalendarTokens.colors.border,
-    padding: 24,
-    gap: 24,
-    shadowColor: mobileCalendarTokens.colors.text,
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 16 },
-    elevation: 8,
-  },
-  header: {
-    gap: 8,
-  },
-  eyebrow: {
-    color: mobileCalendarTokens.colors.accent,
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: mobileCalendarTokens.colors.text,
-    fontSize: 32,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: mobileCalendarTokens.colors.textSubtle,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  form: {
-    gap: 12,
-  },
-  error: {
-    color: mobileCalendarTokens.colors.danger,
-    fontSize: 14,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: mobileCalendarTokens.colors.primary,
-    borderRadius: 18,
-    justifyContent: "center",
-    minHeight: 54,
-  },
-  primaryButtonPressed: {
-    opacity: 0.9,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: mobileCalendarTokens.colors.textOnPrimary,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  footer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  footerText: {
-    color: mobileCalendarTokens.colors.textSubtle,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-  },
-});
