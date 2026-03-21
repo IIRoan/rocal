@@ -22,3 +22,23 @@ const bunStore = path.resolve(process.env.USERPROFILE || process.env.HOME, ".bun
 
 config.watchFolders = [...workspacePackages, workspaceNodeModules, bunStore];
 ```
+
+## TypeScript Configuration for Workspace Aliases
+
+When using workspace aliases (e.g. `@workspace/ui/*`) to import `.native.tsx` components into the React Native app, do NOT explicitly include the `.native` extension in the import path. Metro handles this resolution automatically.
+
+However, to prevent TypeScript compilation errors, you must map the alias to both `.native.tsx` and `.tsx` fallbacks in the mobile app's `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@workspace/ui/*": [
+        "../../packages/ui/src/*",
+        "../../packages/ui/src/*.native.tsx",
+        "../../packages/ui/src/*.tsx"
+      ]
+    }
+  }
+}
+```

@@ -1,0 +1,47 @@
+{
+  "milestone": "screens-and-navigation",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "cd apps/mobile; bun run typecheck; cd ../..; cd apps/mobile; bun run lint", "exitCode": 0 },
+    "typecheck": { "passed": true, "command": "cd apps/mobile; bun run typecheck", "exitCode": 0 },
+    "lint": { "passed": true, "command": "cd apps/mobile; bun run lint", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 3,
+    "failed": 1,
+    "failedFeatures": [
+      "auth-screens"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "auth-screens",
+      "severity": "blocking",
+      "description": "Hardcoded relative import paths to monorepo packages bypassing the workspace alias (`../../../packages/ui/src/components/ui/button.native`). Should use `@workspace/ui/components/ui/button`. Explicitly including `.native` in the import is also an anti-pattern in React Native / Expo."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "mobile-ui-worker skill",
+      "suggestion": "Update verification shell commands to be shell-agnostic or PowerShell compatible. Avoid using `&&` and use separate execution lines instead.",
+      "evidence": "dashboard-screen transcript shows the worker had to manually adapt `&&` to PowerShell syntax `Set-Location ...; ...` because `&&` is invalid.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add boundary: Do not bypass monorepo workspace aliases. Always use `@workspace/ui/components/...` to import shared primitives in the mobile app, and never include explicit `.native` extensions in import paths. Rely on the bundler to resolve platform-specific files.",
+      "evidence": "auth-screens worker explicitly switched to deeply nested relative imports with `.native` extensions (e.g., `../../../packages/ui/src/components/ui/button.native`) to pass tsc.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Worker spent time grepping through packages/calendar-client to discover the calendarApiService methods (getUserSettings, updateUserSettings) and UserSettings types. Documenting core API services and data structures in the library could speed up development.",
+      "reason": "ambiguous; lack of sufficient context to author a comprehensive library file for the calendar-client API without further exploration."
+    }
+  ],
+  "previousRound": null
+}

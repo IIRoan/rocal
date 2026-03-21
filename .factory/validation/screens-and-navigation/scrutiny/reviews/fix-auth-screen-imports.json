@@ -1,0 +1,21 @@
+{
+  "featureId": "fix-auth-screen-imports",
+  "reviewedAt": "2026-03-21T14:40:00Z",
+  "commitId": "f986726739a8ec63f2bedb544471817b2099dc63",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix correctly removes hardcoded relative paths with explicit `.native` extensions in the auth screens, replacing them with the `@workspace/ui` workspace aliases. To resolve TypeScript errors with the extensionless imports, the worker properly updated the path mapping in `apps/mobile/tsconfig.json` to fall back to `*.native.tsx` before `*.tsx`. The implementation addresses all issues noted in the previous review.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "The worker had to add a path mapping in `apps/mobile/tsconfig.json` (`@workspace/ui/components/ui/*` -> `*.native.tsx`, `*.tsx`) to make TypeScript correctly resolve extensionless monorepo alias imports to `.native.tsx` files. This monorepo TypeScript configuration pattern is not documented in `AGENTS.md` or `.factory/library/`.",
+      "evidence": "Worker modified `apps/mobile/tsconfig.json` to include the fallback mapping after exploring `packages/typescript-config/expo.json` to make the alias imports pass `tsc`."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/screens-and-navigation/scrutiny/reviews/auth-screens.json",
+  "summary": "Fix correctly updates the imports to use workspace aliases and adds the necessary tsconfig path mapping to support extensionless `.native.tsx` resolution. Review passes."
+}
