@@ -38,5 +38,8 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10"
+  },
+  "overrides": {
+    "lightningcss": "1.30.1"
   }
 }

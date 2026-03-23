@@ -1,0 +1,191 @@
+{
+  "groupId": "static-checks",
+  "testedAt": "2026-03-21T14:46:00Z",
+  "isolation": {
+    "context": "local execution of bun run typecheck, lint, and rg commands"
+  },
+  "toolsUsed": ["bun", "eslint", "tsc", "rg", "next build"],
+  "assertions": [
+    {
+      "id": "VAL-NAV-003",
+      "title": "Dashboard layout on mobile uses a single-column responsive structure",
+      "status": "pass",
+      "steps": [
+        { "action": "Review dashboard screen layout classes", "expected": "Single-column structure without desktop multi-column tokens", "observed": "app/(tabs)/index.tsx uses full screen SafeAreaView without flex-row or grid classes, relying on MobileCalendarWrapper." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "apps/mobile/app/(tabs)/index.tsx checked."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-NAV-004",
+      "title": "Navigation between screens works via Expo Router",
+      "status": "pass",
+      "steps": [
+        { "action": "Run typecheck and review app/ structure", "expected": "Typecheck passes and routes match expected", "observed": "Typecheck passed. app/ contains sign-in, sign-up, and (tabs) with index and explore." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "cliOutput": ["C:\\Users\\Roan\\.factory\\missions\\b676a1c2-73ff-4023-8e2c-c8154a893a50\\evidence\\screens-and-navigation\\static-checks\\VAL-NAV-004-typecheck.txt"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AUTH-001",
+      "title": "Sign-in and sign-up screens exist and match web layout",
+      "status": "pass",
+      "steps": [
+        { "action": "Compare auth screens with web", "expected": "Similar form layout, inputs, and buttons", "observed": "Mobile screens use the same max-w-sm Card structure, CardHeader, and Button primitives as the web login page." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "Matched apps/mobile/app/sign-in.tsx with apps/web/app/login/page.tsx."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AUTH-002",
+      "title": "Auth form inputs use shared Input primitive",
+      "status": "pass",
+      "steps": [
+        { "action": "Review auth screen imports and classes", "expected": "Uses shared Input with correct classes", "observed": "Both screens import Input from @workspace/ui and apply valid Tailwind classes." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "apps/mobile/app/sign-in.tsx and sign-up.tsx checked."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AUTH-003",
+      "title": "Auth screens support dark mode via theme tokens",
+      "status": "pass",
+      "steps": [
+        { "action": "Search for hardcoded colors in auth screens", "expected": "No hardcoded colors, only theme tokens", "observed": "Verified classes like dark:bg-background, border-border/70, text-muted-foreground. No hex/rgb values found." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "Grep manually executed on auth files."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-001",
+      "title": "Settings screen exists with section layout matching web",
+      "status": "pass",
+      "steps": [
+        { "action": "Review settings screen structure", "expected": "Sections for profile, preferences using Card/Input", "observed": "mobile-account-screen.native.tsx contains Card components for Profile info, Calendar preferences, and Timezone." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "packages/ui/src/components/mobile/mobile-account-screen.native.tsx checked."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-002",
+      "title": "All settings controls use shared UI primitives",
+      "status": "pass",
+      "steps": [
+        { "action": "Review settings screen component usage", "expected": "Uses shared components with token styling", "observed": "Button, Card, Input, and Switch are imported from shared UI and use token-based styling." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "packages/ui/src/components/mobile/mobile-account-screen.native.tsx checked."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-SETTINGS-003",
+      "title": "Settings screen scrolls correctly with consistent spacing",
+      "status": "pass",
+      "steps": [
+        { "action": "Review scroll container and spacing classes", "expected": "ScrollView used with consistent padding/margins", "observed": "ScrollView wraps content with class 'gap-4 px-4 pb-24 pt-4', ensuring correct spacing." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "codeReview": "packages/ui/src/components/mobile/mobile-account-screen.native.tsx checked."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-001",
+      "title": "Full lint pass completes with zero errors",
+      "status": "pass",
+      "steps": [
+        { "action": "Run bun run lint", "expected": "Exit code 0, no errors", "observed": "Lint completed successfully with no errors." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "cliOutput": ["C:\\Users\\Roan\\.factory\\missions\\b676a1c2-73ff-4023-8e2c-c8154a893a50\\evidence\\screens-and-navigation\\static-checks\\VAL-CROSS-001-lint.txt"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "title": "Web app builds successfully",
+      "status": "pass",
+      "steps": [
+        { "action": "Run bun run build in apps/web", "expected": "Build succeeds", "observed": "Next.js build succeeded and prerendered static content." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none",
+        "cliOutput": ["C:\\Users\\Roan\\.factory\\missions\\b676a1c2-73ff-4023-8e2c-c8154a893a50\\evidence\\screens-and-navigation\\static-checks\\VAL-CROSS-002-web-build.txt"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-003",
+      "title": "No orphaned platform files",
+      "status": "fail",
+      "steps": [
+        { "action": "Glob for .native.tsx and .tsx files", "expected": "Every .native.tsx has a matching .tsx file", "observed": "Found several .native.tsx files without corresponding .tsx files (e.g., mobile-auth-card.native.tsx, mobile-month-view.native.tsx)." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none"
+      },
+      "issues": "Files like mobile-auth-card.native.tsx, mobile-account-screen.native.tsx, mobile-sidebar-drawer.native.tsx lack matching .tsx files in packages/ui/src/components."
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "No StyleSheet.create usage in migrated components",
+      "status": "fail",
+      "steps": [
+        { "action": "rg StyleSheet.create in apps/mobile", "expected": "Zero results", "observed": "Found usage in apps/mobile/components/themed-text.tsx, parallax-scroll-view.tsx, ui/collapsible.tsx, and app/modal.tsx." }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "none"
+      },
+      "issues": "StyleSheet.create is still used in default Expo components and some UI wrappers like modal.tsx and collapsible.tsx."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 12 assertions: 10 passed, 2 failed (VAL-CROSS-003: orphaned .native.tsx files, VAL-CROSS-004: StyleSheet.create found in some non-migrated template components)."
+}

@@ -43,9 +43,11 @@ export function MobileEventCalendar({
   error = null,
   onDateRangeChange,
   onCreateEvent,
+  onEventEdit,
   defaultCalendarId = null,
   weekStartDay = 1,
   workingDays = [1, 2, 3, 4, 5],
+  defaultEventDuration = 60,
   timeFormat = "24h",
   timezone,
   showHeader = true,
@@ -168,26 +170,66 @@ export function MobileEventCalendar({
   };
 
   const handleQuickCreate = async () => {
-    if (!onCreateEvent || !defaultCalendarId || creating) return;
-
     const start = new Date(currentDate);
     start.setHours(9, 0, 0, 0);
-    const end = new Date(start);
-    end.setHours(10, 0, 0, 0);
+    handleEventCreate(start);
+  };
 
-    setCreating(true);
-    try {
-      await onCreateEvent({
+  const handleEventSelect = React.useCallback(
+    (event: CalendarEvent) => {
+      onEventEdit?.(event, { mode: "modal" });
+    },
+    [onEventEdit],
+  );
+
+  const handleEventCreate = React.useCallback(
+    (startTime: Date) => {
+      const normalizedStart = new Date(startTime);
+      normalizedStart.setSeconds(0, 0);
+      setCurrentDate(normalizedStart);
+
+      if (onEventEdit) {
+        const newEvent: CalendarEvent = {
+          id: undefined as unknown as string,
+          title: "",
+          start: normalizedStart,
+          end: new Date(normalizedStart.getTime() + defaultEventDuration * 60 * 1000),
+          allDay: false,
+          calendarId: defaultCalendarId ?? "",
+          userId: "",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          timezone: timezone ?? null,
+        };
+        onEventEdit(newEvent, { mode: "modal" });
+        return;
+      }
+
+      if (!onCreateEvent || !defaultCalendarId || creating) return;
+
+      const end = new Date(normalizedStart.getTime() + defaultEventDuration * 60 * 1000);
+
+      setCreating(true);
+      void onCreateEvent({
         title: "New event",
-        start: start.toISOString(),
+        start: normalizedStart.toISOString(),
         end: end.toISOString(),
         allDay: false,
         calendarId: defaultCalendarId,
+      }).finally(() => {
+        setCreating(false);
       });
-    } finally {
-      setCreating(false);
-    }
-  };
+    },
+    [
+      creating,
+      defaultCalendarId,
+      defaultEventDuration,
+      onCreateEvent,
+      onEventEdit,
+      setCurrentDate,
+      timezone,
+    ],
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -311,18 +353,8 @@ export function MobileEventCalendar({
           <MobileDayViewNative
             currentDate={currentDate}
             events={rangeEvents}
-            onEventSelect={() => {}}
-            onEventCreate={(startTime) => {
-              setCurrentDate(startTime);
-              if (!onCreateEvent || !defaultCalendarId) return;
-              void onCreateEvent({
-                title: "New event",
-                start: startTime.toISOString(),
-                end: new Date(startTime.getTime() + 60 * 60 * 1000).toISOString(),
-                allDay: false,
-                calendarId: defaultCalendarId,
-              });
-            }}
+            onEventSelect={handleEventSelect}
+            onEventCreate={handleEventCreate}
             timezone={timezone}
             workingDays={workingDays}
             timeFormat={timeFormat}
@@ -333,18 +365,8 @@ export function MobileEventCalendar({
           <MobileWeekViewNative
             currentDate={currentDate}
             events={rangeEvents}
-            onEventSelect={() => {}}
-            onEventCreate={(startTime) => {
-              setCurrentDate(startTime);
-              if (!onCreateEvent || !defaultCalendarId) return;
-              void onCreateEvent({
-                title: "New event",
-                start: startTime.toISOString(),
-                end: new Date(startTime.getTime() + 60 * 60 * 1000).toISOString(),
-                allDay: false,
-                calendarId: defaultCalendarId,
-              });
-            }}
+            onEventSelect={handleEventSelect}
+            onEventCreate={handleEventCreate}
             weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
             timezone={timezone}
             workingDays={workingDays}
@@ -356,7 +378,7 @@ export function MobileEventCalendar({
           <MobileAgendaViewNative
             currentDate={currentDate}
             events={rangeEvents}
-            onEventSelect={() => {}}
+            onEventSelect={handleEventSelect}
             timeFormat={timeFormat}
             timezone={timezone}
           />

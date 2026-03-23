@@ -5,22 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createLogger } from '@workspace/logger';
 import { Button } from '@workspace/ui/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/ui/card';
-import { Input } from '@workspace/ui/components/ui/input';
 
 import { probeBackendReachability, signInWithGitHub } from '@/lib/auth-client';
 
 const logger = createLogger('mobile:sign-up');
 
 export default function SignUpScreen() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleEmailSignUp = () => {
-    setError('Account creation on mobile currently uses GitHub OAuth. Continue with GitHub below.');
-  };
 
   const handleGitHubSignUp = async () => {
     try {
@@ -41,7 +33,7 @@ export default function SignUpScreen() {
       }
 
       logger.ok('GitHub sign-up attempt completed');
-      router.replace('/(tabs)');
+      router.replace('/');
     } catch (err) {
       logger.error('GitHub sign-up attempt threw unexpectedly', {
         error: err,
@@ -81,66 +73,6 @@ export default function SignUpScreen() {
                     <Text className="text-sm text-destructive">{error}</Text>
                   </View>
                 ) : null}
-
-                <View className="gap-2">
-                  <Text className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Name
-                  </Text>
-                  <Input
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Your full name"
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                    className="rounded-xl border-border/70 bg-background/80 dark:border-border/50 dark:bg-background/40"
-                  />
-                </View>
-
-                <View className="gap-2">
-                  <Text className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Email
-                  </Text>
-                  <Input
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="you@company.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    type="email"
-                    className="rounded-xl border-border/70 bg-background/80 dark:border-border/50 dark:bg-background/40"
-                  />
-                </View>
-
-                <View className="gap-2">
-                  <Text className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Password
-                  </Text>
-                  <Input
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Create a password"
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    type="password"
-                    className="rounded-xl border-border/70 bg-background/80 dark:border-border/50 dark:bg-background/40"
-                  />
-                </View>
-
-                <Button
-                  variant="outline"
-                  onPress={handleEmailSignUp}
-                  className="w-full rounded-xl border-border/70 dark:border-border/50"
-                >
-                  Create account with Email
-                </Button>
-
-                <View className="my-1 flex-row items-center gap-2">
-                  <View className="h-px flex-1 bg-border/70 dark:bg-border/50" />
-                  <Text className="text-xs text-muted-foreground">or</Text>
-                  <View className="h-px flex-1 bg-border/70 dark:bg-border/50" />
-                </View>
 
                 <Button
                   onPress={() => void handleGitHubSignUp()}

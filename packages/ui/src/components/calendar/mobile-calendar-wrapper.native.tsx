@@ -1,6 +1,5 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { calendarApiService, type UserSettings } from "@workspace/calendar-client";
 
@@ -26,8 +25,6 @@ const defaultSettings: Pick<UserSettings, "defaultView" | "weekStartDay" | "time
   workingDays: "[1,2,3,4,5]",
 };
 
-const VIEW_OPTIONS: CalendarView[] = ["month", "week", "day", "agenda"];
-
 export function MobileCalendarWrapper({
   user,
   initialView = "day",
@@ -37,6 +34,7 @@ export function MobileCalendarWrapper({
   onOpenAddEvent,
   onOpenSettings,
   onCreateEvent,
+  onEventEdit,
   onDateRangeChange,
   events,
   error,
@@ -44,6 +42,13 @@ export function MobileCalendarWrapper({
   workingDays,
   timezone,
 }: MobileCalendarWrapperProps) {
+  console.log("[mobile-calendar-wrapper] render", {
+    initialView,
+    providedEvents: events?.length ?? null,
+    loading: loading ?? null,
+    hasError: Boolean(error),
+  });
+
   const calendarData = useSharedCalendarData();
   const [view, setView] = React.useState<CalendarView>(initialView);
   const [currentDate, setCurrentDate] = React.useState(new Date());
@@ -155,53 +160,28 @@ export function MobileCalendarWrapper({
 
   const showMiniCalendar = view === "day" || view === "week" || view === "agenda";
 
+  React.useEffect(() => {
+    console.log("[mobile-calendar-wrapper] state", {
+      view,
+      currentDate: currentDate.toISOString(),
+      calendarCount: calendarData.calendars.length,
+      visibleEventCount: visibleEvents.length,
+      drawerOpen,
+      settingsLoading: settingsQuery.isLoading,
+      settingsError: settingsQuery.error ? (settingsQuery.error as { message?: string }).message ?? "unknown" : null,
+    });
+  }, [
+    calendarData.calendars.length,
+    currentDate,
+    drawerOpen,
+    settingsQuery.error,
+    settingsQuery.isLoading,
+    view,
+    visibleEvents.length,
+  ]);
+
   return (
     <View className="flex-1 bg-background">
-      <View className="flex-row items-center justify-between px-4 pb-2 pt-2">
-        <View>
-          <Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Workspace
-          </Text>
-          <Text className="text-lg font-bold text-foreground">
-            {format(currentDate, view === "day" ? "EEEE, MMM d" : "MMMM yyyy")}
-          </Text>
-        </View>
-
-        <Pressable
-          className="min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-card px-3"
-          onPress={() => setDrawerOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Open menu"
-        >
-          <Text className="text-xs font-semibold uppercase text-foreground">Menu</Text>
-        </Pressable>
-      </View>
-
-      <View className="mx-4 mb-2 flex-row rounded-xl border border-border bg-muted/35 p-1">
-        {VIEW_OPTIONS.map((option) => {
-          const active = view === option;
-          return (
-            <Pressable
-              key={option}
-              onPress={() => setView(option)}
-              className={cn(
-                "min-h-11 flex-1 items-center justify-center rounded-lg",
-                active ? "bg-primary" : "bg-transparent",
-              )}
-            >
-              <Text
-                className={cn(
-                  "text-xs font-semibold uppercase",
-                  active ? "text-primary-foreground" : "text-muted-foreground",
-                )}
-              >
-                {sharedMobileViewLabels[option]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       {showMiniCalendar ? (
         <StickyMiniCalendarNative
           currentDate={currentDate}
@@ -225,6 +205,7 @@ export function MobileCalendarWrapper({
         error={error ?? (calendarData.error || settingsQuery.error || null)}
         onDateRangeChange={onDateRangeChange ?? calendarData.setDateRange}
         onCreateEvent={onCreateEvent ?? calendarData.createEvent}
+        onEventEdit={onEventEdit}
         defaultCalendarId={effectiveDefaultCalendarId}
         weekStartDay={effectiveWeekStartDay}
         workingDays={effectiveWorkingDays}

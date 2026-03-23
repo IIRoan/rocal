@@ -40,15 +40,15 @@
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
-    "@tailwindcss/postcss": "^4.1.11",
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^20.19.9",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "autoprefixer": "^10.4.22",
     "eslint": "^9.20.1",
     "minimatch": "^10.1.1",
-    "nativewind": "^4.2.3",
-    "tailwindcss": "^4.1.11",
+    "nativewind": "^5.0.0-preview.3",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5.8.3"
   },
   "exports": {

@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const fs = require('fs');
 const path = require('path');
 const { withNativewind } = require('nativewind/metro');
 
@@ -13,6 +14,14 @@ const workspacePackages = [
 ].map((relativePath) => path.resolve(workspaceRoot, relativePath));
 const workspaceNodeModules = path.resolve(workspaceRoot, 'node_modules');
 const bunStore = path.resolve(workspaceNodeModules, '.bun');
+const tanstackReactQueryEntry = path.resolve(
+  workspaceNodeModules,
+  '@tanstack/react-query/src/index.ts',
+);
+const tanstackQueryCoreEntry = path.resolve(
+  workspaceNodeModules,
+  '@tanstack/query-core/src/index.ts',
+);
 
 // Create the default Expo config for Metro
 const config = getDefaultConfig(projectRoot);
@@ -38,20 +47,35 @@ config.resolver.extraNodeModules = {
     workspaceRoot,
     'node_modules/.bun/semver@7.7.3/node_modules/semver',
   ),
-  '@tanstack/react-query': path.resolve(
-    workspaceRoot,
-    'node_modules/@tanstack/react-query',
-  ),
-  '@tanstack/query-core': path.resolve(
-    workspaceRoot,
-    'node_modules/@tanstack/query-core',
-  ),
+  // Bun currently installs TanStack Query packages with only `src/` present.
+  // Point Metro at source entry files to avoid `main/module` resolution errors on web.
+  '@tanstack/react-query': tanstackReactQueryEntry,
+  '@tanstack/query-core': tanstackQueryCoreEntry,
 };
+
+// Block broken Bun stubs in local node_modules for packages that must come from workspace root.
+// This forces Metro to fall through to nodeModulesPaths[1] (workspace root) where real files exist.
+const localNodeModules = path.resolve(projectRoot, 'node_modules');
+config.resolver.blockList = [
+  new RegExp(
+    path.join(localNodeModules, '@tanstack').replace(/\\/g, '\\\\') + '[\\\\/].*',
+  ),
+];
 
 // Enable package exports for better module resolution
 config.resolver.unstable_enablePackageExports = true;
+config.resolver.unstable_conditionNames = Array.from(
+  new Set([...(config.resolver.unstable_conditionNames || []), '@tanstack/custom-condition']),
+);
 
 // Limit max workers to prevent "too many open files" error on Windows
 config.maxWorkers = 1;
+
+if (!fs.existsSync(tanstackReactQueryEntry) || !fs.existsSync(tanstackQueryCoreEntry)) {
+  console.warn('[metro] TanStack source entry missing', {
+    tanstackReactQueryEntry,
+    tanstackQueryCoreEntry,
+  });
+}
 
 module.exports = withNativewind(config);
