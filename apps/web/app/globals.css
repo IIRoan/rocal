@@ -412,6 +412,20 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body.capacitor-app {
+    overscroll-behavior: none;
+  }
+
+  ion-app {
+    background: transparent;
+    min-height: 100dvh;
+  }
+
   /* Form fields: clearer separation from cards/background */
   input,
   textarea,

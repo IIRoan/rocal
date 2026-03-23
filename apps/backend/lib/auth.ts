@@ -5,9 +5,47 @@ import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
 
-const backendUrl = process.env.BACKEND_URL || "http://localhost:4001";
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:4000";
+const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
+const frontendUrl =
+  process.env.FRONTEND_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "http://localhost:3000";
 const isProduction = process.env.NODE_ENV === "production";
+
+const parseCsvEnv = (value?: string) => {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const trustedOrigins = Array.from(
+  new Set([
+    frontendUrl,
+    process.env.NEXT_PUBLIC_APP_URL || "",
+    "capacitor://localhost",
+    "http://localhost",
+    "https://localhost",
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://127.0.0.1:3000",
+    ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
+  ]),
+).filter(Boolean);
+
+const passkeyOrigin =
+  process.env.PASSKEY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || frontendUrl;
+
+const socialRedirectUrl =
+  process.env.AUTH_REDIRECT_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  frontendUrl;
+
+const cookieSameSite = (
+  process.env.AUTH_COOKIE_SAME_SITE || "lax"
+) as "lax" | "strict" | "none";
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -25,9 +63,9 @@ const getRpId = (url: string) => {
 export const auth = betterAuth({
   plugins: [
     passkey({
-      rpID: getRpId(frontendUrl),
+      rpID: getRpId(passkeyOrigin),
       rpName: "Rocani",
-      origin: frontendUrl,
+      origin: passkeyOrigin,
     }),
   ],
   user: {
@@ -55,7 +93,7 @@ export const auth = betterAuth({
       : {},
   baseURL: backendUrl,
   basePath: "/api/auth",
-  trustedOrigins: [frontendUrl],
+  trustedOrigins,
   session: {
     cookieCache: {
       enabled: true,
@@ -63,15 +101,15 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    useSecureCookies: isProduction,
+    useSecureCookies: isProduction || cookieSameSite === "none",
     cookieOptions: {
-      sameSite: "lax",
-      secure: isProduction,
+      sameSite: cookieSameSite,
+      secure: isProduction || cookieSameSite === "none",
       httpOnly: true,
       domain: isProduction ? getRpId(backendUrl) : undefined,
     },
   },
   socialProviderConfig: {
-    redirectURL: frontendUrl,
+    redirectURL: socialRedirectUrl,
   },
 }) as any;

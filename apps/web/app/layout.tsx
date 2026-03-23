@@ -5,7 +5,18 @@ import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { LoggerBootstrap } from "@/components/logger-bootstrap";
+import { MobileRuntimeBridge } from "@/components/mobile-runtime-bridge";
 import type { Metadata, Viewport } from "next";
+import "@ionic/react/css/core.css";
+import "@ionic/react/css/normalize.css";
+import "@ionic/react/css/structure.css";
+import "@ionic/react/css/typography.css";
+import "@ionic/react/css/padding.css";
+import "@ionic/react/css/float-elements.css";
+import "@ionic/react/css/text-alignment.css";
+import "@ionic/react/css/text-transformation.css";
+import "@ionic/react/css/flex-utils.css";
+import "@ionic/react/css/display.css";
 import "./globals.css";
 
 const fontSans = Geist({
@@ -68,22 +79,24 @@ export default function RootLayout({
       <body
         className={`${fontSans.variable} ${fontMono.variable} bg-background font-sans antialiased`}
       >
-        <LoggerBootstrap />
-        <QueryProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <LoadingProvider>
-              <SettingsProvider>
-                <CalendarProvider>{children}</CalendarProvider>
-                <Toaster />
-              </SettingsProvider>
-            </LoadingProvider>
-          </ThemeProvider>
-        </QueryProvider>
+        <MobileRuntimeBridge>
+          <LoggerBootstrap />
+          <QueryProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <LoadingProvider>
+                <SettingsProvider>
+                  <CalendarProvider>{children}</CalendarProvider>
+                  <Toaster />
+                </SettingsProvider>
+              </LoadingProvider>
+            </ThemeProvider>
+          </QueryProvider>
+        </MobileRuntimeBridge>
       </body>
     </html>
   );

@@ -45,3 +45,41 @@ Build all applications:
 ```bash
 bun run build
 ```
+
+## Mobile Development (Next.js + Ionic + Capacitor)
+
+The web app in `apps/web` is configured for static export (`out/`) and can be wrapped as a native app with Capacitor.
+
+Common commands:
+```bash
+cd apps/web
+bun run mobile:sync
+bun run mobile:open:ios
+```
+
+Fast iOS iteration (closest to Expo-style live reload):
+```bash
+cd apps/web
+bun run mobile:ios:live
+```
+
+Fast Android iteration on Windows (USB device):
+```bash
+# Terminal 1 (frontend on LAN-visible host)
+cd apps/web
+bun run mobile:dev
+
+# Terminal 2 (backend)
+cd apps/backend
+bun run dev
+
+# Terminal 3 (run on Android with live reload)
+cd apps/web
+bun run mobile:android:devices
+bun run mobile:android:live:usb -- --target=<device-id>
+```
+
+Notes:
+- Commit `apps/web/ios` and `apps/web/android` projects, but ignore generated user/build artifacts (already configured in `.gitignore`).
+- Backend auth/cors supports extra origins through `TRUSTED_ORIGINS` (see `apps/backend/.env.example`).
+- For cross-site cookie auth in native webviews over HTTPS, set `AUTH_COOKIE_SAME_SITE=none`.
