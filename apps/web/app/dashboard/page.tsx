@@ -23,6 +23,7 @@ import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { getApiBaseUrl } from "@/lib/api-url";
 import { useMemo, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -193,7 +194,7 @@ function SidebarWithContext() {
     setAiResponse("");
 
     try {
-      const assistantUrl = `${process.env.NEXT_PUBLIC_API_URL || ""}/api/calendar-assistant`;
+      const assistantUrl = `${getApiBaseUrl()}/api/calendar-assistant`;
       const response = await fetch(assistantUrl, {
         method: "POST",
         credentials: "include",

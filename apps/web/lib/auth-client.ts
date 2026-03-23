@@ -1,9 +1,10 @@
 import { createAuthClient } from "better-auth/react";
 import { passkeyClient } from "@better-auth/passkey/client";
+import { getApiBaseUrl } from "./api-url";
 
 // Define a specific type for the auth client
 const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001",
+  baseURL: getApiBaseUrl(),
   basePath: "/api/auth",
   plugins: [passkeyClient()],
 }) as any;
