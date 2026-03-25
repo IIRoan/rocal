@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --bun next dev",
+    "dev": "bun --bun next dev --webpack",
     "ionic:serve": "bun run mobile:dev",
     "ionic:build": "bun run build",
     "mobile:dev": "bun --bun next dev --webpack --hostname 0.0.0.0 --port 3000",
@@ -33,6 +33,7 @@
     "@better-auth/utils": "^0.3.1",
     "@better-fetch/fetch": "^1.1.21",
     "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.2.0",
     "@capacitor/haptics": "^8.0.1",
     "@capacitor/keyboard": "^8.0.1",

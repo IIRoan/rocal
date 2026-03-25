@@ -459,7 +459,8 @@ function DashboardContent() {
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
           : "/dashboard";
-      router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
+      const loginPath = typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.() ? "/mobile-login" : "/login";
+      router.replace(`${loginPath}?next=${encodeURIComponent(currentPath)}`);
     }
   }, [isPending, session?.user, router]);
 
