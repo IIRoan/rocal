@@ -215,4 +215,11 @@ app.get("/", ({ query, redirect }) => {
 app.listen(port, () => {
   logger.ok(`Server is running on http://localhost:${port}`);
   logger.info(`API documentation: http://localhost:${port}/api/swagger`);
+  logger.info("Auth runtime config", {
+    frontendUrl,
+    authRedirectUrl: process.env.AUTH_REDIRECT_URL || null,
+    mobileAuthCallbackUrl: process.env.MOBILE_AUTH_CALLBACK_URL || null,
+    cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
+    nodeEnv: process.env.NODE_ENV || "development",
+  });
 });

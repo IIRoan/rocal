@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
+import { oneTimeToken } from "better-auth/plugins";
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
@@ -10,7 +11,14 @@ const frontendUrl =
   process.env.FRONTEND_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
   "http://localhost:3000";
+const mobileAuthCallbackUrl =
+  process.env.MOBILE_AUTH_CALLBACK_URL ||
+  process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
+  "app.solace.onl://api/auth";
 const isProduction = process.env.NODE_ENV === "production";
+const skipStateCookieCheck =
+  process.env.AUTH_SKIP_STATE_COOKIE_CHECK === "true" ||
+  (!isProduction && process.env.AUTH_SKIP_STATE_COOKIE_CHECK !== "false");
 
 const parseCsvEnv = (value?: string) => {
   if (!value) return [];
@@ -31,6 +39,10 @@ const trustedOrigins = Array.from(
     "https://localhost:3000",
     "http://127.0.0.1:3000",
     "https://127.0.0.1:3000",
+    mobileAuthCallbackUrl,
+    "app.solace.onl://api",
+    "app.solace.onl://api/auth",
+    "app.solace.onl://",
     ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
   ]),
 ).filter(Boolean);
@@ -67,6 +79,10 @@ export const auth = betterAuth({
       rpName: "Rocani",
       origin: passkeyOrigin,
     }),
+    oneTimeToken({
+      expiresIn: 3,
+      storeToken: "hashed",
+    }),
   ],
   user: {
     additionalFields: {
@@ -76,6 +92,11 @@ export const auth = betterAuth({
         defaultValue: false,
       },
     },
+  },
+  account: {
+    // Mobile OAuth often starts in the webview and finishes in the system browser.
+    // In local/dev this can split state cookies across contexts.
+    skipStateCookieCheck,
   },
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -101,12 +122,16 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    useSecureCookies: isProduction || cookieSameSite === "none",
+    useSecureCookies: isProduction,
     cookieOptions: {
       sameSite: cookieSameSite,
-      secure: isProduction || cookieSameSite === "none",
+      secure: isProduction,
       httpOnly: true,
       domain: isProduction ? getRpId(backendUrl) : undefined,
+    },
+    // Cross subdomain cookie sharing for mobile OAuth flow
+    crossSubDomainCookies: {
+      enabled: true,
     },
   },
   socialProviderConfig: {
