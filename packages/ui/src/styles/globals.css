@@ -1,9 +1,8 @@
+@import "tw-animate-css";
 @import "tailwindcss";
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../../../components/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
-
-@import "tw-animate-css";
 
 /* Dark mode via class on root element */
 @custom-variant dark (&:is(.dark *));

@@ -198,7 +198,6 @@ if (autoStartDevServer) {
         "--bun",
         "next",
         "dev",
-        "--webpack",
         "--hostname",
         "0.0.0.0",
         "--port",
