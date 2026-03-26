@@ -4,7 +4,7 @@ module.exports = {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!react-native|@react-native|@react-native/js-polyfills)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)/)',
   ],
   testMatch: [
     '**/__tests__/**/*.+(ts|tsx|js)',
@@ -12,6 +12,7 @@ module.exports = {
   ],
   testEnvironment: 'jsdom',
   moduleNameMapper: {
+    '^react-native$': 'react-native-web',
     '^@react-native/js-polyfills/error-guard$': '<rootDir>/jest/mocks/error-guard.js',
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
