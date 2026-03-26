@@ -36,8 +36,11 @@
   "dependencies": {
     "@phosphor-icons/react": "2.1.10",
     "@testing-library/react-native": "12.4.1",
+    "babel-jest": "^30.3.0",
     "jest-environment-jsdom": "30.3.0",
+    "jest-react-native": "^18.0.0",
     "metro-react-native-babel-preset": "0.77.0",
-    "react-native-safe-area-context": "5.7.0"
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-web": "^0.21.2"
   }
 }
