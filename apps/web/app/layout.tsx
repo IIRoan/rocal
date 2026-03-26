@@ -1,3 +1,4 @@
+import MobilePage from '@workspace/mobile-ui/src/MobilePage';
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
@@ -80,7 +81,7 @@ export default function RootLayout({
             >
               <LoadingProvider>
                 <SettingsProvider>
-                  <CalendarProvider>{children}</CalendarProvider>
+                  <CalendarProvider><MobilePage>{children}</MobilePage></CalendarProvider>
                   <Toaster />
                 </SettingsProvider>
               </LoadingProvider>
