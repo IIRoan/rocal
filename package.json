@@ -27,7 +27,8 @@
   "devDependencies": {
     "minimatch": "10.1.1",
     "prettier": "3.7.4",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
   },
   "engines": {
     "node": ">=20",
