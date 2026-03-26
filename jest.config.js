@@ -10,8 +10,9 @@ module.exports = {
     '**/__tests__/**/*.+(ts|tsx|js)',
     '**/?(*.)+(spec|test).+(ts|tsx|js)',
   ],
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom',
   moduleNameMapper: {
+    '^react-native$': 'react-native-web',
     '^@react-native/js-polyfills/error-guard$': '<rootDir>/jest/mocks/error-guard.js',
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
