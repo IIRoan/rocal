@@ -1,0 +1,23 @@
+{
+  "milestone": "Calendar Swipe Controls",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": { "passed": false, "command": "bun run test", "exitCode": 1 },
+    "typecheck": { "passed": true, "command": "", "exitCode": 0 },
+    "lint": { "passed": true, "command": "", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [
+    { "featureId": "scrutiny-validator-Calendar Swipe Controls", "severity": "blocking", "description": "Tests are failing with a SyntaxError due to an issue with Jest, Babel, and React Native configuration." }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [],
+  "previousRound": null
+}
