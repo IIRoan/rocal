@@ -1,6 +1,6 @@
 import { isBefore } from "date-fns";
-import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
-import type { EventNotification } from "@workspace/ui/components/calendar/notification-manager";
+import type { CalendarEvent } from "@workspace/ui/components/calendar";
+import type { EventNotification } from "@workspace/ui/components/calendar";
 
 export const resetEventForm = (
   calendars: any[],
@@ -80,3 +80,4 @@ export const validateEventForm = (
 
   return null;
 };
+

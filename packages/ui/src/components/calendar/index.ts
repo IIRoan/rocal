@@ -7,6 +7,7 @@ export { EventCalendar, type EventCalendarProps } from "./event-calendar";
 export { EventItem } from "./event-item";
 export { EventDots } from "./event-dots";
 export { EventsPopup } from "./events-popup";
+export { NotificationManager, type EventNotification } from "./notification-manager";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
 export { formatEventDescription } from "./event-description-formatter";

@@ -4,9 +4,9 @@ import { useState, useCallback, useRef } from "react";
 import type {
   CalendarEvent,
   Calendar,
-} from "@workspace/ui/components/calendar/types";
+} from "@workspace/ui/components/calendar";
 import type { RecurrenceRule } from "@/lib/types/calendar";
-import type { EventNotification } from "@workspace/ui/components/calendar/notification-manager";
+import type { EventNotification } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
 import {
   formatTimeForInput,
@@ -828,3 +828,4 @@ export function useEventForm({
     handleRecurringDeleteAll,
   };
 }
+
