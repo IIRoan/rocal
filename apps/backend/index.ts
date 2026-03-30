@@ -18,6 +18,34 @@ installGlobalConsoleLogger("backend");
 
 const logger = createLogger("backend");
 
+const frontendUrl =
+  process.env.FRONTEND_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "http://localhost:3000";
+
+const parseCsvEnv = (value?: string) => {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const corsOrigins = Array.from(
+  new Set([
+    frontendUrl,
+    process.env.NEXT_PUBLIC_APP_URL || "",
+    "capacitor://localhost",
+    "http://localhost",
+    "https://localhost",
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://127.0.0.1:3000",
+    ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
+  ]),
+).filter(Boolean);
+
 // Better Auth middleware
 const betterAuth = new Elysia({ name: "better-auth" })
   .mount(auth.handler)
@@ -91,10 +119,7 @@ export const createAPI = (prefix = "") => {
   return app
     .use(
       cors({
-        origin:
-          process.env.FRONTEND_URL ||
-          process.env.NEXT_PUBLIC_APP_URL ||
-          "http://localhost:4000",
+        origin: corsOrigins,
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [
@@ -173,16 +198,11 @@ export const createAPI = (prefix = "") => {
 };
 
 // Start the server when this file is run directly
-const port = process.env.PORT ? parseInt(process.env.PORT) : 4001;
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 const app = createAPI("/api");
 
 // Handle OAuth errors at root (better-auth redirects here on error)
 app.get("/", ({ query, redirect }) => {
-  const frontendUrl =
-    process.env.FRONTEND_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "http://localhost:4000";
-
   // If there's an OAuth error, redirect to frontend with error
   if (query.error) {
     return redirect(`${frontendUrl}/login?error=${query.error}`);
@@ -195,4 +215,11 @@ app.get("/", ({ query, redirect }) => {
 app.listen(port, () => {
   logger.ok(`Server is running on http://localhost:${port}`);
   logger.info(`API documentation: http://localhost:${port}/api/swagger`);
+  logger.info("Auth runtime config", {
+    frontendUrl,
+    authRedirectUrl: process.env.AUTH_REDIRECT_URL || null,
+    mobileAuthCallbackUrl: process.env.MOBILE_AUTH_CALLBACK_URL || null,
+    cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
+    nodeEnv: process.env.NODE_ENV || "development",
+  });
 });

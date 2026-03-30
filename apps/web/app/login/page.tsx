@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { signIn, authClient, useSession } from "@/lib/auth-client";
+import { getAppBaseUrl } from "@/lib/api-url";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Github, Key, Shield, Check } from "lucide-react";
 import { Logo } from "@workspace/ui/components/layout";
@@ -78,8 +79,7 @@ function LoginForm() {
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true);
-      const frontendUrl =
-        process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const frontendUrl = getAppBaseUrl();
       const callbackTarget = new URL(getRedirectTarget(), frontendUrl).toString();
       await signIn.social({
         provider: "github",

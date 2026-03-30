@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode } from "react";
-import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
+import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 export type EventEditorMode = "modal" | "popover";
 
@@ -155,3 +155,4 @@ export function CommandPaletteProvider({
     </CommandPaletteContext.Provider>
   );
 }
+

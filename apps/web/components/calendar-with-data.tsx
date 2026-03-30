@@ -19,7 +19,7 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
-import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
+import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 // Define the Day type as expected by date-fns
 // This type is often implicitly defined by date-fns, but explicitly defining it
@@ -242,3 +242,4 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     />
   );
 }
+

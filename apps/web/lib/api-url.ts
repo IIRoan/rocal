@@ -1,0 +1,118 @@
+import { Capacitor } from "@capacitor/core";
+
+const BACKEND_PORT = "3001";
+const DEFAULT_APP_URL = "http://localhost:3000";
+const DEFAULT_MOBILE_AUTH_CALLBACK_URL = "app.solace.onl://api/auth";
+const AUTH_REDIRECT_FALLBACK_PATH = "/dashboard";
+const MOBILE_AUTH_BRIDGE_PATH = "/auth/mobile-complete";
+
+const getHostBasedBackendUrl = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const { protocol, hostname } = window.location;
+  if (!hostname) {
+    return "";
+  }
+  return `${protocol}//${hostname}:${BACKEND_PORT}`;
+};
+
+const toSafeRelativePath = (path?: string | null) => {
+  if (!path || !path.startsWith("/")) {
+    return AUTH_REDIRECT_FALLBACK_PATH;
+  }
+
+  return path;
+};
+
+export const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    const hostBasedUrl = getHostBasedBackendUrl();
+    if (hostBasedUrl) {
+      return hostBasedUrl;
+    }
+  }
+
+  return `http://localhost:${BACKEND_PORT}`;
+};
+
+export const getAppBaseUrl = () => {
+  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    return window.location.origin;
+  }
+
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined" ? window.location.origin : DEFAULT_APP_URL)
+  );
+};
+
+export const getMobileAuthCallbackBaseUrl = () => {
+  return (
+    process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
+    DEFAULT_MOBILE_AUTH_CALLBACK_URL
+  );
+};
+
+export const getMobileAuthCallbackUrl = (
+  nextPath?: string | null,
+  errorCode?: string,
+  oneTimeToken?: string,
+) => {
+  const safePath = toSafeRelativePath(nextPath);
+  const callbackBaseUrl = getMobileAuthCallbackBaseUrl();
+
+  try {
+    const callbackUrl = new URL(callbackBaseUrl);
+    callbackUrl.searchParams.set("next", safePath);
+    if (errorCode) {
+      callbackUrl.searchParams.set("error", errorCode);
+    }
+    if (oneTimeToken) {
+      callbackUrl.searchParams.set("ott", oneTimeToken);
+    }
+    return callbackUrl.toString();
+  } catch {
+    const params = new URLSearchParams({ next: safePath });
+    if (errorCode) {
+      params.set("error", errorCode);
+    }
+    if (oneTimeToken) {
+      params.set("ott", oneTimeToken);
+    }
+    return `${DEFAULT_MOBILE_AUTH_CALLBACK_URL}?${params.toString()}`;
+  }
+};
+
+export const getMobileAuthBridgeUrl = (
+  nextPath?: string | null,
+  errorCode?: string,
+) => {
+  const safePath = toSafeRelativePath(nextPath);
+  const bridgeUrl = new URL(
+    MOBILE_AUTH_BRIDGE_PATH,
+    process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL,
+  );
+  bridgeUrl.searchParams.set("next", safePath);
+
+  if (errorCode) {
+    bridgeUrl.searchParams.set("error", errorCode);
+  }
+
+  return bridgeUrl.toString();
+};
+
+export const getAuthCallbackUrl = (nextPath?: string | null) => {
+  const safePath = toSafeRelativePath(nextPath);
+  return new URL(safePath, getAppBaseUrl()).toString();
+};
+
+export const getAuthErrorCallbackUrl = (nextPath?: string | null) => {
+  return getAuthCallbackUrl(nextPath);
+};
