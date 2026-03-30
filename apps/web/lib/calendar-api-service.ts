@@ -1,4 +1,5 @@
 import { httpClient, HttpClient } from "./http-client";
+import { getApiBaseUrl } from "./api-url";
 import {
   CalendarEvent,
   Calendar,
@@ -34,6 +35,9 @@ import {
   SyncSubscriptionResponse,
   ImportICSRequest,
   ImportICSResponse,
+  CalendarShareLink,
+  CreateCalendarShareLinkRequestPayload,
+  DisableCalendarShareLinkResponsePayload,
 } from "./types/calendar";
 // Browser notifications removed
 
@@ -500,6 +504,50 @@ export class CalendarApiService {
     }
   }
 
+  async downloadEventICS(id: string): Promise<void> {
+    const apiBaseUrl = getApiBaseUrl().replace(/\/+$/, "");
+    const response = await fetch(
+      `${apiBaseUrl}/api/events/${encodeURIComponent(id)}/ics`,
+      {
+        method: "GET",
+        credentials: "include",
+      },
+    );
+
+    if (!response.ok) {
+      let message = "Failed to download ICS file";
+      try {
+        const maybeJson = await response.json();
+        if (typeof maybeJson?.message === "string" && maybeJson.message.trim()) {
+          message = maybeJson.message.trim();
+        }
+      } catch {
+        // Ignore parse failures, keep generic message.
+      }
+
+      throw {
+        error: "Download Error",
+        message,
+        statusCode: response.status,
+      } as ApiError;
+    }
+
+    const blob = await response.blob();
+    const fallbackFilename = "event.ics";
+    const contentDisposition = response.headers.get("content-disposition") || "";
+    const filenameMatch = /filename="?([^"]+)"?/i.exec(contentDisposition);
+    const filename = filenameMatch?.[1] || fallbackFilename;
+
+    const objectUrl = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
   // Calendar Subscriptions API methods
   async getSubscriptions(): Promise<CalendarSubscription[]> {
     try {
@@ -566,6 +614,42 @@ export class CalendarApiService {
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
+    }
+  }
+
+  async getCalendarShareLink(calendarId: string): Promise<CalendarShareLink> {
+    try {
+      return await this.client.get<CalendarShareLink>(
+        `/api/calendars/${calendarId}/share-link`,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to get calendar share link");
+    }
+  }
+
+  async enableCalendarShareLink(
+    calendarId: string,
+    request?: CreateCalendarShareLinkRequestPayload,
+  ): Promise<CalendarShareLink> {
+    try {
+      return await this.client.post<CalendarShareLink>(
+        `/api/calendars/${calendarId}/share-link`,
+        request || {},
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to enable calendar share link");
+    }
+  }
+
+  async disableCalendarShareLink(
+    calendarId: string,
+  ): Promise<DisableCalendarShareLinkResponsePayload> {
+    try {
+      return await this.client.delete<DisableCalendarShareLinkResponsePayload>(
+        `/api/calendars/${calendarId}/share-link`,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to disable calendar share link");
     }
   }
 

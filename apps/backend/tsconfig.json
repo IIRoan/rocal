@@ -17,5 +17,6 @@
       "@workspace/calendar-ics": ["../../packages/calendar-ics/src/index.ts"],
       "@workspace/calendar-ics/*": ["../../packages/calendar-ics/src/*"]
     }
-  }
+  },
+  "include": ["**/*.ts", "../../packages/calendar-ics/src/**/*.ts"]
 }

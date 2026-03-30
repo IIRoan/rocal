@@ -171,6 +171,253 @@ export interface DeleteCalendarSubscriptionResponse {
   success: boolean;
 }
 
+export interface CalendarShareLinkResponse {
+  calendarId: string;
+  calendarName: string;
+  enabled: boolean;
+  shareUrl: string | null;
+}
+
+export interface CreateCalendarShareLinkRequest {
+  regenerate?: boolean;
+}
+
+export interface DisableCalendarShareLinkResponse {
+  success: boolean;
+}
+
+export interface IcsCalendarMetadata {
+  name?: string;
+  description?: string;
+  timezone?: string;
+  method?: CalendarMethodType;
+  productId?: string;
+  sourceUrl?: string;
+}
+
+export interface IcsBuildEventInput {
+  uid?: string;
+  title: string;
+  description?: string | null;
+  start: Date;
+  end: Date;
+  allDay?: boolean;
+  location?: string | null;
+  recurrence?: IcsRecurrenceRule | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  status?: "CONFIRMED" | "TENTATIVE" | "CANCELLED";
+  sequence?: number;
+  sourceUrl?: string;
+}
+
+const WEEKDAY_INDEX_TO_CODE = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+const ICS_LINE_BREAK = "\r\n";
+const DEFAULT_PRODUCT_ID = "-//Solace Calendar//Calendar Export//EN";
+
+function escapeIcsText(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function formatDateStamp(date: Date): string {
+  return `${date.getUTCFullYear()}${pad2(date.getUTCMonth() + 1)}${pad2(date.getUTCDate())}`;
+}
+
+function formatDateTimeStamp(date: Date): string {
+  return `${formatDateStamp(date)}T${pad2(date.getUTCHours())}${pad2(date.getUTCMinutes())}${pad2(date.getUTCSeconds())}Z`;
+}
+
+function addDaysUtc(date: Date, days: number): Date {
+  const copy = new Date(date);
+  copy.setUTCDate(copy.getUTCDate() + days);
+  return copy;
+}
+
+function normalizeEventRange(event: Pick<IcsBuildEventInput, "start" | "end" | "allDay">): {
+  start: Date;
+  end: Date;
+} {
+  const start = new Date(event.start);
+  let end = new Date(event.end);
+
+  if (Number.isNaN(start.getTime())) {
+    throw new Error("Invalid event start date");
+  }
+
+  if (Number.isNaN(end.getTime())) {
+    throw new Error("Invalid event end date");
+  }
+
+  if (end.getTime() <= start.getTime()) {
+    end = event.allDay ? addDaysUtc(start, 1) : new Date(start.getTime() + 60 * 60 * 1000);
+  }
+
+  return { start, end };
+}
+
+function buildRruleString(recurrence: IcsRecurrenceRule): string {
+  const segments: string[] = [];
+
+  segments.push(`FREQ=${recurrence.frequency.toUpperCase()}`);
+
+  if (recurrence.interval > 1) {
+    segments.push(`INTERVAL=${recurrence.interval}`);
+  }
+
+  if (recurrence.count && recurrence.count > 0) {
+    segments.push(`COUNT=${Math.floor(recurrence.count)}`);
+  }
+
+  if (recurrence.until) {
+    const until = new Date(recurrence.until);
+    if (!Number.isNaN(until.getTime())) {
+      segments.push(`UNTIL=${formatDateTimeStamp(until)}`);
+    }
+  }
+
+  if (recurrence.byWeekDay?.length) {
+    const weekdays = recurrence.byWeekDay
+      .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+      .map((day) => WEEKDAY_INDEX_TO_CODE[day]);
+
+    if (weekdays.length) {
+      segments.push(`BYDAY=${Array.from(new Set(weekdays)).join(",")}`);
+    }
+  }
+
+  if (recurrence.byMonthDay?.length) {
+    const monthDays = recurrence.byMonthDay
+      .filter((day) => Number.isInteger(day) && day >= 1 && day <= 31)
+      .map((day) => String(day));
+
+    if (monthDays.length) {
+      segments.push(`BYMONTHDAY=${Array.from(new Set(monthDays)).join(",")}`);
+    }
+  }
+
+  if (recurrence.byMonth?.length) {
+    const months = recurrence.byMonth
+      .filter((month) => Number.isInteger(month) && month >= 1 && month <= 12)
+      .map((month) => String(month));
+
+    if (months.length) {
+      segments.push(`BYMONTH=${Array.from(new Set(months)).join(",")}`);
+    }
+  }
+
+  return segments.join(";");
+}
+
+function buildEventLines(event: IcsBuildEventInput, dtStamp: Date): string[] {
+  const { start, end } = normalizeEventRange(event);
+  const uid = event.uid?.trim() || `${crypto.randomUUID()}@solace-calendar.local`;
+  const allDay = !!event.allDay;
+  const createdAt = event.createdAt && !Number.isNaN(event.createdAt.getTime()) ? event.createdAt : dtStamp;
+  const updatedAt = event.updatedAt && !Number.isNaN(event.updatedAt.getTime()) ? event.updatedAt : dtStamp;
+
+  const lines: string[] = [
+    "BEGIN:VEVENT",
+    `UID:${escapeIcsText(uid)}`,
+    `DTSTAMP:${formatDateTimeStamp(dtStamp)}`,
+    `CREATED:${formatDateTimeStamp(createdAt)}`,
+    `LAST-MODIFIED:${formatDateTimeStamp(updatedAt)}`,
+    `SUMMARY:${escapeIcsText(event.title.trim() || "Untitled Event")}`,
+  ];
+
+  if (allDay) {
+    lines.push(`DTSTART;VALUE=DATE:${formatDateStamp(start)}`);
+    lines.push(`DTEND;VALUE=DATE:${formatDateStamp(addDaysUtc(end, 1))}`);
+  } else {
+    lines.push(`DTSTART:${formatDateTimeStamp(start)}`);
+    lines.push(`DTEND:${formatDateTimeStamp(end)}`);
+  }
+
+  if (event.description?.trim()) {
+    lines.push(`DESCRIPTION:${escapeIcsText(event.description.trim())}`);
+  }
+
+  if (event.location?.trim()) {
+    lines.push(`LOCATION:${escapeIcsText(event.location.trim())}`);
+  }
+
+  if (event.status) {
+    lines.push(`STATUS:${event.status}`);
+  }
+
+  if (event.sequence !== undefined && Number.isFinite(event.sequence)) {
+    lines.push(`SEQUENCE:${Math.max(0, Math.floor(event.sequence))}`);
+  }
+
+  if (event.sourceUrl?.trim()) {
+    lines.push(`URL:${escapeIcsText(event.sourceUrl.trim())}`);
+  }
+
+  if (event.recurrence) {
+    const rrule = buildRruleString(event.recurrence);
+    if (rrule) {
+      lines.push(`RRULE:${rrule}`);
+    }
+  }
+
+  lines.push("END:VEVENT");
+  return lines;
+}
+
+export function buildIcsCalendar(options: {
+  calendar: IcsCalendarMetadata;
+  events: IcsBuildEventInput[];
+}): string {
+  const dtStamp = new Date();
+  const calendarName = options.calendar.name?.trim() || "Calendar";
+  const method = options.calendar.method || DEFAULT_CALENDAR_METHOD;
+
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    `PRODID:${options.calendar.productId?.trim() || DEFAULT_PRODUCT_ID}`,
+    "CALSCALE:GREGORIAN",
+    `METHOD:${method}`,
+    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
+  ];
+
+  if (options.calendar.description?.trim()) {
+    lines.push(`X-WR-CALDESC:${escapeIcsText(options.calendar.description.trim())}`);
+  }
+
+  if (options.calendar.timezone?.trim()) {
+    lines.push(`X-WR-TIMEZONE:${escapeIcsText(options.calendar.timezone.trim())}`);
+  }
+
+  if (options.calendar.sourceUrl?.trim()) {
+    lines.push(`URL:${escapeIcsText(options.calendar.sourceUrl.trim())}`);
+  }
+
+  for (const event of options.events) {
+    lines.push(...buildEventLines(event, dtStamp));
+  }
+
+  lines.push("END:VCALENDAR");
+  return `${lines.join(ICS_LINE_BREAK)}${ICS_LINE_BREAK}`;
+}
+
+export function buildIcsEventFile(options: {
+  calendar: IcsCalendarMetadata;
+  event: IcsBuildEventInput;
+}): string {
+  return buildIcsCalendar({
+    calendar: options.calendar,
+    events: [options.event],
+  });
+}
+
 export type {
   RecurrenceFrequency,
   RecurrenceInstance,

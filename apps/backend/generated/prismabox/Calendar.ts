@@ -11,6 +11,8 @@ export const CalendarPlain = t.Object(
     color: t.String(),
     isVisible: t.Boolean(),
     isDefault: t.Boolean(),
+    icsShareToken: __nullable__(t.String()),
+    icsShareEnabled: t.Boolean(),
     userId: t.String(),
     createdAt: t.Date(),
     updatedAt: t.Date(),
@@ -111,6 +113,8 @@ export const CalendarPlainInputCreate = t.Object(
     color: t.String(),
     isVisible: t.Optional(t.Boolean()),
     isDefault: t.Optional(t.Boolean()),
+    icsShareToken: t.Optional(__nullable__(t.String())),
+    icsShareEnabled: t.Optional(t.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -121,6 +125,8 @@ export const CalendarPlainInputUpdate = t.Object(
     color: t.Optional(t.String()),
     isVisible: t.Optional(t.Boolean()),
     isDefault: t.Optional(t.Boolean()),
+    icsShareToken: t.Optional(__nullable__(t.String())),
+    icsShareEnabled: t.Optional(t.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -297,6 +303,8 @@ export const CalendarWhere = t.Partial(
           color: t.String(),
           isVisible: t.Boolean(),
           isDefault: t.Boolean(),
+          icsShareToken: t.String(),
+          icsShareEnabled: t.Boolean(),
           userId: t.String(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
@@ -315,6 +323,7 @@ export const CalendarWhereUnique = t.Recursive(
           t.Object(
             {
               id: t.String(),
+              icsShareToken: t.String(),
               userId_name: t.Object(
                 { userId: t.String(), name: t.String() },
                 { additionalProperties: false },
@@ -327,6 +336,7 @@ export const CalendarWhereUnique = t.Recursive(
         t.Union(
           [
             t.Object({ id: t.String() }),
+            t.Object({ icsShareToken: t.String() }),
             t.Object({
               userId_name: t.Object(
                 { userId: t.String(), name: t.String() },
@@ -358,6 +368,8 @@ export const CalendarWhereUnique = t.Recursive(
               color: t.String(),
               isVisible: t.Boolean(),
               isDefault: t.Boolean(),
+              icsShareToken: t.String(),
+              icsShareEnabled: t.Boolean(),
               userId: t.String(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
@@ -379,6 +391,8 @@ export const CalendarSelect = t.Partial(
       color: t.Boolean(),
       isVisible: t.Boolean(),
       isDefault: t.Boolean(),
+      icsShareToken: t.Boolean(),
+      icsShareEnabled: t.Boolean(),
       userId: t.Boolean(),
       user: t.Boolean(),
       events: t.Boolean(),
@@ -421,6 +435,12 @@ export const CalendarOrderBy = t.Partial(
         additionalProperties: false,
       }),
       isDefault: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      icsShareToken: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      icsShareEnabled: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       userId: t.Union([t.Literal("asc"), t.Literal("desc")], {

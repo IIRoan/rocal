@@ -6,6 +6,8 @@ import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { requireAuth } from "../lib/auth-guard";
 import { createLogger } from "@workspace/logger";
+import { buildIcsEventFile } from "@workspace/calendar-ics";
+import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
@@ -705,6 +707,91 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             description: "Unauthorized",
           },
         },
+      },
+    },
+  )
+
+  .get(
+    "/:id/ics",
+    async ({ params, user, request, set }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
+      const { id: requestedId } = params as { id: string };
+
+      let eventId = requestedId;
+      let recurrenceInstanceDate: Date | undefined;
+
+      const recurringInstanceMatch = requestedId.match(
+        /^(.+?)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)$/,
+      );
+
+      if (recurringInstanceMatch?.[1] && recurringInstanceMatch?.[2]) {
+        eventId = recurringInstanceMatch[1];
+        const parsedOccurrenceDate = new Date(recurringInstanceMatch[2]);
+        if (!Number.isNaN(parsedOccurrenceDate.getTime())) {
+          recurrenceInstanceDate = parsedOccurrenceDate;
+        }
+      }
+
+      const event = await prisma.calendarEvent.findFirst({
+        where: {
+          id: eventId,
+          userId: user.id,
+        },
+        include: {
+          calendar: true,
+        },
+      });
+
+      if (!event) {
+        throw new ValidationError("Event not found or access denied");
+      }
+
+      let exportedEvent = toIcsBuildEvent(event);
+      if (recurrenceInstanceDate) {
+        const durationMs = Math.max(
+          event.end.getTime() - event.start.getTime(),
+          event.allDay ? 24 * 60 * 60 * 1000 : 60 * 1000,
+        );
+
+        exportedEvent = {
+          ...exportedEvent,
+          uid: `${event.externalId || event.id}-${recurrenceInstanceDate.toISOString()}@solace-calendar.local`,
+          start: recurrenceInstanceDate,
+          end: new Date(recurrenceInstanceDate.getTime() + durationMs),
+          recurrence: undefined,
+        };
+      }
+
+      const icsContent = buildIcsEventFile({
+        calendar: {
+          name: event.calendar.name,
+          timezone: event.timezone || "UTC",
+        },
+        event: exportedEvent,
+      });
+
+      const fileBaseName = recurrenceInstanceDate
+        ? `${event.title}-${recurrenceInstanceDate.toISOString().slice(0, 10)}`
+        : event.title;
+
+      set.headers["Content-Type"] = "text/calendar; charset=utf-8";
+      set.headers["Content-Disposition"] =
+        `attachment; filename="${toSafeIcsFilename(fileBaseName)}"`;
+      set.headers["Cache-Control"] = "no-store";
+
+      return icsContent;
+    },
+    {
+      params: t.Object({
+        id: t.String({
+          description: "Event ID to export as ICS",
+        }),
+      }),
+      detail: {
+        tags: ["Events"],
+        summary: "Download a single event as .ics",
+        security: [{ bearerAuth: [] }],
       },
     },
   )
