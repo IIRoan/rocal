@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CalendarEvent } from "./types";
+import { CalendarEvent, type CalendarView } from "./types";
 import { EventItem } from "./event-item";
 import { cn } from "../../lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -20,7 +20,7 @@ import { useNumberedShortcuts } from "../../hooks";
 
 interface EventDotsProps {
   events: CalendarEvent[];
-  view: "month" | "week" | "day" | "agenda";
+  view: CalendarView;
   onClick?: (event: CalendarEvent) => void;
   showTime?: boolean;
   timeFormat?: "12h" | "24h";

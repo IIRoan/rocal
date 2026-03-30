@@ -3,9 +3,10 @@
 import { Skeleton } from "../ui/skeleton";
 import { cn } from "../../lib/utils";
 import { addDays, startOfWeek, format } from "date-fns";
+import type { CalendarView } from "./types";
 
 interface CalendarSkeletonProps {
-  view?: "month" | "week" | "day" | "agenda";
+  view?: CalendarView;
   className?: string;
   compactView?: boolean;
 }

@@ -38,7 +38,7 @@ import {
   WeekCellsHeight,
 } from "./constants";
 import { addHoursToDate, addMinutesToDate } from "./utils";
-import { CalendarEvent, CalendarView } from "./types";
+import { CalendarEvent, CalendarView, CALENDAR_VIEWS } from "./types";
 import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
@@ -151,7 +151,7 @@ export function EventCalendar({
   const [view, setViewState] = useState<CalendarView>(() => {
     if (typeof window !== "undefined") {
       const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
+      if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
         return savedView as CalendarView;
       }
     }

@@ -69,6 +69,12 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         end = new Date(baseDate);
         end.setHours(23, 59, 59, 999);
         break;
+      case "3day":
+        start = addDays(baseDate, -1);
+        start.setHours(0, 0, 0, 0);
+        end = addDays(baseDate, 1);
+        end.setHours(23, 59, 59, 999);
+        break;
       case "agenda":
         start = new Date(baseDate);
         end = addDays(baseDate, AgendaDaysToShow - 1);

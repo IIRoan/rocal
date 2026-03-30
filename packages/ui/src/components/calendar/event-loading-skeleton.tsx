@@ -3,9 +3,10 @@
 import { cn } from "../../lib/utils";
 import { Skeleton } from "../ui/skeleton";
 import { InlineLogoSpinner } from "../ui/logo-spinner";
+import type { CalendarView } from "./types";
 
 interface EventLoadingSkeletonProps {
-  view?: "month" | "week" | "day" | "agenda";
+  view?: CalendarView;
   className?: string;
   showSpinner?: boolean;
   compactView?: boolean;

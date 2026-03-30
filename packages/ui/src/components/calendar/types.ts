@@ -6,7 +6,15 @@ export interface User {
   hasAiAccess?: boolean;
 }
 
-export type CalendarView = "month" | "week" | "day" | "agenda";
+export type CalendarView = "month" | "week" | "3day" | "day" | "agenda";
+
+export const CALENDAR_VIEWS: readonly CalendarView[] = [
+  "month",
+  "week",
+  "3day",
+  "day",
+  "agenda",
+];
 
 export interface Calendar {
   id: string;

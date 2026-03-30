@@ -24,13 +24,13 @@ import {
 import { addMinutes, differenceInMinutes } from "date-fns";
 
 import { EventItem } from "./event-item";
-import { CalendarEvent } from "./types";
+import { CalendarEvent, type CalendarView } from "./types";
 
 // Define the context type
 type CalendarDndContextType = {
   activeEvent: CalendarEvent | null;
   activeId: UniqueIdentifier | null;
-  activeView: "month" | "week" | "day" | null;
+  activeView: CalendarView | null;
   currentTime: Date | null;
   eventHeight: number | null;
   isMultiDay: boolean;
@@ -74,7 +74,7 @@ export function CalendarDndProvider({
 }: CalendarDndProviderProps) {
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const [activeView, setActiveView] = useState<"month" | "week" | "day" | null>(
+  const [activeView, setActiveView] = useState<CalendarView | null>(
     null,
   );
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -137,7 +137,7 @@ export function CalendarDndProvider({
       dragHandlePosition: eventDragHandlePosition,
     } = active.data.current as {
       event: CalendarEvent;
-      view: "month" | "week" | "day";
+      view: CalendarView;
       height?: number;
       isMultiDay?: boolean;
       multiDayWidth?: number;

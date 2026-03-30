@@ -7,6 +7,8 @@ import {
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Sun, Moon, Monitor, Layout, Check, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
+import type { CalendarView } from "@workspace/ui/components/calendar";
+import { CALENDAR_VIEWS } from "@workspace/ui/components/calendar";
 import type { PaletteView } from "./constants";
 
 interface AppearanceSettingsProps {
@@ -108,7 +110,7 @@ export function AppearanceSettings({
                 Default View
               </div>
               <div className="px-2">
-                {["month", "week", "day", "agenda"].map((view) => (
+                {CALENDAR_VIEWS.map((view) => (
                   <button
                     key={view}
                     type="button"
@@ -119,7 +121,7 @@ export function AppearanceSettings({
                       <Layout className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm flex-1 capitalize">
-                      {view} View
+                      {view === "3day" ? "3 Days" : `${view} View`}
                     </span>
                     {localSettings.defaultView === view && (
                       <Check className="h-4 w-4 text-primary shrink-0" />
