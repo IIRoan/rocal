@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useCalendarData } from "@/hooks/use-calendar-data";
-import type { Calendar as CalendarType } from "@/lib/types/calendar";
+import type {
+  CalendarSubscription,
+  SyncSubscriptionResponse,
+} from "@/lib/types/calendar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -34,21 +37,6 @@ import {
   AlertTriangle,
   ArrowLeft,
 } from "lucide-react";
-
-interface CalendarSubscription {
-  id: string;
-  name: string;
-  url: string;
-  isActive: boolean;
-  syncIntervalMinutes: number;
-  lastSyncAt?: string;
-  lastSyncStatus: "success" | "error" | "pending";
-  lastErrorMessage?: string;
-  calendar: CalendarType;
-  _count: {
-    syncLogs: number;
-  };
-}
 
 interface SubscriptionManagementProps {
   open: boolean;
@@ -121,7 +109,7 @@ export function SubscriptionManagement({
 
   const syncMutation = useMutation({
     mutationFn: (id: string) => calendarApiService.syncSubscription(id),
-    onSuccess: async (_: any, id: string) => {
+    onSuccess: async (_: SyncSubscriptionResponse, id: string) => {
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
       const sub = subscriptions.find((s: CalendarSubscription) => s.id === id);

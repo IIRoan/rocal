@@ -5,12 +5,26 @@ import {
   convertParsedEventToCalendarEvent,
   isEventModified,
 } from "../lib/ics-parser";
+import { Prisma } from "../generated/prisma/index.js";
+import type {
+  CalendarSubscriptionSyncResponse,
+  CreateCalendarSubscriptionRequest,
+  ImportIcsRequest,
+  ImportIcsResponse,
+  UpdateCalendarSubscriptionRequest,
+} from "@workspace/calendar-ics";
 import { requireAuth } from "../lib/auth-guard";
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:subscriptions");
+
+type SyncableSubscription = Prisma.CalendarSubscriptionGetPayload<{
+  include: {
+    calendar: true;
+  };
+}>;
 
 export const subscriptionsRoute = new Elysia()
   .use(requireAuth)
@@ -51,7 +65,7 @@ export const subscriptionsRoute = new Elysia()
     async ({ body, user, request }: any) => {
       // Robust user check with fallback
       user = await ensureAuthenticatedUser(user, request as Request);
-      const { name, url, calendarId } = body;
+      const { name, url, calendarId } = body as CreateCalendarSubscriptionRequest;
 
       // Check if URL is already subscribed by this user
       const existingSubscription = await prisma.calendarSubscription.findFirst({
@@ -193,7 +207,8 @@ export const subscriptionsRoute = new Elysia()
       // Robust user check with fallback
       user = await ensureAuthenticatedUser(user, request as Request);
       const { id } = params;
-      const { name, isActive, syncIntervalMinutes } = body;
+      const { name, isActive, syncIntervalMinutes } =
+        body as UpdateCalendarSubscriptionRequest;
 
       const subscription = await prisma.calendarSubscription.findFirst({
         where: {
@@ -343,7 +358,7 @@ export const subscriptionsRoute = new Elysia()
     async ({ body, user, request }: any) => {
       // Robust user check with fallback
       user = await ensureAuthenticatedUser(user, request as Request);
-      const { calendarId, icsContent, fileName } = body;
+      const { calendarId, icsContent, fileName } = body as ImportIcsRequest;
 
       // Verify calendar belongs to user
       const calendar = await prisma.calendar.findFirst({
@@ -417,7 +432,7 @@ export const subscriptionsRoute = new Elysia()
         }
       }
 
-      return {
+      const response: ImportIcsResponse = {
         success: true,
         eventsCreated: createdEvents.length,
         eventsTotal: parseResult.events.length,
@@ -425,6 +440,8 @@ export const subscriptionsRoute = new Elysia()
         calendarName: parseResult.calendarName,
         errors: errors.length > 0 ? errors : undefined,
       };
+
+      return response;
     },
     {
       body: t.Object({
@@ -442,7 +459,9 @@ export const subscriptionsRoute = new Elysia()
   );
 
 // Sync function for individual subscription
-export async function syncCalendarSubscription(subscription: any) {
+export async function syncCalendarSubscription(
+  subscription: SyncableSubscription,
+): Promise<CalendarSubscriptionSyncResponse> {
   const syncLog = await prisma.calendarSyncLog.create({
     data: {
       subscriptionId: subscription.id,
@@ -562,7 +581,10 @@ export async function syncCalendarSubscription(subscription: any) {
             end: parsedEvent.end,
             allDay: parsedEvent.allDay,
             location: parsedEvent.location,
-            recurrence: parsedEvent.recurrence,
+            recurrence: parsedEvent.recurrence
+              ? JSON.stringify(parsedEvent.recurrence)
+              : null,
+            timezone: parsedEvent.timezone || "UTC",
             syncedAt: new Date(),
           },
         });

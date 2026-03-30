@@ -1,0 +1,21 @@
+{
+  "name": "@workspace/calendar-ics",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "node-ical": "^0.20.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./recurrence": "./src/recurrence.ts",
+    "./parse-ics": "./src/parse-ics.ts"
+  }
+}

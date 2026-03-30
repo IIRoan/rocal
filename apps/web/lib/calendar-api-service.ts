@@ -27,6 +27,13 @@ import {
   NotificationStatus,
   EventNotification,
   CreateNotificationRequest,
+  CalendarSubscription,
+  CreateSubscriptionRequest,
+  UpdateSubscriptionRequest,
+  DeleteSubscriptionResponse,
+  SyncSubscriptionResponse,
+  ImportICSRequest,
+  ImportICSResponse,
 } from "./types/calendar";
 // Browser notifications removed
 
@@ -481,27 +488,12 @@ export class CalendarApiService {
   }
 
   // ICS Import
-  async importICS(request: {
-    calendarId: string;
-    icsContent: string;
-    fileName?: string;
-  }): Promise<{
-    success: boolean;
-    eventsCreated: number;
-    eventsTotal: number;
-    fileName?: string;
-    calendarName?: string;
-    errors?: string[];
-  }> {
+  async importICS(request: ImportICSRequest): Promise<ImportICSResponse> {
     try {
-      const response = await this.client.post<{
-        success: boolean;
-        eventsCreated: number;
-        eventsTotal: number;
-        fileName?: string;
-        calendarName?: string;
-        errors?: string[];
-      }>("/api/subscriptions/import-ics", request);
+      const response = await this.client.post<ImportICSResponse>(
+        "/api/subscriptions/import-ics",
+        request,
+      );
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to import ICS file");
@@ -509,22 +501,21 @@ export class CalendarApiService {
   }
 
   // Calendar Subscriptions API methods
-  async getSubscriptions(): Promise<any[]> {
+  async getSubscriptions(): Promise<CalendarSubscription[]> {
     try {
-      const response = await this.client.get<any[]>("/api/subscriptions");
+      const response =
+        await this.client.get<CalendarSubscription[]>("/api/subscriptions");
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to load subscriptions");
     }
   }
 
-  async createSubscription(request: {
-    name?: string;
-    url: string;
-    calendarId: string;
-  }): Promise<any> {
+  async createSubscription(
+    request: CreateSubscriptionRequest,
+  ): Promise<CalendarSubscription> {
     try {
-      const response = await this.client.post<any>(
+      const response = await this.client.post<CalendarSubscription>(
         "/api/subscriptions",
         request,
       );
@@ -536,14 +527,10 @@ export class CalendarApiService {
 
   async updateSubscription(
     id: string,
-    request: {
-      name?: string;
-      isActive?: boolean;
-      syncIntervalMinutes?: number;
-    },
-  ): Promise<any> {
+    request: UpdateSubscriptionRequest,
+  ): Promise<CalendarSubscription> {
     try {
-      const response = await this.client.put<any>(
+      const response = await this.client.put<CalendarSubscription>(
         `/api/subscriptions/${id}`,
         request,
       );
@@ -556,12 +543,12 @@ export class CalendarApiService {
   async deleteSubscription(
     id: string,
     deleteEvents = false,
-  ): Promise<{ success: boolean }> {
+  ): Promise<DeleteSubscriptionResponse> {
     try {
       const params = new URLSearchParams();
       if (deleteEvents) params.append("deleteEvents", "true");
 
-      const response = await this.client.delete<{ success: boolean }>(
+      const response = await this.client.delete<DeleteSubscriptionResponse>(
         `/api/subscriptions/${id}?${params}`,
       );
       return response;
@@ -570,21 +557,12 @@ export class CalendarApiService {
     }
   }
 
-  async syncSubscription(id: string): Promise<{
-    status: string;
-    eventsAdded?: number;
-    eventsUpdated?: number;
-    eventsDeleted?: number;
-    errors?: string[];
-  }> {
+  async syncSubscription(id: string): Promise<SyncSubscriptionResponse> {
     try {
-      const response = await this.client.post<{
-        status: string;
-        eventsAdded?: number;
-        eventsUpdated?: number;
-        eventsDeleted?: number;
-        errors?: string[];
-      }>(`/api/subscriptions/${id}/sync`, {});
+      const response = await this.client.post<SyncSubscriptionResponse>(
+        `/api/subscriptions/${id}/sync`,
+        {},
+      );
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
