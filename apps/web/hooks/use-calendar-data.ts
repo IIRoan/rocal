@@ -1,6 +1,5 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { calendarApiService } from "../lib/calendar-api-service";
 import {
   CalendarEvent,
@@ -16,17 +15,7 @@ import {
   EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar";
-
-interface DateRange {
-  start: Date;
-  end: Date;
-}
-
-function normalizeDateRange(dateRange: DateRange): DateRange {
-  const start = startOfWeek(startOfMonth(dateRange.start), { weekStartsOn: 1 });
-  const end = endOfWeek(endOfMonth(dateRange.end), { weekStartsOn: 1 });
-  return { start, end };
-}
+import { useCalendarEventsLoader, type DateRange } from "./use-calendar-events-loader";
 
 interface UseCalendarDataOptions {
   initialDateRange?: DateRange;
@@ -94,54 +83,6 @@ export interface UseCalendarDataReturn {
   ) => Promise<void>;
 }
 
-// Validate and clean events: remove duplicates, drop invalid/out-of-range
-function validateAndCleanEvents(
-  items: CalendarEvent[],
-  range: DateRange,
-): { cleanedEvents: CalendarEvent[]; issues: string[]; valid: boolean } {
-  const seen = new Set<string>();
-  const cleaned: CalendarEvent[] = [];
-  let duplicates = 0;
-  let invalidDates = 0;
-  let outOfRange = 0;
-
-  for (const e of items) {
-    // Ensure dates are Date objects (TanStack Query might return serialized dates if not handled)
-    // The API service handles this, but good to be safe
-    const start = e.start instanceof Date ? e.start : new Date(e.start);
-    const end = e.end instanceof Date ? e.end : new Date(e.end);
-
-    const startOk = !isNaN(start.getTime());
-    const endOk = !isNaN(end.getTime());
-
-    if (!startOk || !endOk || start > end) {
-      invalidDates++;
-      continue;
-    }
-
-    // Accept events that intersect the requested range
-    const intersects = start <= range.end && end >= range.start;
-    if (!intersects) {
-      outOfRange++;
-      continue;
-    }
-
-    if (seen.has(e.id)) {
-      duplicates++;
-      continue;
-    }
-    seen.add(e.id);
-    cleaned.push({ ...e, start, end });
-  }
-
-  const issues: string[] = [];
-  if (duplicates) issues.push(`duplicates:${duplicates}`);
-  if (invalidDates) issues.push(`invalidDates:${invalidDates}`);
-  if (outOfRange) issues.push(`outOfRange:${outOfRange}`);
-
-  return { cleanedEvents: cleaned, issues, valid: invalidDates === 0 };
-}
-
 export function useCalendarData(
   options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
@@ -151,11 +92,20 @@ export function useCalendarData(
     autoRefetch = true,
   } = options;
 
-  const [currentDateRange, setCurrentDateRange] = useState<DateRange | null>(
-    initialDateRange || null,
-  );
-
   const queryClient = useQueryClient();
+
+  const {
+    events,
+    eventsLoading,
+    eventsError,
+    setDateRange,
+    refetchEvents,
+  } = useCalendarEventsLoader({
+    initialDateRange,
+    cacheTimeout,
+    autoRefetch,
+    preloadMonthsAhead: 2,
+  });
 
   // --- Queries ---
 
@@ -170,26 +120,6 @@ export function useCalendarData(
     queryKey: ["categories"],
     queryFn: () => calendarApiService.getCategories(),
     enabled: autoRefetch,
-    staleTime: cacheTimeout,
-  });
-
-  const eventsQuery = useQuery({
-    queryKey: ["events", currentDateRange],
-    queryFn: async () => {
-      if (!currentDateRange) return [];
-      const res = await calendarApiService.getEvents(
-        currentDateRange.start,
-        currentDateRange.end,
-      );
-      const { cleanedEvents } = validateAndCleanEvents(
-        res.events,
-        currentDateRange,
-      );
-      return cleanedEvents;
-    },
-    enabled: autoRefetch && !!currentDateRange,
-    placeholderData: (previousData: CalendarEvent[] | undefined) =>
-      previousData,
     staleTime: cacheTimeout,
   });
 
@@ -288,18 +218,6 @@ export function useCalendarData(
 
   // --- Actions ---
 
-  const refetchEvents = useCallback(
-    async (dateRange?: DateRange) => {
-      if (dateRange) {
-        setCurrentDateRange(dateRange);
-        // The query will automatically refetch when currentDateRange changes
-      } else {
-        await eventsQuery.refetch();
-      }
-    },
-    [eventsQuery],
-  );
-
   const refetchCalendars = useCallback(async () => {
     const res = await calendarsQuery.refetch();
     return res.data || [];
@@ -311,30 +229,16 @@ export function useCalendarData(
 
   const refetch = useCallback(async () => {
     await Promise.all([
-      eventsQuery.refetch(),
+      refetchEvents(),
       calendarsQuery.refetch(),
       categoriesQuery.refetch(),
     ]);
-  }, [eventsQuery, calendarsQuery, categoriesQuery]);
+  }, [refetchEvents, calendarsQuery, categoriesQuery]);
 
   const clearCache = useCallback(() => {
     queryClient.invalidateQueries();
     queryClient.clear();
   }, [queryClient]);
-
-  const setDateRange = useCallback((dateRange: DateRange) => {
-    const normalized = normalizeDateRange(dateRange);
-    setCurrentDateRange((prev) => {
-      if (
-        prev &&
-        prev.start.getTime() === normalized.start.getTime() &&
-        prev.end.getTime() === normalized.end.getTime()
-      ) {
-        return prev;
-      }
-      return normalized;
-    });
-  }, []);
 
   // --- Notification Handlers ---
 
@@ -377,24 +281,24 @@ export function useCalendarData(
 
   return {
     // Data
-    events: eventsQuery.data || [],
+    events,
     calendars: calendarsQuery.data || [],
     categories: categoriesQuery.data || [],
 
     // Loading states
     loading:
-      eventsQuery.isLoading ||
+      eventsLoading ||
       calendarsQuery.isLoading ||
       categoriesQuery.isLoading,
-    eventsLoading: eventsQuery.isLoading,
+    eventsLoading,
     calendarsLoading: calendarsQuery.isLoading,
     categoriesLoading: categoriesQuery.isLoading,
 
     // Error states
-    error: (eventsQuery.error ||
+    error: (eventsError ||
       calendarsQuery.error ||
       categoriesQuery.error) as unknown as ApiError | null,
-    eventsError: eventsQuery.error as unknown as ApiError | null,
+    eventsError,
     calendarsError: calendarsQuery.error as unknown as ApiError | null,
     categoriesError: categoriesQuery.error as unknown as ApiError | null,
 
