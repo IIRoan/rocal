@@ -65,6 +65,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
             interval: t.Number({ minimum: 1, maximum: 999 }),
             count: t.Optional(t.Number({ minimum: 1 })),
             until: t.Optional(t.String({ description: "ISO date string" })),
+            timezone: t.Optional(t.String()),
             byWeekDay: t.Optional(
               t.Array(t.Number({ minimum: 0, maximum: 6 })),
             ),
@@ -174,6 +175,7 @@ export const recurringRoutes = new Elysia({ prefix: "/recurring" })
             interval: t.Number({ minimum: 1, maximum: 999 }),
             count: t.Optional(t.Number({ minimum: 1 })),
             until: t.Optional(t.String()),
+            timezone: t.Optional(t.String()),
             byWeekDay: t.Optional(
               t.Array(t.Number({ minimum: 0, maximum: 6 })),
             ),

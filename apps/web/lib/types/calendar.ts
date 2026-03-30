@@ -1,3 +1,14 @@
+import type {
+  CalendarSubscriptionSummary,
+  CalendarSubscriptionSyncResponse,
+  CreateCalendarSubscriptionRequest,
+  DeleteCalendarSubscriptionResponse,
+  ImportIcsRequest,
+  ImportIcsResponse,
+  UpdateCalendarSubscriptionRequest,
+} from "@workspace/calendar-ics";
+import type { RecurrenceRule as SharedRecurrenceRule } from "@workspace/calendar-ics/recurrence";
+
 // Calendar API types matching backend structure
 
 export type EventColor =
@@ -160,15 +171,7 @@ export interface UpdateSettingsRequest extends Partial<
 // Recurring Events Types
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
-export interface RecurrenceRule {
-  frequency: RecurrenceFrequency;
-  interval: number;
-  count?: number;
-  until?: string; // ISO date string
-  byWeekDay?: number[]; // 0-6 (Sunday-Saturday)
-  byMonthDay?: number[]; // 1-31
-  byMonth?: number[]; // 1-12
-}
+export type RecurrenceRule = SharedRecurrenceRule;
 
 export interface RecurrencePreview {
   instances: Array<{
@@ -275,3 +278,12 @@ export interface NotificationStatus {
   checkInterval: string;
   queueProcessInterval: string;
 }
+
+// ICS and Subscription API Types (shared with backend)
+export type CalendarSubscription = CalendarSubscriptionSummary;
+export type CreateSubscriptionRequest = CreateCalendarSubscriptionRequest;
+export type UpdateSubscriptionRequest = UpdateCalendarSubscriptionRequest;
+export type DeleteSubscriptionResponse = DeleteCalendarSubscriptionResponse;
+export type SyncSubscriptionResponse = CalendarSubscriptionSyncResponse;
+export type ImportICSRequest = ImportIcsRequest;
+export type ImportICSResponse = ImportIcsResponse;

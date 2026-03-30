@@ -9,6 +9,7 @@ import type {
   CreateCalendarRequest,
   UpdateCalendarRequest,
   CalendarDeleteAction,
+  ImportICSResponse,
 } from "@/lib/types/calendar";
 import {
   Dialog,
@@ -109,11 +110,9 @@ export function CalendarManagement({
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importCalendarId, setImportCalendarId] = useState<string>("");
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importResult, setImportResult] = useState<{
-    eventsCreated: number;
-    eventsTotal: number;
-    errors?: string[];
-  } | null>(null);
+  const [importResult, setImportResult] = useState<ImportICSResponse | null>(
+    null,
+  );
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
@@ -158,11 +157,7 @@ export function CalendarManagement({
       });
     },
     onSuccess: async (response) => {
-      setImportResult({
-        eventsCreated: response.eventsCreated,
-        eventsTotal: response.eventsTotal,
-        errors: response.errors,
-      });
+      setImportResult(response);
 
       if (response.eventsCreated > 0) {
         setSuccess(
