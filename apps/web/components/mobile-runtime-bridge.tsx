@@ -6,7 +6,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Keyboard, KeyboardResize } from "@capacitor/keyboard";
 import { StatusBar, Style } from "@capacitor/status-bar";
-import { IonApp, setupIonicReact } from "@ionic/react";
+import { setupIonicReact } from "@ionic/react";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { getApiBaseUrl } from "@/lib/api-url";
@@ -181,11 +181,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
 
       appUrlOpenHandle = await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
         console.log("[mobile-auth] appUrlOpen", { url });
-        try {
-          void Browser.close();
-        } catch {
-          // Browser might already be closed or unsupported
-        }
+        void Browser.close().catch(() => undefined);
         
         const deepLinkUrl = new URL(url);
         const handoffToken = deepLinkUrl.searchParams.get("ott");
@@ -363,7 +359,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
   }
 
   return (
-    <IonApp data-mobile-auth-error={authErrorMessage || undefined}>
+    <>
       {children}
       {isProcessingAuth && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
@@ -373,6 +369,6 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
           </div>
         </div>
       )}
-    </IonApp>
+    </>
   );
 }

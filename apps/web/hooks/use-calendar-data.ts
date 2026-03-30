@@ -15,7 +15,7 @@ import {
   ApiError,
   EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
-import { EventNotification } from "@workspace/ui/components/calendar/notification-manager";
+import { EventNotification } from "@workspace/ui/components/calendar";
 
 interface DateRange {
   start: Date;

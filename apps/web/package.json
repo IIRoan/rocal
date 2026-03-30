@@ -47,6 +47,7 @@
     "@swc/helpers": "^0.5.17",
     "@tanstack/react-query": "^5.90.12",
     "@workspace/logger": "0.10.0",
+    "@workspace/mobile-ui": "workspace:*",
     "ai": "^6.0.116",
     "better-auth": "^1.5.5",
     "better-call": "^2.0.2",

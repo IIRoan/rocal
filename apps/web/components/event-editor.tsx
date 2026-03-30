@@ -5,11 +5,13 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import type {
   CalendarEvent,
   Calendar,
-} from "@workspace/ui/components/calendar/types";
+} from "@workspace/ui/components/calendar";
 import { format } from "date-fns";
 import type { UserSettings } from "@/lib/types/calendar";
-import { NotificationManager } from "@workspace/ui/components/calendar/notification-manager";
-import { formatEventDescription } from "@workspace/ui/components/calendar";
+import {
+  NotificationManager,
+  formatEventDescription,
+} from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
 import { RecurringDeleteModal } from "./command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
@@ -1361,3 +1363,4 @@ function EventEditorFooter({
     </div>
   );
 }
+

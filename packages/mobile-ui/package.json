@@ -1,7 +1,12 @@
 {
-  "name": "mobile-ui",
+  "name": "@workspace/mobile-ui",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./MobilePage": "./src/MobilePage.tsx"
+  },
   "scripts": {
     "test": "jest"
   },

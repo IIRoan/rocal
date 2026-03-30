@@ -5,7 +5,7 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Label } from "@workspace/ui/components/ui/label";
 import { RotateCcw, Edit3, Trash2, Calendar, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
-import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
+import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 interface RecurringEventOptionsProps {
   event: CalendarEvent;
@@ -216,3 +216,4 @@ export function RecurringEventOptions({
     </div>
   );
 }
+
