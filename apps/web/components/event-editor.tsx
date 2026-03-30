@@ -15,7 +15,9 @@ import {
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
 import { RecurringDeleteModal } from "./command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
+import { calendarApiService } from "@/lib/calendar-api-service";
 import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocompletetimepicker";
+import { toast } from "sonner";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -103,6 +105,7 @@ import {
   Plus,
   ArrowLeft,
   ChevronRight,
+  Download,
 } from "lucide-react";
 
 import type { EventEditorMode } from "./command-palette-context";
@@ -239,6 +242,19 @@ export function EventEditor({
     eventForm.handleRecurringDeleteThis(calendarData);
   const handleRecurringDeleteAll = () =>
     eventForm.handleRecurringDeleteAll(calendarData);
+  const handleEventDownloadIcs = useCallback(async () => {
+    if (!eventForm.selectedEvent?.id) {
+      return;
+    }
+
+    try {
+      await calendarApiService.downloadEventICS(eventForm.selectedEvent.id);
+    } catch (error: any) {
+      const errorMessage =
+        error?.message || "Failed to download event as ICS file";
+      toast.error(errorMessage);
+    }
+  }, [eventForm.selectedEvent?.id]);
 
   const isViewMode = eventForm.eventViewMode === "view";
   const isMobile = useIsMobile();
@@ -299,6 +315,7 @@ export function EventEditor({
               onBack={onBack}
               handleEventSave={handleEventSave}
               handleEventDelete={handleEventDelete}
+              handleEventDownloadIcs={handleEventDownloadIcs}
             />
           </DrawerContent>
         </Drawer>
@@ -326,6 +343,7 @@ export function EventEditor({
         onBack={onBack}
         handleEventSave={handleEventSave}
         handleEventDelete={handleEventDelete}
+        handleEventDownloadIcs={handleEventDownloadIcs}
         recurringModal={recurringModal}
       />
     );
@@ -413,6 +431,7 @@ export function EventEditor({
           onBack={onBack}
           handleEventSave={handleEventSave}
           handleEventDelete={handleEventDelete}
+          handleEventDownloadIcs={handleEventDownloadIcs}
           desktop
           onClose={() => onOpenChange(false)}
         />
@@ -440,6 +459,7 @@ interface EventEditorPopoverProps {
   onBack: () => void;
   handleEventSave: () => void;
   handleEventDelete: () => void;
+  handleEventDownloadIcs: () => void;
   recurringModal: React.ReactNode;
 }
 
@@ -459,6 +479,7 @@ function EventEditorPopover({
   onBack,
   handleEventSave,
   handleEventDelete,
+  handleEventDownloadIcs,
   recurringModal,
 }: EventEditorPopoverProps) {
   const popoverRef = React.useRef<HTMLDivElement>(null);
@@ -659,6 +680,7 @@ function EventEditorPopover({
           onBack={onBack}
           handleEventSave={handleEventSave}
           handleEventDelete={handleEventDelete}
+          handleEventDownloadIcs={handleEventDownloadIcs}
           desktop
           onClose={() => onOpenChange(false)}
         />
@@ -1209,6 +1231,7 @@ interface FooterProps {
   onBack?: () => void;
   handleEventSave: () => void;
   handleEventDelete: () => void;
+  handleEventDownloadIcs: () => void;
   desktop?: boolean;
   onClose?: () => void;
 }
@@ -1219,6 +1242,7 @@ function EventEditorFooter({
   onBack,
   handleEventSave,
   handleEventDelete,
+  handleEventDownloadIcs,
   desktop,
   onClose,
 }: FooterProps) {
@@ -1254,6 +1278,15 @@ function EventEditorFooter({
                 </Button>
               )}
             <div className="flex-1" />
+            {eventForm.selectedEvent?.id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEventDownloadIcs}
+              >
+                <Download className="h-4 w-4" /> ICS
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={onClose}>
               Close
             </Button>
@@ -1316,6 +1349,11 @@ function EventEditorFooter({
             </Button>
           )}
           <div className="flex-1" />
+          {eventForm.selectedEvent?.id && (
+            <Button variant="outline" onClick={handleEventDownloadIcs}>
+              <Download className="h-4 w-4 mr-2" /> ICS
+            </Button>
+          )}
           <Button variant="outline" onClick={onBack}>
             Close
           </Button>

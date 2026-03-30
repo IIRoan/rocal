@@ -7090,6 +7090,8 @@ export namespace Prisma {
     color: string | null
     isVisible: boolean | null
     isDefault: boolean | null
+    icsShareToken: string | null
+    icsShareEnabled: boolean | null
     userId: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -7101,6 +7103,8 @@ export namespace Prisma {
     color: string | null
     isVisible: boolean | null
     isDefault: boolean | null
+    icsShareToken: string | null
+    icsShareEnabled: boolean | null
     userId: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -7112,6 +7116,8 @@ export namespace Prisma {
     color: number
     isVisible: number
     isDefault: number
+    icsShareToken: number
+    icsShareEnabled: number
     userId: number
     createdAt: number
     updatedAt: number
@@ -7125,6 +7131,8 @@ export namespace Prisma {
     color?: true
     isVisible?: true
     isDefault?: true
+    icsShareToken?: true
+    icsShareEnabled?: true
     userId?: true
     createdAt?: true
     updatedAt?: true
@@ -7136,6 +7144,8 @@ export namespace Prisma {
     color?: true
     isVisible?: true
     isDefault?: true
+    icsShareToken?: true
+    icsShareEnabled?: true
     userId?: true
     createdAt?: true
     updatedAt?: true
@@ -7147,6 +7157,8 @@ export namespace Prisma {
     color?: true
     isVisible?: true
     isDefault?: true
+    icsShareToken?: true
+    icsShareEnabled?: true
     userId?: true
     createdAt?: true
     updatedAt?: true
@@ -7231,6 +7243,8 @@ export namespace Prisma {
     color: string
     isVisible: boolean
     isDefault: boolean
+    icsShareToken: string | null
+    icsShareEnabled: boolean
     userId: string
     createdAt: Date
     updatedAt: Date
@@ -7259,6 +7273,8 @@ export namespace Prisma {
     color?: boolean
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: boolean
+    icsShareEnabled?: boolean
     userId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -7275,6 +7291,8 @@ export namespace Prisma {
     color?: boolean
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: boolean
+    icsShareEnabled?: boolean
     userId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -7287,6 +7305,8 @@ export namespace Prisma {
     color?: boolean
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: boolean
+    icsShareEnabled?: boolean
     userId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -7299,12 +7319,14 @@ export namespace Prisma {
     color?: boolean
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: boolean
+    icsShareEnabled?: boolean
     userId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "color" | "isVisible" | "isDefault" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
+  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "color" | "isVisible" | "isDefault" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
   export type CalendarInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     events?: boolean | Calendar$eventsArgs<ExtArgs>
@@ -7333,6 +7355,8 @@ export namespace Prisma {
       color: string
       isVisible: boolean
       isDefault: boolean
+      icsShareToken: string | null
+      icsShareEnabled: boolean
       userId: string
       createdAt: Date
       updatedAt: Date
@@ -7768,6 +7792,8 @@ export namespace Prisma {
     readonly color: FieldRef<"Calendar", 'String'>
     readonly isVisible: FieldRef<"Calendar", 'Boolean'>
     readonly isDefault: FieldRef<"Calendar", 'Boolean'>
+    readonly icsShareToken: FieldRef<"Calendar", 'String'>
+    readonly icsShareEnabled: FieldRef<"Calendar", 'Boolean'>
     readonly userId: FieldRef<"Calendar", 'String'>
     readonly createdAt: FieldRef<"Calendar", 'DateTime'>
     readonly updatedAt: FieldRef<"Calendar", 'DateTime'>
@@ -21333,6 +21359,8 @@ export namespace Prisma {
     color: 'color',
     isVisible: 'isVisible',
     isDefault: 'isDefault',
+    icsShareToken: 'icsShareToken',
+    icsShareEnabled: 'icsShareEnabled',
     userId: 'userId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
@@ -21955,6 +21983,8 @@ export namespace Prisma {
     color?: StringFilter<"Calendar"> | string
     isVisible?: BoolFilter<"Calendar"> | boolean
     isDefault?: BoolFilter<"Calendar"> | boolean
+    icsShareToken?: StringNullableFilter<"Calendar"> | string | null
+    icsShareEnabled?: BoolFilter<"Calendar"> | boolean
     userId?: StringFilter<"Calendar"> | string
     createdAt?: DateTimeFilter<"Calendar"> | Date | string
     updatedAt?: DateTimeFilter<"Calendar"> | Date | string
@@ -21970,6 +22000,8 @@ export namespace Prisma {
     color?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
+    icsShareToken?: SortOrderInput | SortOrder
+    icsShareEnabled?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -21981,6 +22013,7 @@ export namespace Prisma {
 
   export type CalendarWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    icsShareToken?: string
     userId_name?: CalendarUserIdNameCompoundUniqueInput
     AND?: CalendarWhereInput | CalendarWhereInput[]
     OR?: CalendarWhereInput[]
@@ -21989,6 +22022,7 @@ export namespace Prisma {
     color?: StringFilter<"Calendar"> | string
     isVisible?: BoolFilter<"Calendar"> | boolean
     isDefault?: BoolFilter<"Calendar"> | boolean
+    icsShareEnabled?: BoolFilter<"Calendar"> | boolean
     userId?: StringFilter<"Calendar"> | string
     createdAt?: DateTimeFilter<"Calendar"> | Date | string
     updatedAt?: DateTimeFilter<"Calendar"> | Date | string
@@ -21996,7 +22030,7 @@ export namespace Prisma {
     events?: CalendarEventListRelationFilter
     sharedCalendars?: CalendarSharingListRelationFilter
     subscriptions?: CalendarSubscriptionListRelationFilter
-  }, "id" | "userId_name">
+  }, "id" | "icsShareToken" | "userId_name">
 
   export type CalendarOrderByWithAggregationInput = {
     id?: SortOrder
@@ -22004,6 +22038,8 @@ export namespace Prisma {
     color?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
+    icsShareToken?: SortOrderInput | SortOrder
+    icsShareEnabled?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22021,6 +22057,8 @@ export namespace Prisma {
     color?: StringWithAggregatesFilter<"Calendar"> | string
     isVisible?: BoolWithAggregatesFilter<"Calendar"> | boolean
     isDefault?: BoolWithAggregatesFilter<"Calendar"> | boolean
+    icsShareToken?: StringNullableWithAggregatesFilter<"Calendar"> | string | null
+    icsShareEnabled?: BoolWithAggregatesFilter<"Calendar"> | boolean
     userId?: StringWithAggregatesFilter<"Calendar"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Calendar"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Calendar"> | Date | string
@@ -23403,6 +23441,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutCalendarsInput
@@ -23417,6 +23457,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     userId: string
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -23431,6 +23473,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutCalendarsNestedInput
@@ -23445,6 +23489,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23459,6 +23505,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     userId: string
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -23470,6 +23518,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -23480,6 +23530,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -25002,6 +25054,8 @@ export namespace Prisma {
     color?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
+    icsShareToken?: SortOrder
+    icsShareEnabled?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -25013,6 +25067,8 @@ export namespace Prisma {
     color?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
+    icsShareToken?: SortOrder
+    icsShareEnabled?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -25024,6 +25080,8 @@ export namespace Prisma {
     color?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
+    icsShareToken?: SortOrder
+    icsShareEnabled?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -27068,6 +27126,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     events?: CalendarEventCreateNestedManyWithoutCalendarInput
@@ -27081,6 +27141,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     events?: CalendarEventUncheckedCreateNestedManyWithoutCalendarInput
@@ -27420,6 +27482,8 @@ export namespace Prisma {
     color?: StringFilter<"Calendar"> | string
     isVisible?: BoolFilter<"Calendar"> | boolean
     isDefault?: BoolFilter<"Calendar"> | boolean
+    icsShareToken?: StringNullableFilter<"Calendar"> | string | null
+    icsShareEnabled?: BoolFilter<"Calendar"> | boolean
     userId?: StringFilter<"Calendar"> | string
     createdAt?: DateTimeFilter<"Calendar"> | Date | string
     updatedAt?: DateTimeFilter<"Calendar"> | Date | string
@@ -28277,6 +28341,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutCalendarsInput
@@ -28290,6 +28356,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     userId: string
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -28485,6 +28553,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutCalendarsNestedInput
@@ -28498,6 +28568,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -28928,6 +29000,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutCalendarsInput
@@ -28941,6 +29015,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     userId: string
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -28970,6 +29046,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutCalendarsNestedInput
@@ -28983,6 +29061,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -29379,6 +29459,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutCalendarsInput
@@ -29392,6 +29474,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     userId: string
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -29506,6 +29590,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutCalendarsNestedInput
@@ -29519,6 +29605,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -29707,6 +29795,8 @@ export namespace Prisma {
     color: string
     isVisible?: boolean
     isDefault?: boolean
+    icsShareToken?: string | null
+    icsShareEnabled?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -29937,6 +30027,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: CalendarEventUpdateManyWithoutCalendarNestedInput
@@ -29950,6 +30042,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: CalendarEventUncheckedUpdateManyWithoutCalendarNestedInput
@@ -29963,6 +30057,8 @@ export namespace Prisma {
     color?: StringFieldUpdateOperationsInput | string
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
+    icsShareToken?: NullableStringFieldUpdateOperationsInput | string | null
+    icsShareEnabled?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

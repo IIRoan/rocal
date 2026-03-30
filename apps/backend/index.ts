@@ -10,6 +10,7 @@ import { settingsRoutes } from "./routes/settings";
 import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
+import { calendarSharingRoutes } from "./routes/calendar-sharing";
 import { calendarAssistantRoute } from "./routes/calendar-assistant";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
@@ -101,6 +102,10 @@ export const createAPI = (prefix = "") => {
               name: "Calendar Subscriptions",
               description: "External calendar subscription endpoints",
             },
+            {
+              name: "ICS Sharing",
+              description: "Calendar and event ICS export/sharing endpoints",
+            },
           ],
           components: {
             securitySchemes: {
@@ -188,6 +193,7 @@ export const createAPI = (prefix = "") => {
       },
     )
     .use(eventsRoutes)
+    .use(calendarSharingRoutes)
     .use(categoriesRoutes)
     .use(calendarsRoutes)
     .use(settingsRoutes)

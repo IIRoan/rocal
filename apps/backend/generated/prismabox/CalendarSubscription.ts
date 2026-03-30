@@ -46,6 +46,8 @@ export const CalendarSubscriptionRelations = t.Object(
         color: t.String(),
         isVisible: t.Boolean(),
         isDefault: t.Boolean(),
+        icsShareToken: __nullable__(t.String()),
+        icsShareEnabled: t.Boolean(),
         userId: t.String(),
         createdAt: t.Date(),
         updatedAt: t.Date(),

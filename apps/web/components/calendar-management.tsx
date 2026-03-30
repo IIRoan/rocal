@@ -6,6 +6,7 @@ import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/components/command-palette-context";
 import type {
   Calendar,
+  CalendarShareLink,
   CreateCalendarRequest,
   UpdateCalendarRequest,
   CalendarDeleteAction,
@@ -57,6 +58,10 @@ import {
   Upload,
   FileText,
   ExternalLink,
+  Share2,
+  Copy,
+  RefreshCw,
+  Link2,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -113,6 +118,12 @@ export function CalendarManagement({
   const [importResult, setImportResult] = useState<ImportICSResponse | null>(
     null,
   );
+  const [sharingCalendar, setSharingCalendar] = useState<Calendar | null>(null);
+  const [shareLinkInfo, setShareLinkInfo] = useState<CalendarShareLink | null>(
+    null,
+  );
+  const [shareLinkLoading, setShareLinkLoading] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
@@ -182,7 +193,9 @@ export function CalendarManagement({
   });
 
   const loading =
-    deleteCalendarMutation.isPending || importICSMutation.isPending;
+    deleteCalendarMutation.isPending ||
+    importICSMutation.isPending ||
+    shareLinkLoading;
 
   const validateCalendarForm = () => {
     const errors: { name?: string; color?: string; general?: string } = {};
@@ -374,6 +387,100 @@ export function CalendarManagement({
   const availableTargetCalendars = calendars.filter(
     (c) => c.id !== deletingCalendar?.id,
   );
+
+  const openShareDialog = async (calendar: Calendar) => {
+    setSharingCalendar(calendar);
+    setShareLinkInfo(null);
+    setError(null);
+    setSuccess(null);
+    setShareLinkLoading(true);
+
+    try {
+      const shareInfo = await calendarApiService.getCalendarShareLink(
+        calendar.id,
+      );
+      setShareLinkInfo(shareInfo);
+    } catch (err: any) {
+      setError(err.message || "Failed to load calendar share link");
+    } finally {
+      setShareLinkLoading(false);
+    }
+  };
+
+  const handleEnableShareLink = async (regenerate = false) => {
+    if (!sharingCalendar) return;
+
+    setError(null);
+    setSuccess(null);
+    setShareLinkLoading(true);
+
+    try {
+      const response = await calendarApiService.enableCalendarShareLink(
+        sharingCalendar.id,
+        { regenerate },
+      );
+      setShareLinkInfo(response);
+      setSuccess(
+        regenerate
+          ? "Calendar share link regenerated successfully"
+          : "Calendar share link enabled successfully",
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to enable calendar share link");
+    } finally {
+      setShareLinkLoading(false);
+    }
+  };
+
+  const handleDisableShareLink = async () => {
+    if (!sharingCalendar) return;
+
+    setError(null);
+    setSuccess(null);
+    setShareLinkLoading(true);
+
+    try {
+      await calendarApiService.disableCalendarShareLink(sharingCalendar.id);
+      setShareLinkInfo({
+        calendarId: sharingCalendar.id,
+        calendarName: sharingCalendar.name,
+        enabled: false,
+        shareUrl: null,
+      });
+      setSuccess("Calendar share link disabled successfully");
+    } catch (err: any) {
+      setError(err.message || "Failed to disable calendar share link");
+    } finally {
+      setShareLinkLoading(false);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!shareLinkInfo?.shareUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(shareLinkInfo.shareUrl);
+      setSuccess("Share link copied to clipboard");
+    } catch {
+      setError("Unable to copy link automatically. Please copy it manually.");
+    }
+  };
+
+  const handleToggleShareLink = async (enabled: boolean) => {
+    if (!sharingCalendar) return;
+
+    if (enabled) {
+      await handleEnableShareLink(false);
+      return;
+    }
+
+    await handleDisableShareLink();
+  };
+
+  const handleRegenerateShareLinkConfirmed = async () => {
+    setShowRegenerateConfirm(false);
+    await handleEnableShareLink(true);
+  };
 
   return (
     <>
@@ -613,6 +720,17 @@ export function CalendarManagement({
                           )}
 
                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openShareDialog(calendar)}
+                            title="Share calendar as ICS"
+                            className="h-8 px-2 text-xs"
+                          >
+                            <Share2 className="h-3.5 w-3.5 mr-1" />
+                            Share
+                          </Button>
+
+                          <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => {
@@ -721,6 +839,19 @@ export function CalendarManagement({
           )}
 
           <DialogFooter>
+            {editingCalendar && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const selectedCalendar = editingCalendar;
+                  setEditingCalendar(null);
+                  void openShareDialog(selectedCalendar);
+                }}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => {
@@ -982,6 +1113,144 @@ export function CalendarManagement({
         onOpenChange={setShowSubscriptionDialog}
         onBack={() => setShowSubscriptionDialog(false)}
       />
+
+      {/* Share Calendar Dialog */}
+      <Dialog
+        open={!!sharingCalendar}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSharingCalendar(null);
+            setShareLinkInfo(null);
+            setShareLinkLoading(false);
+            setShowRegenerateConfirm(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Calendar as ICS</DialogTitle>
+            <DialogDescription>
+              Enable a public .ics subscription link for{" "}
+              <strong>{sharingCalendar?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">ICS Sharing</p>
+                  <p className="text-xs text-muted-foreground">
+                    Turn this on to generate a private URL that anyone with the
+                    link can subscribe to.
+                  </p>
+                </div>
+                <Switch
+                  checked={!!shareLinkInfo?.enabled}
+                  onCheckedChange={(checked) => {
+                    void handleToggleShareLink(checked);
+                  }}
+                  disabled={shareLinkLoading}
+                />
+              </div>
+
+              {shareLinkLoading ? (
+                <div className="text-sm text-muted-foreground">
+                  Updating share settings...
+                </div>
+              ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="shareLink">Subscription URL</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="shareLink"
+                        value={shareLinkInfo.shareUrl}
+                        readOnly
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCopyShareLink}
+                      >
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowRegenerateConfirm(true)}
+                    disabled={shareLinkLoading}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Regenerate URL
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Link2 className="h-4 w-4" />
+                  Sharing is currently off. Enable it to create a subscription
+                  link.
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSharingCalendar(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showRegenerateConfirm}
+        onOpenChange={setShowRegenerateConfirm}
+      >
+        <DialogContent
+          showClose={false}
+          className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+        >
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle>Regenerate sharing URL?</DialogTitle>
+            <DialogDescription>
+              This creates a new private ICS URL for this calendar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-5 pb-4">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-sm flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                The current URL stops working immediately. Everyone using it
+                must subscribe again with the new URL.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowRegenerateConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                void handleRegenerateShareLinkConfirmed();
+              }}
+              disabled={shareLinkLoading}
+            >
+              Confirm Regenerate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

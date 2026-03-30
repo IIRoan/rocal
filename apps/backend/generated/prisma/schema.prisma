@@ -94,6 +94,8 @@ model Calendar {
   color           String // blue, orange, violet, rose, emerald
   isVisible       Boolean                @default(true) @map("is_visible")
   isDefault       Boolean                @default(false) @map("is_default")
+  icsShareToken   String?                @unique @map("ics_share_token")
+  icsShareEnabled Boolean                @default(false) @map("ics_share_enabled")
   userId          String                 @map("user_id")
   user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   events          CalendarEvent[]
