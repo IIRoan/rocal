@@ -9,7 +9,7 @@ import {
   handleCalendarDelete,
   resetCalendarForm,
 } from "@/components/command-palette/calendar-utils";
-import type { Calendar } from "@workspace/ui/components/calendar/types";
+import type { Calendar } from "@workspace/ui/components/calendar";
 
 interface UseCalendarFormProps {
   calendars: Calendar[];
@@ -275,3 +275,4 @@ export function useColorSelector({
     presetColors,
   };
 }
+
