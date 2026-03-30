@@ -17,7 +17,31 @@ const autoStartDevServer = process.env.MOBILE_DEV_AUTO_START !== "false";
 const waitTimeoutMs = 90_000;
 const pollIntervalMs = 1_000;
 
-const rawArgs = Bun.argv.slice(2);
+type BunSubprocess = {
+  kill: () => void;
+  exited: Promise<number>;
+};
+
+type BunRuntime = {
+  spawn: (cmd: string[], options: Record<string, unknown>) => BunSubprocess;
+  spawnSync: (
+    cmd: string[],
+    options: Record<string, unknown>,
+  ) => {
+    exitCode: number;
+    stdout: Uint8Array;
+    stderr: Uint8Array;
+  };
+};
+
+const bun = (globalThis as typeof globalThis & { Bun?: BunRuntime }).Bun;
+if (!bun) {
+  throw new Error(
+    "Bun runtime not available. Run this script with Bun (e.g. `bun run ./scripts/mobile-dev-wifi.ts`).",
+  );
+}
+
+const rawArgs = process.argv.slice(2);
 
 const adbConnectArg = rawArgs.find((arg) => arg.startsWith("--adb-connect="));
 const adbConnectEndpoint =
@@ -57,7 +81,7 @@ const waitForServer = async (url: string, timeoutMs: number) => {
 };
 
 const runCommand = (cmd: string[]) => {
-  const proc = Bun.spawnSync(cmd, {
+  const proc = bun.spawnSync(cmd, {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -184,7 +208,7 @@ if (targetDeviceId && !adbState.devices.includes(targetDeviceId)) {
   process.exit(1);
 }
 
-let devServerProc: Bun.Subprocess | null = null;
+let devServerProc: BunSubprocess | null = null;
 if (autoStartDevServer) {
   const alreadyRunning = await isHttpReachable(localDevUrl);
   if (!alreadyRunning) {
@@ -192,7 +216,7 @@ if (autoStartDevServer) {
       `[mobile:dev:wifi] No local dev server detected on ${localDevUrl}. Starting Next.js dev server...`,
     );
 
-    devServerProc = Bun.spawn(
+    devServerProc = bun.spawn(
       [
         "bun",
         "--bun",
@@ -258,7 +282,7 @@ if (targetDeviceId) {
 console.log(`[mobile:dev:wifi] Starting Android live reload on ${liveReloadUrl}`);
 console.log(`[mobile:dev:wifi] Running: ${command.join(" ")}`);
 
-const proc = Bun.spawn(command, {
+const proc = bun.spawn(command, {
   stdout: "inherit",
   stderr: "inherit",
   stdin: "inherit",
