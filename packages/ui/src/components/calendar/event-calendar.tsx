@@ -782,6 +782,8 @@ export function EventCalendar({
             "--event-height": `${compactView ? Math.round(EventHeight * 0.75) : EventHeight}px`,
             "--event-gap": `${compactView ? Math.round(EventGap * 0.5) : EventGap}px`,
             "--week-cells-height": `${compactView ? Math.round(WeekCellsHeight * 0.85) : WeekCellsHeight}px`,
+            "--calendar-toolbar-height": "52px",
+            "--calendar-toolbar-height-sm": "56px",
           } as React.CSSProperties
         }
         onContextMenuCapture={handleCalendarContextMenuCapture}
@@ -792,32 +794,28 @@ export function EventCalendar({
         >
           <div
             className={cn(
-              "sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-5 sm:px-4",
+              "sticky top-0 z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b flex items-center justify-between gap-2 px-2 sm:px-4",
               className,
             )}
           >
-            <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
-              <div className="flex items-center gap-1.5">
-                {onSidebarToggle && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5"
-                    onClick={onSidebarToggle}
-                  >
-                    <ListIcon size={16} />
-                    <span className="sr-only">Toggle Sidebar</span>
-                  </Button>
-                )}
-                <h2
-                  className="font-semibold text-xl transition-transform ease-in-out duration-300"
+            <div className="flex items-center gap-1.5 min-w-0">
+              {onSidebarToggle && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="peer size-7 text-muted-foreground/80 hover:text-foreground/80 hover:bg-transparent! sm:-ms-1.5"
+                  onClick={onSidebarToggle}
                 >
-                  {viewTitle}
-                </h2>
-              </div>
+                  <ListIcon size={16} />
+                  <span className="sr-only">Toggle Sidebar</span>
+                </Button>
+              )}
+              <h2 className="min-w-0 truncate font-semibold text-base sm:text-xl transition-transform ease-in-out duration-300">
+                {viewTitle}
+              </h2>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <div className="flex items-center sm:gap-2 max-sm:order-1">
                   <Button
                     variant="ghost"

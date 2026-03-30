@@ -120,6 +120,18 @@ export function WeekView({
       .filter((event) => eventOverlapsRange(event, weekStart, weekEnd, "day"));
   }, [events, weekStart, weekEnd]);
 
+  const allDayEventsByDay = useMemo(
+    () =>
+      days.map((day) =>
+        sortEvents(
+          allDayEvents.filter((event) =>
+            eventOverlapsRange(event, day, day, "day"),
+          ),
+        ),
+      ),
+    [allDayEvents, days],
+  );
+
   // Process events for each day to calculate positions
   const processedDayEvents = useMemo(() => {
     const result = days.map((day) => {
@@ -357,43 +369,34 @@ export function WeekView({
       className="flex h-full flex-col"
     >
       <div
-        className="bg-background/95 border-border/70 sticky top-0 z-40 grid grid-cols-8 border-b backdrop-blur-md uppercase"
-        style={{ top: "75px" }}
+        className="bg-background/95 border-border/70 sticky top-[var(--calendar-toolbar-height)] sm:top-[var(--calendar-toolbar-height-sm)] z-40 border-b backdrop-blur-md uppercase"
       >
-        <div className="text-muted-foreground/70 py-2 text-center text-xs">
-          <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
-        </div>
-        {days.map((day, dayIndex) => {
-          const dayAllDayEvents = sortEvents(
-            allDayEvents.filter((event) =>
-              eventOverlapsRange(event, day, day, "day"),
-            ),
-          );
-
-          return (
+        <div className="grid grid-cols-8 border-b border-border/40">
+          <div className="text-muted-foreground/70 py-2 text-center text-xs">
+            <span className="max-[479px]:sr-only">
+              {format(new Date(), "O")}
+            </span>
+          </div>
+          {days.map((day) => (
             <div
               key={day.toString()}
-              className={`text-muted-foreground/80 text-center text-xs transition-colors flex justify-center items-center py-2 ${
+              className={`text-muted-foreground/80 text-center text-xs transition-colors py-2 ${
                 isToday(day)
                   ? "text-[var(--calendar-accent)] font-semibold"
                   : ""
               }`}
               data-today={isToday(day) || undefined}
             >
-              <div className="relative inline-block">
-                {/* Day header */}
+              <div className="relative inline-block text-center">
                 <div className="flex items-center justify-center gap-1">
-                  {/* Workday icon - hidden on mobile to save space */}
                   {workingDays.includes(day.getDay()) && (
                     <Briefcase className="h-3 w-3 text-muted-foreground/80 shrink-0 max-sm:hidden" weight="bold" />
                   )}
-                  {/* Enhanced mobile-first day display */}
                   <span className="sm:hidden font-medium" aria-hidden="true">
                     {format(day, "E")[0]} {format(day, "d")}
                   </span>
                   <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
                 </div>
-                {/* Today underline */}
                 <div
                   className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-200 ${
                     isToday(day)
@@ -402,16 +405,20 @@ export function WeekView({
                   }`}
                 />
               </div>
+            </div>
+          ))}
+        </div>
 
-              {/* All-day events integrated into day header */}
-              {dayAllDayEvents.length > 0 && (
-                <div className="pb-1 px-1 space-y-1">
-                  {dayAllDayEvents.map((event) => {
+        <div className="grid grid-cols-8">
+          <div />
+          {days.map((day, dayIndex) => (
+            <div key={`all-day-${day.toString()}`} className="px-1 pb-1">
+              <div className="space-y-1">
+                {(allDayEventsByDay[dayIndex] ?? []).map((event) => {
                     const { start: eStartDay, end: eEndDay } = getEventInterval(
                       event,
                       "day",
                     );
-                    // Clip to the visible week boundaries for segment rendering
                     const weekStartDay = startOfDay(weekStart);
                     const weekEndDay = endOfDay(weekEnd);
                     const visibleStart = isBefore(eStartDay, weekStartDay)
@@ -423,8 +430,6 @@ export function WeekView({
 
                     const isFirstSegmentDay = isSameDay(day, visibleStart);
                     const isLastSegmentDay = isSameDay(day, visibleEnd);
-
-                    // Show title on the first visible day of the segment within this week
                     const shouldShowTitle = isFirstSegmentDay;
 
                     return (
@@ -441,7 +446,6 @@ export function WeekView({
                         onDelete={onEventDelete}
                         onView={onEventView}
                       >
-                        {/* Show title only on the first visible day in the current week */}
                         <div
                           className={cn(
                             "truncate text-xs",
@@ -454,11 +458,10 @@ export function WeekView({
                       </EventItem>
                     );
                   })}
-                </div>
-              )}
+              </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
       <div className="grid flex-1 grid-cols-8">
