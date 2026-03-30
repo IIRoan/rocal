@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "bun run scripts/patch-ionic-css.ts",
     "install:all": "cd apps/backend && bun install && cd ../web && bun install && cd ../notifications && bun install",
     "build": "cd apps/backend && bun run build && cd ../web && bun run build && cd ../notifications && bun run build",
     "build:backend": "cd apps/backend && bun run build",
@@ -20,11 +21,14 @@
     "dev:notifications": "cd apps/notifications && bun run dev",
     "lint": "cd apps/backend && bun run lint & cd apps/web && bun run lint & cd apps/notifications && bun run lint",
     "typecheck": "cd apps/backend && bun run typecheck & cd apps/web && bun run typecheck & cd apps/notifications && bun run typecheck",
+    "test": "jest",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
-    "minimatch": "^10.1.1",
-    "prettier": "^3.7.4",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "babel-preset-jest": "^30.3.0",
+    "minimatch": "10.1.1",
+    "prettier": "3.7.4",
     "typescript": "5.7.3"
   },
   "engines": {
@@ -32,6 +36,14 @@
     "bun": ">=1.0.0"
   },
   "dependencies": {
-    "@phosphor-icons/react": "^2.1.10"
+    "@phosphor-icons/react": "2.1.10",
+    "@testing-library/react-native": "12.4.1",
+    "babel-jest": "^30.3.0",
+    "jest-environment-jsdom": "30.3.0",
+    "jest-react-native": "^18.0.0",
+    "metro-react-native-babel-preset": "0.77.0",
+    "react-native-gesture-handler": "^2.30.0",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-web": "^0.21.2"
   }
 }

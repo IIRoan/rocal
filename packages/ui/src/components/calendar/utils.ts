@@ -10,7 +10,7 @@ import {
 import type {
   CalendarEvent,
   EventColor,
-} from "@workspace/ui/components/index.ts";
+} from "./types";
 
 /**
  * Check if a string is a valid hex color
