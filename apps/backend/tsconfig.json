@@ -11,6 +11,11 @@
     "moduleDetection": "force",
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@workspace/calendar-ics": ["../../packages/calendar-ics/src/index.ts"],
+      "@workspace/calendar-ics/*": ["../../packages/calendar-ics/src/*"]
+    }
   }
 }
