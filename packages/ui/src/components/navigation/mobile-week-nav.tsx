@@ -25,6 +25,7 @@ interface MobileWeekNavProps {
   currentView: CalendarView;
   onDateChange: (date: Date) => void;
   onTodayClick?: () => void;
+  onOpenQuickNav?: () => void;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ export function MobileWeekNav({
   currentView,
   onDateChange,
   onTodayClick,
+  onOpenQuickNav,
   className,
 }: MobileWeekNavProps) {
   const handlePrevious = () => {
@@ -163,14 +165,19 @@ export function MobileWeekNav({
           <ChevronLeft size={20} />
         </Button>
 
-        <div className="flex-1 text-center">
+        <button
+          type="button"
+          onClick={onOpenQuickNav}
+          className="flex-1 text-center rounded-md px-2 py-1 hover:bg-accent/50 active:bg-accent/70 transition-colors"
+          aria-label="Open calendar quick navigation"
+        >
           <div className="text-sm font-medium">{displayText.main}</div>
           {displayText.sub && (
             <div className="text-xs text-muted-foreground mt-0.5">
               {displayText.sub}
             </div>
           )}
-        </div>
+        </button>
 
         <div className="flex items-center gap-2">
           {!isCurrentPeriod && (

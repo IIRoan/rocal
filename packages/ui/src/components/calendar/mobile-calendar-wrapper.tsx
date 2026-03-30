@@ -7,13 +7,19 @@ import {
 } from "./mobile-event-calendar";
 import { MobileBottomNav } from "../navigation/mobile-bottom-nav";
 import { MobileWeekNav } from "../navigation/mobile-week-nav";
+import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { AppSidebar } from "../layout/app-sidebar";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "../ui/sheet";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+} from "../ui/drawer";
 import { SidebarProvider } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
-import { StickyMiniCalendar } from "./sticky-mini-calendar";
 import { CalendarView, User } from "./types";
 import { cn } from "../../lib/utils";
 
@@ -36,6 +42,7 @@ export function MobileCalendarWrapper({
   ...props
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const isMobile = useIsMobile();
   const hasInitializedMobileDate = React.useRef(false);
 
@@ -72,7 +79,8 @@ export function MobileCalendarWrapper({
   const handleDateChange = (date: Date) => setCurrentDate(date);
   const handleToday = () => setCurrentDate(new Date());
   const handleOpenSidebar = () => setIsSidebarOpen(true);
-  const handleCloseSidebar = () => setIsSidebarOpen(false);
+  const handleOpenQuickNav = () => setIsQuickNavOpen(true);
+  const handleCloseQuickNav = () => setIsQuickNavOpen(false);
   const handleOpenAddEvent = () => {
     onOpenAddEvent?.();
     setIsSidebarOpen(false);
@@ -93,31 +101,15 @@ export function MobileCalendarWrapper({
     }
   }, [props.initialView, currentView]);
 
-  const showSeparateNav = currentView === "month" || currentView === "agenda";
-  const showMiniCalendar = currentView === "day" || currentView === "week";
-
   return (
     <div className="relative flex flex-col h-full">
-      {/* Fixed Mini Calendar for day/week views */}
-      {showMiniCalendar && isMobile && (
-        <StickyMiniCalendar
-          events={props.events}
-          onDisplayMonthChange={props.onDateRangeChange}
-          onEventSelect={props.onEventEdit}
-          weekStartDay={props.weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
-          workingDays={props.workingDays}
-          timezone={props.timezone}
-          showDayStrip={currentView === "week"}
-          showAllDayEvents={currentView === "day"}
-        />
-      )}
-
-      {/* Mobile Week Navigation - only for month/agenda views */}
-      {showSeparateNav && (
+      {/* Mobile quick navigation at the top */}
+      {isMobile && (
         <MobileWeekNav
           currentDate={currentDate}
           currentView={currentView}
           onDateChange={handleDateChange}
+          onOpenQuickNav={handleOpenQuickNav}
           className="md:hidden"
         />
       )}
@@ -149,6 +141,31 @@ export function MobileCalendarWrapper({
         onToday={handleToday}
         className="md:hidden"
       />
+
+      {/* Mobile Quick Navigation Drawer */}
+      <Drawer
+        open={isQuickNavOpen}
+        onOpenChange={setIsQuickNavOpen}
+        direction="bottom"
+      >
+        <DrawerContent className="w-full p-0 sm:max-w-none max-h-[85dvh] overflow-hidden safe-area-inset-bottom">
+          <VisuallyHidden>
+            <DrawerTitle>Quick Date Navigation</DrawerTitle>
+            <DrawerDescription>
+              Select a date from the mini calendar.
+            </DrawerDescription>
+          </VisuallyHidden>
+          <div className="p-4 pt-6">
+            <SidebarCalendar
+              events={props.events}
+              onDisplayMonthChange={props.onDateRangeChange}
+              rangeChangeDebounceMs={150}
+              onDateSelect={handleCloseQuickNav}
+              isMobile={true}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Mobile Sidebar Drawer */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
