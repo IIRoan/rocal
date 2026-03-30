@@ -32,13 +32,14 @@ import {
   WeekCellsHeight,
 } from "./constants";
 import { addHoursToDate, addMinutesToDate } from "./utils";
-import { CalendarEvent, CalendarView, User } from "./types";
+import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
 import { AgendaView } from "./agenda-view";
 import { DayView } from "./day-view";
 import { MonthView } from "./month-view";
 import { WeekView } from "./week-view";
 import { MobileDayView } from "./mobile-day-view";
 import { MobileWeekView } from "./mobile-week-view";
+import { MobileThreeDayView } from "./mobile-three-day-view";
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
@@ -145,7 +146,7 @@ export function MobileEventCalendar({
   const [view, setViewState] = useState<CalendarView>(() => {
     if (typeof window !== "undefined") {
       const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
+      if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
         return savedView as CalendarView;
       }
     }
@@ -182,10 +183,10 @@ export function MobileEventCalendar({
       }
 
       if (!validSavedView && isMobile) {
-        // On mobile, always default to day view regardless of initialView
-        setViewState("day");
+        // On mobile, always default to 3-day view regardless of initialView
+        setViewState("3day");
         // Notify parent about the view change
-        onViewChange?.("day");
+        onViewChange?.("3day");
       }
     }
   }, [isMobile, onViewChange]);
@@ -216,6 +217,7 @@ export function MobileEventCalendar({
     { key: "w", action: () => setView("week") },
     { key: "d", action: () => setView("day") },
     { key: "a", action: () => setView("agenda") },
+    { key: "t", action: () => setView("3day") },
   ]);
 
   // Notify parent about the initial view on mount
@@ -261,6 +263,11 @@ export function MobileEventCalendar({
       start.setHours(0, 0, 0, 0);
       end = new Date(currentDate);
       end.setHours(23, 59, 59, 999);
+    } else if (view === "3day") {
+      start = addDays(currentDate, -1);
+      start.setHours(0, 0, 0, 0);
+      end = addDays(currentDate, 1);
+      end.setHours(23, 59, 59, 999);
     } else if (view === "agenda") {
       start = new Date(currentDate);
       end = addDays(currentDate, AgendaDaysToShow - 1);
@@ -292,6 +299,8 @@ export function MobileEventCalendar({
       newDate = subWeeks(currentDate, 1);
     } else if (view === "day") {
       newDate = addDays(currentDate, -1);
+    } else if (view === "3day") {
+      newDate = addDays(currentDate, -3);
     } else if (view === "agenda") {
       newDate = addDays(currentDate, -AgendaDaysToShow);
     } else {
@@ -310,6 +319,8 @@ export function MobileEventCalendar({
       newDate = addWeeks(currentDate, 1);
     } else if (view === "day") {
       newDate = addDays(currentDate, 1);
+    } else if (view === "3day") {
+      newDate = addDays(currentDate, 3);
     } else if (view === "agenda") {
       newDate = addDays(currentDate, AgendaDaysToShow);
     } else {
@@ -488,6 +499,14 @@ export function MobileEventCalendar({
           </span>
         </>
       );
+    } else if (view === "3day") {
+      const start = addDays(currentDate, -1);
+      const end = addDays(currentDate, 1);
+      if (isSameMonth(start, end)) {
+        return `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`;
+      } else {
+        return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+      }
     } else if (view === "agenda") {
       const start = currentDate;
       const end = addDays(currentDate, AgendaDaysToShow - 1);
@@ -652,6 +671,9 @@ export function MobileEventCalendar({
                     <DropdownMenuItem onClick={() => setView("agenda")}>
                       Agenda <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setView("3day")}>
+                      3 Days <DropdownMenuShortcut>⌘+T</DropdownMenuShortcut>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <ThemeToggle useSettingsTheme={themeSettings} />
@@ -700,6 +722,18 @@ export function MobileEventCalendar({
                   timezone={timezone}
                 />
               ))}
+            {view === "3day" && isMobile && (
+              <MobileThreeDayView
+                currentDate={currentDate}
+                events={events}
+                onEventSelect={handleEventSelect}
+                onEventCreate={handleEventCreate}
+                timeFormat={timeFormat}
+                weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+                workingDays={workingDays}
+                timezone={timezone}
+              />
+            )}
             {view === "day" &&
               (isMobile ? (
                 <MobileDayView

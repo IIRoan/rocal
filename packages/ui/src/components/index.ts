@@ -46,3 +46,4 @@ export type {
   CreateEventData,
 } from "./calendar/types";
 export type { Calendar as CalendarData } from "./calendar/types";
+export { CALENDAR_VIEWS } from "./calendar/types";

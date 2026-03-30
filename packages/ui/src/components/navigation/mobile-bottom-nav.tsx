@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChevronDown,
   Check,
+  Columns3,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { CalendarView } from "../calendar/types";
@@ -34,6 +35,7 @@ const VIEW_OPTIONS: {
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }[] = [
   { value: "day", label: "Day", shortLabel: "Day", icon: CalendarDays },
+  { value: "3day", label: "3 Days", shortLabel: "3 Days", icon: Columns3 },
   { value: "week", label: "Week", shortLabel: "Week", icon: Grid3X3 },
   { value: "month", label: "Month", shortLabel: "Month", icon: Calendar },
   { value: "agenda", label: "Agenda", shortLabel: "List", icon: LayoutGrid },

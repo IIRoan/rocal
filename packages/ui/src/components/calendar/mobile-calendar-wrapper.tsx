@@ -20,7 +20,7 @@ import { SidebarProvider } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
-import { CalendarView, User } from "./types";
+import { CalendarView, User, CALENDAR_VIEWS } from "./types";
 import { cn } from "../../lib/utils";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
@@ -49,7 +49,7 @@ export function MobileCalendarWrapper({
   const [currentView, setCurrentView] = useState<CalendarView>(() => {
     if (typeof window !== "undefined") {
       const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
+      if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
         return savedView as CalendarView;
       }
     }
@@ -62,7 +62,7 @@ export function MobileCalendarWrapper({
     if (typeof window !== "undefined") {
       const savedView = sessionStorage.getItem("calendar-view-selection");
       if (!savedView && isMobile) {
-        setCurrentView("day");
+        setCurrentView("3day");
       }
     }
   }, [isMobile]);
@@ -102,7 +102,7 @@ export function MobileCalendarWrapper({
   }, [props.initialView, currentView]);
 
   return (
-    <div className="relative flex flex-col h-full">
+    <div className="relative flex flex-col h-dvh md:h-full">
       {/* Mobile quick navigation at the top */}
       {isMobile && (
         <MobileWeekNav

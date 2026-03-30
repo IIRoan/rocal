@@ -43,6 +43,9 @@ export function MobileWeekNav({
       case "day":
         newDate = subDays(currentDate, 1);
         break;
+      case "3day":
+        newDate = subDays(currentDate, 3);
+        break;
       case "week":
         newDate = subWeeks(currentDate, 1);
         break;
@@ -63,6 +66,9 @@ export function MobileWeekNav({
     switch (currentView) {
       case "day":
         newDate = addDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = addDays(currentDate, 3);
         break;
       case "week":
         newDate = addWeeks(currentDate, 1);
@@ -91,6 +97,21 @@ export function MobileWeekNav({
           main: format(currentDate, "EEEE, MMM d"),
           sub: format(currentDate, "yyyy"),
         };
+      case "3day": {
+        const start = addDays(currentDate, -1);
+        const end = addDays(currentDate, 1);
+        if (isSameMonth(start, end)) {
+          return {
+            main: `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`,
+            sub: "3 Days",
+          };
+        } else {
+          return {
+            main: `${format(start, "MMM d")} - ${format(end, "MMM d")}`,
+            sub: format(end, "yyyy"),
+          };
+        }
+      }
       case "week":
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -131,6 +152,11 @@ export function MobileWeekNav({
     switch (currentView) {
       case "day":
         return isSameDay(currentDate, today);
+      case "3day": {
+        const start3 = addDays(currentDate, -1);
+        const end3 = addDays(currentDate, 1);
+        return today >= start3 && today <= end3;
+      }
       case "week":
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
