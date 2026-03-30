@@ -5,13 +5,13 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { differenceInDays } from "date-fns";
 
-import { CalendarEvent } from "./types";
+import { CalendarEvent, type CalendarView } from "./types";
 import { EventItem } from "./event-item";
 import { useCalendarDnd } from "./calendar-dnd-context";
 
 interface DraggableEventProps {
   event: CalendarEvent;
-  view: "month" | "week" | "day";
+  view: CalendarView;
   showTime?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   height?: number;

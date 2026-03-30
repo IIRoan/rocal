@@ -11,6 +11,7 @@ import type {
   UpdateCalendarSubscriptionRequest,
 } from "@workspace/calendar-ics";
 import type { RecurrenceRule as SharedRecurrenceRule } from "@workspace/calendar-ics/recurrence";
+import type { CalendarView } from "@workspace/ui/components/calendar";
 
 // Calendar API types matching backend structure
 
@@ -145,7 +146,7 @@ export interface UserSettings {
   id: string;
   userId: string;
   theme: "light" | "dark" | "system";
-  defaultView: "month" | "week" | "day" | "agenda";
+  defaultView: CalendarView;
   weekStartDay: number; // 0 = Sunday, 1 = Monday
   timezone: string; // IANA timezone identifier
   timeFormat: "12h" | "24h";

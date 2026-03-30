@@ -14,6 +14,7 @@ import {
 } from "@workspace/ui/components/ui/select";
 import { Calendar, Check, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
+import type { CalendarView } from "@workspace/ui/components/calendar";
 import { WORKING_DAYS, type PaletteView } from "./constants";
 
 interface CalendarDefaultsSettingsProps {
@@ -79,7 +80,7 @@ export function CalendarDefaultsSettings({
                     onValueChange={(value) =>
                       updateSetting(
                         "defaultView",
-                        value as "month" | "week" | "day" | "agenda",
+                        value as CalendarView,
                       )
                     }
                   >
@@ -89,6 +90,7 @@ export function CalendarDefaultsSettings({
                     <SelectContent>
                       <SelectItem value="month">Month</SelectItem>
                       <SelectItem value="week">Week</SelectItem>
+                      <SelectItem value="3day">3 Days</SelectItem>
                       <SelectItem value="day">Day</SelectItem>
                       <SelectItem value="agenda">Agenda</SelectItem>
                     </SelectContent>

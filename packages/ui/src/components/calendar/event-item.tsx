@@ -10,7 +10,7 @@ import {
   getEventColorClasses,
   getEventColorStyles,
 } from "./utils";
-import { CalendarEvent } from "./types";
+import { CalendarEvent, type CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 import { formatEventDescription } from "./event-description-formatter";
 import { formatInTimeZone } from "date-fns-tz";
@@ -157,7 +157,7 @@ function EventWrapper({
 
 interface EventItemProps {
   event: CalendarEvent;
-  view: "month" | "week" | "day" | "agenda";
+  view: CalendarView;
   isDragging?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   showTime?: boolean;
