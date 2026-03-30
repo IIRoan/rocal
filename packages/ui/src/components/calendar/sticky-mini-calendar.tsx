@@ -384,7 +384,10 @@ export function StickyMiniCalendar({
       </div>
 
       {/* Spacer element to push content below fixed header */}
-      <div style={{ height: headerHeight || 60 }} className="flex-shrink-0" />
+      <div
+        style={{ height: headerHeight || 60 }}
+        className="hidden flex-shrink-0 md:block"
+      />
     </>
   );
 }

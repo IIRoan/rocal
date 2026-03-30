@@ -715,7 +715,7 @@ func buildFrontendURL(path string, query map[string]string) string {
 		base = strings.TrimRight(strings.TrimSpace(os.Getenv("NEXT_PUBLIC_APP_URL")), "/")
 	}
 	if base == "" {
-		base = "http://localhost:4000"
+		base = "http://localhost:3000"
 	}
 
 	u, err := url.Parse(base)

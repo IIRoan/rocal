@@ -1,4 +1,5 @@
 import { ApiError } from "./types/calendar";
+import { getApiBaseUrl } from "./api-url";
 
 export interface HttpClientOptions {
   baseURL?: string;
@@ -19,17 +20,7 @@ export class HttpClient {
   private retryDelay: number;
 
   constructor(options: HttpClientOptions = {}) {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    // Debug logging
-    if (typeof window !== "undefined") {
-      console.log("NEXT_PUBLIC_API_URL in browser:", envUrl);
-    }
-
-    // Fallback to localhost backend
-    const fallbackUrl = "http://localhost:4001";
-
-    this.baseURL = envUrl || fallbackUrl;
+    this.baseURL = getApiBaseUrl();
     this.timeout = options.timeout || 10000; // 10 seconds
     this.retries = options.retries || 3;
     this.retryDelay = options.retryDelay || 1000; // 1 second

@@ -1,0 +1,32 @@
+{
+  "milestone": "Calendar Swipe Controls",
+  "round": 2,
+  "status": "fail",
+  "validatorsRun": {
+    "test": { "passed": false, "command": "bun run test", "exitCode": 1 },
+    "typecheck": { "passed": true, "command": "", "exitCode": 0 },
+    "lint": { "passed": true, "command": "", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "failedFeatures": ["create-mobile-calendar-component"]
+  },
+  "blockingIssues": [
+    { "featureId": "create-mobile-calendar-component", "severity": "blocking", "description": "The unit tests for the MobileCalendar component are not passing." }
+  ],
+  "appliedUpdates": [
+    { "target": "library", "description": "Added documentation on how to test React Native components that use `react-native-gesture-handler`.", "sourceFeature": "create-mobile-calendar-component" }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "The `mobile-ui-worker` skill should be updated to provide guidance on how to set up the test environment for components using `react-native-gesture-handler`.",
+      "evidence": "The handoff report for worker session 44b2c1e8-2a20-4a4d-8da2-551a0025014f states that tests are not passing. The diff shows the addition of `react-native-gesture-handler`.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [],
+  "previousRound": ".factory/validation/Calendar Swipe Controls/scrutiny/synthesis.json"
+}

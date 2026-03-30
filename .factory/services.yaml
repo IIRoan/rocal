@@ -1,0 +1,13 @@
+commands:
+  install: bun install
+  build: bun run build
+  test: bun run test
+  lint: bun run lint
+
+services:
+  web:
+    start: bun run dev
+    stop: lsof -ti :3000 | xargs kill
+    healthcheck: curl -sf http://localhost:3000
+    port: 3000
+    depends_on: []

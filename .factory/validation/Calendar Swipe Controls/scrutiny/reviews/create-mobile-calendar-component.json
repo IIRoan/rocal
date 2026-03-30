@@ -1,0 +1,33 @@
+{
+  "featureId": "create-mobile-calendar-component",
+  "reviewedAt": "2026-03-27T14:00:00Z",
+  "commitId": "09fa12e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The MobileCalendar component has been created and wraps the existing calendar with swipe controls. The implementation of the gesture handling is correct. However, the unit tests for the component are not passing, which is a blocking issue.",
+    "issues": [
+      {
+        "file": "packages/mobile-ui/src/components/MobileCalendar.test.tsx",
+        "line": 0,
+        "severity": "blocking",
+        "description": "The unit tests for the MobileCalendar component are not passing. The handoff report confirms this. Without passing tests, we cannot ensure the quality and stability of the component."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The `mobile-ui-worker` skill requires adding tests, but doesn't provide guidance on how to set up the test environment for components using `react-native-gesture-handler`. The worker was unable to get the tests to pass and had to resort to manual verification.",
+      "evidence": "The handoff report for worker session 44b2c1e8-2a20-4a4d-8da2-551a0025014f states that tests are not passing. The diff shows the addition of `react-native-gesture-handler`."
+    },
+    {
+        "area": "knowledge",
+        "observation": "There appears to be a knowledge gap in the project on how to effectively test components that use `react-native-gesture-handler`. Documenting this would save future development time.",
+        "evidence": "The test file `packages/mobile-ui/src/components/MobileCalendar.test.tsx` was created but the tests are not passing."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The feature implementation is functionally correct, but the lack of passing tests makes it impossible to accept. The tests must be fixed before this feature can be approved."
+}

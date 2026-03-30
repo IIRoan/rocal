@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import type { CalendarEvent } from "@workspace/ui/components/calendar/types";
+import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
 import { PasskeySettings } from "./passkey-settings";
 import { SubscriptionManagement } from "./subscription-management";
@@ -736,3 +736,4 @@ export function CommandPalette({
     </Dialog>
   );
 }
+

@@ -1,3 +1,4 @@
+import { MobilePage } from "@workspace/mobile-ui";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
@@ -5,6 +6,7 @@ import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { LoggerBootstrap } from "@/components/logger-bootstrap";
+import { MobileRuntimeBridge } from "@/components/mobile-runtime-bridge";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
@@ -68,22 +70,24 @@ export default function RootLayout({
       <body
         className={`${fontSans.variable} ${fontMono.variable} bg-background font-sans antialiased`}
       >
-        <LoggerBootstrap />
-        <QueryProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <LoadingProvider>
-              <SettingsProvider>
-                <CalendarProvider>{children}</CalendarProvider>
-                <Toaster />
-              </SettingsProvider>
-            </LoadingProvider>
-          </ThemeProvider>
-        </QueryProvider>
+        <MobileRuntimeBridge>
+          <LoggerBootstrap />
+          <QueryProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <LoadingProvider>
+                <SettingsProvider>
+                  <CalendarProvider><MobilePage>{children}</MobilePage></CalendarProvider>
+                  <Toaster />
+                </SettingsProvider>
+              </LoadingProvider>
+            </ThemeProvider>
+          </QueryProvider>
+        </MobileRuntimeBridge>
       </body>
     </html>
   );
