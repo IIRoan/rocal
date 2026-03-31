@@ -369,8 +369,8 @@ export function WeekView({
     >
       <div className="z-40 bg-background/95 backdrop-blur-md shrink-0">
         {/* Day headers row: timezone + day names */}
-        <div className="hidden w-full auto-cols-fr grid-flow-col items-center justify-between pt-3 sm:grid border-b border-border/40">
-          <div className="w-full text-center text-xs text-muted-foreground/70">
+        <div className="hidden w-full auto-cols-fr grid-flow-col items-end justify-between pt-2 sm:grid border-b border-border/40">
+          <div className="w-full text-center text-[11px] font-medium text-muted-foreground/70 pb-2">
             {timezone
               ? formatInTimeZone(new Date(), timezone, "zzz")
               : format(new Date(), "zzz")}
@@ -378,24 +378,37 @@ export function WeekView({
           {days.map((day) => (
             <div
               key={day.toString()}
-              className="w-full text-center text-xs text-muted-foreground"
+              className="w-full flex justify-center"
             >
-              {isToday(day) ? (
-                <span className="inline-block rounded-md bg-[var(--calendar-accent)] px-2 py-1 font-medium text-white">
-                  {format(day, "EEE").toUpperCase().slice(0, 3)} {format(day, "d")}
+              <div className="flex flex-col items-center gap-1 pb-2">
+                <span
+                  className={cn(
+                    "text-[11px] font-medium uppercase tracking-wider",
+                    isToday(day)
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {format(day, "EEE")}
                 </span>
-              ) : (
-                <span>
-                  {format(day, "EEE").toUpperCase().slice(0, 3)} {format(day, "d")}
-                </span>
-              )}
+                <div
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors",
+                    isToday(day)
+                      ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                      : "text-foreground font-medium hover:bg-muted"
+                  )}
+                >
+                  {format(day, "d")}
+                </div>
+              </div>
             </div>
           ))}
         </div>
 
         {/* Mobile day headers */}
-        <div className="sm:hidden grid grid-cols-8 border-b border-border/40">
-          <div className="text-center text-[10px] text-muted-foreground/70 py-1">
+        <div className="sm:hidden grid grid-cols-8 border-b border-border/40 pt-1">
+          <div className="flex items-end justify-center pb-1 text-[9px] font-medium text-muted-foreground/70">
             {timezone
               ? formatInTimeZone(new Date(), timezone, "zzz")
               : format(new Date(), "zzz")}
@@ -403,17 +416,30 @@ export function WeekView({
           {days.map((day) => (
             <div
               key={day.toString()}
-              className="text-center text-[10px] py-1"
+              className="w-full flex justify-center"
             >
-              {isToday(day) ? (
-                <span className="inline-block rounded-md bg-[var(--calendar-accent)] px-1 py-0.5 font-medium text-white">
-                  {format(day, "E")[0]} {format(day, "d")}
+              <div className="flex flex-col items-center gap-0.5 pb-1">
+                <span
+                  className={cn(
+                    "text-[10px] font-medium uppercase",
+                    isToday(day)
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {format(day, "E")[0]}
                 </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  {format(day, "E")[0]} {format(day, "d")}
-                </span>
-              )}
+                <div
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full text-xs transition-colors",
+                    isToday(day)
+                      ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                      : "text-foreground font-medium hover:bg-muted"
+                  )}
+                >
+                  {format(day, "d")}
+                </div>
+              </div>
             </div>
           ))}
         </div>

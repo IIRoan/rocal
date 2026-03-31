@@ -857,23 +857,23 @@ export function EventCalendar({
                   <ChevronRightIcon size={16} aria-hidden="true" />
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                className="h-8 px-3 rounded-xl border-border/50 text-[13px] font-medium text-foreground hover:bg-accent"
-                onClick={handleToday}
-                disabled={loading}
-              >
-                Today
-              </Button>
               <div className="flex items-center justify-between gap-2">
+                <Button
+                  variant="outline"
+                  className="h-8 px-3 rounded-lg border-border/50 text-[13px] font-medium text-foreground hover:bg-accent"
+                  onClick={handleToday}
+                  disabled={loading}
+                >
+                  Today
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="gap-1.5 h-8 rounded-lg border-border/50"
+                      className="gap-1.5 h-8 rounded-lg border-border/50 text-[13px] font-medium text-foreground hover:bg-accent"
                       disabled={loading}
                     >
-                      <span className="capitalize text-[13px]">{view}</span>
+                      <span className="capitalize">{view}</span>
                       <ChevronDownIcon
                         className="-me-1 opacity-60"
                         size={16}
