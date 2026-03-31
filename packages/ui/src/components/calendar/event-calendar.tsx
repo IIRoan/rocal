@@ -58,7 +58,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { ThemeToggle } from "../layout/theme-toggle";
 import { useDropdownShortcuts } from "../../hooks";
 
 export interface EventCalendarProps {
@@ -794,7 +793,7 @@ export function EventCalendar({
         >
           <div
             className={cn(
-              "sticky top-0 z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b flex items-center justify-between gap-2 px-2 sm:px-4",
+              "sticky top-0 z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-2 px-2 sm:px-4",
               className,
             )}
           >
@@ -815,46 +814,45 @@ export function EventCalendar({
               </h2>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center sm:gap-2 max-sm:order-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="max-sm:size-8"
-                    onClick={handlePrevious}
-                    aria-label="Previous"
-                    disabled={loading}
-                  >
-                    <ChevronLeftIcon size={16} aria-hidden="true" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="max-sm:size-8"
-                    onClick={handleNext}
-                    aria-label="Next"
-                    disabled={loading}
-                  >
-                    <ChevronRightIcon size={16} aria-hidden="true" />
-                  </Button>
-                </div>
+              <div className="flex items-center gap-1">
                 <Button
-                  className="max-sm:h-8 max-sm:px-2.5! bg-accent hover:bg-accent/80 text-accent-foreground"
-                  onClick={handleToday}
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7 rounded-lg border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  onClick={handlePrevious}
+                  aria-label="Previous"
                   disabled={loading}
                 >
-                  Today
+                  <ChevronLeftIcon size={16} aria-hidden="true" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7 rounded-lg border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  onClick={handleNext}
+                  aria-label="Next"
+                  disabled={loading}
+                >
+                  <ChevronRightIcon size={16} aria-hidden="true" />
                 </Button>
               </div>
+              <Button
+                variant="outline"
+                className="h-8 px-3 rounded-lg border-border/50 text-foreground font-medium hover:bg-accent"
+                onClick={handleToday}
+                disabled={loading}
+              >
+                Today
+              </Button>
               <div className="flex items-center justify-between gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="gap-1.5 max-sm:h-8 max-sm:px-2! max-sm:gap-1"
+                      className="gap-1.5 h-8 rounded-lg border-border/50"
                       disabled={loading}
                     >
-                      <span className="capitalize">{view}</span>
+                      <span className="capitalize text-[13px]">{view}</span>
                       <ChevronDownIcon
                         className="-me-1 opacity-60"
                         size={16}
@@ -877,7 +875,6 @@ export function EventCalendar({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <ThemeToggle useSettingsTheme={themeSettings} />
               </div>
             </div>
           </div>
