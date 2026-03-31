@@ -19,7 +19,6 @@ import {
 } from "date-fns";
 import {
   ChevronDownIcon,
-  ChevronLeftIcon,
   ChevronRightIcon,
   Eye,
   Loader2,
@@ -694,8 +693,15 @@ export function EventCalendar({
   };
 
   const viewTitle = useMemo(() => {
+    const formatMonthYear = (date: Date) => (
+      <>
+        <span className="font-bold">{format(date, "MMMM")}</span>
+        <span className="text-muted-foreground"> {format(date, "yyyy")}</span>
+      </>
+    );
+
     if (view === "month") {
-      return format(currentDate, "MMMM yyyy");
+      return formatMonthYear(currentDate);
     } else if (view === "week") {
       const start = startOfWeek(currentDate, {
         weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
@@ -704,9 +710,16 @@ export function EventCalendar({
         weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
       });
       if (isSameMonth(start, end)) {
-        return format(start, "MMMM yyyy");
+        return formatMonthYear(start);
       } else {
-        return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
+        return (
+          <>
+            <span className="font-bold">{format(start, "MMM")}</span>
+            <span className="text-muted-foreground"> - </span>
+            <span className="font-bold">{format(end, "MMM")}</span>
+            <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
+          </>
+        );
       }
     } else if (view === "day") {
       return (
@@ -723,17 +736,23 @@ export function EventCalendar({
         </>
       );
     } else if (view === "agenda") {
-      // Show the month range for agenda view
       const start = currentDate;
       const end = addDays(currentDate, AgendaDaysToShow - 1);
 
       if (isSameMonth(start, end)) {
-        return format(start, "MMMM yyyy");
+        return formatMonthYear(start);
       } else {
-        return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`;
+        return (
+          <>
+            <span className="font-bold">{format(start, "MMM")}</span>
+            <span className="text-muted-foreground"> - </span>
+            <span className="font-bold">{format(end, "MMM")}</span>
+            <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
+          </>
+        );
       }
     } else {
-      return format(currentDate, "MMMM yyyy");
+      return formatMonthYear(currentDate);
     }
   }, [currentDate, view]);
 
@@ -775,7 +794,10 @@ export function EventCalendar({
       }}
     >
       <div
-        className="flex has-data-[slot=month-view]:flex-1 flex-col rounded-lg"
+        className={cn(
+          "flex has-data-[slot=month-view]:flex-1 flex-col rounded-lg relative h-full",
+          className,
+        )}
         style={
           {
             "--event-height": `${compactView ? Math.round(EventHeight * 0.75) : EventHeight}px`,
@@ -792,10 +814,9 @@ export function EventCalendar({
           timezone={timezone}
         >
           <div
-            className={cn(
-              "sticky top-0 z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-2 px-2 sm:px-4",
-              className,
-            )}
+            className={
+              "z-50 h-[var(--calendar-toolbar-height)] sm:h-[var(--calendar-toolbar-height-sm)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-2 px-2 sm:px-4 shrink-0"
+            }
           >
             <div className="flex items-center gap-1.5 min-w-0">
               {onSidebarToggle && (
@@ -816,19 +837,19 @@ export function EventCalendar({
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-lg border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  className="h-7 w-7 text-muted-foreground/70 hover:text-foreground hover:bg-accent/50 -scale-x-[1]"
                   onClick={handlePrevious}
                   aria-label="Previous"
                   disabled={loading}
                 >
-                  <ChevronLeftIcon size={16} aria-hidden="true" />
+                  <ChevronRightIcon size={16} aria-hidden="true" />
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-lg border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  className="h-7 w-7 text-muted-foreground/70 hover:text-foreground hover:bg-accent/50"
                   onClick={handleNext}
                   aria-label="Next"
                   disabled={loading}
@@ -838,7 +859,7 @@ export function EventCalendar({
               </div>
               <Button
                 variant="outline"
-                className="h-8 px-3 rounded-lg border-border/50 text-foreground font-medium hover:bg-accent"
+                className="h-8 px-3 rounded-xl border-border/50 text-[13px] font-medium text-foreground hover:bg-accent"
                 onClick={handleToday}
                 disabled={loading}
               >
@@ -879,7 +900,7 @@ export function EventCalendar({
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col relative">
+          <div className="flex flex-1 flex-col relative min-h-0">
             {/* Event loading overlay when navigating between dates */}
             {eventsLoading && events && events.length > 0 && (
               <EventLoadingSkeleton

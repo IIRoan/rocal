@@ -247,9 +247,9 @@ export function DayView({
   );
 
   return (
-    <div data-slot="day-view" className="contents">
+    <div data-slot="day-view" className="absolute inset-0 flex flex-col bg-background animate-fade-in">
       {showAllDaySection && (
-        <div className="border-border/70 bg-muted/50 border-t">
+        <div className="border-border/70 bg-muted/50 border-t shrink-0">
           <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
             <div className="relative">
               <span className="text-muted-foreground/70 absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs">
@@ -286,7 +286,7 @@ export function DayView({
         </div>
       )}
 
-      <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-hidden">
+      <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-y-auto relative min-h-0">
         <div>
           {hours.map((hour, index) => (
             <div

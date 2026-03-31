@@ -19,11 +19,11 @@ import {
   isWithinInterval,
   endOfDay,
 } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
 import { EventItem } from "./event-item";
-import { EventDots } from "./event-dots";
 import {
   isMultiDayEvent,
   sortEvents,
@@ -37,7 +37,7 @@ import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator"
 
 import { StartHour, EndHour } from "./constants";
 import { cn } from "../../lib/utils";
-import { Briefcase } from "@phosphor-icons/react";
+
 
 interface WeekViewProps {
   currentDate: Date;
@@ -364,83 +364,108 @@ export function WeekView({
 
   return (
     <div
-      ref={scrollContainerRef}
       data-slot="week-view"
-      className="flex h-full flex-col"
+      className="absolute inset-0 flex flex-col bg-background animate-fade-in"
     >
-      <div
-        className="bg-background/95 border-border/70 sticky top-[var(--calendar-toolbar-height)] sm:top-[var(--calendar-toolbar-height-sm)] z-40 border-b backdrop-blur-md uppercase"
-      >
-        <div className="grid grid-cols-8 border-b border-border/40">
-          <div className="text-muted-foreground/70 py-2 text-center text-xs">
-            <span className="max-[479px]:sr-only">
-              {format(new Date(), "O")}
-            </span>
+      <div className="z-40 bg-background/95 backdrop-blur-md shrink-0">
+        {/* Day headers row: timezone + day names */}
+        <div className="hidden w-full auto-cols-fr grid-flow-col items-center justify-between pt-3 sm:grid border-b border-border/40">
+          <div className="w-full text-center text-xs text-muted-foreground/70">
+            {timezone
+              ? formatInTimeZone(new Date(), timezone, "zzz")
+              : format(new Date(), "zzz")}
           </div>
           {days.map((day) => (
             <div
               key={day.toString()}
-              className={`text-muted-foreground/80 text-center text-xs transition-colors py-2 ${
-                isToday(day)
-                  ? "text-[var(--calendar-accent)] font-semibold"
-                  : ""
-              }`}
-              data-today={isToday(day) || undefined}
+              className="w-full text-center text-xs text-muted-foreground"
             >
-              <div className="relative inline-block text-center">
-                <div className="flex items-center justify-center gap-1">
-                  {workingDays.includes(day.getDay()) && (
-                    <Briefcase className="h-3 w-3 text-muted-foreground/80 shrink-0 max-sm:hidden" weight="bold" />
-                  )}
-                  <span className="sm:hidden font-medium" aria-hidden="true">
-                    {format(day, "E")[0]} {format(day, "d")}
-                  </span>
-                  <span className="max-sm:hidden">{format(day, "EEE dd")}</span>
-                </div>
-                <div
-                  className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-200 ${
-                    isToday(day)
-                      ? "bg-[var(--calendar-accent)] w-full"
-                      : "bg-transparent w-0"
-                  }`}
-                />
-              </div>
+              {isToday(day) ? (
+                <span className="inline-block rounded-md bg-[var(--calendar-accent)] px-2 py-1 font-medium text-white">
+                  {format(day, "EEE").toUpperCase().slice(0, 3)} {format(day, "d")}
+                </span>
+              ) : (
+                <span>
+                  {format(day, "EEE").toUpperCase().slice(0, 3)} {format(day, "d")}
+                </span>
+              )}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-8">
-          <div />
-          {days.map((day, dayIndex) => (
-            <div key={`all-day-${day.toString()}`} className="px-1 pb-1">
-              <div className="space-y-1">
-                {(allDayEventsByDay[dayIndex] ?? []).map((event) => {
-                    const { start: eStartDay, end: eEndDay } = getEventInterval(
-                      event,
-                      "day",
-                    );
-                    const weekStartDay = startOfDay(weekStart);
-                    const weekEndDay = endOfDay(weekEnd);
-                    const visibleStart = isBefore(eStartDay, weekStartDay)
-                      ? weekStartDay
-                      : eStartDay;
-                    const visibleEnd = isBefore(weekEndDay, eEndDay)
-                      ? weekEndDay
-                      : eEndDay;
+        {/* Mobile day headers */}
+        <div className="sm:hidden grid grid-cols-8 border-b border-border/40">
+          <div className="text-center text-[10px] text-muted-foreground/70 py-1">
+            {timezone
+              ? formatInTimeZone(new Date(), timezone, "zzz")
+              : format(new Date(), "zzz")}
+          </div>
+          {days.map((day) => (
+            <div
+              key={day.toString()}
+              className="text-center text-[10px] py-1"
+            >
+              {isToday(day) ? (
+                <span className="inline-block rounded-md bg-[var(--calendar-accent)] px-1 py-0.5 font-medium text-white">
+                  {format(day, "E")[0]} {format(day, "d")}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  {format(day, "E")[0]} {format(day, "d")}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
-                    const isFirstSegmentDay = isSameDay(day, visibleStart);
-                    const isLastSegmentDay = isSameDay(day, visibleEnd);
-                    const shouldShowTitle = isFirstSegmentDay;
+      {/* All-day events row (non-sticky) */}
+      <div className="grid w-full grid-cols-8 items-stretch justify-between gap-[1px] bg-border/40 border-b border-border/40 relative z-30 shrink-0">
+        <div className="shadow-sm h-full flex flex-col bg-background">
+          <div className="flex flex-1 flex-col items-center justify-center p-1 min-h-[24px]">
+            <span className="text-[10px] text-muted-foreground/70">All-day</span>
+          </div>
+        </div>
+        {days.map((day, dayIndex) => {
+          const dayEvents = allDayEventsByDay[dayIndex] ?? [];
+          return (
+            <div key={`all-day-${day.toString()}`} className="shadow-sm h-full flex flex-col bg-background">
+              <div
+                className={cn(
+                  "flex flex-1 flex-col justify-start p-0.5 gap-0.5",
+                  dayEvents.length === 0 && "min-h-[24px]",
+                )}
+              >
+                {dayEvents.map((event) => {
+                  const { start: eStartDay, end: eEndDay } = getEventInterval(
+                    event,
+                    "day",
+                  );
+                  const weekStartDay = startOfDay(weekStart);
+                  const weekEndDay = endOfDay(weekEnd);
+                  const visibleStart = isBefore(eStartDay, weekStartDay)
+                    ? weekStartDay
+                    : eStartDay;
+                  const visibleEnd = isBefore(weekEndDay, eEndDay)
+                    ? weekEndDay
+                    : eEndDay;
 
-                    return (
+                  const isFirstSegmentDay = isSameDay(day, visibleStart);
+                  const isLastSegmentDay = isSameDay(day, visibleEnd);
+                  const shouldShowTitle = isFirstSegmentDay;
+
+                  return (
+                    <div
+                      key={`allday-${event.id}`}
+                      className="w-full"
+                    >
                       <EventItem
-                        key={`spanning-${event.id}`}
                         onClick={(e) => handleEventClick(event, e)}
                         event={event}
                         view="month"
                         isFirstDay={isFirstSegmentDay}
                         isLastDay={isLastSegmentDay}
-                        className="text-xs"
+                        className="text-[10px] min-h-[20px] h-[22px] items-center"
                         timezone={timezone}
                         onEdit={onEventEdit}
                         onDelete={onEventDelete}
@@ -448,7 +473,7 @@ export function WeekView({
                       >
                         <div
                           className={cn(
-                            "truncate text-xs",
+                            "truncate text-[10px] leading-tight",
                             !shouldShowTitle && "invisible",
                           )}
                           aria-hidden={!shouldShowTitle}
@@ -456,15 +481,16 @@ export function WeekView({
                           {event.title}
                         </div>
                       </EventItem>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      <div className="grid flex-1 grid-cols-8">
+      <div ref={scrollContainerRef} className="grid flex-1 grid-cols-8 overflow-y-auto min-h-0">
         <div className="border-border/70 border-r grid auto-cols-fr">
           {hours.map((hour, index) => (
             <div
