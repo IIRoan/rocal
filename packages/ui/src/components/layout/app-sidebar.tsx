@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
-import { Sparkles, Calendar, Plus, Search } from "lucide-react";
+import { Sparkles, Plus, Search } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -14,8 +14,11 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarGroup,
+  SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarMenu,
   SidebarMenuButton,
+  SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from "../ui/sidebar";
@@ -29,7 +32,6 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
-import { Checkbox } from "../ui/checkbox";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -348,7 +350,7 @@ function AppSidebarDesktop({
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar variant="inset" collapsible="icon" {...props} className="max-lg:p-3 lg:pe-1">
+    <Sidebar variant="inset" collapsible="icon" {...props} className="max-lg:p-3">
       {onCreateEvent && (
         <div className="fixed bottom-8 right-8 z-50">
           <Tooltip>
@@ -396,134 +398,102 @@ function AppSidebarDesktop({
           </div>
         )}
       </SidebarHeader>
-      <SidebarContent className="gap-0 mt-3 pt-3 border-t">
-        {/* Action Buttons: New Event, Search, Settings */}
-        {!isCollapsed && (
-          <div className="flex flex-col gap-1 px-2 mb-2">
-            {onCreateEvent && (
-              <SidebarMenuButton
-                asChild
-                className="rounded-lg justify-start gap-2 h-8 px-3 text-[13px] text-muted-foreground hover:bg-accent"
-                onClick={onCreateEvent}
-              >
-                <button className="flex items-center gap-2">
-                  <Plus size={16} strokeWidth={2} />
-                  New event
-                </button>
-              </SidebarMenuButton>
-            )}
-            <SidebarMenuButton
-              asChild
-              className="rounded-lg justify-start gap-2 h-8 px-3 text-[13px] text-muted-foreground hover:bg-accent"
-            >
-              <button className="flex items-center gap-2">
-                <Search size={16} strokeWidth={2} />
-                Search
-              </button>
-            </SidebarMenuButton>
-            <SidebarMenuButton
-              asChild
-              className="rounded-lg justify-start gap-2 h-8 px-3 text-[13px] text-muted-foreground hover:bg-accent"
-              onClick={onOpenSettings}
-            >
-              <button className="flex items-center gap-2">
-                <GearSixIcon size={16} weight="regular" />
-                Settings
-              </button>
-            </SidebarMenuButton>
-          </div>
-        )}
-        <div className={isCollapsed ? "mt-2 pt-2 border-t" : "mt-2 pt-2 border-t"}>
-          {!isCollapsed && (
-            <div className="flex items-center justify-between px-3 mb-2">
-              <div className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar size={14} strokeWidth={2.5} className="text-primary/40" />
-                Calendars
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-primary/30 hover:text-primary hover:bg-primary/10 transition-colors"
-                  onClick={onOpenCalendarManagement}
-                  title="Calendar Settings"
-                >
-                  <GearSixIcon size={14} weight="bold" />
-                </Button>
-              </div>
-            </div>
-          )}
-          <div className={isCollapsed ? "flex flex-col items-center gap-1 mt-2" : "px-2 space-y-0.5"}>
-            {calendars.map((calendar) => (
-              <div key={calendar.id} className={isCollapsed ? "" : ""}>
-                {isCollapsed ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-sidebar-accent transition-colors"
-                        onClick={() => toggleCalendarVisibility(calendar.id)}
-                      >
-                        <span
-                          className={`size-2.5 rounded-full transition-opacity ${
-                            !isCalendarVisible(calendar.id) && "opacity-40"
-                          }`}
-                          style={{
-                            backgroundColor: calendar.color?.startsWith("#")
-                              ? calendar.color
-                              : `var(--color-event-${calendar.color || "default"})`,
-                          }}
-                        />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{calendar.name}</TooltipContent>
-                  </Tooltip>
-                ) : (
+
+      <SidebarContent className="gap-0">
+        {/* Actions */}
+        <SidebarGroup className="py-2">
+          <SidebarGroupLabel className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider h-auto py-0 mb-1">
+            Actions
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {onCreateEvent && (
+                <SidebarMenuItem>
                   <SidebarMenuButton
-                    asChild
-                    className="relative rounded-xl [&>svg]:size-auto justify-between has-focus-visible:border-ring has-focus-visible:ring-ring/50 has-focus-visible:ring-[3px] hover:bg-accent/50 transition-colors py-2 px-3 h-9"
+                    className="rounded-lg h-8 text-[13px] text-muted-foreground hover:bg-accent"
+                    onClick={onCreateEvent}
                   >
-                    <span>
-                      <span className="font-medium flex items-center gap-3">
-                        <Checkbox
-                          id={calendar.id}
-                          className="size-4 border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
-                          checked={isCalendarVisible(calendar.id)}
-                          onCheckedChange={() =>
-                            toggleCalendarVisibility(calendar.id)
-                          }
-                        />
-                        <label
-                          htmlFor={calendar.id}
-                          className={`text-[13px] font-medium cursor-pointer transition-colors ${
-                            isCalendarVisible(calendar.id)
-                              ? "text-foreground/90"
-                              : "text-foreground/40 line-through"
-                          }`}
-                        >
-                          {calendar.name}
-                        </label>
-                      </span>
-                      <span
-                        className="size-1.5 rounded-full"
-                        style={{
-                          backgroundColor: calendar.color?.startsWith("#")
-                            ? calendar.color
-                            : `var(--color-event-${calendar.color || "default"})`,
-                        }}
-                      ></span>
+                    <Plus size={16} strokeWidth={2} />
+                    New event
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton className="rounded-lg h-8 text-[13px] text-muted-foreground hover:bg-accent">
+                  <Search size={16} strokeWidth={2} />
+                  Search
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  className="rounded-lg h-8 text-[13px] text-muted-foreground hover:bg-accent"
+                  onClick={onOpenSettings}
+                >
+                  <GearSixIcon size={16} weight="regular" />
+                  Settings
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Calendars */}
+        <SidebarGroup className="py-2">
+          <SidebarGroupLabel
+            className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider h-auto py-0 mb-1"
+            asChild
+          >
+            <div className="flex items-center justify-between w-full">
+              <span>Calendars</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-muted-foreground/30 hover:text-foreground hover:bg-accent transition-colors"
+                onClick={onOpenCalendarManagement}
+                title="Calendar Settings"
+              >
+                <GearSixIcon size={13} weight="regular" />
+              </Button>
+            </div>
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {calendars.map((calendar) => (
+                <SidebarMenuItem key={calendar.id}>
+                  <SidebarMenuButton
+                    className="rounded-lg h-8 text-[13px] hover:bg-accent transition-colors"
+                    onClick={() => toggleCalendarVisibility(calendar.id)}
+                  >
+                    <span
+                      className={`size-2.5 rounded-full shrink-0 transition-opacity ${
+                        !isCalendarVisible(calendar.id) && "opacity-30"
+                      }`}
+                      style={{
+                        backgroundColor: calendar.color?.startsWith("#")
+                          ? calendar.color
+                          : `var(--color-event-${calendar.color || "default"})`,
+                      }}
+                    />
+                    <span
+                      className={`truncate transition-colors ${
+                        isCalendarVisible(calendar.id)
+                          ? "text-muted-foreground"
+                          : "text-muted-foreground/40 line-through"
+                      }`}
+                    >
+                      {calendar.name}
                     </span>
                   </SidebarMenuButton>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="gap-0">
+
+      <SidebarFooter className="gap-0 p-1">
         {!isCollapsed && (
-          <SidebarGroup className="px-2">
+          <SidebarGroup className="p-1">
             <SidebarCalendar
               getCachedEventsForRange={getCachedEventsForRange}
               prefetchRange={prefetchRange}
