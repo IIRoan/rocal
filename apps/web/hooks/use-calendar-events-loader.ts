@@ -221,6 +221,28 @@ export function useCalendarEventsLoader(
     [eventsQuery, setDateRange],
   );
 
+  const prefetchRange = useCallback(
+    (range: DateRange) => {
+      const normalized = normalizeDateRange(range);
+      queryClient.prefetchQuery({
+        queryKey: getRangeQueryKey(normalized),
+        queryFn: async () => {
+          const res = await calendarApiService.getEvents(normalized.start, normalized.end);
+          return validateAndCleanEvents(res.events, normalized);
+        },
+        staleTime: cacheTimeout,
+      });
+    },
+    [queryClient, cacheTimeout],
+  );
+
+  const getCachedEventsForRange = useCallback(
+    (range: DateRange): CalendarEvent[] | undefined => {
+      return findBestCachedEventsForRange(queryClient, normalizeDateRange(range));
+    },
+    [queryClient],
+  );
+
   return {
     events: eventsQuery.data || fallbackEvents || [],
     eventsLoading: eventsQuery.isLoading,
@@ -229,5 +251,7 @@ export function useCalendarEventsLoader(
     setDateRange,
     refetchEvents,
     normalizeDateRange,
+    prefetchRange,
+    getCachedEventsForRange,
   };
 }

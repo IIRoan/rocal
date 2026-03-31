@@ -1,8 +1,9 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
+  addMonths,
   eachDayOfInterval,
   endOfDay,
   format,
@@ -17,10 +18,16 @@ interface DateRange {
   end: Date;
 }
 
+interface CalendarEntry {
+  id: string;
+  color?: string;
+}
+
 interface UseMiniCalendarMonthDataOptions {
   calendarMonth: Date;
-  events: CalendarEvent[];
-  onDisplayMonthChange?: (dateRange: DateRange) => void;
+  calendars?: CalendarEntry[];
+  getCachedEventsForRange?: (range: DateRange) => CalendarEvent[] | undefined;
+  prefetchRange?: (range: DateRange) => void;
   rangeChangeDebounceMs?: number;
 }
 
@@ -33,8 +40,9 @@ function toDayKey(date: Date): string {
 
 export function useMiniCalendarMonthData({
   calendarMonth,
-  events,
-  onDisplayMonthChange,
+  calendars,
+  getCachedEventsForRange,
+  prefetchRange,
   rangeChangeDebounceMs = 120,
 }: UseMiniCalendarMonthDataOptions) {
   const grid = useMemo(() => {
@@ -46,54 +54,116 @@ export function useMiniCalendarMonthData({
   }, [calendarMonth]);
 
   const monthKey = format(calendarMonth, "yyyy-MM");
-  const deferredGrid = useDeferredValue(grid);
-  const deferredEvents = useDeferredValue(events);
 
+  // Track which grid range we last fetched
+  const lastFetchedKeyRef = useRef<string | null>(null);
+
+  // When the grid changes, prefetch events for this range and adjacent months
   useEffect(() => {
-    if (!onDisplayMonthChange) return;
+    if (!prefetchRange) return;
 
-    let timeoutId: number | null = null;
-    let idleId: number | null = null;
-    const run = () =>
-      onDisplayMonthChange({ start: deferredGrid.start, end: deferredGrid.end });
+    const gridKey = `${grid.start.toISOString()}-${grid.end.toISOString()}`;
+    if (lastFetchedKeyRef.current === gridKey) return;
+    lastFetchedKeyRef.current = gridKey;
 
-    timeoutId = window.setTimeout(() => {
+    const gridRange = { start: grid.start, end: grid.end };
+
+    const run = () => {
+      prefetchRange(gridRange);
+      prefetchRange({
+        start: addMonths(grid.start, -1),
+        end: addMonths(grid.end, -1),
+      });
+      prefetchRange({
+        start: addMonths(grid.start, 1),
+        end: addMonths(grid.end, 1),
+      });
+    };
+
+    const timeoutId = window.setTimeout(() => {
       if ("requestIdleCallback" in window) {
-        idleId = (window as any).requestIdleCallback(run, { timeout: 300 });
+        (window as any).requestIdleCallback(run, { timeout: 300 });
       } else {
         run();
       }
     }, rangeChangeDebounceMs);
 
-    return () => {
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-      if (idleId !== null && "cancelIdleCallback" in window) {
-        (window as any).cancelIdleCallback(idleId);
+    return () => window.clearTimeout(timeoutId);
+  }, [grid, prefetchRange, rangeChangeDebounceMs]);
+
+  // Periodically check for new cached data to pick up prefetch results
+  const [cacheBuster, setCacheBuster] = useState(0);
+  const lastEventCountRef = useRef(0);
+
+  useEffect(() => {
+    if (!getCachedEventsForRange) return;
+
+    const check = () => {
+      const cached = getCachedEventsForRange({ start: grid.start, end: grid.end });
+      const count = cached?.length ?? 0;
+      if (count !== lastEventCountRef.current) {
+        lastEventCountRef.current = count;
+        setCacheBuster((v) => v + 1);
       }
     };
-  }, [deferredGrid, onDisplayMonthChange, rangeChangeDebounceMs]);
 
+    // Check immediately
+    check();
+
+    // Then poll at a low frequency
+    const intervalId = window.setInterval(check, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [getCachedEventsForRange, grid.start, grid.end]);
+
+  // Build a calendar color lookup map
+  const calendarColorMap = useMemo(() => {
+    if (!calendars) return new Map<string, string>();
+    return new Map(calendars.map((cal) => [cal.id, cal.color || ""]));
+  }, [calendars]);
+
+  // Build the day-to-events map from cached data
   const dayEventsMap = useMemo(() => {
+    // Reference cacheBuster to trigger re-computation
+    void cacheBuster;
+
     const map = new Map<string, CalendarEvent[]>();
-    for (const day of deferredGrid.days) {
+    for (const day of grid.days) {
       map.set(toDayKey(day), []);
     }
 
-    const gridStart = startOfDay(deferredGrid.start);
-    const gridEnd = endOfDay(deferredGrid.end);
+    if (!getCachedEventsForRange) return map;
 
-    for (const event of deferredEvents) {
-      const rawStart = new Date(event.start);
-      const rawEnd = new Date(event.end);
+    const cachedEvents = getCachedEventsForRange({
+      start: grid.start,
+      end: grid.end,
+    });
+
+    if (!cachedEvents || cachedEvents.length === 0) return map;
+
+    const gridStart = startOfDay(grid.start);
+    const gridEnd = endOfDay(grid.end);
+
+    for (const rawEvent of cachedEvents) {
+      const rawStart = new Date(rawEvent.start);
+      const rawEnd = new Date(rawEvent.end);
       if (isNaN(rawStart.getTime()) || isNaN(rawEnd.getTime())) continue;
 
       const eventStart = startOfDay(rawStart);
       const eventEnd = endOfDay(rawEnd);
       if (eventEnd < gridStart || eventStart > gridEnd) continue;
 
+      // Resolve color: event.color || calendar.color
+      const resolvedColor = rawEvent.color || calendarColorMap.get(rawEvent.calendarId) || undefined;
+      const event: CalendarEvent = resolvedColor !== rawEvent.color
+        ? { ...rawEvent, color: resolvedColor }
+        : rawEvent;
+
       const clampedStart = eventStart < gridStart ? gridStart : eventStart;
       const clampedEnd = eventEnd > gridEnd ? gridEnd : eventEnd;
-      const daysInEvent = eachDayOfInterval({ start: clampedStart, end: clampedEnd });
+      const daysInEvent = eachDayOfInterval({
+        start: clampedStart,
+        end: clampedEnd,
+      });
 
       for (const day of daysInEvent) {
         const key = toDayKey(day);
@@ -104,8 +174,7 @@ export function useMiniCalendarMonthData({
     }
 
     return map;
-  }, [deferredEvents, deferredGrid]);
+  }, [grid, getCachedEventsForRange, cacheBuster, calendarColorMap]);
 
   return { grid, dayEventsMap, monthKey, toDayKey };
 }
-
