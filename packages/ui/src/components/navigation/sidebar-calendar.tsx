@@ -32,22 +32,21 @@ const monthSlideVariants = {
 
 interface SidebarCalendarProps {
   events?: CalendarEvent[];
-  onDisplayMonthChange?: (dateRange: { start: Date; end: Date }) => void;
+  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  prefetchRange?: (range: { start: Date; end: Date }) => void;
   onDateSelect?: (date: Date) => void;
-  rangeChangeDebounceMs?: number;
   className?: string;
   isMobile?: boolean;
 }
 
 export function SidebarCalendar({
-  events = [],
-  onDisplayMonthChange,
+  getCachedEventsForRange,
+  prefetchRange,
   onDateSelect,
-  rangeChangeDebounceMs = 120,
   className,
   isMobile = false,
 }: SidebarCalendarProps) {
-  const { currentDate, setCurrentDate } = useCalendarContext();
+  const { currentDate, setCurrentDate, calendars } = useCalendarContext();
   const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,9 +65,9 @@ export function SidebarCalendar({
   const weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"];
   const { grid, dayEventsMap, monthKey, toDayKey } = useMiniCalendarMonthData({
     calendarMonth,
-    events,
-    onDisplayMonthChange,
-    rangeChangeDebounceMs,
+    calendars,
+    getCachedEventsForRange,
+    prefetchRange,
   });
 
   const goToPreviousMonth = () => {
@@ -105,27 +104,37 @@ export function SidebarCalendar({
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>
-      <div className="flex items-center justify-between mb-4 px-1">
+      <div className="flex w-full items-center justify-between mb-1">
         <button
-          onClick={goToPreviousMonth}
-          className="p-2 rounded-full hover:bg-accent transition-colors"
-          aria-label="Previous month"
+          onClick={() => {
+            const now = new Date();
+            const isGoingForward = now.getTime() >= calendarMonth.getTime();
+            setSlideDirection(isGoingForward ? 1 : -1);
+            setCalendarMonth(now);
+            setCurrentDate(now);
+            onDateSelect?.(now);
+          }}
+          className="text-sm tracking-tight text-left hover:opacity-80 transition-opacity"
         >
-          <ChevronLeft size={20} className="text-muted-foreground" />
+          <span className="font-semibold text-foreground">{format(calendarMonth, "MMMM")}</span>
+          <span className="text-muted-foreground ml-0.5">{format(calendarMonth, "yyyy")}</span>
         </button>
-        <button
-          onClick={goToCurrentMonth}
-          className="text-[15px] font-bold tracking-tight"
-        >
-          {format(calendarMonth, "MMMM yyyy")}
-        </button>
-        <button
-          onClick={goToNextMonth}
-          className="p-2 rounded-full hover:bg-accent transition-colors"
-          aria-label="Next month"
-        >
-          <ChevronRight size={20} className="text-muted-foreground" />
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={goToPreviousMonth}
+            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            aria-label="Previous month"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+          </button>
+          <button
+            onClick={goToNextMonth}
+            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            aria-label="Next month"
+          >
+            <ChevronRight size={16} strokeWidth={2} />
+          </button>
+        </div>
       </div>
 
       <div className="relative overflow-hidden">
@@ -137,18 +146,18 @@ export function SidebarCalendar({
           animate="center"
           transition={{ duration: 0.09, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="grid grid-cols-7 gap-1 mb-2 px-1">
+          <div className="grid grid-cols-7 mb-0.5">
             {weekdayLabels.map((label, index) => (
               <div
                 key={`${label}-${index}`}
-                className="aspect-square flex items-center justify-center text-[11px] font-black text-muted-foreground/50 uppercase"
+                className="h-7 flex items-center justify-center text-[11px] font-medium text-muted-foreground/50 uppercase"
               >
                 {label}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1 px-1">
+          <div className="grid grid-cols-7">
             {grid.days.map((day) => {
               const isSelected = isSameDay(day, currentDate);
               const isCurrentMonth = isSameMonth(day, calendarMonth);
@@ -166,7 +175,7 @@ export function SidebarCalendar({
                     "relative flex items-center justify-center transition-transform",
                     isMobile
                       ? "aspect-square rounded-[12px] text-[14px] active:scale-90 flex-col gap-1"
-                      : "h-8 w-8 mx-auto rounded-lg text-[13px] font-medium",
+                      : "aspect-square rounded-lg text-[13px] font-medium",
                     !isCurrentMonth && "text-muted-foreground/30",
                     isCurrentMonth &&
                       !isSelected &&
@@ -199,7 +208,7 @@ export function SidebarCalendar({
                         "flex items-center justify-center z-10",
                         isMobile
                           ? "gap-0.5 mt-[-2px]"
-                          : "absolute bottom-[6px] gap-[2px] w-full",
+                          : "absolute bottom-[3px] gap-[2px] w-full",
                       )}
                     >
                       {dayEvents.slice(0, 3).map((event, i) => (

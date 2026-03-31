@@ -75,6 +75,10 @@ export interface UseCalendarDataReturn {
   setDateRange: (dateRange: DateRange) => void;
   clearCache: () => void;
 
+  // Mini calendar support
+  prefetchRange: (range: DateRange) => void;
+  getCachedEventsForRange: (range: DateRange) => CalendarEvent[] | undefined;
+
   // Notification handlers
   loadNotifications: (eventId: string) => Promise<EventNotification[]>;
   updateNotifications: (
@@ -100,6 +104,8 @@ export function useCalendarData(
     eventsError,
     setDateRange,
     refetchEvents,
+    prefetchRange,
+    getCachedEventsForRange,
   } = useCalendarEventsLoader({
     initialDateRange,
     cacheTimeout,
@@ -334,6 +340,10 @@ export function useCalendarData(
     // Utility
     setDateRange,
     clearCache,
+
+    // Mini calendar support
+    prefetchRange,
+    getCachedEventsForRange,
 
     // Notification handlers
     loadNotifications,
