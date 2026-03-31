@@ -50,7 +50,7 @@ export function AgendaView({
   );
 
   return (
-    <div className="border-border/70 border-t ps-4">
+    <div className="absolute inset-0 border-border/70 border-t ps-4 overflow-y-auto bg-background animate-fade-in">
       {!hasEvents ? (
         <div className="flex min-h-[70svh] flex-col items-center justify-center py-16 text-center">
           <span className="text-muted-foreground/50 mb-2">
