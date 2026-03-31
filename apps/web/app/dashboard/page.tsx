@@ -256,7 +256,8 @@ function SidebarWithContext() {
       aiLoading={aiLoading}
       aiResponse={aiResponse}
       events={transformedEvents}
-      onMiniCalendarMonthChange={calendarData.setDateRange}
+      getCachedEventsForRange={calendarData.getCachedEventsForRange}
+      prefetchRange={calendarData.prefetchRange}
     />
   );
 }
@@ -427,6 +428,8 @@ function MobileLayoutContent() {
       onLoadNotifications={calendarData.loadNotifications}
       onUpdateNotifications={calendarData.updateNotifications}
       onEventEdit={openEventEditor}
+      getCachedEventsForRange={calendarData.getCachedEventsForRange}
+      prefetchRange={calendarData.prefetchRange}
     />
   );
 }

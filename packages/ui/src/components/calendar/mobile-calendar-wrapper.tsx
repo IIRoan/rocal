@@ -20,7 +20,7 @@ import { SidebarProvider } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
-import { CalendarView, User, CALENDAR_VIEWS } from "./types";
+import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
 import { cn } from "../../lib/utils";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
@@ -29,6 +29,8 @@ interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
   onOpenAddEvent?: () => void;
+  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  prefetchRange?: (range: { start: Date; end: Date }) => void;
 }
 
 export function MobileCalendarWrapper({
@@ -37,6 +39,8 @@ export function MobileCalendarWrapper({
   onOpenSettings,
   onOpenCalendarManagement,
   onOpenAddEvent,
+  getCachedEventsForRange,
+  prefetchRange,
   children,
   className,
   ...props
@@ -157,9 +161,8 @@ export function MobileCalendarWrapper({
           </VisuallyHidden>
           <div className="p-4 pt-6">
             <SidebarCalendar
-              events={props.events}
-              onDisplayMonthChange={props.onDateRangeChange}
-              rangeChangeDebounceMs={150}
+              getCachedEventsForRange={getCachedEventsForRange}
+              prefetchRange={prefetchRange}
               onDateSelect={handleCloseQuickNav}
               isMobile={true}
             />
@@ -187,7 +190,8 @@ export function MobileCalendarWrapper({
               onOpenSettings={handleOpenSettings}
               onOpenCalendarManagement={onOpenCalendarManagement}
               events={props.events}
-              onMiniCalendarMonthChange={props.onDateRangeChange}
+              getCachedEventsForRange={getCachedEventsForRange}
+              prefetchRange={prefetchRange}
               isMobile={true}
             />
           </SidebarProvider>
