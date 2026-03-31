@@ -367,7 +367,7 @@ function AppSidebarDesktop({
           </Tooltip>
         </div>
       )}
-      <SidebarHeader>
+      <SidebarHeader className="pt-4 px-4 pb-2">
         <div className="flex justify-between items-center gap-2">
           <a className="inline-flex" href="/">
             <LogoSvg width="32" height="32" className="text-foreground/80" />
@@ -399,48 +399,56 @@ function AppSidebarDesktop({
         )}
       </SidebarHeader>
 
-      <SidebarContent className="gap-0 px-2 py-2">
+      <SidebarContent className="gap-0 px-3 pt-6 pb-2 flex flex-col h-full">
         <SidebarGroup className="p-0">
           <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
+            <SidebarMenu className="gap-1">
               {onCreateEvent && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    className="rounded-md h-8 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+                    className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                     onClick={onCreateEvent}
                   >
-                    <Plus size={16} strokeWidth={2} className="opacity-70" />
+                    <Plus size={18} strokeWidth={2} className="opacity-80" />
                     New event
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
               <SidebarMenuItem>
-                <SidebarMenuButton className="rounded-md h-8 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all">
-                  <Search size={16} strokeWidth={2} className="opacity-70" />
+                <SidebarMenuButton className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors">
+                  <Search size={18} strokeWidth={2} className="opacity-80" />
                   Search
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  className="rounded-md h-8 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+                  className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                   onClick={onOpenSettings}
                 >
-                  <GearSixIcon size={16} weight="regular" className="opacity-70" />
+                  <GearSixIcon size={18} weight="regular" className="opacity-80" />
                   Settings
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              
-              <div className="my-1.5 h-px bg-border/40 mx-2" />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
+        <SidebarGroup className="p-0 mt-auto pt-4">
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-1">
               {calendars.map((calendar) => (
                 <SidebarMenuItem key={calendar.id}>
                   <SidebarMenuButton
-                    className="rounded-md h-8 text-[13px] font-medium hover:bg-muted hover:text-foreground transition-all"
+                    className={`rounded-lg h-9 text-[14px] font-medium transition-colors ${
+                      isCalendarVisible(calendar.id) 
+                        ? "text-foreground hover:bg-muted/80" 
+                        : "text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground"
+                    }`}
                     onClick={() => toggleCalendarVisibility(calendar.id)}
                   >
                     <span
-                      className={`size-2.5 rounded-full shrink-0 transition-opacity ${
-                        !isCalendarVisible(calendar.id) && "opacity-30"
+                      className={`size-3 rounded-full shrink-0 transition-opacity ${
+                        !isCalendarVisible(calendar.id) && "opacity-40"
                       }`}
                       style={{
                         backgroundColor: calendar.color?.startsWith("#")
@@ -448,25 +456,19 @@ function AppSidebarDesktop({
                           : `var(--color-event-${calendar.color || "default"})`,
                       }}
                     />
-                    <span
-                      className={`truncate transition-colors ${
-                        isCalendarVisible(calendar.id)
-                          ? "text-muted-foreground hover:text-foreground"
-                          : "text-muted-foreground/40 line-through"
-                      }`}
-                    >
+                    <span className="truncate">
                       {calendar.name}
                     </span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
 
-              <SidebarMenuItem className="mt-0.5">
+              <SidebarMenuItem className="mt-1">
                 <SidebarMenuButton
-                  className="rounded-md h-8 text-[12px] font-medium text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-all"
+                  className="rounded-lg h-9 text-[13px] font-medium text-muted-foreground/70 hover:bg-muted/80 hover:text-foreground transition-colors"
                   onClick={onOpenCalendarManagement}
                 >
-                  <GearSixIcon size={14} weight="regular" className="opacity-60" />
+                  <GearSixIcon size={16} weight="regular" className="opacity-70" />
                   Manage calendars
                 </SidebarMenuButton>
               </SidebarMenuItem>
