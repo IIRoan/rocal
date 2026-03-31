@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
-import { Sparkles, Calendar, Plus } from "lucide-react";
+import { Sparkles, Calendar, Plus, Search } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -393,13 +393,41 @@ function AppSidebarDesktop({
         )}
       </SidebarHeader>
       <SidebarContent className="gap-0 mt-3 pt-3 border-t">
+        {/* Action Buttons: New Event, Search, Settings */}
         {!isCollapsed && (
-          <SidebarGroup className="px-2">
-            <SidebarCalendar
-              events={events}
-              onDisplayMonthChange={onMiniCalendarMonthChange}
-            />
-          </SidebarGroup>
+          <div className="flex flex-col gap-1 px-2 mb-2">
+            {onCreateEvent && (
+              <SidebarMenuButton
+                asChild
+                className="rounded-lg justify-start gap-2 h-8 px-3 text-[13px] text-muted-foreground hover:bg-accent"
+                onClick={onCreateEvent}
+              >
+                <button className="flex items-center gap-2">
+                  <Plus size={16} strokeWidth={2} />
+                  New event
+                </button>
+              </SidebarMenuButton>
+            )}
+            <SidebarMenuButton
+              asChild
+              className="rounded-lg justify-start gap-2 h-8 px-3 text-[13px] text-muted-foreground hover:bg-accent"
+            >
+              <button className="flex items-center gap-2">
+                <Search size={16} strokeWidth={2} />
+                Search
+              </button>
+            </SidebarMenuButton>
+            <SidebarMenuButton
+              asChild
+              className="rounded-lg justify-start gap-2 h-8 px-3 text-[13px] text-muted-foreground hover:bg-accent"
+              onClick={onOpenSettings}
+            >
+              <button className="flex items-center gap-2">
+                <GearSixIcon size={16} weight="regular" />
+                Settings
+              </button>
+            </SidebarMenuButton>
+          </div>
         )}
         <div className={isCollapsed ? "mt-2 pt-2 border-t" : "mt-2 pt-2 border-t"}>
           {!isCollapsed && (
@@ -535,18 +563,15 @@ function AppSidebarDesktop({
           </div>
         )}
       </SidebarContent>
-      <SidebarFooter className="gap-1">
-        <NavUser
-          user={
-            user || {
-              name: "Guest User",
-              email: "guest@example.com",
-              avatar: "",
-            }
-          }
-          onLogout={onLogout}
-          onOpenSettings={onOpenSettings}
-        />
+      <SidebarFooter className="gap-0">
+        {!isCollapsed && (
+          <SidebarGroup className="px-2">
+            <SidebarCalendar
+              events={events}
+              onDisplayMonthChange={onMiniCalendarMonthChange}
+            />
+          </SidebarGroup>
+        )}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
