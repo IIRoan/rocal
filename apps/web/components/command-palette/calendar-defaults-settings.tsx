@@ -12,10 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import { Calendar, Check, ArrowLeft } from "lucide-react";
+import { Calendar, Check, ArrowLeft, BookOpen } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 import { WORKING_DAYS, type PaletteView } from "./constants";
+import { useSharedCalendarData } from "@/components/calendar-data-provider";
+import { toast } from "sonner";
 
 interface CalendarDefaultsSettingsProps {
   open: boolean;
@@ -42,6 +44,25 @@ export function CalendarDefaultsSettings({
   TransitionContainer,
   transitionDirection,
 }: CalendarDefaultsSettingsProps) {
+  const { calendars, updateCalendar, refetchCalendars } = useSharedCalendarData();
+  const defaultCalendar = calendars.find(c => c.isDefault) || calendars[0];
+
+  const handleDefaultCalendarChange = async (calendarId: string) => {
+    try {
+      const calendar = calendars.find(c => c.id === calendarId);
+      if (!calendar) return;
+
+      await updateCalendar(calendarId, {
+        isDefault: true
+      });
+      
+      await refetchCalendars();
+      toast.success(`Set "${calendar.name}" as default`);
+    } catch (error) {
+      toast.error("Failed to update default calendar");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -68,6 +89,31 @@ export function CalendarDefaultsSettings({
               <span className="text-sm font-medium">Calendar Defaults</span>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Default Calendar - Dropdown */}
+              <div className="px-4 py-3 border-b border-border/50">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm">Default calendar</span>
+                  </div>
+                  <Select
+                    value={defaultCalendar?.id}
+                    onValueChange={handleDefaultCalendarChange}
+                  >
+                    <SelectTrigger className="w-[140px] h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {calendars.map((calendar) => (
+                        <SelectItem key={calendar.id} value={calendar.id}>
+                          {calendar.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Default View - Dropdown */}
               <div className="px-4 py-3 border-b border-border/50">
                 <div className="flex items-center justify-between gap-3">

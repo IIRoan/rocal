@@ -69,6 +69,7 @@ export function CalendarManager({
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
   const [calendarColor, setCalendarColor] = useState("#3b82f6");
+  const [calendarIsDefault, setCalendarIsDefault] = useState(false);
   const [calendarSaving, setCalendarSaving] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<any>(null);
   const [calendarValidationErrors, setCalendarValidationErrors] = useState<{
@@ -215,6 +216,7 @@ export function CalendarManager({
                       resetCalendarForm({
                         setCalendarName,
                         setCalendarColor,
+                        setCalendarIsDefault,
                         setEditingCalendar,
                         setCalendarValidationErrors,
                       });
@@ -252,6 +254,7 @@ export function CalendarManager({
                         setEditingCalendar(calendar);
                         setCalendarName(calendar.name);
                         setCalendarColor(calendar.color);
+                        setCalendarIsDefault(calendar.isDefault || false);
                         setCalendarValidationErrors({});
                         setShowRegenerateConfirm(false);
                         void loadShareLink(calendar.id);
@@ -372,6 +375,23 @@ export function CalendarManager({
                   </div>
                 </div>
 
+                {/* Default Settings */}
+                <div className="space-y-3 pt-3 border-t border-border/50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">
+                        DEFAULT CALENDAR
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use this calendar by default for new events.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={calendarIsDefault}
+                      onCheckedChange={setCalendarIsDefault}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -391,6 +411,7 @@ export function CalendarManager({
                     handleCalendarCreate(
                       calendarName,
                       calendarColor,
+                      calendarIsDefault,
                       calendars,
                       calendarData,
                       {
@@ -398,6 +419,7 @@ export function CalendarManager({
                         setCalendarSaving,
                         setCalendarName,
                         setCalendarColor,
+                        setCalendarIsDefault,
                       },
                       () => goBack("calendars"),
                     )
@@ -509,6 +531,24 @@ export function CalendarManager({
                     </div>
                   </div>
 
+                  {/* Default Settings */}
+                  <div className="space-y-3 pt-3 border-t border-border/50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          DEFAULT CALENDAR
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Use this calendar by default for new events.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={calendarIsDefault}
+                        onCheckedChange={setCalendarIsDefault}
+                      />
+                    </div>
+                  </div>
+
                   {/* ICS Sharing */}
                   <div className="space-y-3 pt-3 border-t border-border/50">
                     <div className="flex items-start justify-between gap-3">
@@ -614,6 +654,7 @@ export function CalendarManager({
                         handleCalendarUpdate(
                           calendarName,
                           calendarColor,
+                          calendarIsDefault,
                           calendars,
                           editingCalendar,
                           calendarData,

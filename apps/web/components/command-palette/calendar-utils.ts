@@ -40,6 +40,7 @@ export const validateCalendarForm = (
 export const handleCalendarCreate = async (
   calendarName: string,
   calendarColor: string,
+  calendarIsDefault: boolean,
   calendars: any[],
   calendarData: any,
   setters: {
@@ -47,6 +48,7 @@ export const handleCalendarCreate = async (
     setCalendarSaving: (saving: boolean) => void;
     setCalendarName: (name: string) => void;
     setCalendarColor: (color: string) => void;
+    setCalendarIsDefault: (isDefault: boolean) => void;
   },
   goBack: (view: PaletteView) => void,
 ) => {
@@ -63,12 +65,13 @@ export const handleCalendarCreate = async (
     await calendarData.createCalendar({
       name: calendarName.trim(),
       color: calendarColor,
-      isDefault: false,
+      isDefault: calendarIsDefault,
     });
 
     toast.success(`Calendar "${calendarName}" created`);
     setters.setCalendarName("");
     setters.setCalendarColor("#3b82f6");
+    setters.setCalendarIsDefault(false);
     goBack("calendars" as PaletteView);
   } catch (error: any) {
     console.error("Failed to create calendar:", error);
@@ -87,6 +90,7 @@ export const handleCalendarCreate = async (
 export const handleCalendarUpdate = async (
   calendarName: string,
   calendarColor: string,
+  calendarIsDefault: boolean,
   calendars: any[],
   editingCalendar: any,
   calendarData: any,
@@ -134,6 +138,7 @@ export const handleCalendarUpdate = async (
     await calendarData.updateCalendar(editingCalendar.id, {
       name: calendarName.trim(),
       color: calendarColor,
+      isDefault: calendarIsDefault,
     });
 
     toast.success(`Calendar "${calendarName}" updated`);
@@ -177,11 +182,13 @@ export const handleCalendarDelete = async (
 export const resetCalendarForm = (setters: {
   setCalendarName: (name: string) => void;
   setCalendarColor: (color: string) => void;
+  setCalendarIsDefault: (isDefault: boolean) => void;
   setEditingCalendar: (calendar: any) => void;
   setCalendarValidationErrors: (errors: any) => void;
 }) => {
   setters.setCalendarName("");
   setters.setCalendarColor("#3b82f6");
+  setters.setCalendarIsDefault(false);
   setters.setEditingCalendar(null);
   setters.setCalendarValidationErrors({});
 };
