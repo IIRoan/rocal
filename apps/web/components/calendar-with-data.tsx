@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import {
   EventCalendar,
   CalendarView,
@@ -35,6 +35,9 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible, currentDate } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const { openEventEditor, previewEvent } = useCommandPalette();
+
+  // Context-menu preview: ghost event shown while right-click menu is open
+  const [contextPreviewEvent, setContextPreviewEvent] = useState<CalendarEvent | null>(null);
 
   // Get the initial view from settings, fallback to month
   const initialView = settings?.defaultView || "month";
@@ -90,6 +93,16 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
   // Use the shared calendar data
   const calendarData = useSharedCalendarData();
+
+  // Context-menu preview handler: resolves calendar fallback before storing
+  const handleSetPreview = useCallback((event: CalendarEvent | null) => {
+    if (event && !event.calendarId) {
+      const fallbackId = calendarData.calendars?.[0]?.id || "";
+      setContextPreviewEvent({ ...event, calendarId: fallbackId });
+    } else {
+      setContextPreviewEvent(event);
+    }
+  }, [calendarData.calendars]);
 
   // Set the date range when component mounts (only once)
   const initializedRef = useRef(false);
@@ -167,13 +180,29 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       });
     }
 
+    // Merge context-menu preview (ghost event while right-click menu is open)
+    if (contextPreviewEvent) {
+      const calendar = calendarMap.get(contextPreviewEvent.calendarId);
+      const previewColor = contextPreviewEvent.color || calendar?.color || undefined;
+      transformedEventsList.push({
+        ...contextPreviewEvent,
+        description: contextPreviewEvent.description ?? undefined,
+        color: previewColor as any,
+        location: contextPreviewEvent.location ?? undefined,
+        categoryId: contextPreviewEvent.categoryId ?? undefined,
+        reminder: (contextPreviewEvent as any).reminder ?? undefined,
+        isPreview: true,
+      });
+    }
+
     return transformedEventsList;
   }, [
     calendarData.events,
     calendarData.calendars,
     visibleCalendarIds,
     previewEvent,
-  ]); // Add calendars + previewEvent to deps
+    contextPreviewEvent,
+  ]); // Add calendars + previewEvent + contextPreviewEvent to deps
 
   // Show calendar skeleton and overlay until ALL core elements are ready:
   // - settings
@@ -245,6 +274,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       onLoadNotifications={calendarData.loadNotifications}
       onUpdateNotifications={calendarData.updateNotifications}
       onEventEdit={openEventEditor}
+      onSetPreview={handleSetPreview}
     />
   );
 }
