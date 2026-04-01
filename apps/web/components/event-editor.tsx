@@ -904,7 +904,7 @@ function MobileEventEditorBody({
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {calendars.map((calendar) => (
+                  {calendars.filter((c) => !c.isSyncOnly).map((calendar) => (
                     <SelectItem key={calendar.id} value={calendar.id}>
                       <div className="flex items-center gap-2">
                         <div

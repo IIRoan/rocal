@@ -385,7 +385,7 @@ export function CalendarManagement({
   };
 
   const availableTargetCalendars = calendars.filter(
-    (c) => c.id !== deletingCalendar?.id,
+    (c) => c.id !== deletingCalendar?.id && !c.isSyncOnly,
   );
 
   const openShareDialog = async (calendar: Calendar) => {
@@ -677,6 +677,12 @@ export function CalendarManagement({
                               <span className="font-medium">
                                 {calendar.name}
                               </span>
+                              {calendar.isSyncOnly && (
+                                <Badge variant="secondary" className="text-xs bg-muted">
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  Synced
+                                </Badge>
+                              )}
                               {calendar.isDefault && (
                                 <Badge variant="outline" className="text-xs">
                                   <Star className="h-3 w-3 mr-1" />
@@ -685,6 +691,9 @@ export function CalendarManagement({
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground">
+                              {calendar.isSyncOnly
+                                ? "Read-only \u00B7 "
+                                : ""}
                               {isCalendarVisible(calendar.id) ? "Visible" : "Hidden"}
                             </div>
                           </div>
@@ -708,7 +717,7 @@ export function CalendarManagement({
                             )}
                           </Button>
 
-                          {!calendar.isDefault && (
+                          {!calendar.isSyncOnly && !calendar.isDefault && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -719,41 +728,46 @@ export function CalendarManagement({
                             </Button>
                           )}
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openShareDialog(calendar)}
-                            title="Share calendar as ICS"
-                            className="h-8 px-2 text-xs"
-                          >
-                            <Share2 className="h-3.5 w-3.5 mr-1" />
-                            Share
-                          </Button>
+                          {!calendar.isSyncOnly && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openShareDialog(calendar)}
+                              title="Share calendar as ICS"
+                              className="h-8 px-2 text-xs"
+                            >
+                              <Share2 className="h-3.5 w-3.5 mr-1" />
+                              Share
+                            </Button>
+                          )}
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCalendar(calendar);
-                              // Clear errors when opening edit dialog
-                              setValidationErrors({});
-                              setError(null);
-                              setSuccess(null);
-                            }}
-                            title="Edit calendar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          {!calendar.isSyncOnly && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingCalendar(calendar);
+                                setValidationErrors({});
+                                setError(null);
+                                setSuccess(null);
+                              }}
+                              title="Edit calendar"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeletingCalendar(calendar)}
-                            title="Delete calendar"
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!calendar.isSyncOnly && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingCalendar(calendar)}
+                              title="Delete calendar"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -1073,7 +1087,7 @@ export function CalendarManagement({
                     <SelectValue placeholder="Select calendar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {calendars.map((cal) => (
+                    {calendars.filter((c) => !c.isSyncOnly).map((cal) => (
                       <SelectItem key={cal.id} value={cal.id}>
                         <div className="flex items-center gap-2">
                           <div
