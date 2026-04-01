@@ -87,10 +87,21 @@ export function PageLoadingOverlay({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm",
+        "fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-sm",
         "animate-fade-in",
         className,
       )}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
       <LogoSpinner
         size="lg"
