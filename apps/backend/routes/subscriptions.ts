@@ -65,7 +65,11 @@ export const subscriptionsRoute = new Elysia()
     async ({ body, user, request }: any) => {
       // Robust user check with fallback
       user = await ensureAuthenticatedUser(user, request as Request);
-      const { name, url, calendarId } = body as CreateCalendarSubscriptionRequest;
+      const { name, url, color } = body;
+
+      if (!name?.trim()) {
+        throw new Error("Calendar name is required");
+      }
 
       // Check if URL is already subscribed by this user
       const existingSubscription = await prisma.calendarSubscription.findFirst({
@@ -77,18 +81,6 @@ export const subscriptionsRoute = new Elysia()
 
       if (existingSubscription) {
         throw new Error("You are already subscribed to this calendar URL");
-      }
-
-      // Verify calendar belongs to user
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          id: calendarId,
-          userId: user.id,
-        },
-      });
-
-      if (!calendar) {
-        throw new Error("Calendar not found or not owned by user");
       }
 
       // Test the URL by attempting to fetch and parse it
@@ -170,13 +162,25 @@ export const subscriptionsRoute = new Elysia()
         );
       }
 
+      // Auto-create a new sync-only calendar for this subscription
+      const calendarColor = color || "#6366f1";
+      const calendar = await prisma.calendar.create({
+        data: {
+          name: name.trim(),
+          color: calendarColor,
+          isSyncOnly: true,
+          isDefault: false,
+          userId: user.id,
+        },
+      });
+
       // Create the subscription
       const subscription = await prisma.calendarSubscription.create({
         data: {
-          name: name || testParseResult.calendarName || "External Calendar",
+          name: name.trim(),
           url,
           userId: user.id,
-          calendarId,
+          calendarId: calendar.id,
           lastSyncStatus: "pending",
         },
         include: {
@@ -184,19 +188,24 @@ export const subscriptionsRoute = new Elysia()
         },
       });
 
+      // Sync immediately on creation (non-blocking)
+      syncCalendarSubscription(subscription).catch((err) => {
+        logger.error("Initial sync failed for subscription:", subscription.id, err);
+      });
+
       return subscription;
     },
     {
       body: t.Object({
-        name: t.Optional(t.String()),
+        name: t.String(),
         url: t.String({ format: "uri" }),
-        calendarId: t.String(),
+        color: t.Optional(t.String()),
       }),
       detail: {
         tags: ["Calendar Subscriptions"],
         summary: "Subscribe to an external calendar",
         description:
-          "Creates a new calendar subscription and validates the URL by attempting to fetch and parse it.",
+          "Creates a new sync-only calendar and subscribes to an external .ics feed. Events are read-only and synced automatically.",
       },
     },
   )
@@ -260,7 +269,6 @@ export const subscriptionsRoute = new Elysia()
       // Robust user check with fallback
       user = await ensureAuthenticatedUser(user, request as Request);
       const { id } = params;
-      const { deleteEvents = false } = query;
 
       const subscription = await prisma.calendarSubscription.findFirst({
         where: {
@@ -273,31 +281,25 @@ export const subscriptionsRoute = new Elysia()
         throw new Error("Subscription not found");
       }
 
-      // If requested, delete all synced events from this subscription
-      if (deleteEvents) {
-        await prisma.calendarEvent.deleteMany({
-          where: {
-            subscriptionId: id,
-            isSynced: true,
-          },
-        });
-      } else {
-        await prisma.calendarEvent.updateMany({
-          where: {
-            subscriptionId: id,
-            isSynced: true,
-          },
-          data: {
-            isSynced: false,
-            subscriptionId: null,
-            externalId: null,
-            syncedAt: null,
-          },
-        });
-      }
+      // Delete all synced events from this subscription
+      await prisma.calendarEvent.deleteMany({
+        where: {
+          subscriptionId: id,
+        },
+      });
 
+      // Delete the subscription
       await prisma.calendarSubscription.delete({
         where: { id },
+      });
+
+      // Delete the associated sync-only calendar
+      await prisma.calendar.deleteMany({
+        where: {
+          id: subscription.calendarId,
+          userId: user.id,
+          isSyncOnly: true,
+        },
       });
 
       return { success: true };

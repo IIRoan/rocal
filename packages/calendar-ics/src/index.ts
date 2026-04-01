@@ -147,9 +147,9 @@ export interface CalendarSubscriptionSummary {
 }
 
 export interface CreateCalendarSubscriptionRequest {
-  name?: string;
+  name: string;
   url: string;
-  calendarId: string;
+  color?: string;
 }
 
 export interface UpdateCalendarSubscriptionRequest {

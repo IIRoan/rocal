@@ -29,6 +29,7 @@ export interface Calendar {
   color: EventColor;
   isVisible: boolean;
   isDefault: boolean;
+  isSyncOnly: boolean;
   userId: string;
   createdAt: Date;
   updatedAt: Date;

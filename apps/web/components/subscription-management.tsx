@@ -17,13 +17,6 @@ import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/ui/select";
 import { Badge } from "@workspace/ui/components/ui/badge";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import {
@@ -38,6 +31,21 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
+const PRESET_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#f43f5e",
+  "#ef4444",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+  "#6366f1",
+  "#ec4899",
+  "#14b8a6",
+];
+
 interface SubscriptionManagementProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,7 +58,7 @@ export function SubscriptionManagement({
   onBack,
 }: SubscriptionManagementProps) {
   const queryClient = useQueryClient();
-  const { calendars, refetchCalendars } = useCalendarData();
+  const { refetchCalendars } = useCalendarData();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -59,13 +67,12 @@ export function SubscriptionManagement({
   const [newSubscription, setNewSubscription] = useState({
     name: "",
     url: "",
-    calendarId: "",
+    color: "#6366f1",
   });
 
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
     url?: string;
-    calendarId?: string;
   }>({});
 
   // Query
@@ -81,13 +88,13 @@ export function SubscriptionManagement({
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; url: string; calendarId: string }) =>
+    mutationFn: (data: { name: string; url: string; color?: string }) =>
       calendarApiService.createSubscription(data),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
-      setSuccess("Calendar subscription created successfully!");
-      setNewSubscription({ name: "", url: "", calendarId: "" });
+      setSuccess("Subscription created! A new sync-only calendar has been added.");
+      setNewSubscription({ name: "", url: "", color: "#6366f1" });
       setShowCreateForm(false);
       setLocalError(null);
     },
@@ -135,7 +142,7 @@ export function SubscriptionManagement({
     const errors: typeof validationErrors = {};
 
     if (!newSubscription.name.trim()) {
-      errors.name = "Subscription name is required";
+      errors.name = "Calendar name is required";
     }
 
     if (!newSubscription.url.trim()) {
@@ -151,10 +158,6 @@ export function SubscriptionManagement({
       }
     }
 
-    if (!newSubscription.calendarId) {
-      errors.calendarId = "Please select a calendar";
-    }
-
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -164,14 +167,14 @@ export function SubscriptionManagement({
     createMutation.mutate({
       name: newSubscription.name.trim(),
       url: newSubscription.url.trim(),
-      calendarId: newSubscription.calendarId,
+      color: newSubscription.color,
     });
   };
 
   const handleDeleteSubscription = (subscription: CalendarSubscription) => {
     if (
       !confirm(
-        `Are you sure you want to unsubscribe from "${subscription.name}"?`,
+        `Are you sure you want to unsubscribe from "${subscription.name}"? The synced calendar and its events will also be deleted.`,
       )
     ) {
       return;
@@ -321,12 +324,16 @@ export function SubscriptionManagement({
 
             {showCreateForm && (
               <div className="px-4 py-3 border-b border-border/50 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  A new read-only calendar will be created for this subscription. Events are synced automatically and cannot be edited.
+                </p>
+
                 <div className="space-y-2">
                   <Label
                     htmlFor="subscription-name"
                     className="text-xs font-medium text-muted-foreground"
                   >
-                    NAME
+                    CALENDAR NAME
                   </Label>
                   <Input
                     id="subscription-name"
@@ -388,53 +395,22 @@ export function SubscriptionManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="subscription-calendar"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    TARGET CALENDAR
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    COLOR
                   </Label>
-                  <Select
-                    value={newSubscription.calendarId}
-                    onValueChange={(value) => {
-                      setNewSubscription({
-                        ...newSubscription,
-                        calendarId: value,
-                      });
-                      if (validationErrors.calendarId) {
-                        setValidationErrors({
-                          ...validationErrors,
-                          calendarId: undefined,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      id="subscription-calendar"
-                      className={`h-8 text-sm ${validationErrors.calendarId ? "border-destructive" : ""}`}
-                    >
-                      <SelectValue placeholder="Select calendar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {calendars.map((calendar) => (
-                        <SelectItem key={calendar.id} value={calendar.id}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: calendar.color }}
-                            />
-                            {calendar.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {validationErrors.calendarId && (
-                    <p className="text-xs text-destructive flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {validationErrors.calendarId}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {PRESET_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`w-6 h-6 rounded-full transition-all ${newSubscription.color === color ? "ring-2 ring-offset-2 ring-primary scale-110" : "hover:scale-110"}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() =>
+                          setNewSubscription({ ...newSubscription, color })
+                        }
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-1">
@@ -443,7 +419,7 @@ export function SubscriptionManagement({
                     size="sm"
                     onClick={() => {
                       setShowCreateForm(false);
-                      setNewSubscription({ name: "", url: "", calendarId: "" });
+                      setNewSubscription({ name: "", url: "", color: "#6366f1" });
                       setValidationErrors({});
                     }}
                     className="h-7"
