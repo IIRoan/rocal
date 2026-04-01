@@ -105,6 +105,8 @@ export interface EventCalendarProps {
       eventViewMode?: "view" | "edit";
     },
   ) => void;
+  // Preview event callback for showing ghost events (e.g. during right-click context menu)
+  onSetPreview?: (event: CalendarEvent | null) => void;
   // Custom sidebar toggle handler for mobile
   onSidebarToggle?: () => void;
 }
@@ -135,6 +137,7 @@ export function EventCalendar({
   onLoadNotifications,
   onUpdateNotifications,
   onEventEdit,
+  onSetPreview,
   onSidebarToggle,
 }: EventCalendarProps) {
   type ContextTarget =
@@ -404,6 +407,7 @@ export function EventCalendar({
     if (eventElement?.dataset.eventId) {
       const event = events.find((item) => item.id === eventElement.dataset.eventId);
       if (event) {
+        onSetPreview?.(null);
         reopenContextMenuAt({ type: "event", event }, e.clientX, e.clientY);
         return;
       }
@@ -422,6 +426,23 @@ export function EventCalendar({
         startTime.setHours(DefaultStartHour, 0, 0, 0);
       }
 
+      // Show a preview event at the right-clicked position
+      startTime.setSeconds(0);
+      startTime.setMilliseconds(0);
+      const previewEvent: CalendarEvent = {
+        id: "__context_preview__" as any,
+        title: "",
+        start: new Date(startTime),
+        end: addMinutesToDate(startTime, defaultEventDuration),
+        allDay: false,
+        calendarId: defaultCalendarId || "",
+        userId: "",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isPreview: true,
+      };
+      onSetPreview?.(previewEvent);
+
       reopenContextMenuAt(
         { type: "timeline", startTime },
         e.clientX,
@@ -429,6 +450,9 @@ export function EventCalendar({
       );
       return;
     }
+
+    // Clear any existing preview for non-timeline right-clicks
+    onSetPreview?.(null);
 
     reopenContextMenuAt({ type: "general" }, e.clientX, e.clientY);
   };
@@ -975,7 +999,15 @@ export function EventCalendar({
         </CalendarDndProvider>
       </div>
 
-      <DropdownMenu open={contextMenuOpen} onOpenChange={setContextMenuOpen}>
+      <DropdownMenu
+        open={contextMenuOpen}
+        onOpenChange={(open) => {
+          setContextMenuOpen(open);
+          if (!open) {
+            onSetPreview?.(null);
+          }
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
             type="button"
