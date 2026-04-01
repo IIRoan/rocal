@@ -110,6 +110,7 @@ export const UserRelations = t.Object(
           color: t.String(),
           isVisible: t.Boolean(),
           isDefault: t.Boolean(),
+          isSyncOnly: t.Boolean(),
           icsShareToken: __nullable__(t.String()),
           icsShareEnabled: t.Boolean(),
           userId: t.String(),
