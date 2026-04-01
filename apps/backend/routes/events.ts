@@ -490,6 +490,14 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           );
         }
 
+        // Block event creation in sync-only calendars
+        if (calendar.isSyncOnly) {
+          throw new ValidationError(
+            "Cannot create events in a sync-only calendar. This calendar is synced from an external subscription.",
+            "calendarId",
+          );
+        }
+
         // Validate reminder if provided (must be a non-negative number)
         if (body.reminder !== undefined && body.reminder !== null) {
           const reminderValue = Number(body.reminder);
@@ -1032,6 +1040,27 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               "calendarId",
             );
           }
+
+          // Block moving events into sync-only calendars
+          if (calendar.isSyncOnly) {
+            throw new ValidationError(
+              "Cannot move events to a sync-only calendar.",
+              "calendarId",
+            );
+          }
+        }
+
+        // Block editing events that are in sync-only calendars (unless it's a sync operation)
+        const eventForSyncCheck = await prisma.calendarEvent.findFirst({
+          where: { id: id, userId: user.id },
+          include: { calendar: true },
+        });
+
+        if (eventForSyncCheck?.isSynced) {
+          throw new ValidationError(
+            "Cannot edit synced events. These events are managed by the external subscription.",
+            "id",
+          );
         }
 
         // Validate category exists and belongs to user if provided

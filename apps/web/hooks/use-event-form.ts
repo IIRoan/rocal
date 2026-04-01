@@ -180,7 +180,7 @@ export function useEventForm({
       setEventAllDay(event.allDay || false);
       setEventLocation(event.location || "");
       setEventCalendarId(
-        event.calendarId || calendarsRef.current?.[0]?.id || "",
+        event.calendarId || calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
       );
       setEventReminder(event.reminder ?? null);
 
@@ -260,7 +260,7 @@ export function useEventForm({
     setEventEndTime("10:00");
     setEventAllDay(false);
     setEventLocation("");
-    setEventCalendarId(calendarsRef.current?.[0]?.id || "");
+    setEventCalendarId(calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "");
     setEventReminder(null);
     setEventNotifications([
       {

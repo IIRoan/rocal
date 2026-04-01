@@ -248,6 +248,7 @@ export function CalendarManager({
                       key={calendar.id}
                       type="button"
                       onClick={() => {
+                        if (calendar.isSyncOnly) return;
                         setEditingCalendar(calendar);
                         setCalendarName(calendar.name);
                         setCalendarColor(calendar.color);
@@ -256,7 +257,7 @@ export function CalendarManager({
                         void loadShareLink(calendar.id);
                         goForward("calendar-edit");
                       }}
-                      className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                      className={`flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors ${calendar.isSyncOnly ? "opacity-70" : ""}`}
                     >
                       <div
                         className="h-3.5 w-3.5 rounded-sm shrink-0"
@@ -264,13 +265,19 @@ export function CalendarManager({
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm truncate">{calendar.name}</div>
-                        {calendar.isDefault && (
+                        {calendar.isSyncOnly ? (
+                          <div className="text-xs text-muted-foreground">
+                            Synced (read-only)
+                          </div>
+                        ) : calendar.isDefault ? (
                           <div className="text-xs text-muted-foreground">
                             Default
                           </div>
-                        )}
+                        ) : null}
                       </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                      {!calendar.isSyncOnly && (
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                      )}
                     </button>
                   ))}
                 </div>

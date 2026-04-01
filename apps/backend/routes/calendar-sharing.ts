@@ -158,11 +158,16 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
           name: true,
           icsShareEnabled: true,
           icsShareToken: true,
+          isSyncOnly: true,
         },
       });
 
       if (!calendar) {
         throw new ValidationError("Calendar not found or access denied");
+      }
+
+      if (calendar.isSyncOnly) {
+        throw new ValidationError("Cannot share a synced calendar. This calendar is read-only and synced from an external subscription.");
       }
 
       return serializeShareLinkResponse(calendar, request as Request);
@@ -195,11 +200,16 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
           id: true,
           name: true,
           icsShareToken: true,
+          isSyncOnly: true,
         },
       });
 
       if (!calendar) {
         throw new ValidationError("Calendar not found or access denied");
+      }
+
+      if (calendar.isSyncOnly) {
+        throw new ValidationError("Cannot share a synced calendar. This calendar is read-only and synced from an external subscription.");
       }
 
       let nextToken = calendar.icsShareToken;
@@ -254,11 +264,16 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
         },
         select: {
           id: true,
+          isSyncOnly: true,
         },
       });
 
       if (!calendar) {
         throw new ValidationError("Calendar not found or access denied");
+      }
+
+      if (calendar.isSyncOnly) {
+        throw new ValidationError("Cannot modify sharing for a synced calendar.");
       }
 
       await prisma.calendar.update({
