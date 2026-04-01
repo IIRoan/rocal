@@ -2,8 +2,7 @@
 
 import { useSession, signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-import { AppSidebar } from "@workspace/ui/components/layout";
-import { MobileCalendarWrapper } from "@workspace/ui/components";
+import dynamic from "next/dynamic";
 import {
   SidebarInset,
   SidebarProvider,
@@ -11,8 +10,27 @@ import {
   MobileCalendarSkeleton,
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
-import { CalendarWithData } from "@/components/calendar-with-data";
-import { CommandPalette } from "@/components/command-palette";
+
+const AppSidebar = dynamic(
+  () => import("@workspace/ui/components/layout").then((mod) => mod.AppSidebar),
+  { ssr: false }
+);
+
+const MobileCalendarWrapper = dynamic(
+  () => import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
+  { ssr: false, loading: () => <MobileCalendarSkeleton /> }
+);
+
+const CalendarWithData = dynamic(
+  () => import("@/components/calendar-with-data").then((mod) => mod.CalendarWithData),
+  { ssr: false }
+);
+
+const CommandPalette = dynamic(
+  () => import("@/components/command-palette").then((mod) => mod.CommandPalette),
+  { ssr: false }
+);
+
 import { CommandPaletteProvider } from "@/components/command-palette-context";
 import { CalendarDataProvider } from "@/components/calendar-data-provider";
 import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";

@@ -38,14 +38,28 @@ import {
 } from "./constants";
 import { addHoursToDate, addMinutesToDate } from "./utils";
 import { CalendarEvent, CalendarView, CALENDAR_VIEWS } from "./types";
-import { AgendaView } from "./agenda-view";
-import { DayView } from "./day-view";
-import { MonthView } from "./month-view";
-import { WeekView } from "./week-view";
+import dynamic from "next/dynamic";
+import { EventLoadingSkeleton } from "./event-loading-skeleton";
+
+const AgendaView = dynamic(() => import("./agenda-view").then((mod) => mod.AgendaView), {
+  ssr: false,
+  loading: () => <EventLoadingSkeleton view="agenda" compactView={false} className="absolute inset-0 z-10" />
+});
+const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), {
+  ssr: false,
+  loading: () => <EventLoadingSkeleton view="day" compactView={false} className="absolute inset-0 z-10" />
+});
+const MonthView = dynamic(() => import("./month-view").then((mod) => mod.MonthView), {
+  ssr: false,
+  loading: () => <EventLoadingSkeleton view="month" compactView={false} className="absolute inset-0 z-10" />
+});
+const WeekView = dynamic(() => import("./week-view").then((mod) => mod.WeekView), {
+  ssr: false,
+  loading: () => <EventLoadingSkeleton view="week" compactView={false} className="absolute inset-0 z-10" />
+});
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
-import { EventLoadingSkeleton } from "./event-loading-skeleton";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
