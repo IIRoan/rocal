@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
 import { useSession } from "@/lib/auth-client";
@@ -11,11 +11,6 @@ import { ArrowRight, Calendar, Sparkles, ShieldCheck } from "lucide-react";
 export function HomePageClient() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   useEffect(() => {
     if (!isPending && session?.user) {
@@ -23,7 +18,7 @@ export function HomePageClient() {
     }
   }, [isPending, session?.user, router]);
 
-  if (isPending || !isClient) {
+  if (isPending) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background">
         <Logo width={48} height={48} className="text-primary animate-pulse mb-4" />

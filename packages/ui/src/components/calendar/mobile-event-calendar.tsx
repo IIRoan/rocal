@@ -33,16 +33,18 @@ import {
 } from "./constants";
 import { addHoursToDate, addMinutesToDate } from "./utils";
 import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
-import { AgendaView } from "./agenda-view";
-import { DayView } from "./day-view";
-import { MonthView } from "./month-view";
-import { WeekView } from "./week-view";
-import { MobileDayView } from "./mobile-day-view";
-import { MobileWeekView } from "./mobile-week-view";
-import { MobileThreeDayView } from "./mobile-three-day-view";
+import dynamic from "next/dynamic";
+import { CalendarSkeleton } from "./calendar-skeleton";
+
+const AgendaView = dynamic(() => import("./agenda-view").then((mod) => mod.AgendaView), { ssr: false, loading: () => <CalendarSkeleton view="agenda" compactView={false} /> });
+const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), { ssr: false, loading: () => <CalendarSkeleton view="day" compactView={false} /> });
+const MonthView = dynamic(() => import("./month-view").then((mod) => mod.MonthView), { ssr: false, loading: () => <CalendarSkeleton view="month" compactView={false} /> });
+const WeekView = dynamic(() => import("./week-view").then((mod) => mod.WeekView), { ssr: false, loading: () => <CalendarSkeleton view="week" compactView={false} /> });
+const MobileDayView = dynamic(() => import("./mobile-day-view").then((mod) => mod.MobileDayView), { ssr: false, loading: () => <CalendarSkeleton view="day" compactView={false} /> });
+const MobileWeekView = dynamic(() => import("./mobile-week-view").then((mod) => mod.MobileWeekView), { ssr: false, loading: () => <CalendarSkeleton view="week" compactView={false} /> });
+const MobileThreeDayView = dynamic(() => import("./mobile-three-day-view").then((mod) => mod.MobileThreeDayView), { ssr: false, loading: () => <CalendarSkeleton view="3day" compactView={false} /> });
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
-import { CalendarSkeleton } from "./calendar-skeleton";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
