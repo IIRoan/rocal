@@ -180,7 +180,7 @@ export function DayView({
         getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
       const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
       const top = (startHour - StartHour) * WeekCellsHeight;
-      const height = (endHour - startHour) * WeekCellsHeight;
+      const height = Math.max((endHour - startHour) * WeekCellsHeight, 22);
 
       const columnIndex = eventColumnMapping.get(event) ?? 0;
 

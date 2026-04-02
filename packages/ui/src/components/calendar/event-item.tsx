@@ -58,6 +58,7 @@ interface EventWrapperProps {
   className?: string;
   children: React.ReactNode;
   currentTime?: Date;
+  compact?: boolean;
   dndListeners?: SyntheticListenerMap;
   dndAttributes?: DraggableAttributes;
   onMouseDown?: (e: React.MouseEvent) => void;
@@ -74,6 +75,7 @@ function EventWrapper({
   className,
   children,
   currentTime,
+  compact = false,
   dndListeners,
   dndAttributes,
   onMouseDown,
@@ -131,11 +133,9 @@ function EventWrapper({
     <button
       className={cn(
         "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] border border-white/20 shadow-sm",
-        // Enhanced mobile touch targets and visual feedback
-        "min-h-[20px] sm:min-h-[24px]", // Minimum touch target size
-        "touch-manipulation", // Optimized touch behavior
-        // Mobile-optimized padding - less horizontal padding to show more text
-        "px-[2px] sm:px-2",
+        "touch-manipulation",
+        // Only apply min-height and padding when not compact (small events)
+        compact ? "min-h-0 px-[1px]" : "min-h-[20px] sm:min-h-[24px] px-[2px] sm:px-2",
         getEventColorClasses(event.color),
         getBorderRadiusClasses(isFirstDay, isLastDay),
         className,
@@ -161,6 +161,7 @@ interface EventItemProps {
   isDragging?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   showTime?: boolean;
+  height?: number;
   currentTime?: Date; // For updating time during drag
   isFirstDay?: boolean;
   isLastDay?: boolean;
@@ -184,6 +185,7 @@ export function EventItem({
   isDragging,
   onClick,
   showTime,
+  height,
   currentTime,
   isFirstDay = true,
   isLastDay = true,
@@ -263,6 +265,12 @@ export function EventItem({
     }
 
     if (view === "week" || view === "day") {
+      // Height-based sizing thresholds
+      const isCompact = height != null && height < 20;
+      const isSmall = height != null && height < 30;
+      const isMedium = height != null && height < 45;
+      const showTimeLine = !isCompact && !isSmall && durationMinutes >= 45 && showTime && !event.allDay;
+
       return (
         <EventWrapper
           event={event}
@@ -270,13 +278,19 @@ export function EventItem({
           isLastDay={isLastDay}
           isDragging={isDragging}
           onClick={onClick}
+          compact={isCompact}
           className={cn(
-            "py-0.5 sm:py-1",
-            durationMinutes < 45 ? "items-center" : "flex-col",
-            // Enhanced mobile typography and sizing with better text wrapping
-            view === "week"
-              ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal"
-              : "text-[13px]",
+            // No vertical padding when very small
+            isCompact ? "" : isSmall ? "py-px" : "py-0.5 sm:py-1",
+            isCompact ? "items-center" : isSmall ? "items-center" : showTimeLine ? "flex-col" : "items-center",
+            // Font size scales with height
+            isCompact
+              ? "text-[8px] leading-none"
+              : isSmall
+                ? "text-[9px] leading-tight"
+                : view === "week"
+                  ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal"
+                  : "text-[13px]",
             className,
           )}
           currentTime={currentTime}
@@ -285,40 +299,18 @@ export function EventItem({
           onMouseDown={onMouseDown}
           onTouchStart={onTouchStart}
         >
-          {durationMinutes < 45 ? (
-            // Short events - mobile optimized layout
-            <div className="flex items-start gap-0.5 w-full min-w-0">
-              <span
-                className={cn(
-                  "font-medium flex-1 min-w-0",
-                  // On mobile, allow text wrapping for very narrow events
-                  view === "week"
-                    ? "break-words hyphens-auto sm:truncate"
-                    : "truncate",
-                )}
-                title={event.title} // Tooltip for full title on hover/long press
-              >
-                {event.title}
-              </span>
-            </div>
-          ) : (
-            // Longer events - mobile optimized layout
-            <>
-              <div className="flex items-start gap-0.5 w-full min-w-0">
-                <span
-                  className={cn(
-                    "font-medium flex-1 min-w-0",
-                    // On mobile, allow text wrapping for week view
-                    view === "week"
-                      ? "break-words hyphens-auto leading-tight sm:truncate"
-                      : "truncate",
-                  )}
-                  title={event.title} // Tooltip for full title on hover/long press
-                >
-                  {event.title}
-                </span>
-              </div>
-            </>
+          <div className="flex items-center gap-0.5 w-full min-w-0 overflow-hidden">
+            <span
+              className="font-medium flex-1 min-w-0 truncate whitespace-nowrap"
+              title={event.title}
+            >
+              {event.title}
+            </span>
+          </div>
+          {showTimeLine && (
+            <span className="opacity-70 truncate whitespace-nowrap text-[10px]">
+              {getEventTime()}
+            </span>
           )}
         </EventWrapper>
       );

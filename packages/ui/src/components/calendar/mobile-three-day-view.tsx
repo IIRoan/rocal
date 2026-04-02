@@ -151,7 +151,7 @@ export function MobileThreeDayView({
         const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
 
         const top = startHour * CELL_HEIGHT;
-        const height = Math.max((endHour - startHour) * CELL_HEIGHT, 16);
+        const height = Math.max((endHour - startHour) * CELL_HEIGHT, 22);
 
         const columnIndex = eventColumnMapping.get(event) ?? 0;
 

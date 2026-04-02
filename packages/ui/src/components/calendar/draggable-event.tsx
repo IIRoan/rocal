@@ -138,6 +138,7 @@ export function DraggableEvent({
         event={event}
         view={view}
         showTime={showTime}
+        height={height}
         isFirstDay={isFirstDay}
         isLastDay={isLastDay}
         isDragging={isDragging}
