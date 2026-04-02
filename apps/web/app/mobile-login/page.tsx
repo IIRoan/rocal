@@ -157,10 +157,11 @@ function MobileLoginForm() {
       } else {
         window.location.assign(authUrl);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
       setIsLoading(false);
-      setError("GitHub login could not be started. Please try again.");
+      const detail = error?.message || error?.toString?.() || "Unknown error";
+      setError(`GitHub login could not be started: ${detail}`);
     }
   };
 

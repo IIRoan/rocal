@@ -241,6 +241,15 @@ function MobileAuthCompleteContent() {
   if (currentStep === "error") {
     return (
       <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex flex-col items-center justify-center px-4 py-6 sm:py-8 bg-background">
+        {errorCode && (
+          <div className="bg-destructive text-destructive-foreground p-4 rounded-md mb-4 w-full max-w-sm text-center">
+            <p className="font-bold">Authentication Error</p>
+            <p className="text-sm">An error occurred during the login process. The specific error code is provided below for debugging.</p>
+            <p className="mt-2 text-xs font-mono bg-destructive-foreground/10 py-1 px-2 rounded-sm">
+              Error Code: {errorCode}
+            </p>
+          </div>
+        )}
         <Logo
           width={56}
           height={56}
