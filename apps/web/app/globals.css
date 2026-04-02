@@ -832,19 +832,19 @@
   @media (max-width: 768px) {
     /* Safe area insets for mobile devices */
     .safe-area-inset-top {
-      padding-top: env(safe-area-inset-top, 0);
+      padding-top: calc(env(safe-area-inset-top, 0) * 0.5); /* Reduced by half */
     }
 
     .safe-area-inset-bottom {
-      padding-bottom: env(safe-area-inset-bottom, 0);
+      padding-bottom: calc(env(safe-area-inset-bottom, 0) * 0.5); /* Reduced by half */
     }
 
     .safe-area-inset-left {
-      padding-left: env(safe-area-inset-left, 0);
+      padding-left: calc(env(safe-area-inset-left, 0) * 0.5);
     }
 
     .safe-area-inset-right {
-      padding-right: env(safe-area-inset-right, 0);
+      padding-right: calc(env(safe-area-inset-right, 0) * 0.5);
     }
 
     /* Improved mobile touch targets */

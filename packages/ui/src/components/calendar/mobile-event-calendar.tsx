@@ -61,6 +61,7 @@ import { useDropdownShortcuts } from "../../hooks";
 export interface MobileEventCalendarProps {
   className?: string;
   initialView?: CalendarView;
+  currentDateOverride?: Date;
   // Data props
   events?: CalendarEvent[];
   categories?: any[];
@@ -138,10 +139,12 @@ export function MobileEventCalendar({
   onEventEdit,
   onSidebarToggle,
   onViewChange,
+  currentDateOverride,
   user,
 }: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
-  const { currentDate, setCurrentDate } = useCalendarContext();
+  const { currentDate: contextCurrentDate, setCurrentDate } = useCalendarContext();
+  const currentDate = currentDateOverride || contextCurrentDate;
   const isMobile = useIsMobile();
 
   // Initialize view from sessionStorage or fallback to smart default
