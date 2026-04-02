@@ -1,0 +1,43 @@
+import { $ } from 'bun';
+import path from 'path';
+
+const androidDir = path.resolve(import.meta.dir, '../android');
+const outputDir = path.resolve(import.meta.dir, '../output');
+const bundletoolPath = path.join(androidDir, 'bundletool/bundletool-all-1.18.3.jar');
+
+async function main() {
+  console.log('Starting Android APK build...');
+
+  // 1. Build the Android App Bundle
+  console.log('Building Android App Bundle...');
+  await $`cd ${androidDir} && ./gradlew bundleRelease`;
+
+  const aabPath = path.join(androidDir, 'app/build/outputs/bundle/release/app-release.aab');
+  const apksPath = path.join(androidDir, 'app-release.apks');
+
+  // 2. Generate the .apks archive
+  console.log('Generating .apks archive...');
+  await $`java -jar ${bundletoolPath} build-apks --bundle=${aabPath} --output=${apksPath} --mode=universal`;
+
+  // 3. Extract the universal.apk
+  console.log('Extracting universal.apk...');
+  const apksZipPath = apksPath.replace('.apks', '.zip');
+  await $`mv ${apksPath} ${apksZipPath}`;
+  await $`unzip -o ${apksZipPath} -d ${androidDir}`;
+
+  const universalApkPath = path.join(androidDir, 'universal.apk');
+
+  // 4. Move to output directory
+  console.log('Moving APK to output directory...');
+  await $`mkdir -p ${outputDir}`;
+  await $`mv ${universalApkPath} ${path.join(outputDir, 'solace.apk')}`;
+
+
+  // 5. Cleanup
+  console.log('Cleaning up...');
+  await $`rm ${apksZipPath}`;
+
+  console.log('Build complete! Find your APK at: ', path.join(outputDir, 'solace.apk'));
+}
+
+main();

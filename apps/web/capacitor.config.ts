@@ -9,6 +9,11 @@ const config: CapacitorConfig = {
   server: {
     // Local auth debugging runs against `http://localhost:3001` via adb reverse.
     // Keep dev on `http://localhost` so cookie semantics match. Production stays https.
+    ...(isProduction
+      ? {
+          url: 'https://solace.onl',
+        }
+      : {}),
     androidScheme: isProduction ? 'https' : 'http',
   },
 };
