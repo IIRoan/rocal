@@ -6,18 +6,6 @@ const DEFAULT_MOBILE_AUTH_CALLBACK_URL = "app.solace.onl://api/auth";
 const AUTH_REDIRECT_FALLBACK_PATH = "/dashboard";
 const MOBILE_AUTH_BRIDGE_PATH = "/auth/mobile-complete";
 
-const getHostBasedBackendUrl = () => {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  const { protocol, hostname } = window.location;
-  if (!hostname) {
-    return "";
-  }
-  return `${protocol}//${hostname}:${BACKEND_PORT}`;
-};
-
 const toSafeRelativePath = (path?: string | null) => {
   if (!path || !path.startsWith("/")) {
     return AUTH_REDIRECT_FALLBACK_PATH;
@@ -33,10 +21,7 @@ export const getApiBaseUrl = () => {
   }
 
   if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-    const hostBasedUrl = getHostBasedBackendUrl();
-    if (hostBasedUrl) {
-      return hostBasedUrl;
-    }
+    return `${window.location.protocol}//${window.location.hostname}:${BACKEND_PORT}`;
   }
 
   return `http://localhost:${BACKEND_PORT}`;
@@ -97,7 +82,7 @@ export const getMobileAuthBridgeUrl = (
   const safePath = toSafeRelativePath(nextPath);
   const bridgeUrl = new URL(
     MOBILE_AUTH_BRIDGE_PATH,
-    process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL,
+    getAppBaseUrl(),
   );
   bridgeUrl.searchParams.set("next", safePath);
 
