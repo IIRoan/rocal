@@ -44,7 +44,6 @@ interface MobileWeekViewProps {
   workingDays?: number[];
   timezone?: string;
   showMonthPicker?: boolean;
-  hideTimeGutter?: boolean;
 }
 
 interface PositionedEvent {
@@ -67,7 +66,6 @@ export function MobileWeekView({
   workingDays = [1, 2, 3, 4, 5],
   timezone,
   showMonthPicker = true,
-  hideTimeGutter = false,
 }: MobileWeekViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
@@ -317,22 +315,20 @@ export function MobileWeekView({
         {/* Time grid with events */}
         <div className="flex">
           {/* Time column - all hours shown, time label ON the hour line */}
-          {!hideTimeGutter && (
-            <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
-              {hours.map((hour, index) => (
-                <div
-                  key={hour.toString()}
-                  className="relative"
-                  style={{ height: MobileCellHeight }}
-                >
-                  {/* Time label positioned ON the line with background to hide line behind text */}
-                  <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
-                    {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
+            {hours.map((hour, index) => (
+              <div
+                key={hour.toString()}
+                className="relative"
+                style={{ height: MobileCellHeight }}
+              >
+                {/* Time label positioned ON the line with background to hide line behind text */}
+                <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
+                  {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
+                </span>
+              </div>
+            ))}
+          </div>
 
           {/* Days columns */}
           {days.map((day, dayIndex) => (
