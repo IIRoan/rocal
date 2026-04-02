@@ -163,7 +163,7 @@ export function MobileDayView({
 
       // Calculate position for full 24-hour day
       const top = startHour * MobileCellHeight;
-      const height = (endHour - startHour) * MobileCellHeight;
+      const height = Math.max((endHour - startHour) * MobileCellHeight, 22);
 
       const columnIndex = eventColumnMapping.get(event) ?? 0;
 
