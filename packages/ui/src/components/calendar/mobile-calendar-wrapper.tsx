@@ -3,12 +3,6 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import {
-  eachHourOfInterval,
-  addHours,
-  format,
-  startOfDay,
-} from "date-fns";
-import {
   MobileEventCalendar,
   MobileEventCalendarProps,
 } from "./mobile-event-calendar";
@@ -47,22 +41,6 @@ interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   onOpenAddEvent?: () => void;
   getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
-}
-
-// Cell heights must match the mobile view components
-const TIME_GUTTER_WIDTH = 44; // w-11 = 2.75rem = 44px
-function getCellHeight(view: CalendarView): number {
-  switch (view) {
-    case "week": return 50;
-    case "day":
-    case "3day": return 60;
-    default: return 60;
-  }
-}
-
-// Check if the view has a time-based gutter
-function hasTimeGutter(view: CalendarView): boolean {
-  return view === "day" || view === "3day" || view === "week";
 }
 
 export function MobileCalendarWrapper({
@@ -188,15 +166,6 @@ export function MobileCalendarWrapper({
   const prevDate = useMemo(() => getPrevDate(currentDate), [currentDate, getPrevDate]);
   const nextDate = useMemo(() => getNextDate(currentDate), [currentDate, getNextDate]);
 
-  // Time gutter state
-  const showGutter = hasTimeGutter(currentView);
-  const cellHeight = getCellHeight(currentView);
-  const hours = useMemo(() => {
-    const dayStart = startOfDay(currentDate);
-    return eachHourOfInterval({ start: addHours(dayStart, 0), end: addHours(dayStart, 23) });
-  }, [currentDate]);
-  const timeGutterRef = useRef<HTMLDivElement>(null);
-
   // Embla Carousel - 3 slides, start on center (index 1)
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
@@ -287,104 +256,44 @@ export function MobileCalendarWrapper({
         />
       )}
 
-      {/* Main Calendar Content - Time Gutter + Embla Carousel */}
+      {/* Main Calendar Content - Embla Carousel */}
       <div className={cn("flex-1 overflow-hidden relative w-full h-full", className)}>
-        <div className="flex h-full">
-          {/* Fixed time gutter - only shown for time-based views */}
-          {showGutter && (
-            <div
-              ref={timeGutterRef}
-              className="flex-shrink-0 border-r border-border/50 bg-background overflow-hidden"
-              style={{ width: TIME_GUTTER_WIDTH }}
-            >
-              {hours.map((hour) => (
-                <div
-                  key={hour.toString()}
-                  className="relative"
-                  style={{ height: cellHeight }}
-                >
-                  <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
-                    {format(hour, props.timeFormat === "24h" ? "HH:00" : "h a")}
-                  </span>
-                </div>
-              ))}
+        <div className="overflow-hidden h-full" ref={emblaRef} style={{ touchAction: "pan-y" }}>
+          <div className="flex h-full">
+            {/* Previous */}
+            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+              <MobileEventCalendar
+                {...props}
+                user={user}
+                initialView={currentView}
+                currentDateOverride={prevDate}
+                onSidebarToggle={handleOpenSidebar}
+                onViewChange={handleCalendarViewChange}
+              />
             </div>
-          )}
-
-          {/* Embla Carousel - slides have no time gutter */}
-          <div className="flex-1 overflow-hidden h-full" ref={emblaRef} style={{ touchAction: "pan-y" }}>
-            <div className="flex h-full">
-              {/* Previous */}
-              <div
-                data-slide-scroll
-                className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
-                style={{ flex: "0 0 100%", touchAction: "pan-y" }}
-                onScroll={() => {
-                  if (emblaApi && timeGutterRef.current) {
-                    const slides = emblaApi.containerNode()?.querySelectorAll<HTMLElement>('[data-slide-scroll]');
-                    const activeSlide = slides?.[emblaApi.selectedScrollSnap()];
-                    if (activeSlide) timeGutterRef.current.scrollTop = activeSlide.scrollTop;
-                  }
-                }}
-              >
+            {/* Current */}
+            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+              {children || (
                 <MobileEventCalendar
                   {...props}
                   user={user}
                   initialView={currentView}
-                  currentDateOverride={prevDate}
+                  currentDateOverride={currentDate}
                   onSidebarToggle={handleOpenSidebar}
                   onViewChange={handleCalendarViewChange}
-                  hideTimeGutter={showGutter}
                 />
-              </div>
-              {/* Current */}
-              <div
-                data-slide-scroll
-                className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
-                style={{ flex: "0 0 100%", touchAction: "pan-y" }}
-                onScroll={() => {
-                  if (emblaApi && timeGutterRef.current) {
-                    const slides = emblaApi.containerNode()?.querySelectorAll<HTMLElement>('[data-slide-scroll]');
-                    const activeSlide = slides?.[emblaApi.selectedScrollSnap()];
-                    if (activeSlide) timeGutterRef.current.scrollTop = activeSlide.scrollTop;
-                  }
-                }}
-              >
-                {children || (
-                  <MobileEventCalendar
-                    {...props}
-                    user={user}
-                    initialView={currentView}
-                    currentDateOverride={currentDate}
-                    onSidebarToggle={handleOpenSidebar}
-                    onViewChange={handleCalendarViewChange}
-                    hideTimeGutter={showGutter}
-                  />
-                )}
-              </div>
-              {/* Next */}
-              <div
-                data-slide-scroll
-                className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
-                style={{ flex: "0 0 100%", touchAction: "pan-y" }}
-                onScroll={() => {
-                  if (emblaApi && timeGutterRef.current) {
-                    const slides = emblaApi.containerNode()?.querySelectorAll<HTMLElement>('[data-slide-scroll]');
-                    const activeSlide = slides?.[emblaApi.selectedScrollSnap()];
-                    if (activeSlide) timeGutterRef.current.scrollTop = activeSlide.scrollTop;
-                  }
-                }}
-              >
-                <MobileEventCalendar
-                  {...props}
-                  user={user}
-                  initialView={currentView}
-                  currentDateOverride={nextDate}
-                  onSidebarToggle={handleOpenSidebar}
-                  onViewChange={handleCalendarViewChange}
-                  hideTimeGutter={showGutter}
-                />
-              </div>
+              )}
+            </div>
+            {/* Next */}
+            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+              <MobileEventCalendar
+                {...props}
+                user={user}
+                initialView={currentView}
+                currentDateOverride={nextDate}
+                onSidebarToggle={handleOpenSidebar}
+                onViewChange={handleCalendarViewChange}
+              />
             </div>
           </div>
         </div>
