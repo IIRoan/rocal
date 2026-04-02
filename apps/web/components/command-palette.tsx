@@ -110,7 +110,12 @@ export function CommandPalette({
     if (open && currentView === "main") {
       setSelectedIndex(0);
       const frameId = requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          if (initialSearchQuery === ">") {
+            searchInputRef.current.setSelectionRange(1, 1);
+          }
+        }
       });
       return () => cancelAnimationFrame(frameId);
     }
