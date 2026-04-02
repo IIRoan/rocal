@@ -1,95 +1,36 @@
 "use client";
 
 import React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, Plus } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import {
   format,
   startOfWeek,
   endOfWeek,
-  addWeeks,
-  subWeeks,
   addDays,
-  subDays,
-  addMonths,
-  subMonths,
-  isSameDay,
   isSameMonth,
 } from "date-fns";
 import { CalendarView } from "../calendar/types";
 import { AgendaDaysToShow } from "../calendar/constants";
 
-interface MobileWeekNavProps {
+interface MobileTopNavProps {
   currentDate: Date;
   currentView: CalendarView;
-  onDateChange: (date: Date) => void;
-  onTodayClick?: () => void;
   onOpenQuickNav?: () => void;
+  onOpenSidebar?: () => void;
+  onOpenAddEvent?: () => void;
   className?: string;
 }
 
-export function MobileWeekNav({
+export function MobileTopNav({
   currentDate,
   currentView,
-  onDateChange,
-  onTodayClick,
   onOpenQuickNav,
+  onOpenSidebar,
+  onOpenAddEvent,
   className,
-}: MobileWeekNavProps) {
-  const handlePrevious = () => {
-    let newDate: Date;
-    switch (currentView) {
-      case "day":
-        newDate = subDays(currentDate, 1);
-        break;
-      case "3day":
-        newDate = subDays(currentDate, 3);
-        break;
-      case "week":
-        newDate = subWeeks(currentDate, 1);
-        break;
-      case "month":
-        newDate = subMonths(currentDate, 1);
-        break;
-      case "agenda":
-        newDate = subDays(currentDate, AgendaDaysToShow);
-        break;
-      default:
-        newDate = subWeeks(currentDate, 1);
-    }
-    onDateChange(newDate);
-  };
-
-  const handleNext = () => {
-    let newDate: Date;
-    switch (currentView) {
-      case "day":
-        newDate = addDays(currentDate, 1);
-        break;
-      case "3day":
-        newDate = addDays(currentDate, 3);
-        break;
-      case "week":
-        newDate = addWeeks(currentDate, 1);
-        break;
-      case "month":
-        newDate = addMonths(currentDate, 1);
-        break;
-      case "agenda":
-        newDate = addDays(currentDate, AgendaDaysToShow);
-        break;
-      default:
-        newDate = addWeeks(currentDate, 1);
-    }
-    onDateChange(newDate);
-  };
-
-  const handleToday = () => {
-    onDateChange(new Date());
-    onTodayClick?.();
-  };
-
+}: MobileTopNavProps) {
   const getDisplayText = () => {
     switch (currentView) {
       case "day":
@@ -147,32 +88,7 @@ export function MobileWeekNav({
     }
   };
 
-  const isToday = () => {
-    const today = new Date();
-    switch (currentView) {
-      case "day":
-        return isSameDay(currentDate, today);
-      case "3day": {
-        const start3 = addDays(currentDate, -1);
-        const end3 = addDays(currentDate, 1);
-        return today >= start3 && today <= end3;
-      }
-      case "week":
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-        return today >= weekStart && today <= weekEnd;
-      case "month":
-        return isSameMonth(currentDate, today);
-      case "agenda":
-        const agendaEnd = addDays(currentDate, AgendaDaysToShow - 1);
-        return today >= currentDate && today <= agendaEnd;
-      default:
-        return false;
-    }
-  };
-
   const displayText = getDisplayText();
-  const isCurrentPeriod = isToday();
 
   return (
     <div
@@ -185,16 +101,16 @@ export function MobileWeekNav({
         <Button
           variant="ghost"
           size="sm"
-          onClick={handlePrevious}
+          onClick={onOpenSidebar}
           className="p-2"
         >
-          <ChevronLeft size={20} />
+          <Menu size={24} />
         </Button>
 
         <button
           type="button"
           onClick={onOpenQuickNav}
-          className="flex-1 text-center rounded-md px-2 py-1 hover:bg-accent/50 active:bg-accent/70 transition-colors"
+          className="flex-1 text-center rounded-md px-2 py-1 hover:bg-accent/50 active:bg-accent/70 transition-colors mx-2"
           aria-label="Open calendar quick navigation"
         >
           <div className="text-sm font-medium">{displayText.main}</div>
@@ -205,26 +121,14 @@ export function MobileWeekNav({
           )}
         </button>
 
-        <div className="flex items-center gap-2">
-          {!isCurrentPeriod && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleToday}
-              className="text-xs px-3 py-1.5 h-auto"
-            >
-              Today
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleNext}
-            className="p-2"
-          >
-            <ChevronRight size={20} />
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onOpenAddEvent}
+          className="p-2"
+        >
+          <Plus size={24} />
+        </Button>
       </div>
     </div>
   );

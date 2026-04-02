@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
+import { motion, PanInfo, useAnimation, useMotionValue } from "motion/react";
 import {
   MobileEventCalendar,
   MobileEventCalendarProps,
 } from "./mobile-event-calendar";
 import { MobileBottomNav } from "../navigation/mobile-bottom-nav";
-import { MobileWeekNav } from "../navigation/mobile-week-nav";
+import { MobileTopNav } from "../navigation/mobile-top-nav";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { AppSidebar } from "../layout/app-sidebar";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "../ui/sheet";
@@ -21,7 +22,16 @@ import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
 import { useIsMobile } from "../../hooks/use-mobile";
 import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
+import { AgendaDaysToShow } from "./constants";
 import { cn } from "../../lib/utils";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
 
 interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   user?: User;
@@ -57,7 +67,7 @@ export function MobileCalendarWrapper({
         return savedView as CalendarView;
       }
     }
-    return props.initialView || "month";
+    return props.initialView || "3day";
   });
 
   const { currentDate, setCurrentDate } = useCalendarContext();
@@ -96,6 +106,54 @@ export function MobileCalendarWrapper({
   const handleViewChange = (view: CalendarView) => setCurrentView(view);
   const handleCalendarViewChange = (view: CalendarView) => setCurrentView(view);
 
+  const handlePrevious = () => {
+    let newDate: Date;
+    switch (currentView) {
+      case "day":
+        newDate = subDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = subDays(currentDate, 3);
+        break;
+      case "week":
+        newDate = subWeeks(currentDate, 1);
+        break;
+      case "month":
+        newDate = subMonths(currentDate, 1);
+        break;
+      case "agenda":
+        newDate = subDays(currentDate, AgendaDaysToShow);
+        break;
+      default:
+        newDate = subWeeks(currentDate, 1);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const handleNext = () => {
+    let newDate: Date;
+    switch (currentView) {
+      case "day":
+        newDate = addDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = addDays(currentDate, 3);
+        break;
+      case "week":
+        newDate = addWeeks(currentDate, 1);
+        break;
+      case "month":
+        newDate = addMonths(currentDate, 1);
+        break;
+      case "agenda":
+        newDate = addDays(currentDate, AgendaDaysToShow);
+        break;
+      default:
+        newDate = addWeeks(currentDate, 1);
+    }
+    setCurrentDate(newDate);
+  };
+
   React.useEffect(() => {
     if (props.initialView && typeof window !== "undefined") {
       const savedView = sessionStorage.getItem("calendar-view-selection");
@@ -105,41 +163,159 @@ export function MobileCalendarWrapper({
     }
   }, [props.initialView, currentView]);
 
+  // Swipe handling using framer-motion
+  const controls = useAnimation();
+  const x = useMotionValue(0);
+  const swipeConfidenceThreshold = 10000;
+  const swipePower = (offset: number, velocity: number) => {
+    return Math.abs(offset) * velocity;
+  };
+
+  const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
+
+  const getNextDate = (date: Date) => {
+    switch (currentView) {
+      case "day": return addDays(date, 1);
+      case "3day": return addDays(date, 3);
+      case "week": return addWeeks(date, 1);
+      case "month": return addMonths(date, 1);
+      case "agenda": return addDays(date, AgendaDaysToShow);
+      default: return addWeeks(date, 1);
+    }
+  };
+
+  const getPrevDate = (date: Date) => {
+    switch (currentView) {
+      case "day": return subDays(date, 1);
+      case "3day": return subDays(date, 3);
+      case "week": return subWeeks(date, 1);
+      case "month": return subMonths(date, 1);
+      case "agenda": return subDays(date, AgendaDaysToShow);
+      default: return subWeeks(date, 1);
+    }
+  };
+
+  const prevDate = useMemo(() => getPrevDate(currentDate), [currentDate, currentView]);
+  const nextDate = useMemo(() => getNextDate(currentDate), [currentDate, currentView]);
+
+  const handleDragEnd = (e: any, { offset, velocity }: PanInfo) => {
+    // If the drag started near the left edge and moved right, don't trigger normal swipe,
+    // let it just snap back, because it might be the edge swipe to open sidebar.
+    if (offset.x > 0 && panStartPos.x < 30) {
+      controls.start({ x: 0, transition: { type: "spring", stiffness: 300, damping: 30 } });
+      return;
+    }
+
+    const swipe = swipePower(offset.x, velocity.x);
+
+    if (swipe < -swipeConfidenceThreshold) {
+      // Swipe left -> Next period
+      controls.start({ x: "-66.666%", transition: { duration: 0.2 } }).then(() => {
+        handleNext();
+        controls.set({ x: "-33.333%" });
+      });
+    } else if (swipe > swipeConfidenceThreshold) {
+      // Swipe right -> Previous period
+      controls.start({ x: "0%", transition: { duration: 0.2 } }).then(() => {
+        handlePrevious();
+        controls.set({ x: "-33.333%" });
+      });
+    } else {
+      // Didn't swipe hard enough, snap back
+      controls.start({ x: "-33.333%", transition: { type: "spring", stiffness: 300, damping: 30 } });
+    }
+  };
+
+  const handleDragStart = (e: any, info: PanInfo) => {
+    // Record where the drag started to detect edge swipes
+    setPanStartPos({ x: info.point.x, y: info.point.y });
+  };
+
+  // Keep the edge swipe handler for opening the sidebar
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch && touch.clientX < 30) {
+       // Just record it, the touchEnd will handle the open
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touch = e.changedTouches[0];
+    if (touch && touch.clientX > 50 && panStartPos.x < 30) {
+       setIsSidebarOpen(true);
+    }
+  };
+
   return (
-    <div className="relative flex flex-col h-dvh md:h-full">
-      {/* Mobile quick navigation at the top */}
+    <div 
+      className="relative flex flex-col h-dvh md:h-full overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Mobile top navigation */}
       {isMobile && (
-        <MobileWeekNav
+        <MobileTopNav
           currentDate={currentDate}
           currentView={currentView}
-          onDateChange={handleDateChange}
           onOpenQuickNav={handleOpenQuickNav}
+          onOpenSidebar={handleOpenSidebar}
+          onOpenAddEvent={handleOpenAddEvent}
           className="md:hidden"
         />
       )}
 
       {/* Main Calendar Content */}
-      <div
-        className={cn(
-          "flex-1 overflow-y-auto pb-20 md:pb-0 md:overflow-hidden",
-          className,
-        )}
-      >
-        {children || (
-          <MobileEventCalendar
-            {...props}
-            user={user}
-            initialView={currentView}
-            onSidebarToggle={handleOpenSidebar}
-            onViewChange={handleCalendarViewChange}
-          />
-        )}
+      <div className={cn("flex-1 overflow-hidden relative w-full h-full", className)}>
+        <motion.div
+          className="absolute inset-y-0 flex w-[300%] h-full"
+          style={{ x }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.7}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          animate={controls}
+          initial={{ x: "-33.333%" }}
+        >
+          <div className="w-1/3 h-full overflow-y-auto pb-20 md:pb-0">
+            <MobileEventCalendar
+              {...props}
+              user={user}
+              initialView={currentView}
+              currentDateOverride={prevDate}
+              onSidebarToggle={handleOpenSidebar}
+              onViewChange={handleCalendarViewChange}
+            />
+          </div>
+          <div className="w-1/3 h-full overflow-y-auto pb-20 md:pb-0">
+            {children || (
+              <MobileEventCalendar
+                {...props}
+                user={user}
+                initialView={currentView}
+                currentDateOverride={currentDate}
+                onSidebarToggle={handleOpenSidebar}
+                onViewChange={handleCalendarViewChange}
+              />
+            )}
+          </div>
+          <div className="w-1/3 h-full overflow-y-auto pb-20 md:pb-0">
+            <MobileEventCalendar
+              {...props}
+              user={user}
+              initialView={currentView}
+              currentDateOverride={nextDate}
+              onSidebarToggle={handleOpenSidebar}
+              onViewChange={handleCalendarViewChange}
+            />
+          </div>
+        </motion.div>
       </div>
 
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav
-        onOpenSidebar={handleOpenSidebar}
-        onOpenAddEvent={handleOpenAddEvent}
+        currentDate={currentDate}
+        onDateChange={handleDateChange}
         currentView={currentView}
         onViewChange={handleViewChange}
         onToday={handleToday}
@@ -170,12 +346,12 @@ export function MobileCalendarWrapper({
         </DrawerContent>
       </Drawer>
 
-      {/* Mobile Sidebar Drawer */}
+      {/* Mobile Sidebar Sheet */}
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
         <SheetContent
-          side="bottom"
+          side="left"
           showClose={false}
-          className="w-full h-[100dvh] p-0 border-none rounded-none sm:max-w-none safe-area-inset-top safe-area-inset-bottom"
+          className="w-[85vw] max-w-[320px] h-[100dvh] p-0 border-r border-border rounded-none safe-area-inset-top safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>
