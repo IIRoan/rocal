@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import {
   Calendar,
-  Plus,
+  ChevronLeft,
+  ChevronRight,
   Grid3X3,
   LayoutGrid,
   CalendarDays,
@@ -13,6 +14,15 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { CalendarView } from "../calendar/types";
+import { AgendaDaysToShow } from "../calendar/constants";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
 import {
   Popover,
   PopoverContent,
@@ -20,9 +30,9 @@ import {
 } from "../ui/popover";
 
 interface MobileBottomNavProps {
-  onOpenSidebar?: () => void;
-  onOpenAddEvent?: () => void;
+  currentDate: Date;
   currentView?: CalendarView;
+  onDateChange: (date: Date) => void;
   onViewChange?: (view: CalendarView) => void;
   onToday?: () => void;
   className?: string;
@@ -97,45 +107,85 @@ const TabButton = React.forwardRef<
 TabButton.displayName = "TabButton";
 
 export function MobileBottomNav({
-  onOpenSidebar,
-  onOpenAddEvent,
-  currentView = "month",
+  currentDate,
+  currentView = "3day",
+  onDateChange,
   onViewChange,
   onToday,
   className,
 }: MobileBottomNavProps) {
   const [isViewOpen, setIsViewOpen] = useState(false);
 
+  const handlePrevious = () => {
+    let newDate: Date;
+    switch (currentView) {
+      case "day":
+        newDate = subDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = subDays(currentDate, 3);
+        break;
+      case "week":
+        newDate = subWeeks(currentDate, 1);
+        break;
+      case "month":
+        newDate = subMonths(currentDate, 1);
+        break;
+      case "agenda":
+        newDate = subDays(currentDate, AgendaDaysToShow);
+        break;
+      default:
+        newDate = subWeeks(currentDate, 1);
+    }
+    onDateChange(newDate);
+  };
+
+  const handleNext = () => {
+    let newDate: Date;
+    switch (currentView) {
+      case "day":
+        newDate = addDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = addDays(currentDate, 3);
+        break;
+      case "week":
+        newDate = addWeeks(currentDate, 1);
+        break;
+      case "month":
+        newDate = addMonths(currentDate, 1);
+        break;
+      case "agenda":
+        newDate = addDays(currentDate, AgendaDaysToShow);
+        break;
+      default:
+        newDate = addWeeks(currentDate, 1);
+    }
+    onDateChange(newDate);
+  };
+
   return (
     <div
       className={cn("fixed bottom-0 left-0 right-0 z-50 md:hidden", className)}
     >
-      {/* Premium glassmorphism background */}
       <div className="relative">
-        {/* Subtle gradient line at top */}
         <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         
-        {/* Main background */}
         <div className="bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
-          {/* Safe area padding */}
           <div className="pb-[env(safe-area-inset-bottom)]">
-            {/* Tab bar - 4 evenly spaced tabs */}
             <div className="flex items-center h-12">
-              {/* Today Button */}
+              <TabButton
+                icon={<ChevronLeft size={20} className="text-muted-foreground" />}
+                label="Prev"
+                onClick={handlePrevious}
+              />
+
               <TabButton
                 icon={<Calendar size={20} className="text-muted-foreground" />}
                 label="Today"
                 onClick={onToday}
               />
 
-              {/* Add Event Button */}
-              <TabButton
-                icon={<Plus size={20} className="text-muted-foreground" />}
-                label="Add"
-                onClick={onOpenAddEvent}
-              />
-
-              {/* View Switcher */}
               <Popover open={isViewOpen} onOpenChange={setIsViewOpen}>
                 <PopoverTrigger asChild>
                   <TabButton
@@ -152,7 +202,6 @@ export function MobileBottomNav({
                   sideOffset={8}
                   className="w-44 p-1.5 rounded-2xl shadow-xl border-border/50 bg-popover/95 backdrop-blur-xl"
                 >
-                  {/* View options */}
                   <div className="space-y-0.5">
                     {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => {
                       const isActive = currentView === value;
@@ -183,11 +232,10 @@ export function MobileBottomNav({
                 </PopoverContent>
               </Popover>
 
-              {/* Calendars/Sidebar */}
               <TabButton
-                icon={<LayoutGrid size={20} className="text-muted-foreground" />}
-                label="Cals"
-                onClick={onOpenSidebar}
+                icon={<ChevronRight size={20} className="text-muted-foreground" />}
+                label="Next"
+                onClick={handleNext}
               />
             </div>
           </div>
