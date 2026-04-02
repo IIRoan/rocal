@@ -8,7 +8,16 @@ const bundletoolPath = path.join(androidDir, 'bundletool/bundletool-all-1.18.3.j
 async function main() {
   console.log('Starting Android APK build...');
 
-  // 1. Build the Android App Bundle
+  // 1. Build the web assets with production env vars from .env.production
+  //    Env vars set inline take precedence over .env.local
+  console.log('Building web assets...');
+  await $`NEXT_PUBLIC_API_URL=https://api.solace.onl NEXT_PUBLIC_APP_URL=https://solace.onl NODE_ENV=production bun run mobile:build`;
+
+  // 2. Sync the web assets to the native project
+  console.log('Syncing web assets...');
+  await $`NODE_ENV=production bunx cap sync`;
+
+  // 3. Build the Android App Bundle
   console.log('Building Android App Bundle...');
   await $`cd ${androidDir} && ./gradlew bundleRelease`;
 

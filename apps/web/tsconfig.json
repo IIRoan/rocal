@@ -1,6 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "types": [
+      "bun-types"
+    ],
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
