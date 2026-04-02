@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useEffect } from "react";
-import { motion, PanInfo, useAnimation, useMotionValue } from "motion/react";
+import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import useEmblaCarousel from "embla-carousel-react";
 import {
   MobileEventCalendar,
   MobileEventCalendarProps,
@@ -81,7 +81,6 @@ export function MobileCalendarWrapper({
     }
   }, [isMobile]);
 
-  // On mobile, always start at current week on boot
   React.useEffect(() => {
     if (isMobile && !hasInitializedMobileDate.current) {
       hasInitializedMobileDate.current = true;
@@ -106,53 +105,31 @@ export function MobileCalendarWrapper({
   const handleViewChange = (view: CalendarView) => setCurrentView(view);
   const handleCalendarViewChange = (view: CalendarView) => setCurrentView(view);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     let newDate: Date;
     switch (currentView) {
-      case "day":
-        newDate = subDays(currentDate, 1);
-        break;
-      case "3day":
-        newDate = subDays(currentDate, 3);
-        break;
-      case "week":
-        newDate = subWeeks(currentDate, 1);
-        break;
-      case "month":
-        newDate = subMonths(currentDate, 1);
-        break;
-      case "agenda":
-        newDate = subDays(currentDate, AgendaDaysToShow);
-        break;
-      default:
-        newDate = subWeeks(currentDate, 1);
+      case "day": newDate = subDays(currentDate, 1); break;
+      case "3day": newDate = subDays(currentDate, 3); break;
+      case "week": newDate = subWeeks(currentDate, 1); break;
+      case "month": newDate = subMonths(currentDate, 1); break;
+      case "agenda": newDate = subDays(currentDate, AgendaDaysToShow); break;
+      default: newDate = subWeeks(currentDate, 1);
     }
     setCurrentDate(newDate);
-  };
+  }, [currentDate, currentView, setCurrentDate]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     let newDate: Date;
     switch (currentView) {
-      case "day":
-        newDate = addDays(currentDate, 1);
-        break;
-      case "3day":
-        newDate = addDays(currentDate, 3);
-        break;
-      case "week":
-        newDate = addWeeks(currentDate, 1);
-        break;
-      case "month":
-        newDate = addMonths(currentDate, 1);
-        break;
-      case "agenda":
-        newDate = addDays(currentDate, AgendaDaysToShow);
-        break;
-      default:
-        newDate = addWeeks(currentDate, 1);
+      case "day": newDate = addDays(currentDate, 1); break;
+      case "3day": newDate = addDays(currentDate, 3); break;
+      case "week": newDate = addWeeks(currentDate, 1); break;
+      case "month": newDate = addMonths(currentDate, 1); break;
+      case "agenda": newDate = addDays(currentDate, AgendaDaysToShow); break;
+      default: newDate = addWeeks(currentDate, 1);
     }
     setCurrentDate(newDate);
-  };
+  }, [currentDate, currentView, setCurrentDate]);
 
   React.useEffect(() => {
     if (props.initialView && typeof window !== "undefined") {
@@ -163,17 +140,8 @@ export function MobileCalendarWrapper({
     }
   }, [props.initialView, currentView]);
 
-  // Swipe handling using framer-motion
-  const controls = useAnimation();
-  const x = useMotionValue(0);
-  const swipeConfidenceThreshold = 10000;
-  const swipePower = (offset: number, velocity: number) => {
-    return Math.abs(offset) * velocity;
-  };
-
-  const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
-
-  const getNextDate = (date: Date) => {
+  // Date helpers for adjacent slides
+  const getNextDate = useCallback((date: Date) => {
     switch (currentView) {
       case "day": return addDays(date, 1);
       case "3day": return addDays(date, 3);
@@ -182,9 +150,9 @@ export function MobileCalendarWrapper({
       case "agenda": return addDays(date, AgendaDaysToShow);
       default: return addWeeks(date, 1);
     }
-  };
+  }, [currentView]);
 
-  const getPrevDate = (date: Date) => {
+  const getPrevDate = useCallback((date: Date) => {
     switch (currentView) {
       case "day": return subDays(date, 1);
       case "3day": return subDays(date, 3);
@@ -193,61 +161,85 @@ export function MobileCalendarWrapper({
       case "agenda": return subDays(date, AgendaDaysToShow);
       default: return subWeeks(date, 1);
     }
-  };
+  }, [currentView]);
 
-  const prevDate = useMemo(() => getPrevDate(currentDate), [currentDate, currentView]);
-  const nextDate = useMemo(() => getNextDate(currentDate), [currentDate, currentView]);
+  const prevDate = useMemo(() => getPrevDate(currentDate), [currentDate, getPrevDate]);
+  const nextDate = useMemo(() => getNextDate(currentDate), [currentDate, getNextDate]);
 
-  const handleDragEnd = (e: any, { offset, velocity }: PanInfo) => {
-    // If the drag started near the left edge and moved right, don't trigger normal swipe,
-    // let it just snap back, because it might be the edge swipe to open sidebar.
-    if (offset.x > 0 && panStartPos.x < 30) {
-      controls.start({ x: 0, transition: { type: "spring", stiffness: 300, damping: 30 } });
-      return;
+  // Embla Carousel - 3 slides, start on center (index 1)
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: false,
+    startIndex: 1,
+    align: "start",
+    dragFree: false,
+    dragThreshold: 20,
+    inViewThreshold: 1,
+  });
+
+  // Infinite loop logic: on slide change, update date and recenter
+  const isScrollingRef = useRef(false);
+
+  const handleSlideSelect = useCallback(() => {
+    if (!emblaApi || isScrollingRef.current) return;
+    const newIndex = emblaApi.selectedScrollSnap();
+
+    if (newIndex === 0) {
+      isScrollingRef.current = true;
+      handlePrevious();
+    } else if (newIndex === 2) {
+      isScrollingRef.current = true;
+      handleNext();
     }
+  }, [emblaApi, handlePrevious, handleNext]);
 
-    const swipe = swipePower(offset.x, velocity.x);
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.on("select", handleSlideSelect);
+    return () => {
+      emblaApi.off("select", handleSlideSelect);
+    };
+  }, [emblaApi, handleSlideSelect]);
 
-    if (swipe < -swipeConfidenceThreshold) {
-      // Swipe left -> Next period
-      controls.start({ x: "-66.666%", transition: { duration: 0.2 } }).then(() => {
-        handleNext();
-        controls.set({ x: "-33.333%" });
+  // After currentDate changes from a swipe, recenter carousel to slide 1 instantly.
+  // Use a double-RAF to ensure React has flushed DOM updates before recentering.
+  useEffect(() => {
+    if (!emblaApi || !isScrollingRef.current) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!emblaApi) return;
+        emblaApi.scrollTo(1, true);
+        isScrollingRef.current = false;
       });
-    } else if (swipe > swipeConfidenceThreshold) {
-      // Swipe right -> Previous period
-      controls.start({ x: "0%", transition: { duration: 0.2 } }).then(() => {
-        handlePrevious();
-        controls.set({ x: "-33.333%" });
-      });
-    } else {
-      // Didn't swipe hard enough, snap back
-      controls.start({ x: "-33.333%", transition: { type: "spring", stiffness: 300, damping: 30 } });
-    }
-  };
+    });
+  }, [currentDate, emblaApi]);
 
-  const handleDragStart = (e: any, info: PanInfo) => {
-    // Record where the drag started to detect edge swipes
-    setPanStartPos({ x: info.point.x, y: info.point.y });
-  };
+  // Edge swipe detection for sidebar - only triggers from screen edge
+  const edgeSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Keep the edge swipe handler for opening the sidebar
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    if (touch && touch.clientX < 30) {
-       // Just record it, the touchEnd will handle the open
+    if (touch && touch.clientX < 15) {
+      edgeSwipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    } else {
+      edgeSwipeStartRef.current = null;
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!edgeSwipeStartRef.current) return;
     const touch = e.changedTouches[0];
-    if (touch && touch.clientX > 50 && panStartPos.x < 30) {
-       setIsSidebarOpen(true);
+    if (!touch) return;
+    const dx = touch.clientX - edgeSwipeStartRef.current.x;
+    const dy = Math.abs(touch.clientY - edgeSwipeStartRef.current.y);
+    // Only trigger sidebar if horizontal swipe is dominant and started from edge
+    if (dx > 80 && dx > dy * 2 && edgeSwipeStartRef.current.x < 15) {
+      setIsSidebarOpen(true);
     }
+    edgeSwipeStartRef.current = null;
   };
 
   return (
-    <div 
+    <div
       className="relative flex flex-col h-dvh md:h-full overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -264,52 +256,47 @@ export function MobileCalendarWrapper({
         />
       )}
 
-      {/* Main Calendar Content */}
+      {/* Main Calendar Content - Embla Carousel */}
       <div className={cn("flex-1 overflow-hidden relative w-full h-full", className)}>
-        <motion.div
-          className="absolute inset-y-0 flex w-[300%] h-full"
-          style={{ x }}
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.7}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          animate={controls}
-          initial={{ x: "-33.333%" }}
-        >
-          <div className="w-1/3 h-full overflow-y-auto pb-20 md:pb-0">
-            <MobileEventCalendar
-              {...props}
-              user={user}
-              initialView={currentView}
-              currentDateOverride={prevDate}
-              onSidebarToggle={handleOpenSidebar}
-              onViewChange={handleCalendarViewChange}
-            />
-          </div>
-          <div className="w-1/3 h-full overflow-y-auto pb-20 md:pb-0">
-            {children || (
+        <div className="overflow-hidden h-full" ref={emblaRef} style={{ touchAction: "pan-y" }}>
+          <div className="flex h-full">
+            {/* Previous */}
+            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
               <MobileEventCalendar
                 {...props}
                 user={user}
                 initialView={currentView}
-                currentDateOverride={currentDate}
+                currentDateOverride={prevDate}
                 onSidebarToggle={handleOpenSidebar}
                 onViewChange={handleCalendarViewChange}
               />
-            )}
+            </div>
+            {/* Current */}
+            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+              {children || (
+                <MobileEventCalendar
+                  {...props}
+                  user={user}
+                  initialView={currentView}
+                  currentDateOverride={currentDate}
+                  onSidebarToggle={handleOpenSidebar}
+                  onViewChange={handleCalendarViewChange}
+                />
+              )}
+            </div>
+            {/* Next */}
+            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+              <MobileEventCalendar
+                {...props}
+                user={user}
+                initialView={currentView}
+                currentDateOverride={nextDate}
+                onSidebarToggle={handleOpenSidebar}
+                onViewChange={handleCalendarViewChange}
+              />
+            </div>
           </div>
-          <div className="w-1/3 h-full overflow-y-auto pb-20 md:pb-0">
-            <MobileEventCalendar
-              {...props}
-              user={user}
-              initialView={currentView}
-              currentDateOverride={nextDate}
-              onSidebarToggle={handleOpenSidebar}
-              onViewChange={handleCalendarViewChange}
-            />
-          </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
