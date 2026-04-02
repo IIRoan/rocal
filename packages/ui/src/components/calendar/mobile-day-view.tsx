@@ -34,6 +34,7 @@ interface MobileDayViewProps {
   workingDays?: number[];
   showMonthPicker?: boolean;
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  hideTimeGutter?: boolean;
 }
 
 interface PositionedEvent {
@@ -55,6 +56,7 @@ export function MobileDayView({
   workingDays = [1, 2, 3, 4, 5],
   showMonthPicker = true,
   weekStartDay = 1,
+  hideTimeGutter = false,
 }: MobileDayViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasScrolledRef = useRef(false);
@@ -263,23 +265,25 @@ export function MobileDayView({
       {/* Timeline with events */}
       <div className="relative pt-3">
         {/* Time column - all hours shown, time label ON the hour line */}
-        <div className="absolute left-0 top-0 w-11 z-10 bg-background pt-3">
-          {hours.map((hour) => (
-            <div
-              key={hour.toString()}
-              className="relative"
-              style={{ height: MobileCellHeight }}
-            >
-              {/* Time label positioned ON the line with background to hide line behind text */}
-              <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
-                {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
-              </span>
-            </div>
-          ))}
-        </div>
+        {!hideTimeGutter && (
+          <div className="absolute left-0 top-0 w-11 z-10 bg-background pt-3">
+            {hours.map((hour) => (
+              <div
+                key={hour.toString()}
+                className="relative"
+                style={{ height: MobileCellHeight }}
+              >
+                {/* Time label positioned ON the line with background to hide line behind text */}
+                <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
+                  {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Events column */}
-        <div className="ml-11 relative">
+        <div className={cn("relative", !hideTimeGutter && "ml-11")}>
           {/* Positioned events */}
           {positionedEvents.map((positionedEvent) => (
             <div

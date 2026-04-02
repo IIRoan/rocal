@@ -38,6 +38,7 @@ interface MobileThreeDayViewProps {
   weekStartDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   workingDays?: number[];
   timezone?: string;
+  hideTimeGutter?: boolean;
 }
 
 interface PositionedEvent {
@@ -58,6 +59,7 @@ export function MobileThreeDayView({
   weekStartDay = 1,
   workingDays = [1, 2, 3, 4, 5],
   timezone,
+  hideTimeGutter = false,
 }: MobileThreeDayViewProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerEvents, setDrawerEvents] = useState<CalendarEvent[]>([]);
@@ -246,7 +248,7 @@ export function MobileThreeDayView({
       <div className="relative">
         <div className="flex">
           {/* Time column spacer - matches timeline width */}
-          <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background" />
+          {!hideTimeGutter && <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background" />}
 
           {/* Day columns headers */}
           {days.map((day, dayIndex) => {
@@ -314,19 +316,21 @@ export function MobileThreeDayView({
       <div className="relative">
         <div className="flex">
           {/* Time column */}
-          <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
-            {hours.map((hour) => (
-              <div
-                key={hour.toString()}
-                className="relative"
-                style={{ height: CELL_HEIGHT }}
-              >
-                <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
-                  {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
-                </span>
-              </div>
-            ))}
-          </div>
+          {!hideTimeGutter && (
+            <div className="w-11 flex-shrink-0 border-r border-border/50 bg-background">
+              {hours.map((hour) => (
+                <div
+                  key={hour.toString()}
+                  className="relative"
+                  style={{ height: CELL_HEIGHT }}
+                >
+                  <span className="absolute top-0 left-0.5 -translate-y-1/2 bg-background px-0.5 text-[9px] font-medium text-muted-foreground">
+                    {format(hour, timeFormat === "24h" ? "HH:00" : "h:00a")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Day columns */}
           {days.map((day, dayIndex) => (

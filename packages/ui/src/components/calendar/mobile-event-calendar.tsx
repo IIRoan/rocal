@@ -109,6 +109,8 @@ export interface MobileEventCalendarProps {
   // View change handler
   onViewChange?: (view: CalendarView) => void;
   user?: User;
+  // Layout
+  hideTimeGutter?: boolean;
 }
 
 export function MobileEventCalendar({
@@ -141,6 +143,7 @@ export function MobileEventCalendar({
   onViewChange,
   currentDateOverride,
   user,
+  hideTimeGutter = false,
 }: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
   const { currentDate: contextCurrentDate, setCurrentDate } = useCalendarContext();
@@ -713,6 +716,7 @@ export function MobileEventCalendar({
                   workingDays={workingDays}
                   timezone={timezone}
                   showMonthPicker={true}
+                  hideTimeGutter={hideTimeGutter}
                 />
               ) : (
                 <WeekView
@@ -737,6 +741,7 @@ export function MobileEventCalendar({
                 weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
                 workingDays={workingDays}
                 timezone={timezone}
+                hideTimeGutter={hideTimeGutter}
               />
             )}
             {view === "day" &&
@@ -751,6 +756,7 @@ export function MobileEventCalendar({
                   workingDays={workingDays}
                   showMonthPicker={true}
                   weekStartDay={weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6}
+                  hideTimeGutter={hideTimeGutter}
                 />
               ) : (
                 <DayView
