@@ -79,6 +79,8 @@
       "name": "solace-app",
       "version": "1.0.0",
       "dependencies": {
+        "@workspace/logger": "workspace:*",
+        "@workspace/mobile-ui": "workspace:*",
         "expo": "~55.0.11",
         "expo-constants": "~55.0.11",
         "expo-linking": "~55.0.11",
