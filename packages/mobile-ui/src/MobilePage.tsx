@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, SafeAreaView, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 interface MobilePageProps {
   children: React.ReactNode;
@@ -7,16 +7,11 @@ interface MobilePageProps {
 
 const MobilePage: React.FC<MobilePageProps> = ({ children }) => {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>{children}</View>
-    </SafeAreaView>
+    <View style={styles.container}>{children}</View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
   container: {
     flex: 1,
   },
