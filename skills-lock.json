@@ -10,6 +10,11 @@
       "source": "martinholovsky/claude-skills-generator",
       "sourceType": "github",
       "computedHash": "a965368152d24169683d5b8dd468510676539522ccee98f2827c9c0cd16f5177"
+    },
+    "upgrading-expo": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "7ccc3de855963fcfd8fa25a81a0baa98e165be0ae46577b736367c104959c30a"
     }
   }
 }
