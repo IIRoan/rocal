@@ -45,6 +45,7 @@ import { getApiBaseUrl } from "@/lib/api-url";
 import { useMemo, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
 
 type CalendarAssistantResponse = {
   reply: string;
@@ -452,6 +453,11 @@ function MobileLayoutContent() {
   );
 }
 
+function CalendarUrlSyncWrapper() {
+  useCalendarUrlSync();
+  return null;
+}
+
 function DashboardContent() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
@@ -529,6 +535,7 @@ function DashboardContent() {
     <SettingsProvider>
       <CalendarDataProvider>
         <CalendarProviderWrapper>
+          <CalendarUrlSyncWrapper />
           <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
             <EventDeepLinkHandler />
             {/* Mobile Layout */}

@@ -60,26 +60,29 @@ export function MobileCalendarWrapper({
   const isMobile = useIsMobile();
   const hasInitializedMobileDate = React.useRef(false);
 
-  const [currentView, setCurrentView] = useState<CalendarView>(() => {
-    if (typeof window !== "undefined") {
-      const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
-        return savedView as CalendarView;
-      }
-    }
-    return props.initialView || "3day";
-  });
+  const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
 
-  const { currentDate, setCurrentDate } = useCalendarContext();
-
+  // Initialize context view from props on first render
   React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (!savedView && isMobile) {
-        setCurrentView("3day");
+    if (currentView === "month" && props.initialView && props.initialView !== "month") {
+      // Check sessionStorage first
+      if (typeof window !== "undefined") {
+        const savedViewData = sessionStorage.getItem("calendar-view-selection");
+        if (savedViewData) {
+          try {
+            const parsedData = JSON.parse(savedViewData);
+            if (parsedData.expires && parsedData.expires > Date.now() && (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)) {
+              setCurrentView(parsedData.view as CalendarView);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+        }
       }
+      setCurrentView(props.initialView);
     }
-  }, [isMobile]);
+  }, []); // Only run once on mount
 
   React.useEffect(() => {
     if (isMobile && !hasInitializedMobileDate.current) {
@@ -102,8 +105,17 @@ export function MobileCalendarWrapper({
     onOpenSettings?.();
     setIsSidebarOpen(false);
   };
-  const handleViewChange = (view: CalendarView) => setCurrentView(view);
-  const handleCalendarViewChange = (view: CalendarView) => setCurrentView(view);
+  const handleViewChange = (view: CalendarView) => {
+    setCurrentView(view);
+    // Also save to sessionStorage
+    if (typeof window !== "undefined") {
+      const expirationTime = new Date();
+      expirationTime.setHours(expirationTime.getHours() + 1);
+      const viewData = { view, expires: expirationTime.getTime() };
+      sessionStorage.setItem("calendar-view-selection", JSON.stringify(viewData));
+    }
+  };
+  const handleCalendarViewChange = handleViewChange;
 
   const handlePrevious = useCallback(() => {
     let newDate: Date;
@@ -130,15 +142,6 @@ export function MobileCalendarWrapper({
     }
     setCurrentDate(newDate);
   }, [currentDate, currentView, setCurrentDate]);
-
-  React.useEffect(() => {
-    if (props.initialView && typeof window !== "undefined") {
-      const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (!savedView && props.initialView !== currentView) {
-        setCurrentView(props.initialView);
-      }
-    }
-  }, [props.initialView, currentView]);
 
   // Date helpers for adjacent slides
   const getNextDate = useCallback((date: Date) => {
