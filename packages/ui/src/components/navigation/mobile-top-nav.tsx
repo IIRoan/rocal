@@ -93,7 +93,7 @@ export function MobileTopNav({
   return (
     <div
       className={cn(
-        "sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border md:hidden",
+        "sticky top-0 z-[100] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border md:hidden",
         className,
       )}
     >
@@ -125,9 +125,10 @@ export function MobileTopNav({
           variant="ghost"
           size="sm"
           onClick={onOpenAddEvent}
-          className="p-2"
+          className="h-7 w-7 p-0 relative z-[101]"
+          aria-label="Add new event"
         >
-          <Plus size={24} />
+          <Plus size={18} />
         </Button>
       </div>
     </div>
