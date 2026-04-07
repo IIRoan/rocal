@@ -160,24 +160,53 @@ export function EventCalendar({
     | { type: "general" };
 
   // Use the shared calendar context instead of local state
-  const { currentDate, setCurrentDate } = useCalendarContext();
+  const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
 
-  // Initialize view from sessionStorage or fallback to initialView
-  const [view, setViewState] = useState<CalendarView>(() => {
-    if (typeof window !== "undefined") {
-      const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
-        return savedView as CalendarView;
+  // Use context view, falling back to initialView on first render if context hasn't been set
+  const view = currentView;
+
+  // Initialize context view from initialView if context is still at default
+  useEffect(() => {
+    if (currentView === "month" && initialView !== "month") {
+      // Check if sessionStorage has a saved view first
+      if (typeof window !== "undefined") {
+        const savedViewData = sessionStorage.getItem("calendar-view-selection");
+        if (savedViewData) {
+          try {
+            const parsedData = JSON.parse(savedViewData);
+            if (parsedData.expires && parsedData.expires > Date.now() && (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)) {
+              setCurrentView(parsedData.view as CalendarView);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+      setCurrentView(initialView);
+    } else if (currentView === "month") {
+      // Even if initialView is "month", check sessionStorage
+      if (typeof window !== "undefined") {
+        const savedViewData = sessionStorage.getItem("calendar-view-selection");
+        if (savedViewData) {
+          try {
+            const parsedData = JSON.parse(savedViewData);
+            if (parsedData.expires && parsedData.expires > Date.now() && (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)) {
+              setCurrentView(parsedData.view as CalendarView);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+        }
       }
     }
-    return initialView;
-  });
+  }, []); // Only run once on mount
 
-  // Custom setView function that also saves to sessionStorage with expiration
+  // Custom setView function that also saves to sessionStorage
   const setView = (newView: CalendarView) => {
-    setViewState(newView);
+    setCurrentView(newView);
     if (typeof window !== "undefined") {
-      // Save view with expiration time (1 hour from now)
       const expirationTime = new Date();
       expirationTime.setHours(expirationTime.getHours() + 1);
       const viewData = {
@@ -208,40 +237,6 @@ export function EventCalendar({
     { key: "d", action: () => setView("day") },
     { key: "a", action: () => setView("agenda") },
   ]);
-
-  // Update view when initialView changes (from settings) only if no valid session preference exists
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedViewData = sessionStorage.getItem("calendar-view-selection");
-      let validSavedView = null;
-
-      // Check if we have saved data and it's not expired
-      if (savedViewData) {
-        try {
-          const parsedData = JSON.parse(savedViewData);
-          const now = new Date().getTime();
-
-          // Only use the saved view if it hasn't expired
-          if (parsedData.expires && parsedData.expires > now) {
-            validSavedView = parsedData.view;
-            // Set the view state to the valid saved view
-            setViewState(parsedData.view);
-          } else {
-            // Clear expired data
-            sessionStorage.removeItem("calendar-view-selection");
-          }
-        } catch (e) {
-          // Handle legacy format or invalid JSON
-          console.warn("Invalid calendar view data in sessionStorage");
-          sessionStorage.removeItem("calendar-view-selection");
-        }
-      }
-
-      if (!validSavedView) {
-        setView(initialView);
-      }
-    }
-  }, [initialView]);
 
   // Calculate date range based on current view and date
   const dateRange = useMemo(() => {
