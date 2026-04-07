@@ -35,6 +35,7 @@ import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { createPortal } from "react-dom";
 
 function renderInlineMarkdown(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
@@ -351,21 +352,22 @@ function AppSidebarDesktop({
 
   return (
     <Sidebar variant="inset" collapsible="icon" {...props} className="max-lg:p-3">
-      {onCreateEvent && (
-        <div className="fixed bottom-8 right-8 z-50">
+      {onCreateEvent && typeof window !== "undefined" && createPortal(
+        <div className="fixed bottom-6 right-6 z-[9999]">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 onClick={onCreateEvent}
-                className="h-14 w-14 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl shadow-primary/30 transition-all hover:scale-110 active:scale-95 border-none group"
+                className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl shadow-primary/30 transition-all hover:scale-110 active:scale-95 border-none group"
                 size="icon"
               >
-                <Plus size={28} strokeWidth={2.5} className="transition-transform group-hover:rotate-90" />
+                <Plus size={20} strokeWidth={2.5} className="transition-transform group-hover:rotate-90" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left" className="font-bold">Create New Event</TooltipContent>
           </Tooltip>
-        </div>
+        </div>,
+        document.body
       )}
       <SidebarHeader className="pt-4 px-4 pb-2">
         <div className="flex justify-between items-center gap-2">

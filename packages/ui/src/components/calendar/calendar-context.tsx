@@ -9,13 +9,17 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
-import { Calendar, EventColor, CreateCalendarData } from "./types";
+import { Calendar, EventColor, CreateCalendarData, CalendarView } from "./types";
 
 interface CalendarContextType {
   // Date management
   currentDate: Date;
   setCurrentDate: (date: Date) => void;
   clearSavedDate: () => void; // Utility to clear localStorage date
+
+  // View management
+  currentView: CalendarView;
+  setCurrentView: (view: CalendarView) => void;
 
   // Calendar management
   calendars: Calendar[];
@@ -114,33 +118,11 @@ export function CalendarProvider({
     [],
   );
 
-  const [currentDate, setCurrentDate] = useState<Date>(() => {
-    // Load saved date from localStorage on initial render
-    if (typeof window !== "undefined") {
-      try {
-        const savedDate = localStorage.getItem("rocani-calendar-current-date");
-        if (savedDate) {
-          const validatedDate = validateDate(savedDate);
-          // If validation returned current date (fallback), clear the invalid localStorage entry
-          const originalDate = new Date(savedDate);
-          if (validatedDate.getTime() !== originalDate.getTime()) {
-            console.warn("Clearing invalid date from localStorage:", savedDate);
-            localStorage.removeItem("rocani-calendar-current-date");
-          }
-          return validatedDate;
-        }
-      } catch (error) {
-        console.warn("Failed to load calendar date from localStorage:", error);
-        // Clear potentially corrupted localStorage entry
-        try {
-          localStorage.removeItem("rocani-calendar-current-date");
-        } catch (clearError) {
-          console.warn("Failed to clear localStorage:", clearError);
-        }
-      }
-    }
-    return new Date();
-  });
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [currentView, setCurrentViewState] = useState<CalendarView>("month");
+  const setCurrentView = useCallback((view: CalendarView) => {
+    setCurrentViewState(view);
+  }, []);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const hasInitialized = useRef(false);
 
@@ -389,60 +371,26 @@ export function CalendarProvider({
     return visibleColors.includes(color);
   };
 
-  // Custom setCurrentDate that also persists to localStorage
+  // Custom setCurrentDate that validates the date before setting it
   const setCurrentDateWithPersistence = useCallback(
     (date: Date) => {
-      // Validate the date before setting it
       const validatedDate = validateDate(date);
       setCurrentDate(validatedDate);
-
-      // Save to localStorage
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem(
-            "rocani-calendar-current-date",
-            validatedDate.toISOString(),
-          );
-        } catch (error) {
-          console.warn("Failed to save calendar date to localStorage:", error);
-        }
-      }
     },
     [validateDate],
   );
 
-  // Utility function to clear saved date from localStorage
+  // Utility function to reset to current date
   const clearSavedDate = useCallback(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedDate = localStorage.getItem("rocani-calendar-current-date");
-        localStorage.removeItem("rocani-calendar-current-date");
-        // Reset to current date
-        setCurrentDate(new Date());
-      } catch (error) {
-        console.warn("Failed to clear calendar date from localStorage:", error);
-      }
-    }
+    setCurrentDate(new Date());
   }, []);
-
-  // Development helper - log localStorage state on mount
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      process.env.NODE_ENV === "development"
-    ) {
-      try {
-        const savedDate = localStorage.getItem("rocani-calendar-current-date");
-      } catch (error) {
-        console.warn("Failed to read localStorage state:", error);
-      }
-    }
-  }, []); // Only run on mount
 
   const value = {
     currentDate,
     setCurrentDate: setCurrentDateWithPersistence,
     clearSavedDate,
+    currentView,
+    setCurrentView,
     calendars,
     setCalendars,
     addCalendar,
