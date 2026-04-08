@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
+import { CheckIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon, FoldersIcon } from "@phosphor-icons/react";
 import { Sparkles, Plus, Search } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
@@ -401,7 +401,7 @@ function AppSidebarDesktop({
         )}
       </SidebarHeader>
 
-      <SidebarContent className="gap-0 px-3 pt-6 pb-2 flex flex-col h-full">
+      <SidebarContent className="gap-0 pt-6 pb-2 flex flex-col h-full">
         <SidebarGroup className="p-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
@@ -436,6 +436,16 @@ function AppSidebarDesktop({
         </SidebarGroup>
 
         <SidebarGroup className="p-0 mt-auto pt-4">
+          <div className="flex items-center gap-2 px-2 mb-1">
+            <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">Calendars</span>
+            <div className="flex-1 h-px bg-border/40" />
+            <button
+              onClick={onOpenCalendarManagement}
+              className="text-[11px] font-medium text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              Manage
+            </button>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               {calendars.map((calendar) => (
@@ -464,16 +474,6 @@ function AppSidebarDesktop({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
-              <SidebarMenuItem className="mt-1">
-                <SidebarMenuButton
-                  className="rounded-lg h-9 text-[13px] font-medium text-muted-foreground/70 hover:bg-muted/80 hover:text-foreground transition-colors"
-                  onClick={onOpenCalendarManagement}
-                >
-                  <GearSixIcon size={16} weight="regular" className="opacity-70" />
-                  Manage calendars
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
