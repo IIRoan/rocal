@@ -12,3 +12,4 @@ export {
   type KeyboardShortcut,
   type UseKeyboardShortcutsOptions,
 } from "./use-keyboard-shortcuts";
+export { useSwipeablePanel } from "./use-swipeable-panel";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import React, { useRef, useMemo, useEffect, useCallback } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import {
   MobileEventCalendar,
@@ -10,7 +10,6 @@ import { MobileBottomNav } from "../navigation/mobile-bottom-nav";
 import { MobileTopNav } from "../navigation/mobile-top-nav";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { AppSidebar } from "../layout/app-sidebar";
-import { Sheet, SheetContent, SheetTitle, SheetDescription } from "../ui/sheet";
 import {
   Drawer,
   DrawerContent,
@@ -20,7 +19,7 @@ import {
 import { SidebarProvider } from "../ui/sidebar";
 import { VisuallyHidden } from "../ui/visually-hidden";
 import { useCalendarContext } from "./calendar-context";
-import { useIsMobile } from "../../hooks/use-mobile";
+import { useIsMobile, useSwipeablePanel } from "../../hooks";
 import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
 import { AgendaDaysToShow } from "./constants";
 import { cn } from "../../lib/utils";
@@ -55,10 +54,12 @@ export function MobileCalendarWrapper({
   className,
   ...props
 }: MobileCalendarWrapperProps & { children?: React.ReactNode }) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
+  const [isQuickNavOpen, setIsQuickNavOpen] = React.useState(false);
   const isMobile = useIsMobile();
   const hasInitializedMobileDate = React.useRef(false);
+  const sidebarPanelRef = useRef<HTMLDivElement>(null);
+  const sidebarOverlayRef = useRef<HTMLDivElement>(null);
+  const mainContainerRef = useRef<HTMLDivElement>(null);
 
   const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
 
@@ -92,18 +93,29 @@ export function MobileCalendarWrapper({
     }
   }, [isMobile, setCurrentDate]);
 
+  const {
+    isOpen: isSidebarOpen,
+    open: handleOpenSidebar,
+    close: handleCloseSidebar,
+  } = useSwipeablePanel({
+    panelRef: sidebarPanelRef,
+    overlayRef: sidebarOverlayRef,
+    gestureTargetRef: mainContainerRef,
+    panelWidthPx: 320,
+    gesturePriority: 40,
+  });
+
   const handleDateChange = (date: Date) => setCurrentDate(date);
   const handleToday = () => setCurrentDate(new Date());
-  const handleOpenSidebar = () => setIsSidebarOpen(true);
   const handleOpenQuickNav = () => setIsQuickNavOpen(true);
   const handleCloseQuickNav = () => setIsQuickNavOpen(false);
   const handleOpenAddEvent = () => {
     onOpenAddEvent?.();
-    setIsSidebarOpen(false);
+    handleCloseSidebar();
   };
   const handleOpenSettings = () => {
     onOpenSettings?.();
-    setIsSidebarOpen(false);
+    handleCloseSidebar();
   };
   const handleViewChange = (view: CalendarView) => {
     setCurrentView(view);
@@ -216,37 +228,8 @@ export function MobileCalendarWrapper({
     });
   }, [currentDate, emblaApi]);
 
-  // Edge swipe detection for sidebar - only triggers from screen edge
-  const edgeSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    if (touch && touch.clientX < 15) {
-      edgeSwipeStartRef.current = { x: touch.clientX, y: touch.clientY };
-    } else {
-      edgeSwipeStartRef.current = null;
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!edgeSwipeStartRef.current) return;
-    const touch = e.changedTouches[0];
-    if (!touch) return;
-    const dx = touch.clientX - edgeSwipeStartRef.current.x;
-    const dy = Math.abs(touch.clientY - edgeSwipeStartRef.current.y);
-    // Only trigger sidebar if horizontal swipe is dominant and started from edge
-    if (dx > 80 && dx > dy * 2 && edgeSwipeStartRef.current.x < 15) {
-      setIsSidebarOpen(true);
-    }
-    edgeSwipeStartRef.current = null;
-  };
-
   return (
-    <div
-      className="relative flex flex-col h-dvh md:h-full overflow-hidden"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div ref={mainContainerRef} className="relative flex flex-col h-dvh md:h-full overflow-hidden">
       {/* Mobile top navigation */}
       {isMobile && (
         <MobileTopNav
@@ -336,33 +319,38 @@ export function MobileCalendarWrapper({
         </DrawerContent>
       </Drawer>
 
-      {/* Mobile Sidebar Sheet */}
-      <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-        <SheetContent
-          side="left"
-          showClose={false}
-          className="w-[85vw] max-w-[320px] h-[100dvh] p-0 border-r border-border rounded-none safe-area-inset-top safe-area-inset-bottom"
-        >
-          <VisuallyHidden>
-            <SheetTitle>Calendar Sidebar</SheetTitle>
-            <SheetDescription>
-              Access your calendars, mini calendar, and account settings
-            </SheetDescription>
-          </VisuallyHidden>
-          <SidebarProvider defaultOpen={true}>
-            <AppSidebar
-              user={user}
-              onLogout={onLogout}
-              onOpenSettings={handleOpenSettings}
-              onOpenCalendarManagement={onOpenCalendarManagement}
-              events={props.events}
-              getCachedEventsForRange={getCachedEventsForRange}
-              prefetchRange={prefetchRange}
-              isMobile={true}
-            />
-          </SidebarProvider>
-        </SheetContent>
-      </Sheet>
+      {/* Sidebar backdrop overlay */}
+      <div
+        ref={sidebarOverlayRef}
+        className="fixed inset-0 z-40 bg-black/50"
+        style={{ opacity: 0, pointerEvents: "none" }}
+        onClick={handleCloseSidebar}
+        aria-hidden={!isSidebarOpen}
+      />
+
+      {/* Sidebar panel — driven by gesture transform */}
+      <div
+        ref={sidebarPanelRef}
+        className="fixed top-0 left-0 z-50 h-[100dvh] w-[85vw] max-w-[320px] border-r border-border bg-background safe-area-inset-top safe-area-inset-bottom"
+        style={{ transform: "translateX(-320px)", willChange: "transform" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calendar Sidebar"
+        aria-hidden={!isSidebarOpen}
+      >
+        <SidebarProvider defaultOpen={true}>
+          <AppSidebar
+            user={user}
+            onLogout={onLogout}
+            onOpenSettings={handleOpenSettings}
+            onOpenCalendarManagement={onOpenCalendarManagement}
+            events={props.events}
+            getCachedEventsForRange={getCachedEventsForRange}
+            prefetchRange={prefetchRange}
+            isMobile={true}
+          />
+        </SidebarProvider>
+      </div>
     </div>
   );
 }
