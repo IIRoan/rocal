@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useRef, useMemo, useEffect, useCallback } from "react";
-import useEmblaCarousel from "embla-carousel-react";
+import { Capacitor } from "@capacitor/core";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { createGesture, createAnimation } from "@ionic/core";
 import {
   MobileEventCalendar,
   MobileEventCalendarProps,
@@ -60,6 +62,11 @@ export function MobileCalendarWrapper({
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
   const sidebarOverlayRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null);
+  const carouselViewportRef = useRef<HTMLDivElement>(null);
+  const slidesContainerRef = useRef<HTMLDivElement>(null);
+  const slideWidthRef = useRef(0);
+  const isCarouselAnimatingRef = useRef(false);
+  const isSidebarOpenRef = useRef(false);
 
   const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
 
@@ -104,6 +111,10 @@ export function MobileCalendarWrapper({
     panelWidthPx: 320,
     gesturePriority: 40,
   });
+
+  useEffect(() => {
+    isSidebarOpenRef.current = isSidebarOpen;
+  }, [isSidebarOpen]);
 
   const handleDateChange = (date: Date) => setCurrentDate(date);
   const handleToday = () => setCurrentDate(new Date());
@@ -181,52 +192,136 @@ export function MobileCalendarWrapper({
   const prevDate = useMemo(() => getPrevDate(currentDate), [currentDate, getPrevDate]);
   const nextDate = useMemo(() => getNextDate(currentDate), [currentDate, getNextDate]);
 
-  // Embla Carousel - 3 slides, start on center (index 1)
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    loop: false,
-    startIndex: 1,
-    align: "start",
-    dragFree: false,
-    dragThreshold: 20,
-    inViewThreshold: 1,
-  });
-
-  // Infinite loop logic: on slide change, update date and recenter
-  const isScrollingRef = useRef(false);
-
-  const handleSlideSelect = useCallback(() => {
-    if (!emblaApi || isScrollingRef.current) return;
-    const newIndex = emblaApi.selectedScrollSnap();
-
-    if (newIndex === 0) {
-      isScrollingRef.current = true;
-      handlePrevious();
-    } else if (newIndex === 2) {
-      isScrollingRef.current = true;
-      handleNext();
-    }
-  }, [emblaApi, handlePrevious, handleNext]);
-
   useEffect(() => {
-    if (!emblaApi) return;
-    emblaApi.on("select", handleSlideSelect);
-    return () => {
-      emblaApi.off("select", handleSlideSelect);
+    const measure = () => {
+      if (!carouselViewportRef.current || !slidesContainerRef.current) return;
+      const width = carouselViewportRef.current.offsetWidth;
+      slideWidthRef.current = width;
+      slidesContainerRef.current.style.transform = `translateX(${-width}px)`;
     };
-  }, [emblaApi, handleSlideSelect]);
 
-  // After currentDate changes from a swipe, recenter carousel to slide 1 instantly.
-  // Use a double-RAF to ensure React has flushed DOM updates before recentering.
-  useEffect(() => {
-    if (!emblaApi || !isScrollingRef.current) return;
-    requestAnimationFrame(() => {
+    measure();
+    window.addEventListener("resize", measure);
+
+    return () => {
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  const snapAndNavigate = useCallback((direction: "next" | "prev" | "center", fromTranslate: number) => {
+    const wrapper = slidesContainerRef.current;
+    if (!wrapper) return;
+
+    const slideWidth = slideWidthRef.current;
+
+    isCarouselAnimatingRef.current = true;
+
+    const targetTranslate =
+      direction === "next"
+        ? -slideWidth * 2
+        : direction === "prev"
+          ? 0
+          : -slideWidth;
+
+    const easing =
+      direction === "center"
+        ? "cubic-bezier(0.34, 1.56, 0.64, 1)"
+        : "cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+
+    const duration = direction === "center" ? 220 : 280;
+
+    const animation = createAnimation()
+      .addElement(wrapper)
+      .duration(duration)
+      .easing(easing)
+      .fromTo("transform", `translateX(${fromTranslate}px)`, `translateX(${targetTranslate}px)`);
+
+    void animation.play().then(() => {
+      if (direction === "next") {
+        if (Capacitor.isNativePlatform()) {
+          void Haptics.impact({ style: ImpactStyle.Light }).catch(() => undefined);
+        }
+        handleNext();
+      } else if (direction === "prev") {
+        if (Capacitor.isNativePlatform()) {
+          void Haptics.impact({ style: ImpactStyle.Light }).catch(() => undefined);
+        }
+        handlePrevious();
+      }
+
       requestAnimationFrame(() => {
-        if (!emblaApi) return;
-        emblaApi.scrollTo(1, true);
-        isScrollingRef.current = false;
+        requestAnimationFrame(() => {
+          if (slidesContainerRef.current) {
+            slidesContainerRef.current.style.transform = `translateX(${-slideWidthRef.current}px)`;
+          }
+          isCarouselAnimatingRef.current = false;
+        });
       });
     });
-  }, [currentDate, emblaApi]);
+  }, [handleNext, handlePrevious]);
+
+  useEffect(() => {
+    const viewport = carouselViewportRef.current;
+    const wrapper = slidesContainerRef.current;
+
+    if (!viewport || !wrapper) return;
+
+    const gesture = createGesture({
+      el: viewport,
+      gestureName: "calendar-date-swipe",
+      direction: "x",
+      threshold: 0,
+      gesturePriority: 20,
+      canStart: (detail) => {
+        if (isCarouselAnimatingRef.current) return false;
+        if (isSidebarOpenRef.current) return false;
+        if (detail.startX <= 60 && detail.deltaX > 0) return false;
+        return true;
+      },
+      onStart: () => {
+        wrapper.style.transition = "none";
+      },
+      onMove: (detail) => {
+        if (isCarouselAnimatingRef.current) return;
+
+        const slideWidth = slideWidthRef.current;
+        let translateX = -slideWidth + detail.deltaX;
+
+        const maxOvershoot = slideWidth * 0.4;
+        if (detail.deltaX > 0) {
+          translateX = -slideWidth + Math.min(detail.deltaX, maxOvershoot);
+        } else if (-detail.deltaX > slideWidth) {
+          translateX = -slideWidth * 2 + Math.max(0, -detail.deltaX - slideWidth) * -0.4;
+        }
+
+        wrapper.style.transform = `translateX(${translateX}px)`;
+      },
+      onEnd: (detail) => {
+        if (isCarouselAnimatingRef.current) return;
+
+        const slideWidth = slideWidthRef.current;
+        const threshold = slideWidth * 0.25;
+        const velocity = 0.3;
+
+        const currentTranslate = -slideWidth + detail.deltaX;
+        const clampedTranslate = Math.max(-slideWidth * 2, Math.min(0, currentTranslate));
+
+        const goNext = detail.deltaX < -threshold || detail.velocityX < -velocity;
+        const goPrev = detail.deltaX > threshold || detail.velocityX > velocity;
+
+        snapAndNavigate(
+          goNext ? "next" : goPrev ? "prev" : "center",
+          clampedTranslate,
+        );
+      },
+    });
+
+    gesture.enable(true);
+
+    return () => {
+      gesture.destroy();
+    };
+  }, [snapAndNavigate]);
 
   return (
     <div ref={mainContainerRef} className="relative flex flex-col h-dvh md:h-full overflow-hidden">
@@ -242,45 +337,61 @@ export function MobileCalendarWrapper({
         />
       )}
 
-      {/* Main Calendar Content - Embla Carousel */}
-      <div className={cn("flex-1 overflow-hidden relative w-full h-full", className)}>
-        <div className="overflow-hidden h-full" ref={emblaRef} style={{ touchAction: "pan-y" }}>
-          <div className="flex h-full">
-            {/* Previous */}
-            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+      {/* Main Calendar Content — native gesture carousel */}
+      <div
+        ref={carouselViewportRef}
+        className={cn("flex-1 overflow-hidden relative w-full h-full", className)}
+      >
+        <div
+          ref={slidesContainerRef}
+          className="flex h-full"
+          style={{
+            width: "300%",
+            willChange: "transform",
+          }}
+        >
+          <div
+            className="overflow-y-auto"
+            style={{ flex: "0 0 33.333%", height: "100%", paddingBottom: "80px", touchAction: "pan-y" }}
+          >
+            <MobileEventCalendar
+              {...props}
+              user={user}
+              initialView={currentView}
+              currentDateOverride={prevDate}
+              onSidebarToggle={handleOpenSidebar}
+              onViewChange={handleCalendarViewChange}
+            />
+          </div>
+
+          <div
+            className="overflow-y-auto"
+            style={{ flex: "0 0 33.333%", height: "100%", paddingBottom: "80px", touchAction: "pan-y" }}
+          >
+            {children || (
               <MobileEventCalendar
                 {...props}
                 user={user}
                 initialView={currentView}
-                currentDateOverride={prevDate}
+                currentDateOverride={currentDate}
                 onSidebarToggle={handleOpenSidebar}
                 onViewChange={handleCalendarViewChange}
               />
-            </div>
-            {/* Current */}
-            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
-              {children || (
-                <MobileEventCalendar
-                  {...props}
-                  user={user}
-                  initialView={currentView}
-                  currentDateOverride={currentDate}
-                  onSidebarToggle={handleOpenSidebar}
-                  onViewChange={handleCalendarViewChange}
-                />
-              )}
-            </div>
-            {/* Next */}
-            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
-              <MobileEventCalendar
-                {...props}
-                user={user}
-                initialView={currentView}
-                currentDateOverride={nextDate}
-                onSidebarToggle={handleOpenSidebar}
-                onViewChange={handleCalendarViewChange}
-              />
-            </div>
+            )}
+          </div>
+
+          <div
+            className="overflow-y-auto"
+            style={{ flex: "0 0 33.333%", height: "100%", paddingBottom: "80px", touchAction: "pan-y" }}
+          >
+            <MobileEventCalendar
+              {...props}
+              user={user}
+              initialView={currentView}
+              currentDateOverride={nextDate}
+              onSidebarToggle={handleOpenSidebar}
+              onViewChange={handleCalendarViewChange}
+            />
           </div>
         </div>
       </div>
