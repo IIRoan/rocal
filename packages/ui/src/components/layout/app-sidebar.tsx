@@ -1,10 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon, FoldersIcon } from "@phosphor-icons/react";
+import {
+  CheckIcon,
+  GearSixIcon,
+  ArrowLineLeftIcon,
+  ArrowLineRightIcon,
+  FoldersIcon,
+} from "@phosphor-icons/react";
 import { Sparkles, Plus, Search } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
+import {
+  CalendarEvent,
+  User,
+  Calendar as CalendarData,
+} from "../calendar/types";
 import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
@@ -64,9 +74,15 @@ function AiResponseContent({ response }: { response: string }) {
         const isBullet = trimmed.startsWith("- ") || trimmed.startsWith("* ");
 
         return (
-          <div key={`${trimmed}-${index}`} className={isBullet ? "flex gap-2 items-start" : "leading-relaxed"}>
+          <div
+            key={`${trimmed}-${index}`}
+            className={isBullet ? "flex gap-2 items-start" : "leading-relaxed"}
+          >
             {isBullet && (
-              <span className="mt-1.5 size-1 rounded-full bg-primary/40 shrink-0" aria-hidden="true" />
+              <span
+                className="mt-1.5 size-1 rounded-full bg-primary/40 shrink-0"
+                aria-hidden="true"
+              />
             )}
             <span className="text-[12px] text-foreground/85">
               {renderInlineMarkdown(isBullet ? trimmed.slice(2) : line)}
@@ -92,7 +108,10 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   events?: CalendarEvent[];
   isMobile?: boolean;
   onClose?: () => void;
-  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  getCachedEventsForRange?: (range: {
+    start: Date;
+    end: Date;
+  }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
 }
 
@@ -119,41 +138,55 @@ export function AppSidebar({
 
   // Mobile version - Full-screen immersive dashboard
   if (isMobile) {
-    const initials = user?.name
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase() || "GU";
+    const initials =
+      user?.name
+        ?.split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase() || "GU";
 
     return (
       <div className="fixed inset-0 z-[100] flex flex-col h-[100dvh] w-full bg-background overflow-hidden overscroll-none">
-        {/* Immersive Header */}
-        <div className="flex items-center justify-between pt-6 pb-2 px-6 shrink-0">
-          <div className="flex items-center gap-3">
-   <div className="flex items-center justify-center size-10">
-  <LogoSvg className="size-full text-primary" />
-</div>
-            <h1 className="text-xl font-extrabold tracking-tight text-foreground">Workspace</h1>
-          </div>
-          
+        {/* Sidebar Header */}
+        <div
+          className="flex items-center gap-3 px-4 shrink-0 border-b border-border/50"
+          style={{
+            paddingTop: "max(16px, env(safe-area-inset-top, 16px))",
+            paddingBottom: "12px",
+          }}
+        >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center justify-center transition-all active:scale-90 outline-none">
-                <Avatar className="size-10 rounded-xl shadow-none">
-                  <AvatarImage src={user?.avatar} alt={user?.name} className="rounded-xl" />
-                  <AvatarFallback className="rounded-xl bg-transparent text-primary font-bold text-sm">
+              <button
+                className="flex items-center justify-center transition-all active:scale-90 outline-none shrink-0"
+                aria-label="Account options"
+              >
+                <Avatar className="size-9 rounded-full">
+                  <AvatarImage
+                    src={user?.avatar}
+                    alt={user?.name}
+                    className="rounded-full"
+                  />
+                  <AvatarFallback className="rounded-full bg-primary/10 text-primary font-bold text-sm">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-2xl border-primary/5">
+            <DropdownMenuContent
+              align="start"
+              className="w-52 rounded-2xl p-2 shadow-2xl border-primary/5"
+            >
               <div className="flex flex-col gap-1 p-3 mb-1">
-                <p className="text-sm font-bold text-foreground leading-none">{user?.name || "Guest User"}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{user?.email || "guest@example.com"}</p>
+                <p className="text-sm font-bold text-foreground leading-none">
+                  {user?.name || "Guest User"}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {user?.email || "guest@example.com"}
+                </p>
               </div>
               <DropdownMenuSeparator className="bg-primary/5" />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="rounded-xl h-11 px-3 font-bold text-sm gap-3 focus:bg-primary/5 focus:text-primary transition-colors cursor-pointer"
                 onClick={onOpenSettings}
               >
@@ -161,7 +194,7 @@ export function AppSidebar({
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-primary/5" />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="rounded-xl h-11 px-3 font-bold text-sm gap-3 focus:bg-destructive/5 text-destructive focus:text-destructive transition-colors cursor-pointer"
                 onClick={onLogout}
               >
@@ -170,26 +203,23 @@ export function AppSidebar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate leading-tight">
+              {user?.name || "Guest"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user?.email || ""}
+            </p>
+          </div>
         </div>
 
         {/* Scrollable Dashboard Content */}
         <div className="flex-1 overflow-auto px-6 pb-10  space-y-2">
-          {/* Main Action Hub */}
-          <div className="flex justify-center py-2">
-            {onCreateEvent && (
-              <Button
-                onClick={onCreateEvent}
-                className="h-20 w-20 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 border-none shadow-2xl shadow-primary/30 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 group"
-              >
-                <Plus size={32} strokeWidth={3} className="transition-transform group-active:rotate-90" />
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-80">New</span>
-              </Button>
-            )}
-          </div>
-
           {/* Mini Calendar Widget */}
           <div className="space-y-4">
-            <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.15em] px-1">Calendar Preview</div>
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
+              Calendar
+            </div>
             <div className="bg-muted/30 border border-border/50 rounded-[32px] p-5 shadow-sm">
               <SidebarCalendar
                 getCachedEventsForRange={getCachedEventsForRange}
@@ -202,7 +232,9 @@ export function AppSidebar({
           {/* Calendars Management Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.15em]">Your Calendars</div>
+              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                Your Calendars
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -219,28 +251,42 @@ export function AppSidebar({
                   key={calendar.id}
                   onClick={() => toggleCalendarVisibility(calendar.id)}
                   className={`flex items-center justify-between gap-4 w-full p-4 rounded-[22px] border transition-all active:scale-[0.99] ${
-                    isCalendarVisible(calendar.id) 
-                      ? "bg-background border-border shadow-sm" 
+                    isCalendarVisible(calendar.id)
+                      ? "bg-background border-border shadow-sm"
                       : "bg-muted/20 border-transparent opacity-60"
                   }`}
                 >
                   <div className="flex items-center gap-4 flex-1">
-                    <div 
+                    <div
                       className="size-6 rounded-lg flex items-center justify-center transition-all shadow-sm"
-                      style={{ 
-                        backgroundColor: isCalendarVisible(calendar.id) ? (calendar.color?.startsWith("#") ? calendar.color : `var(--color-event-${calendar.color || "default"})`) : "rgba(var(--foreground), 0.05)",
-                        border: isCalendarVisible(calendar.id) ? "none" : "2px solid rgba(var(--foreground), 0.1)"
+                      style={{
+                        backgroundColor: isCalendarVisible(calendar.id)
+                          ? calendar.color?.startsWith("#")
+                            ? calendar.color
+                            : `var(--color-event-${calendar.color || "default"})`
+                          : "rgba(var(--foreground), 0.05)",
+                        border: isCalendarVisible(calendar.id)
+                          ? "none"
+                          : "2px solid rgba(var(--foreground), 0.1)",
                       }}
                     >
-                      {isCalendarVisible(calendar.id) && <CheckIcon size={16} weight="bold" color="white" />}
+                      {isCalendarVisible(calendar.id) && (
+                        <CheckIcon size={16} weight="bold" color="white" />
+                      )}
                     </div>
-                    <span className={`text-[15px] font-bold transition-colors ${isCalendarVisible(calendar.id) ? "text-foreground" : "text-foreground/40"}`}>
+                    <span
+                      className={`text-[15px] font-bold transition-colors ${isCalendarVisible(calendar.id) ? "text-foreground" : "text-foreground/40"}`}
+                    >
                       {calendar.name}
                     </span>
                   </div>
-                  <div 
-                    className="size-2 rounded-full" 
-                    style={{ backgroundColor: calendar.color?.startsWith("#") ? calendar.color : `var(--color-event-${calendar.color || "default"})` }} 
+                  <div
+                    className="size-2 rounded-full"
+                    style={{
+                      backgroundColor: calendar.color?.startsWith("#")
+                        ? calendar.color
+                        : `var(--color-event-${calendar.color || "default"})`,
+                    }}
                   />
                 </button>
               ))}
@@ -251,7 +297,9 @@ export function AppSidebar({
           {user?.hasAiAccess && onAiSubmit && onAiQueryChange && (
             <div className="space-y-4 pt-2">
               <div className="flex items-center gap-2 px-1">
-                <div className="text-[11px] font-extrabold text-primary uppercase tracking-[0.2em]">Assistant AI</div>
+                <div className="text-[11px] font-extrabold text-primary uppercase tracking-[0.2em]">
+                  Assistant AI
+                </div>
                 <div className="h-[1px] flex-1 bg-primary/10" />
               </div>
 
@@ -260,12 +308,14 @@ export function AppSidebar({
                   <div className="p-5 bg-background rounded-[24px] border border-primary/5 shadow-sm text-foreground/90 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center gap-2 mb-3">
                       <Sparkles className="size-4 text-primary" />
-                      <span className="text-[10px] font-black uppercase tracking-tighter text-primary/60">Response</span>
+                      <span className="text-[10px] font-black uppercase tracking-tighter text-primary/60">
+                        Response
+                      </span>
                     </div>
                     <AiResponseContent response={aiResponse} />
                   </div>
                 )}
-                
+
                 <div className="relative">
                   <Textarea
                     value={aiQuery || ""}
@@ -312,7 +362,26 @@ export function AppSidebar({
   }
 
   // Desktop version - high quality sidebar
-  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onCreateEvent, aiQuery, onAiQueryChange, onAiSubmit, aiLoading, aiResponse, events, getCachedEventsForRange, prefetchRange, props }} />;
+  return (
+    <AppSidebarDesktop
+      {...{
+        user,
+        onLogout,
+        onOpenSettings,
+        onOpenCalendarManagement,
+        onCreateEvent,
+        aiQuery,
+        onAiQueryChange,
+        onAiSubmit,
+        aiLoading,
+        aiResponse,
+        events,
+        getCachedEventsForRange,
+        prefetchRange,
+        props,
+      }}
+    />
+  );
 }
 
 function AppSidebarDesktop({
@@ -342,33 +411,50 @@ function AppSidebarDesktop({
   aiLoading?: boolean;
   aiResponse?: string;
   events?: CalendarEvent[];
-  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  getCachedEventsForRange?: (range: {
+    start: Date;
+    end: Date;
+  }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   props: React.ComponentProps<typeof Sidebar>;
 }) {
-  const { calendars, toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
+  const { calendars, toggleCalendarVisibility, isCalendarVisible } =
+    useCalendarContext();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar variant="inset" collapsible="icon" {...props} className="max-lg:p-3">
-      {onCreateEvent && typeof window !== "undefined" && createPortal(
-        <div className="fixed bottom-6 right-6 z-[9999]">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={onCreateEvent}
-                className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl shadow-primary/30 transition-all hover:scale-110 active:scale-95 border-none group"
-                size="icon"
-              >
-                <Plus size={20} strokeWidth={2.5} className="transition-transform group-hover:rotate-90" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="font-bold">Create New Event</TooltipContent>
-          </Tooltip>
-        </div>,
-        document.body
-      )}
+    <Sidebar
+      variant="inset"
+      collapsible="icon"
+      {...props}
+      className="max-lg:p-3"
+    >
+      {onCreateEvent &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div className="fixed bottom-6 right-6 z-[9999]">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={onCreateEvent}
+                  className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl shadow-primary/30 transition-all hover:scale-110 active:scale-95 border-none group"
+                  size="icon"
+                >
+                  <Plus
+                    size={20}
+                    strokeWidth={2.5}
+                    className="transition-transform group-hover:rotate-90"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="font-bold">
+                Create New Event
+              </TooltipContent>
+            </Tooltip>
+          </div>,
+          document.body,
+        )}
       <SidebarHeader className="pt-4 px-4 pb-2">
         <div className="flex justify-between items-center gap-2">
           <a className="inline-flex" href="/">
@@ -427,7 +513,11 @@ function AppSidebarDesktop({
                   className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                   onClick={onOpenSettings}
                 >
-                  <GearSixIcon size={18} weight="regular" className="opacity-80" />
+                  <GearSixIcon
+                    size={18}
+                    weight="regular"
+                    className="opacity-80"
+                  />
                   Settings
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -437,7 +527,9 @@ function AppSidebarDesktop({
 
         <SidebarGroup className="p-0 mt-auto pt-4">
           <div className="flex items-center gap-2 px-2 mb-1">
-            <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">Calendars</span>
+            <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+              Calendars
+            </span>
             <div className="flex-1 h-px bg-border/40" />
             <button
               onClick={onOpenCalendarManagement}
@@ -452,8 +544,8 @@ function AppSidebarDesktop({
                 <SidebarMenuItem key={calendar.id}>
                   <SidebarMenuButton
                     className={`rounded-lg h-9 text-[14px] font-medium transition-colors ${
-                      isCalendarVisible(calendar.id) 
-                        ? "text-foreground hover:bg-muted/80" 
+                      isCalendarVisible(calendar.id)
+                        ? "text-foreground hover:bg-muted/80"
                         : "text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground"
                     }`}
                     onClick={() => toggleCalendarVisibility(calendar.id)}
@@ -468,9 +560,7 @@ function AppSidebarDesktop({
                           : `var(--color-event-${calendar.color || "default"})`,
                       }}
                     />
-                    <span className="truncate">
-                      {calendar.name}
-                    </span>
+                    <span className="truncate">{calendar.name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

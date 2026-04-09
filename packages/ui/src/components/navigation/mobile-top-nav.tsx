@@ -4,13 +4,7 @@ import React from "react";
 import { Menu, Plus } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
-import {
-  format,
-  startOfWeek,
-  endOfWeek,
-  addDays,
-  isSameMonth,
-} from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays, isSameMonth } from "date-fns";
 import { CalendarView } from "../calendar/types";
 import { AgendaDaysToShow } from "../calendar/constants";
 
@@ -97,7 +91,10 @@ export function MobileTopNav({
         className,
       )}
     >
-      <div className="flex items-center justify-between px-4 py-3 safe-area-inset-top">
+      <div
+        className="flex items-center justify-between px-4 py-2"
+        style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+      >
         <Button
           variant="ghost"
           size="sm"
