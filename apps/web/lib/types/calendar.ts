@@ -13,6 +13,20 @@ import type {
 import type { RecurrenceRule as SharedRecurrenceRule } from "@workspace/calendar-ics/recurrence";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 
+// Event Search Types
+export interface EventSearchResult {
+  events: CalendarEvent[];
+  total: number;
+}
+
+export interface EventSearchParams {
+  q: string;
+  limit?: number;
+  offset?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 // Calendar API types matching backend structure
 
 export type EventColor =

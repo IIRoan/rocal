@@ -33,6 +33,144 @@ async function resolveEventTimezone(
 export const eventsRoutes = new Elysia({ prefix: "/events" })
   .use(requireAuth)
   .get(
+    "/search",
+    async ({ query, user, request }: any) => {
+      user = await ensureAuthenticatedUser(user, request as Request);
+
+      const { q, limit, offset, startDate, endDate } = query;
+      const searchQuery = (q as string)?.trim();
+
+      if (!searchQuery || searchQuery.length < 2) {
+        return { events: [], total: 0 };
+      }
+
+      const limitVal = Math.min(Math.max(Number(limit) || 20, 1), 50);
+      const offsetVal = Math.max(Number(offset) || 0, 0);
+
+      // Build date filter clause
+      let dateFilter = "";
+      const params: any[] = [user.id, searchQuery, limitVal, offsetVal];
+      if (startDate && endDate) {
+        dateFilter = `AND e.start <= ${params.length + 1}::timestamp AND e.end >= ${params.length + 2}::timestamp`;
+        params.push(new Date(startDate as string), new Date(endDate as string));
+      }
+
+      const results = await prisma.$queryRawUnsafe(
+        `SELECT
+          e.id, e.title, e.description, e.start, e.end, e.all_day, e.location, e.color,
+          e.calendar_id, e.category_id, e.timezone, e.recurrence, e.user_id,
+          e.created_at, e.updated_at,
+          c.id as "calendar.id", c.name as "calendar.name", c.color as "calendar.color",
+          cat.id as "category.id", cat.name as "category.name", cat.color as "category.color",
+          ts_rank(
+            to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, '')),
+            plainto_tsquery('english', $2)
+          ) as rank
+        FROM calendar_event e
+        LEFT JOIN calendar c ON e.calendar_id = c.id
+        LEFT JOIN event_category cat ON e.category_id = cat.id
+        WHERE e.user_id = $1
+          AND (
+            to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))
+            @@ plainto_tsquery('english', $2)
+            OR e.title ILIKE '%' || $2 || '%'
+          )
+          ${dateFilter}
+        ORDER BY rank DESC, e.start DESC
+        LIMIT $3 OFFSET $4`,
+        ...params,
+      );
+
+      const countResult = await prisma.$queryRawUnsafe(
+        `SELECT count(*)::int as total
+        FROM calendar_event e
+        WHERE e.user_id = $1
+          AND (
+            to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))
+            @@ plainto_tsquery('english', $2)
+            OR e.title ILIKE '%' || $2 || '%'
+          )
+          ${dateFilter}`,
+        ...params.slice(0, params.length - 2),
+      );
+
+      const total = (countResult as any[])?.[0]?.total ?? 0;
+
+      // Flatten nested results from joins
+      const events = (results as any[]).map((row) => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        start: row.start,
+        end: row.end,
+        allDay: row.all_day,
+        location: row.location,
+        color: row.color,
+        timezone: row.timezone,
+        recurrence: row.recurrence,
+        calendarId: row.calendar_id,
+        categoryId: row.category_id,
+        userId: row.user_id,
+        calendar: row["calendar.id"]
+          ? {
+              id: row["calendar.id"],
+              name: row["calendar.name"],
+              color: row["calendar.color"],
+            }
+          : null,
+        category: row["category.id"]
+          ? {
+              id: row["category.id"],
+              name: row["category.name"],
+              color: row["category.color"],
+            }
+          : null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
+      return { events, total };
+    },
+    {
+      query: t.Object({
+        q: t.String({
+          description: "Search query (min 2 characters)",
+          minLength: 2,
+        }),
+        limit: t.Optional(
+          t.Number({
+            description: "Max results to return (default 20, max 50)",
+            minimum: 1,
+            maximum: 50,
+          }),
+        ),
+        offset: t.Optional(
+          t.Number({
+            description: "Offset for pagination (default 0)",
+            minimum: 0,
+          }),
+        ),
+        startDate: t.Optional(
+          t.String({
+            description: "Filter events starting after this date (ISO 8601)",
+          }),
+        ),
+        endDate: t.Optional(
+          t.String({
+            description: "Filter events ending before this date (ISO 8601)",
+          }),
+        ),
+      }),
+      detail: {
+        tags: ["Events"],
+        summary: "Search events by text",
+        description:
+          "Full-text search across event title, description, and location. Uses PostgreSQL tsvector for fast lookups with ILIKE fallback for short queries.",
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+  .get(
     "/",
     async ({ query, user, request }: any) => {
       const { start, end } = query;

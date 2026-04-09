@@ -14,6 +14,7 @@ export interface EventEditorOptions {
 interface CommandPaletteContextType {
   isOpen: boolean;
   openPalette: () => void;
+  openSearchPalette: () => void;
   closePalette: () => void;
   openEventEditor: (
     event?: CalendarEvent,
@@ -48,6 +49,7 @@ interface CommandPaletteProviderProps {
     onOpenChange: (open: boolean) => void;
     eventToEdit?: CalendarEvent | null;
     onEventSaved?: () => void;
+    onEventEdit?: (event: CalendarEvent) => void;
     initialView?: string;
     eventEditorMode?: EventEditorMode;
     popoverAnchorPosition?: { x: number; y: number } | null;
@@ -74,6 +76,11 @@ export function CommandPaletteProvider({
     "view" | "edit"
   >("view");
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
+
+  const openSearchPalette = () => {
+    setInitialView("search");
+    setIsOpen(true);
+  };
 
   const openPalette = () => {
     setInitialView("main");
@@ -124,6 +131,7 @@ export function CommandPaletteProvider({
   const value: CommandPaletteContextType = {
     isOpen,
     openPalette,
+    openSearchPalette,
     closePalette,
     openEventEditor,
     openCalendarManagement,
@@ -141,6 +149,7 @@ export function CommandPaletteProvider({
         open={isOpen}
         onOpenChange={closePalette}
         eventToEdit={eventToEdit}
+        onEventEdit={(event) => openEventEditor(event, { eventViewMode: "view" })}
         initialView={initialView}
         eventEditorMode={eventEditorMode}
         popoverAnchorPosition={popoverAnchorPosition}
