@@ -5,7 +5,7 @@ import { useEffect, useRef, useCallback, useState, type RefObject } from "react"
 
 const SNAP_THRESHOLD = 0.35;
 const VELOCITY_THRESHOLD = 0.3;
-const OPEN_ZONE_PX = 40;
+const OPEN_ZONE_PX = 60;
 const ANIMATION_DURATION_OPEN = 240;
 const ANIMATION_DURATION_CLOSE = 200;
 
@@ -169,12 +169,45 @@ export function useSwipeablePanel({
       },
     });
 
+    const closeGestureOverlay = createGesture({
+      el: overlay,
+      gestureName: "swipeable-panel-close-overlay",
+      direction: "x",
+      threshold: 8,
+      gesturePriority,
+      canStart: () => isOpenRef.current,
+      onMove: (detail) => {
+        if (!isOpenRef.current) return;
+        if (detail.deltaX >= 0) return;
+
+        const progress = Math.max(0, 1 + detail.deltaX / panelWidthPx);
+        const translateX = -panelWidthPx + progress * panelWidthPx;
+
+        panel.style.transform = `translateX(${translateX}px)`;
+        overlay.style.opacity = `${progress * 0.5}`;
+      },
+      onEnd: (detail) => {
+        if (!isOpenRef.current) return;
+
+        const progress = 1 + detail.deltaX / panelWidthPx;
+        const shouldClose = progress < 1 - SNAP_THRESHOLD || detail.velocityX < -VELOCITY_THRESHOLD;
+
+        if (shouldClose) {
+          animateToClose();
+        } else {
+          animateToOpen();
+        }
+      },
+    });
+
     openGesture.enable(true);
     closeGesture.enable(true);
+    closeGestureOverlay.enable(true);
 
     return () => {
       openGesture.destroy();
       closeGesture.destroy();
+      closeGestureOverlay.destroy();
     };
   }, [animateToClose, animateToOpen, gesturePriority, gestureTargetRef, overlayRef, panelRef, panelWidthPx]);
 
