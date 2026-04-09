@@ -348,6 +348,7 @@ export function MobileCalendarWrapper({
             getCachedEventsForRange={getCachedEventsForRange}
             prefetchRange={prefetchRange}
             isMobile={true}
+            onClose={handleCloseSidebar}
           />
         </SidebarProvider>
       </div>

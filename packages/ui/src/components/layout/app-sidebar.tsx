@@ -22,7 +22,6 @@ import {
   SidebarRail,
   useSidebar,
 } from "../ui/sidebar";
-import { SheetClose } from "../ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
   DropdownMenu,
@@ -92,6 +91,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   aiResponse?: string;
   events?: CalendarEvent[];
   isMobile?: boolean;
+  onClose?: () => void;
   getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
 }
@@ -109,6 +109,7 @@ export function AppSidebar({
   aiResponse,
   events,
   isMobile = false,
+  onClose,
   getCachedEventsForRange,
   prefetchRange,
   ...props
@@ -298,14 +299,13 @@ export function AppSidebar({
 
         {/* Global Action Bar Footer */}
         <div className="p-6 bg-background border-t border-border/50 shrink-0">
-          <SheetClose asChild>
-            <Button 
-              variant="secondary"
-              className="w-full h-14 rounded-[22px] bg-muted/50 text-foreground hover:bg-muted/80 font-bold text-base transition-all active:scale-[0.97] border-none shadow-none"
-            >
-              Back to Calendar
-            </Button>
-          </SheetClose>
+          <Button
+            variant="secondary"
+            className="w-full h-14 rounded-[22px] bg-muted/50 text-foreground hover:bg-muted/80 font-bold text-base transition-all active:scale-[0.97] border-none shadow-none"
+            onClick={onClose}
+          >
+            Back to Calendar
+          </Button>
         </div>
       </div>
     );
