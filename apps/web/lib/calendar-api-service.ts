@@ -38,6 +38,8 @@ import {
   CalendarShareLink,
   CreateCalendarShareLinkRequestPayload,
   DisableCalendarShareLinkResponsePayload,
+  EventSearchResult,
+  EventSearchParams,
 } from "./types/calendar";
 // Browser notifications removed
 
@@ -104,6 +106,27 @@ export class CalendarApiService {
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to fetch event");
+    }
+  }
+
+  async searchEvents(
+    params: EventSearchParams,
+    signal?: AbortSignal,
+  ): Promise<EventSearchResult> {
+    try {
+      const searchParams = new URLSearchParams({ q: params.q });
+      if (params.limit) searchParams.set("limit", String(params.limit));
+      if (params.offset) searchParams.set("offset", String(params.offset));
+      if (params.startDate) searchParams.set("startDate", params.startDate);
+      if (params.endDate) searchParams.set("endDate", params.endDate);
+
+      const response = await this.client.get<EventSearchResult>(
+        `/api/events/search?${searchParams.toString()}`,
+        { signal },
+      );
+      return response;
+    } catch (error) {
+      throw this.transformError(error, "Failed to search events");
     }
   }
 

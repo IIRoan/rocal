@@ -84,6 +84,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
+  onOpenSearch?: () => void;
   onCreateEvent?: () => void;
   aiQuery?: string;
   onAiQueryChange?: (value: string) => void;
@@ -101,6 +102,7 @@ export function AppSidebar({
   onLogout,
   onOpenSettings,
   onOpenCalendarManagement,
+  onOpenSearch,
   onCreateEvent,
   aiQuery,
   onAiQueryChange,
@@ -312,7 +314,7 @@ export function AppSidebar({
   }
 
   // Desktop version - high quality sidebar
-  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onCreateEvent, aiQuery, onAiQueryChange, onAiSubmit, aiLoading, aiResponse, events, getCachedEventsForRange, prefetchRange, props }} />;
+  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onOpenSearch, onCreateEvent, aiQuery, onAiQueryChange, onAiSubmit, aiLoading, aiResponse, events, getCachedEventsForRange, prefetchRange, props }} />;
 }
 
 function AppSidebarDesktop({
@@ -320,6 +322,7 @@ function AppSidebarDesktop({
   onLogout,
   onOpenSettings,
   onOpenCalendarManagement,
+  onOpenSearch,
   onCreateEvent,
   aiQuery,
   onAiQueryChange,
@@ -335,6 +338,7 @@ function AppSidebarDesktop({
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
+  onOpenSearch?: () => void;
   onCreateEvent?: () => void;
   aiQuery?: string;
   onAiQueryChange?: (value: string) => void;
@@ -417,7 +421,10 @@ function AppSidebarDesktop({
                 </SidebarMenuItem>
               )}
               <SidebarMenuItem>
-                <SidebarMenuButton className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors">
+                <SidebarMenuButton
+                  className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+                  onClick={onOpenSearch}
+                >
                   <Search size={18} strokeWidth={2} className="opacity-80" />
                   Search
                 </SidebarMenuButton>

@@ -94,4 +94,5 @@ export type PaletteView =
   | "calendar-edit"
   | "subscriptions"
   | "events"
-  | "event-editor";
+  | "event-editor"
+  | "search";
