@@ -142,7 +142,7 @@ function EventDeepLinkHandler() {
 
 function SidebarWithContext() {
   const { data: session } = useSession();
-  const { openCalendarManagement, openPalette, openEventEditor } =
+  const { openCalendarManagement, openPalette, openSearchPalette, openEventEditor } =
     useCommandPaletteContext();
   const { isCalendarVisible } = useCalendarContext();
   const { settings } = useSettings();
@@ -266,6 +266,7 @@ function SidebarWithContext() {
       onLogout={handleLogout}
       onOpenSettings={openPalette}
       onOpenCalendarManagement={openCalendarManagement}
+      onOpenSearch={openSearchPalette}
       onCreateEvent={handleCreateEvent}
       aiQuery={aiQuery}
       onAiQueryChange={setAiQuery}
