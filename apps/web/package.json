@@ -21,7 +21,7 @@
     "mobile:android:devices": "adb devices",
     "mobile:android:live": "ionic cap run android -l --external",
     "mobile:android:live:usb": "ionic cap run android -l --external",
-    "mobile:android:live:emu": "ionic cap run android -l --host=10.0.2.2 --port=3000",
+    "mobile:android:live:emu": "ionic cap run android -l",
     "android:build": "bun run ./scripts/build-apk.ts",
     "mobile:dev:wifi": "bun run ./scripts/mobile-dev-wifi.ts",
     "lint": "eslint .",
