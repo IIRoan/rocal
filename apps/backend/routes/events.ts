@@ -533,12 +533,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           }
         }
 
-        // Normalize all-day boundaries if requested
-        if (body.allDay === true) {
-          // Clamp to full-day inclusive bounds
-          startDate.setHours(0, 0, 0, 0);
-          endDate.setHours(23, 59, 59, 999);
-        }
+        // Important: do not normalize all-day boundaries using server-local time.
+        // The client already sends canonical all-day bounds in the user's timezone.
+        // Re-applying setHours() on the server can shift dates across timezones.
 
         // Validate recurrence rule if provided
         if (body.recurrence) {
@@ -1092,16 +1089,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         let finalStartDate = startDate || existingEvent.start;
         let finalEndDate = endDate || existingEvent.end;
 
-        // Normalize all-day boundaries if the event is or becomes all-day
-        const willBeAllDay =
-          body.allDay !== undefined ? !!body.allDay : !!existingEvent.allDay;
-        if (willBeAllDay) {
-          // Only adjust the dates that are being changed; keep others as-is
-          if (startDate)
-            finalStartDate = new Date(finalStartDate.setHours(0, 0, 0, 0));
-          if (endDate)
-            finalEndDate = new Date(finalEndDate.setHours(23, 59, 59, 999));
-        }
+        // Important: avoid server-local normalization for all-day updates.
+        // Keep the boundaries provided by the client to prevent timezone drift.
 
         // Validate date logic
         if (finalStartDate >= finalEndDate) {
