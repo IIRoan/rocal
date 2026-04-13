@@ -388,8 +388,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         ...modifiedInstances,
       ].sort((a, b) => a.start.getTime() - b.start.getTime());
 
-      set.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=300";
-
       return {
         events,
         categories,
