@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -339,6 +339,22 @@ export function EventCalendar({
   }, []);
 
   const navDirectionRef = useRef<1 | -1>(1);
+  const shouldReduceMotion = useReducedMotion();
+
+  const viewTransitionVariants = {
+    enter: (dir: number) => ({
+      x: shouldReduceMotion ? 0 : dir > 0 ? 56 : -56,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      x: shouldReduceMotion ? 0 : dir > 0 ? -40 : 40,
+      opacity: 0,
+    }),
+  };
 
   const handlePrevious = () => {
     navDirectionRef.current = -1;
@@ -983,16 +999,26 @@ export function EventCalendar({
               <motion.div
                 key={`${view}-${format(currentDate, view === "day" ? "yyyy-MM-dd" : view === "week" ? "yyyy-ww" : "yyyy-MM")}`}
                 custom={navDirectionRef.current}
-                variants={{
-                  enter: (dir: number) => ({ x: dir > 0 ? "25%" : "-25%", opacity: 0 }),
-                  center: { x: 0, opacity: 1 },
-                  exit: (dir: number) => ({ x: dir > 0 ? "-25%" : "25%", opacity: 0 }),
-                }}
+                variants={viewTransitionVariants}
                 initial="enter"
                 animate="center"
                 exit="exit"
-                transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
-                style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}
+                transition={{
+                  x: {
+                    type: "spring",
+                    stiffness: 340,
+                    damping: 34,
+                    mass: 0.8,
+                  },
+                  opacity: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
+                }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  willChange: "transform, opacity",
+                }}
               >
                 {view === "month" && (
                   <MonthView
