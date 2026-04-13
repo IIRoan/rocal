@@ -369,8 +369,8 @@ export function WeekView({
     >
       <div className="z-40 bg-background/95 backdrop-blur-md shrink-0">
         {/* Day headers row: timezone + day names */}
-        <div className="hidden w-full auto-cols-fr grid-flow-col items-center justify-between pt-3 sm:grid border-b border-border/40">
-          <div className="caption w-full text-center text-muted-foreground/70">
+        <div className="hidden w-full grid-cols-[3rem_repeat(7,minmax(0,1fr))] items-center justify-between pt-3 sm:grid border-b border-border/40">
+          <div className="caption text-right text-muted-foreground/40 text-[9px] pr-1.5">
             {timezone
               ? formatInTimeZone(new Date(), timezone, "zzz")
               : format(new Date(), "zzz")}
@@ -395,8 +395,8 @@ export function WeekView({
         </div>
 
         {/* Mobile day headers */}
-        <div className="sm:hidden grid grid-cols-8 border-b border-border/40 pt-2">
-          <div className="flex items-center justify-center text-[9px] font-medium text-muted-foreground/70">
+        <div className="sm:hidden grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] border-b border-border/40 pt-2">
+          <div className="flex items-center justify-end text-[8px] font-medium text-muted-foreground/40 pr-1">
             {timezone
               ? formatInTimeZone(new Date(), timezone, "zzz")
               : format(new Date(), "zzz")}
@@ -422,10 +422,10 @@ export function WeekView({
       </div>
 
       {/* All-day events row (non-sticky) */}
-      <div className="grid w-full grid-cols-8 items-stretch justify-between gap-[1px] bg-border/40 border-b border-border/40 relative z-30 shrink-0">
-        <div className="shadow-sm h-full flex flex-col bg-background">
-          <div className="flex flex-1 flex-col items-center justify-center p-1 min-h-[24px]">
-            <span className="text-[10px] text-muted-foreground/70">All-day</span>
+      <div className="grid w-full grid-cols-[3rem_repeat(7,minmax(0,1fr))] items-stretch border-b border-border/40 relative z-30 shrink-0">
+        <div className="h-full flex flex-col bg-background">
+          <div className="flex flex-1 flex-col items-center justify-center min-h-[24px]">
+            <span className="text-[9px] text-muted-foreground/40 leading-none">all-day</span>
           </div>
         </div>
         {days.map((day, dayIndex) => {
@@ -492,15 +492,16 @@ export function WeekView({
         })}
       </div>
 
-      <div ref={scrollContainerRef} className="grid flex-1 grid-cols-8 overflow-y-auto min-h-0">
-        <div className="border-border/70 border-r grid auto-cols-fr">
+      <div ref={scrollContainerRef} className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto min-h-0">
+        {/* Gutter column — time labels only, no stripes */}
+        <div className="grid auto-cols-fr">
           {hours.map((hour, index) => (
             <div
               key={hour.toString()}
-              className="border-border/70 relative min-h-[var(--week-cells-height)] border-b last:border-b-0"
+              className="relative min-h-[var(--week-cells-height)]"
             >
               {index > 0 && (
-                <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs">
+                <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[9px] sm:text-[10px]">
                   {format(hour, timeFormat === "24h" ? "HH:mm" : "h a")}
                 </span>
               )}
@@ -534,7 +535,6 @@ export function WeekView({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="h-full w-full overflow-hidden px-[1px] sm:px-1">
-                    {/* Use regular DraggableEvent for all events */}
                     {positionedEvent.event && (
                       <DraggableEvent
                         event={positionedEvent.event}
