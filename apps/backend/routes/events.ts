@@ -14,6 +14,10 @@ import { ensureAuthenticatedUser } from "../lib/auth-utils";
 
 const logger = createLogger("backend:events");
 
+// In-memory guard: track which users already have calendars set up this process lifetime.
+// Avoids a DB round-trip on every GET /events request for established users.
+const initializedUsers = new Set<string>();
+
 async function resolveEventTimezone(
   userId: string,
   requestedTimezone?: string,
@@ -172,8 +176,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   )
   .get(
     "/",
-    async ({ query, user, request }: any) => {
-      const { start, end } = query;
+    async ({ query: { start, end }, user, request, set }: any) => {
 
       // Robust user check with fallback
       if (!user || !user.id) {
@@ -198,8 +201,11 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         }
       }
 
-      // Ensure user has default calendars
-      await ensureUserCalendars(user.id);
+      // Ensure user has default calendars (only once per server process per user)
+      if (!initializedUsers.has(user.id)) {
+        await ensureUserCalendars(user.id);
+        initializedUsers.add(user.id);
+      }
 
       // Validate required parameters
       if (!start || !end) {
@@ -226,43 +232,43 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         throw new ValidationError("End date must be after start date");
       }
 
-      // Fetch regular (non-recurring) events within date range
-      const regularEvents = await prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          recurrence: null,
-          OR: [
-            {
-              start: { gte: startDate, lte: endDate },
-            },
-            {
-              end: { gte: startDate, lte: endDate },
-            },
-            {
-              start: { lte: startDate },
-              end: { gte: endDate },
-            },
-          ],
-        },
-        include: {
-          category: true,
-          calendar: true,
-        },
-      });
-
-      // Fetch recurring events (parent events)
-      const recurringEvents = await prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          recurrence: { not: null },
-          parentEventId: null, // Only get parent events, not instances
-        },
-        include: {
-          category: true,
-          calendar: true,
-          recurrenceExceptions: true,
-        },
-      });
+      // Fetch regular events and recurring parents in parallel
+      const [regularEvents, recurringEvents] = await Promise.all([
+        prisma.calendarEvent.findMany({
+          where: {
+            userId: user.id,
+            recurrence: null,
+            OR: [
+              {
+                start: { gte: startDate, lte: endDate },
+              },
+              {
+                end: { gte: startDate, lte: endDate },
+              },
+              {
+                start: { lte: startDate },
+                end: { gte: endDate },
+              },
+            ],
+          },
+          include: {
+            category: true,
+            calendar: true,
+          },
+        }),
+        prisma.calendarEvent.findMany({
+          where: {
+            userId: user.id,
+            recurrence: { not: null },
+            parentEventId: null, // Only get parent events, not instances
+          },
+          include: {
+            category: true,
+            calendar: true,
+            recurrenceExceptions: true,
+          },
+        }),
+      ]);
 
       // Generate recurring event instances
       const recurringInstances = [];
@@ -347,18 +353,33 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         }
       }
 
-      // Fetch modified recurring event instances
-      const modifiedInstances = await prisma.calendarEvent.findMany({
-        where: {
-          userId: user.id,
-          parentEventId: { not: null },
-          start: { gte: startDate, lte: endDate },
-        },
-        include: {
-          category: true,
-          calendar: true,
-        },
-      });
+      // Fetch modified instances, categories, and calendars in parallel
+      const [modifiedInstances, categories, calendars] = await Promise.all([
+        prisma.calendarEvent.findMany({
+          where: {
+            userId: user.id,
+            parentEventId: { not: null },
+            start: { gte: startDate, lte: endDate },
+          },
+          include: {
+            category: true,
+            calendar: true,
+          },
+        }),
+        prisma.eventCategory.findMany({
+          where: {
+            userId: user.id,
+            isActive: true,
+          },
+          orderBy: { name: "asc" },
+        }),
+        prisma.calendar.findMany({
+          where: {
+            userId: user.id,
+          },
+          orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+        }),
+      ]);
 
       // Combine all events
       const events = [
@@ -367,25 +388,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         ...modifiedInstances,
       ].sort((a, b) => a.start.getTime() - b.start.getTime());
 
-      // Debug: Log synced events for troubleshooting
-      const syncedEvents = events.filter((e) => e.isSynced);
-
-      // Fetch user's categories for efficient frontend rendering
-      const categories = await prisma.eventCategory.findMany({
-        where: {
-          userId: user.id,
-          isActive: true,
-        },
-        orderBy: { name: "asc" },
-      });
-
-      // Fetch user's calendars for efficient frontend rendering
-      const calendars = await prisma.calendar.findMany({
-        where: {
-          userId: user.id,
-        },
-        orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-      });
+      set.headers["Cache-Control"] = "private, max-age=60, stale-while-revalidate=300";
 
       return {
         events,
