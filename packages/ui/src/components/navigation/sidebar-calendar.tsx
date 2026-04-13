@@ -8,6 +8,8 @@ import {
   isToday,
   addMonths,
   subMonths,
+  startOfMonth,
+  endOfMonth,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
@@ -90,6 +92,19 @@ export function SidebarCalendar({
     }, 100);
   };
 
+  const hoverPrefetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchMonth = (month: Date) => {
+    if (!prefetchRange) return;
+    prefetchRange({ start: startOfMonth(month), end: endOfMonth(month) });
+  };
+  const schedulePrefetch = (month: Date) => {
+    if (hoverPrefetchRef.current) clearTimeout(hoverPrefetchRef.current);
+    hoverPrefetchRef.current = setTimeout(() => prefetchMonth(month), 80);
+  };
+  const cancelPrefetch = () => {
+    if (hoverPrefetchRef.current) clearTimeout(hoverPrefetchRef.current);
+  };
+
   const goToCurrentMonth = () => {
     const isGoingForward = currentDate.getTime() >= calendarMonth.getTime();
     setSlideDirection(isGoingForward ? 1 : -1);
@@ -122,6 +137,8 @@ export function SidebarCalendar({
         <div className="flex items-center">
           <button
             onClick={goToPreviousMonth}
+            onMouseEnter={() => schedulePrefetch(subMonths(calendarMonth, 1))}
+            onMouseLeave={cancelPrefetch}
             className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             aria-label="Previous month"
           >
@@ -129,6 +146,8 @@ export function SidebarCalendar({
           </button>
           <button
             onClick={goToNextMonth}
+            onMouseEnter={() => schedulePrefetch(addMonths(calendarMonth, 1))}
+            onMouseLeave={cancelPrefetch}
             className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             aria-label="Next month"
           >
@@ -171,6 +190,8 @@ export function SidebarCalendar({
                     setCurrentDate(day);
                     onDateSelect?.(day);
                   }}
+                  onMouseEnter={() => schedulePrefetch(day)}
+                  onMouseLeave={cancelPrefetch}
                   className={cn(
                     "relative flex items-center justify-center transition-transform",
                     isMobile

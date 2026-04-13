@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, startTransition } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { addMonths, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, startOfMonth, startOfWeek, subDays, subMonths, subWeeks } from "date-fns";
 import { calendarApiService } from "../lib/calendar-api-service";
 import { CalendarEvent, ApiError } from "../lib/types/calendar";
 
@@ -37,6 +37,37 @@ function shiftDateRangeByMonths(dateRange: DateRange, months: number): DateRange
   return normalizeDateRange({
     start: addMonths(dateRange.start, months),
     end: addMonths(dateRange.end, months),
+  });
+}
+
+// Exported so callers with view context (e.g. CalendarWithData) can fire view-aware prefetches.
+export function buildViewPrefetchRanges(center: Date, view: string): DateRange[] {
+  if (view === "week") {
+    return [-2, -1, 1, 2].map((offset) => {
+      const fn = offset < 0 ? subWeeks : addWeeks;
+      const base = fn(center, Math.abs(offset));
+      return {
+        start: startOfWeek(base, { weekStartsOn: 1 }),
+        end: endOfWeek(base, { weekStartsOn: 1 }),
+      };
+    });
+  }
+  if (view === "day" || view === "3day") {
+    return [-7, -3, -1, 1, 3, 7].map((offset) => {
+      const fn = offset < 0 ? subDays : addDays;
+      const base = fn(center, Math.abs(offset));
+      const start = new Date(base); start.setHours(0, 0, 0, 0);
+      const end = new Date(base); end.setHours(23, 59, 59, 999);
+      return { start, end };
+    });
+  }
+  // month / agenda: ±1 and ±2 months
+  return [-2, -1, 1, 2].map((offset) => {
+    const fn = offset < 0 ? subMonths : addMonths;
+    return normalizeDateRange({
+      start: fn(center, Math.abs(offset)),
+      end: fn(center, Math.abs(offset)),
+    });
   });
 }
 
@@ -127,7 +158,7 @@ export function useCalendarEventsLoader(
 ) {
   const {
     initialDateRange,
-    cacheTimeout = 5 * 60 * 1000,
+    cacheTimeout = 15 * 60 * 1000,
     autoRefetch = true,
     preloadMonthsAhead = 2,
   } = options;
@@ -156,18 +187,16 @@ export function useCalendarEventsLoader(
     placeholderData: (previousData: CalendarEvent[] | undefined) =>
       previousData ?? fallbackEvents ?? [],
     staleTime: cacheTimeout,
+    gcTime: 30 * 60 * 1000,
   });
 
   useEffect(() => {
     if (!currentDateRange || preloadMonthsAhead <= 0) return;
-    const monthOffsets: number[] = [];
-    for (let i = 1; i <= preloadMonthsAhead; i++) {
-      monthOffsets.push(-i, i);
-    }
+    // Use month-based prefetch here; view-aware prefetch is handled in CalendarWithData
+    const ranges = buildViewPrefetchRanges(currentDateRange.start, "month");
 
     const runPrefetch = () => {
-      for (const offset of monthOffsets) {
-        const range = shiftDateRangeByMonths(currentDateRange, offset);
+      for (const range of ranges) {
         queryClient.prefetchQuery({
           queryKey: getRangeQueryKey(range),
           queryFn: async () => {
@@ -175,6 +204,7 @@ export function useCalendarEventsLoader(
             return validateAndCleanEvents(res.events, range);
           },
           staleTime: cacheTimeout,
+          gcTime: 30 * 60 * 1000,
         });
       }
     };

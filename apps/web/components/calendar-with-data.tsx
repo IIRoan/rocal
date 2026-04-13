@@ -16,6 +16,7 @@ import {
   endOfMonth,
 } from "date-fns";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
+import { buildViewPrefetchRanges } from "@/hooks/use-calendar-events-loader";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
@@ -32,7 +33,7 @@ interface CalendarWithDataProps {
 }
 
 export function CalendarWithData({ className }: CalendarWithDataProps) {
-  const { isCalendarVisible, currentDate } = useCalendarContext();
+  const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const { openEventEditor, previewEvent } = useCommandPalette();
 
@@ -117,6 +118,23 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       initializedRef.current = true;
     }
   }, [defaultDateRange, settingsLoading, calendarData]); // Add dependencies to ensure proper initialization
+
+  // View-aware prefetch: when the view or date changes, prefetch adjacent periods
+  useEffect(() => {
+    if (!currentDate || !currentView) return;
+    const ranges = buildViewPrefetchRanges(currentDate, currentView);
+    const runPrefetch = () => {
+      for (const range of ranges) {
+        calendarData.prefetchRange(range);
+      }
+    };
+    if ("requestIdleCallback" in window) {
+      const id = (window as any).requestIdleCallback(runPrefetch, { timeout: 600 });
+      return () => { if ("cancelIdleCallback" in window) (window as any).cancelIdleCallback(id); };
+    }
+    const id = setTimeout(runPrefetch, 50);
+    return () => clearTimeout(id);
+  }, [currentDate, currentView, calendarData]);
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(
@@ -241,9 +259,13 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
   // After initial load, render the interactive calendar.
   // Avoid passing top-level loading to prevent internal skeleton that hides header.
+  // Apply a subtle opacity transition when events are being refetched during navigation.
+  const isNavigationLoading =
+    calendarData.eventsLoading && calendarData.events.length > 0;
+
   return (
     <EventCalendar
-      className={className}
+      className={`${className ?? ""} transition-opacity duration-150 ${isNavigationLoading ? "opacity-60" : "opacity-100"}`}
       initialView={initialView}
       events={transformedEvents}
       categories={calendarData.categories}
@@ -275,6 +297,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       onUpdateNotifications={calendarData.updateNotifications}
       onEventEdit={openEventEditor}
       onSetPreview={handleSetPreview}
+      onPrefetchRange={calendarData.prefetchRange}
     />
   );
 }
