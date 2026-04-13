@@ -132,7 +132,7 @@ function EventWrapper({
   return (
     <button
       className={cn(
-        "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] border border-white/20 shadow-sm",
+        "group/ev relative focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through hover:-translate-y-px hover:brightness-[1.07] hover:shadow-md hover:z-10 active:translate-y-0 active:brightness-95 active:shadow-sm border border-white/20 shadow-sm",
         "touch-manipulation",
         // Only apply min-height and padding when not compact (small events)
         compact ? "min-h-0 px-[1px]" : "min-h-[20px] sm:min-h-[24px] px-[2px] sm:px-2",
@@ -320,7 +320,7 @@ export function EventItem({
     return (
       <button
         className={cn(
-          "focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded p-2 text-left transition outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90",
+          "group/ev relative overflow-hidden focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded p-2 text-left transition-all duration-200 ease-out outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90 hover:-translate-y-px hover:brightness-[1.07] hover:shadow-md active:translate-y-0 active:brightness-95 active:shadow-sm shadow-sm",
           getEventColorClasses(eventColor),
           className,
         )}

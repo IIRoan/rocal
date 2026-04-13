@@ -355,6 +355,7 @@ export function EventEditor({
       <DialogContent
         variant="spotlight"
         showClose={false}
+        aria-describedby={undefined}
         className="overflow-hidden p-0 bg-popover border-border shadow-xl min-w-[420px] max-h-[750px] flex flex-col"
       >
         <VisuallyHidden>
