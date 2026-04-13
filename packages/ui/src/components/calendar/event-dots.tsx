@@ -87,7 +87,7 @@ export function EventDots({
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
-              "focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:scale-[1.02] hover:shadow-md hover:z-10 active:scale-[0.98] rounded",
+              "group/evdots focus-visible:border-ring focus-visible:ring-ring/50 relative flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] hover:-translate-y-px hover:brightness-[1.07] hover:shadow-md hover:z-10 active:translate-y-0 active:brightness-95 active:shadow-sm rounded shadow-sm",
               "min-h-[20px] sm:min-h-[24px]",
             )}
             onClick={(e) => {
