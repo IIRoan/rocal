@@ -354,7 +354,7 @@ export function MobileWeekView({
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="h-full w-full overflow-hidden px-0.5">
+                    <div className="h-full w-full px-0.5">
                       {positionedEvent.event && (
                         <DraggableEvent
                           event={positionedEvent.event}

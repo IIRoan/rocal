@@ -246,6 +246,7 @@ export function SubscriptionManagement({
       <DialogContent
         variant="spotlight"
         showClose={false}
+        aria-describedby={undefined}
         className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
       >
         <VisuallyHidden>
