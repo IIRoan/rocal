@@ -160,6 +160,8 @@ model CalendarEvent {
 
   @@index([isSynced, subscriptionId])
   @@index([externalId, subscriptionId])
+  @@index([userId, start, end])
+  @@index([userId, recurrence, parentEventId])
   @@map("calendar_event")
 }
 

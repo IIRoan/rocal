@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -123,6 +124,8 @@ export interface EventCalendarProps {
   onSetPreview?: (event: CalendarEvent | null) => void;
   // Custom sidebar toggle handler for mobile
   onSidebarToggle?: () => void;
+  // Prefetch a date range (e.g. on hover of prev/next buttons)
+  onPrefetchRange?: (range: { start: Date; end: Date }) => void;
 }
 
 export function EventCalendar({
@@ -153,6 +156,7 @@ export function EventCalendar({
   onEventEdit,
   onSetPreview,
   onSidebarToggle,
+  onPrefetchRange,
 }: EventCalendarProps) {
   type ContextTarget =
     | { type: "event"; event: CalendarEvent }
@@ -334,7 +338,10 @@ export function EventCalendar({
     };
   }, []);
 
+  const navDirectionRef = useRef<1 | -1>(1);
+
   const handlePrevious = () => {
+    navDirectionRef.current = -1;
     let newDate;
     if (view === "month") {
       newDate = subMonths(currentDate, 1);
@@ -351,6 +358,7 @@ export function EventCalendar({
   };
 
   const handleNext = () => {
+    navDirectionRef.current = 1;
     let newDate;
     if (view === "month") {
       newDate = addMonths(currentDate, 1);
@@ -366,7 +374,29 @@ export function EventCalendar({
     if (newDate) setCurrentDate(newDate);
   };
 
+  const prefetchAdjacentRange = (direction: "prev" | "next") => {
+    if (!onPrefetchRange) return;
+    const offset = direction === "next" ? 1 : -1;
+    let start: Date;
+    let end: Date;
+    if (view === "month" || view === "agenda") {
+      const base = direction === "next" ? addMonths(currentDate, offset) : addMonths(currentDate, offset);
+      start = startOfMonth(base);
+      end = endOfMonth(base);
+    } else if (view === "week") {
+      start = startOfWeek(addWeeks(currentDate, offset), { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      end = endOfWeek(start, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    } else {
+      // day / 3day
+      const base = addDays(currentDate, offset);
+      start = new Date(base); start.setHours(0, 0, 0, 0);
+      end = new Date(base); end.setHours(23, 59, 59, 999);
+    }
+    onPrefetchRange({ start, end });
+  };
+
   const handleToday = () => {
+    navDirectionRef.current = currentDate < new Date() ? 1 : -1;
     setCurrentDate(new Date());
   };
 
@@ -874,6 +904,7 @@ export function EventCalendar({
                   size="icon"
                   className="h-7 w-7 text-muted-foreground/70 hover:text-foreground hover:bg-accent/50 -scale-x-[1]"
                   onClick={handlePrevious}
+                  onMouseEnter={() => prefetchAdjacentRange("prev")}
                   aria-label="Previous"
                   disabled={loading}
                 >
@@ -884,6 +915,7 @@ export function EventCalendar({
                   size="icon"
                   className="h-7 w-7 text-muted-foreground/70 hover:text-foreground hover:bg-accent/50"
                   onClick={handleNext}
+                  onMouseEnter={() => prefetchAdjacentRange("next")}
                   aria-label="Next"
                   disabled={loading}
                 >
@@ -933,7 +965,7 @@ export function EventCalendar({
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col relative min-h-0">
+          <div className="flex flex-1 flex-col relative min-h-0 overflow-hidden">
             {/* Event loading overlay when navigating between dates */}
             {eventsLoading && events && events.length > 0 && (
               <EventLoadingSkeleton
@@ -943,65 +975,86 @@ export function EventCalendar({
               />
             )}
 
-            {view === "month" && (
-              <MonthView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                showWeekNumbers={showWeekNumbers}
-                compactView={compactView}
-                timeFormat={timeFormat}
-                weekStartDay={weekStartDay}
-                workingDays={workingDays}
-                timezone={timezone}
-                onEventEdit={onEventEdit}
-                onEventDelete={(event) => handleEventDelete(event.id)}
-                onEventView={onEventEdit}
-              />
-            )}
-            {view === "week" && (
-              <WeekView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                compactView={compactView}
-                timeFormat={timeFormat}
-                weekStartDay={weekStartDay}
-                workingDays={workingDays}
-                timezone={timezone}
-                onEventEdit={onEventEdit}
-                onEventDelete={(event) => handleEventDelete(event.id)}
-                onEventView={onEventEdit}
-              />
-            )}
-            {view === "day" && (
-              <DayView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                onEventCreate={handleEventCreate}
-                compactView={compactView}
-                timeFormat={timeFormat}
-                timezone={timezone}
-                onEventEdit={onEventEdit}
-                onEventDelete={(event) => handleEventDelete(event.id)}
-                onEventView={onEventEdit}
-              />
-            )}
-            {view === "agenda" && (
-              <AgendaView
-                currentDate={currentDate}
-                events={events}
-                onEventSelect={handleEventSelect}
-                timeFormat={timeFormat}
-                timezone={timezone}
-                onEventEdit={onEventEdit}
-                onEventDelete={(event) => handleEventDelete(event.id)}
-                onEventView={onEventEdit}
-              />
-            )}
+            <AnimatePresence
+              mode="sync"
+              custom={navDirectionRef.current}
+              initial={false}
+            >
+              <motion.div
+                key={`${view}-${format(currentDate, view === "day" ? "yyyy-MM-dd" : view === "week" ? "yyyy-ww" : "yyyy-MM")}`}
+                custom={navDirectionRef.current}
+                variants={{
+                  enter: (dir: number) => ({ x: dir > 0 ? "25%" : "-25%", opacity: 0 }),
+                  center: { x: 0, opacity: 1 },
+                  exit: (dir: number) => ({ x: dir > 0 ? "-25%" : "25%", opacity: 0 }),
+                }}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
+                style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}
+              >
+                {view === "month" && (
+                  <MonthView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventSelect={handleEventSelect}
+                    onEventCreate={handleEventCreate}
+                    showWeekNumbers={showWeekNumbers}
+                    compactView={compactView}
+                    timeFormat={timeFormat}
+                    weekStartDay={weekStartDay}
+                    workingDays={workingDays}
+                    timezone={timezone}
+                    onEventEdit={onEventEdit}
+                    onEventDelete={(event) => handleEventDelete(event.id)}
+                    onEventView={onEventEdit}
+                  />
+                )}
+                {view === "week" && (
+                  <WeekView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventSelect={handleEventSelect}
+                    onEventCreate={handleEventCreate}
+                    compactView={compactView}
+                    timeFormat={timeFormat}
+                    weekStartDay={weekStartDay}
+                    workingDays={workingDays}
+                    timezone={timezone}
+                    onEventEdit={onEventEdit}
+                    onEventDelete={(event) => handleEventDelete(event.id)}
+                    onEventView={onEventEdit}
+                  />
+                )}
+                {view === "day" && (
+                  <DayView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventSelect={handleEventSelect}
+                    onEventCreate={handleEventCreate}
+                    compactView={compactView}
+                    timeFormat={timeFormat}
+                    timezone={timezone}
+                    onEventEdit={onEventEdit}
+                    onEventDelete={(event) => handleEventDelete(event.id)}
+                    onEventView={onEventEdit}
+                  />
+                )}
+                {view === "agenda" && (
+                  <AgendaView
+                    currentDate={currentDate}
+                    events={events}
+                    onEventSelect={handleEventSelect}
+                    timeFormat={timeFormat}
+                    timezone={timezone}
+                    onEventEdit={onEventEdit}
+                    onEventDelete={(event) => handleEventDelete(event.id)}
+                    onEventView={onEventEdit}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Event editing now handled by command palette */}

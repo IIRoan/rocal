@@ -94,6 +94,7 @@ model Calendar {
   color           String // blue, orange, violet, rose, emerald
   isVisible       Boolean                @default(true) @map("is_visible")
   isDefault       Boolean                @default(false) @map("is_default")
+  isSyncOnly      Boolean                @default(false) @map("is_sync_only") // Read-only calendar synced from external subscription
   icsShareToken   String?                @unique @map("ics_share_token")
   icsShareEnabled Boolean                @default(false) @map("ics_share_enabled")
   userId          String                 @map("user_id")
@@ -158,6 +159,8 @@ model CalendarEvent {
 
   @@index([isSynced, subscriptionId])
   @@index([externalId, subscriptionId])
+  @@index([userId, start, end])
+  @@index([userId, recurrence, parentEventId])
   @@map("calendar_event")
 }
 
