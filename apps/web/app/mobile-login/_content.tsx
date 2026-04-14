@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { useState, useEffect, useCallback } from "react";
 import { signIn, authClient, useSession } from "@/lib/auth-client";
+import { createLogger } from "@workspace/logger";
 import {
   getMobileAuthBridgeUrl,
   getApiBaseUrl,
@@ -12,6 +13,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Github, Key, Smartphone, Fingerprint } from "lucide-react";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
+
+const log = createLogger("mobile-login");
 
 export function MobileLoginForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -111,7 +114,7 @@ export function MobileLoginForm() {
         }, 500);
       }
     } catch (error: any) {
-      console.error("Passkey login failed:", error);
+      log.error("Passkey login failed:", error);
       setError(
         error.message || "Passkey authentication failed. Please try again.",
       );
@@ -149,7 +152,7 @@ export function MobileLoginForm() {
         window.location.assign(authUrl);
       }
     } catch (error: any) {
-      console.error("Login failed:", error);
+      log.error("Login failed:", error);
       setIsLoading(false);
       const detail = error?.message || error?.toString?.() || "Unknown error";
       setError(`GitHub login could not be started: ${detail}`);
@@ -172,7 +175,7 @@ export function MobileLoginForm() {
         throw new Error("Failed to register passkey");
       }
     } catch (error: any) {
-      console.error("Passkey registration failed:", error);
+      log.error("Passkey registration failed:", error);
       setError(error.message || "Failed to set up passkey. Please try again.");
     } finally {
       setPasskeyLoading(false);

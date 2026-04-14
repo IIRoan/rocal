@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { signIn, authClient, useSession } from "@/lib/auth-client";
+import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl } from "@/lib/api-url";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Github, Key, Shield, Check } from "lucide-react";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
+
+const log = createLogger("login");
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -68,7 +71,7 @@ export function LoginForm() {
         }, 500);
       }
     } catch (error: any) {
-      console.error("Passkey login failed:", error);
+      log.error("Passkey login failed:", error);
       setError(
         error.message || "Passkey authentication failed. Please try again.",
       );
@@ -86,7 +89,7 @@ export function LoginForm() {
         callbackURL: callbackTarget,
       });
     } catch (error) {
-      console.error("Login failed:", error);
+      log.error("Login failed:", error);
     } finally {
       setIsLoading(false);
     }

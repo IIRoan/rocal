@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createLogger } from "@workspace/logger";
 import { getApiBaseUrl, getMobileAuthCallbackUrl } from "@/lib/api-url";
 import { authClient } from "@/lib/auth-client";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui";
+
+const log = createLogger("mobile-auth-bridge");
 
 const getSafeNextPath = (nextPath: string | null) => {
   if (!nextPath || !nextPath.startsWith("/")) {
@@ -80,7 +83,7 @@ export function MobileAuthCompleteContent() {
         return;
       }
 
-      console.log("[mobile-auth-bridge] Starting auth flow");
+      log.debug("Starting auth flow");
       elapsedSecondsRef.current = 0;
 
       try {
@@ -96,13 +99,13 @@ export function MobileAuthCompleteContent() {
 
         const hasUser = !!sessionResult?.data?.user;
 
-        console.log("[mobile-auth-bridge] Session check", {
+        log.debug("Session check", {
           hasUser,
           userId: sessionResult?.data?.user?.id,
         });
 
         if (!hasUser) {
-          console.warn("[mobile-auth-bridge] No user in session, continuing anyway");
+          log.warn("No user in session, continuing anyway");
         }
 
         setCurrentStep("generating_token");
@@ -123,7 +126,7 @@ export function MobileAuthCompleteContent() {
 
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
-            console.error("[mobile-auth-bridge] No valid session for token generation");
+            log.error("No valid session for token generation");
             setCurrentStep("error");
             setErrorMessage(
               "Your session has expired. Please return to the app and try again.",
@@ -139,7 +142,7 @@ export function MobileAuthCompleteContent() {
           throw new Error("No token in response");
         }
 
-        console.log("[mobile-auth-bridge] OTT generated, preparing redirect");
+        log.debug("OTT generated, preparing redirect");
 
         const redirectUrl = getMobileAuthCallbackUrl(nextPath, undefined, data.token);
         setAppRedirectUrl(redirectUrl);
@@ -151,11 +154,11 @@ export function MobileAuthCompleteContent() {
         }, 800);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
-          console.log("[mobile-auth-bridge] Request was cancelled");
+          log.debug("Request was cancelled");
           return;
         }
 
-        console.error("[mobile-auth-bridge] Auth flow failed:", error);
+        log.error("Auth flow failed:", error);
         setCurrentStep("error");
 
         const errorMsg = error instanceof Error ? error.message : "Unknown error";

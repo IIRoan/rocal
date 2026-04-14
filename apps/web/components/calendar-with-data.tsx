@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
+import { createLogger } from "@workspace/logger";
 import {
   EventCalendar,
   CalendarView,
@@ -21,6 +22,8 @@ import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
+
+const log = createLogger("calendar-with-data");
 
 // Define the Day type as expected by date-fns
 // This type is often implicitly defined by date-fns, but explicitly defining it
@@ -109,7 +112,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const initializedRef = useRef(false);
   React.useEffect(() => {
     if (!initializedRef.current && !settingsLoading) {
-      console.log("CalendarWithData - Setting initial date range:", {
+      log.debug("Setting initial date range:", {
         start: defaultDateRange.start.toISOString(),
         end: defaultDateRange.end.toISOString(),
         view: initialView,

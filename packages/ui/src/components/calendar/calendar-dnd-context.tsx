@@ -22,9 +22,12 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { addMinutes, differenceInMinutes } from "date-fns";
+import { createLogger } from "@workspace/logger";
 
 import { EventItem } from "./event-item";
 import { CalendarEvent, type CalendarView } from "./types";
+
+const log = createLogger("calendar-dnd");
 
 // Define the context type
 type CalendarDndContextType = {
@@ -124,7 +127,7 @@ export function CalendarDndProvider({
 
     // Add safety check for data.current
     if (!active.data.current) {
-      console.error("Missing data in drag start event", event);
+      log.error("Missing data in drag start event", event);
       return;
     }
 
@@ -304,7 +307,7 @@ export function CalendarDndProvider({
         });
       }
     } catch (error) {
-      console.error("Error in drag end handler:", error);
+      log.error("Error in drag end handler:", error);
     } finally {
       // Always reset state
       setActiveEvent(null);

@@ -1,8 +1,11 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import { createLogger } from "@workspace/logger";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "./button";
+
+const log = createLogger("error-boundary");
 
 interface Props {
   children: ReactNode;
@@ -26,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+    log.error("ErrorBoundary caught an error:", error, errorInfo);
 
     // Call the optional onError callback
     if (this.props.onError) {

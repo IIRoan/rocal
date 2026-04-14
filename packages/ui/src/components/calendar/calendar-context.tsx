@@ -9,7 +9,10 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
+import { createLogger } from "@workspace/logger";
 import { Calendar, EventColor, CreateCalendarData, CalendarView } from "./types";
+
+const log = createLogger("calendar-context");
 
 interface CalendarContextType {
   // Date management
@@ -79,7 +82,7 @@ export function CalendarProvider({
 
       // Check if date is valid
       if (isNaN(dateObj.getTime())) {
-        console.warn(
+        log.warn(
           "Invalid date provided, falling back to current date:",
           date,
         );
@@ -92,7 +95,7 @@ export function CalendarProvider({
       const maxDate = new Date(now.getFullYear() + 10, 11, 31); // 10 years from now (more restrictive)
 
       if (dateObj < minDate || dateObj > maxDate) {
-        console.warn(
+        log.warn(
           "Date out of reasonable bounds, falling back to current date:",
           date,
         );
@@ -106,7 +109,7 @@ export function CalendarProvider({
 
       // If it's more than 5 years different, treat as suspicious
       if (daysDiff > 365 * 5) {
-        console.warn(
+        log.warn(
           "Date seems too far from current date, falling back:",
           date,
         );
@@ -147,7 +150,7 @@ export function CalendarProvider({
       const stored = localStorage.getItem(VISIBILITY_STORAGE_KEY);
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      console.warn(
+      log.warn(
         "Failed to load calendar visibility from localStorage:",
         error,
       );
@@ -162,7 +165,7 @@ export function CalendarProvider({
     try {
       localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-      console.warn(
+      log.warn(
         "Failed to save calendar visibility to localStorage:",
         error,
       );
@@ -261,7 +264,7 @@ export function CalendarProvider({
         }),
       );
     } catch (error) {
-      console.error("Failed to sync calendar visibility updates:", error);
+      log.error("Failed to sync calendar visibility updates:", error);
       // Could add error handling here, like reverting local state
     }
   }, [localVisibilityState, onUpdateCalendar]);
@@ -282,7 +285,7 @@ export function CalendarProvider({
         const newCalendar = await onCreateCalendar(calendarData);
         setCalendars((prev) => [...prev, newCalendar]);
       } catch (error) {
-        console.error("Failed to create calendar:", error);
+        log.error("Failed to create calendar:", error);
         throw error;
       }
     }
@@ -326,7 +329,7 @@ export function CalendarProvider({
         const refreshedCalendars = await onRefreshCalendars();
         setCalendars(refreshedCalendars);
       } catch (error) {
-        console.error("Failed to refresh calendars:", error);
+        log.error("Failed to refresh calendars:", error);
         throw error;
       }
     }

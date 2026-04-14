@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createLogger } from "@workspace/logger";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCalendarContext } from "./calendar-context";
 import {
@@ -29,6 +30,8 @@ import {
 } from "lucide-react";
 import { ListIcon } from "@phosphor-icons/react";
 import { toast } from "sonner";
+
+const log = createLogger("event-calendar");
 
 import {
   AgendaDaysToShow,
@@ -606,7 +609,7 @@ export function EventCalendar({
       // Return the saved event, or the original event if savedEvent is undefined
       return savedEvent || event;
     } catch (error: any) {
-      console.error("Failed to save event:", error);
+      log.error("Failed to save event:", error);
 
       // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to save event";
@@ -667,7 +670,7 @@ export function EventCalendar({
         });
       }
     } catch (error: any) {
-      console.error("Failed to delete event:", error);
+      log.error("Failed to delete event:", error);
 
       // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to delete event";
@@ -733,7 +736,7 @@ export function EventCalendar({
         position: "bottom-left",
       });
     } catch (error: any) {
-      console.error("Failed to update event:", error);
+      log.error("Failed to update event:", error);
 
       // Show detailed error message based on error type
       const errorMessage = error?.message || "Failed to move event";
@@ -868,7 +871,7 @@ export function EventCalendar({
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
-        console.error("Calendar error:", error, errorInfo);
+        log.error("Calendar error:", error, errorInfo);
         toast.error("Calendar encountered an error. Please refresh the page.");
       }}
     >
