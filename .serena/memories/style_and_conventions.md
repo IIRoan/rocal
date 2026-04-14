@@ -1,0 +1,1 @@
+Codebase is TypeScript-heavy with React function components, utility-first Tailwind classes, and shared UI primitives under packages/ui. Keep changes minimal and consistent with existing styling patterns. Prefer shared sidebar/button/layout primitives over one-off duplicates. Preserve existing naming and component APIs unless a task requires otherwise.

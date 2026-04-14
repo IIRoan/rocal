@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon, GearSixIcon, ArrowLineLeftIcon, ArrowLineRightIcon, FoldersIcon } from "@phosphor-icons/react";
-import { Sparkles, Plus, Search } from "lucide-react";
+import { CheckIcon, GearSixIcon, FoldersIcon } from "@phosphor-icons/react";
+import { Sparkles, Plus, Search, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Settings2, LogOut, ArrowRight } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
 import LogoSvg from "./logo";
@@ -76,6 +76,38 @@ function AiResponseContent({ response }: { response: string }) {
         );
       })}
     </div>
+  );
+}
+
+function CollapsedSidebarIconButton({
+  label,
+  onClick,
+  className,
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`size-9 rounded-lg transition-colors hover:bg-muted/80 hover:text-foreground ${className ?? "text-muted-foreground/70"}`}
+          onClick={onClick}
+          aria-label={label}
+          title={label}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center">
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -166,7 +198,7 @@ export function AppSidebar({
                 className="rounded-xl h-11 px-3 font-bold text-sm gap-3 focus:bg-destructive/5 text-destructive focus:text-destructive transition-colors cursor-pointer"
                 onClick={onLogout}
               >
-                <ArrowLineLeftIcon size={18} weight="bold" />
+                <LogOut size={18} />
                 Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -289,7 +321,7 @@ export function AppSidebar({
                     {aiLoading ? (
                       <div className="size-6 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <ArrowLineRightIcon size={28} weight="bold" />
+                      <ArrowRight size={22} strokeWidth={2.5} />
                     )}
                   </Button>
                 </div>
@@ -373,116 +405,173 @@ function AppSidebarDesktop({
         </div>,
         document.body
       )}
-      <SidebarHeader className="pt-4 px-4 pb-2">
-        <div className="flex justify-between items-center gap-2">
-          <a className="inline-flex" href="/">
-            <LogoSvg width="32" height="32" className="text-foreground/80" />
-          </a>
-          {!isCollapsed && (
+      <SidebarHeader className={isCollapsed ? "items-center pt-4 px-2 pb-2" : "pt-4 px-4 pb-2"}>
+        {isCollapsed ? (
+          <>
+            <a className="inline-flex justify-center" href="/">
+              <LogoSvg width="32" height="32" className="text-foreground/80" />
+            </a>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
-              onClick={toggleSidebar}
-              title="Collapse sidebar"
-            >
-              <ArrowLineLeftIcon size={16} />
-            </Button>
-          )}
-        </div>
-        {isCollapsed && (
-          <div className="flex justify-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+              className="size-8 rounded-full text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
               onClick={toggleSidebar}
               title="Expand sidebar"
+              aria-label="Expand sidebar"
             >
-              <ArrowLineRightIcon size={16} />
+              <PanelLeftOpen size={17} strokeWidth={2} />
+            </Button>
+          </>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <a className="inline-flex" href="/">
+              <LogoSvg width="32" height="32" className="text-foreground/80" />
+            </a>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 rounded-full text-muted-foreground/50 hover:bg-muted/60 hover:text-foreground"
+              onClick={toggleSidebar}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={17} strokeWidth={2} />
             </Button>
           </div>
         )}
       </SidebarHeader>
 
-      <SidebarContent className="gap-0 pt-6 pb-2 flex flex-col h-full">
+      <SidebarContent className="gap-0 pt-5 pb-2 flex flex-col h-full">
         <SidebarGroup className="p-0">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+          {isCollapsed ? (
+            <SidebarGroupContent className="flex flex-col items-center gap-1.5">
               {onCreateEvent && (
+                <CollapsedSidebarIconButton label="New event" onClick={onCreateEvent} className="text-primary hover:bg-primary/10 hover:text-primary">
+                  <Plus size={18} strokeWidth={2.5} />
+                </CollapsedSidebarIconButton>
+              )}
+              <CollapsedSidebarIconButton label="Search" onClick={onOpenSearch}>
+                <Search size={17} strokeWidth={2} />
+              </CollapsedSidebarIconButton>
+              <CollapsedSidebarIconButton label="Settings" onClick={onOpenSettings}>
+                <GearSixIcon size={17} weight="regular" />
+              </CollapsedSidebarIconButton>
+            </SidebarGroupContent>
+          ) : (
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                {onCreateEvent && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="rounded-lg h-9 text-[14px] font-semibold text-primary hover:bg-primary/10 hover:text-primary transition-colors"
+                      onClick={onCreateEvent}
+                    >
+                      <Plus size={18} strokeWidth={2.5} />
+                      New event
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-                    onClick={onCreateEvent}
+                    className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground/80 hover:bg-muted/80 hover:text-foreground transition-colors"
+                    onClick={onOpenSearch}
                   >
-                    <Plus size={18} strokeWidth={2} className="opacity-80" />
-                    New event
+                    <Search size={17} strokeWidth={2} />
+                    Search
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              )}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-                  onClick={onOpenSearch}
-                >
-                  <Search size={18} strokeWidth={2} className="opacity-80" />
-                  Search
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-                  onClick={onOpenSettings}
-                >
-                  <GearSixIcon size={18} weight="regular" className="opacity-80" />
-                  Settings
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="rounded-lg h-9 text-[14px] font-medium text-muted-foreground/80 hover:bg-muted/80 hover:text-foreground transition-colors"
+                    onClick={onOpenSettings}
+                  >
+                    <GearSixIcon size={17} weight="regular" />
+                    Settings
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          )}
         </SidebarGroup>
 
         <SidebarGroup className="p-0 mt-auto pt-4">
-          <div className="flex items-center gap-2 px-2 mb-1">
-            <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider">Calendars</span>
-            <div className="flex-1 h-px bg-border/40" />
-            <button
-              onClick={onOpenCalendarManagement}
-              className="text-[11px] font-medium text-muted-foreground/60 hover:text-foreground transition-colors"
-            >
-              Manage
-            </button>
-          </div>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {calendars.map((calendar) => (
-                <SidebarMenuItem key={calendar.id}>
-                  <SidebarMenuButton
-                    className={`rounded-lg h-9 text-[14px] font-medium transition-colors ${
-                      isCalendarVisible(calendar.id) 
-                        ? "text-foreground hover:bg-muted/80" 
-                        : "text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground"
-                    }`}
-                    onClick={() => toggleCalendarVisibility(calendar.id)}
-                  >
-                    <span
-                      className={`size-3 rounded-full shrink-0 transition-opacity ${
-                        !isCalendarVisible(calendar.id) && "opacity-40"
-                      }`}
-                      style={{
-                        backgroundColor: calendar.color?.startsWith("#")
-                          ? calendar.color
-                          : `var(--color-event-${calendar.color || "default"})`,
-                      }}
-                    />
-                    <span className="truncate">
-                      {calendar.name}
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
+          {isCollapsed ? (
+            <SidebarGroupContent className="flex flex-col items-center gap-1.5">
+              <CollapsedSidebarIconButton label="Manage calendars" onClick={onOpenCalendarManagement}>
+                <SlidersHorizontal size={16} strokeWidth={2} />
+              </CollapsedSidebarIconButton>
+              <SidebarMenu className="flex w-full flex-col items-center gap-1">
+                {calendars.map((calendar) => {
+                  const isVisible = isCalendarVisible(calendar.id);
+
+                  return (
+                    <SidebarMenuItem key={calendar.id} className="flex justify-center">
+                      <CollapsedSidebarIconButton
+                        label={calendar.name}
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
+                        className={isVisible ? "text-foreground" : "text-muted-foreground/40 hover:text-muted-foreground/70"}
+                      >
+                        <span
+                          className={`size-2.5 rounded-full shrink-0 transition-opacity ${
+                            !isVisible ? "opacity-35" : ""
+                          }`}
+                          style={{
+                            backgroundColor: calendar.color?.startsWith("#")
+                              ? calendar.color
+                              : `var(--color-event-${calendar.color || "default"})`,
+                          }}
+                        />
+                      </CollapsedSidebarIconButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          ) : (
+            <>
+              <div className="mb-1 flex items-center justify-between px-2">
+                <span className="text-[13px] font-bold text-foreground/65">Calendars</span>
+                <button
+                  onClick={onOpenCalendarManagement}
+                  title="Manage calendars"
+                  aria-label="Manage calendars"
+                  className="text-muted-foreground/40 transition-colors hover:text-foreground"
+                >
+                  <Settings2 size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  {calendars.map((calendar) => (
+                    <SidebarMenuItem key={calendar.id}>
+                      <SidebarMenuButton
+                        className={`rounded-lg h-9 text-[14px] font-medium transition-colors ${
+                          isCalendarVisible(calendar.id)
+                            ? "text-foreground hover:bg-muted/80"
+                            : "text-muted-foreground/50 hover:bg-muted/40 hover:text-muted-foreground"
+                        }`}
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
+                      >
+                        <span
+                          className={`size-2.5 rounded-full shrink-0 transition-opacity ${
+                            !isCalendarVisible(calendar.id) ? "opacity-35" : ""
+                          }`}
+                          style={{
+                            backgroundColor: calendar.color?.startsWith("#")
+                              ? calendar.color
+                              : `var(--color-event-${calendar.color || "default"})`,
+                          }}
+                        />
+                        <span className="truncate">
+                          {calendar.name}
+                        </span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </>
+          )}
         </SidebarGroup>
       </SidebarContent>
 
