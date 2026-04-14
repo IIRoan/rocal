@@ -1,8 +1,11 @@
 "use client";
 
 import { MoonIcon, SunIcon } from "@phosphor-icons/react";
+import { createLogger } from "@workspace/logger";
 import { useTheme } from "next-themes";
 import { useId } from "react";
+
+const log = createLogger("theme-toggle");
 
 interface ThemeToggleProps {
   useSettingsTheme?: {
@@ -44,7 +47,7 @@ export function ThemeToggle({ useSettingsTheme }: ThemeToggleProps = {}) {
     try {
       await updateTheme(newTheme);
     } catch (error) {
-      console.error("Failed to update theme:", error);
+      log.error("Failed to update theme:", error);
     }
   };
 

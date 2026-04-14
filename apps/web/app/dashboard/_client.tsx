@@ -2,6 +2,7 @@
 
 import { useSession, signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { createLogger } from "@workspace/logger";
 import dynamic from "next/dynamic";
 import {
   SidebarInset,
@@ -46,6 +47,8 @@ import { useMemo, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
+
+const log = createLogger("dashboard");
 
 type CalendarAssistantResponse = {
   reply: string;
@@ -119,7 +122,7 @@ function EventDeepLinkHandler() {
 
         openEventEditor(event, { eventViewMode: "view" });
       } catch (error) {
-        console.error("Failed to open event from email link:", error);
+        log.error("Failed to open event from email link:", error);
         handledEventIdRef.current = eventId;
       }
     };
@@ -179,7 +182,7 @@ function SidebarWithContext() {
       await signOut();
       window.location.href = "/";
     } catch (error) {
-      console.error("Logout failed:", error);
+      log.error("Logout failed:", error);
     }
   };
 
@@ -230,8 +233,8 @@ function SidebarWithContext() {
       try {
         data = JSON.parse(responseText) as CalendarAssistantResponse;
       } catch (parseError) {
-        console.error("Failed to parse AI response:", parseError);
-        console.error("Response text:", responseText);
+        log.error("Failed to parse AI response:", parseError);
+        log.error("Response text:", responseText);
         throw new Error("I received an invalid response. Please try again.");
       }
 
@@ -295,7 +298,7 @@ function MobileLayoutContent() {
       await signOut();
       window.location.href = "/";
     } catch (error) {
-      console.error("Logout failed:", error);
+      log.error("Logout failed:", error);
     }
   };
 
@@ -402,7 +405,7 @@ function MobileLayoutContent() {
       }}
       onLogout={handleLogout}
       onOpenSettings={() => {
-        console.log("Dashboard onOpenSettings called - using openPalette");
+        log.debug("onOpenSettings called - using openPalette");
         openPalette();
       }}
       onOpenCalendarManagement={openCalendarManagement}
@@ -464,7 +467,7 @@ function DashboardContent() {
       await signOut();
       window.location.href = "/";
     } catch (error) {
-      console.error("Logout failed:", error);
+      log.error("Logout failed:", error);
     }
   };
 

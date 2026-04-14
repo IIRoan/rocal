@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { createLogger } from "@workspace/logger";
 import type {
   CalendarEvent,
   Calendar,
@@ -18,6 +19,8 @@ import { validateEventForm } from "@/components/command-palette/event-utils";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+const log = createLogger("event-form");
 
 interface UseEventFormProps {
   calendars: Calendar[];
@@ -192,7 +195,7 @@ export function useEventForm({
           const parsedRule = JSON.parse(event.recurrence) as RecurrenceRule;
           setRecurrenceRule(parsedRule);
         } catch (error) {
-          console.error("Failed to parse recurrence rule:", error);
+          log.error("Failed to parse recurrence rule:", error);
           setIsRecurring(false);
           setRecurrenceRule(null);
         }
@@ -226,7 +229,7 @@ export function useEventForm({
             setEventNotifications(emailNotifications);
           }
         } catch (error) {
-          console.error("Failed to load event notifications:", error);
+          log.error("Failed to load event notifications:", error);
           setEventNotifications([]);
         } finally {
           setNotificationsLoading(false);
@@ -370,7 +373,7 @@ export function useEventForm({
             return;
           }
         } catch (error) {
-          console.error("Failed to validate recurrence rule:", error);
+          log.error("Failed to validate recurrence rule:", error);
           toast.error("Failed to validate recurrence settings");
           return;
         }
@@ -536,7 +539,7 @@ export function useEventForm({
                 data: notificationData,
               });
             } catch (notifError) {
-              console.warn(
+              log.warn(
                 "Failed to update event notifications (non-fatal):",
                 notifError,
               );
@@ -557,7 +560,7 @@ export function useEventForm({
           resetForm();
         }, 100);
       } catch (error: any) {
-        console.error("Failed to save event:", error);
+        log.error("Failed to save event:", error);
 
         let errorMessage = "Failed to save event";
         if (error.message?.includes("Network")) {
@@ -630,7 +633,7 @@ export function useEventForm({
           resetForm();
         }, 100);
       } catch (error: any) {
-        console.error("Failed to delete event:", error);
+        log.error("Failed to delete event:", error);
         toast.error("Failed to delete event");
       } finally {
         setEventSaving(false);
@@ -698,7 +701,7 @@ export function useEventForm({
         await new Promise((resolve) => setTimeout(resolve, 500));
         onClose();
       } catch (error: any) {
-        console.error("Failed to delete recurring event occurrence:", error);
+        log.error("Failed to delete recurring event occurrence:", error);
         toast.error(
           `Failed to delete event occurrence: ${error.message || "Unknown error"}`,
         );
@@ -749,7 +752,7 @@ export function useEventForm({
 
         onClose();
       } catch (error: any) {
-        console.error("Failed to delete recurring event series:", error);
+        log.error("Failed to delete recurring event series:", error);
         toast.error("Failed to delete event series");
       } finally {
         setEventSaving(false);

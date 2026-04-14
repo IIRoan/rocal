@@ -1,5 +1,8 @@
 import { toast } from "sonner";
+import { createLogger } from "@workspace/logger";
 import type { PaletteView } from "./constants";
+
+const log = createLogger("calendar-utils");
 
 export const validateCalendarForm = (
   calendarName: string,
@@ -74,7 +77,7 @@ export const handleCalendarCreate = async (
     setters.setCalendarIsDefault(false);
     goBack("calendars" as PaletteView);
   } catch (error: any) {
-    console.error("Failed to create calendar:", error);
+    log.error("Failed to create calendar:", error);
     if (error.message && error.message.includes("already exists")) {
       setters.setCalendarValidationErrors({
         name: "A calendar with this name already exists",
@@ -145,7 +148,7 @@ export const handleCalendarUpdate = async (
     setters.setEditingCalendar(null);
     goBack("calendars" as PaletteView);
   } catch (error: any) {
-    console.error("Failed to update calendar:", error);
+    log.error("Failed to update calendar:", error);
     if (error.message && error.message.includes("already exists")) {
       setters.setCalendarValidationErrors({
         name: "A calendar with this name already exists",
@@ -172,7 +175,7 @@ export const handleCalendarDelete = async (
     toast.success(`Calendar "${calendar.name}" deleted`);
     goBack("calendars" as PaletteView);
   } catch (error: any) {
-    console.error("Failed to delete calendar:", error);
+    log.error("Failed to delete calendar:", error);
     toast.error("Failed to delete calendar");
   } finally {
     setCalendarSaving(false);

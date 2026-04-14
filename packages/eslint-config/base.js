@@ -20,4 +20,9 @@ export const config = [
   {
     ignores: ["dist/**"],
   },
+  {
+    rules: {
+      "no-console": "warn",
+    },
+  },
 ]

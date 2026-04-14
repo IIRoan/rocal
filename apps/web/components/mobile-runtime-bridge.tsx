@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { createLogger } from "@workspace/logger";
+
+const log = createLogger("mobile-auth");
 import { App as CapacitorApp } from "@capacitor/app";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Keyboard, KeyboardResize } from "@capacitor/keyboard";
@@ -67,7 +70,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
   const finishAuthenticatedNavigation = async (callbackURL?: string | null, handoffToken?: string | null) => {
     const safeCallbackUrl = getSafeAppPath(callbackURL);
     
-    console.log("[mobile-auth] finishAuthenticatedNavigation called", {
+    log.debug("finishAuthenticatedNavigation called", {
       callbackURL,
       hasHandoffToken: !!handoffToken,
       safeCallbackUrl,
@@ -84,7 +87,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
 
       const hasUser = !!sessionResult?.data?.user;
 
-      console.log("[mobile-auth] Session readback result", {
+      log.debug("Session readback result", {
         hasUser,
         safeCallbackUrl,
         userId: sessionResult?.data?.user?.id,
@@ -94,7 +97,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         // If we have a handoff token but no session, the OTT verification should handle it
         // Don't redirect to login immediately - the deep link handler will verify the token
         if (handoffToken) {
-          console.log("[mobile-auth] No session but have handoff token, waiting for OTT verification");
+          log.debug("No session but have handoff token, waiting for OTT verification");
           return;
         }
         
@@ -112,7 +115,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
       setAuthErrorMessage(null);
       
       // Use window.location for more reliable navigation in mobile context
-      console.log("[mobile-auth] Navigating to", safeCallbackUrl);
+      log.debug("Navigating to", safeCallbackUrl);
       if (window.location.pathname !== safeCallbackUrl) {
         window.location.replace(safeCallbackUrl);
       } else {
@@ -122,11 +125,11 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         }, 100);
       }
     } catch (error) {
-      console.error("[mobile-auth] Failed to confirm session:", error);
+      log.error("Failed to confirm session:", error);
       
       // If we have a handoff token, don't redirect to login - OTT verification might succeed
       if (handoffToken) {
-        console.log("[mobile-auth] Session check failed but have handoff token, waiting");
+        log.debug("Session check failed but have handoff token, waiting");
         return;
       }
       
@@ -180,7 +183,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
       );
 
       appUrlOpenHandle = await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
-        console.log("[mobile-auth] appUrlOpen", { url });
+        log.debug("appUrlOpen", { url });
         void Browser.close().catch(() => undefined);
         
         const deepLinkUrl = new URL(url);
@@ -202,7 +205,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
           // Immediately mark token as being handled to prevent duplicate verification
           if (handoffToken) {
             if (completedAuthHandoffTokensRef.current.has(handoffToken)) {
-              console.log("[mobile-auth] Token already handled, skipping duplicate verification");
+              log.debug("Token already handled, skipping duplicate verification");
               window.location.replace(nextPath);
               return;
             }
@@ -226,7 +229,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
             body: JSON.stringify({ token: handoffToken }),
           })
             .then(async (response) => {
-              console.log("[mobile-auth] OTT verify response", {
+              log.debug("OTT verify response", {
                 status: response.status,
                 ok: response.ok,
                 nextPath,
@@ -240,7 +243,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
               await finishAuthenticatedNavigation(nextPath, handoffToken);
             })
             .catch((error: unknown) => {
-              console.error("Mobile one-time-token handoff failed:", error);
+              log.error("Mobile one-time-token handoff failed:", error);
               setIsProcessingAuth(false);
               const loginParams = new URLSearchParams({
                 error: "mobile_handoff_verify_failed",
@@ -256,11 +259,11 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
 
         const normalizedHref = normalizeCustomSchemeCallback(url);
         if (!normalizedHref) {
-          console.log("[mobile-auth] Ignoring non-auth deep link", { url });
+          log.debug("Ignoring non-auth deep link", { url });
           return;
         }
 
-        console.log("[mobile-auth] Handling custom scheme callback", {
+        log.debug("Handling custom scheme callback", {
           normalizedHref,
         });
 
@@ -268,7 +271,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
           .$fetch(normalizedHref.replace("/api/auth", ""))
           .then(({ error }: { error?: { message?: string } | null }) => {
             if (error) {
-              console.error("Custom mobile auth callback failed:", error);
+              log.error("Custom mobile auth callback failed:", error);
               const loginParams = new URLSearchParams({
                 error: "oauth_error",
               });
@@ -279,13 +282,13 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
 
             const parsedUrl = new URL(url);
             const callbackURL = parsedUrl.searchParams.get("callbackURL");
-            console.log("[mobile-auth] Custom scheme callback fetch succeeded", {
+            log.debug("Custom scheme callback fetch succeeded", {
               callbackURL,
             });
             void finishAuthenticatedNavigation(callbackURL);
           })
           .catch((error: unknown) => {
-            console.error("Custom mobile auth callback threw:", error);
+            log.error("Custom mobile auth callback threw:", error);
             const loginParams = new URLSearchParams({
               error: "oauth_error",
             });
@@ -297,7 +300,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
       try {
         const launchUrl = await CapacitorApp.getLaunchUrl();
         if (launchUrl?.url) {
-          console.log("[mobile-auth] Launch URL detected", {
+          log.debug("Launch URL detected", {
             url: launchUrl.url,
           });
           const normalizedHref = normalizeCustomSchemeCallback(launchUrl.url);
@@ -306,7 +309,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
               .$fetch(normalizedHref.replace("/api/auth", ""))
               .then(({ error }: { error?: { message?: string } | null }) => {
                 if (error) {
-                  console.error("Initial custom mobile auth callback failed:", error);
+                  log.error("Initial custom mobile auth callback failed:", error);
                   return;
                 }
 
@@ -315,7 +318,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
                 void finishAuthenticatedNavigation(callbackURL);
               })
               .catch((error: unknown) => {
-                console.error("Initial custom mobile auth callback threw:", error);
+                log.error("Initial custom mobile auth callback threw:", error);
               });
           }
         }

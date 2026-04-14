@@ -1,5 +1,8 @@
 import { ApiError } from "./types/calendar";
 import { getApiBaseUrl } from "./api-url";
+import { createLogger } from "@workspace/logger";
+
+const log = createLogger("http-client");
 
 export interface HttpClientOptions {
   baseURL?: string;
@@ -51,7 +54,7 @@ export class HttpClient {
   private async parseErrorResponse(response: Response): Promise<ApiError> {
     try {
       const errorText = await response.text();
-      console.error(`HTTP ${response.status} Error Response:`, errorText);
+      log.error(`HTTP ${response.status} Error Response:`, errorText);
 
       // Try to parse as JSON
       let errorData: any;
@@ -74,10 +77,10 @@ export class HttpClient {
         details: errorData.details || [],
       };
 
-      console.error(`API Error [${response.url}]:`, apiError);
+      log.error(`API Error [${response.url}]:`, apiError);
       return apiError;
     } catch (parseError) {
-      console.error("Failed to parse error response:", parseError);
+      log.error("Failed to parse error response:", parseError);
       return {
         error: "HTTP Error",
         message: response.statusText || `HTTP ${response.status}`,
@@ -239,7 +242,7 @@ export class HttpClient {
           const dateValue = new Date(value);
           // Debug date transformation for synced events
           if (key === "start" || key === "end") {
-            console.log(`HTTP Client - Transforming ${key}:`, {
+            log.debug(`HTTP Client - Transforming ${key}:`, {
               original: value,
               transformed: dateValue.toString(),
               iso: dateValue.toISOString(),

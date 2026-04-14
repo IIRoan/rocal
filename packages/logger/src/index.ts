@@ -2,14 +2,46 @@ export type LogLevel = "debug" | "info" | "ok" | "warn" | "error" | "skip" | "st
 
 type ConsoleMethod = "debug" | "info" | "log" | "warn" | "error";
 
+const IS_BROWSER = typeof window !== "undefined" && typeof window.document !== "undefined";
+
+let IS_PROD = false;
+try {
+  IS_PROD = process.env.NODE_ENV === "production";
+} catch (e) {
+  // Ignore
+}
+
+const CSS_COLORS = {
+  faint: "color: #888;",
+  debug: "color: #d946ef;",
+  info: "color: #06b6d4;",
+  ok: "color: #22c55e;",
+  warn: "color: #eab308;",
+  error: "color: #ef4444;",
+  skip: "color: #3b82f6;",
+  step: "color: #06b6d4;",
+};
+
+const COLORS = {
+  reset: "\x1b[0m",
+  faint: "\x1b[2m",
+  debug: "\x1b[35m",
+  info: "\x1b[36m",
+  ok: "\x1b[32m",
+  warn: "\x1b[33m",
+  error: "\x1b[31m",
+  skip: "\x1b[34m",
+  step: "\x1b[36m",
+};
+
 const LEVEL_LABELS: Record<LogLevel, string> = {
   debug: "DEBUG",
-  info: "INFO",
-  ok: "OK",
-  warn: "WARN",
-  error: "ERR",
-  skip: "SKIP",
-  step: "STEP",
+  info:  "INFO ",
+  ok:    "OK   ",
+  warn:  "WARN ",
+  error: "ERROR",
+  skip:  "SKIP ",
+  step:  "STEP ",
 };
 
 const LEVEL_METHODS: Record<LogLevel, ConsoleMethod> = {
@@ -27,12 +59,11 @@ const LOGGER_INSTANCE = Symbol.for("workspace.logger.instance");
 const LOGGER_ORIGINALS = Symbol.for("workspace.logger.originals");
 
 function timestamp(): string {
-  return new Date().toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  const d = new Date();
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const date = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${date} ${time}`;
 }
 
 function normalizeArgs(args: unknown[]): string {
@@ -59,16 +90,34 @@ export class WorkspaceLogger {
   constructor(private readonly scope?: string) {}
 
   private write(level: LogLevel, args: unknown[]): void {
-    const prefix = `${timestamp()} ${LEVEL_LABELS[level].padEnd(4, " ")}`;
-    const scope = this.scope ? ` [${this.scope}]` : "";
-    const message = normalizeArgs(args);
-    const line = `${prefix}${scope} ${message}`.trimEnd();
+    if (IS_BROWSER && IS_PROD) return;
+
     const globalRef = globalThis as typeof globalThis & {
       [LOGGER_ORIGINALS]?: Partial<Record<ConsoleMethod, Console[ConsoleMethod]>>;
     };
     const originals = globalRef[LOGGER_ORIGINALS];
     const method = LEVEL_METHODS[level];
     const writer = originals?.[method] ?? console[method];
+
+    if (IS_BROWSER) {
+      const scopeStr = this.scope ? ` <${this.scope}>` : "";
+      writer(
+        `%c${timestamp()} %c${LEVEL_LABELS[level]}%c${scopeStr}`,
+        CSS_COLORS.faint,
+        CSS_COLORS[level as keyof typeof CSS_COLORS],
+        CSS_COLORS.faint,
+        ...args
+      );
+      return;
+    }
+
+    const timeStr = `${COLORS.faint}${timestamp()}${COLORS.reset}`;
+    const levelColor = COLORS[level];
+    const levelStr = `${levelColor}${LEVEL_LABELS[level]}${COLORS.reset}`;
+    const scopeStr = this.scope ? ` ${COLORS.faint}<${this.scope}>${COLORS.reset}` : "";
+    const message = normalizeArgs(args);
+    const line = `${timeStr} ${levelStr}${scopeStr} ${message}`.trimEnd();
+    
     writer(line);
   }
 
@@ -133,10 +182,26 @@ export function installGlobalConsoleLogger(scope?: string): WorkspaceLogger {
 
   const patch = (method: ConsoleMethod, level: LogLevel) => {
     console[method] = (...args: unknown[]) => {
-      const prefix = `${timestamp()} ${LEVEL_LABELS[level].padEnd(4, " ")}`;
-      const scoped = scope ? ` [${scope}]` : "";
-      const line = `${prefix}${scoped} ${normalizeArgs(args)}`.trimEnd();
-      originalConsole[method](line);
+      if (IS_BROWSER && IS_PROD) return;
+
+      if (IS_BROWSER) {
+        const scopeStr = scope ? ` <${scope}>` : "";
+        originalConsole[method]!(
+          `%c${timestamp()} %c${LEVEL_LABELS[level]}%c${scopeStr}`,
+          CSS_COLORS.faint,
+          CSS_COLORS[level as keyof typeof CSS_COLORS],
+          CSS_COLORS.faint,
+          ...args
+        );
+        return;
+      }
+
+      const timeStr = `${COLORS.faint}${timestamp()}${COLORS.reset}`;
+      const levelColor = COLORS[level];
+      const levelStr = `${levelColor}${LEVEL_LABELS[level]}${COLORS.reset}`;
+      const scopeStr = scope ? ` ${COLORS.faint}<${scope}>${COLORS.reset}` : "";
+      const line = `${timeStr} ${levelStr}${scopeStr} ${normalizeArgs(args)}`.trimEnd();
+      originalConsole[method]!(line);
     };
   };
 
