@@ -1,24 +1,14 @@
 import { MobilePage } from "@workspace/mobile-ui";
-import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@workspace/ui/components/ui";
 import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
+import { solaceDisplay, solaceSans } from "@workspace/ui/lib/fonts";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { LoggerBootstrap } from "@/components/logger-bootstrap";
 import { MobileRuntimeBridge } from "@/components/mobile-runtime-bridge";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-
-const fontSans = Geist({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const fontMono = Geist_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Solace",
@@ -68,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} bg-background font-sans antialiased`}
+        className={`${solaceSans.variable} ${solaceDisplay.variable} bg-background font-sans antialiased`}
       >
         <MobileRuntimeBridge>
           <LoggerBootstrap />
