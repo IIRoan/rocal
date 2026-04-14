@@ -1,11 +1,14 @@
 "use client";
 
 import React from "react";
+import { createLogger } from "@workspace/logger";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Label } from "@workspace/ui/components/ui/label";
 import { RotateCcw, Edit3, Trash2, Calendar, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
+
+const log = createLogger("recurring-options");
 
 interface RecurringEventOptionsProps {
   event: CalendarEvent;
@@ -56,7 +59,7 @@ export function RecurringEventOptions({
     }
   }
 
-  console.log("RecurringEventOptions:", {
+  log.debug("RecurringEventOptions:", {
     eventId: event.id,
     isRecurringInstance,
     occurrenceDate,

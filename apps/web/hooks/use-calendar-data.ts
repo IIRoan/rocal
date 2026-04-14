@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createLogger } from "@workspace/logger";
 import { calendarApiService } from "../lib/calendar-api-service";
 import {
   CalendarEvent,
@@ -16,6 +17,8 @@ import {
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar";
 import { useCalendarEventsLoader, type DateRange } from "./use-calendar-events-loader";
+
+const log = createLogger("calendar-data");
 
 interface UseCalendarDataOptions {
   initialDateRange?: DateRange;
@@ -260,7 +263,7 @@ export function useCalendarData(
           isEnabled: n.isEnabled,
         }));
     } catch (error) {
-      console.error("Failed to load event notifications:", error);
+      log.error("Failed to load event notifications:", error);
       return [];
     }
   }, []);
@@ -278,7 +281,7 @@ export function useCalendarData(
           notificationData,
         );
       } catch (error) {
-        console.error("Failed to update event notifications:", error);
+        log.error("Failed to update event notifications:", error);
         throw error;
       }
     },

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { format } from "date-fns";
+import { createLogger } from "@workspace/logger";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -46,6 +47,8 @@ import {
   Search,
 } from "lucide-react";
 import { useNumberedShortcuts } from "@workspace/ui/hooks";
+
+const log = createLogger("command-palette");
 
 import type { EventEditorMode } from "./command-palette-context";
 
@@ -201,7 +204,7 @@ export function CommandPalette({
 
       await updateSettings(updateData);
     } catch (err: any) {
-      console.error("Failed to save settings:", err);
+      log.error("Failed to save settings:", err);
       setLocalSettings(localSettings);
     } finally {
       setSaving(false);
@@ -214,7 +217,7 @@ export function CommandPalette({
       await resetSettings();
       onOpenChange(false);
     } catch (err: any) {
-      console.error("Failed to reset settings:", err);
+      log.error("Failed to reset settings:", err);
     } finally {
       setSaving(false);
     }

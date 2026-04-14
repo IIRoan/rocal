@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createLogger } from "@workspace/logger";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -23,6 +24,8 @@ import {
   Menu,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const log = createLogger("mobile-calendar");
 import { useIsMobile } from "../../hooks/use-mobile";
 
 import {
@@ -182,7 +185,7 @@ export function MobileEventCalendar({
           }
         } catch (e) {
           // Handle legacy format or invalid JSON
-          console.warn("Invalid calendar view data in sessionStorage");
+          log.warn("Invalid calendar view data in sessionStorage");
           sessionStorage.removeItem("calendar-view-selection");
         }
       }
@@ -399,7 +402,7 @@ export function MobileEventCalendar({
 
       return savedEvent || event;
     } catch (error: any) {
-      console.error("Failed to save event:", error);
+      log.error("Failed to save event:", error);
 
       const errorMessage = error?.message || "Failed to save event";
       const isNetworkError =
@@ -435,7 +438,7 @@ export function MobileEventCalendar({
         });
       }
     } catch (error: any) {
-      console.error("Failed to delete event:", error);
+      log.error("Failed to delete event:", error);
       const errorMessage = error?.message || "Failed to delete event";
       toast.error("Failed to delete event", {
         description: errorMessage,
@@ -466,7 +469,7 @@ export function MobileEventCalendar({
         position: "bottom-left",
       });
     } catch (error: any) {
-      console.error("Failed to update event:", error);
+      log.error("Failed to update event:", error);
       const errorMessage = error?.message || "Failed to move event";
       toast.error("Failed to move event", {
         description: errorMessage,
@@ -559,7 +562,7 @@ export function MobileEventCalendar({
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
-        console.error("Calendar error:", error, errorInfo);
+        log.error("Calendar error:", error, errorInfo);
         toast.error("Calendar encountered an error. Please refresh the page.");
       }}
     >

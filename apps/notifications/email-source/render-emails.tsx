@@ -3,7 +3,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as React from "react";
+import { createLogger } from "@workspace/logger";
 import { EventReminderEmailTemplate } from "./event-reminder-email.js";
+
+const log = createLogger("render-emails");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +27,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  log.error(error);
   process.exitCode = 1;
 });

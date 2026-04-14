@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { createLogger } from "@workspace/logger";
 import {
   validateCalendarForm,
   handleCalendarCreate,
@@ -10,6 +11,8 @@ import {
   resetCalendarForm,
 } from "@/components/command-palette/calendar-utils";
 import type { Calendar } from "@workspace/ui/components/calendar";
+
+const log = createLogger("calendar-form");
 
 interface UseCalendarFormProps {
   calendars: Calendar[];
@@ -99,7 +102,7 @@ export function useCalendarForm({
       resetForm();
       onSuccess?.("create", newCalendar);
     } catch (error: any) {
-      console.error("Failed to create calendar:", error);
+      log.error("Failed to create calendar:", error);
       if (error.message && error.message.includes("already exists")) {
         setValidationErrors({
           name: "A calendar with this name already exists",
@@ -137,7 +140,7 @@ export function useCalendarForm({
       resetForm();
       onSuccess?.("update", updatedCalendar);
     } catch (error: any) {
-      console.error("Failed to update calendar:", error);
+      log.error("Failed to update calendar:", error);
       if (error.message && error.message.includes("already exists")) {
         setValidationErrors({
           name: "A calendar with this name already exists",
@@ -167,7 +170,7 @@ export function useCalendarForm({
         toast.success(`Calendar "${calendar.name}" deleted`);
         onSuccess?.("delete", calendar);
       } catch (error: any) {
-        console.error("Failed to delete calendar:", error);
+        log.error("Failed to delete calendar:", error);
         toast.error("Failed to delete calendar");
       } finally {
         setSaving(false);

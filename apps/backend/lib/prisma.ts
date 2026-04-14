@@ -12,11 +12,29 @@ declare global {
 export const prisma =
   globalThis.__prisma ||
   new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    log: [
+      { emit: "event", level: "query" },
+      { emit: "event", level: "error" },
+      { emit: "event", level: "info" },
+      { emit: "event", level: "warn" },
+    ],
   });
+
+// Setup Prisma logging events
+if (process.env.NODE_ENV === "development") {
+  (prisma as any).$on("query", (e: any) => {
+    logger.debug(`prisma:query ${e.query} [${e.duration}ms]`);
+  });
+  (prisma as any).$on("error", (e: any) => {
+    logger.error(e.message);
+  });
+  (prisma as any).$on("warn", (e: any) => {
+    logger.warn(e.message);
+  });
+  (prisma as any).$on("info", (e: any) => {
+    logger.info(e.message);
+  });
+}
 
 // In development, store the client globally to prevent hot reload issues
 if (process.env.NODE_ENV === "development") {
