@@ -245,43 +245,36 @@ export function EventCalendar({
     { key: "a", action: () => setView("agenda") },
   ]);
 
-  // Calculate date range based on current view and date
-  const dateRange = useMemo(() => {
+  // Compute the date range for a given date and view
+  const computeDateRange = (date: Date, v: string) => {
     let start: Date;
     let end: Date;
-
-    if (view === "month") {
-      // Expand to full calendar grid (start/end of weeks around the month)
-      const monthStart = startOfMonth(currentDate);
-      const monthEnd = endOfMonth(currentDate);
-      start = startOfWeek(monthStart, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(monthEnd, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (view === "week") {
-      start = startOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (view === "day") {
-      start = new Date(currentDate);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(currentDate);
-      end.setHours(23, 59, 59, 999);
-    } else if (view === "agenda") {
-      start = new Date(currentDate);
-      end = addDays(currentDate, AgendaDaysToShow - 1);
+    if (v === "month") {
+      const monthStart = startOfMonth(date);
+      const monthEnd = endOfMonth(date);
+      start = startOfWeek(monthStart, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      end = endOfWeek(monthEnd, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    } else if (v === "week") {
+      start = startOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      end = endOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    } else if (v === "day") {
+      start = new Date(date); start.setHours(0, 0, 0, 0);
+      end = new Date(date); end.setHours(23, 59, 59, 999);
+    } else if (v === "agenda") {
+      start = new Date(date);
+      end = addDays(date, AgendaDaysToShow - 1);
     } else {
-      start = startOfMonth(currentDate);
-      end = endOfMonth(currentDate);
+      start = startOfMonth(date);
+      end = endOfMonth(date);
     }
-
     return { start, end };
-  }, [currentDate, view]);
+  };
+
+  // Calculate date range based on current view and date
+  const dateRange = useMemo(
+    () => computeDateRange(currentDate, view),
+    [currentDate, view],
+  );
 
   // Calculate days for week view (needed for day headers)
   const days = useMemo(() => {
@@ -295,7 +288,7 @@ export function EventCalendar({
     return eachDayOfInterval({ start, end });
   }, [currentDate, view, weekStartDay]);
 
-  // Notify parent of date range changes
+  // Notify parent of date range changes (fallback for view changes, external date changes, etc.)
   useEffect(() => {
     onDateRangeChange?.(dateRange);
   }, [dateRange, onDateRangeChange]);
@@ -359,6 +352,12 @@ export function EventCalendar({
     }),
   };
 
+  // Navigate and eagerly start the fetch in the same React batch
+  const navigateTo = (newDate: Date) => {
+    setCurrentDate(newDate);
+    onDateRangeChange?.(computeDateRange(newDate, view));
+  };
+
   const handlePrevious = () => {
     navDirectionRef.current = -1;
     let newDate;
@@ -369,11 +368,10 @@ export function EventCalendar({
     } else if (view === "day") {
       newDate = addDays(currentDate, -1);
     } else if (view === "agenda") {
-      // For agenda view, go back 30 days (a full month)
       newDate = addDays(currentDate, -AgendaDaysToShow);
     }
 
-    if (newDate) setCurrentDate(newDate);
+    if (newDate) navigateTo(newDate);
   };
 
   const handleNext = () => {
@@ -386,11 +384,10 @@ export function EventCalendar({
     } else if (view === "day") {
       newDate = addDays(currentDate, 1);
     } else if (view === "agenda") {
-      // For agenda view, go forward 30 days (a full month)
       newDate = addDays(currentDate, AgendaDaysToShow);
     }
 
-    if (newDate) setCurrentDate(newDate);
+    if (newDate) navigateTo(newDate);
   };
 
   const prefetchAdjacentRange = (direction: "prev" | "next") => {
@@ -416,7 +413,7 @@ export function EventCalendar({
 
   const handleToday = () => {
     navDirectionRef.current = currentDate < new Date() ? 1 : -1;
-    setCurrentDate(new Date());
+    navigateTo(new Date());
   };
 
   // Track last mouse click position for popover positioning on timeline clicks
@@ -915,6 +912,9 @@ export function EventCalendar({
               <h2 className="min-w-0 truncate font-semibold text-base sm:text-xl transition-transform ease-in-out duration-300">
                 {viewTitle}
               </h2>
+              {eventsLoading && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
@@ -985,14 +985,6 @@ export function EventCalendar({
           </div>
 
           <div className="flex flex-1 flex-col relative min-h-0 overflow-hidden">
-            {eventsLoading && events && events.length > 0 && (
-              <EventLoadingSkeleton
-                view={view}
-                compactView={compactView}
-                className="absolute inset-0 z-10"
-              />
-            )}
-
             <AnimatePresence
               mode="sync"
               custom={navDirectionRef.current}

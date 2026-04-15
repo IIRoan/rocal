@@ -43,7 +43,7 @@ function shiftDateRangeByMonths(dateRange: DateRange, months: number): DateRange
 // Exported so callers with view context (e.g. CalendarWithData) can fire view-aware prefetches.
 export function buildViewPrefetchRanges(center: Date, view: string): DateRange[] {
   if (view === "week") {
-    return [-2, -1, 1, 2].map((offset) => {
+    return [-1, 1, -2, 2].map((offset) => {
       const fn = offset < 0 ? subWeeks : addWeeks;
       const base = fn(center, Math.abs(offset));
       return {
@@ -53,7 +53,7 @@ export function buildViewPrefetchRanges(center: Date, view: string): DateRange[]
     });
   }
   if (view === "day" || view === "3day") {
-    return [-7, -3, -1, 1, 3, 7].map((offset) => {
+    return [-1, 1, -3, 3, -7, 7].map((offset) => {
       const fn = offset < 0 ? subDays : addDays;
       const base = fn(center, Math.abs(offset));
       const start = new Date(base); start.setHours(0, 0, 0, 0);
@@ -62,7 +62,7 @@ export function buildViewPrefetchRanges(center: Date, view: string): DateRange[]
     });
   }
   // month / agenda: ±1 and ±2 months
-  return [-2, -1, 1, 2].map((offset) => {
+  return [-1, 1, -2, 2].map((offset) => {
     const fn = offset < 0 ? subMonths : addMonths;
     return normalizeDateRange({
       start: fn(center, Math.abs(offset)),
