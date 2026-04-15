@@ -414,9 +414,7 @@ function MobileLayoutContent() {
       events={transformedEvents}
       categories={calendarData.categories}
       loading={false}
-      eventsLoading={
-        calendarData.eventsLoading && calendarData.events.length === 0
-      }
+      eventsLoading={calendarData.eventsLoading}
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}
