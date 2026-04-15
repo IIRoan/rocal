@@ -985,7 +985,6 @@ export function EventCalendar({
           </div>
 
           <div className="flex flex-1 flex-col relative min-h-0 overflow-hidden">
-            {/* Event loading overlay when navigating between dates */}
             {eventsLoading && events && events.length > 0 && (
               <EventLoadingSkeleton
                 view={view}

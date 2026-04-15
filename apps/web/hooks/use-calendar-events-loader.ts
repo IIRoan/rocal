@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, startTransition } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, startOfMonth, startOfWeek, subDays, subMonths, subWeeks } from "date-fns";
 import { calendarApiService } from "../lib/calendar-api-service";
@@ -226,17 +226,15 @@ export function useCalendarEventsLoader(
 
   const setDateRange = useCallback((dateRange: DateRange) => {
     const normalized = normalizeDateRange(dateRange);
-    startTransition(() => {
-      setCurrentDateRange((prev) => {
-        if (
-          prev &&
-          prev.start.getTime() === normalized.start.getTime() &&
-          prev.end.getTime() === normalized.end.getTime()
-        ) {
-          return prev;
-        }
-        return normalized;
-      });
+    setCurrentDateRange((prev) => {
+      if (
+        prev &&
+        prev.start.getTime() === normalized.start.getTime() &&
+        prev.end.getTime() === normalized.end.getTime()
+      ) {
+        return prev;
+      }
+      return normalized;
     });
   }, []);
 
@@ -275,7 +273,7 @@ export function useCalendarEventsLoader(
 
   return {
     events: eventsQuery.data || fallbackEvents || [],
-    eventsLoading: eventsQuery.isLoading,
+    eventsLoading: eventsQuery.isFetching,
     eventsError: eventsQuery.error as unknown as ApiError | null,
     currentDateRange,
     setDateRange,
