@@ -261,21 +261,16 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   }
 
   // After initial load, render the interactive calendar.
-  // Avoid passing top-level loading to prevent internal skeleton that hides header.
-  // Apply a subtle opacity transition when events are being refetched during navigation.
-  const isNavigationLoading =
-    calendarData.eventsLoading && calendarData.events.length > 0;
-
+  // Pass eventsLoading through so the events area shows a localized overlay
+  // during navigation — the toolbar/header always stays fully visible.
   return (
     <EventCalendar
-      className={`${className ?? ""} transition-opacity duration-150 ${isNavigationLoading ? "opacity-60" : "opacity-100"}`}
+      className={className}
       initialView={initialView}
       events={transformedEvents}
       categories={calendarData.categories}
       loading={false}
-      eventsLoading={
-        calendarData.eventsLoading && calendarData.events.length === 0
-      }
+      eventsLoading={calendarData.eventsLoading}
       error={calendarData.error}
       onCreateEvent={calendarData.createEvent}
       onUpdateEvent={calendarData.updateEvent}

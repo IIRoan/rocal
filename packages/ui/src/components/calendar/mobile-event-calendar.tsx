@@ -38,6 +38,7 @@ import { addHoursToDate, addMinutesToDate } from "./utils";
 import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
 import dynamic from "next/dynamic";
 import { CalendarSkeleton } from "./calendar-skeleton";
+import { EventLoadingSkeleton } from "./event-loading-skeleton";
 
 const AgendaView = dynamic(() => import("./agenda-view").then((mod) => mod.AgendaView), { ssr: false, loading: () => <CalendarSkeleton view="agenda" compactView={false} /> });
 const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), { ssr: false, loading: () => <CalendarSkeleton view="day" compactView={false} /> });
@@ -689,7 +690,14 @@ export function MobileEventCalendar({
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col relative">
+            {eventsLoading && events && events.length > 0 && (
+              <EventLoadingSkeleton
+                view={view}
+                compactView={compactView}
+                className="absolute inset-0 z-10"
+              />
+            )}
             {view === "month" && (
               <MonthView
                 currentDate={currentDate}
