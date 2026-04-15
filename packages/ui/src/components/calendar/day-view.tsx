@@ -59,12 +59,11 @@ export function DayView({
   onEventView,
 }: DayViewProps) {
   const hours = useMemo(() => {
-    const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
-      start: addHours(dayStart, StartHour),
-      end: addHours(dayStart, EndHour),
+      start: addHours(new Date(2000, 0, 1), StartHour),
+      end: addHours(new Date(2000, 0, 1), EndHour),
     });
-  }, [currentDate]);
+  }, []);
 
   const dayEvents = useMemo(() => {
     const dayStart = startOfDay(currentDate);
@@ -288,12 +287,12 @@ export function DayView({
 
       <div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] border-t sm:grid-cols-[4rem_1fr] overflow-y-auto relative min-h-0">
         <div>
-          {hours.map((hour, index) => (
+          {hours.map((hour, hourIndex) => (
             <div
-              key={hour.toString()}
+              key={hourIndex}
               className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
             >
-              {index > 0 && (
+              {hourIndex > 0 && (
                 <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs">
                   {format(hour, timeFormat === "24h" ? "HH:mm" : "h a")}
                 </span>
@@ -347,11 +346,11 @@ export function DayView({
           )}
 
           {/* Time grid */}
-          {hours.map((hour) => {
+          {hours.map((hour, hourIndex) => {
             const hourValue = getHours(hour);
             return (
               <div
-                key={hour.toString()}
+                key={hourIndex}
                 className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
               >
                 {/* Quarter-hour intervals */}
@@ -359,8 +358,8 @@ export function DayView({
                   const quarterHourTime = hourValue + quarter * 0.25;
                   return (
                     <DroppableCell
-                      key={`${hour.toString()}-${quarter}`}
-                      id={`day-cell-${currentDate.toISOString()}-${quarterHourTime}`}
+                      key={quarter}
+                      id={`day-cell-h${hourIndex}-q${quarter}`}
                       date={currentDate}
                       time={quarterHourTime}
                       className={cn(

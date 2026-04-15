@@ -65,7 +65,7 @@ interface PositionedEvent {
   dayIndex: number;
 }
 
-export function WeekView({
+export const WeekView = React.memo(function WeekView({
   currentDate,
   events,
   onEventSelect,
@@ -106,12 +106,11 @@ export function WeekView({
     [currentDate, weekStartDay],
   );
   const hours = useMemo(() => {
-    const dayStart = startOfDay(currentDate);
     return eachHourOfInterval({
-      start: addHours(dayStart, StartHour),
-      end: addHours(dayStart, EndHour),
+      start: addHours(new Date(2000, 0, 1), StartHour),
+      end: addHours(new Date(2000, 0, 1), EndHour),
     });
-  }, [currentDate]);
+  }, []);
 
   // Get all-day events and multi-day events for the week
   const allDayEvents = useMemo(() => {
@@ -342,9 +341,9 @@ export function WeekView({
               ? formatInTimeZone(new Date(), timezone, "zzz")
               : format(new Date(), "zzz")}
           </div>
-          {days.map((day) => (
+          {days.map((day, dayIndex) => (
             <div
-              key={day.toString()}
+              key={dayIndex}
               className="caption w-full text-center text-muted-foreground/70"
             >
               <span
@@ -368,9 +367,9 @@ export function WeekView({
               ? formatInTimeZone(new Date(), timezone, "zzz")
               : format(new Date(), "zzz")}
           </div>
-          {days.map((day) => (
+          {days.map((day, dayIndex) => (
             <div
-              key={day.toString()}
+              key={dayIndex}
               className="w-full text-center text-muted-foreground/70"
             >
               <span
@@ -466,12 +465,12 @@ export function WeekView({
       >
         {/* Gutter column — time labels only, no stripes */}
         <div className="grid auto-cols-fr">
-          {hours.map((hour, index) => (
+          {hours.map((hour, hourIndex) => (
             <div
-              key={hour.toString()}
+              key={hourIndex}
               className="relative min-h-[var(--week-cells-height)]"
             >
-              {index > 0 && (
+              {hourIndex > 0 && (
                 <span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-full items-center justify-end pe-1 text-[9px] sm:text-[10px]">
                   {format(hour, timeFormat === "24h" ? "HH:mm" : "h a")}
                 </span>
@@ -482,7 +481,7 @@ export function WeekView({
 
         {days.map((day, dayIndex) => (
           <div
-            key={day.toString()}
+            key={dayIndex}
             className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
               isToday(day)
                 ? "bg-[var(--calendar-accent-bg)]/20"
@@ -537,11 +536,11 @@ export function WeekView({
                 </div>
               </div>
             )}
-            {hours.map((hour) => {
+            {hours.map((hour, hourIndex) => {
               const hourValue = getHours(hour);
               return (
                 <div
-                  key={hour.toString()}
+                  key={hourIndex}
                   className="border-border/70 relative min-h-[var(--week-cells-height)] border-b last:border-b-0"
                 >
                   {/* Quarter-hour intervals */}
@@ -549,8 +548,8 @@ export function WeekView({
                     const quarterHourTime = hourValue + quarter * 0.25;
                     return (
                       <DroppableCell
-                        key={`${hour.toString()}-${quarter}`}
-                        id={`week-cell-${day.toISOString()}-${quarterHourTime}`}
+                        key={quarter}
+                        id={`week-cell-d${dayIndex}-h${hourIndex}-q${quarter}`}
                         date={day}
                         time={quarterHourTime}
                         className={cn(
@@ -580,4 +579,4 @@ export function WeekView({
       </div>
     </div>
   );
-}
+});
