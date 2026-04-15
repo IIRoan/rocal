@@ -1,0 +1,55 @@
+/* shadcn/ui Theme — Solace Design System */
+/* Paste into globals.css */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 10 85% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 155 78% 44%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 87%;
+    --muted-foreground: 0 0% 44%;
+    --accent: 10 85% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 44%;
+    --input: 0 0% 87%;
+    --ring: 200 64% 55%;
+    --radius: 6px;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 19%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 19%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 10 85% 59%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 155 78% 44%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 56%;
+    --accent: 10 85% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 31%;
+    --input: 0 0% 14%;
+    --ring: 200 64% 55%;
+  }
+
+  /* Product-specific dark accent overrides */
+  .dark-mail     { --primary: 200 100% 86%; --primary-foreground: 0 0% 0%; }
+  .dark-calendar { --primary: 155 78% 35%; --primary-foreground: 0 0% 100%; }
+  .dark-drive    { --primary: 155 78% 44%; --primary-foreground: 0 0% 0%; }
+  .dark-pages    { --secondary: 200 68% 48%; --secondary-foreground: 0 0% 100%; }
+}
