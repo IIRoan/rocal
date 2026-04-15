@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { createLogger } from "@workspace/logger";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCalendarContext } from "./calendar-context";
@@ -172,6 +172,9 @@ export function EventCalendar({
   // Use context view, falling back to initialView on first render if context hasn't been set
   const view = currentView;
 
+  // Defer event layout so grid structure can paint at the new date first
+  const deferredEvents = useDeferredValue(events);
+
   // Initialize context view from initialView if context is still at default
   useEffect(() => {
     if (currentView === "month" && initialView !== "month") {
@@ -339,7 +342,7 @@ export function EventCalendar({
 
   const viewTransitionVariants = {
     enter: (dir: number) => ({
-      x: shouldReduceMotion ? 0 : dir > 0 ? 56 : -56,
+      x: shouldReduceMotion ? 0 : dir > 0 ? 32 : -32,
       opacity: 0,
     }),
     center: {
@@ -347,7 +350,7 @@ export function EventCalendar({
       opacity: 1,
     },
     exit: (dir: number) => ({
-      x: shouldReduceMotion ? 0 : dir > 0 ? -40 : 40,
+      x: shouldReduceMotion ? 0 : dir > 0 ? -24 : 24,
       opacity: 0,
     }),
   };
@@ -1000,11 +1003,11 @@ export function EventCalendar({
                 transition={{
                   x: {
                     type: "spring",
-                    stiffness: 340,
-                    damping: 34,
-                    mass: 0.8,
+                    stiffness: 500,
+                    damping: 40,
+                    mass: 0.6,
                   },
-                  opacity: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
+                  opacity: { duration: 0.1, ease: "easeOut" },
                 }}
                 style={{
                   position: "absolute",
@@ -1017,7 +1020,7 @@ export function EventCalendar({
                 {view === "month" && (
                   <MonthView
                     currentDate={currentDate}
-                    events={events}
+                    events={deferredEvents}
                     onEventSelect={handleEventSelect}
                     onEventCreate={handleEventCreate}
                     showWeekNumbers={showWeekNumbers}
@@ -1034,7 +1037,7 @@ export function EventCalendar({
                 {view === "week" && (
                   <WeekView
                     currentDate={currentDate}
-                    events={events}
+                    events={deferredEvents}
                     onEventSelect={handleEventSelect}
                     onEventCreate={handleEventCreate}
                     compactView={compactView}
@@ -1050,7 +1053,7 @@ export function EventCalendar({
                 {view === "day" && (
                   <DayView
                     currentDate={currentDate}
-                    events={events}
+                    events={deferredEvents}
                     onEventSelect={handleEventSelect}
                     onEventCreate={handleEventCreate}
                     compactView={compactView}
@@ -1064,7 +1067,7 @@ export function EventCalendar({
                 {view === "agenda" && (
                   <AgendaView
                     currentDate={currentDate}
-                    events={events}
+                    events={deferredEvents}
                     onEventSelect={handleEventSelect}
                     timeFormat={timeFormat}
                     timezone={timezone}
