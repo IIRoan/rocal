@@ -231,7 +231,21 @@ export function EventLoadingSkeleton({
     );
   }
 
-  return null;
+  // Fallback for any view not explicitly handled (e.g. "3day")
+  return (
+    <div className={cn("relative", className)}>
+      <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] rounded-lg z-10 flex items-center justify-center">
+        {showSpinner && (
+          <div className="bg-background/90 border border-border rounded-lg p-4 shadow-lg animate-fade-in">
+            <InlineLogoSpinner
+              messageContext="CALENDAR_LOAD"
+              enableCycling={true}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Lightweight event skeleton for quick transitions
