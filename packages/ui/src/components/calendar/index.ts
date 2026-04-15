@@ -19,7 +19,6 @@ export {
 } from "./calendar-skeleton";
 export {
   EventLoadingSkeleton,
-  QuickEventSkeleton,
 } from "./event-loading-skeleton";
 
 // Context providers
