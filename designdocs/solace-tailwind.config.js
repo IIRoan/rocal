@@ -1,0 +1,140 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  theme: {
+    extend: {
+      colors: {
+        primary: '#ef5a3c',
+        secondary: '#19c77f',
+        'accent-pink': '#ef95c2',
+        'accent-blue': '#4ab7ee',
+        'accent-purple': '#87afff',
+        'accent-gold': '#dfab0e',
+        'accent-yellow': '#ffcb30',
+        'accent-teal': '#2797cf',
+        'accent-green': '#00a05e',
+
+        neutral: {
+          DEFAULT: '#000000',
+          50: '#242424',
+          100: '#303030',
+          200: '#505050',
+          300: '#707070',
+          400: '#8f8f8f',
+          500: '#afafaf',
+          600: '#cfcfcf',
+          700: '#dfdfdf',
+          800: '#ebebeb',
+          900: '#f5f5f5',
+          950: '#ffffff',
+        },
+
+        surface: {
+          DEFAULT: '#ffffff',
+          alt: '#ffffff',
+          subtle: '#efefef',
+          dark: '#000000',
+          card: '#ffffff',
+          'card-dark': '#303030',
+          elevated: '#292929',
+        },
+
+        tint: {
+          primary: '#ffebe7',
+          'primary-muted': '#ffc3b7',
+          secondary: '#bfffe5',
+          blue: '#dff4ff',
+          pink: '#ffd7eb',
+          red: '#ffd7d7',
+        },
+
+        background: '#dedede',
+        foreground: '#000000',
+      },
+
+      fontFamily: {
+        display: ['__solaceSansDisplay', 'sans-serif'],
+        body: ['__solaceSansText', 'sans-serif'],
+        mono: ['__solaceMono', 'monospace'],
+        pixel: ['__solacePixel', 'sans-serif'],
+        serif: ['Times New Roman', 'serif'],
+      },
+
+      fontSize: {
+        'hero': ['80px', { lineHeight: '120px' }],
+        'display': ['76px', { lineHeight: '54px', letterSpacing: '-0.76px' }],
+        'h1': ['64px', { lineHeight: '60.8px', letterSpacing: '-0.64px' }],
+        'h2': ['48px', { lineHeight: '52.8px', letterSpacing: '-0.48px' }],
+        'h3': ['36px', { lineHeight: '43.2px' }],
+        'h4': ['20px', { lineHeight: '27px', letterSpacing: '-0.2px' }],
+        'h4-alt': ['19px', { lineHeight: '24.7px' }],
+        'subtitle': ['28px', { lineHeight: '33.6px' }],
+        'medium': ['17px', { lineHeight: '22.95px', letterSpacing: '-0.17px' }],
+        'body': ['14px', { lineHeight: '18.2px', letterSpacing: '-0.07px' }],
+        'body-lg': ['15px', { lineHeight: '22.5px', letterSpacing: '-0.15px' }],
+        'small': ['13px', { lineHeight: '19.5px' }],
+        'caption': ['11px', { lineHeight: '12px', letterSpacing: '0.11px' }],
+      },
+
+      fontWeight: {
+        light: '380',
+        normal: '400',
+        medium: '470',
+        semibold: '520',
+        bold: '700',
+      },
+
+      spacing: {
+        '0': '1px',
+        '1': '4px',
+        '2': '8px',
+        '3': '12px',
+        '4': '16px',
+        '5': '20px',
+        '6': '24px',
+        '7': '28px',
+        '8': '32px',
+        '9': '36px',
+        '10': '40px',
+        '11': '44px',
+        '12': '48px',
+        '16': '64px',
+        '20': '80px',
+        '24': '96px',
+        '26': '104px',
+        '32': '128px',
+        '35': '140px',
+        '36': '144px',
+        '40': '160px',
+        '54': '215px',
+      },
+
+      borderRadius: {
+        xs: '2px',
+        sm: '4px',
+        md: '6px',
+        lg: '10px',
+        xl: '14px',
+        '2xl': '16px',
+        full: '9999px',
+      },
+
+      boxShadow: {
+        xs: 'rgba(0,0,0,0.05) 0px 1px 2px 0px',
+        sm: 'rgba(0,0,0,0.1) 0px 1px 3px 0px, rgba(0,0,0,0.1) 0px 1px 2px -1px',
+        md: 'rgba(0,0,0,0.1) 0px 4px 6px -1px, rgba(0,0,0,0.1) 0px 2px 4px -2px',
+        lg: 'rgba(0,0,0,0.1) 0px 10px 15px -3px, rgba(0,0,0,0.1) 0px 4px 6px -4px',
+        xl: 'rgba(0,0,0,0.1) 0px 20px 25px -5px, rgba(0,0,0,0.1) 0px 8px 10px -6px',
+        card: 'rgba(0,0,0,0.1) 0px 1px 0px 0px inset, rgba(0,0,0,0.1) 0px -1px 0px 1px inset',
+        'card-dark': 'hsla(0,0%,100%,0.08) 0px 1px 0px 0px inset, hsla(0,0%,100%,0.08) 0px -1px 0px 1px inset',
+      },
+
+      screens: {
+        sm: '640px',
+        md: '768px',
+        lg: '1024px',
+        xl: '1280px',
+        '2xl': '1536px',
+      },
+    },
+  },
+};
