@@ -4,7 +4,7 @@ import * as React from "react";
 import { CheckIcon, GearSixIcon, FoldersIcon } from "@phosphor-icons/react";
 import { Sparkles, Plus, Search, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Settings2, LogOut, ArrowRight } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
+import { type CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
 import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
@@ -123,7 +123,6 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onAiSubmit?: () => void;
   aiLoading?: boolean;
   aiResponse?: string;
-  events?: CalendarEvent[];
   isMobile?: boolean;
   getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
@@ -141,7 +140,6 @@ export function AppSidebar({
   onAiSubmit,
   aiLoading,
   aiResponse,
-  events,
   isMobile = false,
   getCachedEventsForRange,
   prefetchRange,
@@ -346,7 +344,7 @@ export function AppSidebar({
   }
 
   // Desktop version - high quality sidebar
-  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onOpenSearch, onCreateEvent, aiQuery, onAiQueryChange, onAiSubmit, aiLoading, aiResponse, events, getCachedEventsForRange, prefetchRange, props }} />;
+  return <AppSidebarDesktop {...{ user, onLogout, onOpenSettings, onOpenCalendarManagement, onOpenSearch, onCreateEvent, aiQuery, onAiQueryChange, onAiSubmit, aiLoading, aiResponse, getCachedEventsForRange, prefetchRange, props }} />;
 }
 
 function AppSidebarDesktop({
@@ -361,7 +359,6 @@ function AppSidebarDesktop({
   onAiSubmit,
   aiLoading,
   aiResponse,
-  events,
   getCachedEventsForRange,
   prefetchRange,
   props,
@@ -377,7 +374,6 @@ function AppSidebarDesktop({
   onAiSubmit?: () => void;
   aiLoading?: boolean;
   aiResponse?: string;
-  events?: CalendarEvent[];
   getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   props: React.ComponentProps<typeof Sidebar>;

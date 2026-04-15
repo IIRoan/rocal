@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import { useCalendarContext } from "./calendar-context";
 import {
@@ -38,7 +38,6 @@ import { addHoursToDate, addMinutesToDate } from "./utils";
 import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
 import dynamic from "next/dynamic";
 import { CalendarSkeleton } from "./calendar-skeleton";
-import { EventLoadingSkeleton } from "./event-loading-skeleton";
 
 const AgendaView = dynamic(() => import("./agenda-view").then((mod) => mod.AgendaView), { ssr: false, loading: () => <CalendarSkeleton view="agenda" compactView={false} /> });
 const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), { ssr: false, loading: () => <CalendarSkeleton view="day" compactView={false} /> });
@@ -252,43 +251,39 @@ export function MobileEventCalendar({
     }
   }, [initialView, view]);
 
-  // Calculate date range based on current view and date
-  const dateRange = useMemo(() => {
+  // Compute the date range for a given date and view
+  const computeDateRange = (date: Date, v: string) => {
     let start: Date;
     let end: Date;
-
-    if (view === "month") {
-      start = startOfMonth(currentDate);
-      end = endOfMonth(currentDate);
-    } else if (view === "week") {
-      start = startOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-      end = endOfWeek(currentDate, {
-        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      });
-    } else if (view === "day") {
-      start = new Date(currentDate);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(currentDate);
-      end.setHours(23, 59, 59, 999);
-    } else if (view === "3day") {
-      start = addDays(currentDate, -1);
-      start.setHours(0, 0, 0, 0);
-      end = addDays(currentDate, 1);
-      end.setHours(23, 59, 59, 999);
-    } else if (view === "agenda") {
-      start = new Date(currentDate);
-      end = addDays(currentDate, AgendaDaysToShow - 1);
+    if (v === "month") {
+      start = startOfMonth(date);
+      end = endOfMonth(date);
+    } else if (v === "week") {
+      start = startOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      end = endOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+    } else if (v === "day") {
+      start = new Date(date); start.setHours(0, 0, 0, 0);
+      end = new Date(date); end.setHours(23, 59, 59, 999);
+    } else if (v === "3day") {
+      start = addDays(date, -1); start.setHours(0, 0, 0, 0);
+      end = addDays(date, 1); end.setHours(23, 59, 59, 999);
+    } else if (v === "agenda") {
+      start = new Date(date);
+      end = addDays(date, AgendaDaysToShow - 1);
     } else {
-      start = startOfMonth(currentDate);
-      end = endOfMonth(currentDate);
+      start = startOfMonth(date);
+      end = endOfMonth(date);
     }
-
     return { start, end };
-  }, [currentDate, view]);
+  };
 
-  // Notify parent of date range changes
+  // Calculate date range based on current view and date
+  const dateRange = useMemo(
+    () => computeDateRange(currentDate, view),
+    [currentDate, view],
+  );
+
+  // Notify parent of date range changes (fallback for view changes, external date changes, etc.)
   useEffect(() => {
     onDateRangeChange?.(dateRange);
   }, [dateRange, onDateRangeChange]);
@@ -297,6 +292,12 @@ export function MobileEventCalendar({
   const createEvent = onCreateEvent || (async () => {});
   const updateEvent = onUpdateEvent || (async () => {});
   const deleteEvent = onDeleteEvent || (async () => {});
+
+  // Navigate and eagerly start the fetch in the same React batch
+  const navigateTo = (newDate: Date) => {
+    setCurrentDate(newDate);
+    onDateRangeChange?.(computeDateRange(newDate, view));
+  };
 
   // Navigation handlers
   const handlePrevious = () => {
@@ -316,7 +317,7 @@ export function MobileEventCalendar({
       newDate = subMonths(currentDate, 1);
     }
 
-    if (newDate) setCurrentDate(newDate);
+    if (newDate) navigateTo(newDate);
   };
 
   const handleNext = () => {
@@ -336,11 +337,11 @@ export function MobileEventCalendar({
       newDate = addMonths(currentDate, 1);
     }
 
-    if (newDate) setCurrentDate(newDate);
+    if (newDate) navigateTo(newDate);
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date());
+    navigateTo(new Date());
   };
 
   const handleEventSelect = (event: CalendarEvent) => {
@@ -593,6 +594,9 @@ export function MobileEventCalendar({
             <div className="flex sm:flex-col max-sm:items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
                 <h2 className="font-semibold text-xl">{viewTitle}</h2>
+                {eventsLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                )}
               </div>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -690,14 +694,7 @@ export function MobileEventCalendar({
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col relative">
-            {eventsLoading && events && events.length > 0 && (
-              <EventLoadingSkeleton
-                view={view}
-                compactView={compactView}
-                className="absolute inset-0 z-10"
-              />
-            )}
+          <div className="flex flex-1 flex-col">
             {view === "month" && (
               <MonthView
                 currentDate={currentDate}

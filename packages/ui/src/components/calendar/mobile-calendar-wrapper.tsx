@@ -355,7 +355,6 @@ export function MobileCalendarWrapper({
               onLogout={onLogout}
               onOpenSettings={handleOpenSettings}
               onOpenCalendarManagement={onOpenCalendarManagement}
-              events={props.events}
               getCachedEventsForRange={getCachedEventsForRange}
               prefetchRange={prefetchRange}
               isMobile={true}

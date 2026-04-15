@@ -126,18 +126,38 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   useEffect(() => {
     if (!currentDate || !currentView) return;
     const ranges = buildViewPrefetchRanges(currentDate, currentView);
-    const runPrefetch = () => {
-      for (const range of ranges) {
+
+    const eagerRanges = ranges.slice(0, 2);
+    const deferredRanges = ranges.slice(2);
+
+    for (const range of eagerRanges) {
+      calendarData.prefetchRange(range);
+    }
+
+    if (deferredRanges.length === 0) {
+      return;
+    }
+
+    const runDeferredPrefetch = () => {
+      for (const range of deferredRanges) {
         calendarData.prefetchRange(range);
       }
     };
+
     if ("requestIdleCallback" in window) {
-      const id = (window as any).requestIdleCallback(runPrefetch, { timeout: 600 });
-      return () => { if ("cancelIdleCallback" in window) (window as any).cancelIdleCallback(id); };
+      const id = (window as any).requestIdleCallback(runDeferredPrefetch, {
+        timeout: 400,
+      });
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          (window as any).cancelIdleCallback(id);
+        }
+      };
     }
-    const id = setTimeout(runPrefetch, 50);
+
+    const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, calendarData]);
+  }, [currentDate, currentView, calendarData.prefetchRange]);
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(
@@ -299,4 +319,3 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     />
   );
 }
-

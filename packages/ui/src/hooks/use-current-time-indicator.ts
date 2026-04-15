@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { endOfWeek, isSameDay, isWithinInterval, startOfWeek } from "date-fns";
-import { createLogger } from "@workspace/logger";
 import { StartHour, EndHour } from "../components/calendar/constants";
-
-const log = createLogger("time-indicator");
 
 function getCurrentTimeInTimezone(timezone?: string): {
   hours: number;
@@ -70,32 +67,16 @@ export function useCurrentTimeIndicator(
         date: timezoneDate,
       } = getCurrentTimeInTimezone(timezone);
 
-      log.debug("Timezone:", timezone);
-      log.debug(
-        "Current time in timezone:",
-        `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`,
-      );
-      log.debug("Local browser time:", new Date().toLocaleTimeString());
-      log.debug("StartHour:", StartHour, "EndHour:", EndHour);
-
       const totalMinutes = (hours - StartHour) * 60 + minutes;
       const dayStartMinutes = 0;
       // EndHour is 23, but we need to include the full 24th hour (23:00-23:59)
       // So the total range should be 24 hours (0-23:59)
       const dayEndMinutes = 24 * 60; // Full 24 hours in minutes
 
-      log.debug("Calculation details:");
-      log.debug("- hours:", hours, "minutes:", minutes);
-      log.debug("- totalMinutes:", totalMinutes);
-      log.debug("- dayStartMinutes:", dayStartMinutes);
-      log.debug("- dayEndMinutes:", dayEndMinutes);
-
       // Calculate position as percentage of day
       const position =
         ((totalMinutes - dayStartMinutes) / (dayEndMinutes - dayStartMinutes)) *
         100;
-
-      log.debug("- calculated position:", position + "%");
 
       // Check if current day is in view based on the calendar view
       let isCurrentTimeVisible = false;

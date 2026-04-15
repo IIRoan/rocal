@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import dynamic from "next/dynamic";
 import {
@@ -11,6 +11,31 @@ import {
   MobileCalendarSkeleton,
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
+import { CommandPaletteProvider } from "@/components/command-palette-context";
+import {
+  CalendarDataProvider,
+  useSharedCalendarData,
+} from "@/components/calendar-data-provider";
+import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
+import { SettingsProvider } from "@/components/settings-provider";
+import { useCommandPalette } from "@/hooks/use-command-palette";
+import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
+import { useCalendarContext } from "@workspace/ui/components/calendar";
+import { useSettings } from "@/hooks/use-settings";
+import { calendarApiService } from "@/lib/calendar-api-service";
+import { getApiBaseUrl } from "@/lib/api-url";
+import { buildViewPrefetchRanges } from "@/hooks/use-calendar-events-loader";
+import {
+  useMemo,
+  useEffect,
+  useState,
+  useRef,
+  Suspense,
+  type ReactNode,
+} from "react";
+import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
+
+const log = createLogger("dashboard");
 
 const AppSidebar = dynamic(
   () => import("@workspace/ui/components/layout").then((mod) => mod.AppSidebar),
@@ -31,24 +56,6 @@ const CommandPalette = dynamic(
   () => import("@/components/command-palette").then((mod) => mod.CommandPalette),
   { ssr: false },
 );
-
-import { CommandPaletteProvider } from "@/components/command-palette-context";
-import { CalendarDataProvider } from "@/components/calendar-data-provider";
-import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
-import { SettingsProvider } from "@/components/settings-provider";
-import { useCommandPalette } from "@/hooks/use-command-palette";
-import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
-import { useCalendarContext } from "@workspace/ui/components/calendar";
-import { useSettings } from "@/hooks/use-settings";
-import { useSharedCalendarData } from "@/components/calendar-data-provider";
-import { calendarApiService } from "@/lib/calendar-api-service";
-import { getApiBaseUrl } from "@/lib/api-url";
-import { useMemo, useEffect, useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
-
-const log = createLogger("dashboard");
 
 type CalendarAssistantResponse = {
   reply: string;
@@ -86,13 +93,37 @@ type CalendarAssistantResponse = {
   error?: string;
 };
 
-function EventDeepLinkHandler() {
+function DashboardLoadingScreen() {
+  return (
+    <>
+      <DashboardSkeleton />
+      <PageLoadingOverlay
+        isLoading={true}
+        messageContext="AUTH_FLOW"
+        enableCycling={true}
+      />
+    </>
+  );
+}
+
+function CalendarUrlSyncWrapper() {
+  useCalendarUrlSync();
+  return null;
+}
+
+function DashboardSearchParamHandlers({
+  onOpenPalette,
+}: {
+  onOpenPalette: (query?: string) => void;
+}) {
   const searchParams = useSearchParams();
-  const eventId = searchParams.get("eventId");
   const { data: session, isPending } = useSession();
   const { openEventEditor } = useCommandPaletteContext();
   const calendarData = useSharedCalendarData();
   const handledEventIdRef = useRef<string | null>(null);
+  const handledPaletteRef = useRef<string | null>(null);
+  const eventId = searchParams.get("eventId");
+  const palette = searchParams.get("palette");
 
   useEffect(() => {
     if (!eventId || handledEventIdRef.current === eventId) {
@@ -108,10 +139,14 @@ function EventDeepLinkHandler() {
 
     const openLinkedEvent = async () => {
       try {
-        const existingEvent = calendarData.events.find((event) => event.id === eventId);
+        const existingEvent = calendarData.events.find(
+          (event) => event.id === eventId,
+        );
         const event = existingEvent || (await calendarApiService.getEvent(eventId));
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         if (event?.start) {
           calendarData.setDateRange({
@@ -123,7 +158,6 @@ function EventDeepLinkHandler() {
         openEventEditor(event, { eventViewMode: "view" });
       } catch (error) {
         log.error("Failed to open event from email link:", error);
-        handledEventIdRef.current = eventId;
       }
     };
 
@@ -140,42 +174,35 @@ function EventDeepLinkHandler() {
     openEventEditor,
   ]);
 
+  useEffect(() => {
+    if (!palette || handledPaletteRef.current === palette) {
+      return;
+    }
+
+    if (isPending || !session?.user) {
+      return;
+    }
+
+    handledPaletteRef.current = palette;
+    onOpenPalette(palette === "settings" ? "settings" : "");
+  }, [palette, isPending, session?.user, onOpenPalette]);
+
   return null;
 }
 
 function SidebarWithContext() {
   const { data: session } = useSession();
-  const { openCalendarManagement, openPalette, openSearchPalette, openEventEditor } =
-    useCommandPaletteContext();
-  const { isCalendarVisible } = useCalendarContext();
+  const {
+    openCalendarManagement,
+    openPalette,
+    openSearchPalette,
+    openEventEditor,
+  } = useCommandPaletteContext();
   const { settings } = useSettings();
   const calendarData = useSharedCalendarData();
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-
-  const visibleCalendarIds = useMemo(() => {
-    return new Set(
-      calendarData.calendars
-        .filter((cal) => isCalendarVisible(cal.id))
-        .map((cal) => cal.id),
-    );
-  }, [calendarData.calendars, isCalendarVisible]);
-
-  const transformedEvents = useMemo(() => {
-    const calendarMap = new Map(
-      calendarData.calendars.map((cal) => [cal.id, cal]),
-    );
-    return calendarData.events
-      .filter((event) => visibleCalendarIds.has(event.calendarId))
-      .map((event) => {
-        const calendar = calendarMap.get(event.calendarId);
-        return {
-          ...event,
-          color: event.color || calendar?.color || undefined,
-        };
-      });
-  }, [calendarData.events, calendarData.calendars, visibleCalendarIds]);
 
   const handleLogout = async () => {
     try {
@@ -209,7 +236,9 @@ function SidebarWithContext() {
 
   const handleAiSubmit = async () => {
     const query = aiQuery.trim();
-    if (!query || aiLoading) return;
+    if (!query || aiLoading) {
+      return;
+    }
 
     setAiLoading(true);
     setAiResponse("");
@@ -222,7 +251,9 @@ function SidebarWithContext() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query,
-          timezone: settings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone:
+            settings?.timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
           now: new Date().toISOString(),
         }),
       });
@@ -239,7 +270,9 @@ function SidebarWithContext() {
       }
 
       if (!response.ok) {
-        throw new Error(data?.reply || data?.error || "Calendar assistant request failed");
+        throw new Error(
+          data?.reply || data?.error || "Calendar assistant request failed",
+        );
       }
 
       if (data.createdEvent || data.updatedEvent || data.deletedEventId) {
@@ -276,7 +309,6 @@ function SidebarWithContext() {
       onAiSubmit={handleAiSubmit}
       aiLoading={aiLoading}
       aiResponse={aiResponse}
-      events={transformedEvents}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
       prefetchRange={calendarData.prefetchRange}
     />
@@ -287,9 +319,7 @@ function MobileLayoutContent() {
   const { data: session } = useSession();
   const { openCalendarManagement, openEventEditor, openPalette } =
     useCommandPaletteContext();
-  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } =
-    useCommandPalette();
-  const { isCalendarVisible } = useCalendarContext();
+  const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const calendarData = useSharedCalendarData();
 
@@ -348,7 +378,7 @@ function MobileLayoutContent() {
       calendarData.calendars.map((cal) => [cal.id, cal]),
     );
 
-    const transformedEventsList = calendarData.events
+    return calendarData.events
       .filter((event) => visibleCalendarIds.has(event.calendarId))
       .map((event) => {
         const calendar = calendarMap.get(event.calendarId);
@@ -363,9 +393,45 @@ function MobileLayoutContent() {
           reminder: (event as any).reminder ?? undefined,
         };
       });
-
-    return transformedEventsList;
   }, [calendarData.events, calendarData.calendars, visibleCalendarIds]);
+
+  useEffect(() => {
+    if (!currentDate || !currentView) {
+      return;
+    }
+
+    const ranges = buildViewPrefetchRanges(currentDate, currentView);
+    const eagerRanges = ranges.slice(0, 2);
+    const deferredRanges = ranges.slice(2);
+
+    for (const range of eagerRanges) {
+      calendarData.prefetchRange(range);
+    }
+
+    if (deferredRanges.length === 0) {
+      return;
+    }
+
+    const runDeferredPrefetch = () => {
+      for (const range of deferredRanges) {
+        calendarData.prefetchRange(range);
+      }
+    };
+
+    if ("requestIdleCallback" in window) {
+      const id = (window as any).requestIdleCallback(runDeferredPrefetch, {
+        timeout: 400,
+      });
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          (window as any).cancelIdleCallback(id);
+        }
+      };
+    }
+
+    const id = setTimeout(runDeferredPrefetch, 32);
+    return () => clearTimeout(id);
+  }, [currentDate, currentView, calendarData.prefetchRange]);
 
   const isInitialLoading =
     settingsLoading ||
@@ -444,12 +510,19 @@ function MobileLayoutContent() {
   );
 }
 
-function CalendarUrlSyncWrapper() {
-  useCalendarUrlSync();
-  return null;
+export function DashboardPageContent() {
+  return (
+    <>
+      <div className="md:hidden min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom">
+        <MobileLayoutContent />
+      </div>
+
+      <CalendarWithData className="hidden h-full min-h-screen md:flex md:flex-1" />
+    </>
+  );
 }
 
-function DashboardContent() {
+export function DashboardShell({ children }: { children: ReactNode }) {
   const { data: session, isPending } = useSession();
   const router = useRouter();
   const {
@@ -458,16 +531,6 @@ function DashboardContent() {
     openPalette,
     initialQuery,
   } = useCommandPalette();
-  const searchParams = useSearchParams();
-  const paletteHandledRef = useRef<string | null>(null);
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      window.location.href = "/";
-    } catch (error) {
-      log.error("Logout failed:", error);
-    }
-  };
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -475,71 +538,35 @@ function DashboardContent() {
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
           : "/dashboard";
-      const loginPath = typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.() ? "/mobile-login" : "/login";
+      const loginPath =
+        typeof window !== "undefined" &&
+        (window as any).Capacitor?.isNativePlatform?.()
+          ? "/mobile-login"
+          : "/login";
       router.replace(`${loginPath}?next=${encodeURIComponent(currentPath)}`);
     }
   }, [isPending, session?.user, router]);
 
-  useEffect(() => {
-    const palette = searchParams.get("palette");
-    if (!palette || paletteHandledRef.current === palette) {
-      return;
-    }
-
-    if (isPending || !session?.user) {
-      return;
-    }
-
-    paletteHandledRef.current = palette;
-    openPalette(palette === "settings" ? "settings" : "");
-  }, [searchParams, isPending, session?.user, openPalette]);
-
-  if (isPending) {
-    return (
-      <>
-        <DashboardSkeleton />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext="AUTH_FLOW"
-          enableCycling={true}
-        />
-      </>
-    );
-  }
-
-  if (!session?.user) {
-    return (
-      <>
-        <DashboardSkeleton />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext="AUTH_FLOW"
-          enableCycling={true}
-        />
-      </>
-    );
+  if (isPending || !session?.user) {
+    return <DashboardLoadingScreen />;
   }
 
   return (
     <SettingsProvider>
       <CalendarDataProvider>
         <CalendarProviderWrapper>
-          <CalendarUrlSyncWrapper />
           <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
-            <EventDeepLinkHandler />
-            <div className="md:hidden min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom">
-              <MobileLayoutContent />
-            </div>
+            <Suspense fallback={null}>
+              <CalendarUrlSyncWrapper />
+              <DashboardSearchParamHandlers onOpenPalette={openPalette} />
+            </Suspense>
 
-            <div className="hidden md:block min-h-screen">
-              <SidebarProvider>
-                <SidebarWithContext />
-                <SidebarInset>
-                  <CalendarWithData />
-                </SidebarInset>
-              </SidebarProvider>
-            </div>
+            <SidebarProvider>
+              <SidebarWithContext />
+              <SidebarInset>{children}</SidebarInset>
+            </SidebarProvider>
           </CommandPaletteProvider>
+
           <CommandPalette
             open={commandPaletteOpen}
             onOpenChange={setCommandPaletteOpen}
@@ -548,22 +575,5 @@ function DashboardContent() {
         </CalendarProviderWrapper>
       </CalendarDataProvider>
     </SettingsProvider>
-  );
-}
-
-export function DashboardClient() {
-  return (
-    <Suspense fallback={
-      <>
-        <DashboardSkeleton />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext="AUTH_FLOW"
-          enableCycling={true}
-        />
-      </>
-    }>
-      <DashboardContent />
-    </Suspense>
   );
 }
