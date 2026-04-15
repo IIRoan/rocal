@@ -1,0 +1,147 @@
+:root {
+  /* Brand */
+  --color-primary: #ef5a3c;
+  --color-secondary: #19c77f;
+
+  /* Accents */
+  --color-accent-pink: #ef95c2;
+  --color-accent-blue: #4ab7ee;
+  --color-accent-purple: #87afff;
+  --color-accent-gold: #dfab0e;
+  --color-accent-yellow: #ffcb30;
+  --color-accent-teal: #2797cf;
+  --color-accent-green: #00a05e;
+
+  /* Neutrals */
+  --color-neutral-0: #000000;
+  --color-neutral-50: #242424;
+  --color-neutral-100: #303030;
+  --color-neutral-200: #505050;
+  --color-neutral-300: #707070;
+  --color-neutral-400: #8f8f8f;
+  --color-neutral-500: #afafaf;
+  --color-neutral-600: #cfcfcf;
+  --color-neutral-700: #dfdfdf;
+  --color-neutral-800: #ebebeb;
+  --color-neutral-900: #f5f5f5;
+  --color-neutral-950: #ffffff;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-alt: #ffffff;
+  --color-surface-subtle: #efefef;
+  --color-surface-dark: #000000;
+  --color-surface-card: #ffffff;
+  --color-surface-card-dark: #303030;
+  --color-surface-elevated: #292929;
+  --color-background: #dedede;
+  --color-foreground: #000000;
+
+  /* Tints */
+  --color-tint-primary: #ffebe7;
+  --color-tint-primary-muted: #ffc3b7;
+  --color-tint-primary-hover: #ff8e78;
+  --color-tint-secondary: #bfffe5;
+  --color-tint-blue: #dff4ff;
+  --color-tint-blue-text: #b7e7ff;
+  --color-tint-pink: #ffd7eb;
+  --color-tint-red: #ffd7d7;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(180deg, #ef5a3c 0%, #ed4f2f 100%);
+  --gradient-secondary: linear-gradient(180deg, #0fba5b 0%, #34ac80 100%);
+  --gradient-blue: linear-gradient(180deg, #51c4fe 0%, #31afee 100%);
+  --gradient-pink: linear-gradient(180deg, #ef95c2 0%, #f087bc 100%);
+  --gradient-hero: linear-gradient(#fff, transparent 400px);
+  --gradient-emphasis: linear-gradient(0deg, hsla(0,0%,100%,.16), hsla(0,0%,100%,.16)), #000;
+
+  /* Typography */
+  --font-display: '__solaceSansDisplay', sans-serif;
+  --font-body: '__solaceSansText', sans-serif;
+  --font-mono: '__solaceMono', monospace;
+  --font-pixel: '__solacePixel', sans-serif;
+  --font-serif: 'Times New Roman', serif;
+
+  /* Fluid Type */
+  --f900: clamp(20px, 3rem, 64px);
+  --f800: clamp(18px, 2rem, 24px);
+  --f600: clamp(12px, 0.8rem, 16px);
+  --f200: clamp(10px, 0.5rem, 14px);
+
+  /* Spacing */
+  --space-0: 1px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-11: 44px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-26: 104px;
+  --space-32: 128px;
+  --space-35: 140px;
+  --space-36: 144px;
+  --space-40: 160px;
+  --space-54: 215px;
+
+  /* Radius */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: rgba(0,0,0,0.05) 0px 1px 2px 0px;
+  --shadow-sm: rgba(0,0,0,0.1) 0px 1px 3px 0px, rgba(0,0,0,0.1) 0px 1px 2px -1px;
+  --shadow-md: rgba(0,0,0,0.1) 0px 4px 6px -1px, rgba(0,0,0,0.1) 0px 2px 4px -2px;
+  --shadow-lg: rgba(0,0,0,0.1) 0px 10px 15px -3px, rgba(0,0,0,0.1) 0px 4px 6px -4px;
+  --shadow-xl: rgba(0,0,0,0.1) 0px 20px 25px -5px, rgba(0,0,0,0.1) 0px 8px 10px -6px;
+  --shadow-card: rgba(0,0,0,0.1) 0px 1px 0px 0px inset, rgba(0,0,0,0.1) 0px -1px 0px 1px inset;
+  --shadow-card-dark: hsla(0,0%,100%,0.08) 0px 1px 0px 0px inset, hsla(0,0%,100%,0.08) 0px -1px 0px 1px inset;
+  --shadow-icon-bevel: inset 0px -3px 0px 1px rgba(0,0,0,0.1), inset 0px 1px 0px 1px hsla(0,0%,100%,0.5);
+  --shadow-page: 0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px rgb(0 0 0/6%), inset 0px -1px 2px rgba(0,0,0,0.1);
+
+  /* Focus */
+  --ring-color: rgba(39,151,207,0.5);
+  --ring-offset: #fff;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 0.15s;
+  --duration-normal: 0.2s;
+
+  /* Overlays */
+  --bg-overlay-primary: rgba(0,0,0,0.1);
+  --bg-overlay-secondary: rgba(0,0,0,0.08);
+  --bg-overlay-tertiary: rgba(0,0,0,0.04);
+
+  /* Sizing */
+  --cellSize: 90px;
+  --gridBase: 3;
+}
+
+/* Dark mode */
+.dark {
+  --color-surface: #000000;
+  --color-surface-card: #303030;
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+}
+
+/* Product-specific dark overrides — apply via class */
+.dark-mail     { --color-dark-primary: #b7e7ff; --color-dark-secondary: #ef5a3c; }
+.dark-calendar { --color-dark-primary: #00a05e; --color-dark-secondary: #ef5a3c; }
+.dark-drive    { --color-dark-primary: #19c77f; --color-dark-secondary: #00a05e; }
+.dark-pages    { --color-dark-primary: #ef5a3c; --color-dark-secondary: #2797cf; }

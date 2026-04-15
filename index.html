@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solace — Master Your Time</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --primary: #ef5a3c;
+  --primary-hover: #ed4f2f;
+  --secondary: #19c77f;
+  --accent-blue: #4ab7ee;
+  --accent-teal: #2797cf;
+  --accent-green: #00a05e;
+  --n0: #000000;
+  --n50: #242424;
+  --n100: #303030;
+  --n200: #505050;
+  --n300: #707070;
+  --n400: #8f8f8f;
+  --n500: #afafaf;
+  --n600: #cfcfcf;
+  --n700: #dfdfdf;
+  --n800: #ebebeb;
+  --n900: #f5f5f5;
+  --n950: #ffffff;
+  --tint-primary: #ffebe7;
+  --gradient-primary: linear-gradient(180deg, #ef5a3c 0%, #ed4f2f 100%);
+  --gradient-secondary: linear-gradient(180deg, #0fba5b 0%, #34ac80 100%);
+  --bevel: rgba(0,0,0,0.1) 0px 1px 0px 0px inset, rgba(0,0,0,0.1) 0px -1px 0px 1px inset;
+  --bevel-dark: hsla(0,0%,100%,0.08) 0px 1px 0px 0px inset, hsla(0,0%,100%,0.08) 0px -1px 0px 1px inset;
+  --shadow-xl: rgba(0,0,0,0.1) 0px 20px 25px -5px, rgba(0,0,0,0.1) 0px 8px 10px -6px;
+  --shadow-md: rgba(0,0,0,0.1) 0px 4px 6px -1px, rgba(0,0,0,0.1) 0px 2px 4px -2px;
+  --ease-out: cubic-bezier(0,0,0.2,1);
+  --ease-in-out: cubic-bezier(0.4,0,0.2,1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 380;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Navbar ─── */
+.nav-outer {
+  position: fixed;
+  z-index: 9999;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  top: 0;
+  pointer-events: none;
+}
+.nav-island {
+  pointer-events: auto;
+  margin-top: 16px;
+  background: var(--n100);
+  border: 1px solid var(--n200);
+  border-radius: 16px;
+  box-shadow: var(--shadow-xl);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 14px;
+  width: 91.67%;
+  max-width: 700px;
+}
+.nav-logo {
+  padding: 8px 10px 8px 10px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--primary);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.nav-logo svg { flex-shrink: 0; }
+.nav-sep { width: 1px; height: 20px; background: var(--n200); margin: 0 4px; flex-shrink: 0; }
+.nav-links { display: flex; align-items: center; gap: 0; flex: 1; }
+.nav-links a {
+  padding: 8px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  font-weight: 400;
+  transition: color 0.15s var(--ease-in-out), background 0.15s var(--ease-in-out);
+  white-space: nowrap;
+}
+.nav-links a:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.nav-cta {
+  margin-left: auto;
+  padding-right: 4px;
+}
+.nav-cta a {
+  background: var(--gradient-primary);
+  color: #fff;
+  border-radius: 9999px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s var(--ease-in-out);
+  display: block;
+}
+.nav-cta a:hover { opacity: 0.9; }
+
+/* ─── Hero ─── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 120px 24px 80px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% 20%, rgba(239,90,60,0.12) 0%, transparent 70%);
+}
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black 0%, transparent 100%);
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239,90,60,0.12);
+  border: 1px solid rgba(239,90,60,0.25);
+  border-radius: 9999px;
+  padding: 5px 14px 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ff8e78;
+  margin-bottom: 32px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px;
+  background: var(--primary);
+  border-radius: 9999px;
+  flex-shrink: 0;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+.hero h1 {
+  font-size: clamp(44px, 7vw, 76px);
+  font-weight: 380;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  color: #fff;
+  max-width: 860px;
+  margin: 0 auto 24px;
+}
+.hero h1 em {
+  font-style: normal;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  font-size: 18px;
+  font-weight: 380;
+  color: var(--n500);
+  max-width: 520px;
+  margin: 0 auto 48px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 80px;
+}
+.btn-primary {
+  background: var(--gradient-primary);
+  color: #fff;
+  border-radius: 9999px;
+  padding: 13px 28px;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.15s var(--ease-in-out), transform 0.15s var(--ease-out);
+  box-shadow: 0 0 0 1px rgba(239,90,60,0.3), 0 8px 24px rgba(239,90,60,0.25);
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-ghost {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.8);
+  border-radius: 9999px;
+  padding: 13px 28px;
+  font-size: 15px;
+  font-weight: 400;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s var(--ease-in-out), color 0.15s var(--ease-in-out);
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+/* ─── App preview mockup ─── */
+.hero-mockup {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  border-radius: 14px 14px 0 0;
+  background: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-bottom: none;
+  overflow: hidden;
+  box-shadow: 0 -8px 80px rgba(239,90,60,0.08), 0 0 0 1px rgba(255,255,255,0.06);
+  position: relative;
+  z-index: 1;
+}
+.mockup-chrome {
+  background: var(--n900);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--n700);
+}
+.chrome-dot { width: 10px; height: 10px; border-radius: 9999px; }
+.chrome-dot:nth-child(1) { background: #ff5f57; }
+.chrome-dot:nth-child(2) { background: #febc2e; }
+.chrome-dot:nth-child(3) { background: #28c840; }
+.chrome-url {
+  margin: 0 auto;
+  background: var(--n800);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--n300);
+  font-family: monospace;
+  width: 180px;
+  text-align: center;
+}
+.mockup-body {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 360px;
+  background: #fff;
+}
+.mockup-sidebar {
+  background: var(--n900);
+  border-right: 1px solid var(--n800);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-heading {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--n400);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 8px 4px;
+  margin-top: 8px;
+}
+.sidebar-heading:first-child { margin-top: 0; }
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--n200);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.sidebar-item:hover { background: var(--n800); }
+.sidebar-item.active { background: var(--tint-primary); color: var(--primary); font-weight: 500; }
+.sidebar-dot {
+  width: 8px; height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+.mockup-calendar {
+  padding: 20px;
+  overflow: hidden;
+}
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cal-title { font-size: 15px; font-weight: 600; color: var(--n50); }
+.cal-nav { display: flex; gap: 4px; }
+.cal-nav-btn {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--n900);
+  border: 1px solid var(--n800);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--n300);
+}
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.cal-weekday {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--n400);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 0;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px;
+  font-size: 11px;
+  color: var(--n200);
+  cursor: pointer;
+  transition: background 0.1s;
+  position: relative;
+  min-height: 40px;
+}
+.cal-day:hover { background: var(--n900); }
+.cal-day.today {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+.cal-day.has-event::after {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 9999px;
+  background: var(--primary);
+  position: absolute;
+  bottom: 4px;
+}
+.cal-day.today.has-event::after { background: rgba(255,255,255,0.7); }
+.cal-day.muted { color: var(--n600); }
+.cal-event-strip {
+  width: 100%;
+  border-radius: 3px;
+  height: 3px;
+  margin-top: 2px;
+}
+
+/* ─── White panel (features / content) ─── */
+.white-panel {
+  background: #fff;
+  color: #000;
+  border-radius: 0 0 0 0;
+}
+.white-panel-first {
+  background: #fff;
+  color: #000;
+}
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.section { padding: 80px 0; }
+.section + .section { border-top: 1px solid var(--n800); }
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+.section-headline {
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 380;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #000;
+  margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 16px;
+  font-weight: 380;
+  color: var(--n300);
+  max-width: 560px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Feature cards ─── */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+@media (max-width: 768px) {
+  .feature-grid { grid-template-columns: 1fr; }
+}
+.feature-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 28px 24px;
+  box-shadow: var(--bevel);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.feature-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-md);
+}
+.feature-title {
+  font-size: 16px;
+  font-weight: 470;
+  letter-spacing: -0.02em;
+  color: #000;
+  margin-bottom: 8px;
+}
+.feature-desc {
+  font-size: 13px;
+  font-weight: 380;
+  color: var(--n300);
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Feature split section ─── */
+.split-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+@media (max-width: 768px) {
+  .split-section { grid-template-columns: 1fr; gap: 32px; }
+}
+.split-visual {
+  border-radius: 14px;
+  background: var(--n900);
+  overflow: hidden;
+  box-shadow: var(--bevel);
+  aspect-ratio: 4/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.visual-inner {
+  width: 85%;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+.checklist { margin-top: 32px; display: flex; flex-direction: column; gap: 12px; }
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--n200);
+  letter-spacing: -0.01em;
+}
+.check-icon {
+  width: 20px; height: 20px;
+  border-radius: 9999px;
+  background: rgba(25,199,127,0.1);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── Tinted section ─── */
+.tinted-section {
+  background: rgba(239,90,60,0.05);
+  border-top: 1px solid rgba(239,90,60,0.1);
+  border-bottom: 1px solid rgba(239,90,60,0.1);
+}
+.tinted-section .section-headline { color: #000; }
+
+/* ─── Notification cards ─── */
+.notif-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.notif-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--bevel);
+}
+.notif-icon {
+  width: 36px; height: 36px;
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.notif-content { flex: 1; min-width: 0; }
+.notif-title { font-size: 13px; font-weight: 500; color: #000; margin-bottom: 2px; }
+.notif-meta { font-size: 11px; color: var(--n400); }
+.notif-time { font-size: 11px; color: var(--n500); flex-shrink: 0; }
+
+/* ─── Stats row ─── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 48px;
+  padding-top: 48px;
+  border-top: 1px solid var(--n800);
+}
+@media (max-width: 640px) {
+  .stats-row { grid-template-columns: 1fr; }
+}
+.stat-item { display: flex; flex-direction: column; gap: 4px; }
+.stat-value {
+  font-size: 40px;
+  font-weight: 380;
+  letter-spacing: -0.04em;
+  color: #000;
+  line-height: 1;
+}
+.stat-value span { color: var(--primary); }
+.stat-label { font-size: 13px; color: var(--n400); }
+
+/* ─── Dark CTA ─── */
+.dark-cta {
+  background: #000;
+  padding: 100px 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.dark-cta-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 600px 300px at 50% 100%, rgba(239,90,60,0.1) 0%, transparent 70%);
+}
+.dark-cta h2 {
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 380;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin-bottom: 16px;
+  position: relative;
+}
+.dark-cta p {
+  font-size: 16px;
+  color: var(--n500);
+  max-width: 440px;
+  margin: 0 auto 40px;
+  line-height: 1.6;
+  position: relative;
+}
+.dark-cta .cta-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+/* ─── Footer ─── */
+footer {
+  background: var(--n50);
+  color: #fff;
+  padding: 56px 40px 40px;
+  border-top: 1px solid var(--n100);
+}
+.footer-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.footer-top {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(4, 1fr);
+  gap: 40px;
+  margin-bottom: 48px;
+}
+@media (max-width: 768px) {
+  .footer-top { grid-template-columns: 1fr 1fr; }
+}
+.footer-brand { display: flex; flex-direction: column; gap: 12px; }
+.footer-logo {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+}
+.footer-tagline { font-size: 13px; color: var(--n400); line-height: 1.5; max-width: 200px; }
+.footer-col h5 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--n600);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.footer-col a {
+  display: block;
+  font-size: 13px;
+  color: var(--n400);
+  text-decoration: none;
+  margin-bottom: 8px;
+  transition: color 0.15s var(--ease-in-out);
+}
+.footer-col a:hover { color: #fff; }
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 1px solid var(--n100);
+  font-size: 12px;
+  color: var(--n400);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ─── Animations ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-fade-up { animation: fadeUp 0.6s var(--ease-out) both; }
+.anim-delay-1 { animation-delay: 0.1s; }
+.anim-delay-2 { animation-delay: 0.2s; }
+.anim-delay-3 { animation-delay: 0.3s; }
+.anim-delay-4 { animation-delay: 0.4s; }
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+  .hero h1 { font-size: 36px; }
+  .mockup-sidebar { display: none; }
+  .mockup-body { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════ NAVBAR ════════════════ -->
+<nav class="nav-outer" role="navigation" aria-label="Main navigation">
+  <div class="nav-island">
+    <a href="#" class="nav-logo" aria-label="Solace home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="4" stroke="currentColor" stroke-width="1.8" fill="none"/>
+        <path d="M3 9h18" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="7" y="13" width="3" height="3" rx="1" fill="currentColor" opacity="0.6"/>
+        <rect x="11" y="13" width="3" height="3" rx="1" fill="currentColor"/>
+        <rect x="7" y="17" width="3" height="3" rx="1" fill="currentColor" opacity="0.4"/>
+        <circle cx="8" cy="6.5" r="1" fill="currentColor" opacity="0.5"/>
+        <circle cx="16" cy="6.5" r="1" fill="currentColor" opacity="0.5"/>
+      </svg>
+      Solace
+    </a>
+    <div class="nav-sep" aria-hidden="true"></div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#notifications">Notifications</a>
+    </div>
+    <div class="nav-cta">
+      <a href="/login">Get started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ════════════════ HERO ════════════════ -->
+<section class="hero" aria-label="Hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="hero-grid" aria-hidden="true"></div>
+
+  <div class="hero-badge anim-fade-up" aria-label="New">
+    <span class="hero-badge-dot" aria-hidden="true"></span>
+    Now with passkey authentication
+  </div>
+
+  <h1 class="anim-fade-up anim-delay-1">
+    Master your time with<br><em>clarity and calm</em>
+  </h1>
+
+  <p class="hero-sub anim-fade-up anim-delay-2">
+    Solace is a beautifully crafted calendar built for focus — with smart scheduling, email notifications, and seamless cross-platform sync.
+  </p>
+
+  <div class="hero-actions anim-fade-up anim-delay-3">
+    <a href="/login" class="btn-primary">
+      Start for free
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <a href="#features" class="btn-ghost">
+      See features
+    </a>
+  </div>
+
+  <!-- Calendar mockup -->
+  <div class="hero-mockup anim-fade-up anim-delay-4" role="img" aria-label="Solace calendar interface preview">
+    <div class="mockup-chrome">
+      <div class="chrome-dot" aria-hidden="true"></div>
+      <div class="chrome-dot" aria-hidden="true"></div>
+      <div class="chrome-dot" aria-hidden="true"></div>
+      <div class="chrome-url" aria-hidden="true">app.solace.cal</div>
+    </div>
+    <div class="mockup-body">
+      <div class="mockup-sidebar" aria-hidden="true">
+        <div class="sidebar-heading">Calendars</div>
+        <div class="sidebar-item active">
+          <span class="sidebar-dot" style="background:var(--primary)"></span>
+          My calendar
+        </div>
+        <div class="sidebar-item">
+          <span class="sidebar-dot" style="background:var(--accent-blue)"></span>
+          Work
+        </div>
+        <div class="sidebar-item">
+          <span class="sidebar-dot" style="background:var(--secondary)"></span>
+          Personal
+        </div>
+        <div class="sidebar-heading">Notifications</div>
+        <div class="sidebar-item">
+          <span class="sidebar-dot" style="background:var(--n600)"></span>
+          Upcoming events
+        </div>
+        <div class="sidebar-item">
+          <span class="sidebar-dot" style="background:var(--n600)"></span>
+          Daily digest
+        </div>
+      </div>
+      <div class="mockup-calendar" aria-label="Calendar for April 2026">
+        <div class="cal-header">
+          <span class="cal-title">April 2026</span>
+          <div class="cal-nav" aria-label="Navigate months">
+            <div class="cal-nav-btn" aria-label="Previous month">‹</div>
+            <div class="cal-nav-btn" aria-label="Next month">›</div>
+          </div>
+        </div>
+        <div class="cal-weekdays" role="row">
+          <div class="cal-weekday" role="columnheader" aria-label="Sunday">Su</div>
+          <div class="cal-weekday" role="columnheader" aria-label="Monday">Mo</div>
+          <div class="cal-weekday" role="columnheader" aria-label="Tuesday">Tu</div>
+          <div class="cal-weekday" role="columnheader" aria-label="Wednesday">We</div>
+          <div class="cal-weekday" role="columnheader" aria-label="Thursday">Th</div>
+          <div class="cal-weekday" role="columnheader" aria-label="Friday">Fr</div>
+          <div class="cal-weekday" role="columnheader" aria-label="Saturday">Sa</div>
+        </div>
+        <div class="cal-grid">
+          <!-- Week 1 -->
+          <div class="cal-day muted" aria-label="March 29">29</div>
+          <div class="cal-day muted" aria-label="March 30">30</div>
+          <div class="cal-day muted" aria-label="March 31">31</div>
+          <div class="cal-day" aria-label="April 1">1</div>
+          <div class="cal-day has-event" aria-label="April 2, has event">2</div>
+          <div class="cal-day" aria-label="April 3">3</div>
+          <div class="cal-day" aria-label="April 4">4</div>
+          <!-- Week 2 -->
+          <div class="cal-day" aria-label="April 5">5</div>
+          <div class="cal-day has-event" aria-label="April 6, has event">6</div>
+          <div class="cal-day" aria-label="April 7">7</div>
+          <div class="cal-day has-event" aria-label="April 8, has event">8</div>
+          <div class="cal-day" aria-label="April 9">9</div>
+          <div class="cal-day has-event" aria-label="April 10, has event">10</div>
+          <div class="cal-day" aria-label="April 11">11</div>
+          <!-- Week 3 -->
+          <div class="cal-day" aria-label="April 12">12</div>
+          <div class="cal-day" aria-label="April 13">13</div>
+          <div class="cal-day" aria-label="April 14">14</div>
+          <div class="cal-day today" aria-label="April 15, today" aria-current="date">15</div>
+          <div class="cal-day has-event" aria-label="April 16, has event">16</div>
+          <div class="cal-day has-event" aria-label="April 17, has event">17</div>
+          <div class="cal-day" aria-label="April 18">18</div>
+          <!-- Week 4 -->
+          <div class="cal-day" aria-label="April 19">19</div>
+          <div class="cal-day has-event" aria-label="April 20, has event">20</div>
+          <div class="cal-day" aria-label="April 21">21</div>
+          <div class="cal-day" aria-label="April 22">22</div>
+          <div class="cal-day has-event" aria-label="April 23, has event">23</div>
+          <div class="cal-day" aria-label="April 24">24</div>
+          <div class="cal-day" aria-label="April 25">25</div>
+          <!-- Week 5 -->
+          <div class="cal-day" aria-label="April 26">26</div>
+          <div class="cal-day" aria-label="April 27">27</div>
+          <div class="cal-day has-event" aria-label="April 28, has event">28</div>
+          <div class="cal-day" aria-label="April 29">29</div>
+          <div class="cal-day" aria-label="April 30">30</div>
+          <div class="cal-day muted" aria-label="May 1">1</div>
+          <div class="cal-day muted" aria-label="May 2">2</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FEATURES ════════════════ -->
+<div class="white-panel-first" id="features">
+  <div class="container">
+    <div class="section">
+      <p class="section-label">Built for focus</p>
+      <h2 class="section-headline">Everything you need,<br>nothing you don't</h2>
+      <p class="section-sub">
+        A thoughtfully designed calendar app that keeps you in flow — on web, iOS, and Android.
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon" style="background:var(--tint-primary);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="18" rx="3" stroke="#ef5a3c" stroke-width="1.8"/>
+              <path d="M3 9h18" stroke="#ef5a3c" stroke-width="1.8"/>
+              <rect x="7" y="13" width="3" height="3" rx="1" fill="#ef5a3c" opacity="0.7"/>
+              <rect x="11" y="13" width="3" height="3" rx="1" fill="#ef5a3c"/>
+            </svg>
+          </div>
+          <div class="feature-title">Smart Calendar</div>
+          <div class="feature-desc">An intuitive month and week view built for speed. Create, drag, and resize events with precision. Recurring events, all-day support, and timezone awareness built in.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon" style="background:rgba(74,183,238,0.1);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="#4ab7ee" stroke-width="1.8" fill="none"/>
+              <path d="M12 7v5l3 3" stroke="#4ab7ee" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="feature-title">Email Notifications</div>
+          <div class="feature-desc">A dedicated Go-powered notification service sends timely reminders via Resend. Get daily digests, event alerts, and smart scheduling summaries directly to your inbox.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon" style="background:rgba(25,199,127,0.1);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 12l2 2 4-4" stroke="#19c77f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 2l2.4 4.8 5.2.8-3.8 3.7.9 5.2L12 14l-4.7 2.5.9-5.2L4.4 7.6l5.2-.8L12 2z" stroke="#19c77f" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="feature-title">Passkey Auth</div>
+          <div class="feature-desc">Sign in with Face ID, Touch ID, or a hardware security key — no passwords required. Powered by Better Auth with full WebAuthn support for a phishing-resistant experience.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon" style="background:rgba(135,175,255,0.15);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="5" y="2" width="14" height="20" rx="3" stroke="#87afff" stroke-width="1.8"/>
+              <path d="M9 8h6M9 12h6M9 16h4" stroke="#87afff" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="feature-title">Native Mobile</div>
+          <div class="feature-desc">A full native experience on iOS and Android via Capacitor — not just a web wrapper. Haptics, status bar integration, and live-reload development included out of the box.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon" style="background:rgba(223,171,14,0.1);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#dfab0e" stroke-width="1.8" stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <div class="feature-title">Fast by Default</div>
+          <div class="feature-desc">The backend runs on Elysia.js with Bun — one of the fastest HTTP stacks available. Prisma + PostgreSQL for type-safe queries. Static export for sub-second page loads.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon" style="background:rgba(239,149,194,0.15);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3C7.58 3 4 6.58 4 11c0 4.42 3.58 8 8 8s8-3.58 8-8c0-4.42-3.58-8-8-8z" stroke="#ef95c2" stroke-width="1.8" fill="none"/>
+              <path d="M12 15v-4M12 8v1" stroke="#ef95c2" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="feature-title">Monorepo Ready</div>
+          <div class="feature-desc">A clean Bun workspace with shared packages for UI, logging, ESLint, and TypeScript config. Scale from solo project to team repo without restructuring your codebase.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ PRIVACY SECTION ════════════════ -->
+<div class="white-panel" id="privacy">
+  <div class="container">
+    <div class="section">
+      <div class="split-section">
+        <div>
+          <p class="section-label">Built for you</p>
+          <h2 class="section-headline">Your data,<br>your calendar</h2>
+          <p class="section-sub">
+            Solace is self-hostable and open source. Your calendar events live in your own PostgreSQL database. No tracking, no ads, no third-party data sharing.
+          </p>
+          <div class="checklist">
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Self-hostable on any VPS or cloud provider
+            </div>
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              No telemetry or external analytics
+            </div>
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Open source — read and audit every line
+            </div>
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Passkey-only login — no password leaks
+            </div>
+          </div>
+        </div>
+        <div class="split-visual" aria-hidden="true">
+          <div class="visual-inner">
+            <!-- Mini security card mockup -->
+            <div style="padding:20px;">
+              <div style="font-size:12px;font-weight:600;color:var(--n300);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">Authentication</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="background:var(--n900);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--bevel);">
+                  <div style="width:36px;height:36px;border-radius:9999px;background:rgba(25,199,127,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C9.24 2 7 4.24 7 7v2H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V11a2 2 0 00-2-2h-2V7c0-2.76-2.24-5-5-5z" stroke="#19c77f" stroke-width="1.6" fill="none"/><circle cx="12" cy="15" r="2" fill="#19c77f" opacity="0.7"/></svg>
+                  </div>
+                  <div>
+                    <div style="font-size:13px;font-weight:500;color:#000;">Passkey (Face ID)</div>
+                    <div style="font-size:11px;color:var(--n400);">Hardware-backed · Phishing-resistant</div>
+                  </div>
+                  <div style="margin-left:auto;background:rgba(25,199,127,0.12);border-radius:9999px;padding:3px 10px;font-size:11px;color:var(--accent-green);font-weight:500;">Active</div>
+                </div>
+                <div style="background:var(--n900);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--bevel);">
+                  <div style="width:36px;height:36px;border-radius:9999px;background:rgba(74,183,238,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="5" y="5" width="14" height="14" rx="3" stroke="#4ab7ee" stroke-width="1.6"/><path d="M9 12l2 2 4-4" stroke="#4ab7ee" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div>
+                    <div style="font-size:13px;font-weight:500;color:#000;">Session tokens</div>
+                    <div style="font-size:11px;color:var(--n400);">Signed · Short-lived · HTTP-only</div>
+                  </div>
+                </div>
+                <div style="background:var(--n900);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--bevel);">
+                  <div style="width:36px;height:36px;border-radius:9999px;background:rgba(239,90,60,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#ef5a3c" stroke-width="1.6"/><path d="M12 8v4M12 16v.5" stroke="#ef5a3c" stroke-width="1.6" stroke-linecap="round"/></svg>
+                  </div>
+                  <div>
+                    <div style="font-size:13px;font-weight:500;color:#000;">Zero password storage</div>
+                    <div style="font-size:11px;color:var(--n400);">No passwords to steal or breach</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ NOTIFICATIONS SECTION ════════════════ -->
+<div class="tinted-section" id="notifications">
+  <div class="container">
+    <div class="section">
+      <div class="split-section">
+        <div class="split-visual" aria-hidden="true">
+          <div style="padding:24px;width:100%;display:flex;flex-direction:column;gap:10px;">
+            <div style="font-size:11px;font-weight:600;color:var(--n400);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">Today's digest</div>
+            <div class="notif-card">
+              <div class="notif-icon" style="background:var(--tint-primary);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="3" stroke="#ef5a3c" stroke-width="1.6"/><path d="M3 9h18M8 2v3M16 2v3" stroke="#ef5a3c" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </div>
+              <div class="notif-content">
+                <div class="notif-title">Design review</div>
+                <div class="notif-meta">Today · 10:00 AM · 45 min</div>
+              </div>
+              <div class="notif-time">In 2h</div>
+            </div>
+            <div class="notif-card">
+              <div class="notif-icon" style="background:rgba(74,183,238,0.1);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#4ab7ee" stroke-width="1.6"/><path d="M12 7v5l3 3" stroke="#4ab7ee" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </div>
+              <div class="notif-content">
+                <div class="notif-title">Team standup</div>
+                <div class="notif-meta">Today · 2:00 PM · 30 min</div>
+              </div>
+              <div class="notif-time">In 6h</div>
+            </div>
+            <div class="notif-card">
+              <div class="notif-icon" style="background:rgba(25,199,127,0.1);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 8l-8 5-8-5V6a2 2 0 012-2h12a2 2 0 012 2v2z" stroke="#19c77f" stroke-width="1.6" fill="none"/><path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="#19c77f" stroke-width="1.6"/></svg>
+              </div>
+              <div class="notif-content">
+                <div class="notif-title">Tomorrow — 3 events</div>
+                <div class="notif-meta">Daily digest · sent at 7:00 AM</div>
+              </div>
+              <div class="notif-time">Done</div>
+            </div>
+            <div style="text-align:center;font-size:11px;color:var(--n500);margin-top:4px;">Delivered via Resend · Go service</div>
+          </div>
+        </div>
+        <div>
+          <p class="section-label">Never miss a beat</p>
+          <h2 class="section-headline">Smart notifications,<br>zero noise</h2>
+          <p class="section-sub">
+            A dedicated Go microservice watches your calendar and sends beautiful HTML email digests via Resend — daily summaries, event reminders, and upcoming week previews.
+          </p>
+          <div class="checklist" style="margin-top:24px;">
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Daily agenda digest at your chosen time
+            </div>
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Per-event reminders — 15 min, 1 hour, or custom
+            </div>
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Beautifully formatted HTML templates
+            </div>
+            <div class="check-item">
+              <div class="check-icon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#19c77f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              Timezone-aware — works anywhere in the world
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ STACK SECTION ════════════════ -->
+<div class="white-panel">
+  <div class="container">
+    <div class="section">
+      <p class="section-label">Open source</p>
+      <h2 class="section-headline">A modern stack,<br>carefully chosen</h2>
+      <p class="section-sub">
+        Every layer is picked for developer experience and performance. Deploy to Railway, Fly.io, or your own VPS with a single command.
+      </p>
+
+      <div class="stats-row">
+        <div class="stat-item">
+          <div class="stat-value">3<span>×</span></div>
+          <div class="stat-label">Independent services — web, API, and notifications deployed separately</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">100<span>%</span></div>
+          <div class="stat-label">TypeScript — from UI components to API endpoints, fully type-safe</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">2<span>+</span></div>
+          <div class="stat-label">Native platforms — iOS and Android via Capacitor, same codebase</div>
+        </div>
+      </div>
+
+      <!-- Tech pills -->
+      <div style="margin-top:40px;display:flex;flex-wrap:wrap;gap:8px;">
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Next.js</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Elysia.js</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Bun</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Go</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">PostgreSQL</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Prisma</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Tailwind CSS</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">shadcn/ui</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Capacitor</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Better Auth</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Resend</span>
+        <span style="background:var(--n900);border:1px solid var(--n800);border-radius:9999px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--n200);">Railway</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ CTA ════════════════ -->
+<section class="dark-cta">
+  <div class="dark-cta-glow" aria-hidden="true"></div>
+  <h2>Ready to find your solace?</h2>
+  <p>A calm, focused calendar for people who value their time. Free and open source.</p>
+  <div class="cta-btns">
+    <a href="/login" class="btn-primary">
+      Get started free
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <a href="https://github.com" class="btn-ghost" rel="noopener noreferrer">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      View source
+    </a>
+  </div>
+</section>
+
+<!-- ════════════════ FOOTER ════════════════ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="#" class="footer-logo" aria-label="Solace home">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="4" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M3 9h18" stroke="currentColor" stroke-width="1.8"/>
+            <rect x="7" y="13" width="3" height="3" rx="1" fill="currentColor" opacity="0.7"/>
+            <rect x="11" y="13" width="3" height="3" rx="1" fill="currentColor"/>
+          </svg>
+          Solace
+        </a>
+        <p class="footer-tagline">A modern calendar for people who value their time.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Product</h5>
+        <a href="#features">Features</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#notifications">Notifications</a>
+        <a href="/login">Web app</a>
+      </div>
+      <div class="footer-col">
+        <h5>Platform</h5>
+        <a href="#">iOS app</a>
+        <a href="#">Android app</a>
+        <a href="#">Self-host</a>
+        <a href="#">Changelog</a>
+      </div>
+      <div class="footer-col">
+        <h5>Developer</h5>
+        <a href="#">GitHub</a>
+        <a href="#">Documentation</a>
+        <a href="#">API reference</a>
+        <a href="#">Contributing</a>
+      </div>
+      <div class="footer-col">
+        <h5>Legal</h5>
+        <a href="/privacy">Privacy policy</a>
+        <a href="#">Terms of service</a>
+        <a href="#">License (MIT)</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Solace. Open source under MIT License.</span>
+      <span>Built with Next.js · Elysia.js · Go</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
