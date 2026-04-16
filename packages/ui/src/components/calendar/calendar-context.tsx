@@ -10,7 +10,12 @@ import React, {
   ReactNode,
 } from "react";
 import { createLogger } from "@workspace/logger";
-import { Calendar, EventColor, CreateCalendarData, CalendarView } from "./types";
+import {
+  Calendar,
+  EventColor,
+  CreateCalendarData,
+  CalendarView,
+} from "./types";
 
 const log = createLogger("calendar-context");
 
@@ -82,10 +87,7 @@ export function CalendarProvider({
 
       // Check if date is valid
       if (isNaN(dateObj.getTime())) {
-        log.warn(
-          "Invalid date provided, falling back to current date:",
-          date,
-        );
+        log.warn("Invalid date provided, falling back to current date:", date);
         return new Date();
       }
 
@@ -109,10 +111,7 @@ export function CalendarProvider({
 
       // If it's more than 5 years different, treat as suspicious
       if (daysDiff > 365 * 5) {
-        log.warn(
-          "Date seems too far from current date, falling back:",
-          date,
-        );
+        log.warn("Date seems too far from current date, falling back:", date);
         return new Date();
       }
 
@@ -150,10 +149,7 @@ export function CalendarProvider({
       const stored = localStorage.getItem(VISIBILITY_STORAGE_KEY);
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      log.warn(
-        "Failed to load calendar visibility from localStorage:",
-        error,
-      );
+      log.warn("Failed to load calendar visibility from localStorage:", error);
       return {};
     }
   };
@@ -165,10 +161,7 @@ export function CalendarProvider({
     try {
       localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-      log.warn(
-        "Failed to save calendar visibility to localStorage:",
-        error,
-      );
+      log.warn("Failed to save calendar visibility to localStorage:", error);
     }
   };
 
@@ -184,8 +177,11 @@ export function CalendarProvider({
             !newCal ||
             newCal.name !== cal.name ||
             newCal.color !== cal.color ||
+            newCal.kind !== cal.kind ||
+            newCal.isPublic !== cal.isPublic ||
             newCal.isVisible !== cal.isVisible ||
-            newCal.isDefault !== cal.isDefault
+            newCal.isDefault !== cal.isDefault ||
+            newCal.isSyncOnly !== cal.isSyncOnly
           );
         }) ||
         initialCalendars.some(
@@ -243,31 +239,53 @@ export function CalendarProvider({
 
     const updates = Array.from(pendingUpdatesRef.current);
     pendingUpdatesRef.current.clear();
+    const previousVisibilityByCalendarId = new Map(
+      updates.map((calendarId) => [
+        calendarId,
+        calendars.find((calendar) => calendar.id === calendarId)?.isVisible,
+      ]),
+    );
 
     // Batch update all pending visibility changes
-    try {
-      await Promise.all(
-        updates.map(async (calendarId) => {
-          const newVisibility = localVisibilityState[calendarId];
-          if (newVisibility !== undefined) {
-            const updatedCalendar = await onUpdateCalendar(calendarId, {
-              isVisible: newVisibility,
-            });
+    const results = await Promise.allSettled(
+      updates.map(async (calendarId) => {
+        const newVisibility = localVisibilityState[calendarId];
+        if (newVisibility === undefined) {
+          return;
+        }
 
-            // Update the calendar in state to reflect the server response
-            setCalendars((prev) =>
-              prev.map((cal) =>
-                cal.id === calendarId ? updatedCalendar : cal,
-              ),
-            );
-          }
-        }),
+        const updatedCalendar = await onUpdateCalendar(calendarId, {
+          isVisible: newVisibility,
+        });
+
+        setCalendars((prev) =>
+          prev.map((calendar) =>
+            calendar.id === calendarId ? updatedCalendar : calendar,
+          ),
+        );
+      }),
+    );
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        return;
+      }
+
+      const calendarId = updates[index];
+      const previousVisibility =
+        previousVisibilityByCalendarId.get(calendarId) ?? true;
+
+      setLocalVisibilityState((prev) => ({
+        ...prev,
+        [calendarId]: previousVisibility,
+      }));
+      log.error(
+        "Failed to sync calendar visibility update:",
+        calendarId,
+        result.reason,
       );
-    } catch (error) {
-      log.error("Failed to sync calendar visibility updates:", error);
-      // Could add error handling here, like reverting local state
-    }
-  }, [localVisibilityState, onUpdateCalendar]);
+    });
+  }, [calendars, localVisibilityState, onUpdateCalendar]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

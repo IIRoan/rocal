@@ -172,6 +172,8 @@ exports.Prisma.CalendarScalarFieldEnum = {
   id: 'id',
   name: 'name',
   color: 'color',
+  kind: 'kind',
+  isPublic: 'isPublic',
   isVisible: 'isVisible',
   isDefault: 'isDefault',
   isSyncOnly: 'isSyncOnly',

@@ -7088,6 +7088,8 @@ export namespace Prisma {
     id: string | null
     name: string | null
     color: string | null
+    kind: string | null
+    isPublic: boolean | null
     isVisible: boolean | null
     isDefault: boolean | null
     isSyncOnly: boolean | null
@@ -7102,6 +7104,8 @@ export namespace Prisma {
     id: string | null
     name: string | null
     color: string | null
+    kind: string | null
+    isPublic: boolean | null
     isVisible: boolean | null
     isDefault: boolean | null
     isSyncOnly: boolean | null
@@ -7116,6 +7120,8 @@ export namespace Prisma {
     id: number
     name: number
     color: number
+    kind: number
+    isPublic: number
     isVisible: number
     isDefault: number
     isSyncOnly: number
@@ -7132,6 +7138,8 @@ export namespace Prisma {
     id?: true
     name?: true
     color?: true
+    kind?: true
+    isPublic?: true
     isVisible?: true
     isDefault?: true
     isSyncOnly?: true
@@ -7146,6 +7154,8 @@ export namespace Prisma {
     id?: true
     name?: true
     color?: true
+    kind?: true
+    isPublic?: true
     isVisible?: true
     isDefault?: true
     isSyncOnly?: true
@@ -7160,6 +7170,8 @@ export namespace Prisma {
     id?: true
     name?: true
     color?: true
+    kind?: true
+    isPublic?: true
     isVisible?: true
     isDefault?: true
     isSyncOnly?: true
@@ -7247,6 +7259,8 @@ export namespace Prisma {
     id: string
     name: string
     color: string
+    kind: string
+    isPublic: boolean
     isVisible: boolean
     isDefault: boolean
     isSyncOnly: boolean
@@ -7278,6 +7292,8 @@ export namespace Prisma {
     id?: boolean
     name?: boolean
     color?: boolean
+    kind?: boolean
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -7297,6 +7313,8 @@ export namespace Prisma {
     id?: boolean
     name?: boolean
     color?: boolean
+    kind?: boolean
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -7312,6 +7330,8 @@ export namespace Prisma {
     id?: boolean
     name?: boolean
     color?: boolean
+    kind?: boolean
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -7327,6 +7347,8 @@ export namespace Prisma {
     id?: boolean
     name?: boolean
     color?: boolean
+    kind?: boolean
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -7337,7 +7359,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "color" | "isVisible" | "isDefault" | "isSyncOnly" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
+  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "color" | "kind" | "isPublic" | "isVisible" | "isDefault" | "isSyncOnly" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
   export type CalendarInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     events?: boolean | Calendar$eventsArgs<ExtArgs>
@@ -7364,6 +7386,8 @@ export namespace Prisma {
       id: string
       name: string
       color: string
+      kind: string
+      isPublic: boolean
       isVisible: boolean
       isDefault: boolean
       isSyncOnly: boolean
@@ -7802,6 +7826,8 @@ export namespace Prisma {
     readonly id: FieldRef<"Calendar", 'String'>
     readonly name: FieldRef<"Calendar", 'String'>
     readonly color: FieldRef<"Calendar", 'String'>
+    readonly kind: FieldRef<"Calendar", 'String'>
+    readonly isPublic: FieldRef<"Calendar", 'Boolean'>
     readonly isVisible: FieldRef<"Calendar", 'Boolean'>
     readonly isDefault: FieldRef<"Calendar", 'Boolean'>
     readonly isSyncOnly: FieldRef<"Calendar", 'Boolean'>
@@ -21370,6 +21396,8 @@ export namespace Prisma {
     id: 'id',
     name: 'name',
     color: 'color',
+    kind: 'kind',
+    isPublic: 'isPublic',
     isVisible: 'isVisible',
     isDefault: 'isDefault',
     isSyncOnly: 'isSyncOnly',
@@ -21995,6 +22023,8 @@ export namespace Prisma {
     id?: StringFilter<"Calendar"> | string
     name?: StringFilter<"Calendar"> | string
     color?: StringFilter<"Calendar"> | string
+    kind?: StringFilter<"Calendar"> | string
+    isPublic?: BoolFilter<"Calendar"> | boolean
     isVisible?: BoolFilter<"Calendar"> | boolean
     isDefault?: BoolFilter<"Calendar"> | boolean
     isSyncOnly?: BoolFilter<"Calendar"> | boolean
@@ -22013,6 +22043,8 @@ export namespace Prisma {
     id?: SortOrder
     name?: SortOrder
     color?: SortOrder
+    kind?: SortOrder
+    isPublic?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
     isSyncOnly?: SortOrder
@@ -22036,6 +22068,8 @@ export namespace Prisma {
     NOT?: CalendarWhereInput | CalendarWhereInput[]
     name?: StringFilter<"Calendar"> | string
     color?: StringFilter<"Calendar"> | string
+    kind?: StringFilter<"Calendar"> | string
+    isPublic?: BoolFilter<"Calendar"> | boolean
     isVisible?: BoolFilter<"Calendar"> | boolean
     isDefault?: BoolFilter<"Calendar"> | boolean
     isSyncOnly?: BoolFilter<"Calendar"> | boolean
@@ -22053,6 +22087,8 @@ export namespace Prisma {
     id?: SortOrder
     name?: SortOrder
     color?: SortOrder
+    kind?: SortOrder
+    isPublic?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
     isSyncOnly?: SortOrder
@@ -22073,6 +22109,8 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"Calendar"> | string
     name?: StringWithAggregatesFilter<"Calendar"> | string
     color?: StringWithAggregatesFilter<"Calendar"> | string
+    kind?: StringWithAggregatesFilter<"Calendar"> | string
+    isPublic?: BoolWithAggregatesFilter<"Calendar"> | boolean
     isVisible?: BoolWithAggregatesFilter<"Calendar"> | boolean
     isDefault?: BoolWithAggregatesFilter<"Calendar"> | boolean
     isSyncOnly?: BoolWithAggregatesFilter<"Calendar"> | boolean
@@ -23458,6 +23496,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -23475,6 +23515,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -23492,6 +23534,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -23509,6 +23553,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -23526,6 +23572,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -23540,6 +23588,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -23553,6 +23603,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -25078,6 +25130,8 @@ export namespace Prisma {
     id?: SortOrder
     name?: SortOrder
     color?: SortOrder
+    kind?: SortOrder
+    isPublic?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
     isSyncOnly?: SortOrder
@@ -25092,6 +25146,8 @@ export namespace Prisma {
     id?: SortOrder
     name?: SortOrder
     color?: SortOrder
+    kind?: SortOrder
+    isPublic?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
     isSyncOnly?: SortOrder
@@ -25106,6 +25162,8 @@ export namespace Prisma {
     id?: SortOrder
     name?: SortOrder
     color?: SortOrder
+    kind?: SortOrder
+    isPublic?: SortOrder
     isVisible?: SortOrder
     isDefault?: SortOrder
     isSyncOnly?: SortOrder
@@ -27153,6 +27211,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -27169,6 +27229,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -27511,6 +27573,8 @@ export namespace Prisma {
     id?: StringFilter<"Calendar"> | string
     name?: StringFilter<"Calendar"> | string
     color?: StringFilter<"Calendar"> | string
+    kind?: StringFilter<"Calendar"> | string
+    isPublic?: BoolFilter<"Calendar"> | boolean
     isVisible?: BoolFilter<"Calendar"> | boolean
     isDefault?: BoolFilter<"Calendar"> | boolean
     isSyncOnly?: BoolFilter<"Calendar"> | boolean
@@ -28371,6 +28435,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -28387,6 +28453,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -28585,6 +28653,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -28601,6 +28671,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -29034,6 +29106,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -29050,6 +29124,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -29082,6 +29158,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -29098,6 +29176,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -29497,6 +29577,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -29513,6 +29595,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -29630,6 +29714,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -29646,6 +29732,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -29837,6 +29925,8 @@ export namespace Prisma {
     id?: string
     name: string
     color: string
+    kind?: string
+    isPublic?: boolean
     isVisible?: boolean
     isDefault?: boolean
     isSyncOnly?: boolean
@@ -30070,6 +30160,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -30086,6 +30178,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean
@@ -30102,6 +30196,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     color?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
     isVisible?: BoolFieldUpdateOperationsInput | boolean
     isDefault?: BoolFieldUpdateOperationsInput | boolean
     isSyncOnly?: BoolFieldUpdateOperationsInput | boolean

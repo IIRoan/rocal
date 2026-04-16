@@ -22,7 +22,7 @@ interface TimeRegionSettingsProps {
   onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
-  goBack: (view: PaletteView) => void;
+  goBack: () => void;
   goForward: (view: PaletteView) => void;
   currentView: string;
   TransitionContainer: React.ComponentType<{
@@ -66,7 +66,7 @@ export function TimeRegionSettings({
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
                 <button
-                  onClick={() => goBack("main")}
+                  onClick={() => goBack()}
                   className="p-1 rounded hover:bg-muted/50 transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -148,7 +148,7 @@ export function TimeRegionSettings({
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
                 <button
-                  onClick={() => goBack("time-region")}
+                  onClick={() => goBack()}
                   className="p-1 rounded hover:bg-muted/50 transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -191,7 +191,7 @@ export function TimeRegionSettings({
                           onClick={() => {
                             updateSetting("timezone", tz.value);
                             setTimezoneSearch("");
-                            goBack("time-region");
+                            goBack();
                           }}
                           className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                         >
@@ -222,7 +222,7 @@ export function TimeRegionSettings({
                               type="button"
                               onClick={() => {
                                 updateSetting("timezone", tz.value);
-                                goBack("time-region");
+                                goBack();
                               }}
                               className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                             >

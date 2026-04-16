@@ -86,18 +86,55 @@ export function CommandPalette({
   const { settings, loading, updateSettings, resetSettings } = useSettings();
   const { setCurrentDate, setCurrentView: setCalendarView } = useCalendarContext();
 
-  const [currentView, setCurrentView] = useState<PaletteView>(
-    initialView as PaletteView,
+  // Navigation history stack — goForward pushes, goBack pops
+  const buildInitialHistory = (view: PaletteView): PaletteView[] => {
+    const PARENT_CHAINS: Partial<Record<PaletteView, PaletteView[]>> = {
+      appearance: ["main"],
+      "time-region": ["main"],
+      timezone: ["main", "time-region"],
+      notifications: ["main"],
+      "calendar-defaults": ["main"],
+      account: ["main"],
+      security: ["main"],
+      passkeys: ["main", "security"],
+      calendars: ["main"],
+      "calendar-create": ["main", "calendars"],
+      "calendar-edit": ["main", "calendars"],
+      subscriptions: ["main"],
+      "subscriptions-add-feed": ["main", "subscriptions"],
+      "subscriptions-holidays": ["main", "subscriptions"],
+      "subscriptions-edit": ["main", "subscriptions"],
+      events: ["main"],
+      "event-editor": ["main"],
+      search: ["main"],
+    };
+    if (view === "main") return ["main"];
+    const parents = PARENT_CHAINS[view];
+    return parents ? [...parents, view] : ["main", view];
+  };
+
+  const [navHistory, setNavHistory] = useState<PaletteView[]>(() =>
+    buildInitialHistory(initialView as PaletteView),
   );
   const [transitionDirection, setTransitionDirection] = useState<
     "forward" | "back"
   >("forward");
+  const currentView = navHistory[navHistory.length - 1] ?? "main";
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialSearchQuery);
   const [passkeyAddMode, setPasskeyAddMode] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [subscriptionEditCalendarId, setSubscriptionEditCalendarId] = useState<string | undefined>(undefined);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Clear subscriptionEditCalendarId when leaving subscription views
+  useEffect(() => {
+    const isSubscriptionView = currentView.startsWith("subscriptions");
+    if (!isSubscriptionView) {
+      setSubscriptionEditCalendarId(undefined);
+    }
+  }, [currentView]);
 
   // Debounce search query to prevent visual shake
   useEffect(() => {
@@ -135,14 +172,14 @@ export function CommandPalette({
     setTransitionDirection("forward");
     setSearchQuery("");
     setPasskeyAddMode(false);
-    setCurrentView(next);
+    setNavHistory((h) => [...h, next]);
   };
 
-  const goBack = (prev: PaletteView) => {
+  const goBack = () => {
     setTransitionDirection("back");
     setSearchQuery("");
     setPasskeyAddMode(false);
-    setCurrentView(prev);
+    setNavHistory((h) => (h.length > 1 ? h.slice(0, -1) : ["main"]));
   };
 
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
@@ -154,14 +191,14 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!open) {
-      setCurrentView(initialView as PaletteView);
+      setNavHistory(buildInitialHistory(initialView as PaletteView));
       setSearchQuery("");
     }
   }, [open, initialView]);
 
   useEffect(() => {
     if (open) {
-      setCurrentView(initialView as PaletteView);
+      setNavHistory(buildInitialHistory(initialView as PaletteView));
     }
   }, [initialView, open]);
 
@@ -252,31 +289,21 @@ export function CommandPalette({
         break;
       // Action commands - take user directly to the item/setting
       case "newEvent":
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("events");
+        goForward("events");
         break;
       case "newCalendar":
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("calendar-create");
+        goForward("calendar-create");
         break;
       case "openCalendars":
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("calendars");
+        goForward("calendars");
         break;
       case "newPasskey":
         setPasskeyAddMode(true);
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("passkeys");
+        goForward("passkeys");
         break;
       case "openPasskeys":
         setPasskeyAddMode(false);
-        setTransitionDirection("forward");
-        setSearchQuery("");
-        setCurrentView("passkeys");
+        goForward("passkeys");
         break;
     }
   };
@@ -418,10 +445,17 @@ export function CommandPalette({
       <CalendarManager
         open={open}
         onOpenChange={onOpenChange}
-        onBack={() => goBack("main")}
-        onGoToSubscriptions={() => goForward("subscriptions")}
+        onBack={goBack}
+        onGoToSubscriptions={(calendarId?: string) => {
+          setSubscriptionEditCalendarId(calendarId);
+          if (calendarId) {
+            goForward("subscriptions-edit");
+          } else {
+            goForward("subscriptions");
+          }
+        }}
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onNavigateTo={goForward}
         transitionDirection={transitionDirection}
       />
     );
@@ -798,18 +832,27 @@ export function CommandPalette({
       <PasskeySettings
         open={open}
         onOpenChange={onOpenChange}
-        onBack={() => goBack("security")}
+        onBack={() => goBack()}
         startInAddMode={passkeyAddMode}
       />
     );
   }
 
-  if (currentView === "subscriptions") {
+  if (
+    currentView === "subscriptions" ||
+    currentView === "subscriptions-add-feed" ||
+    currentView === "subscriptions-holidays" ||
+    currentView === "subscriptions-edit"
+  ) {
     return (
       <SubscriptionManagement
         open={open}
         onOpenChange={onOpenChange}
-        onBack={() => goBack("calendars")}
+        onBack={goBack}
+        currentView={currentView}
+        onNavigateTo={goForward}
+        initialEditCalendarId={subscriptionEditCalendarId}
+        transitionDirection={transitionDirection}
       />
     );
   }
@@ -838,7 +881,7 @@ export function CommandPalette({
         onOpenChange={onOpenChange}
         eventToEdit={newEvent}
         onEventSaved={onEventSaved}
-        onBack={() => goBack("main")}
+        onBack={() => goBack()}
         localSettings={localSettings}
         editorMode={eventEditorMode}
         anchorPosition={popoverAnchorPosition}
@@ -866,7 +909,7 @@ export function CommandPalette({
           <div className="flex flex-col">
             <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
               <button
-                onClick={() => goBack("main")}
+                onClick={() => goBack()}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />

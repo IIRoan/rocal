@@ -1,5 +1,6 @@
 import type {
   CalendarShareLinkResponse,
+  CalendarKind,
   CreateCalendarShareLinkRequest,
   CalendarSubscriptionSummary,
   CalendarSubscriptionSyncResponse,
@@ -41,6 +42,8 @@ export interface Calendar {
   id: string;
   name: string;
   color: EventColor;
+  kind: CalendarKind;
+  isPublic: boolean;
   isVisible: boolean;
   isDefault: boolean;
   isSyncOnly: boolean;
