@@ -24,7 +24,7 @@ interface CalendarDefaultsSettingsProps {
   onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
-  goBack: (view: PaletteView) => void;
+  goBack: () => void;
   workingDaysList: number[];
   TransitionContainer: React.ComponentType<{
     direction: "forward" | "back";
@@ -44,18 +44,24 @@ export function CalendarDefaultsSettings({
   TransitionContainer,
   transitionDirection,
 }: CalendarDefaultsSettingsProps) {
-  const { calendars, updateCalendar, refetchCalendars } = useSharedCalendarData();
-  const defaultCalendar = calendars.find(c => c.isDefault) || calendars[0];
+  const { calendars, updateCalendar, refetchCalendars } =
+    useSharedCalendarData();
+  const editableCalendars = calendars.filter(
+    (calendar) => calendar.kind === "owned",
+  );
+  const defaultCalendar =
+    editableCalendars.find((calendar) => calendar.isDefault) ||
+    editableCalendars[0];
 
   const handleDefaultCalendarChange = async (calendarId: string) => {
     try {
-      const calendar = calendars.find(c => c.id === calendarId);
+      const calendar = editableCalendars.find((item) => item.id === calendarId);
       if (!calendar) return;
 
       await updateCalendar(calendarId, {
-        isDefault: true
+        isDefault: true,
       });
-      
+
       await refetchCalendars();
       toast.success(`Set "${calendar.name}" as default`);
     } catch (error) {
@@ -81,7 +87,7 @@ export function CalendarDefaultsSettings({
             {/* Header */}
             <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
               <button
-                onClick={() => goBack("main")}
+                onClick={() => goBack()}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -104,7 +110,7 @@ export function CalendarDefaultsSettings({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {calendars.map((calendar) => (
+                      {editableCalendars.map((calendar) => (
                         <SelectItem key={calendar.id} value={calendar.id}>
                           {calendar.name}
                         </SelectItem>
@@ -124,10 +130,7 @@ export function CalendarDefaultsSettings({
                   <Select
                     value={localSettings.defaultView}
                     onValueChange={(value) =>
-                      updateSetting(
-                        "defaultView",
-                        value as CalendarView,
-                      )
+                      updateSetting("defaultView", value as CalendarView)
                     }
                   >
                     <SelectTrigger className="w-[120px] h-9 text-sm">

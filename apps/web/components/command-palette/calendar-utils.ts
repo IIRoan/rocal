@@ -1,6 +1,5 @@
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
-import type { PaletteView } from "./constants";
 
 const log = createLogger("calendar-utils");
 
@@ -53,7 +52,7 @@ export const handleCalendarCreate = async (
     setCalendarColor: (color: string) => void;
     setCalendarIsDefault: (isDefault: boolean) => void;
   },
-  goBack: (view: PaletteView) => void,
+  goBack: () => void,
 ) => {
   setters.setCalendarValidationErrors({});
 
@@ -75,7 +74,7 @@ export const handleCalendarCreate = async (
     setters.setCalendarName("");
     setters.setCalendarColor("#3b82f6");
     setters.setCalendarIsDefault(false);
-    goBack("calendars" as PaletteView);
+    goBack();
   } catch (error: any) {
     log.error("Failed to create calendar:", error);
     if (error.message && error.message.includes("already exists")) {
@@ -102,7 +101,7 @@ export const handleCalendarUpdate = async (
     setCalendarSaving: (saving: boolean) => void;
     setEditingCalendar: (calendar: any) => void;
   },
-  goBack: (view: PaletteView) => void,
+  goBack: () => void,
 ) => {
   if (!editingCalendar) return;
 
@@ -146,7 +145,7 @@ export const handleCalendarUpdate = async (
 
     toast.success(`Calendar "${calendarName}" updated`);
     setters.setEditingCalendar(null);
-    goBack("calendars" as PaletteView);
+    goBack();
   } catch (error: any) {
     log.error("Failed to update calendar:", error);
     if (error.message && error.message.includes("already exists")) {
@@ -165,7 +164,7 @@ export const handleCalendarDelete = async (
   calendar: any,
   calendarData: any,
   setCalendarSaving: (saving: boolean) => void,
-  goBack: (view: PaletteView) => void,
+  goBack: () => void,
 ) => {
   setCalendarSaving(true);
   try {
@@ -173,7 +172,7 @@ export const handleCalendarDelete = async (
     // Default action is "delete_events" which will remove all events in the calendar
     await calendarData.deleteCalendar(calendar.id, "delete_events");
     toast.success(`Calendar "${calendar.name}" deleted`);
-    goBack("calendars" as PaletteView);
+    goBack();
   } catch (error: any) {
     log.error("Failed to delete calendar:", error);
     toast.error("Failed to delete calendar");
