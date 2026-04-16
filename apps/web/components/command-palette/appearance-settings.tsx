@@ -16,7 +16,7 @@ interface AppearanceSettingsProps {
   onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
-  goBack: (view: PaletteView) => void;
+  goBack: () => void;
   TransitionContainer: React.ComponentType<{
     direction: "forward" | "back";
     children: React.ReactNode;
@@ -55,7 +55,7 @@ export function AppearanceSettings({
             {/* Header */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
               <button
-                onClick={() => goBack("main")}
+                onClick={() => goBack()}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />

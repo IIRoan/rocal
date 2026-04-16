@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import type { CalendarShareLink } from "@/lib/types/calendar";
+import type { Calendar, CalendarShareLink } from "@/lib/types/calendar";
 import { toast } from "sonner";
 import {
   TransitionContainer,
@@ -31,7 +31,6 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Switch } from "@workspace/ui/components/ui/switch";
 import {
   ArrowLeft,
-  Calendar,
   Plus,
   Save,
   Trash2,
@@ -48,11 +47,22 @@ interface CalendarManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBack: () => void;
-  onGoToSubscriptions: () => void;
+  onGoToSubscriptions: (calendarId?: string) => void;
   currentView: PaletteView;
-  onViewChange: (view: PaletteView) => void;
+  onNavigateTo: (view: PaletteView) => void;
   transitionDirection: "forward" | "back";
 }
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
+};
 
 export function CalendarManager({
   open,
@@ -60,18 +70,28 @@ export function CalendarManager({
   onBack,
   onGoToSubscriptions,
   currentView,
-  onViewChange,
+  onNavigateTo,
   transitionDirection,
 }: CalendarManagerProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
+  const ownedCalendars = calendars.filter(
+    (calendar) => calendar.kind === "owned",
+  );
+  const publicCalendars = calendars.filter(
+    (calendar) => calendar.kind === "public_holiday",
+  );
+  const subscribedCalendars = calendars.filter(
+    (calendar) =>
+      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
+  );
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
   const [calendarColor, setCalendarColor] = useState("#3b82f6");
   const [calendarIsDefault, setCalendarIsDefault] = useState(false);
   const [calendarSaving, setCalendarSaving] = useState(false);
-  const [editingCalendar, setEditingCalendar] = useState<any>(null);
+  const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [calendarValidationErrors, setCalendarValidationErrors] = useState<{
     name?: string;
     color?: string;
@@ -84,11 +104,11 @@ export function CalendarManager({
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   const goForward = (next: PaletteView) => {
-    onViewChange(next);
+    onNavigateTo(next);
   };
 
-  const goBack = (prev: PaletteView) => {
-    onViewChange(prev);
+  const goBack = () => {
+    onBack();
   };
 
   const loadShareLink = async (calendarId: string) => {
@@ -97,12 +117,11 @@ export function CalendarManager({
     setShareLinkInfo(null);
 
     try {
-      const shareInfo = await calendarApiService.getCalendarShareLink(
-        calendarId,
-      );
+      const shareInfo =
+        await calendarApiService.getCalendarShareLink(calendarId);
       setShareLinkInfo(shareInfo);
-    } catch (error: any) {
-      setShareLinkError(error.message || "Failed to load share link");
+    } catch (error: unknown) {
+      setShareLinkError(getErrorMessage(error, "Failed to load share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -121,13 +140,12 @@ export function CalendarManager({
       );
       setShareLinkInfo(shareInfo);
       toast.success(
-        regenerate
-          ? "ICS share link regenerated"
-          : "ICS share link enabled",
+        regenerate ? "ICS share link regenerated" : "ICS share link enabled",
       );
-    } catch (error: any) {
-      setShareLinkError(error.message || "Failed to enable share link");
-      toast.error(error.message || "Failed to enable share link");
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, "Failed to enable share link");
+      setShareLinkError(message);
+      toast.error(message);
     } finally {
       setShareLinkLoading(false);
     }
@@ -148,9 +166,10 @@ export function CalendarManager({
         shareUrl: null,
       });
       toast.success("ICS share link disabled");
-    } catch (error: any) {
-      setShareLinkError(error.message || "Failed to disable share link");
-      toast.error(error.message || "Failed to disable share link");
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, "Failed to disable share link");
+      setShareLinkError(message);
+      toast.error(message);
     } finally {
       setShareLinkLoading(false);
     }
@@ -187,6 +206,7 @@ export function CalendarManager({
         <DialogContent
           variant="spotlight"
           showClose={false}
+          aria-describedby={undefined}
           className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
         >
           <VisuallyHidden>
@@ -231,11 +251,11 @@ export function CalendarManager({
 
                   <button
                     type="button"
-                    onClick={onGoToSubscriptions}
+                    onClick={() => onGoToSubscriptions()}
                     className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                   >
                     <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm">Subscribe to External</span>
+                    <span className="text-sm">Public & External Feeds</span>
                     <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                   </button>
                 </div>
@@ -245,12 +265,15 @@ export function CalendarManager({
                   Your Calendars
                 </div>
                 <div className="p-1">
-                  {calendars.map((calendar) => (
+                  {ownedCalendars.map((calendar) => (
                     <button
                       key={calendar.id}
                       type="button"
                       onClick={() => {
-                        if (calendar.isSyncOnly) return;
+                        if (calendar.isSyncOnly) {
+                          onGoToSubscriptions(calendar.id);
+                          return;
+                        }
                         setEditingCalendar(calendar);
                         setCalendarName(calendar.name);
                         setCalendarColor(calendar.color);
@@ -260,7 +283,7 @@ export function CalendarManager({
                         void loadShareLink(calendar.id);
                         goForward("calendar-edit");
                       }}
-                      className={`flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors ${calendar.isSyncOnly ? "opacity-70" : ""}`}
+                      className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                     >
                       <div
                         className="h-3.5 w-3.5 rounded-sm shrink-0"
@@ -278,12 +301,73 @@ export function CalendarManager({
                           </div>
                         ) : null}
                       </div>
-                      {!calendar.isSyncOnly && (
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                      )}
-                    </button>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />                    </button>
                   ))}
                 </div>
+
+                {publicCalendars.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                      Public Calendars
+                    </div>
+                    <div className="p-1">
+                      {publicCalendars.map((calendar) => (
+                        <button
+                          key={calendar.id}
+                          type="button"
+                          onClick={() => onGoToSubscriptions(calendar.id)}
+                          className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                        >
+                          <div
+                            className="h-3.5 w-3.5 rounded-sm shrink-0"
+                            style={{ backgroundColor: calendar.color }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm truncate">
+                              {calendar.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Public holiday calendar
+                            </div>
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {subscribedCalendars.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                      Subscribed Calendars
+                    </div>
+                    <div className="p-1">
+                      {subscribedCalendars.map((calendar) => (
+                        <button
+                          key={calendar.id}
+                          type="button"
+                          onClick={() => onGoToSubscriptions(calendar.id)}
+                          className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                        >
+                          <div
+                            className="h-3.5 w-3.5 rounded-sm shrink-0"
+                            style={{ backgroundColor: calendar.color }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm truncate">
+                              {calendar.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              External subscription
+                            </div>
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </TransitionContainer>
@@ -298,6 +382,7 @@ export function CalendarManager({
         <DialogContent
           variant="spotlight"
           showClose={false}
+          aria-describedby={undefined}
           className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
         >
           <VisuallyHidden>
@@ -308,7 +393,7 @@ export function CalendarManager({
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
                 <button
-                  onClick={() => goBack("calendars")}
+                  onClick={() => goBack()}
                   className="p-1 rounded hover:bg-muted/50 transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -399,7 +484,7 @@ export function CalendarManager({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => goBack("calendars")}
+                  onClick={() => goBack()}
                   disabled={calendarSaving}
                   className="h-8"
                 >
@@ -421,7 +506,7 @@ export function CalendarManager({
                         setCalendarColor,
                         setCalendarIsDefault,
                       },
-                      () => goBack("calendars"),
+                      () => goBack(),
                     )
                   }
                   disabled={calendarSaving || !calendarName.trim()}
@@ -454,6 +539,7 @@ export function CalendarManager({
           <DialogContent
             variant="spotlight"
             showClose={false}
+            aria-describedby={undefined}
             className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[560px]"
           >
             <VisuallyHidden>
@@ -464,7 +550,7 @@ export function CalendarManager({
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
                   <button
-                    onClick={() => goBack("calendars")}
+                    onClick={() => goBack()}
                     className="p-1 rounded hover:bg-muted/50 transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -609,7 +695,9 @@ export function CalendarManager({
                     )}
 
                     {shareLinkError && (
-                      <p className="text-xs text-destructive">{shareLinkError}</p>
+                      <p className="text-xs text-destructive">
+                        {shareLinkError}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -625,7 +713,7 @@ export function CalendarManager({
                           editingCalendar,
                           calendarData,
                           setCalendarSaving,
-                          () => goBack("calendars"),
+                          () => goBack(),
                         )
                       }
                       disabled={calendarSaving}
@@ -642,7 +730,7 @@ export function CalendarManager({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => goBack("calendars")}
+                      onClick={() => goBack()}
                       disabled={calendarSaving}
                       className="h-8"
                     >
@@ -663,7 +751,7 @@ export function CalendarManager({
                             setCalendarSaving,
                             setEditingCalendar,
                           },
-                          () => goBack("calendars"),
+                          () => goBack(),
                         )
                       }
                       disabled={calendarSaving || !calendarName.trim()}
@@ -731,7 +819,6 @@ export function CalendarManager({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
       </>
     );
   }

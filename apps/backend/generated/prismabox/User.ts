@@ -108,6 +108,8 @@ export const UserRelations = t.Object(
           id: t.String(),
           name: t.String(),
           color: t.String(),
+          kind: t.String(),
+          isPublic: t.Boolean(),
           isVisible: t.Boolean(),
           isDefault: t.Boolean(),
           isSyncOnly: t.Boolean(),

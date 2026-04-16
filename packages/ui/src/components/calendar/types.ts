@@ -20,6 +20,8 @@ export interface Calendar {
   id: string;
   name: string;
   color: EventColor;
+  kind: "owned" | "subscribed" | "public_holiday";
+  isPublic: boolean;
   isVisible: boolean;
   isDefault: boolean;
   isSyncOnly: boolean;

@@ -102,7 +102,9 @@ export class CalendarApiService {
 
   async getEvent(id: string): Promise<CalendarEvent> {
     try {
-      const response = await this.client.get<CalendarEvent>(`/api/events/${id}`);
+      const response = await this.client.get<CalendarEvent>(
+        `/api/events/${id}`,
+      );
       return response;
     } catch (error) {
       throw this.transformError(error, "Failed to fetch event");
@@ -269,14 +271,20 @@ export class CalendarApiService {
   }
 
   // Utility methods
-  private transformError(error: any, defaultMessage: string): ApiError {
+  private transformError(error: unknown, defaultMessage: string): ApiError {
     // If it's already an ApiError from the HTTP client, return it
-    if (error.statusCode && error.error && error.message) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "statusCode" in error &&
+      "error" in error &&
+      "message" in error
+    ) {
       return error as ApiError;
     }
 
     // Handle network errors
-    if (error.name === "TypeError" || error.name === "AbortError") {
+    if (error instanceof Error && error.name === "TypeError") {
       return {
         error: "Network Error",
         message:
@@ -286,7 +294,7 @@ export class CalendarApiService {
     }
 
     // Handle timeout errors
-    if (error.name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return {
         error: "Timeout Error",
         message: "The request took too long to complete. Please try again.",
@@ -297,8 +305,17 @@ export class CalendarApiService {
     // Fallback for unknown errors
     return {
       error: "Unknown Error",
-      message: error.message || defaultMessage,
-      statusCode: error.status || 500,
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : defaultMessage,
+      statusCode:
+        error &&
+        typeof error === "object" &&
+        "status" in error &&
+        typeof (error as { status?: unknown }).status === "number"
+          ? ((error as { status: number }).status ?? 500)
+          : 500,
     };
   }
 
@@ -541,7 +558,10 @@ export class CalendarApiService {
       let message = "Failed to download ICS file";
       try {
         const maybeJson = await response.json();
-        if (typeof maybeJson?.message === "string" && maybeJson.message.trim()) {
+        if (
+          typeof maybeJson?.message === "string" &&
+          maybeJson.message.trim()
+        ) {
           message = maybeJson.message.trim();
         }
       } catch {
@@ -557,7 +577,8 @@ export class CalendarApiService {
 
     const blob = await response.blob();
     const fallbackFilename = "event.ics";
-    const contentDisposition = response.headers.get("content-disposition") || "";
+    const contentDisposition =
+      response.headers.get("content-disposition") || "";
     const filenameMatch = /filename="?([^"]+)"?/i.exec(contentDisposition);
     const filename = filenameMatch?.[1] || fallbackFilename;
 

@@ -9,6 +9,8 @@ export const CalendarPlain = t.Object(
     id: t.String(),
     name: t.String(),
     color: t.String(),
+    kind: t.String(),
+    isPublic: t.Boolean(),
     isVisible: t.Boolean(),
     isDefault: t.Boolean(),
     isSyncOnly: t.Boolean(),
@@ -112,6 +114,8 @@ export const CalendarPlainInputCreate = t.Object(
   {
     name: t.String(),
     color: t.String(),
+    kind: t.Optional(t.String()),
+    isPublic: t.Optional(t.Boolean()),
     isVisible: t.Optional(t.Boolean()),
     isDefault: t.Optional(t.Boolean()),
     isSyncOnly: t.Optional(t.Boolean()),
@@ -125,6 +129,8 @@ export const CalendarPlainInputUpdate = t.Object(
   {
     name: t.Optional(t.String()),
     color: t.Optional(t.String()),
+    kind: t.Optional(t.String()),
+    isPublic: t.Optional(t.Boolean()),
     isVisible: t.Optional(t.Boolean()),
     isDefault: t.Optional(t.Boolean()),
     isSyncOnly: t.Optional(t.Boolean()),
@@ -304,6 +310,8 @@ export const CalendarWhere = t.Partial(
           id: t.String(),
           name: t.String(),
           color: t.String(),
+          kind: t.String(),
+          isPublic: t.Boolean(),
           isVisible: t.Boolean(),
           isDefault: t.Boolean(),
           isSyncOnly: t.Boolean(),
@@ -370,6 +378,8 @@ export const CalendarWhereUnique = t.Recursive(
               id: t.String(),
               name: t.String(),
               color: t.String(),
+              kind: t.String(),
+              isPublic: t.Boolean(),
               isVisible: t.Boolean(),
               isDefault: t.Boolean(),
               isSyncOnly: t.Boolean(),
@@ -394,6 +404,8 @@ export const CalendarSelect = t.Partial(
       id: t.Boolean(),
       name: t.Boolean(),
       color: t.Boolean(),
+      kind: t.Boolean(),
+      isPublic: t.Boolean(),
       isVisible: t.Boolean(),
       isDefault: t.Boolean(),
       isSyncOnly: t.Boolean(),
@@ -435,6 +447,12 @@ export const CalendarOrderBy = t.Partial(
         additionalProperties: false,
       }),
       color: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      kind: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      isPublic: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       isVisible: t.Union([t.Literal("asc"), t.Literal("desc")], {

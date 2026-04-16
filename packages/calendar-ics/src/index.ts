@@ -1,3 +1,5 @@
+import type { CalendarKind } from "./national-holiday-calendars";
+
 export const CALENDAR_METHOD_TYPES = [
   "PUBLISH",
   "REQUEST",
@@ -9,13 +11,24 @@ export const CALENDAR_METHOD_TYPES = [
   "DECLINECOUNTER",
 ] as const;
 
+export {
+  findNationalHolidayCalendarByUrl,
+  NATIONAL_HOLIDAY_CALENDARS,
+} from "./national-holiday-calendars";
+export type {
+  CalendarKind,
+  NationalHolidayCalendarCatalogEntry,
+} from "./national-holiday-calendars";
+
 export type CalendarMethodType = (typeof CALENDAR_METHOD_TYPES)[number];
 
 export const DEFAULT_CALENDAR_METHOD: CalendarMethodType = "PUBLISH";
 
 const CALENDAR_METHOD_SET = new Set<string>(CALENDAR_METHOD_TYPES);
 
-export function isCalendarMethodType(value: string): value is CalendarMethodType {
+export function isCalendarMethodType(
+  value: string,
+): value is CalendarMethodType {
   return CALENDAR_METHOD_SET.has(value);
 }
 
@@ -91,7 +104,9 @@ const ICS_TO_IANA_TIMEZONE_MAP: Record<string, string> = {
   "Greenwich Standard Time": "UTC",
 };
 
-export function normalizeIcsTimezone(timezone?: string | null): string | undefined {
+export function normalizeIcsTimezone(
+  timezone?: string | null,
+): string | undefined {
   if (!timezone) {
     return undefined;
   }
@@ -129,6 +144,8 @@ export interface CalendarSummaryForSubscription {
   id: string;
   name: string;
   color: string;
+  kind?: CalendarKind;
+  isPublic?: boolean;
 }
 
 export interface CalendarSubscriptionSummary {
@@ -154,6 +171,7 @@ export interface CreateCalendarSubscriptionRequest {
 
 export interface UpdateCalendarSubscriptionRequest {
   name?: string;
+  color?: string;
   isActive?: boolean;
   syncIntervalMinutes?: number;
 }
@@ -211,7 +229,15 @@ export interface IcsBuildEventInput {
   sourceUrl?: string;
 }
 
-const WEEKDAY_INDEX_TO_CODE = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+const WEEKDAY_INDEX_TO_CODE = [
+  "SU",
+  "MO",
+  "TU",
+  "WE",
+  "TH",
+  "FR",
+  "SA",
+] as const;
 const ICS_LINE_BREAK = "\r\n";
 const DEFAULT_PRODUCT_ID = "-//Solace Calendar//Calendar Export//EN";
 
@@ -241,7 +267,9 @@ function addDaysUtc(date: Date, days: number): Date {
   return copy;
 }
 
-function normalizeEventRange(event: Pick<IcsBuildEventInput, "start" | "end" | "allDay">): {
+function normalizeEventRange(
+  event: Pick<IcsBuildEventInput, "start" | "end" | "allDay">,
+): {
   start: Date;
   end: Date;
 } {
@@ -257,7 +285,9 @@ function normalizeEventRange(event: Pick<IcsBuildEventInput, "start" | "end" | "
   }
 
   if (end.getTime() <= start.getTime()) {
-    end = event.allDay ? addDaysUtc(start, 1) : new Date(start.getTime() + 60 * 60 * 1000);
+    end = event.allDay
+      ? addDaysUtc(start, 1)
+      : new Date(start.getTime() + 60 * 60 * 1000);
   }
 
   return { start, end };
@@ -318,10 +348,17 @@ function buildRruleString(recurrence: IcsRecurrenceRule): string {
 
 function buildEventLines(event: IcsBuildEventInput, dtStamp: Date): string[] {
   const { start, end } = normalizeEventRange(event);
-  const uid = event.uid?.trim() || `${crypto.randomUUID()}@solace-calendar.local`;
+  const uid =
+    event.uid?.trim() || `${crypto.randomUUID()}@solace-calendar.local`;
   const allDay = !!event.allDay;
-  const createdAt = event.createdAt && !Number.isNaN(event.createdAt.getTime()) ? event.createdAt : dtStamp;
-  const updatedAt = event.updatedAt && !Number.isNaN(event.updatedAt.getTime()) ? event.updatedAt : dtStamp;
+  const createdAt =
+    event.createdAt && !Number.isNaN(event.createdAt.getTime())
+      ? event.createdAt
+      : dtStamp;
+  const updatedAt =
+    event.updatedAt && !Number.isNaN(event.updatedAt.getTime())
+      ? event.updatedAt
+      : dtStamp;
 
   const lines: string[] = [
     "BEGIN:VEVENT",
@@ -389,11 +426,15 @@ export function buildIcsCalendar(options: {
   ];
 
   if (options.calendar.description?.trim()) {
-    lines.push(`X-WR-CALDESC:${escapeIcsText(options.calendar.description.trim())}`);
+    lines.push(
+      `X-WR-CALDESC:${escapeIcsText(options.calendar.description.trim())}`,
+    );
   }
 
   if (options.calendar.timezone?.trim()) {
-    lines.push(`X-WR-TIMEZONE:${escapeIcsText(options.calendar.timezone.trim())}`);
+    lines.push(
+      `X-WR-TIMEZONE:${escapeIcsText(options.calendar.timezone.trim())}`,
+    );
   }
 
   if (options.calendar.sourceUrl?.trim()) {

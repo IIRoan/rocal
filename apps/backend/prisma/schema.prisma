@@ -93,6 +93,8 @@ model Calendar {
   id              String            @id @default(cuid())
   name            String
   color           String // blue, orange, violet, rose, emerald
+  kind            String            @default("owned") @map("kind") // owned, subscribed, public_holiday
+  isPublic        Boolean           @default(false) @map("is_public")
   isVisible       Boolean           @default(true) @map("is_visible")
   isDefault       Boolean           @default(false) @map("is_default")
   isSyncOnly      Boolean           @default(false) @map("is_sync_only") // Read-only calendar synced from external subscription

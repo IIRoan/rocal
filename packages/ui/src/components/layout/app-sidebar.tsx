@@ -2,9 +2,19 @@
 
 import * as React from "react";
 import { GearSixIcon } from "@phosphor-icons/react";
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
+import {
+  Plus,
+  Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings2,
+} from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
-import { type CalendarEvent, User, Calendar as CalendarData } from "../calendar/types";
+import {
+  type CalendarEvent,
+  User,
+  Calendar as CalendarData,
+} from "../calendar/types";
 import LogoSvg from "./logo";
 
 import { NavUser } from "../navigation/nav-user";
@@ -74,7 +84,10 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onOpenSearch?: () => void;
   onCreateEvent?: () => void;
   isMobile?: boolean;
-  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  getCachedEventsForRange?: (range: {
+    start: Date;
+    end: Date;
+  }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
 }
 
@@ -90,7 +103,18 @@ export function AppSidebar({
   prefetchRange,
   ...props
 }: AppSidebarProps) {
-  const { calendars, toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
+  const { calendars, toggleCalendarVisibility, isCalendarVisible } =
+    useCalendarContext();
+  const ownedCalendars = calendars.filter(
+    (calendar) => calendar.kind === "owned",
+  );
+  const publicCalendars = calendars.filter(
+    (calendar) => calendar.kind === "public_holiday",
+  );
+  const subscribedCalendars = calendars.filter(
+    (calendar) =>
+      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
+  );
 
   if (isMobile) {
     const initials =
@@ -106,7 +130,12 @@ export function AppSidebar({
         <div className="flex items-center justify-between pt-safe-offset-5 pt-5 pb-3 px-5 shrink-0 border-b border-border/40">
           <div className="flex items-center gap-2.5">
             <LogoSvg className="size-7 text-primary" />
-            <span className="text-[17px] tracking-[-0.04em] text-foreground" style={{ fontWeight: 380 }}>rocal</span>
+            <span
+              className="text-[17px] tracking-[-0.04em] text-foreground"
+              style={{ fontWeight: 380 }}
+            >
+              rocal
+            </span>
           </div>
           <div className="flex items-center gap-1">
             {onOpenSearch && (
@@ -119,36 +148,43 @@ export function AppSidebar({
               </button>
             )}
             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="outline-none active:scale-90 transition-transform">
-                <Avatar className="size-8 rounded-full">
-                  <AvatarImage src={user?.avatar} alt={user?.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 rounded-xl">
-              <div className="px-3 py-2.5">
-                <p className="text-sm font-semibold leading-none text-foreground">{user?.name || "Guest"}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{user?.email}</p>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="gap-2.5 cursor-pointer" onClick={onOpenSettings}>
-                <GearSixIcon size={16} />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="gap-2.5 text-destructive focus:text-destructive cursor-pointer"
-                onClick={onLogout}
-              >
-                <LogOut size={16} />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="outline-none active:scale-90 transition-transform">
+                  <Avatar className="size-8 rounded-full">
+                    <AvatarImage src={user?.avatar} alt={user?.name} />
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 rounded-xl">
+                <div className="px-3 py-2.5">
+                  <p className="text-sm font-semibold leading-none text-foreground">
+                    {user?.name || "Guest"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {user?.email}
+                  </p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2.5 cursor-pointer"
+                  onClick={onOpenSettings}
+                >
+                  <GearSixIcon size={16} />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2.5 text-destructive focus:text-destructive cursor-pointer"
+                  onClick={onLogout}
+                >
+                  <LogOut size={16} />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -191,7 +227,7 @@ export function AppSidebar({
               </button>
             </div>
             <div className="space-y-1">
-              {calendars.map((calendar: CalendarData) => {
+              {ownedCalendars.map((calendar: CalendarData) => {
                 const isVisible = isCalendarVisible(calendar.id);
                 const calColor = calendar.color?.startsWith("#")
                   ? calendar.color
@@ -213,10 +249,84 @@ export function AppSidebar({
                         opacity: isVisible ? 1 : 0.35,
                       }}
                     />
-                    <span className="text-sm font-medium truncate">{calendar.name}</span>
+                    <span className="text-sm font-medium truncate">
+                      {calendar.name}
+                    </span>
                   </button>
                 );
               })}
+
+              {publicCalendars.length > 0 && (
+                <>
+                  <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    Public
+                  </div>
+                  {publicCalendars.map((calendar: CalendarData) => {
+                    const isVisible = isCalendarVisible(calendar.id);
+                    const calColor = calendar.color?.startsWith("#")
+                      ? calendar.color
+                      : `var(--color-event-${calendar.color || "default"})`;
+                    return (
+                      <button
+                        key={calendar.id}
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all active:scale-[0.99] ${
+                          isVisible
+                            ? "bg-muted/50 text-foreground"
+                            : "text-muted-foreground/50"
+                        }`}
+                      >
+                        <span
+                          className="size-2.5 rounded-full shrink-0 transition-opacity"
+                          style={{
+                            backgroundColor: calColor,
+                            opacity: isVisible ? 1 : 0.35,
+                          }}
+                        />
+                        <span className="text-sm font-medium truncate">
+                          {calendar.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {subscribedCalendars.length > 0 && (
+                <>
+                  <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    Subscribed
+                  </div>
+                  {subscribedCalendars.map((calendar: CalendarData) => {
+                    const isVisible = isCalendarVisible(calendar.id);
+                    const calColor = calendar.color?.startsWith("#")
+                      ? calendar.color
+                      : `var(--color-event-${calendar.color || "default"})`;
+                    return (
+                      <button
+                        key={calendar.id}
+                        onClick={() => toggleCalendarVisibility(calendar.id)}
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all active:scale-[0.99] ${
+                          isVisible
+                            ? "bg-muted/50 text-foreground"
+                            : "text-muted-foreground/50"
+                        }`}
+                      >
+                        <span
+                          className="size-2.5 rounded-full shrink-0 transition-opacity"
+                          style={{
+                            backgroundColor: calColor,
+                            opacity: isVisible ? 1 : 0.35,
+                          }}
+                        />
+                        <span className="text-sm font-medium truncate">
+                          {calendar.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -270,18 +380,36 @@ function AppSidebarDesktop({
   onOpenCalendarManagement?: () => void;
   onOpenSearch?: () => void;
   onCreateEvent?: () => void;
-  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  getCachedEventsForRange?: (range: {
+    start: Date;
+    end: Date;
+  }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   props: React.ComponentProps<typeof Sidebar>;
 }) {
-  const { calendars, toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
+  const { calendars, toggleCalendarVisibility, isCalendarVisible } =
+    useCalendarContext();
+  const ownedCalendars = calendars.filter(
+    (calendar) => calendar.kind === "owned",
+  );
+  const publicCalendars = calendars.filter(
+    (calendar) => calendar.kind === "public_holiday",
+  );
+  const subscribedCalendars = calendars.filter(
+    (calendar) =>
+      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
+  );
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
   return (
     <Sidebar variant="inset" collapsible="icon" {...props}>
       {/* Header: logo + collapse toggle */}
-      <SidebarHeader className={isCollapsed ? "items-center pt-4 px-2 pb-3" : "pt-4 px-4 pb-3"}>
+      <SidebarHeader
+        className={
+          isCollapsed ? "items-center pt-4 px-2 pb-3" : "pt-4 px-4 pb-3"
+        }
+      >
         {isCollapsed ? (
           <>
             <a className="inline-flex justify-center" href="/">
@@ -306,7 +434,12 @@ function AppSidebarDesktop({
           <div className="flex items-center justify-between">
             <a className="inline-flex items-center gap-2" href="/">
               <LogoSvg width="28" height="28" className="text-primary" />
-              <span className="text-[15px] tracking-[-0.04em] text-foreground" style={{ fontWeight: 380 }}>rocal</span>
+              <span
+                className="text-[15px] tracking-[-0.04em] text-foreground"
+                style={{ fontWeight: 380 }}
+              >
+                rocal
+              </span>
             </a>
             <div className="flex items-center gap-0.5">
               {onOpenSearch && (
@@ -347,7 +480,9 @@ function AppSidebarDesktop({
 
         {/* New event CTA */}
         {onCreateEvent && (
-          <SidebarGroup className={`px-2 shrink-0 ${isCollapsed ? "pt-2" : "pt-1"}`}>
+          <SidebarGroup
+            className={`px-2 shrink-0 ${isCollapsed ? "pt-2" : "pt-1"}`}
+          >
             {isCollapsed ? (
               <SidebarGroupContent className="flex flex-col items-center">
                 <CollapsedIconButton
@@ -375,13 +510,18 @@ function AppSidebarDesktop({
         )}
 
         {/* Calendars list */}
-        <SidebarGroup className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-3"}`}>
+        <SidebarGroup
+          className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-3"}`}
+        >
           {isCollapsed ? (
             <SidebarGroupContent className="flex flex-col items-center gap-1">
               {calendars.map((calendar) => {
                 const isVisible = isCalendarVisible(calendar.id);
                 return (
-                  <SidebarMenuItem key={calendar.id} className="flex justify-center list-none">
+                  <SidebarMenuItem
+                    key={calendar.id}
+                    className="flex justify-center list-none"
+                  >
                     <CollapsedIconButton
                       label={calendar.name}
                       onClick={() => toggleCalendarVisibility(calendar.id)}
@@ -416,7 +556,71 @@ function AppSidebarDesktop({
               </div>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0.5">
-                  {calendars.map((calendar) => {
+                  {ownedCalendars.map((calendar) => {
+                    const isVisible = isCalendarVisible(calendar.id);
+                    return (
+                      <SidebarMenuItem key={calendar.id}>
+                        <SidebarMenuButton
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors ${
+                            isVisible
+                              ? "text-foreground hover:bg-muted/70"
+                              : "text-muted-foreground/40 hover:bg-muted/40 hover:text-muted-foreground/70"
+                          }`}
+                          onClick={() => toggleCalendarVisibility(calendar.id)}
+                        >
+                          <span
+                            className="size-2 rounded-full shrink-0 transition-opacity"
+                            style={{
+                              backgroundColor: calendar.color?.startsWith("#")
+                                ? calendar.color
+                                : `var(--color-event-${calendar.color || "default"})`,
+                              opacity: isVisible ? 1 : 0.3,
+                            }}
+                          />
+                          <span className="truncate">{calendar.name}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+
+                  {publicCalendars.length > 0 && (
+                    <SidebarMenuItem className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55 list-none">
+                      Public
+                    </SidebarMenuItem>
+                  )}
+                  {publicCalendars.map((calendar) => {
+                    const isVisible = isCalendarVisible(calendar.id);
+                    return (
+                      <SidebarMenuItem key={calendar.id}>
+                        <SidebarMenuButton
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors ${
+                            isVisible
+                              ? "text-foreground hover:bg-muted/70"
+                              : "text-muted-foreground/40 hover:bg-muted/40 hover:text-muted-foreground/70"
+                          }`}
+                          onClick={() => toggleCalendarVisibility(calendar.id)}
+                        >
+                          <span
+                            className="size-2 rounded-full shrink-0 transition-opacity"
+                            style={{
+                              backgroundColor: calendar.color?.startsWith("#")
+                                ? calendar.color
+                                : `var(--color-event-${calendar.color || "default"})`,
+                              opacity: isVisible ? 1 : 0.3,
+                            }}
+                          />
+                          <span className="truncate">{calendar.name}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+
+                  {subscribedCalendars.length > 0 && (
+                    <SidebarMenuItem className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/55 list-none">
+                      Subscribed
+                    </SidebarMenuItem>
+                  )}
+                  {subscribedCalendars.map((calendar) => {
                     const isVisible = isCalendarVisible(calendar.id);
                     return (
                       <SidebarMenuItem key={calendar.id}>
@@ -452,21 +656,23 @@ function AppSidebarDesktop({
       {/* Footer: user profile */}
       <SidebarFooter className="p-2 border-t border-border/40">
         {user ? (
-          <NavUser user={user} onLogout={onLogout} onOpenSettings={onOpenSettings} />
-        ) : (
-          isCollapsed ? null : (
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className="rounded-lg h-9 text-[13px] font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
-                  onClick={onOpenSettings}
-                >
-                  <GearSixIcon size={16} weight="regular" />
-                  Settings
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          )
+          <NavUser
+            user={user}
+            onLogout={onLogout}
+            onOpenSettings={onOpenSettings}
+          />
+        ) : isCollapsed ? null : (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="rounded-lg h-9 text-[13px] font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+                onClick={onOpenSettings}
+              >
+                <GearSixIcon size={16} weight="regular" />
+                Settings
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         )}
       </SidebarFooter>
       <SidebarRail />

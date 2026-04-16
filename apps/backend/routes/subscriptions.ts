@@ -13,8 +13,8 @@ import type {
   ImportIcsResponse,
   UpdateCalendarSubscriptionRequest,
 } from "@workspace/calendar-ics";
+import { findNationalHolidayCalendarByUrl } from "@workspace/calendar-ics";
 import { requireAuth } from "../lib/auth-guard";
-import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 import { createLogger } from "@workspace/logger";
 
@@ -25,6 +25,22 @@ type SyncableSubscription = Prisma.CalendarSubscriptionGetPayload<{
     calendar: true;
   };
 }>;
+
+const ALLOWED_CALENDAR_COLORS = [
+  "blue",
+  "orange",
+  "violet",
+  "rose",
+  "emerald",
+] as const;
+
+const isHexCalendarColor = (value: string) =>
+  /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
+
+const isValidCalendarColor = (value: string) =>
+  ALLOWED_CALENDAR_COLORS.includes(
+    value as (typeof ALLOWED_CALENDAR_COLORS)[number],
+  ) || isHexCalendarColor(value);
 
 export const subscriptionsRoute = new Elysia()
   .use(requireAuth)
@@ -121,10 +137,7 @@ export const subscriptionsRoute = new Elysia()
 
         const icsContent = await response.text();
         logger.info("📄 Fetched ICS content length:", icsContent.length);
-        logger.info(
-          "📄 First 200 chars of ICS:",
-          icsContent.substring(0, 200),
-        );
+        logger.info("📄 First 200 chars of ICS:", icsContent.substring(0, 200));
 
         // Get user settings for timezone
         let userSettings = await prisma.userSettings.findUnique({
@@ -162,12 +175,20 @@ export const subscriptionsRoute = new Elysia()
         );
       }
 
+      const matchingNationalHolidayCalendar =
+        findNationalHolidayCalendarByUrl(url);
+
       // Auto-create a new sync-only calendar for this subscription
-      const calendarColor = color || "#6366f1";
+      const calendarColor =
+        color || matchingNationalHolidayCalendar?.defaultColor || "#6366f1";
       const calendar = await prisma.calendar.create({
         data: {
           name: name.trim(),
           color: calendarColor,
+          kind: matchingNationalHolidayCalendar
+            ? "public_holiday"
+            : "subscribed",
+          isPublic: !!matchingNationalHolidayCalendar,
           isSyncOnly: true,
           isDefault: false,
           userId: user.id,
@@ -182,6 +203,8 @@ export const subscriptionsRoute = new Elysia()
           userId: user.id,
           calendarId: calendar.id,
           lastSyncStatus: "pending",
+          // Holiday calendars change rarely — sync weekly instead of every 15 min
+          syncIntervalMinutes: matchingNationalHolidayCalendar ? 10080 : 15,
         },
         include: {
           calendar: true,
@@ -190,7 +213,11 @@ export const subscriptionsRoute = new Elysia()
 
       // Sync immediately on creation (non-blocking)
       syncCalendarSubscription(subscription).catch((err) => {
-        logger.error("Initial sync failed for subscription:", subscription.id, err);
+        logger.error(
+          "Initial sync failed for subscription:",
+          subscription.id,
+          err,
+        );
       });
 
       return subscription;
@@ -216,7 +243,7 @@ export const subscriptionsRoute = new Elysia()
       // Robust user check with fallback
       user = await ensureAuthenticatedUser(user, request as Request);
       const { id } = params;
-      const { name, isActive, syncIntervalMinutes } =
+      const { name, color, isActive, syncIntervalMinutes } =
         body as UpdateCalendarSubscriptionRequest;
 
       const subscription = await prisma.calendarSubscription.findFirst({
@@ -224,23 +251,59 @@ export const subscriptionsRoute = new Elysia()
           id,
           userId: user.id,
         },
+        include: {
+          calendar: true,
+        },
       });
 
       if (!subscription) {
         throw new Error("Subscription not found");
       }
 
-      const updatedSubscription = await prisma.calendarSubscription.update({
-        where: { id },
-        data: {
-          name: name || subscription.name,
-          isActive: isActive !== undefined ? isActive : subscription.isActive,
-          syncIntervalMinutes:
-            syncIntervalMinutes || subscription.syncIntervalMinutes,
-        },
-        include: {
-          calendar: true,
-        },
+      const trimmedName = name?.trim();
+
+      if (trimmedName !== undefined) {
+        if (!trimmedName) {
+          throw new Error("Calendar name is required");
+        }
+
+        if (trimmedName.length > 100) {
+          throw new Error("Calendar name cannot exceed 100 characters");
+        }
+      }
+
+      if (color !== undefined && !isValidCalendarColor(color)) {
+        throw new Error(
+          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g. #FF0000)`,
+        );
+      }
+
+      const updatedSubscription = await prisma.$transaction(async (tx) => {
+        if (trimmedName !== undefined || color !== undefined) {
+          await tx.calendar.update({
+            where: {
+              id: subscription.calendarId,
+            },
+            data: {
+              ...(trimmedName !== undefined ? { name: trimmedName } : {}),
+              ...(color !== undefined ? { color } : {}),
+            },
+          });
+        }
+
+        return tx.calendarSubscription.update({
+          where: { id },
+          data: {
+            ...(trimmedName !== undefined ? { name: trimmedName } : {}),
+            ...(isActive !== undefined ? { isActive } : {}),
+            ...(syncIntervalMinutes !== undefined
+              ? { syncIntervalMinutes }
+              : {}),
+          },
+          include: {
+            calendar: true,
+          },
+        });
       });
 
       return updatedSubscription;
@@ -251,6 +314,7 @@ export const subscriptionsRoute = new Elysia()
       }),
       body: t.Object({
         name: t.Optional(t.String()),
+        color: t.Optional(t.String()),
         isActive: t.Optional(t.Boolean()),
         syncIntervalMinutes: t.Optional(
           t.Number({ minimum: 5, maximum: 1440 }),

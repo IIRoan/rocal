@@ -1,25 +1,119 @@
 import { Elysia, t } from "elysia";
+import { Prisma } from "../generated/prisma/index.js";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
 import { ensureUserCalendars } from "../lib/user-setup";
 import { requireAuth } from "../lib/auth-guard";
-
-import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+
+const createCalendarBodySchema = t.Object({
+  name: t.String({
+    minLength: 1,
+    maxLength: 100,
+    description: "Calendar name (required, 1-100 characters)",
+  }),
+  color: t.String({
+    description:
+      "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
+  }),
+  isDefault: t.Optional(
+    t.Boolean({
+      description:
+        "Whether this should be the default calendar (default: false)",
+    }),
+  ),
+});
+
+const updateCalendarParamsSchema = t.Object({
+  id: t.String({
+    description: "Calendar ID",
+  }),
+});
+
+const updateCalendarBodySchema = t.Object({
+  name: t.Optional(
+    t.String({
+      minLength: 1,
+      maxLength: 100,
+      description: "Calendar name (1-100 characters)",
+    }),
+  ),
+  color: t.Optional(
+    t.String({
+      description:
+        "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
+    }),
+  ),
+  isVisible: t.Optional(
+    t.Boolean({
+      description: "Whether the calendar is visible",
+    }),
+  ),
+  isDefault: t.Optional(
+    t.Boolean({
+      description: "Whether this should be the default calendar",
+    }),
+  ),
+});
+
+const deleteCalendarParamsSchema = t.Object({
+  id: t.String({
+    description: "Calendar ID to delete",
+  }),
+});
+
+const deleteCalendarQuerySchema = t.Object({
+  action: t.Optional(
+    t.Union([t.Literal("delete_events"), t.Literal("move_events")], {
+      description:
+        "What to do with events: delete_events (default), or move_events",
+    }),
+  ),
+  targetCalendarId: t.Optional(
+    t.String({
+      description: "Target calendar ID when using move_events action",
+    }),
+  ),
+});
+
+type CreateCalendarBody = typeof createCalendarBodySchema.static;
+type UpdateCalendarParams = typeof updateCalendarParamsSchema.static;
+type UpdateCalendarBody = typeof updateCalendarBodySchema.static;
+type DeleteCalendarParams = typeof deleteCalendarParamsSchema.static;
+type DeleteCalendarQuery = typeof deleteCalendarQuerySchema.static;
+
+const ALLOWED_CALENDAR_COLORS = [
+  "blue",
+  "orange",
+  "violet",
+  "rose",
+  "emerald",
+] as const;
+
+const isHexCalendarColor = (value: string) =>
+  /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
+
+const isValidCalendarColor = (value: string) =>
+  ALLOWED_CALENDAR_COLORS.includes(
+    value as (typeof ALLOWED_CALENDAR_COLORS)[number],
+  ) || isHexCalendarColor(value);
 
 export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
   .use(requireAuth)
   .get(
     "/",
     async ({ user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(
+        user,
+        request as Request,
+      );
 
       // Ensure user has default calendars
-      await ensureUserCalendars(user.id);
+      await ensureUserCalendars(authenticatedUser.id);
 
       const calendars = await prisma.calendar.findMany({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         orderBy: [
           { isDefault: "desc" }, // Default calendar first
@@ -75,9 +169,13 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
   .post(
     "/",
     async ({ body, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(
+        user,
+        request as Request,
+      );
+      const typedBody = body as CreateCalendarBody;
 
-      const { name, color, isDefault } = body;
+      const { name, color, isDefault } = typedBody;
 
       // Validate required fields
       if (!name?.trim()) {
@@ -88,12 +186,9 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       }
 
       // Validate color (allow predefined colors or hex colors)
-      const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-      const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
-
-      if (!allowedColors.includes(color) && !isHexColor) {
+      if (!isValidCalendarColor(color)) {
         throw new ValidationError(
-          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
           "color",
         );
       }
@@ -109,7 +204,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       // Check if calendar name already exists for this user
       const existingCalendar = await prisma.calendar.findFirst({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
           name: name.trim(),
         },
       });
@@ -125,7 +220,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (isDefault) {
         await prisma.calendar.updateMany({
           where: {
-            userId: user.id,
+            userId: authenticatedUser.id,
             isDefault: true,
           },
           data: {
@@ -139,32 +234,18 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         data: {
           name: name.trim(),
           color,
+          kind: "owned",
+          isPublic: false,
           isVisible: true,
           isDefault: isDefault || false,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
       return calendar;
     },
     {
-      body: t.Object({
-        name: t.String({
-          minLength: 1,
-          maxLength: 100,
-          description: "Calendar name (required, 1-100 characters)",
-        }),
-        color: t.String({
-          description:
-            "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
-        }),
-        isDefault: t.Optional(
-          t.Boolean({
-            description:
-              "Whether this should be the default calendar (default: false)",
-          }),
-        ),
-      }),
+      body: createCalendarBodySchema,
       detail: {
         tags: ["Calendars"],
         summary: "Create a new calendar",
@@ -204,15 +285,20 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
   .put(
     "/:id",
     async ({ params, body, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(
+        user,
+        request as Request,
+      );
+      const typedParams = params as UpdateCalendarParams;
+      const typedBody = body as UpdateCalendarBody;
 
-      const { id } = params;
+      const { id } = typedParams;
 
       // Verify calendar exists and belongs to user
       const existingCalendar = await prisma.calendar.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -220,15 +306,27 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         throw new ValidationError("Calendar not found or access denied");
       }
 
+      const isVisibilityOnlyUpdate =
+        typedBody.isVisible !== undefined &&
+        typedBody.name === undefined &&
+        typedBody.color === undefined &&
+        typedBody.isDefault === undefined;
+
+      if (existingCalendar.kind !== "owned" && !isVisibilityOnlyUpdate) {
+        throw new ValidationError(
+          "Only owned calendars can be updated here. Manage subscribed or public calendars from subscriptions instead.",
+        );
+      }
+
       // Validate name if provided
-      if (body.name !== undefined) {
-        if (!body.name?.trim()) {
+      if (typedBody.name !== undefined) {
+        if (!typedBody.name?.trim()) {
           throw new ValidationError(
             "Calendar name is required and cannot be empty",
             "name",
           );
         }
-        if (body.name.trim().length > 100) {
+        if (typedBody.name.trim().length > 100) {
           throw new ValidationError(
             "Calendar name cannot exceed 100 characters",
             "name",
@@ -238,8 +336,8 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         // Check if calendar name already exists for this user (excluding current calendar)
         const existingNameCalendar = await prisma.calendar.findFirst({
           where: {
-            userId: user.id,
-            name: body.name.trim(),
+            userId: authenticatedUser.id,
+            name: typedBody.name.trim(),
             id: { not: id },
           },
         });
@@ -253,40 +351,35 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       }
 
       // Validate color if provided (allow predefined colors or hex colors)
-      if (body.color !== undefined) {
-        const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-        const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-          body.color,
-        );
-
-        if (!allowedColors.includes(body.color) && !isHexColor) {
+      if (typedBody.color !== undefined) {
+        if (!isValidCalendarColor(typedBody.color)) {
           throw new ValidationError(
-            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+            `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
             "color",
           );
         }
       }
 
       // Prepare update data
-      const updateData: any = {};
+      const updateData: Prisma.CalendarUpdateInput = {};
 
-      if (body.name !== undefined) {
-        updateData.name = body.name.trim();
+      if (typedBody.name !== undefined) {
+        updateData.name = typedBody.name.trim();
       }
-      if (body.color !== undefined) {
-        updateData.color = body.color;
+      if (typedBody.color !== undefined) {
+        updateData.color = typedBody.color;
       }
-      if (body.isVisible !== undefined) {
-        updateData.isVisible = body.isVisible;
+      if (typedBody.isVisible !== undefined) {
+        updateData.isVisible = typedBody.isVisible;
       }
-      if (body.isDefault !== undefined) {
-        updateData.isDefault = body.isDefault;
+      if (typedBody.isDefault !== undefined) {
+        updateData.isDefault = typedBody.isDefault;
 
         // If setting as default, unset other defaults
-        if (body.isDefault) {
+        if (typedBody.isDefault) {
           await prisma.calendar.updateMany({
             where: {
-              userId: user.id,
+              userId: authenticatedUser.id,
               isDefault: true,
               id: { not: id },
             },
@@ -308,36 +401,8 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       return updatedCalendar;
     },
     {
-      params: t.Object({
-        id: t.String({
-          description: "Calendar ID",
-        }),
-      }),
-      body: t.Object({
-        name: t.Optional(
-          t.String({
-            minLength: 1,
-            maxLength: 100,
-            description: "Calendar name (1-100 characters)",
-          }),
-        ),
-        color: t.Optional(
-          t.String({
-            description:
-              "Calendar color (blue, orange, violet, rose, emerald, or hex color like #FF0000)",
-          }),
-        ),
-        isVisible: t.Optional(
-          t.Boolean({
-            description: "Whether the calendar is visible",
-          }),
-        ),
-        isDefault: t.Optional(
-          t.Boolean({
-            description: "Whether this should be the default calendar",
-          }),
-        ),
-      }),
+      params: updateCalendarParamsSchema,
+      body: updateCalendarBodySchema,
       detail: {
         tags: ["Calendars"],
         summary: "Update an existing calendar",
@@ -364,16 +429,21 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
   .delete(
     "/:id",
     async ({ params, query, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(
+        user,
+        request as Request,
+      );
+      const typedParams = params as DeleteCalendarParams;
+      const typedQuery = query as DeleteCalendarQuery;
 
-      const { id } = params;
-      const { action = "delete_events", targetCalendarId } = query;
+      const { id } = typedParams;
+      const { action = "delete_events", targetCalendarId } = typedQuery;
 
       // Verify calendar exists and belongs to user
       const existingCalendar = await prisma.calendar.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -381,16 +451,23 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
         throw new ValidationError("Calendar not found or access denied");
       }
 
-      // Prevent deleting the last calendar
+      if (existingCalendar.kind !== "owned") {
+        throw new ValidationError(
+          "Only owned calendars can be deleted here. Manage subscribed or public calendars from subscriptions instead.",
+        );
+      }
+
+      // Prevent deleting the last owned calendar
       const calendarCount = await prisma.calendar.count({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
+          kind: "owned",
         },
       });
 
       if (calendarCount <= 1) {
         throw new ValidationError(
-          "Cannot delete the last calendar. Create another calendar first.",
+          "Cannot delete the last editable calendar. Create another calendar first.",
           "calendarId",
         );
       }
@@ -415,7 +492,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
           const targetCalendar = await prisma.calendar.findFirst({
             where: {
               id: targetCalendarId,
-              userId: user.id,
+              userId: authenticatedUser.id,
             },
           });
 
@@ -457,7 +534,7 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       if (existingCalendar.isDefault) {
         const nextCalendar = await prisma.calendar.findFirst({
           where: {
-            userId: user.id,
+            userId: authenticatedUser.id,
             id: { not: id },
           },
           orderBy: {
@@ -492,24 +569,8 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
       };
     },
     {
-      params: t.Object({
-        id: t.String({
-          description: "Calendar ID to delete",
-        }),
-      }),
-      query: t.Object({
-        action: t.Optional(
-          t.Union([t.Literal("delete_events"), t.Literal("move_events")], {
-            description:
-              "What to do with events: delete_events (default), or move_events",
-          }),
-        ),
-        targetCalendarId: t.Optional(
-          t.String({
-            description: "Target calendar ID when using move_events action",
-          }),
-        ),
-      }),
+      params: deleteCalendarParamsSchema,
+      query: deleteCalendarQuerySchema,
       detail: {
         tags: ["Calendars"],
         summary: "Delete a calendar with event handling options",

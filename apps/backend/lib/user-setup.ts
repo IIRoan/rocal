@@ -23,6 +23,8 @@ export async function ensureUserCalendars(userId: string) {
           {
             name: "Personal",
             color: "#10b981", // emerald
+            kind: "owned",
+            isPublic: false,
             isVisible: true,
             isDefault: true,
             userId,
@@ -30,6 +32,8 @@ export async function ensureUserCalendars(userId: string) {
           {
             name: "Work",
             color: "#3b82f6", // blue
+            kind: "owned",
+            isPublic: false,
             isVisible: true,
             isDefault: false,
             userId,
@@ -37,6 +41,8 @@ export async function ensureUserCalendars(userId: string) {
           {
             name: "Family",
             color: "#f43f5e", // rose
+            kind: "owned",
+            isPublic: false,
             isVisible: true,
             isDefault: false,
             userId,

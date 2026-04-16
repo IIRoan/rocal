@@ -177,7 +177,6 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   .get(
     "/",
     async ({ query: { start, end }, user, request, set }: any) => {
-
       // Robust user check with fallback
       if (!user || !user.id) {
         try {
@@ -193,10 +192,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             throw new Error("User context missing");
           }
         } catch (e) {
-          logger.error(
-            "User missing in events handler and fallback failed",
-            e,
-          );
+          logger.error("User missing in events handler and fallback failed", e);
           throw new Error("User context missing");
         }
       }
@@ -626,10 +622,10 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           );
         }
 
-        // Block event creation in sync-only calendars
-        if (calendar.isSyncOnly) {
+        // Block event creation in non-owned calendars
+        if (calendar.kind !== "owned" || calendar.isSyncOnly) {
           throw new ValidationError(
-            "Cannot create events in a sync-only calendar. This calendar is synced from an external subscription.",
+            "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
             "calendarId",
           );
         }
@@ -650,7 +646,10 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           body.reminder = reminderValue;
         }
 
-        const eventTimezone = await resolveEventTimezone(user.id, body.timezone);
+        const eventTimezone = await resolveEventTimezone(
+          user.id,
+          body.timezone,
+        );
 
         // Create the event
         const event = await prisma.calendarEvent.create({
@@ -1169,10 +1168,10 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             );
           }
 
-          // Block moving events into sync-only calendars
-          if (calendar.isSyncOnly) {
+          // Block moving events into non-owned calendars
+          if (calendar.kind !== "owned" || calendar.isSyncOnly) {
             throw new ValidationError(
-              "Cannot move events to a sync-only calendar.",
+              "Cannot move events to a read-only calendar.",
               "calendarId",
             );
           }

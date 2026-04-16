@@ -93,6 +93,9 @@ export type PaletteView =
   | "calendar-create"
   | "calendar-edit"
   | "subscriptions"
+  | "subscriptions-add-feed"
+  | "subscriptions-holidays"
+  | "subscriptions-edit"
   | "events"
   | "event-editor"
   | "search";

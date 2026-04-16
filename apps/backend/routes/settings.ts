@@ -147,6 +147,13 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
             "defaultCalendarId",
           );
         }
+
+        if (calendar.kind !== "owned") {
+          throw new ValidationError(
+            "The default calendar must be one of your editable calendars.",
+            "defaultCalendarId",
+          );
+        }
       }
 
       // Update or create settings

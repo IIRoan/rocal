@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/components/command-palette-context";
+import type { PaletteView } from "@/components/command-palette/index";
 import type {
+  ApiError,
   Calendar,
+  CalendarSubscription,
   CalendarShareLink,
   CreateCalendarRequest,
   UpdateCalendarRequest,
@@ -40,7 +43,10 @@ import {
 } from "@workspace/ui/components/ui/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
-import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/ui/radio-group";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@workspace/ui/components/ui/radio-group";
 import { SubscriptionManagement } from "./subscription-management";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import {
@@ -58,12 +64,14 @@ import {
   Upload,
   FileText,
   ExternalLink,
+  Globe,
   Share2,
   Copy,
   RefreshCw,
   Link2,
 } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 
 const PRESET_COLORS = [
   "#3b82f6", // blue
@@ -80,6 +88,31 @@ const PRESET_COLORS = [
   "#14b8a6", // teal
 ];
 
+const calendarFormSchema = z.object({
+  name: z.string().trim().min(1, "Calendar name is required").max(100),
+  color: z
+    .string()
+    .trim()
+    .refine((value) => {
+      const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
+      return (
+        allowedColors.includes(value) ||
+        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)
+      );
+    }, "Please select a valid color"),
+});
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
+};
+
 interface CalendarManagementProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -94,6 +127,30 @@ export function CalendarManagement({
     useCalendarData();
   const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
   const { openCalendarManagement } = useCommandPalette();
+  const ownedCalendars = calendars.filter(
+    (calendar) => calendar.kind === "owned",
+  );
+  const publicCalendars = calendars.filter(
+    (calendar) => calendar.kind === "public_holiday",
+  );
+  const subscribedCalendars = calendars.filter(
+    (calendar) =>
+      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
+  );
+  const { data: subscriptions = [] } = useQuery<
+    CalendarSubscription[],
+    ApiError
+  >({
+    queryKey: ["subscriptions"],
+    queryFn: () => calendarApiService.getSubscriptions(),
+    enabled: open,
+  });
+  const subscriptionByCalendarId = new Map<string, CalendarSubscription>(
+    subscriptions.map((subscription) => [
+      subscription.calendar.id,
+      subscription,
+    ]),
+  );
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
@@ -125,6 +182,7 @@ export function CalendarManagement({
   const [shareLinkLoading, setShareLinkLoading] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [subscriptionView, setSubscriptionView] = useState<PaletteView>("subscriptions");
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
     color?: string;
@@ -146,6 +204,7 @@ export function CalendarManagement({
     },
     onSuccess: async () => {
       await refetchCalendars();
+      await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       setDeletingCalendar(null);
       setDeleteAction("delete_events");
       setTargetCalendarId("");
@@ -153,8 +212,23 @@ export function CalendarManagement({
       // Also invalidate events since they might have been moved or deleted
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
-    onError: (err: any) => {
-      setError(err.message || "Failed to delete calendar");
+    onError: (error: ApiError) => {
+      setError(getErrorMessage(error, "Failed to delete calendar"));
+    },
+  });
+
+  const deleteSubscriptionMutation = useMutation({
+    mutationFn: async (subscriptionId: string) =>
+      calendarApiService.deleteSubscription(subscriptionId),
+    onSuccess: async () => {
+      await refetchCalendars();
+      await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      setSuccess("Calendar removed successfully!");
+      setError(null);
+    },
+    onError: (error: ApiError) => {
+      setError(getErrorMessage(error, "Failed to remove calendar"));
     },
   });
 
@@ -187,27 +261,30 @@ export function CalendarManagement({
         }, 2000);
       }
     },
-    onError: (err: any) => {
-      setError(err.message || "Failed to import ICS file");
+    onError: (error: ApiError) => {
+      setError(getErrorMessage(error, "Failed to import ICS file"));
     },
   });
 
   const loading =
     deleteCalendarMutation.isPending ||
+    deleteSubscriptionMutation.isPending ||
     importICSMutation.isPending ||
     shareLinkLoading;
 
   const validateCalendarForm = () => {
     const errors: { name?: string; color?: string; general?: string } = {};
 
-    // Check if name is empty
-    if (!newCalendar.name.trim()) {
-      errors.name = "Calendar name is required";
-    }
-
-    // Check name length
-    if (newCalendar.name.trim().length > 100) {
-      errors.name = "Calendar name cannot exceed 100 characters";
+    const parsed = calendarFormSchema.safeParse(newCalendar);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        if (issue.path[0] === "name") {
+          errors.name = issue.message;
+        }
+        if (issue.path[0] === "color") {
+          errors.color = issue.message;
+        }
+      }
     }
 
     // Check for duplicate names (case-insensitive)
@@ -215,16 +292,6 @@ export function CalendarManagement({
     if (existingNames.includes(newCalendar.name.trim().toLowerCase())) {
       errors.name = "A calendar with this name already exists";
     }
-
-    // Validate color format
-    const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-      newCalendar.color,
-    );
-    const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-    if (!allowedColors.includes(newCalendar.color) && !isHexColor) {
-      errors.color = "Please select a valid color";
-    }
-
     return errors;
   };
 
@@ -253,23 +320,24 @@ export function CalendarManagement({
       setShowCreateForm(false);
       setValidationErrors({});
       setSuccess("Calendar created successfully!");
-    } catch (err: any) {
+    } catch (error: unknown) {
       // Handle specific API errors
-      if (err.message && err.message.includes("already exists")) {
+      const message = getErrorMessage(error, "Failed to create calendar.");
+      if (message.includes("already exists")) {
         setValidationErrors({
           name: "A calendar with this name already exists",
         });
-      } else if (err.message && err.message.includes("name is required")) {
+      } else if (message.includes("name is required")) {
         setValidationErrors({ name: "Calendar name is required" });
-      } else if (err.message && err.message.includes("exceed 100 characters")) {
+      } else if (message.includes("exceed 100 characters")) {
         setValidationErrors({
           name: "Calendar name cannot exceed 100 characters",
         });
-      } else if (err.message && err.message.includes("Color must be")) {
+      } else if (message.includes("Color must be")) {
         setValidationErrors({ color: "Please select a valid color" });
       } else {
         // Generic error fallback
-        setError(err.message || "Failed to create calendar. Please try again.");
+        setError(message);
       }
     }
   };
@@ -280,14 +348,9 @@ export function CalendarManagement({
   ) => {
     const errors: { name?: string; color?: string; general?: string } = {};
 
-    // Check if name is empty
-    if (!name.trim()) {
-      errors.name = "Calendar name is required";
-    }
-
-    // Check name length
-    if (name.trim().length > 100) {
-      errors.name = "Calendar name cannot exceed 100 characters";
+    const parsed = calendarFormSchema.shape.name.safeParse(name);
+    if (!parsed.success) {
+      errors.name = parsed.error.issues[0]?.message || "Invalid calendar name";
     }
 
     // Check for duplicate names (excluding current calendar)
@@ -322,22 +385,23 @@ export function CalendarManagement({
       await updateCalendar(calendar.id, updates);
       setSuccess("Calendar updated successfully!");
       return true; // Indicate success
-    } catch (err: any) {
+    } catch (error: unknown) {
       // Handle specific API errors
-      if (err.message && err.message.includes("already exists")) {
+      const message = getErrorMessage(error, "Failed to update calendar.");
+      if (message.includes("already exists")) {
         setValidationErrors({
           name: "A calendar with this name already exists",
         });
-      } else if (err.message && err.message.includes("name is required")) {
+      } else if (message.includes("name is required")) {
         setValidationErrors({ name: "Calendar name is required" });
-      } else if (err.message && err.message.includes("exceed 100 characters")) {
+      } else if (message.includes("exceed 100 characters")) {
         setValidationErrors({
           name: "Calendar name cannot exceed 100 characters",
         });
-      } else if (err.message && err.message.includes("Color must be")) {
+      } else if (message.includes("Color must be")) {
         setValidationErrors({ color: "Please select a valid color" });
       } else {
-        setError(err.message || "Failed to update calendar. Please try again.");
+        setError(message);
       }
       return false; // Indicate failure
     }
@@ -357,6 +421,27 @@ export function CalendarManagement({
     toggleCalendarVisibility(calendar.id);
   };
 
+  const handleRemoveSubscribedCalendar = (calendar: Calendar) => {
+    const subscription = subscriptionByCalendarId.get(calendar.id);
+    if (!subscription) {
+      setError("Unable to find the backing subscription for this calendar.");
+      return;
+    }
+
+    const action =
+      calendar.kind === "public_holiday" ? "remove" : "unsubscribe from";
+
+    if (
+      !confirm(
+        `Are you sure you want to ${action} "${calendar.name}"? The read-only calendar and its synced events will be deleted.`,
+      )
+    ) {
+      return;
+    }
+
+    deleteSubscriptionMutation.mutate(subscription.id);
+  };
+
   const handleSetDefault = (calendar: Calendar) => {
     handleUpdateCalendar(calendar, { isDefault: true });
   };
@@ -371,7 +456,7 @@ export function CalendarManagement({
     });
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
@@ -400,8 +485,8 @@ export function CalendarManagement({
         calendar.id,
       );
       setShareLinkInfo(shareInfo);
-    } catch (err: any) {
-      setError(err.message || "Failed to load calendar share link");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to load calendar share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -425,8 +510,8 @@ export function CalendarManagement({
           ? "Calendar share link regenerated successfully"
           : "Calendar share link enabled successfully",
       );
-    } catch (err: any) {
-      setError(err.message || "Failed to enable calendar share link");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to enable calendar share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -448,8 +533,8 @@ export function CalendarManagement({
         shareUrl: null,
       });
       setSuccess("Calendar share link disabled successfully");
-    } catch (err: any) {
-      setError(err.message || "Failed to disable calendar share link");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to disable calendar share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -663,7 +748,7 @@ export function CalendarManagement({
             <div className="space-y-2">
               <h3 className="text-lg font-semibold">Your Calendars</h3>
               <div className="space-y-2">
-                {calendars.map((calendar) => (
+                {ownedCalendars.map((calendar) => (
                   <Card key={calendar.id}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -678,7 +763,10 @@ export function CalendarManagement({
                                 {calendar.name}
                               </span>
                               {calendar.isSyncOnly && (
-                                <Badge variant="secondary" className="text-xs bg-muted">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs bg-muted"
+                                >
                                   <ExternalLink className="h-3 w-3 mr-1" />
                                   Synced
                                 </Badge>
@@ -691,10 +779,10 @@ export function CalendarManagement({
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {calendar.isSyncOnly
-                                ? "Read-only \u00B7 "
-                                : ""}
-                              {isCalendarVisible(calendar.id) ? "Visible" : "Hidden"}
+                              {calendar.isSyncOnly ? "Read-only \u00B7 " : ""}
+                              {isCalendarVisible(calendar.id)
+                                ? "Visible"
+                                : "Hidden"}
                             </div>
                           </div>
                         </div>
@@ -775,6 +863,150 @@ export function CalendarManagement({
                 ))}
               </div>
             </div>
+
+            {publicCalendars.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Public Calendars</h3>
+                <div className="space-y-2">
+                  {publicCalendars.map((calendar) => (
+                    <Card key={calendar.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className="w-4 h-4 rounded"
+                              style={{ backgroundColor: calendar.color }}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">
+                                  {calendar.name}
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs bg-primary/10 text-primary"
+                                >
+                                  <Globe className="h-3 w-3 mr-1" />
+                                  Public
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Read-only public holiday calendar ·{" "}
+                                {isCalendarVisible(calendar.id)
+                                  ? "Visible"
+                                  : "Hidden"}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleVisibility(calendar)}
+                              title={
+                                isCalendarVisible(calendar.id)
+                                  ? "Hide calendar"
+                                  : "Show calendar"
+                              }
+                            >
+                              {isCalendarVisible(calendar.id) ? (
+                                <Eye className="h-4 w-4" />
+                              ) : (
+                                <EyeOff className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleRemoveSubscribedCalendar(calendar)
+                              }
+                              title="Remove public calendar"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {subscribedCalendars.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Subscribed Calendars</h3>
+                <div className="space-y-2">
+                  {subscribedCalendars.map((calendar) => (
+                    <Card key={calendar.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className="w-4 h-4 rounded"
+                              style={{ backgroundColor: calendar.color }}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">
+                                  {calendar.name}
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs bg-muted"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  Subscribed
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Read-only external calendar ·{" "}
+                                {isCalendarVisible(calendar.id)
+                                  ? "Visible"
+                                  : "Hidden"}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleVisibility(calendar)}
+                              title={
+                                isCalendarVisible(calendar.id)
+                                  ? "Hide calendar"
+                                  : "Show calendar"
+                              }
+                            >
+                              {isCalendarVisible(calendar.id) ? (
+                                <Eye className="h-4 w-4" />
+                              ) : (
+                                <EyeOff className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleRemoveSubscribedCalendar(calendar)
+                              }
+                              title="Remove subscribed calendar"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -784,7 +1016,7 @@ export function CalendarManagement({
         open={!!editingCalendar}
         onOpenChange={(open) => !open && setEditingCalendar(null)}
       >
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Edit Calendar</DialogTitle>
           </DialogHeader>
@@ -902,7 +1134,7 @@ export function CalendarManagement({
         open={!!deletingCalendar}
         onOpenChange={(open) => !open && setDeletingCalendar(null)}
       >
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -923,7 +1155,11 @@ export function CalendarManagement({
             >
               <div className="space-y-3">
                 <div className="flex items-start space-x-3">
-                  <RadioGroupItem value="delete_events" id="delete_events" className="mt-1" />
+                  <RadioGroupItem
+                    value="delete_events"
+                    id="delete_events"
+                    className="mt-1"
+                  />
                   <div className="space-y-1">
                     <Label
                       htmlFor="delete_events"
@@ -938,7 +1174,11 @@ export function CalendarManagement({
                 </div>
 
                 <div className="flex items-start space-x-3">
-                  <RadioGroupItem value="move_events" id="move_events" className="mt-1" />
+                  <RadioGroupItem
+                    value="move_events"
+                    id="move_events"
+                    className="mt-1"
+                  />
                   <div className="space-y-1">
                     <Label
                       htmlFor="move_events"
@@ -1087,17 +1327,19 @@ export function CalendarManagement({
                     <SelectValue placeholder="Select calendar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {calendars.filter((c) => !c.isSyncOnly).map((cal) => (
-                      <SelectItem key={cal.id} value={cal.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: cal.color }}
-                          />
-                          {cal.name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {calendars
+                      .filter((c) => !c.isSyncOnly)
+                      .map((cal) => (
+                        <SelectItem key={cal.id} value={cal.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: cal.color }}
+                            />
+                            {cal.name}
+                          </div>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1124,8 +1366,19 @@ export function CalendarManagement({
       {/* Subscription Management Dialog */}
       <SubscriptionManagement
         open={showSubscriptionDialog}
-        onOpenChange={setShowSubscriptionDialog}
-        onBack={() => setShowSubscriptionDialog(false)}
+        onOpenChange={(open) => {
+          setShowSubscriptionDialog(open);
+          if (!open) setSubscriptionView("subscriptions");
+        }}
+        onBack={() => {
+          if (subscriptionView !== "subscriptions") {
+            setSubscriptionView("subscriptions");
+          } else {
+            setShowSubscriptionDialog(false);
+          }
+        }}
+        currentView={subscriptionView}
+        onNavigateTo={setSubscriptionView}
       />
 
       {/* Share Calendar Dialog */}
@@ -1211,7 +1464,6 @@ export function CalendarManagement({
                 </div>
               )}
             </div>
-
           </div>
 
           <DialogFooter>
