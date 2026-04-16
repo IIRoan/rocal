@@ -304,11 +304,6 @@ function SidebarWithContext() {
       onOpenCalendarManagement={openCalendarManagement}
       onOpenSearch={openSearchPalette}
       onCreateEvent={handleCreateEvent}
-      aiQuery={aiQuery}
-      onAiQueryChange={setAiQuery}
-      onAiSubmit={handleAiSubmit}
-      aiLoading={aiLoading}
-      aiResponse={aiResponse}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
       prefetchRange={calendarData.prefetchRange}
     />
