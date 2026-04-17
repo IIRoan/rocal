@@ -22,6 +22,8 @@
     "lint": "cd apps/backend && bun run lint & cd apps/web && bun run lint & cd apps/notifications && bun run lint",
     "typecheck": "cd apps/backend && bun run typecheck & cd apps/web && bun run typecheck & cd apps/notifications && bun run typecheck",
     "test": "jest",
+    "test:backend": "cd apps/backend && bun run test",
+    "test:backend:coverage": "cd apps/backend && bun run test:coverage",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {

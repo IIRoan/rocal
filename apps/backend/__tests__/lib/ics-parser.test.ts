@@ -1,0 +1,189 @@
+import { describe, expect, it } from "@jest/globals";
+
+import type { CalendarEvent } from "../../generated/prisma/index.js";
+import {
+  convertParsedEventToCalendarEvent,
+  isEventModified,
+  parseICSFile,
+} from "../../lib/ics-parser";
+
+function createCalendarEvent(
+  overrides: Partial<CalendarEvent> = {},
+): CalendarEvent {
+  return {
+    id: "event-1",
+    title: "Imported event",
+    description: null,
+    start: new Date("2024-02-01T10:00:00.000Z"),
+    end: new Date("2024-02-01T11:00:00.000Z"),
+    allDay: false,
+    location: null,
+    color: null,
+    timezone: "UTC",
+    isPrivate: false,
+    reminder: null,
+    recurrence: null,
+    parentEventId: null,
+    isSynced: false,
+    externalId: null,
+    subscriptionId: null,
+    syncedAt: null,
+    userId: "user-1",
+    calendarId: "calendar-1",
+    categoryId: null,
+    createdAt: new Date("2024-01-01T08:00:00.000Z"),
+    updatedAt: new Date("2024-01-02T09:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+describe("ics-parser", () => {
+  it("parses ICS content through the shared package", () => {
+    const result = parseICSFile(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:event-1",
+        "DTSTART:20240201T100000Z",
+        "DTEND:20240201T110000Z",
+        "SUMMARY:Imported event",
+        "DESCRIPTION:Imported description",
+        "LOCATION:HQ",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n"),
+      "UTC",
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.method).toBe("PUBLISH");
+    expect(result.events).toEqual([
+      expect.objectContaining({
+        uid: "event-1",
+        sourceUid: "event-1",
+        title: "Imported event",
+        description: "Imported description",
+        location: "HQ",
+        timezone: "Etc/UTC",
+      }),
+    ]);
+  });
+
+  it("converts a parsed ICS event into a calendar create input", () => {
+    const result = convertParsedEventToCalendarEvent(
+      {
+        uid: "uid-1",
+        sourceUid: "uid-1",
+        title: "Imported event",
+        description: "Imported description",
+        start: new Date("2024-02-01T10:00:00.000Z"),
+        end: new Date("2024-02-01T11:00:00.000Z"),
+        allDay: false,
+        location: "HQ",
+        recurrence: { frequency: "weekly", interval: 1, byWeekDay: [1, 3] },
+        timezone: "Europe/Amsterdam",
+      },
+      "user-1",
+      "calendar-1",
+      "subscription-1",
+    );
+
+    expect(result).toEqual({
+      title: "Imported event",
+      description: "Imported description",
+      start: new Date("2024-02-01T10:00:00.000Z"),
+      end: new Date("2024-02-01T11:00:00.000Z"),
+      allDay: false,
+      location: "HQ",
+      recurrence: '{"frequency":"weekly","interval":1,"byWeekDay":[1,3]}',
+      timezone: "Europe/Amsterdam",
+      isSynced: true,
+      externalId: "uid-1",
+      subscriptionId: "subscription-1",
+      syncedAt: expect.any(Date),
+      user: { connect: { id: "user-1" } },
+      calendar: { connect: { id: "calendar-1" } },
+    });
+  });
+
+  it("uses UTC and omits sync metadata when no subscription is provided", () => {
+    expect(
+      convertParsedEventToCalendarEvent(
+        {
+          uid: "uid-2",
+          sourceUid: "uid-2",
+          title: "Imported event",
+          start: new Date("2024-02-01T10:00:00.000Z"),
+          end: new Date("2024-02-01T11:00:00.000Z"),
+          allDay: true,
+        },
+        "user-1",
+        "calendar-1",
+      ),
+    ).toEqual({
+      title: "Imported event",
+      description: undefined,
+      start: new Date("2024-02-01T10:00:00.000Z"),
+      end: new Date("2024-02-01T11:00:00.000Z"),
+      allDay: true,
+      location: undefined,
+      recurrence: undefined,
+      timezone: "UTC",
+      isSynced: false,
+      externalId: "uid-2",
+      subscriptionId: undefined,
+      syncedAt: undefined,
+      user: { connect: { id: "user-1" } },
+      calendar: { connect: { id: "calendar-1" } },
+    });
+  });
+
+  it("detects when a parsed event matches the stored event", () => {
+    const existingEvent = createCalendarEvent({
+      title: "Imported event",
+      description: "Imported description",
+      location: "HQ",
+      recurrence: '{"frequency":"weekly","interval":1}',
+    });
+
+    expect(
+      isEventModified(existingEvent, {
+        uid: "uid-1",
+        sourceUid: "uid-1",
+        title: "Imported event",
+        description: "Imported description",
+        start: new Date("2024-02-01T10:00:00.000Z"),
+        end: new Date("2024-02-01T11:00:00.000Z"),
+        allDay: false,
+        location: "HQ",
+        recurrence: { frequency: "weekly", interval: 1 },
+        timezone: "UTC",
+      }),
+    ).toBe(false);
+  });
+
+  it("detects modified data including fallback null and timezone handling", () => {
+    const existingEvent = createCalendarEvent({
+      description: null,
+      location: null,
+      recurrence: null,
+      timezone: "UTC",
+    });
+
+    expect(
+      isEventModified(existingEvent, {
+        uid: "uid-1",
+        sourceUid: "uid-1",
+        title: "Imported event",
+        description: "Changed",
+        start: new Date("2024-02-01T10:00:00.000Z"),
+        end: new Date("2024-02-01T11:00:00.000Z"),
+        allDay: false,
+        location: "HQ",
+        recurrence: { frequency: "weekly", interval: 1 },
+        timezone: "Europe/Amsterdam",
+      }),
+    ).toBe(true);
+  });
+});
