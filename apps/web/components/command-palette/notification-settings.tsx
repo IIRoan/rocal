@@ -1,54 +1,22 @@
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Switch } from "@workspace/ui/components/ui/switch";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Mail, Clock, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
-import type { PaletteView } from "./constants";
 
 interface NotificationSettingsProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
   goBack: () => void;
-  TransitionContainer: React.ComponentType<{
-    direction: "forward" | "back";
-    children: React.ReactNode;
-    viewKey?: string;
-  }>;
-  transitionDirection: "forward" | "back";
 }
 
 export function NotificationSettings({
-  open,
-  onOpenChange,
   localSettings,
   updateSetting,
   goBack,
-  TransitionContainer,
-  transitionDirection,
 }: NotificationSettingsProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-      >
-        <VisuallyHidden>
-          <DialogTitle>Notification Settings</DialogTitle>
-        </VisuallyHidden>
-        <TransitionContainer
-          direction={transitionDirection}
-          viewKey="notifications"
-        >
-          <div className="flex flex-col">
+    <div className="flex flex-col">
             {/* Header */}
             <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
               <button
@@ -118,9 +86,6 @@ export function NotificationSettings({
                 />
               </div>
             </div>
-          </div>
-        </TransitionContainer>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }

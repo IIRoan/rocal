@@ -1,10 +1,4 @@
 import React, { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Input } from "@workspace/ui/components/ui/input";
 import {
   Globe,
@@ -18,51 +12,25 @@ import type { UserSettings } from "@/lib/types/calendar";
 import { TIMEZONE_GROUPS, ALL_TIMEZONES, type PaletteView } from "./constants";
 
 interface TimeRegionSettingsProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
   goBack: () => void;
   goForward: (view: PaletteView) => void;
   currentView: string;
-  TransitionContainer: React.ComponentType<{
-    direction: "forward" | "back";
-    children: React.ReactNode;
-    viewKey?: string;
-  }>;
-  transitionDirection: "forward" | "back";
 }
 
 export function TimeRegionSettings({
-  open,
-  onOpenChange,
   localSettings,
   updateSetting,
   goBack,
   goForward,
   currentView,
-  TransitionContainer,
-  transitionDirection,
 }: TimeRegionSettingsProps) {
   const [timezoneSearch, setTimezoneSearch] = useState("");
 
   if (currentView === "time-region") {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-        >
-          <VisuallyHidden>
-            <DialogTitle>Time & Region Settings</DialogTitle>
-          </VisuallyHidden>
-          <TransitionContainer
-            direction={transitionDirection}
-            viewKey={currentView}
-          >
-            <div className="flex flex-col">
+      <div className="flex flex-col">
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
                 <button
@@ -121,35 +89,18 @@ export function TimeRegionSettings({
                   ))}
                 </div>
               </div>
-            </div>
-          </TransitionContainer>
-        </DialogContent>
-      </Dialog>
+    </div>
     );
   }
 
   if (currentView === "timezone") {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-        >
-          <VisuallyHidden>
-            <DialogTitle>Timezone Selection</DialogTitle>
-          </VisuallyHidden>
-          <TransitionContainer
-            direction={transitionDirection}
-            viewKey={currentView}
-          >
-            <div className="flex flex-col">
-              {/* Header */}
-              <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                <button
-                  onClick={() => goBack()}
-                  className="p-1 rounded hover:bg-muted/50 transition-colors"
+      <div className="flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+          <button
+            onClick={() => goBack()}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                 </button>
@@ -246,10 +197,7 @@ export function TimeRegionSettings({
                   )
                 )}
               </div>
-            </div>
-          </TransitionContainer>
-        </DialogContent>
-      </Dialog>
+      </div>
     );
   }
 

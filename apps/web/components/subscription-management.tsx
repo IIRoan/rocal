@@ -16,18 +16,18 @@ import type {
 import { NATIONAL_HOLIDAY_CALENDARS } from "@workspace/calendar-ics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { Button } from "@workspace/ui/components/ui/button";
+import { Input } from "@workspace/ui/components/ui/input";
+import { Label } from "@workspace/ui/components/ui/label";
+import { Badge } from "@workspace/ui/components/ui/badge";
+import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
-import { Label } from "@workspace/ui/components/ui/label";
-import { Badge } from "@workspace/ui/components/ui/badge";
-import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
-import { TransitionContainer, PRESET_COLORS, type PaletteView } from "./command-palette/index";
+import { PRESET_COLORS, type PaletteView } from "./command-palette/index";
 import {
   Plus,
   Trash2,
@@ -94,12 +94,11 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 
 interface SubscriptionManagementProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange?: (open: boolean) => void;
   onBack?: () => void;
   currentView: PaletteView;
   onNavigateTo: (view: PaletteView) => void;
   initialEditCalendarId?: string;
-  transitionDirection?: "forward" | "back";
 }
 
 export function SubscriptionManagement({
@@ -109,7 +108,6 @@ export function SubscriptionManagement({
   currentView,
   onNavigateTo,
   initialEditCalendarId,
-  transitionDirection = "forward",
 }: SubscriptionManagementProps) {
   const queryClient = useQueryClient();
   const { calendars, refetchCalendars } = useCalendarData();
@@ -148,10 +146,6 @@ export function SubscriptionManagement({
     setLocalError(null);
     setSuccess(null);
     onBack?.();
-  };
-
-  const handleOpenChange = (isOpen: boolean) => {
-    onOpenChange(isOpen);
   };
 
   // Query
@@ -492,32 +486,10 @@ export function SubscriptionManagement({
     }
   };
 
-  const dialogContentClass =
-    "overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[520px]";
-
   const isHolidayCalendar =
     editingSubscriptionData?.calendar.kind === "public_holiday";
 
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        aria-describedby={undefined}
-        className={dialogContentClass}
-      >
-        <VisuallyHidden>
-          <DialogTitle>
-            {currentView === "subscriptions-add-feed"
-              ? "Add External Feed"
-              : currentView === "subscriptions-holidays"
-                ? "Holiday Calendars"
-                : currentView === "subscriptions-edit"
-                  ? "Edit Calendar"
-                  : "Calendar Subscriptions"}
-          </DialogTitle>
-        </VisuallyHidden>
-        <TransitionContainer direction={transitionDirection}>
+  const content = (
           <div
             className="flex flex-col"
             style={{ minHeight: "360px", maxHeight: "calc(100dvh - 200px)" }}
@@ -1109,8 +1081,27 @@ export function SubscriptionManagement({
               </>
             )}
           </div>
-        </TransitionContainer>
-      </DialogContent>
-    </Dialog>
   );
+
+  // When used standalone (with onOpenChange), wrap in Dialog
+  if (onOpenChange) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          variant="spotlight"
+          showClose={false}
+          aria-describedby={undefined}
+          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[520px]"
+        >
+          <VisuallyHidden>
+            <DialogTitle>Calendar Subscriptions</DialogTitle>
+          </VisuallyHidden>
+          {content}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // When embedded in command palette, return content directly
+  return content;
 }

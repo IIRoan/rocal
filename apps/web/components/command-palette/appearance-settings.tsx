@@ -1,57 +1,25 @@
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Sun, Moon, Monitor, Layout, Check, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 import { CALENDAR_VIEWS } from "@workspace/ui/components/calendar";
-import type { PaletteView } from "./constants";
 
 interface AppearanceSettingsProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
   goBack: () => void;
-  TransitionContainer: React.ComponentType<{
-    direction: "forward" | "back";
-    children: React.ReactNode;
-    viewKey?: string;
-  }>;
-  transitionDirection: "forward" | "back";
 }
 
 export function AppearanceSettings({
-  open,
-  onOpenChange,
   localSettings,
   updateSetting,
   goBack,
-  TransitionContainer,
-  transitionDirection,
 }: AppearanceSettingsProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        className="overflow-hidden p-0 bg-popover border-border shadow-xl"
-      >
-        <VisuallyHidden>
-          <DialogTitle>Appearance Settings</DialogTitle>
-        </VisuallyHidden>
-        <TransitionContainer
-          direction={transitionDirection}
-          viewKey="appearance"
-        >
-          <div
-            className="flex flex-col"
-            style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}
-          >
+    <div
+      className="flex flex-col"
+      style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}
+    >
             {/* Header */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
               <button
@@ -130,9 +98,6 @@ export function AppearanceSettings({
                 ))}
               </div>
             </div>
-          </div>
-        </TransitionContainer>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
