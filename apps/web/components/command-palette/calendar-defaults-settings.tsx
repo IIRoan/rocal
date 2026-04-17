@@ -1,11 +1,5 @@
 import React from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -15,34 +9,22 @@ import {
 import { Calendar, Check, ArrowLeft, BookOpen } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
-import { WORKING_DAYS, type PaletteView } from "./constants";
+import { WORKING_DAYS } from "./constants";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { toast } from "sonner";
 
 interface CalendarDefaultsSettingsProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
   goBack: () => void;
   workingDaysList: number[];
-  TransitionContainer: React.ComponentType<{
-    direction: "forward" | "back";
-    children: React.ReactNode;
-    viewKey?: string;
-  }>;
-  transitionDirection: "forward" | "back";
 }
 
 export function CalendarDefaultsSettings({
-  open,
-  onOpenChange,
   localSettings,
   updateSetting,
   goBack,
   workingDaysList,
-  TransitionContainer,
-  transitionDirection,
 }: CalendarDefaultsSettingsProps) {
   const { calendars, updateCalendar, refetchCalendars } =
     useSharedCalendarData();
@@ -70,31 +52,18 @@ export function CalendarDefaultsSettings({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-      >
-        <VisuallyHidden>
-          <DialogTitle>Calendar Defaults</DialogTitle>
-        </VisuallyHidden>
-        <TransitionContainer
-          direction={transitionDirection}
-          viewKey="calendar-defaults"
+    <div className="flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+        <button
+          onClick={() => goBack()}
+          className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <div className="flex flex-col">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-              <button
-                onClick={() => goBack()}
-                className="p-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <span className="text-sm font-medium">Calendar Defaults</span>
-            </div>
-            <div className="flex-1 overflow-y-auto min-h-0">
+          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <span className="text-sm font-medium">Calendar Defaults</span>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
               {/* Default Calendar - Dropdown */}
               <div className="px-4 py-3 border-b border-border/50">
                 <div className="flex items-center justify-between gap-3">
@@ -207,9 +176,6 @@ export function CalendarDefaultsSettings({
                 ))}
               </div>
             </div>
-          </div>
-        </TransitionContainer>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
