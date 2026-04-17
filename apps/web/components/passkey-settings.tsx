@@ -4,12 +4,6 @@ import React, { useState, useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -26,14 +20,12 @@ import {
 
 interface PasskeySettingsProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
   onBack: () => void;
   startInAddMode?: boolean;
 }
 
 export function PasskeySettings({
   open,
-  onOpenChange,
   onBack,
   startInAddMode = false,
 }: PasskeySettingsProps) {
@@ -153,16 +145,6 @@ export function PasskeySettings({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-      >
-        <VisuallyHidden>
-          <DialogTitle>Passkeys</DialogTitle>
-        </VisuallyHidden>
         <div className="flex flex-col">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -315,7 +297,5 @@ export function PasskeySettings({
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
   );
 }

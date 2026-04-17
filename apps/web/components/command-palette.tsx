@@ -417,7 +417,7 @@ export function CommandPalette({
 
   const workingDaysList = JSON.parse(localSettings.workingDays) as number[];
 
-  // Event editor
+  // Event editor (standalone - uses its own Dialog/Drawer/Popover)
   if (currentView === "event-editor") {
     return (
       <EventEditor
@@ -435,50 +435,54 @@ export function CommandPalette({
     );
   }
 
-  // Calendar management
-  if (
-    currentView === "calendars" ||
-    currentView === "calendar-create" ||
-    currentView === "calendar-edit"
-  ) {
-    return (
-      <CalendarManager
-        open={open}
-        onOpenChange={onOpenChange}
-        onBack={goBack}
-        onGoToSubscriptions={(calendarId?: string) => {
-          setSubscriptionEditCalendarId(calendarId);
-          if (calendarId) {
-            goForward("subscriptions-edit");
-          } else {
-            goForward("subscriptions");
-          }
-        }}
-        currentView={currentView}
-        onNavigateTo={goForward}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
+  // Helper to get dialog title for accessibility
+  const getDialogTitle = () => {
+    switch (currentView) {
+      case "main": return "Command Palette";
+      case "search": return "Search Events";
+      case "appearance": return "Appearance Settings";
+      case "notifications": return "Notification Settings";
+      case "time-region": return "Time & Region Settings";
+      case "timezone": return "Timezone Selection";
+      case "calendar-defaults": return "Calendar Defaults";
+      case "account": return "Account Settings";
+      case "security": return "Security";
+      case "passkeys": return "Passkeys";
+      case "calendars": return "Calendar Management";
+      case "calendar-create": return "Create Calendar";
+      case "calendar-edit": return "Edit Calendar";
+      case "subscriptions": return "Calendar Subscriptions";
+      case "subscriptions-add-feed": return "Add External Feed";
+      case "subscriptions-holidays": return "Holiday Calendars";
+      case "subscriptions-edit": return "Edit Calendar";
+      case "events": return "New Event";
+      default: return "Settings";
+    }
+  };
 
-  if (currentView === "main" || currentView === "search") {
-    const isSearchOnly = currentView === "search";
+  // New event for "events" view
+  const getNewEvent = (): CalendarEvent => {
+    const startTime = new Date();
+    startTime.setSeconds(0);
+    startTime.setMilliseconds(0);
+    return {
+      id: undefined as any,
+      title: "",
+      start: startTime,
+      end: new Date(startTime.getTime() + 60 * 60 * 1000),
+      allDay: false,
+      calendarId: localSettings?.defaultCalendarId || calendars?.[0]?.id || "",
+      userId: "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  };
 
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border shadow-xl"
-        >
-          <VisuallyHidden>
-            <DialogTitle>{isSearchOnly ? "Search Events" : "Command Palette"}</DialogTitle>
-          </VisuallyHidden>
-          <TransitionContainer
-            direction={transitionDirection}
-            viewKey={currentView}
-          >
+  // Render view content based on currentView
+  const renderContent = () => {
+    if (currentView === "main" || currentView === "search") {
+      const isSearchOnly = currentView === "search";
+      return (
             <div
               className="flex flex-col"
               style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
@@ -735,194 +739,176 @@ export function CommandPalette({
                 </span>
               </div>
             </div>
-          </TransitionContainer>
-        </DialogContent>
-      </Dialog>
     );
   }
 
-  if (currentView === "appearance") {
+    if (currentView === "appearance") {
+      return (
+        <AppearanceSettings
+          localSettings={localSettings}
+          updateSetting={updateSetting}
+          goBack={goBack}
+        />
+      );
+    }
+
+    if (currentView === "notifications") {
+      return (
+        <NotificationSettings
+          localSettings={localSettings}
+          updateSetting={updateSetting}
+          goBack={goBack}
+        />
+      );
+    }
+
+    if (currentView === "time-region" || currentView === "timezone") {
+      return (
+        <TimeRegionSettings
+          localSettings={localSettings}
+          updateSetting={updateSetting}
+          goBack={goBack}
+          goForward={goForward}
+          currentView={currentView}
+        />
+      );
+    }
+
+    if (currentView === "calendar-defaults") {
+      return (
+        <CalendarDefaultsSettings
+          localSettings={localSettings}
+          updateSetting={updateSetting}
+          goBack={goBack}
+          workingDaysList={workingDaysList}
+        />
+      );
+    }
+
+    if (currentView === "account") {
+      return (
+        <AccountSettings
+          goBack={goBack}
+          saving={saving}
+          handleReset={handleReset}
+        />
+      );
+    }
+
+    if (currentView === "security") {
+      return (
+        <SecuritySettings
+          goBack={goBack}
+          goForward={goForward}
+        />
+      );
+    }
+
+    if (currentView === "passkeys") {
+      return (
+        <PasskeySettings
+          open={open}
+          onBack={() => goBack()}
+          startInAddMode={passkeyAddMode}
+        />
+      );
+    }
+
+    if (
+      currentView === "calendars" ||
+      currentView === "calendar-create" ||
+      currentView === "calendar-edit"
+    ) {
+      return (
+        <CalendarManager
+          onBack={goBack}
+          onGoToSubscriptions={(calendarId?: string) => {
+            setSubscriptionEditCalendarId(calendarId);
+            if (calendarId) {
+              goForward("subscriptions-edit");
+            } else {
+              goForward("subscriptions");
+            }
+          }}
+          currentView={currentView}
+          onNavigateTo={goForward}
+        />
+      );
+    }
+
+    if (
+      currentView === "subscriptions" ||
+      currentView === "subscriptions-add-feed" ||
+      currentView === "subscriptions-holidays" ||
+      currentView === "subscriptions-edit"
+    ) {
+      return (
+        <SubscriptionManagement
+          open={open}
+          onBack={goBack}
+          currentView={currentView}
+          onNavigateTo={goForward}
+          initialEditCalendarId={subscriptionEditCalendarId}
+        />
+      );
+    }
+
+    if (currentView === "events") {
+      return (
+        <EventEditor
+          open={open}
+          onOpenChange={onOpenChange}
+          eventToEdit={getNewEvent()}
+          onEventSaved={onEventSaved}
+          onBack={() => goBack()}
+          localSettings={localSettings}
+          editorMode={eventEditorMode}
+          anchorPosition={popoverAnchorPosition}
+          updatePreviewEvent={updatePreviewEvent}
+          showBackButton
+        />
+      );
+    }
+
+    // Fallback
     return (
-      <AppearanceSettings
-        open={open}
-        onOpenChange={onOpenChange}
-        localSettings={localSettings}
-        updateSetting={updateSetting}
-        goBack={goBack}
-        TransitionContainer={TransitionContainer}
-        transitionDirection={transitionDirection}
-      />
+      <div className="flex flex-col">
+        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+          <button
+            onClick={() => goBack()}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <span className="text-sm font-medium">Settings</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-1">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
+            <Settings className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm">This section is coming soon</span>
+          </div>
+        </div>
+      </div>
     );
-  }
+  };
 
-  if (currentView === "notifications") {
-    return (
-      <NotificationSettings
-        open={open}
-        onOpenChange={onOpenChange}
-        localSettings={localSettings}
-        updateSetting={updateSetting}
-        goBack={goBack}
-        TransitionContainer={TransitionContainer}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
-
-  if (currentView === "time-region" || currentView === "timezone") {
-    return (
-      <TimeRegionSettings
-        open={open}
-        onOpenChange={onOpenChange}
-        localSettings={localSettings}
-        updateSetting={updateSetting}
-        goBack={goBack}
-        goForward={goForward}
-        currentView={currentView}
-        TransitionContainer={TransitionContainer}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
-
-  if (currentView === "calendar-defaults") {
-    return (
-      <CalendarDefaultsSettings
-        open={open}
-        onOpenChange={onOpenChange}
-        localSettings={localSettings}
-        updateSetting={updateSetting}
-        goBack={goBack}
-        workingDaysList={workingDaysList}
-        TransitionContainer={TransitionContainer}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
-
-  if (currentView === "account") {
-    return (
-      <AccountSettings
-        open={open}
-        onOpenChange={onOpenChange}
-        goBack={goBack}
-        saving={saving}
-        handleReset={handleReset}
-        TransitionContainer={TransitionContainer}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
-
-  if (currentView === "security") {
-    return (
-      <SecuritySettings
-        open={open}
-        onOpenChange={onOpenChange}
-        goBack={goBack}
-        goForward={goForward}
-        TransitionContainer={TransitionContainer}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
-
-  if (currentView === "passkeys") {
-    return (
-      <PasskeySettings
-        open={open}
-        onOpenChange={onOpenChange}
-        onBack={() => goBack()}
-        startInAddMode={passkeyAddMode}
-      />
-    );
-  }
-
-  if (
-    currentView === "subscriptions" ||
-    currentView === "subscriptions-add-feed" ||
-    currentView === "subscriptions-holidays" ||
-    currentView === "subscriptions-edit"
-  ) {
-    return (
-      <SubscriptionManagement
-        open={open}
-        onOpenChange={onOpenChange}
-        onBack={goBack}
-        currentView={currentView}
-        onNavigateTo={goForward}
-        initialEditCalendarId={subscriptionEditCalendarId}
-        transitionDirection={transitionDirection}
-      />
-    );
-  }
-
-  if (currentView === "events") {
-    // Create a new event with defaults (same as "New Event" button)
-    const startTime = new Date();
-    startTime.setSeconds(0);
-    startTime.setMilliseconds(0);
-
-    const newEvent: CalendarEvent = {
-      id: undefined as any,
-      title: "",
-      start: startTime,
-      end: new Date(startTime.getTime() + 60 * 60 * 1000), // 1 hour default
-      allDay: false,
-      calendarId: localSettings?.defaultCalendarId || calendars?.[0]?.id || "",
-      userId: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    return (
-      <EventEditor
-        open={open}
-        onOpenChange={onOpenChange}
-        eventToEdit={newEvent}
-        onEventSaved={onEventSaved}
-        onBack={() => goBack()}
-        localSettings={localSettings}
-        editorMode={eventEditorMode}
-        anchorPosition={popoverAnchorPosition}
-        updatePreviewEvent={updatePreviewEvent}
-      />
-    );
-  }
-
-  // Other views fallback
+  // Single Dialog for ALL views (except event-editor which has its own Dialog/Drawer/Popover)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         variant="spotlight"
         showClose={false}
         aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl"
       >
         <VisuallyHidden>
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>{getDialogTitle()}</DialogTitle>
         </VisuallyHidden>
         <TransitionContainer
           direction={transitionDirection}
           viewKey={currentView}
         >
-          <div className="flex flex-col">
-            <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-              <button
-                onClick={() => goBack()}
-                className="p-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <span className="text-sm font-medium">Settings</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-1">
-              <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
-                <Settings className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm">This section is coming soon</span>
-              </div>
-            </div>
-          </div>
+          {renderContent()}
         </TransitionContainer>
       </DialogContent>
     </Dialog>

@@ -6,7 +6,6 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 import type { Calendar, CalendarShareLink } from "@/lib/types/calendar";
 import { toast } from "sonner";
 import {
-  TransitionContainer,
   PRESET_COLORS,
   resetCalendarForm,
   validateCalendarForm,
@@ -24,7 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -44,13 +42,10 @@ import {
 } from "lucide-react";
 
 interface CalendarManagerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onBack: () => void;
   onGoToSubscriptions: (calendarId?: string) => void;
   currentView: PaletteView;
   onNavigateTo: (view: PaletteView) => void;
-  transitionDirection: "forward" | "back";
 }
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
@@ -65,13 +60,10 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 export function CalendarManager({
-  open,
-  onOpenChange,
   onBack,
   onGoToSubscriptions,
   currentView,
   onNavigateTo,
-  transitionDirection,
 }: CalendarManagerProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
@@ -202,17 +194,6 @@ export function CalendarManager({
 
   if (currentView === "calendars") {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-        >
-          <VisuallyHidden>
-            <DialogTitle>Calendar Management</DialogTitle>
-          </VisuallyHidden>
-          <TransitionContainer direction={transitionDirection}>
             <div className="flex flex-col">
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -370,25 +351,11 @@ export function CalendarManager({
                 )}
               </div>
             </div>
-          </TransitionContainer>
-        </DialogContent>
-      </Dialog>
     );
   }
 
   if (currentView === "calendar-create") {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-        >
-          <VisuallyHidden>
-            <DialogTitle>Create Calendar</DialogTitle>
-          </VisuallyHidden>
-          <TransitionContainer direction={transitionDirection}>
             <div className="flex flex-col">
               {/* Header */}
               <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -526,26 +493,12 @@ export function CalendarManager({
                 </Button>
               </div>
             </div>
-          </TransitionContainer>
-        </DialogContent>
-      </Dialog>
     );
   }
 
   if (currentView === "calendar-edit") {
     return (
       <>
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent
-            variant="spotlight"
-            showClose={false}
-            aria-describedby={undefined}
-            className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[560px]"
-          >
-            <VisuallyHidden>
-              <DialogTitle>Edit Calendar</DialogTitle>
-            </VisuallyHidden>
-            <TransitionContainer direction={transitionDirection}>
               <div className="flex flex-col">
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -772,9 +725,6 @@ export function CalendarManager({
                   </div>
                 </div>
               </div>
-            </TransitionContainer>
-          </DialogContent>
-        </Dialog>
 
         <Dialog
           open={showRegenerateConfirm}

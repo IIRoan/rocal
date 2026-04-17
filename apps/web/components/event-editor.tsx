@@ -122,6 +122,7 @@ interface EventEditorProps {
   anchorPosition?: { x: number; y: number } | null;
   initialEventViewMode?: "view" | "edit";
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
+  showBackButton?: boolean;
 }
 
 export function EventEditor({
@@ -135,6 +136,7 @@ export function EventEditor({
   anchorPosition = null,
   initialEventViewMode = "view",
   updatePreviewEvent,
+  showBackButton = false,
 }: EventEditorProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
@@ -350,6 +352,87 @@ export function EventEditor({
   }
 
   // Desktop modal mode (default)
+  // When embedded in command palette (showBackButton), return content without Dialog
+  if (showBackButton) {
+    return (
+      <>
+        {/* Header - command palette style with option toggles */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
+          <button
+            onClick={onBack}
+            className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <span className="text-sm font-medium">{dialogTitle}</span>
+          <div className="flex-1" />
+          {/* Option toggles in header - disabled in view mode */}
+          {!isViewMode && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowLocation(!showLocation)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${showLocation ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+                title="Location"
+              >
+                <MapPin className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDescription(!showDescription)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${showDescription ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+                title="Description"
+              >
+                <FileText className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => eventForm.setIsRecurring(!eventForm.isRecurring)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${eventForm.isRecurring ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+                title="Repeat"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  eventForm.setShowNotifications(!eventForm.showNotifications)
+                }
+                className={`p-1.5 rounded transition-colors cursor-pointer ${eventForm.showNotifications ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+                title="Reminder"
+              >
+                <Bell className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+        <MobileEventEditorBody
+          eventForm={eventForm}
+          isViewMode={isViewMode}
+          showLocation={showLocation}
+          showDescription={showDescription}
+          setShowLocation={setShowLocation}
+          setShowDescription={setShowDescription}
+          localSettings={localSettings}
+          calendars={calendars}
+          desktop
+        />
+        <EventEditorFooter
+          isViewMode={isViewMode}
+          eventForm={eventForm}
+          onBack={onBack}
+          handleEventSave={handleEventSave}
+          handleEventDelete={handleEventDelete}
+          handleEventDownloadIcs={handleEventDownloadIcs}
+          desktop
+          onClose={() => onOpenChange(false)}
+        />
+        {recurringModal}
+      </>
+    );
+  }
+
+  // Standalone desktop modal mode (from event-editor view, clicking existing event etc.)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent

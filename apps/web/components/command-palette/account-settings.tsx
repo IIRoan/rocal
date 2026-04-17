@@ -1,61 +1,32 @@
 import React, { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { RotateCcw, Check, X, ArrowLeft, AlertTriangle } from "lucide-react";
-import type { PaletteView } from "./constants";
 
 interface AccountSettingsProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   goBack: () => void;
   saving: boolean;
   handleReset: () => void;
-  TransitionContainer: React.ComponentType<{
-    direction: "forward" | "back";
-    children: React.ReactNode;
-    viewKey?: string;
-  }>;
-  transitionDirection: "forward" | "back";
 }
 
 export function AccountSettings({
-  open,
-  onOpenChange,
   goBack,
   saving,
   handleReset,
-  TransitionContainer,
-  transitionDirection,
 }: AccountSettingsProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[480px]"
-      >
-        <VisuallyHidden>
-          <DialogTitle>Account Settings</DialogTitle>
-        </VisuallyHidden>
-        <TransitionContainer direction={transitionDirection} viewKey="account">
-          <div className="flex flex-col">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-              <button
-                onClick={() => goBack()}
-                className="p-1 rounded hover:bg-muted/50 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <span className="text-sm font-medium">Account</span>
-            </div>
-            <div className="flex-1 overflow-y-auto min-h-0 p-1">
+    <div className="flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+        <button
+          onClick={() => goBack()}
+          className="p-1 rounded hover:bg-muted/50 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <span className="text-sm font-medium">Account</span>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0 p-1">
               {!showResetConfirm ? (
                 <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
                   Danger Zone
@@ -103,10 +74,7 @@ export function AccountSettings({
                   </button>
                 </div>
               )}
-            </div>
-          </div>
-        </TransitionContainer>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
