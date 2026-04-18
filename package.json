@@ -24,6 +24,11 @@
     "test": "jest",
     "test:backend": "cd apps/backend && bun run test",
     "test:backend:coverage": "cd apps/backend && bun run test:coverage",
+    "test:ui": "cd packages/ui && bun run test",
+    "test:ui:coverage": "cd packages/ui && bun run test:coverage",
+    "test:notifications": "cd apps/notifications && bun run test",
+    "test:notifications:coverage": "cd apps/notifications && bun run test:coverage",
+    "test:ci": "bun run test:backend:coverage && bun run test:ui:coverage && bun run test:notifications:coverage",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
