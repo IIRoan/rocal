@@ -14,6 +14,7 @@ export {
   COMMANDS,
   type Command,
   type CommandAction,
+  type PresetColor,
 } from "./navigation-config";
 export * from "./time-utils";
 export * from "./event-utils";

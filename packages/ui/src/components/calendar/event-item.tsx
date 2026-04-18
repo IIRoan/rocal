@@ -9,6 +9,8 @@ import {
   getBorderRadiusClasses,
   getEventColorClasses,
   getEventColorStyles,
+  isHexColor,
+  getColorSwatchValue,
 } from "./utils";
 import { CalendarEvent, type CalendarView } from "./types";
 import { cn } from "../../lib/utils";
@@ -96,8 +98,7 @@ function EventWrapper({
   if (isPreview) {
     // For hex colors, derive a semi-transparent background from the hex
     // For named colors, use the color class with reduced opacity for visibility in both themes
-    const hexStyles = getEventColorStyles(event.color);
-    const hasHex = Object.keys(hexStyles).length > 0;
+    const colorIsHex = isHexColor(event.color || "");
 
     return (
       <div
@@ -108,15 +109,15 @@ function EventWrapper({
           "border-2 border-dashed rounded-md",
           "animate-in fade-in-0 duration-300",
           // Use the event color classes for named colors so the border inherits the right color
-          !hasHex && getEventColorClasses(event.color),
+          !colorIsHex && getEventColorClasses(event.color),
           className,
         )}
         style={
-          hasHex
+          colorIsHex
             ? {
-                borderColor: hexStyles.backgroundColor as string,
-                backgroundColor: `${hexStyles.backgroundColor}33`,
-                color: hexStyles.color,
+                borderColor: event.color!,
+                backgroundColor: `${event.color}33`,
+                color: event.color,
                 opacity: 0.85,
               }
             : { opacity: 0.85 }

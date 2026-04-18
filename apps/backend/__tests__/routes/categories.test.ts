@@ -144,7 +144,7 @@ describe("categoriesRoutes", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: "Work",
-          color: "teal",
+          color: "chartreuse",
         }),
       }),
     );
@@ -278,7 +278,7 @@ describe("categoriesRoutes", () => {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          color: "teal",
+          color: "chartreuse",
         }),
       }),
     );

@@ -34,6 +34,10 @@ export function TransitionContainer({
     return contentRef.current?.scrollHeight;
   }, []);
 
+  // Keep a ref to latest children so transition timers can read fresh content
+  const latestChildren = useRef(children);
+  latestChildren.current = children;
+
   // Track height passively when idle (handles within-view resizes)
   useEffect(() => {
     if (phase !== "idle" || !contentRef.current) return;
@@ -48,12 +52,17 @@ export function TransitionContainer({
     return () => observer.disconnect();
   }, [phase]);
 
+  // Update displayed content for same-view changes (e.g. data refetch)
+  // Only when not in the middle of an exit transition
   useEffect(() => {
-    if (viewKey === lastViewKey.current) {
-      // Same view — update children in place
+    if (phase !== "exiting") {
       setDisplayChildren(children);
-      return;
     }
+  }, [children, phase]);
+
+  // Handle view transitions — only runs when viewKey changes
+  useEffect(() => {
+    if (viewKey === lastViewKey.current) return;
 
     lastViewKey.current = viewKey;
 
@@ -72,7 +81,7 @@ export function TransitionContainer({
     // Phase 2: After exit, swap content + start height animation + fade in
     timers.push(
       setTimeout(() => {
-        setDisplayChildren(children);
+        setDisplayChildren(latestChildren.current);
         setPhase("entering");
 
         // Measure new content height after React renders it
@@ -99,7 +108,7 @@ export function TransitionContainer({
     );
 
     return () => timers.forEach(clearTimeout);
-  }, [children, viewKey]);
+  }, [viewKey, measureHeight]);
 
   // Compute inline styles for the content based on phase
   const contentStyle: React.CSSProperties =
