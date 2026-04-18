@@ -44,6 +44,7 @@ import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { LogOut } from "lucide-react";
+import { getColorSwatchValue } from "../calendar/utils";
 
 function CollapsedIconButton({
   label,
@@ -229,9 +230,7 @@ export function AppSidebar({
             <div className="space-y-1">
               {ownedCalendars.map((calendar: CalendarData) => {
                 const isVisible = isCalendarVisible(calendar.id);
-                const calColor = calendar.color?.startsWith("#")
-                  ? calendar.color
-                  : `var(--color-event-${calendar.color || "default"})`;
+                const calColor = getColorSwatchValue(calendar.color || "blue");
                 return (
                   <button
                     key={calendar.id}
@@ -263,9 +262,7 @@ export function AppSidebar({
                   </div>
                   {publicCalendars.map((calendar: CalendarData) => {
                     const isVisible = isCalendarVisible(calendar.id);
-                    const calColor = calendar.color?.startsWith("#")
-                      ? calendar.color
-                      : `var(--color-event-${calendar.color || "default"})`;
+                    const calColor = getColorSwatchValue(calendar.color || "blue");
                     return (
                       <button
                         key={calendar.id}
@@ -299,9 +296,7 @@ export function AppSidebar({
                   </div>
                   {subscribedCalendars.map((calendar: CalendarData) => {
                     const isVisible = isCalendarVisible(calendar.id);
-                    const calColor = calendar.color?.startsWith("#")
-                      ? calendar.color
-                      : `var(--color-event-${calendar.color || "default"})`;
+                    const calColor = getColorSwatchValue(calendar.color || "blue");
                     return (
                       <button
                         key={calendar.id}
@@ -529,9 +524,7 @@ function AppSidebarDesktop({
                       <span
                         className="size-2.5 rounded-full shrink-0 transition-opacity"
                         style={{
-                          backgroundColor: calendar.color?.startsWith("#")
-                            ? calendar.color
-                            : `var(--color-event-${calendar.color || "default"})`,
+                          backgroundColor: getColorSwatchValue(calendar.color || "blue"),
                           opacity: isVisible ? 1 : 0.3,
                         }}
                       />
@@ -571,9 +564,7 @@ function AppSidebarDesktop({
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
                             style={{
-                              backgroundColor: calendar.color?.startsWith("#")
-                                ? calendar.color
-                                : `var(--color-event-${calendar.color || "default"})`,
+                              backgroundColor: getColorSwatchValue(calendar.color || "blue"),
                               opacity: isVisible ? 1 : 0.3,
                             }}
                           />
@@ -603,9 +594,7 @@ function AppSidebarDesktop({
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
                             style={{
-                              backgroundColor: calendar.color?.startsWith("#")
-                                ? calendar.color
-                                : `var(--color-event-${calendar.color || "default"})`,
+                              backgroundColor: getColorSwatchValue(calendar.color || "blue"),
                               opacity: isVisible ? 1 : 0.3,
                             }}
                           />
@@ -635,9 +624,7 @@ function AppSidebarDesktop({
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
                             style={{
-                              backgroundColor: calendar.color?.startsWith("#")
-                                ? calendar.color
-                                : `var(--color-event-${calendar.color || "default"})`,
+                              backgroundColor: getColorSwatchValue(calendar.color || "blue"),
                               opacity: isVisible ? 1 : 0.3,
                             }}
                           />

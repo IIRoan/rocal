@@ -272,6 +272,10 @@ export function CalendarProvider({
       }
 
       const calendarId = updates[index];
+      if (!calendarId) {
+        return;
+      }
+
       const previousVisibility =
         previousVisibilityByCalendarId.get(calendarId) ?? true;
 

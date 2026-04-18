@@ -82,21 +82,10 @@ type UpdateCalendarBody = typeof updateCalendarBodySchema.static;
 type DeleteCalendarParams = typeof deleteCalendarParamsSchema.static;
 type DeleteCalendarQuery = typeof deleteCalendarQuerySchema.static;
 
-const ALLOWED_CALENDAR_COLORS = [
-  "blue",
-  "orange",
-  "violet",
-  "rose",
-  "emerald",
-] as const;
-
-const isHexCalendarColor = (value: string) =>
-  /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
-
-const isValidCalendarColor = (value: string) =>
-  ALLOWED_CALENDAR_COLORS.includes(
-    value as (typeof ALLOWED_CALENDAR_COLORS)[number],
-  ) || isHexCalendarColor(value);
+import {
+  ALLOWED_CALENDAR_COLORS,
+  isValidCalendarColor,
+} from "../lib/colors";
 
 export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
   .use(requireAuth)

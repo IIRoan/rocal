@@ -12,6 +12,7 @@ import {
   NotificationManager,
   formatEventDescription,
 } from "@workspace/ui/components/calendar";
+import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
 import { RecurringDeleteModal } from "./command-palette/recurring-delete-modal";
 import { useEventForm } from "@/hooks/use-event-form";
@@ -993,7 +994,7 @@ function MobileEventEditorBody({
                       <div className="flex items-center gap-2">
                         <div
                           className="size-2.5 rounded-full"
-                          style={{ backgroundColor: calendar.color }}
+                          style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                         />
                         <span>{calendar.name}</span>
                       </div>

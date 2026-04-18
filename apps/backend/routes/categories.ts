@@ -1,6 +1,10 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
+import {
+  ALLOWED_CALENDAR_COLORS,
+  isValidCalendarColor,
+} from "../lib/colors";
 
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
@@ -55,12 +59,9 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       }
 
       // Validate color against allowed values (allow predefined colors or hex colors)
-      const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-      const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
-
-      if (!allowedColors.includes(color) && !isHexColor) {
+      if (!isValidCalendarColor(color)) {
         throw new Error(
-          `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
         );
       }
 
@@ -117,17 +118,10 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       }
 
       // Validate color if provided (allow predefined colors or hex colors)
-      if (updates.color) {
-        const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-        const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-          updates.color,
+      if (updates.color && !isValidCalendarColor(updates.color)) {
+        throw new Error(
+          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
         );
-
-        if (!allowedColors.includes(updates.color) && !isHexColor) {
-          throw new Error(
-            `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
-          );
-        }
       }
 
       // Check for name uniqueness if name is being updated

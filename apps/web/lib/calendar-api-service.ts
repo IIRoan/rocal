@@ -364,9 +364,13 @@ export class CalendarApiService {
     }
 
     if ("color" in event && event.color) {
-      const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-      if (!allowedColors.includes(event.color)) {
-        errors.push(`Color must be one of: ${allowedColors.join(", ")}`);
+      const allowedColors = [
+        "blue", "orange", "violet", "rose", "emerald",
+        "red", "cyan", "lime", "amber", "indigo", "pink", "teal",
+      ];
+      const isHex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(event.color);
+      if (!allowedColors.includes(event.color) && !isHex) {
+        errors.push(`Color must be one of: ${allowedColors.join(", ")} or a valid hex color`);
       }
     }
 
@@ -384,9 +388,13 @@ export class CalendarApiService {
     }
 
     if ("color" in category && category.color) {
-      const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-      if (!allowedColors.includes(category.color)) {
-        errors.push(`Color must be one of: ${allowedColors.join(", ")}`);
+      const allowedColors = [
+        "blue", "orange", "violet", "rose", "emerald",
+        "red", "cyan", "lime", "amber", "indigo", "pink", "teal",
+      ];
+      const isHex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(category.color);
+      if (!allowedColors.includes(category.color) && !isHex) {
+        errors.push(`Color must be one of: ${allowedColors.join(", ")} or a valid hex color`);
       }
     }
 

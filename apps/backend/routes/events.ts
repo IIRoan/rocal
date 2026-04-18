@@ -8,6 +8,10 @@ import { requireAuth } from "../lib/auth-guard";
 import { createLogger } from "@workspace/logger";
 import { buildIcsEventFile } from "@workspace/calendar-ics";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
+import {
+  ALLOWED_CALENDAR_COLORS,
+  isValidCalendarColor,
+} from "../lib/colors";
 
 import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
@@ -517,14 +521,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         // Validate color if provided (allow predefined colors or hex colors)
         if (body.color) {
-          const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-          const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-            body.color,
-          );
-
-          if (!allowedColors.includes(body.color) && !isHexColor) {
+          if (!isValidCalendarColor(body.color)) {
             throw new ValidationError(
-              `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+              `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
               "color",
             );
           }
@@ -1139,14 +1138,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
 
         // Validate color if provided (allow predefined colors or hex colors)
         if (body.color !== undefined && body.color) {
-          const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
-          const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(
-            body.color,
-          );
-
-          if (!allowedColors.includes(body.color) && !isHexColor) {
+          if (!isValidCalendarColor(body.color)) {
             throw new ValidationError(
-              `Color must be one of: ${allowedColors.join(", ")} or a valid hex color (e.g., #FF0000)`,
+              `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
               "color",
             );
           }
