@@ -28,6 +28,7 @@ import {
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { PRESET_COLORS, type PaletteView } from "./command-palette/index";
+import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
   Plus,
   Trash2,
@@ -46,6 +47,12 @@ import {
   Search,
 } from "lucide-react";
 
+const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
+
+const isValidColor = (value: string) =>
+  ALLOWED_COLOR_VALUES.includes(value) ||
+  /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value);
+
 const customSubscriptionSchema = z.object({
   name: z.string().trim().min(1, "Calendar name is required").max(100),
   url: z
@@ -59,7 +66,7 @@ const customSubscriptionSchema = z.object({
   color: z
     .string()
     .trim()
-    .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/),
+    .refine(isValidColor, "Please select a valid color"),
 });
 
 const editableSubscriptionSchema = z.object({
@@ -67,7 +74,7 @@ const editableSubscriptionSchema = z.object({
   color: z
     .string()
     .trim()
-    .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Please select a valid color"),
+    .refine(isValidColor, "Please select a valid color"),
 });
 
 type CustomSubscriptionForm = z.infer<typeof customSubscriptionSchema>;
@@ -120,7 +127,7 @@ export function SubscriptionManagement({
     useState<CustomSubscriptionForm>({
       name: "",
       url: "",
-      color: "#6366f1",
+      color: "indigo",
     });
   const [editingSubscription, setEditingSubscription] =
     useState<EditableSubscriptionForm | null>(null);
@@ -193,7 +200,7 @@ export function SubscriptionManagement({
       await refetchCalendars();
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       setSuccess("Read-only calendar added successfully.");
-      setNewSubscription({ name: "", url: "", color: "#6366f1" });
+      setNewSubscription({ name: "", url: "", color: "indigo" });
       setValidationErrors({});
       setLocalError(null);
       goBackToMain();
@@ -603,7 +610,7 @@ export function SubscriptionManagement({
                             {/* Color swatch */}
                             <div
                               className="h-3.5 w-3.5 rounded-sm shrink-0"
-                              style={{ backgroundColor: subscription.calendar.color }}
+                              style={{ backgroundColor: getColorSwatchValue(subscription.calendar.color) }}
                             />
                             {/* Info — click to edit */}
                             <button
@@ -891,7 +898,7 @@ export function SubscriptionManagement({
                             className="h-3 w-3 rounded-full shrink-0"
                             style={{
                               backgroundColor:
-                                existingSub?.calendar.color ?? hc.defaultColor,
+                                getColorSwatchValue(existingSub?.calendar.color ?? hc.defaultColor),
                             }}
                           />
                           <span className="text-sm flex-1 truncate">{hc.label}</span>

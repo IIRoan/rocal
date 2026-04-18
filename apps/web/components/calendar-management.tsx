@@ -43,6 +43,7 @@ import {
 } from "@workspace/ui/components/ui/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
+import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
   RadioGroup,
   RadioGroupItem,
@@ -74,19 +75,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 const PRESET_COLORS = [
-  "#3b82f6", // blue
-  "#10b981", // emerald
-  "#f59e0b", // orange
-  "#8b5cf6", // violet
-  "#f43f5e", // rose
-  "#ef4444", // red
-  "#06b6d4", // cyan
-  "#84cc16", // lime
-  "#f97316", // orange-500
-  "#6366f1", // indigo
-  "#ec4899", // pink
-  "#14b8a6", // teal
+  { value: "blue", label: "Blue" },
+  { value: "emerald", label: "Emerald" },
+  { value: "orange", label: "Orange" },
+  { value: "violet", label: "Violet" },
+  { value: "rose", label: "Rose" },
+  { value: "red", label: "Red" },
+  { value: "cyan", label: "Cyan" },
+  { value: "lime", label: "Lime" },
+  { value: "amber", label: "Amber" },
+  { value: "indigo", label: "Indigo" },
+  { value: "pink", label: "Pink" },
+  { value: "teal", label: "Teal" },
 ];
+
+const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
 
 const calendarFormSchema = z.object({
   name: z.string().trim().min(1, "Calendar name is required").max(100),
@@ -94,9 +97,8 @@ const calendarFormSchema = z.object({
     .string()
     .trim()
     .refine((value) => {
-      const allowedColors = ["blue", "orange", "violet", "rose", "emerald"];
       return (
-        allowedColors.includes(value) ||
+        ALLOWED_COLOR_VALUES.includes(value) ||
         /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)
       );
     }, "Please select a valid color"),
@@ -163,7 +165,7 @@ export function CalendarManagement({
 
   const [newCalendar, setNewCalendar] = useState({
     name: "",
-    color: "#3b82f6",
+    color: "blue",
     isDefault: false,
   });
 
@@ -316,7 +318,7 @@ export function CalendarManagement({
       };
 
       await createCalendar(calendarData);
-      setNewCalendar({ name: "", color: "#3b82f6", isDefault: false });
+      setNewCalendar({ name: "", color: "blue", isDefault: false });
       setShowCreateForm(false);
       setValidationErrors({});
       setSuccess("Calendar created successfully!");
@@ -755,7 +757,7 @@ export function CalendarManagement({
                         <div className="flex items-center space-x-3">
                           <div
                             className="w-4 h-4 rounded"
-                            style={{ backgroundColor: calendar.color }}
+                            style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div>
                             <div className="flex items-center gap-2">
@@ -875,7 +877,7 @@ export function CalendarManagement({
                           <div className="flex items-center space-x-3">
                             <div
                               className="w-4 h-4 rounded"
-                              style={{ backgroundColor: calendar.color }}
+                              style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                             />
                             <div>
                               <div className="flex items-center gap-2">
@@ -947,7 +949,7 @@ export function CalendarManagement({
                           <div className="flex items-center space-x-3">
                             <div
                               className="w-4 h-4 rounded"
-                              style={{ backgroundColor: calendar.color }}
+                              style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                             />
                             <div>
                               <div className="flex items-center gap-2">
@@ -1334,7 +1336,7 @@ export function CalendarManagement({
                           <div className="flex items-center gap-2">
                             <div
                               className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: cal.color }}
+                              style={{ backgroundColor: getColorSwatchValue(cal.color) }}
                             />
                             {cal.name}
                           </div>

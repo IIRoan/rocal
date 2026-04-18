@@ -371,17 +371,22 @@ export const SEARCH_INDEX = [
   },
 ];
 
-export const PRESET_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#8b5cf6",
-  "#f43f5e",
-  "#ef4444",
-  "#06b6d4",
-  "#84cc16",
-  "#f97316",
-  "#6366f1",
-  "#ec4899",
-  "#14b8a6",
+export interface PresetColor {
+  value: string;
+  label: string;
+}
+
+export const PRESET_COLORS: PresetColor[] = [
+  { value: "blue", label: "Blue" },
+  { value: "emerald", label: "Emerald" },
+  { value: "orange", label: "Orange" },
+  { value: "violet", label: "Violet" },
+  { value: "rose", label: "Rose" },
+  { value: "red", label: "Red" },
+  { value: "cyan", label: "Cyan" },
+  { value: "lime", label: "Lime" },
+  { value: "amber", label: "Amber" },
+  { value: "indigo", label: "Indigo" },
+  { value: "pink", label: "Pink" },
+  { value: "teal", label: "Teal" },
 ];

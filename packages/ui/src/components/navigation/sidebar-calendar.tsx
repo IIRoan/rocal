@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   format,
   isSameDay,
@@ -15,7 +15,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
-import { resolveEventColorValue } from "../calendar/utils";
+import { resolveInlineColorValue } from "../calendar/utils";
 import { cn } from "../../lib/utils";
 import { useHorizontalSwipeGesture } from "../../hooks/use-horizontal-swipe-gesture";
 import { useMiniCalendarMonthData } from "../../hooks/use-mini-calendar-month-data";
@@ -48,11 +48,17 @@ export function SidebarCalendar({
   className,
   isMobile = false,
 }: SidebarCalendarProps) {
-  const { currentDate, setCurrentDate, calendars } = useCalendarContext();
+  const { currentDate, setCurrentDate, calendars, getVisibleCalendars } =
+    useCalendarContext();
   const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const swipeLockRef = useRef(false);
+
+  const visibleCalendarIds = useMemo(
+    () => new Set(getVisibleCalendars().map((calendar) => calendar.id)),
+    [getVisibleCalendars],
+  );
 
   useEffect(() => {
     if (currentDate && !isNaN(currentDate.getTime())) {
@@ -68,6 +74,7 @@ export function SidebarCalendar({
   const { grid, dayEventsMap, monthKey, toDayKey } = useMiniCalendarMonthData({
     calendarMonth,
     calendars,
+    visibleCalendarIds,
     getCachedEventsForRange,
     prefetchRange,
   });
@@ -243,7 +250,7 @@ export function SidebarCalendar({
                           style={{
                             backgroundColor: isSelected
                               ? undefined
-                              : resolveEventColorValue(event.color),
+                              : resolveInlineColorValue(event.color),
                           }}
                         />
                       ))}

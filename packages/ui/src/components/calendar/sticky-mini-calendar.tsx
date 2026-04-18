@@ -24,7 +24,7 @@ import {
   getAllEventsForDay,
   getEventInterval,
   isMultiDayEvent,
-  resolveEventColorValue,
+  resolveInlineColorValue,
   sortEvents,
   eventOverlapsRange,
 } from "./utils";
@@ -219,7 +219,7 @@ export function StickyMiniCalendar({
                         key={`${event.id || "event"}-${i}`}
                         className="w-0.5 h-0.5 rounded-full"
                         style={{
-                          backgroundColor: resolveEventColorValue(event.color),
+                          backgroundColor: resolveInlineColorValue(event.color),
                         }}
                       />
                     ))}

@@ -28,6 +28,7 @@ import {
   DrawerContent,
   DrawerTitle,
 } from "../ui/drawer";
+import { resolveInlineColorValue } from "./utils";
 
 // Show entire 24 hours for mobile week view
 const MobileStartHour = 0;
@@ -453,7 +454,7 @@ export function MobileWeekView({
                         <div
                           className="w-3 h-3 rounded-full"
                           style={{
-                            backgroundColor: (event.color as string) || "#3b82f6",
+                            backgroundColor: resolveInlineColorValue(event.color || "blue"),
                           }}
                         />
                       </div>

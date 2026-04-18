@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { cn } from "../../lib/utils";
 import { useCalendarContext } from "./calendar-context";
-import { getAllEventsForDay } from "./utils";
+import { getAllEventsForDay, resolveInlineColorValue } from "./utils";
 import { CalendarEvent } from "./types";
 
 interface MobileDayStripProps {
@@ -143,7 +143,7 @@ export function MobileDayStrip({
                       )}
                       style={
                         !isSelected && event.color
-                          ? { backgroundColor: event.color }
+                          ? { backgroundColor: resolveInlineColorValue(event.color) }
                           : undefined
                       }
                     />

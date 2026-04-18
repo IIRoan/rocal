@@ -85,4 +85,11 @@ export type EventColor =
   | "violet"
   | "rose"
   | "emerald"
+  | "red"
+  | "cyan"
+  | "lime"
+  | "amber"
+  | "indigo"
+  | "pink"
+  | "teal"
   | string;

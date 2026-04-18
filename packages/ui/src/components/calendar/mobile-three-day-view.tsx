@@ -26,6 +26,7 @@ import {
   DrawerContent,
   DrawerTitle,
 } from "../ui/drawer";
+import { resolveInlineColorValue } from "./utils";
 
 const CELL_HEIGHT = 60;
 
@@ -298,7 +299,7 @@ export function MobileThreeDayView({
                         key={i}
                         className="w-1 h-1 rounded-full"
                         style={{
-                          backgroundColor: (ev.color as string) || "#3b82f6",
+                          backgroundColor: resolveInlineColorValue(ev.color || "blue"),
                         }}
                       />
                     ))}
@@ -449,7 +450,7 @@ export function MobileThreeDayView({
                   <div className="flex items-center justify-center w-6 h-6 shrink-0">
                     <div
                       className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: (event.color as string) || "#3b82f6" }}
+                      style={{ backgroundColor: resolveInlineColorValue(event.color || "blue") }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">

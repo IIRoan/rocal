@@ -13,7 +13,9 @@ import {
   handleCalendarUpdate,
   handleCalendarDelete,
   type PaletteView,
+  type PresetColor,
 } from "./command-palette/index";
+import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 
 import {
   Dialog,
@@ -80,7 +82,7 @@ export function CalendarManager({
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
-  const [calendarColor, setCalendarColor] = useState("#3b82f6");
+  const [calendarColor, setCalendarColor] = useState("blue");
   const [calendarIsDefault, setCalendarIsDefault] = useState(false);
   const [calendarSaving, setCalendarSaving] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
@@ -268,7 +270,7 @@ export function CalendarManager({
                     >
                       <div
                         className="h-3.5 w-3.5 rounded-sm shrink-0"
-                        style={{ backgroundColor: calendar.color }}
+                        style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm truncate">{calendar.name}</div>
@@ -301,7 +303,7 @@ export function CalendarManager({
                         >
                           <div
                             className="h-3.5 w-3.5 rounded-sm shrink-0"
-                            style={{ backgroundColor: calendar.color }}
+                            style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm truncate">
@@ -333,7 +335,7 @@ export function CalendarManager({
                         >
                           <div
                             className="h-3.5 w-3.5 rounded-sm shrink-0"
-                            style={{ backgroundColor: calendar.color }}
+                            style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm truncate">
@@ -405,26 +407,34 @@ export function CalendarManager({
                     COLOR
                   </Label>
                   <div className="flex flex-wrap gap-2">
-                    {PRESET_COLORS.map((color) => (
+                    {PRESET_COLORS.map((preset) => (
                       <button
-                        key={color}
+                        key={preset.value}
                         type="button"
-                        onClick={() => setCalendarColor(color)}
+                        onClick={() => {
+                          setCalendarColor(preset.value);
+                          if (calendarValidationErrors.color) {
+                            setCalendarValidationErrors({
+                              ...calendarValidationErrors,
+                              color: undefined,
+                            });
+                          }
+                        }}
                         className={`w-6 h-6 rounded-full border-2 transition-all ${
-                          calendarColor === color
+                          calendarColor === preset.value
                             ? "border-foreground scale-110"
                             : "border-transparent hover:scale-105"
                         }`}
-                        style={{ backgroundColor: color }}
+                        style={{ backgroundColor: getColorSwatchValue(preset.value) }}
+                        title={preset.label}
                       />
                     ))}
-                    <input
-                      type="color"
-                      value={calendarColor}
-                      onChange={(e) => setCalendarColor(e.target.value)}
-                      className="w-6 h-6 rounded-full border cursor-pointer"
-                    />
                   </div>
+                  {calendarValidationErrors.color && (
+                    <p className="text-xs text-destructive">
+                      {calendarValidationErrors.color}
+                    </p>
+                  )}
                 </div>
 
                 {/* Default Settings */}
@@ -548,26 +558,34 @@ export function CalendarManager({
                       COLOR
                     </Label>
                     <div className="flex flex-wrap gap-2">
-                      {PRESET_COLORS.map((color) => (
+                      {PRESET_COLORS.map((preset) => (
                         <button
-                          key={color}
+                          key={preset.value}
                           type="button"
-                          onClick={() => setCalendarColor(color)}
+                          onClick={() => {
+                            setCalendarColor(preset.value);
+                            if (calendarValidationErrors.color) {
+                              setCalendarValidationErrors({
+                                ...calendarValidationErrors,
+                                color: undefined,
+                              });
+                            }
+                          }}
                           className={`w-6 h-6 rounded-full border-2 transition-all ${
-                            calendarColor === color
+                            calendarColor === preset.value
                               ? "border-foreground scale-110"
                               : "border-transparent hover:scale-105"
                           }`}
-                          style={{ backgroundColor: color }}
+                          style={{ backgroundColor: getColorSwatchValue(preset.value) }}
+                          title={preset.label}
                         />
                       ))}
-                      <input
-                        type="color"
-                        value={calendarColor}
-                        onChange={(e) => setCalendarColor(e.target.value)}
-                        className="w-6 h-6 rounded-full border cursor-pointer"
-                      />
                     </div>
+                    {calendarValidationErrors.color && (
+                      <p className="text-xs text-destructive">
+                        {calendarValidationErrors.color}
+                      </p>
+                    )}
                   </div>
 
                   {/* Default Settings */}

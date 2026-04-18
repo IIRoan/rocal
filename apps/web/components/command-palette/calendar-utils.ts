@@ -1,7 +1,10 @@
 import { toast } from "sonner";
 import { createLogger } from "@workspace/logger";
+import { PRESET_COLORS } from "./navigation-config";
 
 const log = createLogger("calendar-utils");
+
+const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
 
 export const validateCalendarForm = (
   calendarName: string,
@@ -30,9 +33,9 @@ export const validateCalendarForm = (
     errors.name = "A calendar with this name already exists";
   }
 
-  // Validate color format (basic hex validation)
+  // Validate color format (named colors or hex)
   const isHexColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(calendarColor);
-  if (!isHexColor) {
+  if (!isHexColor && !ALLOWED_COLOR_VALUES.includes(calendarColor)) {
     errors.color = "Please select a valid color";
   }
 
@@ -72,8 +75,9 @@ export const handleCalendarCreate = async (
 
     toast.success(`Calendar "${calendarName}" created`);
     setters.setCalendarName("");
-    setters.setCalendarColor("#3b82f6");
+    setters.setCalendarColor("blue");
     setters.setCalendarIsDefault(false);
+    setters.setCalendarValidationErrors({});
     goBack();
   } catch (error: any) {
     log.error("Failed to create calendar:", error);
@@ -107,32 +111,10 @@ export const handleCalendarUpdate = async (
 
   setters.setCalendarValidationErrors({});
 
-  // Validate only if name changed
-  if (calendarName !== editingCalendar.name) {
-    const existingNames = calendars
-      .filter((cal) => cal.id !== editingCalendar.id)
-      .map((cal) => cal.name.toLowerCase());
-
-    if (!calendarName.trim()) {
-      setters.setCalendarValidationErrors({
-        name: "Calendar name is required",
-      });
-      return;
-    }
-
-    if (calendarName.trim().length > 100) {
-      setters.setCalendarValidationErrors({
-        name: "Calendar name cannot exceed 100 characters",
-      });
-      return;
-    }
-
-    if (existingNames.includes(calendarName.trim().toLowerCase())) {
-      setters.setCalendarValidationErrors({
-        name: "A calendar with this name already exists",
-      });
-      return;
-    }
+  const errors = validateCalendarForm(calendarName, calendarColor, calendars, editingCalendar);
+  if (Object.keys(errors).length > 0) {
+    setters.setCalendarValidationErrors(errors);
+    return;
   }
 
   setters.setCalendarSaving(true);
@@ -151,6 +133,10 @@ export const handleCalendarUpdate = async (
     if (error.message && error.message.includes("already exists")) {
       setters.setCalendarValidationErrors({
         name: "A calendar with this name already exists",
+      });
+    } else if (error.message && error.message.includes("Color must be")) {
+      setters.setCalendarValidationErrors({
+        color: "Please select a valid color",
       });
     } else {
       toast.error("Failed to update calendar");
@@ -189,7 +175,7 @@ export const resetCalendarForm = (setters: {
   setCalendarValidationErrors: (errors: any) => void;
 }) => {
   setters.setCalendarName("");
-  setters.setCalendarColor("#3b82f6");
+  setters.setCalendarColor("blue");
   setters.setCalendarIsDefault(false);
   setters.setEditingCalendar(null);
   setters.setCalendarValidationErrors({});
