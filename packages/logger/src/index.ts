@@ -86,8 +86,16 @@ function normalizeArgs(args: unknown[]): string {
     .join(" ");
 }
 
+export interface LoggerOptions {
+  timestamp?: boolean;
+}
+
 export class WorkspaceLogger {
-  constructor(private readonly scope?: string) {}
+  private readonly options: LoggerOptions;
+
+  constructor(private readonly scope?: string, options?: LoggerOptions) {
+    this.options = { timestamp: true, ...options };
+  }
 
   private write(level: LogLevel, args: unknown[]): void {
     if (IS_BROWSER && IS_PROD) return;
@@ -111,13 +119,13 @@ export class WorkspaceLogger {
       return;
     }
 
-    const timeStr = `${COLORS.faint}${timestamp()}${COLORS.reset}`;
+    const timeStr = this.options.timestamp ? `${COLORS.faint}${timestamp()}${COLORS.reset} ` : "";
     const levelColor = COLORS[level];
     const levelStr = `${levelColor}${LEVEL_LABELS[level]}${COLORS.reset}`;
     const scopeStr = this.scope ? ` ${COLORS.faint}<${this.scope}>${COLORS.reset}` : "";
     const message = normalizeArgs(args);
-    const line = `${timeStr} ${levelStr}${scopeStr} ${message}`.trimEnd();
-    
+    const line = `${timeStr}${levelStr}${scopeStr} ${message}`.trimEnd();
+
     writer(line);
   }
 
@@ -150,12 +158,12 @@ export class WorkspaceLogger {
   }
 
   child(scope: string): WorkspaceLogger {
-    return new WorkspaceLogger(this.scope ? `${this.scope}:${scope}` : scope);
+    return new WorkspaceLogger(this.scope ? `${this.scope}:${scope}` : scope, this.options);
   }
 }
 
-export function createLogger(scope?: string): WorkspaceLogger {
-  return new WorkspaceLogger(scope);
+export function createLogger(scope?: string, options?: LoggerOptions): WorkspaceLogger {
+  return new WorkspaceLogger(scope, options);
 }
 
 export function installGlobalConsoleLogger(scope?: string): WorkspaceLogger {
