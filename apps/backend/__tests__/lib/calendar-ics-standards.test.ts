@@ -17,13 +17,19 @@ function getFoldedPropertyLines(
     return [];
   }
 
-  const propertyLines = [lines[startIndex]];
+  const firstLine = lines[startIndex];
+  if (firstLine === undefined) {
+    return [];
+  }
+
+  const propertyLines: string[] = [firstLine];
   for (let index = startIndex + 1; index < lines.length; index += 1) {
-    if (!lines[index].startsWith(" ")) {
+    const line = lines[index];
+    if (line === undefined || !line.startsWith(" ")) {
       break;
     }
 
-    propertyLines.push(lines[index]);
+    propertyLines.push(line);
   }
 
   return propertyLines;
@@ -117,6 +123,11 @@ describe("calendar-ics standards", () => {
     expect(parsedResult.events).toHaveLength(1);
 
     const parsedEvent = parsedResult.events[0];
+    expect(parsedEvent).toBeDefined();
+    if (!parsedEvent) {
+      throw new Error("Expected a parsed event");
+    }
+
     const icsContent = unfoldIcs(
       buildIcsCalendar({
         calendar: { name: "Imported Calendar" },
