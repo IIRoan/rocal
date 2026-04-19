@@ -1,5 +1,6 @@
 import { createLogger } from "@workspace/logger";
 import { spawn } from "child_process";
+import * as fs from "fs";
 import * as path from "path";
 
 const log = createLogger("test-runner", { timestamp: false });
@@ -21,6 +22,7 @@ interface SuiteResult {
 
 const rootDir = path.join(__dirname, "..");
 const useCoverage = process.argv.includes("--coverage");
+const summaryPath = process.argv.find((a) => a.startsWith("--summary="))?.split("=")[1];
 
 const suites: TestSuite[] = [
   {
@@ -148,6 +150,36 @@ async function main() {
   log.info(`Suites: ${suitesPassed.length} passed, ${suitesFailed.length} failed, ${results.length} total`);
 
   console.log();
+
+  if (summaryPath) {
+    const allPassed = suitesFailed.length === 0;
+    const lines: string[] = [
+      "## Test Results",
+      "",
+      allPassed
+        ? "> **All suites passed** :white_check_mark:"
+        : "> **Some suites failed** :x:",
+      "",
+      "| Suite | Status | Tests |",
+      "|-------|--------|-------|",
+    ];
+
+    for (const result of results) {
+      const icon = result.exitCode === 0 ? ":white_check_mark:" : ":x:";
+      const status = result.exitCode === 0 ? "Passed" : "Failed";
+      const tests = result.total > 0 ? `${result.passed}/${result.total}` : "-";
+      lines.push(`| ${result.name} | ${icon} ${status} | ${tests} |`);
+    }
+
+    lines.push("");
+    if (totalTests > 0) {
+      lines.push(`**Tests:** ${totalPassed} passed, ${totalFailed} failed, ${totalTests} total`);
+    }
+    lines.push(`**Suites:** ${suitesPassed.length} passed, ${suitesFailed.length} failed, ${results.length} total`);
+    lines.push("");
+
+    fs.writeFileSync(summaryPath, lines.join("\n"));
+  }
 
   if (suitesFailed.length > 0) {
     log.error(`${suitesFailed.length} suite(s) failed`);
