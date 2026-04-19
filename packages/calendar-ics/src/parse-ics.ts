@@ -78,6 +78,7 @@ const CALENDAR_TIMEZONE_KEYS = [
   "X-WR-TIMEZONE",
   "x-wr-timezone",
 ] as const;
+const DATE_TIME_PARTS_FORMATTER_CACHE = new Map<string, Intl.DateTimeFormat>();
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null;
@@ -122,6 +123,131 @@ function coerceDate(value: unknown): Date | undefined {
   }
 
   return undefined;
+}
+
+function getDateTimePartsFormatter(timezone: string): Intl.DateTimeFormat {
+  const resolvedTimezone = normalizeIcsTimezone(timezone) || "UTC";
+  const cachedFormatter = DATE_TIME_PARTS_FORMATTER_CACHE.get(resolvedTimezone);
+  if (cachedFormatter) {
+    return cachedFormatter;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: resolvedTimezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+
+  DATE_TIME_PARTS_FORMATTER_CACHE.set(resolvedTimezone, formatter);
+  return formatter;
+}
+
+function getTimeZoneOffsetMs(date: Date, timezone: string): number {
+  const formatter = getDateTimePartsFormatter(timezone);
+  const parts = formatter.formatToParts(date);
+  const lookup = (
+    type: "year" | "month" | "day" | "hour" | "minute" | "second",
+  ) => parts.find((part) => part.type === type)?.value;
+
+  const year = Number.parseInt(lookup("year") || "0", 10);
+  const month = Number.parseInt(lookup("month") || "1", 10);
+  const day = Number.parseInt(lookup("day") || "1", 10);
+  const hour = Number.parseInt(lookup("hour") || "0", 10);
+  const minute = Number.parseInt(lookup("minute") || "0", 10);
+  const second = Number.parseInt(lookup("second") || "0", 10);
+
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  return asUtc - (date.getTime() - date.getMilliseconds());
+}
+
+function getRuntimeLocalDateParts(date: Date): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+  };
+}
+
+function addDaysToDateParts(
+  dateParts: { year: number; month: number; day: number },
+  days: number,
+): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  const copy = new Date(
+    Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day),
+  );
+  copy.setUTCDate(copy.getUTCDate() + days);
+
+  return {
+    year: copy.getUTCFullYear(),
+    month: copy.getUTCMonth() + 1,
+    day: copy.getUTCDate(),
+  };
+}
+
+function buildUtcDateFromTimeZoneDateParts(
+  dateParts: { year: number; month: number; day: number },
+  timezone: string,
+  endOfDay: boolean,
+): Date {
+  const resolvedTimezone = normalizeIcsTimezone(timezone) || "UTC";
+  const utcGuess = new Date(
+    Date.UTC(
+      dateParts.year,
+      dateParts.month - 1,
+      dateParts.day,
+      endOfDay ? 23 : 0,
+      endOfDay ? 59 : 0,
+      endOfDay ? 59 : 0,
+      endOfDay ? 999 : 0,
+    ),
+  );
+
+  const initialOffset = getTimeZoneOffsetMs(utcGuess, resolvedTimezone);
+  let normalized = new Date(utcGuess.getTime() - initialOffset);
+  const adjustedOffset = getTimeZoneOffsetMs(normalized, resolvedTimezone);
+
+  if (adjustedOffset !== initialOffset) {
+    normalized = new Date(utcGuess.getTime() - adjustedOffset);
+  }
+
+  if (endOfDay) {
+    normalized.setMilliseconds(999);
+  }
+
+  return normalized;
+}
+
+function normalizeAllDayRange(
+  start: Date,
+  end: Date | undefined,
+  timezone: string,
+): {
+  start: Date;
+  end: Date;
+} {
+  const startDateParts = getRuntimeLocalDateParts(start);
+  const lastCoveredDateParts =
+    end && end.getTime() > start.getTime()
+      ? addDaysToDateParts(getRuntimeLocalDateParts(end), -1)
+      : startDateParts;
+
+  return {
+    start: buildUtcDateFromTimeZoneDateParts(startDateParts, timezone, false),
+    end: buildUtcDateFromTimeZoneDateParts(lastCoveredDateParts, timezone, true),
+  };
 }
 
 function parsePositiveInt(value: unknown): number | undefined {
@@ -317,12 +443,14 @@ function parseVEvent(
     return null;
   }
 
-  const start = coerceDate(event.start);
+  let start = coerceDate(event.start);
   if (!start) {
     return null;
   }
 
   const allDay = isAllDayEvent(event);
+  const allDayTimezone = normalizeIcsTimezone(userTimezone) || "UTC";
+  const eventTimezone = getEventTimezone(event);
   let end = coerceDate(event.end);
 
   if (!end) {
@@ -333,20 +461,27 @@ function parseVEvent(
     }
   }
 
-  if (allDay && end.getTime() > start.getTime()) {
-    end = new Date(end.getTime() - DAY_IN_MS);
+  if (allDay) {
+    const normalizedAllDayRange = normalizeAllDayRange(
+      start,
+      end,
+      allDayTimezone,
+    );
+    start = normalizedAllDayRange.start;
+    end = normalizedAllDayRange.end;
   }
 
   const recurrenceIdDate = coerceDate(event.recurrenceid);
   const recurrenceId = recurrenceIdDate?.toISOString();
   const uid = buildIcsExternalId(sourceUid, recurrenceId);
 
-  const eventTimezone = getEventTimezone(event);
   const timezone =
     eventTimezone ??
-    (!allDay
-      ? (calendarTimezone ? normalizeIcsTimezone(calendarTimezone) : userTimezone)
-      : undefined);
+    (allDay
+      ? allDayTimezone
+      : calendarTimezone
+        ? normalizeIcsTimezone(calendarTimezone)
+        : userTimezone);
 
   const recurrenceRule = parseRecurrenceRule(event.rrule);
   if (recurrenceRule && !recurrenceRule.timezone && timezone) {

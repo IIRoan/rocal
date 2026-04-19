@@ -7,6 +7,7 @@ module.exports = {
     "<rootDir>/lib/auth-guard.ts",
     "<rootDir>/lib/auth-utils.ts",
     "<rootDir>/lib/calendar-sync-service.ts",
+    "<rootDir>/lib/colors.ts",
     "<rootDir>/lib/errors.ts",
     "<rootDir>/lib/ics-export.ts",
     "<rootDir>/lib/ics-parser.ts",

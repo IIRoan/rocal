@@ -7,6 +7,8 @@
     "build:emails": "tsx ./email-source/render-emails.tsx",
     "build": "bun run build:emails && go build -o notifications main.go",
     "dev": "bun run build:emails && go run main.go",
+    "test": "bun run build:emails && go test ./...",
+    "test:coverage": "bun run build:emails && go test ./... -covermode=atomic -coverprofile=coverage.out && go tool cover -func=coverage.out",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "tsc --project tsconfig.json --noEmit"
   },
