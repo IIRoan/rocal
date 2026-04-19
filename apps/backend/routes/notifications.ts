@@ -1,28 +1,22 @@
 import { Elysia, t } from "elysia";
-import {
-  ValidationError,
-  NotFoundError,
-  UnauthorizedError,
-} from "../lib/errors";
-import { prisma } from "../lib/prisma";
+import { ValidationError, UnauthorizedError, NotFoundError } from "../lib/errors";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
-import { NotificationCalculator } from "../lib/notification-calculator";
-import { createLogger } from "@workspace/logger";
 import { strictObject } from "../lib/validation";
+import { prisma } from "../lib/prisma";
+import { NotificationService } from "../services/notification.service";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:notifications");
+const notificationService = new NotificationService(prisma);
 
 // Rate limiting configuration
 const RATE_LIMITS = {
-  GET_NOTIFICATIONS: { requests: 100, windowMs: 60000 }, // 100 requests per minute
-  UPDATE_NOTIFICATIONS: { requests: 20, windowMs: 60000 }, // 20 updates per minute
-  CREATE_NOTIFICATIONS: { requests: 30, windowMs: 60000 }, // 30 creates per minute
-  STATUS_CHECK: { requests: 50, windowMs: 60000 }, // 50 status checks per minute
-  DEBUG_ACCESS: { requests: 10, windowMs: 60000 }, // 10 debug requests per minute
+  GET_NOTIFICATIONS: { requests: 100, windowMs: 60000 },
+  UPDATE_NOTIFICATIONS: { requests: 20, windowMs: 60000 },
 };
 
-// Simple in-memory rate limiter (for production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-const logger = createLogger("backend:notifications");
 
 type RateLimitContext = {
   request: Request;
@@ -33,33 +27,6 @@ type RateLimitContext = {
   user?: { id: string } | null;
 };
 
-type NotificationConfigInput = {
-  notificationType: "email" | "browser";
-  minutesBefore: number;
-  isEnabled: boolean;
-};
-
-type CreatedNotification = {
-  id: string;
-  notificationType: "email" | "browser";
-  minutesBefore: number;
-  notificationTime: Date;
-  notificationDateLocal: string;
-  notificationTimezone: string;
-  isEnabled: boolean;
-};
-
-type NotificationsContext<TParams = { eventId: string }, TBody = unknown> = {
-  params: TParams;
-  body: TBody;
-  request: Request;
-  user?: unknown;
-  set: RateLimitContext["set"];
-};
-
-/**
- * Rate limiting middleware
- */
 function rateLimit(limit: { requests: number; windowMs: number }) {
   return ({ request, set, user }: RateLimitContext) => {
     if (!user) {
@@ -71,11 +38,8 @@ function rateLimit(limit: { requests: number; windowMs: number }) {
     const now = Date.now();
     const windowStart = now - limit.windowMs;
 
-    // Clean up old entries
     for (const [k, v] of rateLimitStore.entries()) {
-      if (v.resetTime < windowStart) {
-        rateLimitStore.delete(k);
-      }
+      if (v.resetTime < windowStart) rateLimitStore.delete(k);
     }
 
     const current = rateLimitStore.get(key);
@@ -98,78 +62,6 @@ function rateLimit(limit: { requests: number; windowMs: number }) {
   };
 }
 
-/**
- * Validate notification configuration
- */
-function validateNotificationConfig(config: NotificationConfigInput): void {
-  if (
-    !config.notificationType ||
-    !["email", "browser"].includes(config.notificationType)
-  ) {
-    throw new ValidationError(
-      "Invalid notification type. Must be 'email' or 'browser'.",
-    );
-  }
-
-  if (typeof config.minutesBefore !== "number" || config.minutesBefore < 0) {
-    throw new ValidationError("minutesBefore must be a non-negative number.");
-  }
-
-  if (config.minutesBefore > 43200) {
-    // 30 days in minutes
-    throw new ValidationError(
-      "minutesBefore cannot exceed 30 days (43200 minutes).",
-    );
-  }
-
-  if (typeof config.isEnabled !== "boolean") {
-    throw new ValidationError("isEnabled must be a boolean value.");
-  }
-}
-
-/**
- * Validate event ownership
- */
-async function validateEventOwnership(eventId: string, userId: string) {
-  // Check if this is a recurring instance ID or synced event - just return null for these
-  if (
-    eventId.includes("_") &&
-    eventId.match(/_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
-  ) {
-    return null; // Recurring instances don't have notifications
-  }
-
-  const event = await prisma.calendarEvent.findFirst({
-    where: { id: eventId, userId },
-    select: { id: true, start: true, timezone: true, title: true, isSynced: true },
-  });
-
-  if (!event) {
-    throw new NotFoundError("Event not found or access denied");
-  }
-
-  // Synced events don't have notifications either
-  if (event.isSynced) {
-    return null;
-  }
-
-  return event;
-}
-
-type NotificationRow = {
-  id: string;
-  eventId: string;
-  notificationType: string;
-  minutesBefore: number;
-  notificationTime: Date;
-  notificationDateLocal: string;
-  notificationTimezone: string;
-  isEnabled: boolean;
-  isSent: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
 export const notificationsRoutes = new Elysia({
   prefix: "/notifications",
   normalize: false,
@@ -177,86 +69,28 @@ export const notificationsRoutes = new Elysia({
   .use(requireAuth)
   .get(
     "/event/:eventId",
-    async ({
-      params,
-      user,
-      request,
-      set,
-    }: NotificationsContext<{ eventId: string }>) => {
-      // Robust user check with fallback
+    async ({ params, user, request, set }: any) => {
       const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
-        // Apply rate limiting
         rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({
           request,
           set,
           user: authenticatedUser,
         });
 
-        const { eventId } = params;
-
-        // Validate event ownership
-        const event = await validateEventOwnership(eventId, authenticatedUser.id);
-
-        // If event is null (synced or recurring instance), return empty notifications
-        if (!event) {
-          return {
-            success: true,
-            data: {
-              eventId,
-              notifications: [],
-              count: 0,
-            },
-          };
-        }
-
-        // Get notifications for the event
-        const notifications = await prisma.$queryRaw<NotificationRow[]>`
-          SELECT
-            en.id,
-            en.event_id AS "eventId",
-            en.notification_type AS "notificationType",
-            en.minutes_before AS "minutesBefore",
-            en.notification_time AS "notificationTime",
-            en.notification_date_local AS "notificationDateLocal",
-            en.notification_timezone AS "notificationTimezone",
-            en.is_enabled AS "isEnabled",
-            en.is_sent AS "isSent",
-            en.created_at AS "createdAt",
-            en.updated_at AS "updatedAt"
-          FROM public.event_notification en
-          INNER JOIN public.calendar_event ce ON ce.id = en.event_id
-          WHERE en.event_id = ${eventId}
-            AND ce.user_id = ${authenticatedUser.id}
-          ORDER BY en.notification_type ASC, en.minutes_before ASC
-        `;
-
-        return {
-          success: true,
-          data: {
-            eventId,
-            notifications: notifications.map((n) => ({
-              ...n,
-              notificationTime: n.notificationTime.toISOString(),
-              notificationDateLocal: n.notificationDateLocal,
-              notificationTimezone: n.notificationTimezone,
-              createdAt: n.createdAt.toISOString(),
-              updatedAt: n.updatedAt.toISOString(),
-            })),
-            count: notifications.length,
-          },
-        };
+        return await notificationService.getForEvent(authenticatedUser.id, params.eventId);
       } catch (error) {
         if (
           error instanceof ValidationError ||
-          error instanceof NotFoundError ||
-          error instanceof UnauthorizedError
+          error instanceof UnauthorizedError ||
+          error instanceof NotFoundError
         ) {
           throw error;
         }
         logger.error("Failed to get event notifications:", error);
-        throw new ValidationError("Failed to retrieve event notifications");
+        set.status = 500;
+        return "Failed to retrieve event notifications";
       }
     },
     {
@@ -272,251 +106,38 @@ export const notificationsRoutes = new Elysia({
         description:
           "Retrieves all notification settings for a specific event with enhanced validation and rate limiting",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: {
-            description: "Event notifications retrieved successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    success: { type: "boolean" },
-                    data: {
-                      type: "object",
-                      properties: {
-                        eventId: { type: "string" },
-                        notifications: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              id: { type: "string" },
-                              eventId: { type: "string" },
-                              notificationType: {
-                                type: "string",
-                                enum: ["email", "browser"],
-                              },
-                              minutesBefore: { type: "integer", minimum: 0 },
-                              notificationTime: {
-                                type: "string",
-                                format: "date-time",
-                              },
-                              isEnabled: { type: "boolean" },
-                              isSent: { type: "boolean" },
-                              createdAt: {
-                                type: "string",
-                                format: "date-time",
-                              },
-                              updatedAt: {
-                                type: "string",
-                                format: "date-time",
-                              },
-                            },
-                          },
-                        },
-                        count: { type: "integer" },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          400: { description: "Validation error" },
-          401: { description: "Unauthorized" },
-          404: { description: "Event not found" },
-          429: { description: "Rate limit exceeded" },
-        },
       },
     },
   )
 
   .put(
     "/event/:eventId",
-    async ({
-      params,
-      body,
-      user,
-      request,
-      set,
-    }: NotificationsContext<{ eventId: string }, { notifications: NotificationConfigInput[] }>) => {
-      // Robust user check with fallback
+    async ({ params, body, user, request, set }: any) => {
       const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
-        // Apply rate limiting
         rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
           request,
           set,
           user: authenticatedUser,
         });
 
-        const { eventId } = params;
-        const { notifications } = body;
-
-        // Validate event ownership
-        const event = await validateEventOwnership(eventId, authenticatedUser.id);
-
-        // If event is null (synced or recurring instance), return success without doing anything
-        if (!event) {
-          return {
-            success: true,
-            message: "No notifications to update for this event type",
-          };
-        }
-
-        // Validate notification configurations
-        if (!Array.isArray(notifications)) {
-          throw new ValidationError("notifications must be an array");
-        }
-
-        // Validate each notification configuration
-        for (const config of notifications) {
-          validateNotificationConfig(config);
-        }
-
-        // Check for duplicate notification configurations
-        const configKeys = notifications.map(
-          (n) => `${n.notificationType}-${n.minutesBefore}`,
+        return await notificationService.setForEvent(
+          authenticatedUser.id,
+          params.eventId,
+          body.notifications,
         );
-        const uniqueKeys = new Set(configKeys);
-        if (configKeys.length !== uniqueKeys.size) {
-          throw new ValidationError(
-            "Duplicate notification configurations are not allowed",
-          );
-        }
-
-        // Delete existing notifications for this event
-        await prisma.eventNotification.deleteMany({
-          where: { eventId },
-        });
-
-        // Create new notifications, but skip any that would be in the past or for past events
-        const createdNotifications: CreatedNotification[] = [];
-        const skippedConfigurations: Array<{
-          notificationType: string;
-          minutesBefore: number;
-          reason: string;
-        }> = [];
-
-        const now = new Date();
-        const eventIsInPast = event.start <= now;
-
-        if (eventIsInPast) {
-          // Entirely skip creating notifications for past events
-          return {
-            success: true,
-            message: "Event is in the past; notifications skipped",
-            data: {
-              eventId,
-              created: 0,
-              skipped: notifications.length,
-              details: {
-                createdNotifications: [],
-                skippedConfigurations: notifications.map((n) => ({
-                  notificationType: n.notificationType,
-                  minutesBefore: n.minutesBefore,
-                  reason: "event_in_past",
-                })),
-              },
-            },
-          };
-        }
-
-        for (const config of notifications) {
-          if (!config.isEnabled) {
-            skippedConfigurations.push({
-              notificationType: config.notificationType,
-              minutesBefore: config.minutesBefore,
-              reason: "disabled",
-            });
-            continue;
-          }
-
-          const schedule = NotificationCalculator.buildNotificationSchedule(
-            event.start,
-            config.minutesBefore,
-            event.timezone,
-          );
-          if (schedule.notificationTime <= now) {
-            skippedConfigurations.push({
-              notificationType: config.notificationType,
-              minutesBefore: config.minutesBefore,
-              reason: "notification_time_in_past",
-            });
-            continue;
-          }
-
-          const notificationId = crypto.randomUUID();
-          await prisma.$executeRaw`
-            INSERT INTO public.event_notification (
-              id,
-              event_id,
-              notification_type,
-              minutes_before,
-              notification_time,
-              notification_date_local,
-              notification_timezone,
-              is_enabled,
-              is_sent,
-              created_at,
-              updated_at
-            ) VALUES (
-              ${notificationId},
-              ${eventId},
-              ${config.notificationType},
-              ${config.minutesBefore},
-              ${schedule.notificationTime},
-              ${schedule.notificationDateLocal},
-              ${schedule.notificationTimezone},
-              true,
-              false,
-              NOW(),
-              NOW()
-            )
-          `;
-          createdNotifications.push({
-            id: notificationId,
-            notificationType: config.notificationType,
-            minutesBefore: config.minutesBefore,
-            notificationTime: schedule.notificationTime,
-            notificationDateLocal: schedule.notificationDateLocal,
-            notificationTimezone: schedule.notificationTimezone,
-            isEnabled: true,
-          });
-        }
-
-        return {
-          success: true,
-          message: "Event notifications updated successfully",
-          data: {
-            eventId,
-            created: createdNotifications.length,
-            skipped: skippedConfigurations.length,
-            details: {
-              createdNotifications: createdNotifications.map((n) => ({
-                id: n.id,
-                type: n.notificationType,
-                minutesBefore: n.minutesBefore,
-                notificationTime: n.notificationTime.toISOString(),
-                notificationDateLocal: n.notificationDateLocal,
-                notificationTimezone: n.notificationTimezone,
-                isEnabled: n.isEnabled,
-              })),
-              skippedConfigurations,
-            },
-          },
-        };
       } catch (error) {
         if (
           error instanceof ValidationError ||
-          error instanceof NotFoundError ||
-          error instanceof UnauthorizedError
+          error instanceof UnauthorizedError ||
+          error instanceof NotFoundError
         ) {
           throw error;
         }
         logger.error("Failed to update event notifications:", error);
-        throw new ValidationError("Failed to update event notifications");
+        set.status = 500;
+        return "Failed to update event notifications";
       }
     },
     {
@@ -531,14 +152,12 @@ export const notificationsRoutes = new Elysia({
           strictObject({
             notificationType: t.Union(
               [t.Literal("browser"), t.Literal("email")],
-              {
-                description: "Type of notification",
-              },
+              { description: "Type of notification" },
             ),
             minutesBefore: t.Integer({
               description: "Minutes before event to send notification",
               minimum: 0,
-              maximum: 43200, // 30 days
+              maximum: 43200,
             }),
             isEnabled: t.Boolean({
               description: "Whether this notification is enabled",
@@ -546,7 +165,7 @@ export const notificationsRoutes = new Elysia({
           }),
           {
             description: "Array of notification settings",
-            maxItems: 20, // Reasonable limit
+            maxItems: 20,
           },
         ),
       }),
@@ -556,74 +175,34 @@ export const notificationsRoutes = new Elysia({
         description:
           "Updates all notification settings for a specific event using the enhanced notification service with comprehensive validation",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: { description: "Event notifications updated successfully" },
-          400: { description: "Validation error" },
-          401: { description: "Unauthorized" },
-          404: { description: "Event not found" },
-          429: { description: "Rate limit exceeded" },
-        },
       },
     },
   )
 
   .delete(
     "/event/:eventId",
-    async ({
-      params,
-      user,
-      request,
-      set,
-    }: NotificationsContext<{ eventId: string }>) => {
-      // Robust user check with fallback
+    async ({ params, user, request, set }: any) => {
       const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
-        // Apply rate limiting
         rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
           request,
           set,
           user: authenticatedUser,
         });
 
-        const { eventId } = params;
-
-        // Validate event ownership
-        const event = await validateEventOwnership(eventId, authenticatedUser.id);
-
-        // If event is null (synced or recurring instance), return success without doing anything
-        if (!event) {
-          return {
-            success: true,
-            message: "No notifications to delete for this event type",
-            deletedCount: 0,
-          };
-        }
-
-        // Delete notifications directly from database
-        const deleteResult = await prisma.eventNotification.deleteMany({
-          where: { eventId },
-        });
-        const deletedCount = deleteResult.count;
-
-        return {
-          success: true,
-          message: `Successfully deleted ${deletedCount} notifications for event`,
-          data: {
-            eventId,
-            deletedCount,
-          },
-        };
+        return await notificationService.deleteForEvent(authenticatedUser.id, params.eventId);
       } catch (error) {
         if (
           error instanceof ValidationError ||
-          error instanceof NotFoundError ||
-          error instanceof UnauthorizedError
+          error instanceof UnauthorizedError ||
+          error instanceof NotFoundError
         ) {
           throw error;
         }
         logger.error("Failed to delete event notifications:", error);
-        throw new ValidationError("Failed to delete event notifications");
+        set.status = 500;
+        return "Failed to delete event notifications";
       }
     },
     {
@@ -639,35 +218,6 @@ export const notificationsRoutes = new Elysia({
         description:
           "Deletes all notification settings for a specific event using the enhanced notification service",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: {
-            description: "Event notifications deleted successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    success: { type: "boolean" },
-                    message: { type: "string" },
-                    data: {
-                      type: "object",
-                      properties: {
-                        eventId: { type: "string" },
-                        deletedCount: { type: "integer" },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          400: { description: "Validation error" },
-          401: { description: "Unauthorized" },
-          404: { description: "Event not found" },
-          429: { description: "Rate limit exceeded" },
-        },
       },
     },
   );
-
-// Status, debug, and cleanup routes removed - handled by separate notification server

@@ -1,94 +1,21 @@
 import { Elysia, t } from "elysia";
-import { prisma } from "../lib/prisma";
-import { ValidationError } from "../lib/errors";
-import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
-import { createLogger } from "@workspace/logger";
 import { strictObject } from "../lib/validation";
+import { prisma } from "../lib/prisma";
+import { RecurringService } from "../services/recurring.service";
 
-const logger = createLogger("backend:recurring");
-type RecurringRuleInput =
-  | string
-  | {
-      frequency: RecurrenceRule["frequency"];
-      interval: number;
-      count?: number;
-      until?: string;
-      timezone?: string;
-      byWeekDay?: number[];
-      byMonthDay?: number[];
-      byMonth?: number[];
-    };
-type RecurringUpdates = {
-  title?: string;
-  description?: string;
-  start?: string;
-  end?: string;
-  allDay?: boolean;
-  location?: string;
-  color?: string;
-  reminder?: number;
-  recurrence?: string;
-  calendarId?: string;
-  categoryId?: string;
-};
-type RecurringContext<
-  TParams = Record<string, never>,
-  TBody = unknown,
-  TQuery = Record<string, string>,
-> = {
-  params: TParams;
-  body: TBody;
-  query: TQuery;
-  request: Request;
-  user?: unknown;
-};
+const recurringService = new RecurringService(prisma);
 
 export const recurringRoutes = new Elysia({
   prefix: "/recurring",
   normalize: false,
 })
   .use(requireAuth)
-  // Validate recurrence rule
   .post(
     "/validate",
-    async ({ body }: RecurringContext<Record<string, never>, { rule: RecurringRuleInput }>) => {
-      const { rule } = body;
-
-      try {
-        const parsedRule =
-          typeof rule === "string"
-            ? RecurrenceEngine.parseRecurrenceRule(rule)
-            : (rule as RecurrenceRule);
-
-        if (!parsedRule) {
-          return {
-            valid: false,
-            errors: ["Invalid recurrence rule format"],
-            description: null,
-          };
-        }
-
-        const errors = RecurrenceEngine.validateRecurrenceRule(parsedRule);
-        const description =
-          errors.length === 0
-            ? RecurrenceEngine.getRecurrenceDescription(parsedRule)
-            : null;
-
-        return {
-          valid: errors.length === 0,
-          errors,
-          description,
-          rule: parsedRule,
-        };
-      } catch {
-        return {
-          valid: false,
-          errors: ["Failed to parse recurrence rule"],
-          description: null,
-        };
-      }
+    async ({ body }: any) => {
+      return recurringService.validate(body.rule);
     },
     {
       body: strictObject({
@@ -121,92 +48,19 @@ export const recurringRoutes = new Elysia({
         description:
           "Validates a recurrence rule and returns a human-readable description",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: {
-            description: "Validation result",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    valid: { type: "boolean" },
-                    errors: { type: "array", items: { type: "string" } },
-                    description: { type: "string", nullable: true },
-                    rule: { type: "object", nullable: true },
-                  },
-                },
-              },
-            },
-          },
-          401: { description: "Unauthorized" },
-        },
       },
     },
   )
 
-  // Generate recurrence instances for preview
   .post(
     "/preview",
-    async ({
-      body,
-    }: RecurringContext<
-      Record<string, never>,
-      {
-        eventStart: string;
-        eventEnd: string;
-        recurrenceRule: RecurringRuleInput;
-        previewDays?: number;
-      }
-    >) => {
-      const { eventStart, eventEnd, recurrenceRule, previewDays = 90 } = body;
-
-      try {
-        const startDate = new Date(eventStart);
-        const endDate = new Date(eventEnd);
-        const previewEndDate = new Date(
-          startDate.getTime() + previewDays * 24 * 60 * 60 * 1000,
-        );
-
-        const rule =
-          typeof recurrenceRule === "string"
-            ? RecurrenceEngine.parseRecurrenceRule(recurrenceRule)
-            : (recurrenceRule as RecurrenceRule);
-
-        if (!rule) {
-          throw new ValidationError(
-            "Invalid recurrence rule",
-            "recurrenceRule",
-          );
-        }
-
-        const mockEvent = {
-          id: "preview",
-          start: startDate,
-          end: endDate,
-          recurrence: RecurrenceEngine.createRecurrenceRule(rule),
-        };
-
-        const instances = RecurrenceEngine.generateInstances(
-          mockEvent,
-          startDate,
-          previewEndDate,
-          [],
-        );
-
-        return {
-          instances: instances.map((instance) => ({
-            date: instance.date.toISOString(),
-            isOriginal: instance.isOriginal,
-          })),
-          description: RecurrenceEngine.getRecurrenceDescription(rule),
-          totalInstances: instances.length,
-        };
-      } catch {
-        throw new ValidationError(
-          "Failed to generate preview",
-          "recurrenceRule",
-        );
-      }
+    async ({ body }: any) => {
+      return recurringService.preview({
+        eventStart: body.eventStart,
+        eventEnd: body.eventEnd,
+        recurrenceRule: body.recurrenceRule,
+        previewDays: body.previewDays,
+      });
     },
     {
       body: strictObject({
@@ -244,213 +98,21 @@ export const recurringRoutes = new Elysia({
         description:
           "Generate a preview of recurring event instances for the specified period",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: {
-            description: "Preview instances generated",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    instances: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          date: { type: "string" },
-                          isOriginal: { type: "boolean" },
-                        },
-                      },
-                    },
-                    description: { type: "string" },
-                    totalInstances: { type: "number" },
-                  },
-                },
-              },
-            },
-          },
-          400: { description: "Validation error" },
-          401: { description: "Unauthorized" },
-        },
       },
     },
   )
 
-  // Edit recurring event series
   .put(
     "/event/:id",
-    async ({
-      params,
-      body,
-      user,
-      request,
-    }: RecurringContext<
-      { id: string },
-      {
-        editScope: "this_only" | "this_and_future" | "all";
-        occurrenceDate?: string;
-        updates: RecurringUpdates;
-      }
-    >) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-
-      const { id } = params;
-      const { editScope, occurrenceDate, updates } = body;
-
-      // Verify event exists and belongs to user
-      const existingEvent = await prisma.calendarEvent.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-          recurrence: { not: null },
-        },
+    async ({ params, body, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return recurringService.editSeries({
+        userId,
+        eventId: params.id,
+        editScope: body.editScope,
+        occurrenceDate: body.occurrenceDate,
+        updates: body.updates,
       });
-
-      if (!existingEvent) {
-        throw new ValidationError("Recurring event not found or access denied");
-      }
-
-      switch (editScope) {
-        case "this_only": {
-          const eventUpdates = updates;
-
-          if (!occurrenceDate) {
-            throw new ValidationError(
-              "Occurrence date is required for 'this_only' edit",
-              "occurrenceDate",
-            );
-          }
-
-          const exceptionDate = new Date(occurrenceDate);
-
-          // Create modified event
-          const modifiedEvent = await prisma.calendarEvent.create({
-            data: {
-              title: eventUpdates.title ?? existingEvent.title,
-              description: eventUpdates.description ?? existingEvent.description,
-              allDay: eventUpdates.allDay ?? existingEvent.allDay,
-              location: eventUpdates.location ?? existingEvent.location,
-              color: eventUpdates.color ?? existingEvent.color,
-              reminder: eventUpdates.reminder ?? existingEvent.reminder,
-              calendarId: eventUpdates.calendarId ?? existingEvent.calendarId,
-              categoryId: eventUpdates.categoryId ?? existingEvent.categoryId,
-              parentEventId: id,
-              recurrence: null, // Exception events don't have recurrence
-              userId: authenticatedUser.id,
-              start: eventUpdates.start
-                ? new Date(eventUpdates.start)
-                : existingEvent.start,
-              end: eventUpdates.end
-                ? new Date(eventUpdates.end)
-                : existingEvent.end,
-            },
-            include: {
-              category: true,
-              calendar: true,
-            },
-          });
-
-          // Create exception record
-          await prisma.recurrenceException.create({
-            data: {
-              parentEventId: id,
-              exceptionDate,
-              modifiedEventId: modifiedEvent.id,
-              type: "modified",
-            },
-          });
-
-          return modifiedEvent;
-        }
-
-        case "this_and_future": {
-          const eventUpdates = updates;
-
-          if (!occurrenceDate) {
-            throw new ValidationError(
-              "Occurrence date is required for 'this_and_future' edit",
-              "occurrenceDate",
-            );
-          }
-
-          const splitDate = new Date(occurrenceDate);
-
-          // Update original event to end before split date
-          const originalRule = RecurrenceEngine.parseRecurrenceRule(
-            existingEvent.recurrence!,
-          );
-          if (originalRule) {
-            originalRule.until = new Date(
-              splitDate.getTime() - 24 * 60 * 60 * 1000,
-            );
-            await prisma.calendarEvent.update({
-              where: { id },
-              data: {
-                recurrence: RecurrenceEngine.createRecurrenceRule(originalRule),
-              },
-            });
-          }
-
-          // Create new recurring event starting from split date
-          const newEvent = await prisma.calendarEvent.create({
-            data: {
-              title: eventUpdates.title ?? existingEvent.title,
-              description: eventUpdates.description ?? existingEvent.description,
-              allDay: eventUpdates.allDay ?? existingEvent.allDay,
-              location: eventUpdates.location ?? existingEvent.location,
-              color: eventUpdates.color ?? existingEvent.color,
-              reminder: eventUpdates.reminder ?? existingEvent.reminder,
-              recurrence: eventUpdates.recurrence ?? existingEvent.recurrence,
-              calendarId: eventUpdates.calendarId ?? existingEvent.calendarId,
-              categoryId: eventUpdates.categoryId ?? existingEvent.categoryId,
-              userId: authenticatedUser.id,
-              parentEventId: id,
-              start: eventUpdates.start
-                ? new Date(eventUpdates.start)
-                : splitDate,
-              end: eventUpdates.end
-                ? new Date(eventUpdates.end)
-                : new Date(
-                    splitDate.getTime() +
-                      (existingEvent.end.getTime() -
-                        existingEvent.start.getTime()),
-                  ),
-            },
-            include: {
-              category: true,
-              calendar: true,
-            },
-          });
-
-          return newEvent;
-        }
-
-        case "all": {
-          // Update the entire series
-          const updatedEvent = await prisma.calendarEvent.update({
-            where: { id },
-            data: {
-              ...updates,
-              start: updates.start ? new Date(updates.start) : undefined,
-              end: updates.end ? new Date(updates.end) : undefined,
-              updatedAt: new Date(),
-            },
-            include: {
-              category: true,
-              calendar: true,
-            },
-          });
-
-          return updatedEvent;
-        }
-
-        default:
-          throw new ValidationError(
-            "Invalid edit scope. Use 'this_only', 'this_and_future', or 'all'",
-            "editScope",
-          );
-      }
     },
     {
       params: strictObject({
@@ -488,192 +150,20 @@ export const recurringRoutes = new Elysia({
         description:
           "Edit a recurring event with options for scope: single occurrence, this and future, or entire series",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: { description: "Recurring event updated successfully" },
-          400: { description: "Validation error" },
-          401: { description: "Unauthorized" },
-          404: { description: "Recurring event not found" },
-        },
       },
     },
   )
 
-  // Delete recurring event series
   .delete(
     "/event/:id",
-    async ({
-      params,
-      query,
-      user,
-      request,
-    }: RecurringContext<
-      { id: string },
-      unknown,
-      { deleteScope: "this_only" | "this_and_future" | "all"; occurrenceDate?: string }
-    >) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-
-      const { id } = params;
-      const { deleteScope, occurrenceDate } = query;
-
-      logger.info("🗑️ DELETE RECURRING EVENT REQUEST:", {
-        eventId: id,
-        deleteScope,
-        occurrenceDate,
-        userId: authenticatedUser.id,
+    async ({ params, query, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return recurringService.deleteSeries({
+        userId,
+        eventId: params.id,
+        deleteScope: query.deleteScope,
+        occurrenceDate: query.occurrenceDate,
       });
-
-      // Verify event exists and belongs to user
-      const existingEvent = await prisma.calendarEvent.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-          recurrence: { not: null },
-        },
-      });
-
-      if (!existingEvent) {
-        throw new ValidationError("Recurring event not found or access denied");
-      }
-
-      switch (deleteScope) {
-        case "this_only": {
-          if (!occurrenceDate) {
-            throw new ValidationError(
-              "Occurrence date is required for 'this_only' delete",
-              "occurrenceDate",
-            );
-          }
-
-          const exceptionDate = new Date(occurrenceDate);
-          logger.info("📅 Creating RecurrenceException:", {
-            parentEventId: id,
-            exceptionDate: exceptionDate.toISOString(),
-            originalOccurrenceDate: occurrenceDate,
-            type: "deleted",
-          });
-
-          // Check if exception already exists
-          const existingException = await prisma.recurrenceException.findUnique(
-            {
-              where: {
-                parentEventId_exceptionDate: {
-                  parentEventId: id,
-                  exceptionDate,
-                },
-              },
-            },
-          );
-
-          let exception;
-          if (existingException) {
-            logger.warn(
-              "⚠️ RecurrenceException already exists:",
-              existingException,
-            );
-
-            // If it's already deleted, that's fine - just return success
-            if (existingException.type === "deleted") {
-              logger.ok("✅ Occurrence already deleted, returning success");
-              exception = existingException;
-            } else {
-              // If it's a different type (e.g., "modified"), update it to "deleted"
-              logger.info("🔄 Updating existing exception to deleted type");
-              exception = await prisma.recurrenceException.update({
-                where: {
-                  parentEventId_exceptionDate: {
-                    parentEventId: id,
-                    exceptionDate,
-                  },
-                },
-                data: {
-                  type: "deleted",
-                },
-              });
-            }
-          } else {
-            // Create new deletion exception
-            exception = await prisma.recurrenceException.create({
-              data: {
-                parentEventId: id,
-                exceptionDate,
-                type: "deleted",
-              },
-            });
-            logger.ok("✅ New RecurrenceException created:", exception);
-          }
-
-          return {
-            success: true,
-            message: "Single occurrence deleted successfully",
-            deletedEventId: id,
-            action: "delete_occurrence",
-          };
-        }
-
-        case "this_and_future": {
-          if (!occurrenceDate) {
-            throw new ValidationError(
-              "Occurrence date is required for 'this_and_future' delete",
-              "occurrenceDate",
-            );
-          }
-
-          const splitDate = new Date(occurrenceDate);
-
-          // Update original event to end before split date
-          const originalRule = RecurrenceEngine.parseRecurrenceRule(
-            existingEvent.recurrence!,
-          );
-          if (originalRule) {
-            originalRule.until = new Date(
-              splitDate.getTime() - 24 * 60 * 60 * 1000,
-            );
-            await prisma.calendarEvent.update({
-              where: { id },
-              data: {
-                recurrence: RecurrenceEngine.createRecurrenceRule(originalRule),
-              },
-            });
-          }
-
-          return {
-            success: true,
-            message: "Future occurrences deleted successfully",
-            deletedEventId: id,
-            action: "delete_future",
-          };
-        }
-
-        case "all": {
-          // Delete the entire series and all exceptions
-          await prisma.recurrenceException.deleteMany({
-            where: { parentEventId: id },
-          });
-
-          await prisma.calendarEvent.deleteMany({
-            where: { parentEventId: id },
-          });
-
-          await prisma.calendarEvent.delete({
-            where: { id },
-          });
-
-          return {
-            success: true,
-            message: "Entire recurring series deleted successfully",
-            deletedEventId: id,
-            action: "delete_all",
-          };
-        }
-
-        default:
-          throw new ValidationError(
-            "Invalid delete scope. Use 'this_only', 'this_and_future', or 'all'",
-            "deleteScope",
-          );
-      }
     },
     {
       params: strictObject({
@@ -695,50 +185,14 @@ export const recurringRoutes = new Elysia({
         description:
           "Delete a recurring event with options for scope: single occurrence, this and future, or entire series",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: { description: "Recurring event deleted successfully" },
-          400: { description: "Validation error" },
-          401: { description: "Unauthorized" },
-          404: { description: "Recurring event not found" },
-        },
       },
     },
   )
 
-  // Get common recurrence patterns
   .get(
     "/patterns",
     async () => {
-      const patterns = RecurrenceEngine.createCommonPatterns();
-
-      return {
-        patterns: {
-          daily: {
-            rule: patterns.daily(),
-            description: "Daily",
-          },
-          weekly: {
-            rule: patterns.weekly(),
-            description: "Weekly",
-          },
-          biweekly: {
-            rule: patterns.biweekly(),
-            description: "Every 2 weeks",
-          },
-          monthly: {
-            rule: patterns.monthly(),
-            description: "Monthly",
-          },
-          yearly: {
-            rule: patterns.yearly(),
-            description: "Yearly",
-          },
-          weekdays: {
-            rule: patterns.weekdays(),
-            description: "Every weekday",
-          },
-        },
-      };
+      return recurringService.getCommonPatterns();
     },
     {
       detail: {
@@ -746,31 +200,6 @@ export const recurringRoutes = new Elysia({
         summary: "Get common recurrence patterns",
         description: "Returns pre-defined common recurrence patterns",
         security: [{ bearerAuth: [] }],
-        responses: {
-          200: {
-            description: "Common recurrence patterns",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    patterns: {
-                      type: "object",
-                      additionalProperties: {
-                        type: "object",
-                        properties: {
-                          rule: { type: "object" },
-                          description: { type: "string" },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          401: { description: "Unauthorized" },
-        },
       },
     },
   );

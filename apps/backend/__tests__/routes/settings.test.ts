@@ -173,7 +173,7 @@ describe("settingsRoutes", () => {
 
     expect(response.status).toBe(500);
     await expect(readText(response)).resolves.toBe(
-      "Invalid working days format - must be valid JSON array",
+      "Working days must be a JSON array of numbers 0-6",
     );
   });
 
