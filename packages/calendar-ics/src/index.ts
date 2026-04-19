@@ -337,7 +337,7 @@ function foldIcsLine(line: string): string[] {
   const segments: string[] = [];
   let currentSegment = "";
   let currentOctets = 0;
-  let limit = maxLineLengths[0];
+  let limit = maxLineLengths[0] ?? ICS_MAX_LINE_OCTETS;
 
   for (const character of line) {
     const characterOctets = TEXT_ENCODER.encode(character).length;
@@ -346,7 +346,7 @@ function foldIcsLine(line: string): string[] {
       segments.push(currentSegment);
       currentSegment = character;
       currentOctets = characterOctets;
-      limit = maxLineLengths[1];
+      limit = maxLineLengths[1] ?? ICS_CONTINUATION_MAX_LINE_OCTETS;
       continue;
     }
 

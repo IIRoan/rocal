@@ -4,7 +4,7 @@ function GoTemplateTag({ children }: { children: string }) {
   return <>{children}</>;
 }
 
-function MetaRow({
+function DetailBlock({
   label,
   value,
 }: {
@@ -12,35 +12,32 @@ function MetaRow({
   value: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", gap: "12px", padding: "10px 0" }}>
-      <div style={{ flex: "1 1 80px", minWidth: "72px" }}>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "11px",
-            lineHeight: "14px",
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "#737373",
-            fontWeight: 600,
-          }}
-        >
-          {label}
-        </p>
+    <div style={{ marginBottom: "18px" }}>
+      <div
+        className="detail-label"
+        style={{
+          fontSize: "11px",
+          lineHeight: "14px",
+          fontWeight: 600,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase" as const,
+          color: "#999",
+          marginBottom: "4px",
+        }}
+      >
+        {label}
       </div>
-      <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "14px",
-            lineHeight: "20px",
-            color: "#262626",
-            fontWeight: 400,
-            wordBreak: "break-word",
-          }}
-        >
-          {value}
-        </p>
+      <div
+        className="detail-value"
+        style={{
+          fontSize: "16px",
+          lineHeight: "22px",
+          fontWeight: 400,
+          color: "#1a1a1a",
+          wordBreak: "break-word" as const,
+        }}
+      >
+        {value}
       </div>
     </div>
   );
@@ -52,16 +49,37 @@ export function EventReminderEmailTemplate() {
       <head>
         <meta charSet="UTF-8" />
         <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="supported-color-schemes" content="light dark" />
         <title>{`{{.EventTitle}} - {{.TimeUntilEvent}}`}</title>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+            :root { color-scheme: light dark; }
+            body { background-color: #ffffff !important; color: #1a1a1a !important; }
+            @media (prefers-color-scheme: dark) {
+              body { background-color: #1a1a1a !important; color: #e5e5e5 !important; }
+              .email-title { color: #ffffff !important; }
+              .email-subtitle { color: rgba(255,255,255,0.55) !important; }
+              .detail-label { color: rgba(255,255,255,0.40) !important; }
+              .detail-value { color: #e5e5e5 !important; }
+              .email-btn { background: #2a2a2a !important; color: #ffffff !important; border-color: rgba(255,255,255,0.15) !important; }
+              .email-hr { background-color: #333 !important; }
+              .email-footer { color: #666 !important; }
+              .email-footer a { color: #666 !important; }
+            }
+          `,
+          }}
+        />
       </head>
       <body
         style={{
           margin: 0,
-          padding: "24px 16px",
-          backgroundColor: "#fafafa",
+          padding: 0,
+          backgroundColor: "#ffffff",
           color: "#1a1a1a",
           fontFamily:
-            'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            '"Helvetica Neue", Helvetica, Arial, sans-serif',
           WebkitFontSmoothing: "antialiased",
         }}
       >
@@ -78,153 +96,177 @@ export function EventReminderEmailTemplate() {
           {"{{.TimeUntilEvent}}"} for {"{{.EventTitle}}"}.
         </div>
 
-        <div style={{ margin: "0 auto", maxWidth: "500px" }}>
-          <div
+        <div style={{ margin: "0 auto", maxWidth: "555px", padding: "48px 28px 40px" }}>
+          {/* Logo */}
+          <a href={"{{.CalendarUrl}}"} style={{ outline: "none", textDecoration: "none" }}>
+            <img
+              src={"{{.LogoUrl}}"}
+              alt="Solace"
+              width="36"
+              height="36"
+              style={{
+                display: "block",
+                width: "36px",
+                height: "36px",
+                border: 0,
+                marginBottom: "28px",
+              }}
+            />
+          </a>
+
+          {/* Title */}
+          <h1
+            className="email-title"
             style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #e5e5e5",
-              borderRadius: "24px",
-              overflow: "hidden",
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+              margin: 0,
+              fontSize: "22px",
+              lineHeight: "130%",
+              fontWeight: 700,
+              letterSpacing: "-0.01em",
+              color: "#000",
             }}
           >
-            {/* Header */}
-            <div style={{ padding: "28px 28px 20px" }}>
-              <p
-                style={{
-                  margin: "0 0 6px",
-                  fontSize: "11px",
-                  lineHeight: "14px",
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  color: "#8b8b8b",
-                  fontWeight: 600,
-                }}
-              >
-                {"{{.TimeUntilEvent}}"}
-              </p>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: "24px",
-                  lineHeight: "30px",
-                  letterSpacing: "-0.02em",
-                  color: "#1a1a1a",
-                  fontWeight: 600,
-                  wordBreak: "break-word",
-                }}
-              >
-                {"{{.EventTitle}}"}
-              </h1>
-            </div>
+            {"{{.EventTitle}}"}
+          </h1>
+          <p
+            className="email-subtitle"
+            style={{
+              margin: "6px 0 0",
+              fontSize: "15px",
+              lineHeight: "130%",
+              color: "rgba(0, 0, 0, 0.50)",
+            }}
+          >
+            {"{{.TimeUntilEvent}}"}
+          </p>
 
-            {/* Details */}
-            <div style={{ padding: "0 28px 24px" }}>
-              <div style={{ borderTop: "1px solid #f0f0f0" }}>
-                <MetaRow label="Date" value={"{{.EventDate}}"} />
-                <MetaRow label="Time" value={"{{.EventTime}}"} />
-                <GoTemplateTag>{"{{if .CalendarName}}"}</GoTemplateTag>
-                <MetaRow label="Calendar" value={"{{.CalendarName}}"} />
-                <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
-                <GoTemplateTag>{"{{if .EventLocation}}"}</GoTemplateTag>
-                <MetaRow label="Location" value={"{{.EventLocation}}"} />
-                <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
-                <GoTemplateTag>{"{{if .Duration}}"}</GoTemplateTag>
-                <MetaRow label="Duration" value={"{{.Duration}}"} />
-                <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
-              </div>
+          {/* Details */}
+          <div style={{ marginTop: "28px" }}>
+            <DetailBlock label="When" value={<>{"{{.EventDate}}"} {"·"} {"{{.EventTime}}"}</>} />
 
-              <div style={{ paddingTop: "16px" }}>
-                <a
-                  href={"{{.EventUrl}}"}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: "44px",
-                    borderRadius: "12px",
-                    backgroundColor: "#1a1a1a",
-                    color: "#ffffff",
-                    textDecoration: "none",
-                    fontSize: "14px",
-                    lineHeight: "20px",
-                    fontWeight: 500,
-                    transition: "opacity 0.15s ease",
-                  }}
-                >
-                  Open Event
-                </a>
-              </div>
-            </div>
+            <GoTemplateTag>{"{{if .EventLocation}}"}</GoTemplateTag>
+            <DetailBlock label="Where" value={"{{.EventLocation}}"} />
+            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
 
-            {/* Footer */}
-            <div
-              style={{
-                padding: "18px 28px",
-                borderTop: "1px solid #f0f0f0",
-                backgroundColor: "#fafafa",
-              }}
-            >
-              <p
-                style={{
-                  margin: "0 0 14px",
-                  fontSize: "12px",
-                  lineHeight: "17px",
-                  color: "#737373",
-                }}
-              >
-                This reminder was sent because email notifications are enabled
-                for your account.
-              </p>
+            <GoTemplateTag>{"{{if .CalendarName}}"}</GoTemplateTag>
+            <DetailBlock label="Calendar" value={"{{.CalendarName}}"} />
+            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: "24px",
-                  fontSize: "11px",
-                  lineHeight: "16px",
-                  letterSpacing: "0.05em",
-                  textTransform: "none",
-                  fontWeight: 400,
-                }}
-              >
-                <a
-                  href={"{{.SettingsUrl}}"}
-                  style={{ color: "#525252", textDecoration: "none" }}
-                >
-                  Settings
-                </a>
-                <a
-                  href={"{{.PrivacyUrl}}"}
-                  style={{ color: "#525252", textDecoration: "none" }}
-                >
-                  Privacy
-                </a>
-                <a
-                  href={"{{.CalendarUrl}}"}
-                  style={{ color: "#525252", textDecoration: "none" }}
-                >
-                  Calendar
-                </a>
-              </div>
-            </div>
+            <GoTemplateTag>{"{{if .Duration}}"}</GoTemplateTag>
+            <DetailBlock label="Duration" value={"{{.Duration}}"} />
+            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
           </div>
 
-          {/* Branding below card */}
-          <p
+          {/* Button */}
+          <table
+            border={0}
+            cellPadding={0}
+            cellSpacing={0}
             style={{
-              textAlign: "center",
-              margin: "18px 0 0",
-              fontSize: "13px",
-              lineHeight: "18px",
-              color: "#a3a3a3",
+              borderCollapse: "separate",
+              width: "fit-content",
+              lineHeight: "100%",
+              padding: "6px 0 0",
+            }}
+          >
+            <tbody>
+              <tr>
+                <td align="center" valign="middle">
+                  <a
+                    className="email-btn"
+                    href={"{{.EventUrl}}"}
+                    style={{
+                      display: "inline-block",
+                      background: "#fff",
+                      color: "#000",
+                      fontFamily:
+                        '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                      fontSize: "15px",
+                      fontWeight: 500,
+                      lineHeight: "100%",
+                      margin: 0,
+                      textDecoration: "none",
+                      padding: "12px 20px",
+                      border: "1px solid rgba(0, 0, 0, 0.12)",
+                      borderBottom: "2px solid rgba(0, 0, 0, 0.12)",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    Open Event
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Footer divider */}
+          <hr
+            className="email-hr"
+            style={{
+              border: "none",
+              height: "1px",
+              backgroundColor: "#e5e5e5",
+              margin: "36px 0 20px 0",
+            }}
+          />
+
+          {/* Footer */}
+          <p
+            className="email-footer"
+            style={{
+              margin: "0 0 6px",
+              fontSize: "12px",
+              lineHeight: "1.4",
+              color: "#a8a8a8",
               fontWeight: 600,
-              letterSpacing: "0.02em",
             }}
           >
             Solace
+          </p>
+          <p
+            className="email-footer"
+            style={{
+              margin: "0 0 4px",
+              fontSize: "12px",
+              lineHeight: "1.5",
+              color: "#a8a8a8",
+            }}
+          >
+            This reminder was sent because email notifications are enabled
+            for your account.
+          </p>
+          <p
+            className="email-footer"
+            style={{
+              margin: 0,
+              fontSize: "12px",
+              lineHeight: "1.5",
+              color: "#a8a8a8",
+            }}
+          >
+            <a
+              className="email-footer"
+              href={"{{.SettingsUrl}}"}
+              style={{ color: "#a8a8a8", textDecoration: "underline" }}
+            >
+              Settings
+            </a>
+            {" \u00B7 "}
+            <a
+              className="email-footer"
+              href={"{{.PrivacyUrl}}"}
+              style={{ color: "#a8a8a8", textDecoration: "underline" }}
+            >
+              Privacy
+            </a>
+            {" \u00B7 "}
+            <a
+              className="email-footer"
+              href={"{{.CalendarUrl}}"}
+              style={{ color: "#a8a8a8", textDecoration: "underline" }}
+            >
+              Calendar
+            </a>
           </p>
         </div>
       </body>

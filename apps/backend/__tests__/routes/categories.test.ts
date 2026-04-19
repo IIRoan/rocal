@@ -55,7 +55,9 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(categoriesRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(categoriesRoutes);
 }
 
 async function readJson(response: Response) {
@@ -133,6 +135,29 @@ describe("categoriesRoutes", () => {
       },
     });
     await expect(readJson(response)).resolves.toEqual(created);
+  });
+
+  it("rejects unexpected category fields", async () => {
+    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+
+    const response = await createApp().handle(
+      new Request("http://localhost/categories/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Work",
+          color: "#123456",
+          unexpected: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(readText(response)).resolves.toContain(
+      "Property 'unexpected' should not be provided",
+    );
+    expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 
   it("rejects invalid category colors", async () => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
@@ -8,6 +9,7 @@ import { requireAuth } from "../lib/auth-guard";
 import { createLogger } from "@workspace/logger";
 import { buildIcsEventFile } from "@workspace/calendar-ics";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
+import { strictObject } from "../lib/validation";
 import {
   ALLOWED_CALENDAR_COLORS,
   isValidCalendarColor,
@@ -38,7 +40,10 @@ async function resolveEventTimezone(
   return userSettings?.timezone || "UTC";
 }
 
-export const eventsRoutes = new Elysia({ prefix: "/events" })
+export const eventsRoutes = new Elysia({
+  prefix: "/events",
+  normalize: false,
+})
   .use(requireAuth)
   .get(
     "/search",
@@ -140,7 +145,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       return { events, total };
     },
     {
-      query: t.Object({
+      query: strictObject({
         q: t.String({
           description: "Search query (min 2 characters)",
           minLength: 2,
@@ -180,7 +185,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   )
   .get(
     "/",
-    async ({ query: { start, end }, user, request, set }: any) => {
+    async ({ query: { start, end }, user, request }: any) => {
       // Robust user check with fallback
       if (!user || !user.id) {
         try {
@@ -395,7 +400,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       };
     },
     {
-      query: t.Object({
+      query: strictObject({
         start: t.String({
           description: "Start date in ISO 8601 format",
           examples: ["2024-01-01T00:00:00.000Z"],
@@ -738,7 +743,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      body: t.Object({
+      body: strictObject({
         title: t.String({
           minLength: 1,
           maxLength: 255,
@@ -925,7 +930,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       return icsContent;
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String({
           description: "Event ID to export as ICS",
         }),
@@ -981,7 +986,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String({
           description: "Event ID to fetch",
         }),
@@ -1085,8 +1090,8 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             : existingEvent.timezone;
 
         // Use existing dates if not provided in update
-        let finalStartDate = startDate || existingEvent.start;
-        let finalEndDate = endDate || existingEvent.end;
+        const finalStartDate = startDate || existingEvent.start;
+        const finalEndDate = endDate || existingEvent.end;
 
         // Important: avoid server-local normalization for all-day updates.
         // Keep the boundaries provided by the client to prevent timezone drift.
@@ -1422,12 +1427,12 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String({
           description: "Event ID",
         }),
       }),
-      body: t.Object({
+      body: strictObject({
         title: t.Optional(
           t.String({
             minLength: 1,
@@ -1627,7 +1632,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String({
           description: "Event ID to delete",
         }),
@@ -1707,7 +1712,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         let result;
 
         switch (action) {
-          case "move":
+          case "move": {
             if (!targetCalendarId) {
               throw new ValidationError(
                 "Target calendar ID is required for move operation",
@@ -1748,8 +1753,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               eventsProcessed: result.count,
               action: "move",
             };
+          }
 
-          case "delete":
+          case "delete": {
             // Clean up associated notifications
             const deletedNotifications =
               await prisma.eventNotification.deleteMany({
@@ -1778,8 +1784,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               eventsProcessed: result.count,
               action: "delete",
             };
+          }
 
-          case "duplicate":
+          case "duplicate": {
             // Duplicate events
             const duplicatedEvents = [];
             for (const event of events) {
@@ -1872,6 +1879,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
               action: "duplicate",
               createdEvents: duplicatedEvents,
             };
+          }
 
           default:
             throw new ValidationError(
@@ -1885,7 +1893,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       }
     },
     {
-      body: t.Object({
+      body: strictObject({
         action: t.Union(
           [t.Literal("move"), t.Literal("delete"), t.Literal("duplicate")],
           {

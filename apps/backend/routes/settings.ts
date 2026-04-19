@@ -3,19 +3,47 @@ import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import { strictObject } from "../lib/validation";
 
-import { auth } from "../lib/auth";
+type SettingsUpdateBody = {
+  theme?: "light" | "dark" | "system";
+  defaultView?: "month" | "week" | "day" | "agenda";
+  weekStartDay?: number;
+  timezone?: string;
+  timeFormat?: "12h" | "24h";
+  workingHoursStart?: number;
+  workingHoursEnd?: number;
+  workingDays?: string;
+  emailNotifications?: boolean;
+  browserNotifications?: boolean;
+  reminderSound?: boolean;
+  defaultReminder?: number | null;
+  defaultEventDuration?: number;
+  defaultCalendarId?: string | null;
+  compactView?: boolean;
+  showWeekNumbers?: boolean;
+  showDeclinedEvents?: boolean;
+};
 
-export const settingsRoutes = new Elysia({ prefix: "/settings" })
+type SettingsContext<TBody = unknown> = {
+  body: TBody;
+  request: Request;
+  user?: unknown;
+};
+
+export const settingsRoutes = new Elysia({
+  prefix: "/settings",
+  normalize: false,
+})
   .use(requireAuth)
   .get(
     "/",
-    async ({ user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+    async ({ user, request }: SettingsContext) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       // Get user settings, create default if doesn't exist
       let settings = await prisma.userSettings.findUnique({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -23,7 +51,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       if (!settings) {
         settings = await prisma.userSettings.create({
           data: {
-            userId: user.id,
+            userId: authenticatedUser.id,
           },
         });
       }
@@ -85,13 +113,12 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
 
   .put(
     "/",
-    async ({ body, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
-      const { name, color, isDefault } = body;
+    async ({ body, user, request }: SettingsContext<SettingsUpdateBody>) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       if (body.timezone) {
         try {
           Intl.DateTimeFormat(undefined, { timeZone: body.timezone });
-        } catch (error) {
+        } catch {
           throw new ValidationError("Invalid timezone identifier", "timezone");
         }
       }
@@ -124,7 +151,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
               "workingDays",
             );
           }
-        } catch (error) {
+        } catch {
           throw new ValidationError(
             "Invalid working days format - must be valid JSON array",
             "workingDays",
@@ -137,7 +164,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
         const calendar = await prisma.calendar.findFirst({
           where: {
             id: body.defaultCalendarId,
-            userId: user.id,
+            userId: authenticatedUser.id,
           },
         });
 
@@ -159,14 +186,14 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       // Update or create settings
       const settings = await prisma.userSettings.upsert({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         update: {
           ...body,
           updatedAt: new Date(),
         },
         create: {
-          userId: user.id,
+          userId: authenticatedUser.id,
           ...body,
         },
       });
@@ -174,7 +201,7 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
       return settings;
     },
     {
-      body: t.Object({
+      body: strictObject({
         theme: t.Optional(
           t.Union([t.Literal("light"), t.Literal("dark"), t.Literal("system")]),
         ),
@@ -283,13 +310,13 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
 
   .delete(
     "/",
-    async ({ user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+    async ({ user, request }: SettingsContext) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       // Delete user settings (will recreate with defaults on next GET)
       await prisma.userSettings.deleteMany({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 

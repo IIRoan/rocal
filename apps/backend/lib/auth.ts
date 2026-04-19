@@ -137,4 +137,5 @@ export const auth = betterAuth({
   socialProviderConfig: {
     redirectURL: socialRedirectUrl,
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;

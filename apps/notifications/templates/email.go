@@ -28,6 +28,7 @@ type EmailTemplateData struct {
 	CalendarUrl    string
 	SettingsUrl    string
 	PrivacyUrl     string
+	LogoUrl        string
 }
 
 // EventReminderEmail returns the HTML template for event reminders

@@ -73,7 +73,9 @@ const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(notificationsRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(notificationsRoutes);
 }
 
 function eventFixture(
@@ -296,6 +298,31 @@ describe("notificationsRoutes", () => {
     await expect(response.text()).resolves.toBe(
       "Duplicate notification configurations are not allowed",
     );
+  });
+
+  it("rejects unexpected notification fields", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/notifications/event/event-extra-field", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          notifications: [
+            {
+              notificationType: "email",
+              minutesBefore: 15,
+              isEnabled: true,
+              unexpected: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.text()).resolves.toContain(
+      "Property 'notifications.0.unexpected' should not be provided",
+    );
+    expect(mockPrisma.calendarEvent.findFirst).not.toHaveBeenCalled();
   });
 
   it("returns a no-op success when updating a recurring instance", async () => {

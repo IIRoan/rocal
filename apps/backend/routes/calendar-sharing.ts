@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 import { NotFoundError, ValidationError } from "../lib/errors";
+import { strictObject } from "../lib/validation";
 import {
   buildIcsCalendar,
   type CalendarShareLinkResponse,
@@ -13,6 +14,15 @@ import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 
 const SHARE_TOKEN_LENGTH = 40;
 const SHARE_TOKEN_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+type CalendarSharingContext<TParams = Record<string, never>, TBody = unknown> = {
+  params: TParams;
+  body: TBody;
+  request: Request;
+  user?: unknown;
+  set: {
+    headers: Record<string, string | number | undefined>;
+  };
+};
 
 function resolveBackendBaseUrl(request: Request): string {
   const configuredBaseUrl = process.env.BACKEND_URL?.trim();
@@ -73,10 +83,17 @@ function serializeShareLinkResponse(
   };
 }
 
-export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
+export const calendarSharingRoutes = new Elysia({
+  prefix: "/calendars",
+  normalize: false,
+})
   .get(
     "/shared/:token",
-    async ({ params, set, request }: any) => {
+    async ({
+      params,
+      set,
+      request,
+    }: CalendarSharingContext<{ token: string }>) => {
       const token = (params?.token || "").trim().replace(/\.ics$/i, "");
       if (!token) {
         throw new NotFoundError("Shared calendar not found");
@@ -118,7 +135,7 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
           name: calendar.name,
           description: `Shared calendar from ${calendar.user.name || calendar.user.email}`,
           timezone: timezoneSource?.timezone || "UTC",
-          sourceUrl: buildSharedCalendarUrl(token, request as Request),
+          sourceUrl: buildSharedCalendarUrl(token, request),
         },
         events: calendar.events.map((event) => toIcsBuildEvent(event)),
       });
@@ -132,7 +149,7 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
       return icsContent;
     },
     {
-      params: t.Object({
+      params: strictObject({
         token: t.String(),
       }),
       detail: {
@@ -144,14 +161,18 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
   .use(requireAuth)
   .get(
     "/:id/share-link",
-    async ({ params, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      user,
+      request,
+    }: CalendarSharingContext<{ id: string }>) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { id } = params as { id: string };
 
       const calendar = await prisma.calendar.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         select: {
           id: true,
@@ -170,10 +191,10 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
         throw new ValidationError("Cannot share a synced calendar. This calendar is read-only and synced from an external subscription.");
       }
 
-      return serializeShareLinkResponse(calendar, request as Request);
+      return serializeShareLinkResponse(calendar, request);
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
       detail: {
@@ -185,8 +206,13 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
   )
   .post(
     "/:id/share-link",
-    async ({ params, body, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: CalendarSharingContext<{ id: string }, CreateCalendarShareLinkRequest | null>) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { id } = params as { id: string };
       const { regenerate = false } =
         (body as CreateCalendarShareLinkRequest) || {};
@@ -194,7 +220,7 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
       const calendar = await prisma.calendar.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         select: {
           id: true,
@@ -233,14 +259,14 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
         },
       });
 
-      return serializeShareLinkResponse(updatedCalendar, request as Request);
+      return serializeShareLinkResponse(updatedCalendar, request);
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
       body: t.Optional(
-        t.Object({
+        strictObject({
           regenerate: t.Optional(t.Boolean()),
         }),
       ),
@@ -253,14 +279,18 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
   )
   .delete(
     "/:id/share-link",
-    async ({ params, user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      user,
+      request,
+    }: CalendarSharingContext<{ id: string }>) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { id } = params as { id: string };
 
       const calendar = await prisma.calendar.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         select: {
           id: true,
@@ -293,7 +323,7 @@ export const calendarSharingRoutes = new Elysia({ prefix: "/calendars" })
       return response;
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
       detail: {
