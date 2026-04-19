@@ -1,72 +1,26 @@
 import Elysia, { t } from "elysia";
-import { prisma } from "../lib/prisma";
-import {
-  parseICSFile,
-  convertParsedEventToCalendarEvent,
-  isEventModified,
-} from "../lib/ics-parser";
-import type { Prisma } from "../generated/prisma/index.js";
-import {
-  findNationalHolidayCalendarByUrl,
-  type CalendarSubscriptionSyncResponse,
-  type ImportIcsRequest,
-  type ImportIcsResponse,
-  type UpdateCalendarSubscriptionRequest,
-} from "@workspace/calendar-ics";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
-import { createLogger } from "@workspace/logger";
 import { strictObject } from "../lib/validation";
+import { prisma } from "../lib/prisma";
+import { SubscriptionService } from "../services/subscription.service";
 
-const logger = createLogger("backend:subscriptions");
-type SubscriptionsContext<
-  TParams = Record<string, never>,
-  TBody = unknown,
-  TQuery = Record<string, string>,
-> = {
-  params: TParams;
-  body: TBody;
-  query: TQuery;
-  request: Request;
-  user?: unknown;
-};
+const subscriptionService = new SubscriptionService(prisma);
 
-type SyncableSubscription = Prisma.CalendarSubscriptionGetPayload<{
-  include: {
-    calendar: true;
-  };
-}>;
-
-import {
-  ALLOWED_CALENDAR_COLORS,
-  isValidCalendarColor,
-} from "../lib/colors";
+// Re-export syncCalendarSubscription for use by calendar-sync-service
+export async function syncCalendarSubscription(
+  subscription: Parameters<SubscriptionService["syncCalendarSubscription"]>[0],
+) {
+  return subscriptionService.syncCalendarSubscription(subscription);
+}
 
 export const subscriptionsRoute = new Elysia({ normalize: false })
   .use(requireAuth)
   .get(
     "/subscriptions",
-    async ({ user, request }: SubscriptionsContext) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const subscriptions = await prisma.calendarSubscription.findMany({
-        where: {
-          userId: authenticatedUser.id,
-        },
-        include: {
-          calendar: true,
-          _count: {
-            select: {
-              syncLogs: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      return subscriptions;
+    async ({ user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return subscriptionService.list(userId);
     },
     {
       detail: {
@@ -78,153 +32,14 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .post(
     "/subscriptions",
-    async ({
-      body,
-      user,
-      request,
-    }: SubscriptionsContext<Record<string, never>, { name: string; url: string; color?: string }>) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { name, url, color } = body;
-
-      if (!name?.trim()) {
-        throw new Error("Calendar name is required");
-      }
-
-      // Check if URL is already subscribed by this user
-      const existingSubscription = await prisma.calendarSubscription.findFirst({
-        where: {
-          userId: authenticatedUser.id,
-          url: url,
-        },
+    async ({ body, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return subscriptionService.create({
+        userId,
+        name: body.name,
+        url: body.url,
+        color: body.color,
       });
-
-      if (existingSubscription) {
-        throw new Error("You are already subscribed to this calendar URL");
-      }
-
-      // Test the URL by attempting to fetch and parse it
-      let testParseResult;
-      try {
-        const response = await fetch(url, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            Accept: "text/calendar,text/plain,*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "no-cache",
-          },
-        });
-
-        if (!response.ok) {
-          logger.error(
-            `❌ HTTP error fetching calendar: ${response.status} ${response.statusText}`,
-          );
-          if (response.status >= 500) {
-            throw new Error(
-              `The calendar server is currently unavailable (${response.status}). Please try again later or contact the calendar provider.`,
-            );
-          } else if (response.status === 404) {
-            throw new Error(
-              `Calendar not found at the provided URL. Please check the URL and try again.`,
-            );
-          } else if (response.status === 403 || response.status === 401) {
-            throw new Error(
-              `Access denied to the calendar. The calendar may be private or require authentication.`,
-            );
-          } else {
-            throw new Error(
-              `Failed to fetch calendar: ${response.status} ${response.statusText}`,
-            );
-          }
-        }
-
-        const icsContent = await response.text();
-        logger.info("📄 Fetched ICS content length:", icsContent.length);
-        logger.info("📄 First 200 chars of ICS:", icsContent.substring(0, 200));
-
-        // Get user settings for timezone
-        let userSettings = await prisma.userSettings.findUnique({
-          where: { userId: authenticatedUser.id },
-        });
-
-        // Create default settings if none exist
-        if (!userSettings) {
-          userSettings = await prisma.userSettings.create({
-            data: { userId: authenticatedUser.id },
-          });
-        }
-
-        const userTimezone = userSettings.timezone || "UTC";
-
-        testParseResult = parseICSFile(icsContent, userTimezone);
-
-        logger.ok("✅ ICS parsing completed:", {
-          eventsFound: testParseResult.events.length,
-          errorsCount: testParseResult.errors.length,
-          calendarName: testParseResult.calendarName,
-        });
-
-        if (testParseResult.errors.length > 0) {
-          logger.warn("⚠️ ICS parsing warnings:", testParseResult.errors);
-        }
-      } catch (error) {
-        logger.error("💥 Complete error details:", error);
-        logger.error(
-          "💥 Error stack:",
-          error instanceof Error ? error.stack : "No stack trace",
-        );
-        throw new Error(
-          `Unable to fetch or parse calendar from URL: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-      }
-
-      const matchingNationalHolidayCalendar =
-        findNationalHolidayCalendarByUrl(url);
-
-      // Auto-create a new sync-only calendar for this subscription
-      const calendarColor =
-        color || matchingNationalHolidayCalendar?.defaultColor || "#6366f1";
-      const calendar = await prisma.calendar.create({
-        data: {
-          name: name.trim(),
-          color: calendarColor,
-          kind: matchingNationalHolidayCalendar
-            ? "public_holiday"
-            : "subscribed",
-          isPublic: !!matchingNationalHolidayCalendar,
-          isSyncOnly: true,
-          isDefault: false,
-          userId: authenticatedUser.id,
-        },
-      });
-
-      // Create the subscription
-      const subscription = await prisma.calendarSubscription.create({
-        data: {
-          name: name.trim(),
-          url,
-          userId: authenticatedUser.id,
-          calendarId: calendar.id,
-          lastSyncStatus: "pending",
-          // Holiday calendars change rarely — sync weekly instead of every 15 min
-          syncIntervalMinutes: matchingNationalHolidayCalendar ? 10080 : 15,
-        },
-        include: {
-          calendar: true,
-        },
-      });
-
-      // Sync immediately on creation (non-blocking)
-      syncCalendarSubscription(subscription).catch((err) => {
-        logger.error(
-          "Initial sync failed for subscription:",
-          subscription.id,
-          err,
-        );
-      });
-
-      return subscription;
     },
     {
       body: strictObject({
@@ -243,84 +58,19 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .put(
     "/subscriptions/:id",
-    async ({
-      params,
-      body,
-      user,
-      request,
-    }: SubscriptionsContext<{ id: string }, UpdateCalendarSubscriptionRequest>) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { id } = params;
-      const { name, color, isActive, syncIntervalMinutes } =
-        body as UpdateCalendarSubscriptionRequest;
-
-      const subscription = await prisma.calendarSubscription.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-        },
-        include: {
-          calendar: true,
-        },
+    async ({ params, body, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return subscriptionService.update({
+        userId,
+        subscriptionId: params.id,
+        name: body.name,
+        color: body.color,
+        isActive: body.isActive,
+        syncIntervalMinutes: body.syncIntervalMinutes,
       });
-
-      if (!subscription) {
-        throw new Error("Subscription not found");
-      }
-
-      const trimmedName = name?.trim();
-
-      if (trimmedName !== undefined) {
-        if (!trimmedName) {
-          throw new Error("Calendar name is required");
-        }
-
-        if (trimmedName.length > 100) {
-          throw new Error("Calendar name cannot exceed 100 characters");
-        }
-      }
-
-      if (color !== undefined && !isValidCalendarColor(color)) {
-        throw new Error(
-          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g. #FF0000)`,
-        );
-      }
-
-      const updatedSubscription = await prisma.$transaction(async (tx) => {
-        if (trimmedName !== undefined || color !== undefined) {
-          await tx.calendar.update({
-            where: {
-              id: subscription.calendarId,
-            },
-            data: {
-              ...(trimmedName !== undefined ? { name: trimmedName } : {}),
-              ...(color !== undefined ? { color } : {}),
-            },
-          });
-        }
-
-        return tx.calendarSubscription.update({
-          where: { id },
-          data: {
-            ...(trimmedName !== undefined ? { name: trimmedName } : {}),
-            ...(isActive !== undefined ? { isActive } : {}),
-            ...(syncIntervalMinutes !== undefined
-              ? { syncIntervalMinutes }
-              : {}),
-          },
-          include: {
-            calendar: true,
-          },
-        });
-      });
-
-      return updatedSubscription;
     },
     {
-      params: strictObject({
-        id: t.String(),
-      }),
+      params: strictObject({ id: t.String() }),
       body: strictObject({
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
@@ -338,53 +88,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .delete(
     "/subscriptions/:id",
-    async ({
-      params,
-      user,
-      request,
-    }: SubscriptionsContext<{ id: string }, unknown, { deleteEvents?: boolean }>) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { id } = params;
-
-      const subscription = await prisma.calendarSubscription.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-        },
+    async ({ params, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return subscriptionService.delete({
+        userId,
+        subscriptionId: params.id,
       });
-
-      if (!subscription) {
-        throw new Error("Subscription not found");
-      }
-
-      // Delete all synced events from this subscription
-      await prisma.calendarEvent.deleteMany({
-        where: {
-          subscriptionId: id,
-        },
-      });
-
-      // Delete the subscription
-      await prisma.calendarSubscription.delete({
-        where: { id },
-      });
-
-      // Delete the associated sync-only calendar
-      await prisma.calendar.deleteMany({
-        where: {
-          id: subscription.calendarId,
-          userId: authenticatedUser.id,
-          isSyncOnly: true,
-        },
-      });
-
-      return { success: true };
     },
     {
-      params: strictObject({
-        id: t.String(),
-      }),
+      params: strictObject({ id: t.String() }),
       query: strictObject({
         deleteEvents: t.Optional(t.Boolean()),
       }),
@@ -399,36 +111,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .post(
     "/subscriptions/:id/sync",
-    async ({
-      params,
-      user,
-      request,
-    }: SubscriptionsContext<{ id: string }>) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { id } = params;
-
-      const subscription = await prisma.calendarSubscription.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-        },
-        include: {
-          calendar: true,
-        },
+    async ({ params, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return subscriptionService.sync({
+        userId,
+        subscriptionId: params.id,
       });
-
-      if (!subscription) {
-        throw new Error("Subscription not found");
-      }
-
-      const syncResult = await syncCalendarSubscription(subscription);
-      return syncResult;
     },
     {
-      params: strictObject({
-        id: t.String(),
-      }),
+      params: strictObject({ id: t.String() }),
       detail: {
         tags: ["Calendar Subscriptions"],
         summary: "Manually trigger subscription sync",
@@ -438,97 +129,14 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .post(
     "/subscriptions/import-ics",
-    async ({
-      body,
-      user,
-      request,
-    }: SubscriptionsContext<Record<string, never>, ImportIcsRequest>) => {
-      // Robust user check with fallback
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { calendarId, icsContent, fileName } = body as ImportIcsRequest;
-
-      // Verify calendar belongs to user
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          id: calendarId,
-          userId: authenticatedUser.id,
-        },
+    async ({ body, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      return subscriptionService.importIcs({
+        userId,
+        calendarId: body.calendarId,
+        icsContent: body.icsContent,
+        fileName: body.fileName,
       });
-
-      if (!calendar) {
-        throw new Error("Calendar not found or not owned by user");
-      }
-
-      // Get user settings for timezone
-      let userSettings = await prisma.userSettings.findUnique({
-        where: { userId: authenticatedUser.id },
-      });
-
-      // Create default settings if none exist
-      if (!userSettings) {
-        userSettings = await prisma.userSettings.create({
-          data: { userId: authenticatedUser.id },
-        });
-      }
-
-      const userTimezone = userSettings.timezone || "UTC";
-      logger.info("🔍 Parsing ICS content with user timezone:", userTimezone);
-      const parseResult = parseICSFile(icsContent, userTimezone);
-
-      if (parseResult.events.length === 0) {
-        throw new Error("No valid events found in ICS file");
-      }
-
-      const createdEvents = [];
-      const errors = [...parseResult.errors];
-
-      for (const parsedEvent of parseResult.events) {
-        try {
-          // Check if event with same external ID already exists in this calendar
-          const existingEvent = await prisma.calendarEvent.findFirst({
-            where: {
-              calendarId,
-              externalId: parsedEvent.uid,
-              isSynced: false, // Only check manually imported events
-            },
-          });
-
-          if (existingEvent) {
-            errors.push(
-              `Event "${parsedEvent.title}" with UID ${parsedEvent.uid} already exists in calendar`,
-            );
-            continue;
-          }
-
-          const eventData = convertParsedEventToCalendarEvent(
-            parsedEvent,
-            authenticatedUser.id,
-            calendarId,
-            // No subscriptionId for manual import
-          );
-
-          const createdEvent = await prisma.calendarEvent.create({
-            data: eventData,
-          });
-
-          createdEvents.push(createdEvent);
-        } catch (error) {
-          errors.push(
-            `Failed to create event "${parsedEvent.title}": ${error instanceof Error ? error.message : "Unknown error"}`,
-          );
-        }
-      }
-
-      const response: ImportIcsResponse = {
-        success: true,
-        eventsCreated: createdEvents.length,
-        eventsTotal: parseResult.events.length,
-        fileName: fileName || "unknown.ics",
-        calendarName: parseResult.calendarName,
-        errors: errors.length > 0 ? errors : undefined,
-      };
-
-      return response;
     },
     {
       body: strictObject({
@@ -544,210 +152,3 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
       },
     },
   );
-
-// Sync function for individual subscription
-export async function syncCalendarSubscription(
-  subscription: SyncableSubscription,
-): Promise<CalendarSubscriptionSyncResponse> {
-  const syncLog = await prisma.calendarSyncLog.create({
-    data: {
-      subscriptionId: subscription.id,
-      status: "started",
-    },
-  });
-
-  const startTime = Date.now();
-
-  try {
-    // Fetch the calendar
-
-    const response = await fetch(subscription.url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        Accept: "text/calendar,text/plain,*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        ...(subscription.etag && { "If-None-Match": subscription.etag }),
-        ...(subscription.lastModified && {
-          "If-Modified-Since": subscription.lastModified,
-        }),
-      },
-    });
-
-    // Handle 304 Not Modified
-    if (response.status === 304) {
-      await prisma.calendarSyncLog.update({
-        where: { id: syncLog.id },
-        data: {
-          status: "success",
-          completedAt: new Date(),
-          syncDurationMs: Date.now() - startTime,
-          httpStatusCode: 304,
-        },
-      });
-
-      await prisma.calendarSubscription.update({
-        where: { id: subscription.id },
-        data: {
-          lastSyncAt: new Date(),
-          lastSyncStatus: "success",
-          lastErrorMessage: null,
-        },
-      });
-
-      return {
-        status: "success",
-        message: "Calendar not modified, no sync needed",
-      };
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const icsContent = await response.text();
-
-    // Get user settings for timezone
-    let userSettings = await prisma.userSettings.findUnique({
-      where: { userId: subscription.userId },
-    });
-
-    // Create default settings if none exist
-    if (!userSettings) {
-      userSettings = await prisma.userSettings.create({
-        data: { userId: subscription.userId },
-      });
-    }
-
-    const userTimezone = userSettings.timezone || "UTC";
-    logger.info("🔍 Parsing ICS content with user timezone:", userTimezone);
-    const parseResult = parseICSFile(icsContent, userTimezone);
-
-    let eventsAdded = 0;
-    let eventsUpdated = 0;
-    let eventsDeleted = 0;
-
-    // Get current synced events for this subscription
-    const currentEvents = await prisma.calendarEvent.findMany({
-      where: {
-        subscriptionId: subscription.id,
-        isSynced: true,
-      },
-    });
-
-    const currentEventsByUid = new Map(
-      currentEvents.map((event) => [event.externalId!, event]),
-    );
-
-    const newEventUids = new Set(parseResult.events.map((event) => event.uid));
-
-    // Process new/updated events
-    for (const parsedEvent of parseResult.events) {
-      const existingEvent = currentEventsByUid.get(parsedEvent.uid);
-
-      if (!existingEvent) {
-        // Create new event
-        const eventData = convertParsedEventToCalendarEvent(
-          parsedEvent,
-          subscription.userId,
-          subscription.calendarId,
-          subscription.id,
-        );
-
-        await prisma.calendarEvent.create({ data: eventData });
-        eventsAdded++;
-      } else if (isEventModified(existingEvent, parsedEvent)) {
-        // Update existing event
-        await prisma.calendarEvent.update({
-          where: { id: existingEvent.id },
-          data: {
-            title: parsedEvent.title,
-            description: parsedEvent.description,
-            start: parsedEvent.start,
-            end: parsedEvent.end,
-            allDay: parsedEvent.allDay,
-            location: parsedEvent.location,
-            recurrence: parsedEvent.recurrence
-              ? JSON.stringify(parsedEvent.recurrence)
-              : null,
-            timezone: parsedEvent.timezone || "UTC",
-            syncedAt: new Date(),
-          },
-        });
-        eventsUpdated++;
-      }
-    }
-
-    // Delete events that no longer exist in the external calendar
-    for (const [uid, event] of currentEventsByUid) {
-      if (!newEventUids.has(uid)) {
-        await prisma.calendarEvent.delete({
-          where: { id: event.id },
-        });
-        eventsDeleted++;
-      }
-    }
-
-    // Update subscription
-    const etag = response.headers.get("etag");
-    const lastModified = response.headers.get("last-modified");
-
-    await prisma.calendarSubscription.update({
-      where: { id: subscription.id },
-      data: {
-        lastSyncAt: new Date(),
-        lastSyncStatus: "success",
-        lastErrorMessage: null,
-        etag,
-        lastModified,
-      },
-    });
-
-    // Complete sync log
-    await prisma.calendarSyncLog.update({
-      where: { id: syncLog.id },
-      data: {
-        status: "success",
-        eventsAdded,
-        eventsUpdated,
-        eventsDeleted,
-        completedAt: new Date(),
-        syncDurationMs: Date.now() - startTime,
-        httpStatusCode: response.status,
-      },
-    });
-
-    return {
-      status: "success",
-      eventsAdded,
-      eventsUpdated,
-      eventsDeleted,
-      errors: parseResult.errors.length > 0 ? parseResult.errors : undefined,
-    };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-
-    await prisma.calendarSyncLog.update({
-      where: { id: syncLog.id },
-      data: {
-        status: "error",
-        errorMessage,
-        completedAt: new Date(),
-        syncDurationMs: Date.now() - startTime,
-      },
-    });
-
-    await prisma.calendarSubscription.update({
-      where: { id: subscription.id },
-      data: {
-        lastSyncAt: new Date(),
-        lastSyncStatus: "error",
-        lastErrorMessage: errorMessage,
-      },
-    });
-
-    throw error;
-  }
-}

@@ -1,28 +1,12 @@
 import { Elysia, t } from "elysia";
-import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
-import { NotFoundError, ValidationError } from "../lib/errors";
 import { strictObject } from "../lib/validation";
-import {
-  buildIcsCalendar,
-  type CalendarShareLinkResponse,
-  type CreateCalendarShareLinkRequest,
-  type DisableCalendarShareLinkResponse,
-} from "@workspace/calendar-ics";
-import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
+import { prisma } from "../lib/prisma";
+import { CalendarSharingService } from "../services/calendar-sharing.service";
+import { toSafeIcsFilename } from "../lib/ics-export";
 
-const SHARE_TOKEN_LENGTH = 40;
-const SHARE_TOKEN_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-type CalendarSharingContext<TParams = Record<string, never>, TBody = unknown> = {
-  params: TParams;
-  body: TBody;
-  request: Request;
-  user?: unknown;
-  set: {
-    headers: Record<string, string | number | undefined>;
-  };
-};
+const calendarSharingService = new CalendarSharingService(prisma);
 
 function resolveBackendBaseUrl(request: Request): string {
   const configuredBaseUrl = process.env.BACKEND_URL?.trim();
@@ -34,124 +18,30 @@ function resolveBackendBaseUrl(request: Request): string {
   return `${requestUrl.protocol}//${requestUrl.host}`;
 }
 
-function buildSharedCalendarUrl(token: string, request: Request): string {
-  const baseUrl = resolveBackendBaseUrl(request);
-  return `${baseUrl}/api/calendars/shared/${encodeURIComponent(token)}`;
-}
-
-function generateShareToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(SHARE_TOKEN_LENGTH));
-  return Array.from(bytes)
-    .map((value) => SHARE_TOKEN_ALPHABET[value % SHARE_TOKEN_ALPHABET.length])
-    .join("");
-}
-
-async function createUniqueShareToken(): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const token = generateShareToken();
-    const existing = await prisma.calendar.findFirst({
-      where: { icsShareToken: token },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return token;
-    }
-  }
-
-  throw new Error("Unable to generate a unique share token");
-}
-
-function serializeShareLinkResponse(
-  calendar: {
-    id: string;
-    name: string;
-    icsShareEnabled: boolean;
-    icsShareToken: string | null;
-  },
-  request: Request,
-): CalendarShareLinkResponse {
-  const enabled = calendar.icsShareEnabled && !!calendar.icsShareToken;
-  return {
-    calendarId: calendar.id,
-    calendarName: calendar.name,
-    enabled,
-    shareUrl:
-      enabled && calendar.icsShareToken
-        ? buildSharedCalendarUrl(calendar.icsShareToken, request)
-        : null,
-  };
-}
-
 export const calendarSharingRoutes = new Elysia({
   prefix: "/calendars",
   normalize: false,
 })
   .get(
     "/shared/:token",
-    async ({
-      params,
-      set,
-      request,
-    }: CalendarSharingContext<{ token: string }>) => {
-      const token = (params?.token || "").trim().replace(/\.ics$/i, "");
-      if (!token) {
-        throw new NotFoundError("Shared calendar not found");
-      }
+    async ({ params, set, request }: any) => {
+      const baseUrl = resolveBackendBaseUrl(request);
+      const sourceUrl = `${baseUrl}/api/calendars/shared/${encodeURIComponent(params.token)}`;
 
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          icsShareToken: token,
-          icsShareEnabled: true,
-        },
-        include: {
-          events: {
-            where: {
-              parentEventId: null,
-            },
-            orderBy: {
-              start: "asc",
-            },
-          },
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      if (!calendar) {
-        throw new NotFoundError("Shared calendar not found");
-      }
-
-      const timezoneSource = calendar.events.find(
-        (event) => !event.allDay && !!event.timezone,
+      const result = await calendarSharingService.getSharedCalendarIcs(
+        params.token,
+        sourceUrl,
       );
-
-      const icsContent = buildIcsCalendar({
-        calendar: {
-          name: calendar.name,
-          description: `Shared calendar from ${calendar.user.name || calendar.user.email}`,
-          timezone: timezoneSource?.timezone || "UTC",
-          sourceUrl: buildSharedCalendarUrl(token, request),
-        },
-        events: calendar.events.map((event) => toIcsBuildEvent(event)),
-      });
 
       set.headers["Content-Type"] = "text/calendar; charset=utf-8";
       set.headers["Content-Disposition"] =
-        `inline; filename="${toSafeIcsFilename(calendar.name)}"`;
-      // Always return fresh ICS content for subscriptions.
+        `inline; filename="${toSafeIcsFilename(result.calendarName)}"`;
       set.headers["Cache-Control"] = "no-store, max-age=0";
 
-      return icsContent;
+      return result.icsContent;
     },
     {
-      params: strictObject({
-        token: t.String(),
-      }),
+      params: strictObject({ token: t.String() }),
       detail: {
         tags: ["ICS Sharing"],
         summary: "Public shared calendar feed (.ics)",
@@ -161,42 +51,17 @@ export const calendarSharingRoutes = new Elysia({
   .use(requireAuth)
   .get(
     "/:id/share-link",
-    async ({
-      params,
-      user,
-      request,
-    }: CalendarSharingContext<{ id: string }>) => {
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { id } = params as { id: string };
-
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-        },
-        select: {
-          id: true,
-          name: true,
-          icsShareEnabled: true,
-          icsShareToken: true,
-          isSyncOnly: true,
-        },
+    async ({ params, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      const baseUrl = resolveBackendBaseUrl(request);
+      return calendarSharingService.getShareLink({
+        userId,
+        calendarId: params.id,
+        baseUrl,
       });
-
-      if (!calendar) {
-        throw new ValidationError("Calendar not found or access denied");
-      }
-
-      if (calendar.isSyncOnly) {
-        throw new ValidationError("Cannot share a synced calendar. This calendar is read-only and synced from an external subscription.");
-      }
-
-      return serializeShareLinkResponse(calendar, request);
     },
     {
-      params: strictObject({
-        id: t.String(),
-      }),
+      params: strictObject({ id: t.String() }),
       detail: {
         tags: ["ICS Sharing"],
         summary: "Get calendar ICS share-link status",
@@ -206,65 +71,18 @@ export const calendarSharingRoutes = new Elysia({
   )
   .post(
     "/:id/share-link",
-    async ({
-      params,
-      body,
-      user,
-      request,
-    }: CalendarSharingContext<{ id: string }, CreateCalendarShareLinkRequest | null>) => {
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { id } = params as { id: string };
-      const { regenerate = false } =
-        (body as CreateCalendarShareLinkRequest) || {};
-
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-        },
-        select: {
-          id: true,
-          name: true,
-          icsShareToken: true,
-          isSyncOnly: true,
-        },
+    async ({ params, body, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      const baseUrl = resolveBackendBaseUrl(request);
+      return calendarSharingService.createShareLink({
+        userId,
+        calendarId: params.id,
+        baseUrl,
+        regenerate: body?.regenerate,
       });
-
-      if (!calendar) {
-        throw new ValidationError("Calendar not found or access denied");
-      }
-
-      if (calendar.isSyncOnly) {
-        throw new ValidationError("Cannot share a synced calendar. This calendar is read-only and synced from an external subscription.");
-      }
-
-      let nextToken = calendar.icsShareToken;
-      if (!nextToken || regenerate) {
-        nextToken = await createUniqueShareToken();
-      }
-
-      const updatedCalendar = await prisma.calendar.update({
-        where: {
-          id: calendar.id,
-        },
-        data: {
-          icsShareEnabled: true,
-          icsShareToken: nextToken,
-        },
-        select: {
-          id: true,
-          name: true,
-          icsShareEnabled: true,
-          icsShareToken: true,
-        },
-      });
-
-      return serializeShareLinkResponse(updatedCalendar, request);
     },
     {
-      params: strictObject({
-        id: t.String(),
-      }),
+      params: strictObject({ id: t.String() }),
       body: t.Optional(
         strictObject({
           regenerate: t.Optional(t.Boolean()),
@@ -279,53 +97,17 @@ export const calendarSharingRoutes = new Elysia({
   )
   .delete(
     "/:id/share-link",
-    async ({
-      params,
-      user,
-      request,
-    }: CalendarSharingContext<{ id: string }>) => {
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-      const { id } = params as { id: string };
-
-      const calendar = await prisma.calendar.findFirst({
-        where: {
-          id,
-          userId: authenticatedUser.id,
-        },
-        select: {
-          id: true,
-          isSyncOnly: true,
-        },
+    async ({ params, user, request }: any) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
+      const baseUrl = resolveBackendBaseUrl(request);
+      return calendarSharingService.disableShareLink({
+        userId,
+        calendarId: params.id,
+        baseUrl,
       });
-
-      if (!calendar) {
-        throw new ValidationError("Calendar not found or access denied");
-      }
-
-      if (calendar.isSyncOnly) {
-        throw new ValidationError("Cannot modify sharing for a synced calendar.");
-      }
-
-      await prisma.calendar.update({
-        where: {
-          id: calendar.id,
-        },
-        data: {
-          icsShareEnabled: false,
-          icsShareToken: null,
-        },
-      });
-
-      const response: DisableCalendarShareLinkResponse = {
-        success: true,
-      };
-
-      return response;
     },
     {
-      params: strictObject({
-        id: t.String(),
-      }),
+      params: strictObject({ id: t.String() }),
       detail: {
         tags: ["ICS Sharing"],
         summary: "Disable calendar ICS share-link",
