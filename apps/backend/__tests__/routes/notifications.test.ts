@@ -449,10 +449,9 @@ describe("notificationsRoutes", () => {
       }),
     );
 
+    const responseBody = await response.text();
     expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe(
-      "Failed to update event notifications",
-    );
+    expect(responseBody).toBe("Failed to update event notifications");
   });
 
   it("deletes notifications for owned events and no-ops for recurring instances", async () => {
@@ -503,9 +502,8 @@ describe("notificationsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe(
-      "Failed to delete event notifications",
-    );
+    const body = await response.text();
+    expect(body).toBe("Failed to delete event notifications");
   });
 
   it("enforces the update rate limit", async () => {

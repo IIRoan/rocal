@@ -6,6 +6,10 @@ A monorepo application with three main services: web frontend, API backend, and 
 
 - **apps/web** - Next.js frontend with shadcn/ui components
 - **apps/backend** - Elysia.js API server with authentication and database
+  - `routes/` - Thin HTTP adapters (auth, validation schemas, headers)
+  - `contracts/` - TypeScript interfaces and DTOs for each service
+  - `services/` - Business logic (validation, database, transformations)
+  - `lib/` - Shared utilities (auth, errors, Prisma, recurrence engine, etc.)
 - **apps/notifications** - Go service for scheduled email notifications
 - **packages/ui** - Shared UI component library
 - **packages/logger** - Shared logging utilities
