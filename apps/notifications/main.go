@@ -463,6 +463,7 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		CalendarUrl:    buildFrontendURL("/dashboard", nil),
 		SettingsUrl:    buildFrontendURL("/settings", nil),
 		PrivacyUrl:     buildFrontendURL("/privacy", nil),
+		LogoUrl:        "https://solace.onl/favicon-192x192.png",
 	}
 
 	html, err := templates.RenderEventReminder(templateData)

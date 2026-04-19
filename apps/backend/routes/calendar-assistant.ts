@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Elysia } from "elysia";
 import { generateText, stepCountIs, tool } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
+import { strictZodObject } from "../lib/validation";
 
 const DEFAULT_SEARCH_BACK_DAYS = 60;
 const DEFAULT_SEARCH_FORWARD_DAYS = 400;
@@ -18,14 +20,7 @@ const WEEKDAY_NAMES = [
   "saturday",
 ];
 
-const calendarSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  color: z.string().optional(),
-  isDefault: z.boolean().optional(),
-});
-
-const eventSchema = z.object({
+const eventSchema = strictZodObject({
   id: z.string(),
   title: z.string(),
   description: z.string().optional(),
@@ -36,7 +31,7 @@ const eventSchema = z.object({
   calendarId: z.string(),
 });
 
-const requestSchema = z.object({
+const requestSchema = strictZodObject({
   query: z.string().min(1).max(500),
   timezone: z.string().min(1).max(100).optional(),
   now: z.string().datetime().optional(),
@@ -147,7 +142,8 @@ function normalizeText(value: string) {
 function sanitizeQuery(query: string): string {
   return query
     // Remove control characters
-    .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
     // Remove potential prompt injection patterns (more comprehensive)
     .replace(/ignore\s+(all\s+)?previous/gi, "")
     .replace(/system\s+prompt/gi, "")
@@ -164,7 +160,7 @@ function sanitizeQuery(query: string): string {
     .replace(/what\s+if/gi, "")
     .replace(/\[\s*system\s*\]/gi, "")
     .replace(/\{\s*system\s*\}/gi, "")
-    .replace(/\<\s*system\s*\>/gi, "")
+    .replace(/<\s*system\s*>/gi, "")
     // Remove excessive whitespace
     .replace(/\s+/g, " ")
     .trim();
@@ -472,7 +468,10 @@ async function deleteEventOnBackend(eventId: string, cookies: string, request: R
   }
 }
 
-export const calendarAssistantRoute = new Elysia({ prefix: "/calendar-assistant" })
+export const calendarAssistantRoute = new Elysia({
+  prefix: "/calendar-assistant",
+  normalize: false,
+})
   .use(requireAuth)
   .post("/", async ({ body, request, set, user }: any) => {
   try {
@@ -588,7 +587,7 @@ Rules:
       tools: {
         get_events: tool({
           description: "Fetch events for a precise day, week, month, or custom range. Supports natural language like 'next monday', 'this week', or explicit start/end dates.",
-          inputSchema: z.object({
+          inputSchema: strictZodObject({
             rangeQuery: z.string().optional().describe("Natural-language range like 'next monday' or 'this week'."),
             startDate: z.string().optional().describe("Optional explicit start date."),
             endDate: z.string().optional().describe("Optional explicit end date."),
@@ -614,7 +613,7 @@ Rules:
         }),
         find_events: tool({
           description: "Search broadly for events when the date is unclear or when matching a title before updating or deleting.",
-          inputSchema: z.object({
+          inputSchema: strictZodObject({
             query: z.string().min(1).describe("Search text to match against event title, description, or location."),
             rangeQuery: z.string().optional().describe("Optional range hint like 'next month' or 'this week'."),
           }),
@@ -646,7 +645,7 @@ Rules:
         }),
         create_event: tool({
           description: "Create a calendar event. Use natural language or explicit datetime strings. End time defaults to 1 hour after start unless all-day is true.",
-          inputSchema: z.object({
+          inputSchema: strictZodObject({
             title: z.string().max(255),
             startDateTime: z.string(),
             endDateTime: z.string().optional(),
@@ -711,7 +710,7 @@ Rules:
         }),
         update_event: tool({
           description: "Update an existing event after locating it with get_events or find_events.",
-          inputSchema: z.object({
+          inputSchema: strictZodObject({
             eventId: z.string(),
             title: z.string().max(255).optional(),
             description: z.string().max(1000).optional(),
@@ -793,7 +792,7 @@ Rules:
         }),
         delete_event: tool({
           description: "Delete an event after identifying its id.",
-          inputSchema: z.object({ eventId: z.string() }),
+          inputSchema: strictZodObject({ eventId: z.string() }),
           execute: async ({ eventId }) => {
             // First verify the event exists and get its title
             let existingEvent = eventCache.get(eventId);
