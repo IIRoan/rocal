@@ -2,14 +2,10 @@ import { describe, expect, it } from "@jest/globals";
 import { addDays, eachDayOfInterval, endOfDay, startOfDay } from "date-fns";
 
 import type { CalendarEvent } from "../components/calendar/types";
-import { buildMiniCalendarDayEventsMap } from "./use-mini-calendar-month-data";
-
-function toDayKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import {
+  buildMiniCalendarDayEventsMap,
+  toMiniCalendarDayKey,
+} from "./mini-calendar-day-events";
 
 function createEvent(
   id: string,
@@ -53,7 +49,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       visibleCalendarIds: new Set(["visible"]),
     });
 
-    expect(dayEventsMap.get(toDayKey(targetDay))).toEqual([
+    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
       expect.objectContaining({
         id: "visible-event",
         calendarId: "visible",
@@ -75,7 +71,7 @@ describe("buildMiniCalendarDayEventsMap", () => {
       calendarColorMap,
     });
 
-    expect(dayEventsMap.get(toDayKey(targetDay))).toEqual([
+    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
       expect.objectContaining({ id: "visible-event", color: "teal" }),
       expect.objectContaining({ id: "hidden-event", color: "rose" }),
     ]);
@@ -97,10 +93,52 @@ describe("buildMiniCalendarDayEventsMap", () => {
       visibleCalendarIds: new Set(["visible"]),
     });
 
-    expect(dayEventsMap.get(toDayKey(targetDay))?.map((event) => event.id)).toEqual([
+    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))?.map((event) => event.id)).toEqual([
       "event-1",
       "event-2",
       "event-3",
+    ]);
+  });
+
+  it("returns empty indicator lists for days without cached events", () => {
+    const dayEventsMap = buildMiniCalendarDayEventsMap({
+      days,
+      gridStart: startOfDay(gridStart),
+      gridEnd: endOfDay(gridEnd),
+      cachedEvents: [],
+      calendarColorMap,
+      visibleCalendarIds: new Set(["visible"]),
+    });
+
+    expect(dayEventsMap.get(toMiniCalendarDayKey(gridStart))).toEqual([]);
+  });
+
+  it("clamps multi-day events to the visible grid range", () => {
+    const spanningEvent: CalendarEvent = {
+      id: "spanning",
+      title: "spanning",
+      start: addDays(gridStart, -2),
+      end: addDays(gridEnd, 2),
+      calendarId: "visible",
+      userId: "user-1",
+      createdAt: gridStart,
+      updatedAt: gridStart,
+    };
+
+    const dayEventsMap = buildMiniCalendarDayEventsMap({
+      days,
+      gridStart: startOfDay(gridStart),
+      gridEnd: endOfDay(gridEnd),
+      cachedEvents: [spanningEvent],
+      calendarColorMap,
+      visibleCalendarIds: new Set(["visible"]),
+    });
+
+    expect(dayEventsMap.get(toMiniCalendarDayKey(gridStart))).toEqual([
+      expect.objectContaining({ id: "spanning", color: "teal" }),
+    ]);
+    expect(dayEventsMap.get(toMiniCalendarDayKey(gridEnd))).toEqual([
+      expect.objectContaining({ id: "spanning", color: "teal" }),
     ]);
   });
 });
