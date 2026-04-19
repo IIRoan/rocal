@@ -178,6 +178,36 @@ func TestFormatEventDetailsForEmail(t *testing.T) {
 			t.Fatalf("expected all-day Duration, got %q", details.Duration)
 		}
 	})
+
+	t.Run("all day event keeps the canonical local date", func(t *testing.T) {
+		loc, err := time.LoadLocation("Europe/Amsterdam")
+		if err != nil {
+			t.Fatalf("failed to load timezone: %v", err)
+		}
+
+		localStart := time.Date(2026, time.January, 10, 0, 0, 0, 0, loc)
+		localEnd := time.Date(2026, time.January, 10, 23, 59, 59, 0, loc)
+
+		details, err := server.formatEventDetailsForEmail(EventData{
+			Title:  "Holiday",
+			Start:  localStart.UTC(),
+			End:    localEnd.UTC(),
+			AllDay: true,
+		}, "Europe/Amsterdam", 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if details.EventDate != localStart.Format("Monday, Jan 2") {
+			t.Fatalf("expected EventDate %q, got %q", localStart.Format("Monday, Jan 2"), details.EventDate)
+		}
+		if details.EventTime != "All day" {
+			t.Fatalf("expected all-day EventTime, got %q", details.EventTime)
+		}
+		if details.Duration != "All day" {
+			t.Fatalf("expected all-day Duration, got %q", details.Duration)
+		}
+	})
 }
 
 func TestSenderDisplayAndFromAddress(t *testing.T) {

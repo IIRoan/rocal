@@ -47,6 +47,7 @@ describe("ics-export", () => {
       start: new Date("2024-02-01T10:00:00.000Z"),
       end: new Date("2024-02-01T11:00:00.000Z"),
       allDay: false,
+      timezone: "UTC",
       location: "Room A",
       recurrence: {
         frequency: "weekly",

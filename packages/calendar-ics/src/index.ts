@@ -220,6 +220,7 @@ export interface IcsBuildEventInput {
   start: Date;
   end: Date;
   allDay?: boolean;
+  timezone?: string | null;
   location?: string | null;
   recurrence?: IcsRecurrenceRule | null;
   createdAt?: Date;
@@ -240,6 +241,10 @@ const WEEKDAY_INDEX_TO_CODE = [
 ] as const;
 const ICS_LINE_BREAK = "\r\n";
 const DEFAULT_PRODUCT_ID = "-//Solace Calendar//Calendar Export//EN";
+const ICS_MAX_LINE_OCTETS = 75;
+const ICS_CONTINUATION_MAX_LINE_OCTETS = 74;
+const TEXT_ENCODER = new TextEncoder();
+const DATE_PARTS_FORMATTER_CACHE = new Map<string, Intl.DateTimeFormat>();
 
 function escapeIcsText(value: string): string {
   return value
@@ -247,6 +252,10 @@ function escapeIcsText(value: string): string {
     .replace(/\r?\n/g, "\\n")
     .replace(/,/g, "\\,")
     .replace(/;/g, "\\;");
+}
+
+function sanitizeIcsUri(value: string): string {
+  return value.replace(/\r?\n/g, "").trim();
 }
 
 function pad2(value: number): string {
@@ -261,10 +270,101 @@ function formatDateTimeStamp(date: Date): string {
   return `${formatDateStamp(date)}T${pad2(date.getUTCHours())}${pad2(date.getUTCMinutes())}${pad2(date.getUTCSeconds())}Z`;
 }
 
+function getDatePartsFormatter(timezone: string): Intl.DateTimeFormat {
+  const resolvedTimezone = normalizeIcsTimezone(timezone) || "UTC";
+  const cachedFormatter = DATE_PARTS_FORMATTER_CACHE.get(resolvedTimezone);
+  if (cachedFormatter) {
+    return cachedFormatter;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: resolvedTimezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  DATE_PARTS_FORMATTER_CACHE.set(resolvedTimezone, formatter);
+  return formatter;
+}
+
+function formatDateStampInTimeZone(date: Date, timezone: string): string {
+  const resolvedTimezone = normalizeIcsTimezone(timezone) || "UTC";
+
+  try {
+    const parts = getDatePartsFormatter(resolvedTimezone).formatToParts(date);
+    const lookup = (type: "year" | "month" | "day") =>
+      parts.find((part) => part.type === type)?.value;
+
+    const year = lookup("year");
+    const month = lookup("month");
+    const day = lookup("day");
+
+    if (year && month && day) {
+      return `${year}${month}${day}`;
+    }
+  } catch {
+    // Fall back to UTC if the provided timezone is not usable.
+  }
+
+  return formatDateStamp(date);
+}
+
+function addDaysToDateStamp(dateStamp: string, days: number): string {
+  if (!/^\d{8}$/.test(dateStamp)) {
+    return dateStamp;
+  }
+
+  const year = Number.parseInt(dateStamp.slice(0, 4), 10);
+  const month = Number.parseInt(dateStamp.slice(4, 6), 10);
+  const day = Number.parseInt(dateStamp.slice(6, 8), 10);
+  const copy = new Date(Date.UTC(year, month - 1, day));
+  copy.setUTCDate(copy.getUTCDate() + days);
+  return formatDateStamp(copy);
+}
+
 function addDaysUtc(date: Date, days: number): Date {
   const copy = new Date(date);
   copy.setUTCDate(copy.getUTCDate() + days);
   return copy;
+}
+
+function foldIcsLine(line: string): string[] {
+  const maxLineLengths = [
+    ICS_MAX_LINE_OCTETS,
+    ICS_CONTINUATION_MAX_LINE_OCTETS,
+  ];
+  const segments: string[] = [];
+  let currentSegment = "";
+  let currentOctets = 0;
+  let limit = maxLineLengths[0];
+
+  for (const character of line) {
+    const characterOctets = TEXT_ENCODER.encode(character).length;
+
+    if (currentOctets > 0 && currentOctets + characterOctets > limit) {
+      segments.push(currentSegment);
+      currentSegment = character;
+      currentOctets = characterOctets;
+      limit = maxLineLengths[1];
+      continue;
+    }
+
+    currentSegment += character;
+    currentOctets += characterOctets;
+  }
+
+  if (currentSegment || segments.length === 0) {
+    segments.push(currentSegment);
+  }
+
+  return segments.map((segment, index) =>
+    index === 0 ? segment : ` ${segment}`,
+  );
+}
+
+function foldIcsLines(lines: string[]): string[] {
+  return lines.flatMap((line) => foldIcsLine(line));
 }
 
 function normalizeEventRange(
@@ -284,10 +384,12 @@ function normalizeEventRange(
     throw new Error("Invalid event end date");
   }
 
-  if (end.getTime() <= start.getTime()) {
-    end = event.allDay
-      ? addDaysUtc(start, 1)
-      : new Date(start.getTime() + 60 * 60 * 1000);
+  if (event.allDay) {
+    if (end.getTime() < start.getTime()) {
+      end = new Date(start);
+    }
+  } else if (end.getTime() <= start.getTime()) {
+    end = new Date(start.getTime() + 60 * 60 * 1000);
   }
 
   return { start, end };
@@ -346,7 +448,11 @@ function buildRruleString(recurrence: IcsRecurrenceRule): string {
   return segments.join(";");
 }
 
-function buildEventLines(event: IcsBuildEventInput, dtStamp: Date): string[] {
+function buildEventLines(
+  event: IcsBuildEventInput,
+  dtStamp: Date,
+  calendarTimezone?: string,
+): string[] {
   const { start, end } = normalizeEventRange(event);
   const uid =
     event.uid?.trim() || `${crypto.randomUUID()}@solace-calendar.local`;
@@ -370,8 +476,15 @@ function buildEventLines(event: IcsBuildEventInput, dtStamp: Date): string[] {
   ];
 
   if (allDay) {
-    lines.push(`DTSTART;VALUE=DATE:${formatDateStamp(start)}`);
-    lines.push(`DTEND;VALUE=DATE:${formatDateStamp(addDaysUtc(end, 1))}`);
+    const timezone = normalizeIcsTimezone(event.timezone ?? calendarTimezone) || "UTC";
+    const startDateStamp = formatDateStampInTimeZone(start, timezone);
+    const endExclusiveDateStamp = addDaysToDateStamp(
+      formatDateStampInTimeZone(end, timezone),
+      1,
+    );
+
+    lines.push(`DTSTART;VALUE=DATE:${startDateStamp}`);
+    lines.push(`DTEND;VALUE=DATE:${endExclusiveDateStamp}`);
   } else {
     lines.push(`DTSTART:${formatDateTimeStamp(start)}`);
     lines.push(`DTEND:${formatDateTimeStamp(end)}`);
@@ -394,7 +507,7 @@ function buildEventLines(event: IcsBuildEventInput, dtStamp: Date): string[] {
   }
 
   if (event.sourceUrl?.trim()) {
-    lines.push(`URL:${escapeIcsText(event.sourceUrl.trim())}`);
+    lines.push(`URL:${sanitizeIcsUri(event.sourceUrl.trim())}`);
   }
 
   if (event.recurrence) {
@@ -438,15 +551,15 @@ export function buildIcsCalendar(options: {
   }
 
   if (options.calendar.sourceUrl?.trim()) {
-    lines.push(`URL:${escapeIcsText(options.calendar.sourceUrl.trim())}`);
+    lines.push(`URL:${sanitizeIcsUri(options.calendar.sourceUrl.trim())}`);
   }
 
   for (const event of options.events) {
-    lines.push(...buildEventLines(event, dtStamp));
+    lines.push(...buildEventLines(event, dtStamp, options.calendar.timezone));
   }
 
   lines.push("END:VCALENDAR");
-  return `${lines.join(ICS_LINE_BREAK)}${ICS_LINE_BREAK}`;
+  return `${foldIcsLines(lines).join(ICS_LINE_BREAK)}${ICS_LINE_BREAK}`;
 }
 
 export function buildIcsEventFile(options: {
