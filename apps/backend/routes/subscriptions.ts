@@ -5,20 +5,31 @@ import {
   convertParsedEventToCalendarEvent,
   isEventModified,
 } from "../lib/ics-parser";
-import { Prisma } from "../generated/prisma/index.js";
-import type {
-  CalendarSubscriptionSyncResponse,
-  CreateCalendarSubscriptionRequest,
-  ImportIcsRequest,
-  ImportIcsResponse,
-  UpdateCalendarSubscriptionRequest,
+import type { Prisma } from "../generated/prisma/index.js";
+import {
+  findNationalHolidayCalendarByUrl,
+  type CalendarSubscriptionSyncResponse,
+  type ImportIcsRequest,
+  type ImportIcsResponse,
+  type UpdateCalendarSubscriptionRequest,
 } from "@workspace/calendar-ics";
-import { findNationalHolidayCalendarByUrl } from "@workspace/calendar-ics";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 import { createLogger } from "@workspace/logger";
+import { strictObject } from "../lib/validation";
 
 const logger = createLogger("backend:subscriptions");
+type SubscriptionsContext<
+  TParams = Record<string, never>,
+  TBody = unknown,
+  TQuery = Record<string, string>,
+> = {
+  params: TParams;
+  body: TBody;
+  query: TQuery;
+  request: Request;
+  user?: unknown;
+};
 
 type SyncableSubscription = Prisma.CalendarSubscriptionGetPayload<{
   include: {
@@ -31,16 +42,16 @@ import {
   isValidCalendarColor,
 } from "../lib/colors";
 
-export const subscriptionsRoute = new Elysia()
+export const subscriptionsRoute = new Elysia({ normalize: false })
   .use(requireAuth)
   .get(
     "/subscriptions",
-    async ({ user, request }: any) => {
+    async ({ user, request }: SubscriptionsContext) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const subscriptions = await prisma.calendarSubscription.findMany({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         include: {
           calendar: true,
@@ -67,9 +78,13 @@ export const subscriptionsRoute = new Elysia()
 
   .post(
     "/subscriptions",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: SubscriptionsContext<Record<string, never>, { name: string; url: string; color?: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { name, url, color } = body;
 
       if (!name?.trim()) {
@@ -79,7 +94,7 @@ export const subscriptionsRoute = new Elysia()
       // Check if URL is already subscribed by this user
       const existingSubscription = await prisma.calendarSubscription.findFirst({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
           url: url,
         },
       });
@@ -130,13 +145,13 @@ export const subscriptionsRoute = new Elysia()
 
         // Get user settings for timezone
         let userSettings = await prisma.userSettings.findUnique({
-          where: { userId: user.id },
+          where: { userId: authenticatedUser.id },
         });
 
         // Create default settings if none exist
         if (!userSettings) {
           userSettings = await prisma.userSettings.create({
-            data: { userId: user.id },
+            data: { userId: authenticatedUser.id },
           });
         }
 
@@ -180,7 +195,7 @@ export const subscriptionsRoute = new Elysia()
           isPublic: !!matchingNationalHolidayCalendar,
           isSyncOnly: true,
           isDefault: false,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -189,7 +204,7 @@ export const subscriptionsRoute = new Elysia()
         data: {
           name: name.trim(),
           url,
-          userId: user.id,
+          userId: authenticatedUser.id,
           calendarId: calendar.id,
           lastSyncStatus: "pending",
           // Holiday calendars change rarely — sync weekly instead of every 15 min
@@ -212,7 +227,7 @@ export const subscriptionsRoute = new Elysia()
       return subscription;
     },
     {
-      body: t.Object({
+      body: strictObject({
         name: t.String(),
         url: t.String({ format: "uri" }),
         color: t.Optional(t.String()),
@@ -228,9 +243,14 @@ export const subscriptionsRoute = new Elysia()
 
   .put(
     "/subscriptions/:id",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: SubscriptionsContext<{ id: string }, UpdateCalendarSubscriptionRequest>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { id } = params;
       const { name, color, isActive, syncIntervalMinutes } =
         body as UpdateCalendarSubscriptionRequest;
@@ -238,7 +258,7 @@ export const subscriptionsRoute = new Elysia()
       const subscription = await prisma.calendarSubscription.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         include: {
           calendar: true,
@@ -298,10 +318,10 @@ export const subscriptionsRoute = new Elysia()
       return updatedSubscription;
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
-      body: t.Object({
+      body: strictObject({
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
         isActive: t.Optional(t.Boolean()),
@@ -318,15 +338,19 @@ export const subscriptionsRoute = new Elysia()
 
   .delete(
     "/subscriptions/:id",
-    async ({ params, user, query, request }: any) => {
+    async ({
+      params,
+      user,
+      request,
+    }: SubscriptionsContext<{ id: string }, unknown, { deleteEvents?: boolean }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { id } = params;
 
       const subscription = await prisma.calendarSubscription.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -350,7 +374,7 @@ export const subscriptionsRoute = new Elysia()
       await prisma.calendar.deleteMany({
         where: {
           id: subscription.calendarId,
-          userId: user.id,
+          userId: authenticatedUser.id,
           isSyncOnly: true,
         },
       });
@@ -358,10 +382,10 @@ export const subscriptionsRoute = new Elysia()
       return { success: true };
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
-      query: t.Object({
+      query: strictObject({
         deleteEvents: t.Optional(t.Boolean()),
       }),
       detail: {
@@ -375,15 +399,19 @@ export const subscriptionsRoute = new Elysia()
 
   .post(
     "/subscriptions/:id/sync",
-    async ({ params, user, request }: any) => {
+    async ({
+      params,
+      user,
+      request,
+    }: SubscriptionsContext<{ id: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { id } = params;
 
       const subscription = await prisma.calendarSubscription.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         include: {
           calendar: true,
@@ -398,7 +426,7 @@ export const subscriptionsRoute = new Elysia()
       return syncResult;
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
       detail: {
@@ -410,16 +438,20 @@ export const subscriptionsRoute = new Elysia()
 
   .post(
     "/subscriptions/import-ics",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: SubscriptionsContext<Record<string, never>, ImportIcsRequest>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       const { calendarId, icsContent, fileName } = body as ImportIcsRequest;
 
       // Verify calendar belongs to user
       const calendar = await prisma.calendar.findFirst({
         where: {
           id: calendarId,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -429,13 +461,13 @@ export const subscriptionsRoute = new Elysia()
 
       // Get user settings for timezone
       let userSettings = await prisma.userSettings.findUnique({
-        where: { userId: user.id },
+        where: { userId: authenticatedUser.id },
       });
 
       // Create default settings if none exist
       if (!userSettings) {
         userSettings = await prisma.userSettings.create({
-          data: { userId: user.id },
+          data: { userId: authenticatedUser.id },
         });
       }
 
@@ -470,7 +502,7 @@ export const subscriptionsRoute = new Elysia()
 
           const eventData = convertParsedEventToCalendarEvent(
             parsedEvent,
-            user.id,
+            authenticatedUser.id,
             calendarId,
             // No subscriptionId for manual import
           );
@@ -499,7 +531,7 @@ export const subscriptionsRoute = new Elysia()
       return response;
     },
     {
-      body: t.Object({
+      body: strictObject({
         calendarId: t.String(),
         icsContent: t.String(),
         fileName: t.Optional(t.String()),

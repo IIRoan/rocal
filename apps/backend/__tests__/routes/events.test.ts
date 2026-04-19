@@ -112,7 +112,9 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(eventsRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(eventsRoutes);
 }
 
 async function readText(response: Response) {
@@ -290,7 +292,6 @@ describe("eventsRoutes – color validation", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             color: "rose",
-            updatedAt: existingEvent.updatedAt.toISOString(),
           }),
         }),
       );
@@ -311,7 +312,6 @@ describe("eventsRoutes – color validation", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             color: "#FF5733",
-            updatedAt: existingEvent.updatedAt.toISOString(),
           }),
         }),
       );
@@ -328,7 +328,6 @@ describe("eventsRoutes – color validation", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             color: "chartreuse",
-            updatedAt: existingEvent.updatedAt.toISOString(),
           }),
         }),
       );

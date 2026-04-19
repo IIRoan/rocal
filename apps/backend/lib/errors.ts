@@ -38,7 +38,7 @@ export class ForbiddenError extends Error {
 export class DatabaseError extends Error {
   constructor(
     message: string,
-    public originalError?: any,
+    public originalError?: Error,
   ) {
     super(message);
     this.name = "DatabaseError";
@@ -48,7 +48,7 @@ export class DatabaseError extends Error {
 export class NotificationError extends Error {
   constructor(
     message: string,
-    public originalError?: any,
+    public originalError?: Error,
   ) {
     super(message);
     this.name = "NotificationError";
@@ -60,7 +60,7 @@ export interface ApiErrorResponse {
   error: string;
   message: string;
   statusCode: number;
-  details?: any;
+  details?: Record<string, unknown>;
   timestamp: string;
 }
 

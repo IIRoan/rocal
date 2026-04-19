@@ -3,14 +3,13 @@ import {
   ValidationError,
   NotFoundError,
   UnauthorizedError,
-  ForbiddenError,
 } from "../lib/errors";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
-import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { createLogger } from "@workspace/logger";
+import { strictObject } from "../lib/validation";
 
 // Rate limiting configuration
 const RATE_LIMITS = {
@@ -25,11 +24,44 @@ const RATE_LIMITS = {
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 const logger = createLogger("backend:notifications");
 
+type RateLimitContext = {
+  request: Request;
+  set: {
+    status?: number | string;
+    headers: Record<string, string | number | undefined>;
+  };
+  user?: { id: string } | null;
+};
+
+type NotificationConfigInput = {
+  notificationType: "email" | "browser";
+  minutesBefore: number;
+  isEnabled: boolean;
+};
+
+type CreatedNotification = {
+  id: string;
+  notificationType: "email" | "browser";
+  minutesBefore: number;
+  notificationTime: Date;
+  notificationDateLocal: string;
+  notificationTimezone: string;
+  isEnabled: boolean;
+};
+
+type NotificationsContext<TParams = { eventId: string }, TBody = unknown> = {
+  params: TParams;
+  body: TBody;
+  request: Request;
+  user?: unknown;
+  set: RateLimitContext["set"];
+};
+
 /**
  * Rate limiting middleware
  */
 function rateLimit(limit: { requests: number; windowMs: number }) {
-  return ({ request, set, user }: any) => {
+  return ({ request, set, user }: RateLimitContext) => {
     if (!user) {
       set.status = 401;
       throw new UnauthorizedError("Authentication required");
@@ -69,7 +101,7 @@ function rateLimit(limit: { requests: number; windowMs: number }) {
 /**
  * Validate notification configuration
  */
-function validateNotificationConfig(config: any): void {
+function validateNotificationConfig(config: NotificationConfigInput): void {
   if (
     !config.notificationType ||
     !["email", "browser"].includes(config.notificationType)
@@ -138,22 +170,34 @@ type NotificationRow = {
   updatedAt: Date;
 };
 
-export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
+export const notificationsRoutes = new Elysia({
+  prefix: "/notifications",
+  normalize: false,
+})
   .use(requireAuth)
   .get(
     "/event/:eventId",
-    async ({ params, user, request, set }: any) => {
+    async ({
+      params,
+      user,
+      request,
+      set,
+    }: NotificationsContext<{ eventId: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
         // Apply rate limiting
-        rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({ request, set, user });
+        rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({
+          request,
+          set,
+          user: authenticatedUser,
+        });
 
         const { eventId } = params;
 
         // Validate event ownership
-        const event = await validateEventOwnership(eventId, user.id);
+        const event = await validateEventOwnership(eventId, authenticatedUser.id);
 
         // If event is null (synced or recurring instance), return empty notifications
         if (!event) {
@@ -184,7 +228,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
           FROM public.event_notification en
           INNER JOIN public.calendar_event ce ON ce.id = en.event_id
           WHERE en.event_id = ${eventId}
-            AND ce.user_id = ${user.id}
+            AND ce.user_id = ${authenticatedUser.id}
           ORDER BY en.notification_type ASC, en.minutes_before ASC
         `;
 
@@ -216,7 +260,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
     },
     {
-      params: t.Object({
+      params: strictObject({
         eventId: t.String({
           description: "Event ID to get notifications for",
           minLength: 1,
@@ -289,19 +333,29 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
 
   .put(
     "/event/:eventId",
-    async ({ params, body, user, request, set }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+      set,
+    }: NotificationsContext<{ eventId: string }, { notifications: NotificationConfigInput[] }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
         // Apply rate limiting
-        rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({ request, set, user });
+        rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+          request,
+          set,
+          user: authenticatedUser,
+        });
 
         const { eventId } = params;
         const { notifications } = body;
 
         // Validate event ownership
-        const event = await validateEventOwnership(eventId, user.id);
+        const event = await validateEventOwnership(eventId, authenticatedUser.id);
 
         // If event is null (synced or recurring instance), return success without doing anything
         if (!event) {
@@ -338,15 +392,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
         });
 
         // Create new notifications, but skip any that would be in the past or for past events
-        const createdNotifications = [] as Array<{
-          id: string;
-          notificationType: string;
-          minutesBefore: number;
-          notificationTime: Date;
-          notificationDateLocal: string;
-          notificationTimezone: string;
-          isEnabled: boolean;
-        }>;
+        const createdNotifications: CreatedNotification[] = [];
         const skippedConfigurations: Array<{
           notificationType: string;
           minutesBefore: number;
@@ -437,7 +483,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
             notificationDateLocal: schedule.notificationDateLocal,
             notificationTimezone: schedule.notificationTimezone,
             isEnabled: true,
-          } as any);
+          });
         }
 
         return {
@@ -474,15 +520,15 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
     },
     {
-      params: t.Object({
+      params: strictObject({
         eventId: t.String({
           description: "Event ID to update notifications for",
           minLength: 1,
         }),
       }),
-      body: t.Object({
+      body: strictObject({
         notifications: t.Array(
-          t.Object({
+          strictObject({
             notificationType: t.Union(
               [t.Literal("browser"), t.Literal("email")],
               {
@@ -523,18 +569,27 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
 
   .delete(
     "/event/:eventId",
-    async ({ params, user, request, set }: any) => {
+    async ({
+      params,
+      user,
+      request,
+      set,
+    }: NotificationsContext<{ eventId: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
         // Apply rate limiting
-        rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({ request, set, user });
+        rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+          request,
+          set,
+          user: authenticatedUser,
+        });
 
         const { eventId } = params;
 
         // Validate event ownership
-        const event = await validateEventOwnership(eventId, user.id);
+        const event = await validateEventOwnership(eventId, authenticatedUser.id);
 
         // If event is null (synced or recurring instance), return success without doing anything
         if (!event) {
@@ -572,7 +627,7 @@ export const notificationsRoutes = new Elysia({ prefix: "/notifications" })
       }
     },
     {
-      params: t.Object({
+      params: strictObject({
         eventId: t.String({
           description: "Event ID to delete notifications for",
           minLength: 1,

@@ -1,12 +1,13 @@
 import { Elysia, t } from "elysia";
-import { Prisma } from "../generated/prisma/index.js";
+import type { Prisma } from "../generated/prisma/index.js";
 import { prisma } from "../lib/prisma";
 import { ValidationError } from "../lib/errors";
 import { ensureUserCalendars } from "../lib/user-setup";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import { strictObject } from "../lib/validation";
 
-const createCalendarBodySchema = t.Object({
+const createCalendarBodySchema = strictObject({
   name: t.String({
     minLength: 1,
     maxLength: 100,
@@ -24,13 +25,13 @@ const createCalendarBodySchema = t.Object({
   ),
 });
 
-const updateCalendarParamsSchema = t.Object({
+const updateCalendarParamsSchema = strictObject({
   id: t.String({
     description: "Calendar ID",
   }),
 });
 
-const updateCalendarBodySchema = t.Object({
+const updateCalendarBodySchema = strictObject({
   name: t.Optional(
     t.String({
       minLength: 1,
@@ -56,13 +57,13 @@ const updateCalendarBodySchema = t.Object({
   ),
 });
 
-const deleteCalendarParamsSchema = t.Object({
+const deleteCalendarParamsSchema = strictObject({
   id: t.String({
     description: "Calendar ID to delete",
   }),
 });
 
-const deleteCalendarQuerySchema = t.Object({
+const deleteCalendarQuerySchema = strictObject({
   action: t.Optional(
     t.Union([t.Literal("delete_events"), t.Literal("move_events")], {
       description:
@@ -81,20 +82,34 @@ type UpdateCalendarParams = typeof updateCalendarParamsSchema.static;
 type UpdateCalendarBody = typeof updateCalendarBodySchema.static;
 type DeleteCalendarParams = typeof deleteCalendarParamsSchema.static;
 type DeleteCalendarQuery = typeof deleteCalendarQuerySchema.static;
+type CalendarsContext<
+  TParams = Record<string, never>,
+  TBody = unknown,
+  TQuery = Record<string, string>,
+> = {
+  params: TParams;
+  body: TBody;
+  query: TQuery;
+  request: Request;
+  user?: unknown;
+};
 
 import {
   ALLOWED_CALENDAR_COLORS,
   isValidCalendarColor,
 } from "../lib/colors";
 
-export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
+export const calendarsRoutes = new Elysia({
+  prefix: "/calendars",
+  normalize: false,
+})
   .use(requireAuth)
   .get(
     "/",
-    async ({ user, request }: any) => {
+    async ({ user, request }: CalendarsContext) => {
       const authenticatedUser = await ensureAuthenticatedUser(
         user,
-        request as Request,
+        request,
       );
 
       // Ensure user has default calendars
@@ -157,10 +172,14 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
 
   .post(
     "/",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: CalendarsContext<Record<string, never>, CreateCalendarBody>) => {
       const authenticatedUser = await ensureAuthenticatedUser(
         user,
-        request as Request,
+        request,
       );
       const typedBody = body as CreateCalendarBody;
 
@@ -273,10 +292,15 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
 
   .put(
     "/:id",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: CalendarsContext<UpdateCalendarParams, UpdateCalendarBody>) => {
       const authenticatedUser = await ensureAuthenticatedUser(
         user,
-        request as Request,
+        request,
       );
       const typedParams = params as UpdateCalendarParams;
       const typedBody = body as UpdateCalendarBody;
@@ -417,10 +441,15 @@ export const calendarsRoutes = new Elysia({ prefix: "/calendars" })
 
   .delete(
     "/:id",
-    async ({ params, query, user, request }: any) => {
+    async ({
+      params,
+      query,
+      user,
+      request,
+    }: CalendarsContext<DeleteCalendarParams, unknown, DeleteCalendarQuery>) => {
       const authenticatedUser = await ensureAuthenticatedUser(
         user,
-        request as Request,
+        request,
       );
       const typedParams = params as DeleteCalendarParams;
       const typedQuery = query as DeleteCalendarQuery;

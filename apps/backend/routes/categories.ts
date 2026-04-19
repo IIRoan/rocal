@@ -1,24 +1,34 @@
 import { Elysia, t } from "elysia";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
+import { strictObject } from "../lib/validation";
 import {
   ALLOWED_CALENDAR_COLORS,
   isValidCalendarColor,
 } from "../lib/colors";
 
-import { auth } from "../lib/auth";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 
-export const categoriesRoutes = new Elysia({ prefix: "/categories" })
+type CategoriesContext<TParams = Record<string, never>, TBody = unknown> = {
+  params: TParams;
+  body: TBody;
+  request: Request;
+  user?: unknown;
+};
+
+export const categoriesRoutes = new Elysia({
+  prefix: "/categories",
+  normalize: false,
+})
   .use(requireAuth)
   .get(
     "/",
-    async ({ user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
+    async ({ user, request }: CategoriesContext) => {
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
       // Fetch user's active categories with usage count
       const categories = await prisma.eventCategory.findMany({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
           isActive: true,
         },
         include: {
@@ -47,9 +57,13 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
 
   .post(
     "/",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: CategoriesContext<Record<string, never>, { name: string; color: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       const { name, color } = body;
 
@@ -68,7 +82,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       // Check for name uniqueness per user
       const existingCategory = await prisma.eventCategory.findFirst({
         where: {
-          userId: user.id,
+          userId: authenticatedUser.id,
           name: name.trim(),
         },
       });
@@ -82,14 +96,14 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
         data: {
           name: name.trim(),
           color,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
       return category;
     },
     {
-      body: t.Object({
+      body: strictObject({
         name: t.String(),
         color: t.String(),
       }),
@@ -98,9 +112,14 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
 
   .put(
     "/:id",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: CategoriesContext<{ id: string }, { name?: string; color?: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       const { id } = params;
       const updates = body;
@@ -109,7 +128,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       const existingCategory = await prisma.eventCategory.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -128,7 +147,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       if (updates.name && updates.name.trim() !== existingCategory.name) {
         const duplicateCategory = await prisma.eventCategory.findFirst({
           where: {
-            userId: user.id,
+            userId: authenticatedUser.id,
             name: updates.name.trim(),
             id: { not: id },
           },
@@ -151,10 +170,10 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       return updatedCategory;
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
-      body: t.Object({
+      body: strictObject({
         name: t.Optional(t.String()),
         color: t.Optional(t.String()),
       }),
@@ -163,9 +182,9 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
 
   .delete(
     "/:id",
-    async ({ params, user, request }: any) => {
+    async ({ params, user, request }: CategoriesContext<{ id: string }>) => {
       // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
+      const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       const { id } = params;
 
@@ -173,7 +192,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       const existingCategory = await prisma.eventCategory.findFirst({
         where: {
           id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
       });
 
@@ -185,7 +204,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       await prisma.calendarEvent.updateMany({
         where: {
           categoryId: id,
-          userId: user.id,
+          userId: authenticatedUser.id,
         },
         data: {
           categoryId: null,
@@ -200,7 +219,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" })
       return { success: true, message: "Category deleted successfully" };
     },
     {
-      params: t.Object({
+      params: strictObject({
         id: t.String(),
       }),
     },

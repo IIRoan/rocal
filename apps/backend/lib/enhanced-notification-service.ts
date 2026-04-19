@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports */
 /**
  * Enhanced Notification Service
  *
@@ -341,8 +342,8 @@ export class EnhancedNotificationService {
           },
         });
       });
-    } catch (error) {
-      logger.error("Failed to log service startup:", error);
+    } catch {
+      logger.error("Failed to log service startup");
       // Don't throw - this is just for monitoring
     }
   }
@@ -2432,7 +2433,7 @@ export class EnhancedNotificationService {
         day: "numeric",
         timeZone: timezone,
       });
-    } catch (error) {
+    } catch {
       // Fallback to UTC if timezone is invalid
       return date.toLocaleDateString("en-US", {
         weekday: "long",
@@ -2464,7 +2465,7 @@ export class EnhancedNotificationService {
         hour12: !is24Hour,
         timeZone: timezone,
       });
-    } catch (error) {
+    } catch {
       // Fallback to UTC if timezone is invalid
       return date.toLocaleTimeString("en-US", {
         hour: "numeric",
@@ -2607,7 +2608,7 @@ export class EnhancedNotificationService {
     // For now, just log browser notifications
     // In a real implementation, you would send this via WebSocket or push notification
     logger.info(
-      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}"`,
+      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}" (${minutesBefore} min before)`,
     );
   }
 
