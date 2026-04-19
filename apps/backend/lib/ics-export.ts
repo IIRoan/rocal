@@ -34,6 +34,7 @@ export function toIcsBuildEvent(event: CalendarEvent): IcsBuildEventInput {
     start: event.start,
     end: event.end,
     allDay: event.allDay,
+    timezone: event.timezone,
     location: event.location,
     recurrence: toIcsRecurrenceRule(event.recurrence),
     createdAt: event.createdAt,

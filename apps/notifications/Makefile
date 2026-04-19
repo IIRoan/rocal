@@ -1,4 +1,4 @@
-.PHONY: dev build clean deps test
+.PHONY: dev build clean deps test test-coverage
 
 # Development
 dev:
@@ -23,7 +23,13 @@ deps:
 
 # Run tests
 test:
+	bun run build:emails
 	go test ./...
+
+test-coverage:
+	bun run build:emails
+	go test ./... -covermode=atomic -coverprofile=coverage.out
+	go tool cover -func=coverage.out
 
 # Format code
 fmt:
