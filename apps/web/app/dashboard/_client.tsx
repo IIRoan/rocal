@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import dynamic from "next/dynamic";
 import {
+  FORCE_LOADING_DESIGN_PREVIEW,
   SidebarInset,
   SidebarProvider,
   DashboardSkeleton,
@@ -438,7 +439,7 @@ function MobileLayoutContent() {
     calendarData.eventsLoading && calendarData.events.length === 0;
   const isAllInitialLoading = isInitialLoading || isInitialEventsLoading;
 
-  if (isAllInitialLoading) {
+  if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
       <>
         <MobileCalendarSkeleton />

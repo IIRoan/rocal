@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
 import { useSession } from "@/lib/auth-client";
 import { Logo } from "@workspace/ui/components/layout";
+import {
+  FORCE_LOADING_DESIGN_PREVIEW,
+  PageLoadingOverlay,
+} from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
 import { ArrowRight, Calendar, Sparkles, ShieldCheck } from "lucide-react";
 
@@ -18,12 +22,8 @@ export function HomePageClient() {
     }
   }, [isPending, session?.user, router]);
 
-  if (isPending) {
-    return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background">
-        <Logo width={48} height={48} className="text-primary animate-pulse mb-4" />
-      </div>
-    );
+  if (FORCE_LOADING_DESIGN_PREVIEW || isPending) {
+    return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
   }
 
   if (session?.user) {
