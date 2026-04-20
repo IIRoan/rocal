@@ -4,8 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "noEmit": true,
-    "baseUrl": "."
+    "noEmit": true
   },
-  "include": ["email-source/**/*.ts", "email-source/**/*.tsx"]
+  "include": [
+    "email-source/**/*.ts",
+    "email-source/**/*.tsx"
+  ]
 }

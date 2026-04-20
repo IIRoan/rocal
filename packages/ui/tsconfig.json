@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "es2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": false,
@@ -12,12 +16,21 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-      "@workspace/ui/*": ["./src/*"],
-      "@/*": ["./src/*"]
+      "@workspace/ui/*": [
+        "./src/*"
+      ],
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", ".turbo"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".turbo"
+  ]
 }
