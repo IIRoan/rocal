@@ -23,7 +23,6 @@ import {
   API_DOCS_UI_PATH,
   createApiDocsErrorBody,
   getApiDocsAccess,
-  renderApiDocsDeniedHtml,
 } from "./lib/docs-access";
 import {
   apiDocumentationDescription,
@@ -191,11 +190,12 @@ export const createAPI = (prefix = "") => {
         return createApiDocsErrorBody(result);
       }
 
-      set.headers["Content-Type"] = "text/html; charset=utf-8";
-      return renderApiDocsDeniedHtml({
-        title: result.title,
-        message: result.message,
-        loginUrl,
+      return new Response(result.message, {
+        status: result.status,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "Content-Type": "text/plain; charset=utf-8",
+        },
       });
     })
     .use(
@@ -203,6 +203,14 @@ export const createAPI = (prefix = "") => {
         path: API_DOCS_UI_PATH,
         specPath: API_DOCS_SPEC_PATH,
         documentation: apiDocumentation,
+        scalarConfig: {
+          theme: "none",
+          layout: "modern",
+          darkMode: false,
+          withDefaultFonts: false,
+          hideDownloadButton: false,
+          searchHotKey: "k",
+        },
       }),
     );
 
