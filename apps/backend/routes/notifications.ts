@@ -73,7 +73,7 @@ export const notificationsRoutes = new Elysia({
   .use(requireAuth)
   .get(
     "/event/:eventId",
-    async ({ params, user, request, set }: any) => {
+    async ({ params, user, request, set }: { params: { eventId: string }; user?: unknown; request: Request; set: { status?: number | string; headers: Record<string, string | number | undefined> } }) => {
       const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
@@ -118,7 +118,7 @@ export const notificationsRoutes = new Elysia({
 
   .put(
     "/event/:eventId",
-    async ({ params, body, user, request, set }: any) => {
+    async ({ params, body, user, request, set }: { params: { eventId: string }; body: { notifications: Array<{ notificationType: "browser" | "email"; minutesBefore: number; isEnabled: boolean }> }; user?: unknown; request: Request; set: { status?: number | string; headers: Record<string, string | number | undefined> } }) => {
       const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
@@ -186,7 +186,7 @@ export const notificationsRoutes = new Elysia({
 
   .delete(
     "/event/:eventId",
-    async ({ params, user, request, set }: any) => {
+    async ({ params, user, request, set }: { params: { eventId: string }; user?: unknown; request: Request; set: { status?: number | string; headers: Record<string, string | number | undefined> } }) => {
       const authenticatedUser = await ensureAuthenticatedUser(user, request);
 
       try {
