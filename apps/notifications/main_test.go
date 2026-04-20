@@ -572,10 +572,10 @@ func TestFormatReminderSummaryEdgeCases(t *testing.T) {
 		{minutes: 1, want: "1 minute"},
 		{minutes: 59, want: "59 minutes"},
 		{minutes: 60, want: "1 hour"},
-		{minutes: 61, want: "1 hour 1 minutes"},
+		{minutes: 61, want: "1 hour 1 minute"},
 		{minutes: 120, want: "2 hours"},
 		{minutes: 1440, want: "24 hours"},
-		{minutes: 1441, want: "24 hours 1 minutes"},
+		{minutes: 1441, want: "24 hours 1 minute"},
 	}
 
 	for _, test := range tests {
@@ -814,7 +814,7 @@ func TestAddErrorConcurrency(t *testing.T) {
 	}
 }
 
-func TestHealthHandlerMethodNotAllowed(t *testing.T) {
+func TestHealthHandlerAcceptsAnyMethod(t *testing.T) {
 	server := newTestServer(t)
 	server.isRunning = true
 

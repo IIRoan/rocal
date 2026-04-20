@@ -1,5 +1,9 @@
 import { Elysia, t } from "elysia";
-import { ValidationError, UnauthorizedError, NotFoundError } from "../lib/errors";
+import {
+  ValidationError,
+  UnauthorizedError,
+  NotFoundError,
+} from "../lib/errors";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
 import { strictObject } from "../lib/validation";
@@ -79,7 +83,10 @@ export const notificationsRoutes = new Elysia({
           user: authenticatedUser,
         });
 
-        return await notificationService.getForEvent(authenticatedUser.id, params.eventId);
+        return await notificationService.getForEvent(
+          authenticatedUser.id,
+          params.eventId,
+        );
       } catch (error) {
         if (
           error instanceof ValidationError ||
@@ -89,8 +96,7 @@ export const notificationsRoutes = new Elysia({
           throw error;
         }
         logger.error("Failed to get event notifications:", error);
-        set.status = 500;
-        return "Failed to retrieve event notifications";
+        throw new Error("Failed to retrieve event notifications");
       }
     },
     {
@@ -136,8 +142,7 @@ export const notificationsRoutes = new Elysia({
           throw error;
         }
         logger.error("Failed to update event notifications:", error);
-        set.status = 500;
-        return "Failed to update event notifications";
+        throw new Error("Failed to update event notifications");
       }
     },
     {
@@ -191,7 +196,10 @@ export const notificationsRoutes = new Elysia({
           user: authenticatedUser,
         });
 
-        return await notificationService.deleteForEvent(authenticatedUser.id, params.eventId);
+        return await notificationService.deleteForEvent(
+          authenticatedUser.id,
+          params.eventId,
+        );
       } catch (error) {
         if (
           error instanceof ValidationError ||
@@ -201,8 +209,7 @@ export const notificationsRoutes = new Elysia({
           throw error;
         }
         logger.error("Failed to delete event notifications:", error);
-        set.status = 500;
-        return "Failed to delete event notifications";
+        throw new Error("Failed to delete event notifications");
       }
     },
     {

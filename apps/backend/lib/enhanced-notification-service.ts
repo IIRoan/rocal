@@ -342,8 +342,8 @@ export class EnhancedNotificationService {
           },
         });
       });
-    } catch {
-      logger.error("Failed to log service startup");
+    } catch (error) {
+      logger.error("Failed to log service startup", error);
       // Don't throw - this is just for monitoring
     }
   }
@@ -669,11 +669,12 @@ export class EnhancedNotificationService {
             // Process each notification configuration
             for (const config of notifications) {
               try {
-                const schedule = NotificationCalculator.buildNotificationSchedule(
-                  actualEventStart,
-                  config.minutesBefore,
-                  event.timezone,
-                );
+                const schedule =
+                  NotificationCalculator.buildNotificationSchedule(
+                    actualEventStart,
+                    config.minutesBefore,
+                    event.timezone,
+                  );
 
                 // Calculate exact notification time
                 const calcResult =
@@ -2762,9 +2763,7 @@ export class EnhancedNotificationService {
         },
       });
 
-      logger.ok(
-        `✅ Deleted ${deletedLogsResult.count} old notification logs`,
-      );
+      logger.ok(`✅ Deleted ${deletedLogsResult.count} old notification logs`);
 
       // Step 2: Clean up old sent notifications that are no longer needed
       // Only delete notifications that are:
