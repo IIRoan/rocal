@@ -5,7 +5,9 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import { requireAuth } from "../lib/auth-guard";
-import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import type { AuthenticatedUser } from "../lib/auth-utils";
+import { authenticatedRouteDetail } from "../lib/openapi";
+import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { NotificationService } from "../services/notification.service";
@@ -71,160 +73,201 @@ export const notificationsRoutes = new Elysia({
   normalize: false,
 })
   .use(requireAuth)
-  .get(
-    "/event/:eventId",
-    async ({ params, user, request, set }: { params: { eventId: string }; user?: unknown; request: Request; set: { status?: number | string; headers: Record<string, string | number | undefined> } }) => {
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-
-      try {
-        rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({
+  .guard(authenticatedRouteDetail("Notifications"), (app) =>
+    app
+      .get(
+        "/event/:eventId",
+        async ({
+          params,
           request,
           set,
-          user: authenticatedUser,
-        });
+          authenticatedUser,
+        }: {
+          params: { eventId: string };
+          request: Request;
+          set: {
+            status?: number | string;
+            headers: Record<string, string | number | undefined>;
+          };
+          authenticatedUser?: AuthenticatedUser;
+        }) => {
+          try {
+            const user = await resolveRouteUser(authenticatedUser, request);
+            rateLimit(RATE_LIMITS.GET_NOTIFICATIONS)({
+              request,
+              set,
+              user,
+            });
 
-        return await notificationService.getForEvent(
-          authenticatedUser.id,
-          params.eventId,
-        );
-      } catch (error) {
-        if (
-          error instanceof ValidationError ||
-          error instanceof UnauthorizedError ||
-          error instanceof NotFoundError
-        ) {
-          throw error;
-        }
-        logger.error("Failed to get event notifications:", error);
-        throw new Error("Failed to retrieve event notifications");
-      }
-    },
-    {
-      params: strictObject({
-        eventId: t.String({
-          description: "Event ID to get notifications for",
-          minLength: 1,
-        }),
-      }),
-      detail: {
-        tags: ["Notifications"],
-        summary: "Get notifications for an event",
-        description:
-          "Retrieves all notification settings for a specific event with enhanced validation and rate limiting",
-        security: [{ bearerAuth: [] }],
-      },
-    },
-  )
-
-  .put(
-    "/event/:eventId",
-    async ({ params, body, user, request, set }: { params: { eventId: string }; body: { notifications: Array<{ notificationType: "browser" | "email"; minutesBefore: number; isEnabled: boolean }> }; user?: unknown; request: Request; set: { status?: number | string; headers: Record<string, string | number | undefined> } }) => {
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-
-      try {
-        rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
-          request,
-          set,
-          user: authenticatedUser,
-        });
-
-        return await notificationService.setForEvent(
-          authenticatedUser.id,
-          params.eventId,
-          body.notifications,
-        );
-      } catch (error) {
-        if (
-          error instanceof ValidationError ||
-          error instanceof UnauthorizedError ||
-          error instanceof NotFoundError
-        ) {
-          throw error;
-        }
-        logger.error("Failed to update event notifications:", error);
-        throw new Error("Failed to update event notifications");
-      }
-    },
-    {
-      params: strictObject({
-        eventId: t.String({
-          description: "Event ID to update notifications for",
-          minLength: 1,
-        }),
-      }),
-      body: strictObject({
-        notifications: t.Array(
-          strictObject({
-            notificationType: t.Union(
-              [t.Literal("browser"), t.Literal("email")],
-              { description: "Type of notification" },
-            ),
-            minutesBefore: t.Integer({
-              description: "Minutes before event to send notification",
-              minimum: 0,
-              maximum: 43200,
-            }),
-            isEnabled: t.Boolean({
-              description: "Whether this notification is enabled",
+            return await notificationService.getForEvent(
+              user.id,
+              params.eventId,
+            );
+          } catch (error) {
+            if (
+              error instanceof ValidationError ||
+              error instanceof UnauthorizedError ||
+              error instanceof NotFoundError
+            ) {
+              throw error;
+            }
+            logger.error("Failed to get event notifications:", error);
+            throw new Error("Failed to retrieve event notifications");
+          }
+        },
+        {
+          params: strictObject({
+            eventId: t.String({
+              description: "Event ID to get notifications for",
+              minLength: 1,
             }),
           }),
-          {
-            description: "Array of notification settings",
-            maxItems: 20,
+          detail: {
+            summary: "Get notifications for an event",
+            description:
+              "Retrieves all notification settings for a specific event with enhanced validation and rate limiting",
           },
-        ),
-      }),
-      detail: {
-        tags: ["Notifications"],
-        summary: "Update notifications for an event",
-        description:
-          "Updates all notification settings for a specific event using the enhanced notification service with comprehensive validation",
-        security: [{ bearerAuth: [] }],
-      },
-    },
-  )
+        },
+      )
 
-  .delete(
-    "/event/:eventId",
-    async ({ params, user, request, set }: { params: { eventId: string }; user?: unknown; request: Request; set: { status?: number | string; headers: Record<string, string | number | undefined> } }) => {
-      const authenticatedUser = await ensureAuthenticatedUser(user, request);
-
-      try {
-        rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+      .put(
+        "/event/:eventId",
+        async ({
+          params,
+          body,
           request,
           set,
-          user: authenticatedUser,
-        });
+          authenticatedUser,
+        }: {
+          params: { eventId: string };
+          body: {
+            notifications: Array<{
+              notificationType: "browser" | "email";
+              minutesBefore: number;
+              isEnabled: boolean;
+            }>;
+          };
+          request: Request;
+          set: {
+            status?: number | string;
+            headers: Record<string, string | number | undefined>;
+          };
+          authenticatedUser?: AuthenticatedUser;
+        }) => {
+          try {
+            const user = await resolveRouteUser(authenticatedUser, request);
+            rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+              request,
+              set,
+              user,
+            });
 
-        return await notificationService.deleteForEvent(
-          authenticatedUser.id,
-          params.eventId,
-        );
-      } catch (error) {
-        if (
-          error instanceof ValidationError ||
-          error instanceof UnauthorizedError ||
-          error instanceof NotFoundError
-        ) {
-          throw error;
-        }
-        logger.error("Failed to delete event notifications:", error);
-        throw new Error("Failed to delete event notifications");
-      }
-    },
-    {
-      params: strictObject({
-        eventId: t.String({
-          description: "Event ID to delete notifications for",
-          minLength: 1,
-        }),
-      }),
-      detail: {
-        tags: ["Notifications"],
-        summary: "Delete all notifications for an event",
-        description:
-          "Deletes all notification settings for a specific event using the enhanced notification service",
-        security: [{ bearerAuth: [] }],
-      },
-    },
+            return await notificationService.setForEvent(
+              user.id,
+              params.eventId,
+              body.notifications,
+            );
+          } catch (error) {
+            if (
+              error instanceof ValidationError ||
+              error instanceof UnauthorizedError ||
+              error instanceof NotFoundError
+            ) {
+              throw error;
+            }
+            logger.error("Failed to update event notifications:", error);
+            throw new Error("Failed to update event notifications");
+          }
+        },
+        {
+          params: strictObject({
+            eventId: t.String({
+              description: "Event ID to update notifications for",
+              minLength: 1,
+            }),
+          }),
+          body: strictObject({
+            notifications: t.Array(
+              strictObject({
+                notificationType: t.Union(
+                  [t.Literal("browser"), t.Literal("email")],
+                  { description: "Type of notification" },
+                ),
+                minutesBefore: t.Integer({
+                  description: "Minutes before event to send notification",
+                  minimum: 0,
+                  maximum: 43200,
+                }),
+                isEnabled: t.Boolean({
+                  description: "Whether this notification is enabled",
+                }),
+              }),
+              {
+                description: "Array of notification settings",
+                maxItems: 20,
+              },
+            ),
+          }),
+          detail: {
+            summary: "Update notifications for an event",
+            description:
+              "Updates all notification settings for a specific event using the enhanced notification service with comprehensive validation",
+          },
+        },
+      )
+
+      .delete(
+        "/event/:eventId",
+        async ({
+          params,
+          request,
+          set,
+          authenticatedUser,
+        }: {
+          params: { eventId: string };
+          request: Request;
+          set: {
+            status?: number | string;
+            headers: Record<string, string | number | undefined>;
+          };
+          authenticatedUser?: AuthenticatedUser;
+        }) => {
+          try {
+            const user = await resolveRouteUser(authenticatedUser, request);
+            rateLimit(RATE_LIMITS.UPDATE_NOTIFICATIONS)({
+              request,
+              set,
+              user,
+            });
+
+            return await notificationService.deleteForEvent(
+              user.id,
+              params.eventId,
+            );
+          } catch (error) {
+            if (
+              error instanceof ValidationError ||
+              error instanceof UnauthorizedError ||
+              error instanceof NotFoundError
+            ) {
+              throw error;
+            }
+            logger.error("Failed to delete event notifications:", error);
+            throw new Error("Failed to delete event notifications");
+          }
+        },
+        {
+          params: strictObject({
+            eventId: t.String({
+              description: "Event ID to delete notifications for",
+              minLength: 1,
+            }),
+          }),
+          detail: {
+            summary: "Delete all notifications for an event",
+            description:
+              "Deletes all notification settings for a specific event using the enhanced notification service",
+          },
+        },
+      ),
   );

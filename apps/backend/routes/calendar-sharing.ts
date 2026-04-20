@@ -1,6 +1,8 @@
 import { Elysia, t } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
-import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import type { AuthenticatedUser } from "../lib/auth-utils";
+import { authenticatedRouteDetail } from "../lib/openapi";
+import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { CalendarSharingService } from "../services/calendar-sharing.service";
@@ -57,95 +59,92 @@ export const calendarSharingRoutes = new Elysia({
     },
   )
   .use(requireAuth)
-  .get(
-    "/:id/share-link",
-    async ({
-      params,
-      user,
-      request,
-    }: {
-      params: { id: string };
-      user?: unknown;
-      request: Request;
-    }) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request);
-      const baseUrl = resolveBackendBaseUrl(request);
-      return calendarSharingService.getShareLink({
-        userId,
-        calendarId: params.id,
-        baseUrl,
-      });
-    },
-    {
-      params: strictObject({ id: t.String() }),
-      detail: {
-        tags: ["ICS Sharing"],
-        summary: "Get calendar ICS share-link status",
-        security: [{ bearerAuth: [] }],
-      },
-    },
-  )
-  .post(
-    "/:id/share-link",
-    async ({
-      params,
-      body,
-      user,
-      request,
-    }: {
-      params: { id: string };
-      body?: { regenerate?: boolean };
-      user?: unknown;
-      request: Request;
-    }) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request);
-      const baseUrl = resolveBackendBaseUrl(request);
-      return calendarSharingService.createShareLink({
-        userId,
-        calendarId: params.id,
-        baseUrl,
-        regenerate: body?.regenerate,
-      });
-    },
-    {
-      params: strictObject({ id: t.String() }),
-      body: t.Optional(
-        strictObject({
-          regenerate: t.Optional(t.Boolean()),
-        }),
+  .guard(authenticatedRouteDetail("ICS Sharing"), (app) =>
+    app
+      .get(
+        "/:id/share-link",
+        async ({
+          params,
+          request,
+          authenticatedUser,
+        }: {
+          params: { id: string };
+          request: Request;
+          authenticatedUser?: AuthenticatedUser;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          const baseUrl = resolveBackendBaseUrl(request);
+          return calendarSharingService.getShareLink({
+            userId: user.id,
+            calendarId: params.id,
+            baseUrl,
+          });
+        },
+        {
+          params: strictObject({ id: t.String() }),
+          detail: {
+            summary: "Get calendar ICS share-link status",
+          },
+        },
+      )
+      .post(
+        "/:id/share-link",
+        async ({
+          params,
+          body,
+          request,
+          authenticatedUser,
+        }: {
+          params: { id: string };
+          body?: { regenerate?: boolean };
+          request: Request;
+          authenticatedUser?: AuthenticatedUser;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          const baseUrl = resolveBackendBaseUrl(request);
+          return calendarSharingService.createShareLink({
+            userId: user.id,
+            calendarId: params.id,
+            baseUrl,
+            regenerate: body?.regenerate,
+          });
+        },
+        {
+          params: strictObject({ id: t.String() }),
+          body: t.Optional(
+            strictObject({
+              regenerate: t.Optional(t.Boolean()),
+            }),
+          ),
+          detail: {
+            summary: "Enable or regenerate calendar ICS share-link",
+          },
+        },
+      )
+      .delete(
+        "/:id/share-link",
+        async ({
+          params,
+          request,
+          authenticatedUser,
+        }: {
+          params: { id: string };
+          request: Request;
+          authenticatedUser?: AuthenticatedUser;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          const baseUrl = resolveBackendBaseUrl(request);
+          return calendarSharingService.disableShareLink({
+            userId: user.id,
+            calendarId: params.id,
+            baseUrl,
+          });
+        },
+        {
+          params: strictObject({ id: t.String() }),
+          detail: {
+            summary: "Disable calendar ICS share-link",
+          },
+        },
       ),
-      detail: {
-        tags: ["ICS Sharing"],
-        summary: "Enable or regenerate calendar ICS share-link",
-        security: [{ bearerAuth: [] }],
-      },
-    },
-  )
-  .delete(
-    "/:id/share-link",
-    async ({
-      params,
-      user,
-      request,
-    }: {
-      params: { id: string };
-      user?: unknown;
-      request: Request;
-    }) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request);
-      const baseUrl = resolveBackendBaseUrl(request);
-      return calendarSharingService.disableShareLink({
-        userId,
-        calendarId: params.id,
-        baseUrl,
-      });
-    },
-    {
-      params: strictObject({ id: t.String() }),
-      detail: {
-        tags: ["ICS Sharing"],
-        summary: "Disable calendar ICS share-link",
-        security: [{ bearerAuth: [] }],
-      },
-    },
   );
