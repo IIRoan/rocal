@@ -20,15 +20,19 @@ import {
   isToday,
 } from "date-fns";
 import {
-  ChevronDownIcon,
+  AlignJustify,
   ChevronRightIcon,
+  Columns3,
   Eye,
+  LayoutGrid,
   Loader2,
   Pencil,
   Plus,
+  Square,
   Trash2,
 } from "lucide-react";
 import { ListIcon } from "@phosphor-icons/react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { toast } from "sonner";
 
 const log = createLogger("event-calendar");
@@ -72,9 +76,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { Separator } from "../ui/separator";
 import { useDropdownShortcuts } from "../../hooks";
 
 export interface EventCalendarProps {
@@ -920,11 +924,11 @@ export function EventCalendar({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
+              <div className="inline-flex items-center rounded-md border border-border/60 bg-background shadow-xs overflow-hidden">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-muted-foreground/70 hover:text-foreground hover:bg-accent/50 -scale-x-[1]"
+                  className="h-7 w-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 -scale-x-[1]"
                   onClick={handlePrevious}
                   onMouseEnter={() => prefetchAdjacentRange("prev")}
                   aria-label="Previous"
@@ -932,10 +936,21 @@ export function EventCalendar({
                 >
                   <ChevronRightIcon size={16} aria-hidden="true" />
                 </Button>
+                <Separator orientation="vertical" className="h-4" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleToday}
+                  disabled={loading}
+                  className="h-7 px-3 rounded-none text-xs font-medium hover:bg-accent/60"
+                >
+                  Today
+                </Button>
+                <Separator orientation="vertical" className="h-4" />
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-muted-foreground/70 hover:text-foreground hover:bg-accent/50"
+                  className="h-7 w-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60"
                   onClick={handleNext}
                   onMouseEnter={() => prefetchAdjacentRange("next")}
                   aria-label="Next"
@@ -944,45 +959,48 @@ export function EventCalendar({
                   <ChevronRightIcon size={16} aria-hidden="true" />
                 </Button>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  className="h-8 px-3 rounded-lg border-border/50 text-[13px] font-medium text-foreground hover:bg-accent"
-                  onClick={handleToday}
-                  disabled={loading}
-                >
-                  Today
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="gap-1.5 h-8 rounded-lg border-border/50 text-[13px] font-medium text-foreground hover:bg-accent"
-                      disabled={loading}
-                    >
-                      <span className="capitalize">{view}</span>
-                      <ChevronDownIcon
-                        className="-me-1 opacity-60"
-                        size={16}
-                        aria-hidden="true"
-                      />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-32">
-                    <DropdownMenuItem onClick={() => setView("month")}>
-                      Month <DropdownMenuShortcut>⌘+M</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("week")}>
-                      Week <DropdownMenuShortcut>⌘+W</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("day")}>
-                      Day <DropdownMenuShortcut>⌘+D</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView("agenda")}>
-                      Agenda <DropdownMenuShortcut>⌘+A</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <div
+                role="radiogroup"
+                aria-label="Calendar view"
+                className="inline-flex items-center rounded-md border border-border/60 bg-background shadow-xs p-0.5 gap-0.5"
+              >
+                {(
+                  [
+                    { value: "month", label: "Month", icon: LayoutGrid, shortcut: "M" },
+                    { value: "week", label: "Week", icon: Columns3, shortcut: "W" },
+                    { value: "day", label: "Day", icon: Square, shortcut: "D" },
+                    { value: "agenda", label: "Agenda", icon: AlignJustify, shortcut: "A" },
+                  ] as const
+                ).map(({ value, label, icon: Icon, shortcut }) => {
+                  const active = view === value;
+                  return (
+                    <Tooltip key={value}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          aria-label={label}
+                          disabled={loading}
+                          onClick={() => setView(value as CalendarView)}
+                          className={cn(
+                            "inline-flex items-center justify-center h-6 w-7 rounded-sm transition-colors",
+                            "text-muted-foreground/70 hover:text-foreground hover:bg-accent/60",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "disabled:opacity-50 disabled:pointer-events-none",
+                            active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm",
+                          )}
+                        >
+                          <Icon size={14} aria-hidden="true" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        {label}
+                        <span className="ml-1.5 opacity-60">{shortcut}</span>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
               </div>
             </div>
           </div>
