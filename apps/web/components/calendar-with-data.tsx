@@ -26,7 +26,10 @@ import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { buildViewPrefetchRanges } from "@/hooks/use-calendar-events-loader";
 import { useSettings } from "@/hooks/use-settings";
 import { useCommandPalette } from "./command-palette-context";
-import { PageLoadingOverlay } from "@workspace/ui/components/ui";
+import {
+  FORCE_LOADING_DESIGN_PREVIEW,
+  PageLoadingOverlay,
+} from "@workspace/ui/components/ui";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 const log = createLogger("calendar-with-data");
@@ -279,7 +282,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         ? "DATA_SYNC"
         : undefined;
 
-  if (isAllInitialLoading) {
+  if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
       <>
         <CalendarSkeleton view={initialView} className={className} />
