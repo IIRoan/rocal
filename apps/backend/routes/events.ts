@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Elysia, t } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import { ensureAuthenticatedUser } from "../lib/auth-utils";
@@ -15,8 +14,22 @@ export const eventsRoutes = new Elysia({
   .use(requireAuth)
   .get(
     "/search",
-    async ({ query, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      query,
+      user,
+      request,
+    }: {
+      query: {
+        q: string;
+        limit?: number;
+        offset?: number;
+        startDate?: string;
+        endDate?: string;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.search({
         userId,
         query: query.q,
@@ -67,8 +80,16 @@ export const eventsRoutes = new Elysia({
   )
   .get(
     "/",
-    async ({ query: { start, end }, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      query: { start, end },
+      user,
+      request,
+    }: {
+      query: { start: string; end: string };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.list({ userId, start, end });
     },
     {
@@ -94,8 +115,29 @@ export const eventsRoutes = new Elysia({
 
   .post(
     "/",
-    async ({ body, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      body,
+      user,
+      request,
+    }: {
+      body: {
+        title: string;
+        description?: string;
+        start: string;
+        end: string;
+        allDay?: boolean;
+        location?: string;
+        color?: string;
+        calendarId: string;
+        categoryId?: string;
+        timezone?: string;
+        reminder?: number | null;
+        recurrence?: string;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.create({ userId, ...body });
     },
     {
@@ -176,8 +218,18 @@ export const eventsRoutes = new Elysia({
 
   .get(
     "/:id/ics",
-    async ({ params, user, request, set }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      user,
+      request,
+      set,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+      set: { headers: Record<string, string | number | undefined> };
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       const result = await eventService.exportIcs(userId, params.id);
 
       set.headers["Content-Type"] = "text/calendar; charset=utf-8";
@@ -201,8 +253,16 @@ export const eventsRoutes = new Elysia({
 
   .get(
     "/:id",
-    async ({ params, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.getById(userId, params.id);
     },
     {
@@ -221,8 +281,31 @@ export const eventsRoutes = new Elysia({
 
   .put(
     "/:id",
-    async ({ params, body, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      body: {
+        title?: string;
+        description?: string;
+        start?: string;
+        end?: string;
+        timezone?: string;
+        allDay?: boolean;
+        location?: string;
+        color?: string;
+        calendarId?: string;
+        categoryId?: string;
+        reminder?: number | null;
+        recurrence?: string | null;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.update({ userId, eventId: params.id, ...body });
     },
     {
@@ -306,8 +389,16 @@ export const eventsRoutes = new Elysia({
 
   .delete(
     "/:id",
-    async ({ params, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      params,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.delete(userId, params.id);
     },
     {
@@ -326,8 +417,20 @@ export const eventsRoutes = new Elysia({
 
   .post(
     "/bulk",
-    async ({ body, user, request }: any) => {
-      const { id: userId } = await ensureAuthenticatedUser(user, request as Request);
+    async ({
+      body,
+      user,
+      request,
+    }: {
+      body: {
+        action: "move" | "delete" | "duplicate";
+        eventIds: string[];
+        targetCalendarId?: string;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
+      const { id: userId } = await ensureAuthenticatedUser(user, request);
       return eventService.bulkAction({
         userId,
         action: body.action,

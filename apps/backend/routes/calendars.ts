@@ -85,7 +85,15 @@ export const calendarsRoutes = new Elysia({
 
   .post(
     "/",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: {
+      body: { name: string; color: string; isDefault?: boolean };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return calendarService.create({
         userId,
@@ -107,7 +115,22 @@ export const calendarsRoutes = new Elysia({
 
   .put(
     "/:id",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      body: {
+        name?: string;
+        color?: string;
+        isVisible?: boolean;
+        isDefault?: boolean;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return calendarService.update({
         userId,
@@ -132,7 +155,20 @@ export const calendarsRoutes = new Elysia({
 
   .delete(
     "/:id",
-    async ({ params, query, user, request }: any) => {
+    async ({
+      params,
+      query,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      query: {
+        action?: "delete_events" | "move_events";
+        targetCalendarId?: string;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return calendarService.delete({
         userId,
@@ -142,7 +178,9 @@ export const calendarsRoutes = new Elysia({
       });
     },
     {
-      params: strictObject({ id: t.String({ description: "Calendar ID to delete" }) }),
+      params: strictObject({
+        id: t.String({ description: "Calendar ID to delete" }),
+      }),
       query: deleteCalendarQuerySchema,
       detail: {
         tags: ["Calendars"],

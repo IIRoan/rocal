@@ -18,7 +18,7 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
   .use(requireAuth)
   .get(
     "/subscriptions",
-    async ({ user, request }: any) => {
+    async ({ user, request }: { user?: unknown; request: Request }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return subscriptionService.list(userId);
     },
@@ -32,7 +32,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .post(
     "/subscriptions",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: {
+      body: { name: string; url: string; color?: string };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return subscriptionService.create({
         userId,
@@ -58,7 +66,22 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .put(
     "/subscriptions/:id",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      body: {
+        name?: string;
+        color?: string;
+        isActive?: boolean;
+        syncIntervalMinutes?: number;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return subscriptionService.update({
         userId,
@@ -88,7 +111,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .delete(
     "/subscriptions/:id",
-    async ({ params, user, request }: any) => {
+    async ({
+      params,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return subscriptionService.delete({
         userId,
@@ -111,7 +142,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .post(
     "/subscriptions/:id/sync",
-    async ({ params, user, request }: any) => {
+    async ({
+      params,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return subscriptionService.sync({
         userId,
@@ -129,7 +168,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
 
   .post(
     "/subscriptions/import-ics",
-    async ({ body, user, request }: any) => {
+    async ({
+      body,
+      user,
+      request,
+    }: {
+      body: { calendarId: string; icsContent: string; fileName?: string };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return subscriptionService.importIcs({
         userId,
