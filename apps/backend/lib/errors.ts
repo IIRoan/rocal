@@ -38,7 +38,7 @@ export class ForbiddenError extends Error {
 export class DatabaseError extends Error {
   constructor(
     message: string,
-    public originalError?: any,
+    public originalError?: Error,
   ) {
     super(message);
     this.name = "DatabaseError";
@@ -48,7 +48,7 @@ export class DatabaseError extends Error {
 export class NotificationError extends Error {
   constructor(
     message: string,
-    public originalError?: any,
+    public originalError?: Error,
   ) {
     super(message);
     this.name = "NotificationError";
@@ -60,8 +60,36 @@ export interface ApiErrorResponse {
   error: string;
   message: string;
   statusCode: number;
-  details?: any;
+  details?: Record<string, unknown>;
   timestamp: string;
+}
+
+function getValidationDetails(error: unknown) {
+  if (!error || typeof error !== "object" || !("all" in error)) {
+    return undefined;
+  }
+
+  const rawIssues = (error as { all?: unknown }).all;
+  if (!Array.isArray(rawIssues) || rawIssues.length === 0) {
+    return undefined;
+  }
+
+  const issues = rawIssues
+    .filter((issue): issue is Record<string, unknown> => !!issue && typeof issue === "object")
+    .map((issue) => ({
+      path: typeof issue.path === "string" ? issue.path : undefined,
+      message:
+        typeof issue.message === "string"
+          ? issue.message
+          : typeof issue.summary === "string"
+            ? issue.summary
+            : "Invalid value",
+      expected:
+        typeof issue.expected === "string" ? issue.expected : undefined,
+      found: "found" in issue ? issue.found : undefined,
+    }));
+
+  return issues.length > 0 ? { issues } : undefined;
 }
 
 // Error handling middleware
@@ -84,6 +112,7 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
           error: "Validation Error",
           message: error.message,
           statusCode: 400,
+          details: getValidationDetails(error),
           timestamp,
         } as ApiErrorResponse;
 

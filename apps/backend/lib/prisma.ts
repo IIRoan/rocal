@@ -1,7 +1,21 @@
-import { PrismaClient } from "../generated/prisma";
+import { PrismaClient, type Prisma } from "../generated/prisma";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:prisma");
+
+type PrismaQueryEvent = {
+  query: string;
+  duration: number;
+};
+
+type PrismaLogEvent = {
+  message: string;
+};
+
+type PrismaEventClient = PrismaClient & {
+  $on(event: "query", callback: (event: PrismaQueryEvent) => void): void;
+  $on(event: "error" | "warn" | "info", callback: (event: PrismaLogEvent) => void): void;
+};
 
 // Global Prisma client instance to prevent multiple connections
 declare global {
@@ -22,16 +36,17 @@ export const prisma =
 
 // Setup Prisma logging events
 if (process.env.NODE_ENV === "development") {
-  (prisma as any).$on("query", (e: any) => {
+  const prismaWithEvents = prisma as unknown as PrismaEventClient;
+  prismaWithEvents.$on("query", (e) => {
     logger.debug(`prisma:query ${e.query} [${e.duration}ms]`);
   });
-  (prisma as any).$on("error", (e: any) => {
+  prismaWithEvents.$on("error", (e) => {
     logger.error(e.message);
   });
-  (prisma as any).$on("warn", (e: any) => {
+  prismaWithEvents.$on("warn", (e) => {
     logger.warn(e.message);
   });
-  (prisma as any).$on("info", (e: any) => {
+  prismaWithEvents.$on("info", (e) => {
     logger.info(e.message);
   });
 }
@@ -76,7 +91,9 @@ export const db = {
   },
 
   // Transaction wrapper
-  async transaction<T>(fn: (tx: any) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
     return prisma.$transaction(fn);
   },
 
