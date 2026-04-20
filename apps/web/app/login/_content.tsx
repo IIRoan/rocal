@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { signIn, signUp, authClient, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
-import { getAppBaseUrl } from "@/lib/api-url";
+import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Github, Key, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -35,13 +35,24 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { theme: currentTheme } = useTheme();
   const nextPath = searchParams.get("next");
+  const callbackUrl =
+    searchParams.get("callbackURL") || searchParams.get("callbackUrl");
 
-  const getRedirectTarget = useCallback(() => {
-    const fallback = "/dashboard";
-    if (!nextPath) return fallback;
-    if (!nextPath.startsWith("/")) return fallback;
-    return nextPath;
-  }, [nextPath]);
+  const getRedirectTarget = useCallback(
+    () => resolveAuthRedirectTarget(nextPath, callbackUrl),
+    [nextPath, callbackUrl],
+  );
+
+  const redirectAfterAuth = useCallback(() => {
+    const target = getRedirectTarget();
+
+    if (target.external) {
+      window.location.replace(target.href);
+      return;
+    }
+
+    router.replace(target.href);
+  }, [getRedirectTarget, router]);
 
   const syncThemeAfterAuth = useCallback(async () => {
     if (
@@ -60,9 +71,9 @@ export function LoginForm() {
 
   const handleSessionRedirect = useCallback(() => {
     if (session?.user) {
-      router.replace(getRedirectTarget());
+      redirectAfterAuth();
     }
-  }, [session, router, getRedirectTarget]);
+  }, [session, redirectAfterAuth]);
 
   useEffect(() => {
     if (!isPending) {
@@ -113,7 +124,7 @@ export function LoginForm() {
 
       await syncThemeAfterAuth();
       setTimeout(() => {
-        router.replace(getRedirectTarget());
+        redirectAfterAuth();
       }, 100);
     } catch (err: any) {
       log.error("Email auth failed:", err);
@@ -134,7 +145,7 @@ export function LoginForm() {
       if (result?.data?.user || result?.user) {
         await syncThemeAfterAuth();
         setTimeout(() => {
-          router.replace(getRedirectTarget());
+          redirectAfterAuth();
         }, 100);
       } else {
         setTimeout(() => {
@@ -158,10 +169,10 @@ export function LoginForm() {
         localStorage.setItem("pending-theme-sync", currentTheme);
       }
       const frontendUrl = getAppBaseUrl();
-      const callbackTarget = new URL(
-        getRedirectTarget(),
-        frontendUrl,
-      ).toString();
+      const redirectTarget = getRedirectTarget();
+      const callbackTarget = redirectTarget.external
+        ? redirectTarget.href
+        : new URL(redirectTarget.href, frontendUrl).toString();
       await signIn.social({
         provider: "github",
         callbackURL: callbackTarget,
