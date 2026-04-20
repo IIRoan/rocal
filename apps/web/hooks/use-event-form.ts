@@ -183,7 +183,9 @@ export function useEventForm({
       setEventAllDay(event.allDay || false);
       setEventLocation(event.location || "");
       setEventCalendarId(
-        event.calendarId || calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
+        event.calendarId ||
+          calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
+          "",
       );
       setEventReminder(event.reminder ?? null);
 
@@ -263,7 +265,9 @@ export function useEventForm({
     setEventEndTime("10:00");
     setEventAllDay(false);
     setEventLocation("");
-    setEventCalendarId(calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "");
+    setEventCalendarId(
+      calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
+    );
     setEventReminder(null);
     setEventNotifications([
       {
@@ -614,6 +618,7 @@ export function useEventForm({
       resetForm,
       validateRecurrenceMutation,
       updateNotificationsMutation,
+      localSettings.timezone,
     ],
   );
 
@@ -831,4 +836,3 @@ export function useEventForm({
     handleRecurringDeleteAll,
   };
 }
-

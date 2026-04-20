@@ -1,4 +1,4 @@
-import type { PrismaClient, Prisma } from "../generated/prisma/index.js";
+import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
   ISubscriptionService,
   SubscriptionCreateInput,
@@ -9,8 +9,10 @@ import type {
   SyncableSubscription,
   CalendarSubscriptionSyncResponse,
 } from "../contracts/subscription.contract";
-import type { ImportIcsResponse } from "@workspace/calendar-ics";
-import { findNationalHolidayCalendarByUrl } from "@workspace/calendar-ics";
+import {
+  type ImportIcsResponse,
+  findNationalHolidayCalendarByUrl,
+} from "@workspace/calendar-ics";
 import {
   parseICSFile,
   convertParsedEventToCalendarEvent,
