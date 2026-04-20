@@ -123,9 +123,6 @@ export function CommandPalette({
   const [navHistory, setNavHistory] = useState<PaletteView[]>(() =>
     buildInitialHistory(initialView as PaletteView),
   );
-  const [transitionDirection, setTransitionDirection] = useState<
-    "forward" | "back"
-  >("forward");
   const currentView = navHistory[navHistory.length - 1] ?? "main";
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialSearchQuery);
@@ -178,14 +175,12 @@ export function CommandPalette({
   }, [open, currentView, initialSearchQuery]);
 
   const goForward = useCallback((next: PaletteView) => {
-    setTransitionDirection("forward");
     setSearchQuery("");
     setPasskeyAddMode(false);
     setNavHistory((h) => [...h, next]);
   }, []);
 
   const goBack = () => {
-    setTransitionDirection("back");
     setSearchQuery("");
     setPasskeyAddMode(false);
     setNavHistory((h) => (h.length > 1 ? h.slice(0, -1) : ["main"]));
@@ -936,10 +931,7 @@ export function CommandPalette({
         <VisuallyHidden>
           <DialogTitle>{getDialogTitle()}</DialogTitle>
         </VisuallyHidden>
-        <TransitionContainer
-          direction={transitionDirection}
-          viewKey={currentView}
-        >
+        <TransitionContainer viewKey={currentView}>
           {renderContent()}
         </TransitionContainer>
       </DialogContent>
