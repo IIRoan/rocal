@@ -16,10 +16,7 @@ import {
   convertParsedEventToCalendarEvent,
   isEventModified,
 } from "../lib/ics-parser";
-import {
-  ALLOWED_CALENDAR_COLORS,
-  isValidCalendarColor,
-} from "../lib/colors";
+import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:subscription-service");
@@ -59,9 +56,10 @@ export class SubscriptionService implements ISubscriptionService {
       throw new Error("Calendar name is required");
     }
 
-    const existingSubscription = await this.prisma.calendarSubscription.findFirst({
-      where: { userId, url },
-    });
+    const existingSubscription =
+      await this.prisma.calendarSubscription.findFirst({
+        where: { userId, url },
+      });
 
     if (existingSubscription) {
       throw new Error("You are already subscribed to this calendar URL");
@@ -70,6 +68,26 @@ export class SubscriptionService implements ISubscriptionService {
     // Test the URL
     let testParseResult;
     try {
+      const parsedUrl = new URL(url);
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        throw new Error("Only HTTP and HTTPS URLs are supported");
+      }
+      const hostname = parsedUrl.hostname.toLowerCase();
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1" ||
+        hostname === "0.0.0.0" ||
+        hostname.endsWith(".local") ||
+        hostname.startsWith("10.") ||
+        hostname.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+      ) {
+        throw new Error(
+          "URLs pointing to internal or private networks are not allowed",
+        );
+      }
+
       const response = await fetch(url, {
         headers: {
           "User-Agent":
@@ -86,11 +104,17 @@ export class SubscriptionService implements ISubscriptionService {
             `The calendar server is currently unavailable (${response.status}). Please try again later or contact the calendar provider.`,
           );
         } else if (response.status === 404) {
-          throw new Error(`Calendar not found at the provided URL. Please check the URL and try again.`);
+          throw new Error(
+            `Calendar not found at the provided URL. Please check the URL and try again.`,
+          );
         } else if (response.status === 403 || response.status === 401) {
-          throw new Error(`Access denied to the calendar. The calendar may be private or require authentication.`);
+          throw new Error(
+            `Access denied to the calendar. The calendar may be private or require authentication.`,
+          );
         } else {
-          throw new Error(`Failed to fetch calendar: ${response.status} ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch calendar: ${response.status} ${response.statusText}`,
+          );
         }
       }
 
@@ -107,10 +131,18 @@ export class SubscriptionService implements ISubscriptionService {
       );
     }
 
-    const matchingNationalHolidayCalendar = findNationalHolidayCalendarByUrl(url);
+    const matchingNationalHolidayCalendar =
+      findNationalHolidayCalendarByUrl(url);
 
     const calendarColor =
       color || matchingNationalHolidayCalendar?.defaultColor || "#6366f1";
+
+    if (color && !isValidCalendarColor(color)) {
+      throw new Error(
+        "Invalid calendar color. Please use a valid hex color or one of the allowed named colors.",
+      );
+    }
+
     const calendar = await this.prisma.calendar.create({
       data: {
         name: name.trim(),
@@ -137,14 +169,25 @@ export class SubscriptionService implements ISubscriptionService {
 
     // Sync immediately on creation (non-blocking)
     this.syncCalendarSubscription(subscription).catch((err) => {
-      logger.error("Initial sync failed for subscription:", subscription.id, err);
+      logger.error(
+        "Initial sync failed for subscription:",
+        subscription.id,
+        err,
+      );
     });
 
     return subscription;
   }
 
   async update(input: SubscriptionUpdateInput) {
-    const { userId, subscriptionId, name, color, isActive, syncIntervalMinutes } = input;
+    const {
+      userId,
+      subscriptionId,
+      name,
+      color,
+      isActive,
+      syncIntervalMinutes,
+    } = input;
 
     const subscription = await this.prisma.calendarSubscription.findFirst({
       where: { id: subscriptionId, userId },
@@ -159,7 +202,8 @@ export class SubscriptionService implements ISubscriptionService {
 
     if (trimmedName !== undefined) {
       if (!trimmedName) throw new Error("Calendar name is required");
-      if (trimmedName.length > 100) throw new Error("Calendar name cannot exceed 100 characters");
+      if (trimmedName.length > 100)
+        throw new Error("Calendar name cannot exceed 100 characters");
     }
 
     if (color !== undefined && !isValidCalendarColor(color)) {
@@ -217,7 +261,9 @@ export class SubscriptionService implements ISubscriptionService {
     return { success: true };
   }
 
-  async sync(input: SubscriptionSyncInput): Promise<CalendarSubscriptionSyncResponse> {
+  async sync(
+    input: SubscriptionSyncInput,
+  ): Promise<CalendarSubscriptionSyncResponse> {
     const { userId, subscriptionId } = input;
 
     const subscription = await this.prisma.calendarSubscription.findFirst({
@@ -272,7 +318,9 @@ export class SubscriptionService implements ISubscriptionService {
           calendarId,
         );
 
-        const createdEvent = await this.prisma.calendarEvent.create({ data: eventData });
+        const createdEvent = await this.prisma.calendarEvent.create({
+          data: eventData,
+        });
         createdEvents.push(createdEvent);
       } catch (error) {
         errors.push(
@@ -328,10 +376,17 @@ export class SubscriptionService implements ISubscriptionService {
 
         await this.prisma.calendarSubscription.update({
           where: { id: subscription.id },
-          data: { lastSyncAt: new Date(), lastSyncStatus: "success", lastErrorMessage: null },
+          data: {
+            lastSyncAt: new Date(),
+            lastSyncStatus: "success",
+            lastErrorMessage: null,
+          },
         });
 
-        return { status: "success", message: "Calendar not modified, no sync needed" };
+        return {
+          status: "success",
+          message: "Calendar not modified, no sync needed",
+        };
       }
 
       if (!response.ok) {
@@ -354,7 +409,9 @@ export class SubscriptionService implements ISubscriptionService {
         currentEvents.map((event) => [event.externalId!, event]),
       );
 
-      const newEventUids = new Set(parseResult.events.map((event) => event.uid));
+      const newEventUids = new Set(
+        parseResult.events.map((event) => event.uid),
+      );
 
       for (const parsedEvent of parseResult.events) {
         const existingEvent = currentEventsByUid.get(parsedEvent.uid);
@@ -378,7 +435,9 @@ export class SubscriptionService implements ISubscriptionService {
               end: parsedEvent.end,
               allDay: parsedEvent.allDay,
               location: parsedEvent.location,
-              recurrence: parsedEvent.recurrence ? JSON.stringify(parsedEvent.recurrence) : null,
+              recurrence: parsedEvent.recurrence
+                ? JSON.stringify(parsedEvent.recurrence)
+                : null,
               timezone: parsedEvent.timezone || "UTC",
               syncedAt: new Date(),
             },
@@ -429,7 +488,8 @@ export class SubscriptionService implements ISubscriptionService {
         errors: parseResult.errors.length > 0 ? parseResult.errors : undefined,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
 
       await this.prisma.calendarSyncLog.update({
         where: { id: syncLog.id },

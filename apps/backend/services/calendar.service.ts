@@ -7,10 +7,7 @@ import type {
   CalendarDeleteResult,
 } from "../contracts/calendar.contract";
 import { ValidationError } from "../lib/errors";
-import {
-  ALLOWED_CALENDAR_COLORS,
-  isValidCalendarColor,
-} from "../lib/colors";
+import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { ensureUserCalendars } from "../lib/user-setup";
 
 export class CalendarService implements ICalendarService {
@@ -168,7 +165,12 @@ export class CalendarService implements ICalendarService {
   }
 
   async delete(input: CalendarDeleteInput): Promise<CalendarDeleteResult> {
-    const { userId, calendarId, action = "delete_events", targetCalendarId } = input;
+    const {
+      userId,
+      calendarId,
+      action = "delete_events",
+      targetCalendarId,
+    } = input;
 
     const existingCalendar = await this.prisma.calendar.findFirst({
       where: { id: calendarId, userId },
@@ -195,11 +197,11 @@ export class CalendarService implements ICalendarService {
       );
     }
 
-    const events = await this.prisma.calendarEvent.findMany({
+    const eventCount = await this.prisma.calendarEvent.count({
       where: { calendarId },
     });
 
-    if (events.length > 0) {
+    if (eventCount > 0) {
       if (action === "move_events") {
         if (!targetCalendarId) {
           throw new ValidationError(
@@ -257,12 +259,12 @@ export class CalendarService implements ICalendarService {
       success: true,
       message:
         action === "move_events"
-          ? `Calendar deleted successfully. ${events.length} events moved to target calendar.`
-          : events.length > 0
-            ? `Calendar deleted successfully. ${events.length} events were also deleted.`
+          ? `Calendar deleted successfully. ${eventCount} events moved to target calendar.`
+          : eventCount > 0
+            ? `Calendar deleted successfully. ${eventCount} events were also deleted.`
             : "Calendar deleted successfully.",
       deletedCalendarId: calendarId,
-      eventsAffected: events.length,
+      eventsAffected: eventCount,
       action: action || "delete_events",
     };
   }
