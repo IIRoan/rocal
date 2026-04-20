@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { generateText, stepCountIs, tool } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
@@ -9,7 +8,6 @@ import type {
   AssistantChatInput,
   AssistantChatResult,
 } from "../contracts/calendar-assistant.contract";
-
 
 const DEFAULT_SEARCH_BACK_DAYS = 60;
 const DEFAULT_SEARCH_FORWARD_DAYS = 400;
@@ -23,7 +21,6 @@ const WEEKDAY_NAMES = [
   "friday",
   "saturday",
 ];
-
 
 type BackendEvent = {
   id: string;
@@ -61,7 +58,6 @@ type UpdateEventInput = {
   location?: string;
   calendarId?: string;
 };
-
 
 function startOfDay(date: Date) {
   const value = new Date(date);
@@ -118,7 +114,6 @@ function formatDate(date: Date) {
   });
 }
 
-
 function normalizeText(value: string) {
   return value
     .toLowerCase()
@@ -129,48 +124,60 @@ function normalizeText(value: string) {
 }
 
 function sanitizeQuery(query: string): string {
-  return query
-    // Remove control characters
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
-    // Remove potential prompt injection patterns (more comprehensive)
-    .replace(/ignore\s+(all\s+)?previous/gi, "")
-    .replace(/system\s+prompt/gi, "")
-    .replace(/reveal\s+system/gi, "")
-    .replace(/developer\s+instructions/gi, "")
-    .replace(/bypass|jailbreak/gi, "")
-    .replace(/you\s+are\s+now/gi, "")
-    .replace(/new\s+instructions/gi, "")
-    .replace(/act\s+as/gi, "")
-    .replace(/pretend\s+to\s+be/gi, "")
-    .replace(/roleplay/gi, "")
-    .replace(/hypothetical/gi, "")
-    .replace(/imagine/gi, "")
-    .replace(/what\s+if/gi, "")
-    .replace(/\[\s*system\s*\]/gi, "")
-    .replace(/\{\s*system\s*\}/gi, "")
-    .replace(/<\s*system\s*>/gi, "")
-    // Remove excessive whitespace
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    query
+      // Remove control characters
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
+      // Remove potential prompt injection patterns (more comprehensive)
+      .replace(/ignore\s+(all\s+)?previous/gi, "")
+      .replace(/system\s+prompt/gi, "")
+      .replace(/reveal\s+system/gi, "")
+      .replace(/developer\s+instructions/gi, "")
+      .replace(/bypass|jailbreak/gi, "")
+      .replace(/you\s+are\s+now/gi, "")
+      .replace(/new\s+instructions/gi, "")
+      .replace(/act\s+as/gi, "")
+      .replace(/pretend\s+to\s+be/gi, "")
+      .replace(/roleplay/gi, "")
+      .replace(/hypothetical/gi, "")
+      .replace(/imagine/gi, "")
+      .replace(/what\s+if/gi, "")
+      .replace(/\[\s*system\s*\]/gi, "")
+      .replace(/\{\s*system\s*\}/gi, "")
+      .replace(/<\s*system\s*>/gi, "")
+      // Remove excessive whitespace
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
-
 
 function parseIsoDateOnly(value: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
-  const parsed = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const parsed = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
   return Number.isNaN(parsed.getTime()) ? null : startOfDay(parsed);
 }
 
 function parseWeekday(value: string) {
-  const clean = normalizeText(value).replace(/\b(on|for|at|the)\b/g, " ").trim();
+  const clean = normalizeText(value)
+    .replace(/\b(on|for|at|the)\b/g, " ")
+    .trim();
   return WEEKDAY_NAMES.findIndex(
-    (day) => clean === day || clean === day.slice(0, 3) || clean.endsWith(` ${day}`),
+    (day) =>
+      clean === day || clean === day.slice(0, 3) || clean.endsWith(` ${day}`),
   );
 }
 
-function resolveWeekday(targetDay: number, now: Date, mode: "this" | "next" | "last" | "nearest") {
+function resolveWeekday(
+  targetDay: number,
+  now: Date,
+  mode: "this" | "next" | "last" | "nearest",
+) {
   const today = startOfDay(now);
   const currentDay = today.getDay();
 
@@ -194,7 +201,9 @@ function resolveWeekday(targetDay: number, now: Date, mode: "this" | "next" | "l
 }
 
 function parseNaturalDate(value: string, now: Date): Date | null {
-  const raw = normalizeText(value).replace(/\b(my|what|whats|what is|show|tell me|about)\b/g, " ").trim();
+  const raw = normalizeText(value)
+    .replace(/\b(my|what|whats|what is|show|tell me|about)\b/g, " ")
+    .trim();
   if (!raw) return null;
 
   const isoDate = parseIsoDateOnly(raw);
@@ -211,9 +220,12 @@ function parseNaturalDate(value: string, now: Date): Date | null {
 
   const weekday = parseWeekday(raw);
   if (weekday !== -1) {
-    if (raw.includes("next week")) return addDays(startOfWeek(addDays(now, 7)), (weekday + 6) % 7);
-    if (raw.includes("this week")) return addDays(startOfWeek(now), (weekday + 6) % 7);
-    if (raw.includes("last week")) return addDays(startOfWeek(addDays(now, -7)), (weekday + 6) % 7);
+    if (raw.includes("next week"))
+      return addDays(startOfWeek(addDays(now, 7)), (weekday + 6) % 7);
+    if (raw.includes("this week"))
+      return addDays(startOfWeek(now), (weekday + 6) % 7);
+    if (raw.includes("last week"))
+      return addDays(startOfWeek(addDays(now, -7)), (weekday + 6) % 7);
     if (raw.startsWith("next ")) return resolveWeekday(weekday, now, "next");
     if (raw.startsWith("this ")) return resolveWeekday(weekday, now, "this");
     if (raw.startsWith("last ")) return resolveWeekday(weekday, now, "last");
@@ -254,7 +266,9 @@ function parseDateTime(input: string, now: Date) {
     return date;
   }
 
-  const combined = value.match(/^(.*?)(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)$/i);
+  const combined = value.match(
+    /^(.*?)(?:\s+at)?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)$/i,
+  );
   if (combined) {
     const datePart = parseNaturalDate(combined[1]!, now);
     const timePart = parseTimeParts(combined[2]!);
@@ -296,38 +310,74 @@ function resolveDateRange(params: {
 
   if (!query) {
     const today = startOfDay(now);
-    return { start: today, end: endOfDay(today), label: formatDate(today) } satisfies DateRange;
+    return {
+      start: today,
+      end: endOfDay(today),
+      label: formatDate(today),
+    } satisfies DateRange;
   }
 
   if (query.includes("next weekend")) {
     const start = addDays(startOfWeek(addDays(now, 7)), 5);
-    return { start, end: endOfDay(addDays(start, 1)), label: "next weekend" } satisfies DateRange;
+    return {
+      start,
+      end: endOfDay(addDays(start, 1)),
+      label: "next weekend",
+    } satisfies DateRange;
   }
   if (query.includes("this weekend")) {
     const start = addDays(startOfWeek(now), 5);
-    return { start, end: endOfDay(addDays(start, 1)), label: "this weekend" } satisfies DateRange;
+    return {
+      start,
+      end: endOfDay(addDays(start, 1)),
+      label: "this weekend",
+    } satisfies DateRange;
   }
   if (query.includes("next week")) {
     const anchor = addDays(now, 7);
-    return { start: startOfWeek(anchor), end: endOfWeek(anchor), label: "next week" } satisfies DateRange;
+    return {
+      start: startOfWeek(anchor),
+      end: endOfWeek(anchor),
+      label: "next week",
+    } satisfies DateRange;
   }
   if (query.includes("this week")) {
-    return { start: startOfWeek(now), end: endOfWeek(now), label: "this week" } satisfies DateRange;
+    return {
+      start: startOfWeek(now),
+      end: endOfWeek(now),
+      label: "this week",
+    } satisfies DateRange;
   }
   if (query.includes("last week")) {
     const anchor = addDays(now, -7);
-    return { start: startOfWeek(anchor), end: endOfWeek(anchor), label: "last week" } satisfies DateRange;
+    return {
+      start: startOfWeek(anchor),
+      end: endOfWeek(anchor),
+      label: "last week",
+    } satisfies DateRange;
   }
   if (query.includes("next month")) {
     const anchor = addMonths(now, 1);
-    return { start: startOfMonth(anchor), end: endOfMonth(anchor), label: "next month" } satisfies DateRange;
+    return {
+      start: startOfMonth(anchor),
+      end: endOfMonth(anchor),
+      label: "next month",
+    } satisfies DateRange;
   }
   if (query.includes("this month")) {
-    return { start: startOfMonth(now), end: endOfMonth(now), label: "this month" } satisfies DateRange;
+    return {
+      start: startOfMonth(now),
+      end: endOfMonth(now),
+      label: "this month",
+    } satisfies DateRange;
   }
   if (query.includes("last month")) {
     const anchor = addMonths(now, -1);
-    return { start: startOfMonth(anchor), end: endOfMonth(anchor), label: "last month" } satisfies DateRange;
+    return {
+      start: startOfMonth(anchor),
+      end: endOfMonth(anchor),
+      label: "last month",
+    } satisfies DateRange;
   }
 
   const singleDate = parseNaturalDate(query, now);
@@ -342,14 +392,14 @@ function resolveDateRange(params: {
   throw new Error(`Could not understand the date range: ${rangeQuery}`);
 }
 
-
 function clampSearchWindow(start: Date, end: Date) {
   const diffDays = Math.ceil((end.getTime() - start.getTime()) / 86400000);
   if (diffDays > MAX_FETCH_WINDOW_DAYS) {
-    throw new Error(`Date range is too large. Please keep it under ${MAX_FETCH_WINDOW_DAYS} days.`);
+    throw new Error(
+      `Date range is too large. Please keep it under ${MAX_FETCH_WINDOW_DAYS} days.`,
+    );
   }
 }
-
 
 function cacheEvents(cache: Map<string, BackendEvent>, events: BackendEvent[]) {
   for (const event of events) {
@@ -359,7 +409,10 @@ function cacheEvents(cache: Map<string, BackendEvent>, events: BackendEvent[]) {
 
 function eventMatchesSearch(event: BackendEvent, query?: string) {
   if (!query?.trim()) return true;
-  const haystack = [event.title, event.description, event.location].filter(Boolean).join(" ").toLowerCase();
+  const haystack = [event.title, event.description, event.location]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
   return query
     .toLowerCase()
     .split(/\s+/)
@@ -379,16 +432,22 @@ function formatEventResult(event: BackendEvent) {
   };
 }
 
-
 function buildSameOriginUrl(request: Request, path: string): string {
   try {
     return new URL(path, request.url).toString();
   } catch (error) {
-    throw new Error(`Invalid URL construction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Invalid URL construction: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
 }
 
-async function fetchEvents(start: Date, end: Date, cookies: string, request: Request) {
+async function fetchEvents(
+  start: Date,
+  end: Date,
+  cookies: string,
+  request: Request,
+) {
   clampSearchWindow(start, end);
   const url = buildSameOriginUrl(
     request,
@@ -400,11 +459,15 @@ async function fetchEvents(start: Date, end: Date, cookies: string, request: Req
   });
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unable to read response");
-    throw new Error(`Failed to fetch events (${response.status}): ${errorText.slice(0, 180)}`);
+    const errorText = await response
+      .text()
+      .catch(() => "Unable to read response");
+    throw new Error(
+      `Failed to fetch events (${response.status}): ${errorText.slice(0, 180)}`,
+    );
   }
 
-  const data = await response.json() as { events?: BackendEvent[] };
+  const data = (await response.json()) as { events?: BackendEvent[] };
   return (data.events || []).map((event: BackendEvent) => ({
     id: event.id,
     title: event.title,
@@ -417,7 +480,11 @@ async function fetchEvents(start: Date, end: Date, cookies: string, request: Req
   })) as BackendEvent[];
 }
 
-async function createEventOnBackend(input: CreateEventInput, cookies: string, request: Request) {
+async function createEventOnBackend(
+  input: CreateEventInput,
+  cookies: string,
+  request: Request,
+) {
   const response = await fetch(buildSameOriginUrl(request, "/api/events"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookies },
@@ -425,42 +492,72 @@ async function createEventOnBackend(input: CreateEventInput, cookies: string, re
   });
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unable to read response");
-    throw new Error(`Failed to create event (${response.status}): ${errorText.slice(0, 180)}`);
+    const errorText = await response
+      .text()
+      .catch(() => "Unable to read response");
+    throw new Error(
+      `Failed to create event (${response.status}): ${errorText.slice(0, 180)}`,
+    );
   }
 
-  const data = await response.json() as { event?: BackendEvent } | BackendEvent;
-  return (data as any).event || data as BackendEvent;
+  const data = (await response.json()) as
+    | { event?: BackendEvent }
+    | BackendEvent;
+  return (data as { event?: BackendEvent }).event || (data as BackendEvent);
 }
 
-async function updateEventOnBackend(eventId: string, updates: UpdateEventInput, cookies: string, request: Request) {
-  const response = await fetch(buildSameOriginUrl(request, `/api/events/${eventId}`), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: cookies },
-    body: JSON.stringify(updates),
-  });
+async function updateEventOnBackend(
+  eventId: string,
+  updates: UpdateEventInput,
+  cookies: string,
+  request: Request,
+) {
+  const response = await fetch(
+    buildSameOriginUrl(request, `/api/events/${eventId}`),
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookies },
+      body: JSON.stringify(updates),
+    },
+  );
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unable to read response");
-    throw new Error(`Failed to update event (${response.status}): ${errorText.slice(0, 180)}`);
+    const errorText = await response
+      .text()
+      .catch(() => "Unable to read response");
+    throw new Error(
+      `Failed to update event (${response.status}): ${errorText.slice(0, 180)}`,
+    );
   }
 
-  const data = await response.json() as { event?: BackendEvent } | BackendEvent;
-  return (data as any).event || data as BackendEvent;
+  const data = (await response.json()) as
+    | { event?: BackendEvent }
+    | BackendEvent;
+  return (data as { event?: BackendEvent }).event || (data as BackendEvent);
 }
 
-async function deleteEventOnBackend(eventId: string, cookies: string, request: Request) {
-  const response = await fetch(buildSameOriginUrl(request, `/api/events/${eventId}`), {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json", Cookie: cookies },
-  });
+async function deleteEventOnBackend(
+  eventId: string,
+  cookies: string,
+  request: Request,
+) {
+  const response = await fetch(
+    buildSameOriginUrl(request, `/api/events/${eventId}`),
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Cookie: cookies },
+    },
+  );
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unable to read response");
-    throw new Error(`Failed to delete event (${response.status}): ${errorText.slice(0, 180)}`);
+    const errorText = await response
+      .text()
+      .catch(() => "Unable to read response");
+    throw new Error(
+      `Failed to delete event (${response.status}): ${errorText.slice(0, 180)}`,
+    );
   }
 }
-
 
 export class CalendarAssistantService implements ICalendarAssistantService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -472,7 +569,9 @@ export class CalendarAssistantService implements ICalendarAssistantService {
       const apiKey = process.env.OPENROUTER_API_KEY;
 
       if (!apiKey) {
-        throw Object.assign(new Error("OPENROUTER_API_KEY is missing"), { statusCode: 500 });
+        throw Object.assign(new Error("OPENROUTER_API_KEY is missing"), {
+          statusCode: 500,
+        });
       }
 
       const dbUser = await this.prisma.user.findUnique({
@@ -531,7 +630,8 @@ export class CalendarAssistantService implements ICalendarAssistantService {
 
       if (dangerousPatterns.some((pattern) => lowered.includes(pattern))) {
         return {
-          reply: "I can only help with calendar tasks like checking schedules or managing events.",
+          reply:
+            "I can only help with calendar tasks like checking schedules or managing events.",
           createdEvent: null,
           updatedEvent: null,
           deletedEventId: null,
@@ -540,7 +640,9 @@ export class CalendarAssistantService implements ICalendarAssistantService {
       }
 
       const openrouter = createOpenRouter({ apiKey });
-      const model = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash-lite-preview-09-2025";
+      const model =
+        process.env.OPENROUTER_MODEL ||
+        "google/gemini-2.5-flash-lite-preview-09-2025";
       const eventCache = new Map<string, BackendEvent>();
       const fetchedEvents: BackendEvent[] = [];
       let createdEvent: BackendEvent | null = null;
@@ -579,19 +681,36 @@ Rules:
               rangeQuery: z
                 .string()
                 .optional()
-                .describe("Natural-language range like 'next monday' or 'this week'."),
-              startDate: z.string().optional().describe("Optional explicit start date."),
-              endDate: z.string().optional().describe("Optional explicit end date."),
+                .describe(
+                  "Natural-language range like 'next monday' or 'this week'.",
+                ),
+              startDate: z
+                .string()
+                .optional()
+                .describe("Optional explicit start date."),
+              endDate: z
+                .string()
+                .optional()
+                .describe("Optional explicit end date."),
               search: z
                 .string()
                 .optional()
-                .describe("Optional text filter for event title, description, or location."),
+                .describe(
+                  "Optional text filter for event title, description, or location.",
+                ),
             }),
             execute: async ({ rangeQuery, startDate, endDate, search }) => {
-              const range = resolveDateRange({ rangeQuery, startDate, endDate, now });
+              const range = resolveDateRange({
+                rangeQuery,
+                startDate,
+                endDate,
+                now,
+              });
               const events = (
                 await fetchEvents(range.start, range.end, cookies, request)
-              ).filter((event: BackendEvent) => eventMatchesSearch(event, search));
+              ).filter((event: BackendEvent) =>
+                eventMatchesSearch(event, search),
+              );
               cacheEvents(eventCache, events);
               fetchedEvents.push(...events);
 
@@ -614,11 +733,15 @@ Rules:
               query: z
                 .string()
                 .min(1)
-                .describe("Search text to match against event title, description, or location."),
+                .describe(
+                  "Search text to match against event title, description, or location.",
+                ),
               rangeQuery: z
                 .string()
                 .optional()
-                .describe("Optional range hint like 'next month' or 'this week'."),
+                .describe(
+                  "Optional range hint like 'next month' or 'this week'.",
+                ),
             }),
             execute: async ({ query: searchQuery, rangeQuery }) => {
               const range = rangeQuery
@@ -631,7 +754,9 @@ Rules:
 
               const events = (
                 await fetchEvents(range.start, range.end, cookies, request)
-              ).filter((event: BackendEvent) => eventMatchesSearch(event, searchQuery));
+              ).filter((event: BackendEvent) =>
+                eventMatchesSearch(event, searchQuery),
+              );
               cacheEvents(eventCache, events);
               fetchedEvents.push(...events);
 
@@ -671,7 +796,9 @@ Rules:
             }) => {
               const start = parseDateTime(startDateTime, now);
               if (!start) {
-                return { error: `Could not parse start time: ${startDateTime}` };
+                return {
+                  error: `Could not parse start time: ${startDateTime}`,
+                };
               }
 
               const end = allDay
@@ -691,7 +818,9 @@ Rules:
 
               const resolvedCalendarId = calendarId || defaultCalendarId;
               if (!resolvedCalendarId) {
-                return { error: "No calendar is available for creating events." };
+                return {
+                  error: "No calendar is available for creating events.",
+                };
               }
 
               try {
@@ -717,8 +846,10 @@ Rules:
                   success: true,
                   event: createdEvent ? formatEventResult(createdEvent) : null,
                 };
-              } catch (error: any) {
-                return { error: `Failed to create event: ${error.message}` };
+              } catch (error: unknown) {
+                return {
+                  error: `Failed to create event: ${error instanceof Error ? error.message : "Unknown error"}`,
+                };
               }
             },
           }),
@@ -756,7 +887,9 @@ Rules:
                     cookies,
                     request,
                   );
-                  existingEvent = events.find((e: BackendEvent) => e.id === eventId);
+                  existingEvent = events.find(
+                    (e: BackendEvent) => e.id === eventId,
+                  );
                   if (!existingEvent) {
                     return {
                       error: `Event ${eventId} not found. Please search for the event first.`,
@@ -777,11 +910,17 @@ Rules:
               if (calendarId !== undefined) updates.calendarId = calendarId;
               if (allDay !== undefined) updates.allDay = allDay;
 
-              const parsedStart = startDateTime ? parseDateTime(startDateTime, now) : null;
-              const parsedEnd = endDateTime ? parseDateTime(endDateTime, now) : null;
+              const parsedStart = startDateTime
+                ? parseDateTime(startDateTime, now)
+                : null;
+              const parsedEnd = endDateTime
+                ? parseDateTime(endDateTime, now)
+                : null;
 
               if (startDateTime && !parsedStart) {
-                return { error: `Could not parse start time: ${startDateTime}` };
+                return {
+                  error: `Could not parse start time: ${startDateTime}`,
+                };
               }
               if (endDateTime && !parsedEnd) {
                 return { error: `Could not parse end time: ${endDateTime}` };
@@ -808,7 +947,12 @@ Rules:
               if (parsedEnd) updates.end = parsedEnd.toISOString();
 
               try {
-                updatedEvent = await updateEventOnBackend(eventId, updates, cookies, request);
+                updatedEvent = await updateEventOnBackend(
+                  eventId,
+                  updates,
+                  cookies,
+                  request,
+                );
                 // Only update cache after successful backend operation
                 if (updatedEvent) {
                   eventCache.set(eventId, updatedEvent);
@@ -818,8 +962,10 @@ Rules:
                   success: true,
                   event: updatedEvent ? formatEventResult(updatedEvent) : null,
                 };
-              } catch (error: any) {
-                return { error: `Failed to update event: ${error.message}` };
+              } catch (error: unknown) {
+                return {
+                  error: `Failed to update event: ${error instanceof Error ? error.message : "Unknown error"}`,
+                };
               }
             },
           }),
@@ -840,7 +986,9 @@ Rules:
                     cookies,
                     request,
                   );
-                  existingEvent = events.find((e: BackendEvent) => e.id === eventId);
+                  existingEvent = events.find(
+                    (e: BackendEvent) => e.id === eventId,
+                  );
                   if (!existingEvent) {
                     return {
                       error: `Event ${eventId} not found. Please search for the event first.`,
@@ -867,8 +1015,10 @@ Rules:
                   deletedEventId: eventId,
                   title: eventTitle,
                 };
-              } catch (error: any) {
-                return { error: `Failed to delete event: ${error.message}` };
+              } catch (error: unknown) {
+                return {
+                  error: `Failed to delete event: ${error instanceof Error ? error.message : "Unknown error"}`,
+                };
               }
             },
           }),
@@ -886,8 +1036,9 @@ Rules:
         deletedEventId,
         events: uniqueFetchedEvents,
       };
-    } catch (error: any) {
-      const reply = error?.message?.includes("parse")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "";
+      const reply = message.includes("parse")
         ? "I had trouble understanding that calendar request. Try rephrasing it with a clearer date or time."
         : "Something went wrong while handling that calendar request.";
 
@@ -897,7 +1048,7 @@ Rules:
         updatedEvent: null,
         deletedEventId: null,
         events: [],
-        error: error?.message || "Unknown error",
+        error: message || "Unknown error",
       };
     }
   }

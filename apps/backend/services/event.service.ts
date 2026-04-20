@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
   IEventService,
@@ -57,7 +56,12 @@ export class EventService implements IEventService {
     const offsetVal = Math.max(Number(offset) || 0, 0);
 
     let dateFilter = "";
-    const params: any[] = [userId, searchQuery, limitVal, offsetVal];
+    const params: (string | number | Date)[] = [
+      userId,
+      searchQuery,
+      limitVal,
+      offsetVal,
+    ];
     if (startDate && endDate) {
       dateFilter = `AND e.start <= ${params.length + 1}::timestamp AND e.end >= ${params.length + 2}::timestamp`;
       params.push(new Date(startDate), new Date(endDate));
@@ -102,9 +106,9 @@ export class EventService implements IEventService {
       ...params.slice(0, params.length - 2),
     );
 
-    const total = (countResult as any[])?.[0]?.total ?? 0;
+    const total = (countResult as { total: number }[])?.[0]?.total ?? 0;
 
-    const events = (results as any[]).map((row) => ({
+    const events = (results as Record<string, unknown>[]).map((row) => ({
       id: row.id,
       title: row.title,
       description: row.description,
@@ -139,9 +143,7 @@ export class EventService implements IEventService {
     return { events, total };
   }
 
-  async list(
-    input: EventListInput,
-  ): Promise<{
+  async list(input: EventListInput): Promise<{
     events: unknown[];
     categories: unknown[];
     calendars: unknown[];
@@ -217,8 +219,7 @@ export class EventService implements IEventService {
     for (const recurringEvent of recurringEvents) {
       try {
         let recurrenceRule = recurringEvent.recurrence || "{}";
-        const parsedRule =
-          RecurrenceEngine.parseRecurrenceRule(recurrenceRule);
+        const parsedRule = RecurrenceEngine.parseRecurrenceRule(recurrenceRule);
 
         // Fallback: infer weekday recurrence from title keywords when rule is empty
         if (
@@ -658,7 +659,8 @@ export class EventService implements IEventService {
       }
 
       // Validate dates if provided
-      let startDate: Date | undefined;      let endDate: Date | undefined;
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
 
       if (input.start) {
         startDate = new Date(input.start);
@@ -808,7 +810,7 @@ export class EventService implements IEventService {
         }
       }
 
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
 
       if (input.title !== undefined) {
         updateData.title = input.title.trim();
@@ -846,9 +848,7 @@ export class EventService implements IEventService {
       if (input.recurrence !== undefined) {
         if (input.recurrence) {
           try {
-            const rule = RecurrenceEngine.parseRecurrenceRule(
-              input.recurrence,
-            );
+            const rule = RecurrenceEngine.parseRecurrenceRule(input.recurrence);
             if (!rule) {
               throw new ValidationError(
                 "Invalid recurrence rule format",
@@ -895,14 +895,14 @@ export class EventService implements IEventService {
 
         if (timeChanged || reminderChanged) {
           // Get current notification configurations or create from reminder
-          let notificationConfigs: {            notificationType: "email" | "browser";
+          let notificationConfigs: {
+            notificationType: "email" | "browser";
             minutesBefore: number;
             isEnabled: boolean;
           }[] = [];
 
           if (reminderChanged) {
-            const finalReminderValue =
-              reminderValue || updatedEvent.reminder;
+            const finalReminderValue = reminderValue || updatedEvent.reminder;
 
             if (finalReminderValue && finalReminderValue > 0) {
               const userSettings = await this.prisma.userSettings.findUnique({
@@ -977,21 +977,21 @@ export class EventService implements IEventService {
           logger.ok(`Updated notifications for event ${id}`);
         }
       } catch (notificationError) {
-        logger.error(
-          "Failed to update notifications:",
-          notificationError,
-        );
+        logger.error("Failed to update notifications:", notificationError);
         // Notification failure shouldn't fail the event update
       }
 
       return updatedEvent;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Event update error:", error);
 
       // Handle optimistic locking conflict
       if (
-        error.code === "P2025" ||
-        error.message?.includes("Record to update not found")
+        (error instanceof Error &&
+          "code" in error &&
+          (error as { code: string }).code === "P2025") ||
+        (error instanceof Error &&
+          error.message?.includes("Record to update not found"))
       ) {
         throw new ValidationError(
           "Event was modified by another process. Please refresh and try again.",
@@ -1190,10 +1190,9 @@ export class EventService implements IEventService {
 
             try {
               if (event.reminder && event.reminder > 0) {
-                const userSettings =
-                  await this.prisma.userSettings.findUnique({
-                    where: { userId },
-                  });
+                const userSettings = await this.prisma.userSettings.findUnique({
+                  where: { userId },
+                });
 
                 if (userSettings?.emailNotifications !== false) {
                   const notificationSchedule =
