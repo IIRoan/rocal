@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -63,18 +63,12 @@ const customSubscriptionSchema = z.object({
     .refine((value) => value.toLowerCase().includes(".ics"), {
       message: "URL should point to an .ics calendar file",
     }),
-  color: z
-    .string()
-    .trim()
-    .refine(isValidColor, "Please select a valid color"),
+  color: z.string().trim().refine(isValidColor, "Please select a valid color"),
 });
 
 const editableSubscriptionSchema = z.object({
   name: z.string().trim().min(1, "Calendar name is required").max(100),
-  color: z
-    .string()
-    .trim()
-    .refine(isValidColor, "Please select a valid color"),
+  color: z.string().trim().refine(isValidColor, "Please select a valid color"),
 });
 
 type CustomSubscriptionForm = z.infer<typeof customSubscriptionSchema>;
@@ -86,7 +80,6 @@ type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
   calendar: Calendar | undefined;
 };
-
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
   if (error && typeof error === "object" && "message" in error) {
@@ -143,7 +136,12 @@ export function SubscriptionManagement({
     color?: string;
   }>({});
 
-  const goToSubView = (view: "subscriptions-add-feed" | "subscriptions-holidays" | "subscriptions-edit") => {
+  const goToSubView = (
+    view:
+      | "subscriptions-add-feed"
+      | "subscriptions-holidays"
+      | "subscriptions-edit",
+  ) => {
     setLocalError(null);
     setSuccess(null);
     onNavigateTo(view);
@@ -167,7 +165,20 @@ export function SubscriptionManagement({
   });
 
   // Auto-open edit view when navigated here with a specific calendar ID
-  useEffect(() => {
+  const [prevEditCalendarId, setPrevEditCalendarId] = useState(
+    initialEditCalendarId,
+  );
+  const [prevSubscriptionsLength, setPrevSubscriptionsLength] = useState(
+    subscriptions.length,
+  );
+  const editCalendarIdChanged = initialEditCalendarId !== prevEditCalendarId;
+  const subscriptionsLengthChanged =
+    subscriptions.length !== prevSubscriptionsLength;
+  if (editCalendarIdChanged || subscriptionsLengthChanged) {
+    if (editCalendarIdChanged) setPrevEditCalendarId(initialEditCalendarId);
+    if (subscriptionsLengthChanged)
+      setPrevSubscriptionsLength(subscriptions.length);
+
     if (
       currentView === "subscriptions-edit" &&
       initialEditCalendarId &&
@@ -189,7 +200,7 @@ export function SubscriptionManagement({
         setSuccess(null);
       }
     }
-  }, [currentView, initialEditCalendarId, subscriptions, editingSubscription]);
+  }
 
   // Mutations
   const createMutation = useMutation({
@@ -378,7 +389,11 @@ export function SubscriptionManagement({
   const handleCreateSubscription = () => {
     const parsed = validateForm();
     if (!parsed) return;
-    createMutation.mutate({ name: parsed.name, url: parsed.url, color: parsed.color });
+    createMutation.mutate({
+      name: parsed.name,
+      url: parsed.url,
+      color: parsed.color,
+    });
   };
 
   const handleOpenEdit = (subscription: CalendarSubscription) => {
@@ -497,597 +512,607 @@ export function SubscriptionManagement({
     editingSubscriptionData?.calendar.kind === "public_holiday";
 
   const content = (
-          <div
-            className="flex flex-col"
-            style={{ minHeight: "360px", maxHeight: "calc(100dvh - 200px)" }}
-          >
-            {/* ─── MAIN VIEW ─── */}
-            {currentView === "subscriptions" && (
-              <>
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                  {onBack && (
-                    <button
-                      onClick={onBack}
-                      className="p-1 rounded hover:bg-muted/50 transition-colors"
-                    >
-                      <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  )}
-                  <Rss className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Subscriptions</span>
-                </div>
-
-                {/* Notification bar */}
-                {(error || success) && (
-                  <div
-                    className={`flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 ${
-                      error
-                        ? "text-destructive bg-destructive/5"
-                        : "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50"
-                    }`}
-                  >
-                    {error ? (
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    ) : (
-                      <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span className="flex-1">{error ?? success}</span>
-                    <button
-                      onClick={() => {
-                        setLocalError(null);
-                        setSuccess(null);
-                      }}
-                      className="opacity-60 hover:opacity-100 transition-opacity"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex-1 overflow-y-auto min-h-0">
-                  {/* Actions section */}
-                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
-                    Actions
-                  </div>
-                  <div className="p-1">
-                    <button
-                      type="button"
-                      onClick={() => goToSubView("subscriptions-add-feed")}
-                      className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                    >
-                      <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm">Add External Feed</span>
-                      <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => goToSubView("subscriptions-holidays")}
-                      className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                    >
-                      <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm flex-1">
-                        Browse Holiday Calendars
-                      </span>
-                      {publicHolidaySubscriptions.length > 0 && (
-                        <span className="text-xs text-muted-foreground/70 shrink-0">
-                          {publicHolidaySubscriptions.length} added
-                        </span>
-                      )}
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                    </button>
-                  </div>
-
-                  {/* Synced Calendars section */}
-                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
-                    Synced Calendars
-                    {readOnlyCalendars.length > 0 && (
-                      <span className="ml-1 opacity-60">
-                        · {readOnlyCalendars.length}
-                      </span>
-                    )}
-                  </div>
-
-                  {isLoadingSubscriptions ? (
-                    <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span className="text-xs">Loading...</span>
-                    </div>
-                  ) : readOnlyCalendars.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                      No synced calendars yet.
-                    </div>
-                  ) : (
-                    <div className="p-1">
-                      {readOnlyCalendars.map(({ subscription }) => {
-                        const isHoliday =
-                          subscription.calendar.kind === "public_holiday";
-                        return (
-                          <div
-                            key={subscription.id}
-                            className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-accent/20 group"
-                          >
-                            {/* Color swatch */}
-                            <div
-                              className="h-3.5 w-3.5 rounded-sm shrink-0"
-                              style={{ backgroundColor: getColorSwatchValue(subscription.calendar.color) }}
-                            />
-                            {/* Info — click to edit */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(subscription)}
-                              className="flex-1 min-w-0 text-left"
-                            >
-                              <div className="text-sm truncate">
-                                {subscription.calendar.name}
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                {isHoliday ? (
-                                  <Globe className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-                                ) : (
-                                  <Link2 className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-                                )}
-                                <span className="text-xs text-muted-foreground">
-                                  {isHoliday ? "Holiday" : "External feed"}
-                                </span>
-                                {!isHoliday &&
-                                  getStatusBadge(
-                                    subscription.lastSyncStatus,
-                                    subscription.lastErrorMessage,
-                                  )}
-                                {!isCalendarVisible(subscription.calendar.id) && (
-                                  <span className="text-xs text-muted-foreground/60">
-                                    · Hidden
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-                            {/* Quick actions */}
-                            <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  toggleCalendarVisibility(subscription.calendar.id)
-                                }
-                                title={
-                                  isCalendarVisible(subscription.calendar.id)
-                                    ? "Hide calendar"
-                                    : "Show calendar"
-                                }
-                                className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
-                              >
-                                {isCalendarVisible(subscription.calendar.id) ? (
-                                  <Eye className="h-3.5 w-3.5" />
-                                ) : (
-                                  <EyeOff className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                              {!isHoliday && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSyncSubscription(subscription)}
-                                  disabled={syncMutation.isPending}
-                                  title="Sync now"
-                                  className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
-                                >
-                                  <RefreshCw
-                                    className={`h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
-                                  />
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(subscription)}
-                                title="Edit"
-                                className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
-                              >
-                                <ChevronRight className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </>
+    <div
+      className="flex flex-col"
+      style={{ minHeight: "360px", maxHeight: "calc(100dvh - 200px)" }}
+    >
+      {/* ─── MAIN VIEW ─── */}
+      {currentView === "subscriptions" && (
+        <>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-1 rounded hover:bg-muted/50 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
             )}
+            <Rss className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium">Subscriptions</span>
+          </div>
 
-            {/* ─── ADD EXTERNAL FEED VIEW ─── */}
-            {currentView === "subscriptions-add-feed" && (
-              <>
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                  <button
-                    onClick={goBackToMain}
-                    className="p-1 rounded hover:bg-muted/50 transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Add External Feed</span>
-                </div>
+          {/* Notification bar */}
+          {(error || success) && (
+            <div
+              className={`flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 ${
+                error
+                  ? "text-destructive bg-destructive/5"
+                  : "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50"
+              }`}
+            >
+              {error ? (
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="flex-1">{error ?? success}</span>
+              <button
+                onClick={() => {
+                  setLocalError(null);
+                  setSuccess(null);
+                }}
+                className="opacity-60 hover:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
-                {/* Notification bar */}
-                {error && (
-                  <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 text-destructive bg-destructive/5">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span className="flex-1">{error}</span>
-                    <button
-                      onClick={() => setLocalError(null)}
-                      className="opacity-60 hover:opacity-100 transition-opacity"
-                    >
-                      ✕
-                    </button>
-                  </div>
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {/* Actions section */}
+            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+              Actions
+            </div>
+            <div className="p-1">
+              <button
+                type="button"
+                onClick={() => goToSubView("subscriptions-add-feed")}
+                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+              >
+                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm">Add External Feed</span>
+                <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToSubView("subscriptions-holidays")}
+                className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+              >
+                <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm flex-1">Browse Holiday Calendars</span>
+                {publicHolidaySubscriptions.length > 0 && (
+                  <span className="text-xs text-muted-foreground/70 shrink-0">
+                    {publicHolidaySubscriptions.length} added
+                  </span>
                 )}
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+              </button>
+            </div>
 
-                <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="subscription-name"
-                      className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+            {/* Synced Calendars section */}
+            <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+              Synced Calendars
+              {readOnlyCalendars.length > 0 && (
+                <span className="ml-1 opacity-60">
+                  · {readOnlyCalendars.length}
+                </span>
+              )}
+            </div>
+
+            {isLoadingSubscriptions ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span className="text-xs">Loading...</span>
+              </div>
+            ) : readOnlyCalendars.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                No synced calendars yet.
+              </div>
+            ) : (
+              <div className="p-1">
+                {readOnlyCalendars.map(({ subscription }) => {
+                  const isHoliday =
+                    subscription.calendar.kind === "public_holiday";
+                  return (
+                    <div
+                      key={subscription.id}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-accent/20 group"
                     >
-                      Name
-                    </Label>
-                    <Input
-                      id="subscription-name"
-                      value={newSubscription.name}
-                      onChange={(e) => {
-                        setNewSubscription((v) => ({ ...v, name: e.target.value }));
-                        if (validationErrors.name)
-                          setValidationErrors({ ...validationErrors, name: undefined });
-                      }}
-                      placeholder="e.g. Team Vacation Calendar"
-                      className={`h-9 text-sm ${validationErrors.name ? "border-destructive" : ""}`}
-                    />
-                    {validationErrors.name && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="subscription-url"
-                      className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-                    >
-                      URL (.ics)
-                    </Label>
-                    <Input
-                      id="subscription-url"
-                      value={newSubscription.url}
-                      onChange={(e) => {
-                        setNewSubscription((v) => ({ ...v, url: e.target.value }));
-                        if (validationErrors.url)
-                          setValidationErrors({ ...validationErrors, url: undefined });
-                      }}
-                      placeholder="https://example.com/calendar.ics"
-                      className={`h-9 text-sm ${validationErrors.url ? "border-destructive" : ""}`}
-                    />
-                    {validationErrors.url && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.url}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Color
-                    </Label>
-                    <ColorPicker
-                      value={newSubscription.color}
-                      onChange={(color) =>
-                        setNewSubscription((v) => ({ ...v, color }))
-                      }
-                      presetColors={PRESET_COLORS}
-                    />
-                  </div>
-
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      type="button"
-                      onClick={handleCreateSubscription}
-                      disabled={loading}
-                      className="h-9"
-                    >
-                      {createMutation.isPending ? (
-                        <>
-                          <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="mr-2 h-3.5 w-3.5" />
-                          Add Feed
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* ─── HOLIDAY CALENDARS VIEW ─── */}
-            {currentView === "subscriptions-holidays" && (
-              <>
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                  <button
-                    onClick={goBackToMain}
-                    className="p-1 rounded hover:bg-muted/50 transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Holiday Calendars</span>
-                </div>
-
-                {/* Notification bar */}
-                {(error || success) && (
-                  <div
-                    className={`flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 ${
-                      error
-                        ? "text-destructive bg-destructive/5"
-                        : "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50"
-                    }`}
-                  >
-                    {error ? (
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    ) : (
-                      <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span className="flex-1">{error ?? success}</span>
-                    <button
-                      onClick={() => {
-                        setLocalError(null);
-                        setSuccess(null);
-                      }}
-                      className="opacity-60 hover:opacity-100 transition-opacity"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {/* Search bar */}
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
-                  <Search className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                  <Input
-                    value={holidaySearch}
-                    onChange={(e) => setHolidaySearch(e.target.value)}
-                    placeholder="Search country or language..."
-                    className="h-7 border-0 bg-transparent ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
-                    autoComplete="off"
-                  />
-                  {holidaySearch && (
-                    <button
-                      onClick={() => setHolidaySearch("")}
-                      className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        viewBox="0 0 16 16"
-                        fill="currentColor"
+                      {/* Color swatch */}
+                      <div
+                        className="h-3.5 w-3.5 rounded-sm shrink-0"
+                        style={{
+                          backgroundColor: getColorSwatchValue(
+                            subscription.calendar.color,
+                          ),
+                        }}
+                      />
+                      {/* Info — click to edit */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(subscription)}
+                        className="flex-1 min-w-0 text-left"
                       >
-                        <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex-1 overflow-y-auto min-h-0 py-1">
-                  {filteredHolidayCalendars.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                      No calendars match your search.
-                    </div>
-                  ) : (
-                    filteredHolidayCalendars.map((hc) => {
-                      const normalizedUrl = normalizeSubscriptionUrl(hc.url);
-                      const existingSub = subscriptionByNormalizedUrl.get(normalizedUrl);
-                      return (
-                        <div
-                          key={hc.id}
-                          className="flex items-center gap-3 px-4 py-2 hover:bg-accent/20 transition-colors"
-                        >
-                          <span
-                            className="h-3 w-3 rounded-full shrink-0"
-                            style={{
-                              backgroundColor:
-                                getColorSwatchValue(existingSub?.calendar.color ?? hc.defaultColor),
-                            }}
-                          />
-                          <span className="text-sm flex-1 truncate">{hc.label}</span>
-                          {existingSub ? (
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] bg-primary/10 text-primary px-1.5 py-0 h-auto"
-                              >
-                                Added
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                type="button"
-                                disabled={loading}
-                                onClick={() => handleDeleteSubscription(existingSub)}
-                                className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                              >
-                                Remove
-                              </Button>
-                            </div>
+                        <div className="text-sm truncate">
+                          {subscription.calendar.name}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {isHoliday ? (
+                            <Globe className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              type="button"
-                              disabled={loading}
-                              onClick={() => handleCreateHolidayCalendar(hc)}
-                              className="h-7 px-2 text-xs shrink-0"
-                            >
-                              Add
-                            </Button>
+                            <Link2 className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {isHoliday ? "Holiday" : "External feed"}
+                          </span>
+                          {!isHoliday &&
+                            getStatusBadge(
+                              subscription.lastSyncStatus,
+                              subscription.lastErrorMessage,
+                            )}
+                          {!isCalendarVisible(subscription.calendar.id) && (
+                            <span className="text-xs text-muted-foreground/60">
+                              · Hidden
+                            </span>
                           )}
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* ─── EDIT VIEW ─── */}
-            {currentView === "subscriptions-edit" && editingSubscription && (
-              <>
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                  <button
-                    onClick={goBackToMain}
-                    className="p-1 rounded hover:bg-muted/50 transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <Pencil className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">Edit Calendar</span>
-                </div>
-
-                {/* Notification bar */}
-                {error && (
-                  <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 text-destructive bg-destructive/5">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span className="flex-1">{error}</span>
-                    <button
-                      onClick={() => setLocalError(null)}
-                      className="opacity-60 hover:opacity-100 transition-opacity"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="edit-subscription-name"
-                      className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-                    >
-                      Name
-                    </Label>
-                    <Input
-                      id="edit-subscription-name"
-                      value={editingSubscription.name}
-                      onChange={(e) => {
-                        setEditingSubscription({
-                          ...editingSubscription,
-                          name: e.target.value,
-                        });
-                        if (editValidationErrors.name)
-                          setEditValidationErrors({
-                            ...editValidationErrors,
-                            name: undefined,
-                          });
-                      }}
-                      className={`h-9 text-sm ${editValidationErrors.name ? "border-destructive" : ""}`}
-                    />
-                    {editValidationErrors.name && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {editValidationErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Color
-                    </Label>
-                    <ColorPicker
-                      value={editingSubscription.color}
-                      onChange={(color) => {
-                        setEditingSubscription({ ...editingSubscription, color });
-                        if (editValidationErrors.color)
-                          setEditValidationErrors({
-                            ...editValidationErrors,
-                            color: undefined,
-                          });
-                      }}
-                      presetColors={PRESET_COLORS}
-                    />
-                    {editValidationErrors.color && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {editValidationErrors.color}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Sync status info — external feeds only */}
-                  {editingSubscriptionData && !isHolidayCalendar && (
-                    <div className="rounded-md border border-border/50 bg-muted/20 px-3 py-2.5 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Last synced</span>
-                        <span className="font-medium">
-                          {formatLastSync(editingSubscriptionData.lastSyncAt)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Status</span>
-                        {getStatusBadge(
-                          editingSubscriptionData.lastSyncStatus,
-                          editingSubscriptionData.lastErrorMessage,
+                      </button>
+                      {/* Quick actions */}
+                      <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleCalendarVisibility(subscription.calendar.id)
+                          }
+                          title={
+                            isCalendarVisible(subscription.calendar.id)
+                              ? "Hide calendar"
+                              : "Show calendar"
+                          }
+                          className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
+                        >
+                          {isCalendarVisible(subscription.calendar.id) ? (
+                            <Eye className="h-3.5 w-3.5" />
+                          ) : (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        {!isHoliday && (
+                          <button
+                            type="button"
+                            onClick={() => handleSyncSubscription(subscription)}
+                            disabled={syncMutation.isPending}
+                            title="Sync now"
+                            className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
+                          >
+                            <RefreshCw
+                              className={`h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
+                            />
+                          </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(subscription)}
+                          title="Edit"
+                          className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                      {editingSubscriptionData.lastErrorMessage && (
-                        <div className="flex items-start gap-1 text-xs text-destructive pt-1">
-                          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span className="break-words">
-                            {editingSubscriptionData.lastErrorMessage}
-                          </span>
-                        </div>
-                      )}
                     </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between pt-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() =>
-                        editingSubscriptionData &&
-                        handleDeleteSubscription(editingSubscriptionData)
-                      }
-                      disabled={loading}
-                      className="h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="mr-2 h-3.5 w-3.5" />
-                      Remove
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={handleUpdateSubscription}
-                      disabled={loading}
-                      className="h-9"
-                    >
-                      {updateMutation.isPending ? (
-                        <>
-                          <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Changes"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </>
+                  );
+                })}
+              </div>
             )}
           </div>
+        </>
+      )}
+
+      {/* ─── ADD EXTERNAL FEED VIEW ─── */}
+      {currentView === "subscriptions-add-feed" && (
+        <>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+            <button
+              onClick={goBackToMain}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium">Add External Feed</span>
+          </div>
+
+          {/* Notification bar */}
+          {error && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 text-destructive bg-destructive/5">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">{error}</span>
+              <button
+                onClick={() => setLocalError(null)}
+                className="opacity-60 hover:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="subscription-name"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+              >
+                Name
+              </Label>
+              <Input
+                id="subscription-name"
+                value={newSubscription.name}
+                onChange={(e) => {
+                  setNewSubscription((v) => ({ ...v, name: e.target.value }));
+                  if (validationErrors.name)
+                    setValidationErrors({
+                      ...validationErrors,
+                      name: undefined,
+                    });
+                }}
+                placeholder="e.g. Team Vacation Calendar"
+                className={`h-9 text-sm ${validationErrors.name ? "border-destructive" : ""}`}
+              />
+              {validationErrors.name && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="subscription-url"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+              >
+                URL (.ics)
+              </Label>
+              <Input
+                id="subscription-url"
+                value={newSubscription.url}
+                onChange={(e) => {
+                  setNewSubscription((v) => ({ ...v, url: e.target.value }));
+                  if (validationErrors.url)
+                    setValidationErrors({
+                      ...validationErrors,
+                      url: undefined,
+                    });
+                }}
+                placeholder="https://example.com/calendar.ics"
+                className={`h-9 text-sm ${validationErrors.url ? "border-destructive" : ""}`}
+              />
+              {validationErrors.url && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {validationErrors.url}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Color
+              </Label>
+              <ColorPicker
+                value={newSubscription.color}
+                onChange={(color) =>
+                  setNewSubscription((v) => ({ ...v, color }))
+                }
+                presetColors={PRESET_COLORS}
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                type="button"
+                onClick={handleCreateSubscription}
+                disabled={loading}
+                className="h-9"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    Add Feed
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── HOLIDAY CALENDARS VIEW ─── */}
+      {currentView === "subscriptions-holidays" && (
+        <>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+            <button
+              onClick={goBackToMain}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium">Holiday Calendars</span>
+          </div>
+
+          {/* Notification bar */}
+          {(error || success) && (
+            <div
+              className={`flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 ${
+                error
+                  ? "text-destructive bg-destructive/5"
+                  : "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50"
+              }`}
+            >
+              {error ? (
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="flex-1">{error ?? success}</span>
+              <button
+                onClick={() => {
+                  setLocalError(null);
+                  setSuccess(null);
+                }}
+                className="opacity-60 hover:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Search bar */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
+            <Search className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+            <Input
+              value={holidaySearch}
+              onChange={(e) => setHolidaySearch(e.target.value)}
+              placeholder="Search country or language..."
+              className="h-7 border-0 bg-transparent ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
+              autoComplete="off"
+            />
+            {holidaySearch && (
+              <button
+                onClick={() => setHolidaySearch("")}
+                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                >
+                  <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-0 py-1">
+            {filteredHolidayCalendars.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                No calendars match your search.
+              </div>
+            ) : (
+              filteredHolidayCalendars.map((hc) => {
+                const normalizedUrl = normalizeSubscriptionUrl(hc.url);
+                const existingSub =
+                  subscriptionByNormalizedUrl.get(normalizedUrl);
+                return (
+                  <div
+                    key={hc.id}
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-accent/20 transition-colors"
+                  >
+                    <span
+                      className="h-3 w-3 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: getColorSwatchValue(
+                          existingSub?.calendar.color ?? hc.defaultColor,
+                        ),
+                      }}
+                    />
+                    <span className="text-sm flex-1 truncate">{hc.label}</span>
+                    {existingSub ? (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] bg-primary/10 text-primary px-1.5 py-0 h-auto"
+                        >
+                          Added
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          type="button"
+                          disabled={loading}
+                          onClick={() => handleDeleteSubscription(existingSub)}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        type="button"
+                        disabled={loading}
+                        onClick={() => handleCreateHolidayCalendar(hc)}
+                        className="h-7 px-2 text-xs shrink-0"
+                      >
+                        Add
+                      </Button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ─── EDIT VIEW ─── */}
+      {currentView === "subscriptions-edit" && editingSubscription && (
+        <>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+            <button
+              onClick={goBackToMain}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <Pencil className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium">Edit Calendar</span>
+          </div>
+
+          {/* Notification bar */}
+          {error && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 text-destructive bg-destructive/5">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">{error}</span>
+              <button
+                onClick={() => setLocalError(null)}
+                className="opacity-60 hover:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="edit-subscription-name"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+              >
+                Name
+              </Label>
+              <Input
+                id="edit-subscription-name"
+                value={editingSubscription.name}
+                onChange={(e) => {
+                  setEditingSubscription({
+                    ...editingSubscription,
+                    name: e.target.value,
+                  });
+                  if (editValidationErrors.name)
+                    setEditValidationErrors({
+                      ...editValidationErrors,
+                      name: undefined,
+                    });
+                }}
+                className={`h-9 text-sm ${editValidationErrors.name ? "border-destructive" : ""}`}
+              />
+              {editValidationErrors.name && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {editValidationErrors.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Color
+              </Label>
+              <ColorPicker
+                value={editingSubscription.color}
+                onChange={(color) => {
+                  setEditingSubscription({ ...editingSubscription, color });
+                  if (editValidationErrors.color)
+                    setEditValidationErrors({
+                      ...editValidationErrors,
+                      color: undefined,
+                    });
+                }}
+                presetColors={PRESET_COLORS}
+              />
+              {editValidationErrors.color && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {editValidationErrors.color}
+                </p>
+              )}
+            </div>
+
+            {/* Sync status info — external feeds only */}
+            {editingSubscriptionData && !isHolidayCalendar && (
+              <div className="rounded-md border border-border/50 bg-muted/20 px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Last synced</span>
+                  <span className="font-medium">
+                    {formatLastSync(editingSubscriptionData.lastSyncAt)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Status</span>
+                  {getStatusBadge(
+                    editingSubscriptionData.lastSyncStatus,
+                    editingSubscriptionData.lastErrorMessage,
+                  )}
+                </div>
+                {editingSubscriptionData.lastErrorMessage && (
+                  <div className="flex items-start gap-1 text-xs text-destructive pt-1">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    <span className="break-words">
+                      {editingSubscriptionData.lastErrorMessage}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() =>
+                  editingSubscriptionData &&
+                  handleDeleteSubscription(editingSubscriptionData)
+                }
+                disabled={loading}
+                className="h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Remove
+              </Button>
+              <Button
+                type="button"
+                onClick={handleUpdateSubscription}
+                disabled={loading}
+                className="h-9"
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 
   // When used standalone (with onOpenChange), wrap in Dialog

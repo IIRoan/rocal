@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Capacitor } from "@capacitor/core";
 import { createLogger } from "@workspace/logger";
 
@@ -61,46 +67,82 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
   const [isProcessingAuth, setIsProcessingAuth] = useState(false);
   const [authStatus, setAuthStatus] = useState<string>("");
 
-  const [isClient, setIsClient] = useState(false);
+  const emptySubscribe = useCallback(() => () => {}, []);
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const finishAuthenticatedNavigation = useCallback(
+    async (callbackURL?: string | null, handoffToken?: string | null) => {
+      const safeCallbackUrl = getSafeAppPath(callbackURL);
 
-  const finishAuthenticatedNavigation = async (callbackURL?: string | null, handoffToken?: string | null) => {
-    const safeCallbackUrl = getSafeAppPath(callbackURL);
-    
-    log.debug("finishAuthenticatedNavigation called", {
-      callbackURL,
-      hasHandoffToken: !!handoffToken,
-      safeCallbackUrl,
-    });
-    
-    try {
-      // Add timeout to prevent hanging
-      const sessionResult = await Promise.race([
-        authClient.getSession(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Session check timeout")), 5000)
-        ),
-      ]);
-
-      const hasUser = !!sessionResult?.data?.user;
-
-      log.debug("Session readback result", {
-        hasUser,
+      log.debug("finishAuthenticatedNavigation called", {
+        callbackURL,
+        hasHandoffToken: !!handoffToken,
         safeCallbackUrl,
-        userId: sessionResult?.data?.user?.id,
       });
 
-      if (!hasUser) {
-        // If we have a handoff token but no session, the OTT verification should handle it
-        // Don't redirect to login immediately - the deep link handler will verify the token
-        if (handoffToken) {
-          log.debug("No session but have handoff token, waiting for OTT verification");
+      try {
+        // Add timeout to prevent hanging
+        const sessionResult = await Promise.race([
+          authClient.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Session check timeout")), 5000),
+          ),
+        ]);
+
+        const hasUser = !!sessionResult?.data?.user;
+
+        log.debug("Session readback result", {
+          hasUser,
+          safeCallbackUrl,
+          userId: sessionResult?.data?.user?.id,
+        });
+
+        if (!hasUser) {
+          // If we have a handoff token but no session, the OTT verification should handle it
+          // Don't redirect to login immediately - the deep link handler will verify the token
+          if (handoffToken) {
+            log.debug(
+              "No session but have handoff token, waiting for OTT verification",
+            );
+            return;
+          }
+
+          const loginParams = new URLSearchParams({
+            error: "mobile_session_missing",
+          });
+          if (safeCallbackUrl !== "/dashboard") {
+            loginParams.set("next", safeCallbackUrl);
+          }
+          router.replace(`/mobile-login?${loginParams.toString()}`);
+          setAuthErrorMessage("Authentication session was not persisted");
           return;
         }
-        
+
+        setAuthErrorMessage(null);
+
+        // Use window.location for more reliable navigation in mobile context
+        log.debug("Navigating to", safeCallbackUrl);
+        if (window.location.pathname !== safeCallbackUrl) {
+          window.location.replace(safeCallbackUrl);
+        } else {
+          router.replace(safeCallbackUrl);
+          setTimeout(() => {
+            router.refresh();
+          }, 100);
+        }
+      } catch (error) {
+        log.error("Failed to confirm session:", error);
+
+        // If we have a handoff token, don't redirect to login - OTT verification might succeed
+        if (handoffToken) {
+          log.debug("Session check failed but have handoff token, waiting");
+          return;
+        }
+
         const loginParams = new URLSearchParams({
           error: "mobile_session_missing",
         });
@@ -109,40 +151,10 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         }
         router.replace(`/mobile-login?${loginParams.toString()}`);
         setAuthErrorMessage("Authentication session was not persisted");
-        return;
       }
-
-      setAuthErrorMessage(null);
-      
-      // Use window.location for more reliable navigation in mobile context
-      log.debug("Navigating to", safeCallbackUrl);
-      if (window.location.pathname !== safeCallbackUrl) {
-        window.location.replace(safeCallbackUrl);
-      } else {
-        router.replace(safeCallbackUrl);
-        setTimeout(() => {
-          router.refresh();
-        }, 100);
-      }
-    } catch (error) {
-      log.error("Failed to confirm session:", error);
-      
-      // If we have a handoff token, don't redirect to login - OTT verification might succeed
-      if (handoffToken) {
-        log.debug("Session check failed but have handoff token, waiting");
-        return;
-      }
-      
-      const loginParams = new URLSearchParams({
-        error: "mobile_session_missing",
-      });
-      if (safeCallbackUrl !== "/dashboard") {
-        loginParams.set("next", safeCallbackUrl);
-      }
-      router.replace(`/mobile-login?${loginParams.toString()}`);
-      setAuthErrorMessage("Authentication session was not persisted");
-    }
-  };
+    },
+    [router],
+  );
 
   useEffect(() => {
     if (!isNativePlatform) {
@@ -182,120 +194,127 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         },
       );
 
-      appUrlOpenHandle = await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
-        log.debug("appUrlOpen", { url });
-        void Browser.close().catch(() => undefined);
-        
-        const deepLinkUrl = new URL(url);
-        const handoffToken = deepLinkUrl.searchParams.get("ott");
-        const nextPath = getSafeAppPath(deepLinkUrl.searchParams.get("next"));
-        const redirectError = deepLinkUrl.searchParams.get("error");
+      appUrlOpenHandle = await CapacitorApp.addListener(
+        "appUrlOpen",
+        ({ url }) => {
+          log.debug("appUrlOpen", { url });
+          void Browser.close().catch(() => undefined);
 
-        if (handoffToken || redirectError) {
-          if (redirectError) {
-            const loginParams = new URLSearchParams({ error: redirectError });
-            if (nextPath !== "/dashboard") {
-              loginParams.set("next", nextPath);
-            }
-            router.replace(`/mobile-login?${loginParams.toString()}`);
-            setAuthErrorMessage("Authentication failed");
-            return;
-          }
+          const deepLinkUrl = new URL(url);
+          const handoffToken = deepLinkUrl.searchParams.get("ott");
+          const nextPath = getSafeAppPath(deepLinkUrl.searchParams.get("next"));
+          const redirectError = deepLinkUrl.searchParams.get("error");
 
-          // Immediately mark token as being handled to prevent duplicate verification
-          if (handoffToken) {
-            if (completedAuthHandoffTokensRef.current.has(handoffToken)) {
-              log.debug("Token already handled, skipping duplicate verification");
-              window.location.replace(nextPath);
-              return;
-            }
-            completedAuthHandoffTokensRef.current.add(handoffToken);
-          }
-
-          if (!handoffToken) {
-            window.location.replace(nextPath);
-            return;
-          }
-
-          setIsProcessingAuth(true);
-          setAuthStatus("Securing your session...");
-
-          void fetch(`${getApiBaseUrl()}/api/auth/one-time-token/verify`, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ token: handoffToken }),
-          })
-            .then(async (response) => {
-              log.debug("OTT verify response", {
-                status: response.status,
-                ok: response.ok,
-                nextPath,
-              });
-              if (!response.ok) {
-                throw new Error(`Failed to verify token (${response.status})`);
-              }
-
-              completedAuthHandoffTokensRef.current.add(handoffToken);
-              setAuthStatus("Login successful! Opening app...");
-              await finishAuthenticatedNavigation(nextPath, handoffToken);
-            })
-            .catch((error: unknown) => {
-              log.error("Mobile one-time-token handoff failed:", error);
-              setIsProcessingAuth(false);
-              const loginParams = new URLSearchParams({
-                error: "mobile_handoff_verify_failed",
-              });
+          if (handoffToken || redirectError) {
+            if (redirectError) {
+              const loginParams = new URLSearchParams({ error: redirectError });
               if (nextPath !== "/dashboard") {
                 loginParams.set("next", nextPath);
               }
               router.replace(`/mobile-login?${loginParams.toString()}`);
               setAuthErrorMessage("Authentication failed");
-            });
-          return;
-        }
+              return;
+            }
 
-        const normalizedHref = normalizeCustomSchemeCallback(url);
-        if (!normalizedHref) {
-          log.debug("Ignoring non-auth deep link", { url });
-          return;
-        }
+            // Immediately mark token as being handled to prevent duplicate verification
+            if (handoffToken) {
+              if (completedAuthHandoffTokensRef.current.has(handoffToken)) {
+                log.debug(
+                  "Token already handled, skipping duplicate verification",
+                );
+                window.location.replace(nextPath);
+                return;
+              }
+              completedAuthHandoffTokensRef.current.add(handoffToken);
+            }
 
-        log.debug("Handling custom scheme callback", {
-          normalizedHref,
-        });
+            if (!handoffToken) {
+              window.location.replace(nextPath);
+              return;
+            }
 
-        void authClient
-          .$fetch(normalizedHref.replace("/api/auth", ""))
-          .then(({ error }: { error?: { message?: string } | null }) => {
-            if (error) {
-              log.error("Custom mobile auth callback failed:", error);
+            setIsProcessingAuth(true);
+            setAuthStatus("Securing your session...");
+
+            void fetch(`${getApiBaseUrl()}/api/auth/one-time-token/verify`, {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ token: handoffToken }),
+            })
+              .then(async (response) => {
+                log.debug("OTT verify response", {
+                  status: response.status,
+                  ok: response.ok,
+                  nextPath,
+                });
+                if (!response.ok) {
+                  throw new Error(
+                    `Failed to verify token (${response.status})`,
+                  );
+                }
+
+                completedAuthHandoffTokensRef.current.add(handoffToken);
+                setAuthStatus("Login successful! Opening app...");
+                await finishAuthenticatedNavigation(nextPath, handoffToken);
+              })
+              .catch((error: unknown) => {
+                log.error("Mobile one-time-token handoff failed:", error);
+                setIsProcessingAuth(false);
+                const loginParams = new URLSearchParams({
+                  error: "mobile_handoff_verify_failed",
+                });
+                if (nextPath !== "/dashboard") {
+                  loginParams.set("next", nextPath);
+                }
+                router.replace(`/mobile-login?${loginParams.toString()}`);
+                setAuthErrorMessage("Authentication failed");
+              });
+            return;
+          }
+
+          const normalizedHref = normalizeCustomSchemeCallback(url);
+          if (!normalizedHref) {
+            log.debug("Ignoring non-auth deep link", { url });
+            return;
+          }
+
+          log.debug("Handling custom scheme callback", {
+            normalizedHref,
+          });
+
+          void authClient
+            .$fetch(normalizedHref.replace("/api/auth", ""))
+            .then(({ error }: { error?: { message?: string } | null }) => {
+              if (error) {
+                log.error("Custom mobile auth callback failed:", error);
+                const loginParams = new URLSearchParams({
+                  error: "oauth_error",
+                });
+                router.replace(`/mobile-login?${loginParams.toString()}`);
+                setAuthErrorMessage(error.message || "Authentication failed");
+                return;
+              }
+
+              const parsedUrl = new URL(url);
+              const callbackURL = parsedUrl.searchParams.get("callbackURL");
+              log.debug("Custom scheme callback fetch succeeded", {
+                callbackURL,
+              });
+              void finishAuthenticatedNavigation(callbackURL);
+            })
+            .catch((error: unknown) => {
+              log.error("Custom mobile auth callback threw:", error);
               const loginParams = new URLSearchParams({
                 error: "oauth_error",
               });
               router.replace(`/mobile-login?${loginParams.toString()}`);
-              setAuthErrorMessage(error.message || "Authentication failed");
-              return;
-            }
-
-            const parsedUrl = new URL(url);
-            const callbackURL = parsedUrl.searchParams.get("callbackURL");
-            log.debug("Custom scheme callback fetch succeeded", {
-              callbackURL,
+              setAuthErrorMessage("Authentication failed");
             });
-            void finishAuthenticatedNavigation(callbackURL);
-          })
-          .catch((error: unknown) => {
-            log.error("Custom mobile auth callback threw:", error);
-            const loginParams = new URLSearchParams({
-              error: "oauth_error",
-            });
-            router.replace(`/mobile-login?${loginParams.toString()}`);
-            setAuthErrorMessage("Authentication failed");
-          });
-      });
+        },
+      );
 
       try {
         const launchUrl = await CapacitorApp.getLaunchUrl();
@@ -309,7 +328,10 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
               .$fetch(normalizedHref.replace("/api/auth", ""))
               .then(({ error }: { error?: { message?: string } | null }) => {
                 if (error) {
-                  log.error("Initial custom mobile auth callback failed:", error);
+                  log.error(
+                    "Initial custom mobile auth callback failed:",
+                    error,
+                  );
                   return;
                 }
 
@@ -338,7 +360,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         void appUrlOpenHandle.remove();
       }
     };
-  }, [router]);
+  }, [router, finishAuthenticatedNavigation]);
 
   useEffect(() => {
     if (!isNativePlatform) {

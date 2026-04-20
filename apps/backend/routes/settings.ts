@@ -31,9 +31,35 @@ export const settingsRoutes = new Elysia({
 
   .put(
     "/",
-    async ({ body, user, request }: { body: Record<string, unknown>; user?: unknown; request: Request }) => {
+    async ({
+      body,
+      user,
+      request,
+    }: {
+      body: {
+        theme?: "light" | "dark" | "system";
+        defaultView?: "month" | "week" | "day" | "agenda";
+        weekStartDay?: number;
+        timezone?: string;
+        timeFormat?: "12h" | "24h";
+        workingHoursStart?: number;
+        workingHoursEnd?: number;
+        workingDays?: string;
+        emailNotifications?: boolean;
+        browserNotifications?: boolean;
+        reminderSound?: boolean;
+        defaultReminder?: number | null;
+        defaultEventDuration?: number;
+        defaultCalendarId?: string | null;
+        compactView?: boolean;
+        showWeekNumbers?: boolean;
+        showDeclinedEvents?: boolean;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
-      return settingsService.update({ userId, ...body } as any);
+      return settingsService.update({ userId, ...body });
     },
     {
       body: strictObject({

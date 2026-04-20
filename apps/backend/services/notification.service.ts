@@ -9,9 +9,6 @@ import type {
 } from "../contracts/notification.contract";
 import { ValidationError, NotFoundError } from "../lib/errors";
 import { NotificationCalculator } from "../lib/notification-calculator";
-import { createLogger } from "@workspace/logger";
-
-const logger = createLogger("backend:notification-service");
 
 export class NotificationService implements INotificationService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -26,7 +23,13 @@ export class NotificationService implements INotificationService {
 
     const event = await this.prisma.calendarEvent.findFirst({
       where: { id: eventId, userId },
-      select: { id: true, start: true, timezone: true, title: true, isSynced: true },
+      select: {
+        id: true,
+        start: true,
+        timezone: true,
+        title: true,
+        isSynced: true,
+      },
     });
 
     if (!event) {
@@ -65,7 +68,10 @@ export class NotificationService implements INotificationService {
     }
   }
 
-  async getForEvent(userId: string, eventId: string): Promise<EventNotificationsResult> {
+  async getForEvent(
+    userId: string,
+    eventId: string,
+  ): Promise<EventNotificationsResult> {
     const event = await this.validateEventOwnership(eventId, userId);
 
     if (!event) {
@@ -255,7 +261,10 @@ export class NotificationService implements INotificationService {
     };
   }
 
-  async deleteForEvent(userId: string, eventId: string): Promise<NotificationDeleteResult> {
+  async deleteForEvent(
+    userId: string,
+    eventId: string,
+  ): Promise<NotificationDeleteResult> {
     const event = await this.validateEventOwnership(eventId, userId);
 
     if (!event) {

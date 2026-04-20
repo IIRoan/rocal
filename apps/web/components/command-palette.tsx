@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import { format } from "date-fns";
 import { createLogger } from "@workspace/logger";
 import { useSettings } from "@/hooks/use-settings";
@@ -84,7 +90,8 @@ export function CommandPalette({
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
-  const { setCurrentDate, setCurrentView: setCalendarView } = useCalendarContext();
+  const { setCurrentDate, setCurrentView: setCalendarView } =
+    useCalendarContext();
 
   // Navigation history stack — goForward pushes, goBack pops
   const buildInitialHistory = (view: PaletteView): PaletteView[] => {
@@ -124,7 +131,9 @@ export function CommandPalette({
   const [debouncedQuery, setDebouncedQuery] = useState(initialSearchQuery);
   const [passkeyAddMode, setPasskeyAddMode] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [subscriptionEditCalendarId, setSubscriptionEditCalendarId] = useState<string | undefined>(undefined);
+  const [subscriptionEditCalendarId, setSubscriptionEditCalendarId] = useState<
+    string | undefined
+  >(undefined);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -166,14 +175,14 @@ export function CommandPalette({
       });
       return () => cancelAnimationFrame(frameId);
     }
-  }, [open, currentView]);
+  }, [open, currentView, initialSearchQuery]);
 
-  const goForward = (next: PaletteView) => {
+  const goForward = useCallback((next: PaletteView) => {
     setTransitionDirection("forward");
     setSearchQuery("");
     setPasskeyAddMode(false);
     setNavHistory((h) => [...h, next]);
-  };
+  }, []);
 
   const goBack = () => {
     setTransitionDirection("back");
@@ -208,45 +217,45 @@ export function CommandPalette({
     open && currentView === "main",
   );
 
-  const updateSetting = async <K extends keyof UserSettings>(
-    key: K,
-    value: UserSettings[K],
-  ) => {
-    if (!localSettings || saving) return;
+  const updateSetting = useCallback(
+    async <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
+      if (!localSettings || saving) return;
 
-    const newSettings = { ...localSettings, [key]: value };
-    setLocalSettings(newSettings);
+      const newSettings = { ...localSettings, [key]: value };
+      setLocalSettings(newSettings);
 
-    setSaving(true);
-    try {
-      const updateData: UpdateSettingsRequest = {
-        theme: newSettings.theme,
-        defaultView: newSettings.defaultView,
-        weekStartDay: newSettings.weekStartDay,
-        timezone: newSettings.timezone,
-        timeFormat: newSettings.timeFormat,
-        workingHoursStart: newSettings.workingHoursStart,
-        workingHoursEnd: newSettings.workingHoursEnd,
-        workingDays: newSettings.workingDays,
-        emailNotifications: newSettings.emailNotifications,
-        browserNotifications: newSettings.browserNotifications,
-        reminderSound: newSettings.reminderSound,
-        defaultReminder: newSettings.defaultReminder,
-        defaultEventDuration: newSettings.defaultEventDuration,
-        defaultCalendarId: newSettings.defaultCalendarId,
-        compactView: newSettings.compactView,
-        showWeekNumbers: newSettings.showWeekNumbers,
-        showDeclinedEvents: newSettings.showDeclinedEvents,
-      };
+      setSaving(true);
+      try {
+        const updateData: UpdateSettingsRequest = {
+          theme: newSettings.theme,
+          defaultView: newSettings.defaultView,
+          weekStartDay: newSettings.weekStartDay,
+          timezone: newSettings.timezone,
+          timeFormat: newSettings.timeFormat,
+          workingHoursStart: newSettings.workingHoursStart,
+          workingHoursEnd: newSettings.workingHoursEnd,
+          workingDays: newSettings.workingDays,
+          emailNotifications: newSettings.emailNotifications,
+          browserNotifications: newSettings.browserNotifications,
+          reminderSound: newSettings.reminderSound,
+          defaultReminder: newSettings.defaultReminder,
+          defaultEventDuration: newSettings.defaultEventDuration,
+          defaultCalendarId: newSettings.defaultCalendarId,
+          compactView: newSettings.compactView,
+          showWeekNumbers: newSettings.showWeekNumbers,
+          showDeclinedEvents: newSettings.showDeclinedEvents,
+        };
 
-      await updateSettings(updateData);
-    } catch (err: any) {
-      log.error("Failed to save settings:", err);
-      setLocalSettings(localSettings);
-    } finally {
-      setSaving(false);
-    }
-  };
+        await updateSettings(updateData);
+      } catch (err: any) {
+        log.error("Failed to save settings:", err);
+        setLocalSettings(localSettings);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [localSettings, saving, updateSettings],
+  );
 
   const handleReset = async () => {
     setSaving(true);
@@ -277,36 +286,42 @@ export function CommandPalette({
   }, [isCommandMode, commandQuery]);
 
   // Execute a command action
-  const executeCommand = (cmd: (typeof COMMANDS)[0]) => {
-    const { action, payload } = cmd.execute;
-    switch (action) {
-      // Immediate actions that close the palette
-      case "setTheme":
-        if (payload?.theme) {
-          updateSetting("theme", payload.theme as "light" | "dark" | "system");
-          onOpenChange(false);
-        }
-        break;
-      // Action commands - take user directly to the item/setting
-      case "newEvent":
-        goForward("events");
-        break;
-      case "newCalendar":
-        goForward("calendar-create");
-        break;
-      case "openCalendars":
-        goForward("calendars");
-        break;
-      case "newPasskey":
-        setPasskeyAddMode(true);
-        goForward("passkeys");
-        break;
-      case "openPasskeys":
-        setPasskeyAddMode(false);
-        goForward("passkeys");
-        break;
-    }
-  };
+  const executeCommand = useCallback(
+    (cmd: (typeof COMMANDS)[0]) => {
+      const { action, payload } = cmd.execute;
+      switch (action) {
+        // Immediate actions that close the palette
+        case "setTheme":
+          if (payload?.theme) {
+            updateSetting(
+              "theme",
+              payload.theme as "light" | "dark" | "system",
+            );
+            onOpenChange(false);
+          }
+          break;
+        // Action commands - take user directly to the item/setting
+        case "newEvent":
+          goForward("events");
+          break;
+        case "newCalendar":
+          goForward("calendar-create");
+          break;
+        case "openCalendars":
+          goForward("calendars");
+          break;
+        case "newPasskey":
+          setPasskeyAddMode(true);
+          goForward("passkeys");
+          break;
+        case "openPasskeys":
+          setPasskeyAddMode(false);
+          goForward("passkeys");
+          break;
+      }
+    },
+    [updateSetting, onOpenChange, goForward],
+  );
 
   // Auto-execute if exact command match
   useEffect(() => {
@@ -319,7 +334,7 @@ export function CommandPalette({
         return () => clearTimeout(timer);
       }
     }
-  }, [isCommandMode, commandQuery, currentView]);
+  }, [isCommandMode, commandQuery, currentView, executeCommand]);
 
   // Event search: query backend when user types in main search (not command mode)
   const showEventSearch = !isCommandMode && debouncedQuery.trim().length >= 2;
@@ -438,25 +453,44 @@ export function CommandPalette({
   // Helper to get dialog title for accessibility
   const getDialogTitle = () => {
     switch (currentView) {
-      case "main": return "Command Palette";
-      case "search": return "Search Events";
-      case "appearance": return "Appearance Settings";
-      case "notifications": return "Notification Settings";
-      case "time-region": return "Time & Region Settings";
-      case "timezone": return "Timezone Selection";
-      case "calendar-defaults": return "Calendar Defaults";
-      case "account": return "Account Settings";
-      case "security": return "Security";
-      case "passkeys": return "Passkeys";
-      case "calendars": return "Calendar Management";
-      case "calendar-create": return "Create Calendar";
-      case "calendar-edit": return "Edit Calendar";
-      case "subscriptions": return "Calendar Subscriptions";
-      case "subscriptions-add-feed": return "Add External Feed";
-      case "subscriptions-holidays": return "Holiday Calendars";
-      case "subscriptions-edit": return "Edit Calendar";
-      case "events": return "New Event";
-      default: return "Settings";
+      case "main":
+        return "Command Palette";
+      case "search":
+        return "Search Events";
+      case "appearance":
+        return "Appearance Settings";
+      case "notifications":
+        return "Notification Settings";
+      case "time-region":
+        return "Time & Region Settings";
+      case "timezone":
+        return "Timezone Selection";
+      case "calendar-defaults":
+        return "Calendar Defaults";
+      case "account":
+        return "Account Settings";
+      case "security":
+        return "Security";
+      case "passkeys":
+        return "Passkeys";
+      case "calendars":
+        return "Calendar Management";
+      case "calendar-create":
+        return "Create Calendar";
+      case "calendar-edit":
+        return "Edit Calendar";
+      case "subscriptions":
+        return "Calendar Subscriptions";
+      case "subscriptions-add-feed":
+        return "Add External Feed";
+      case "subscriptions-holidays":
+        return "Holiday Calendars";
+      case "subscriptions-edit":
+        return "Edit Calendar";
+      case "events":
+        return "New Event";
+      default:
+        return "Settings";
     }
   };
 
@@ -483,264 +517,267 @@ export function CommandPalette({
     if (currentView === "main" || currentView === "search") {
       const isSearchOnly = currentView === "search";
       return (
-            <div
-              className="flex flex-col"
-              style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
-            >
-              {/* Search Header - GitHub style */}
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
-                {isCommandMode && !isSearchOnly ? (
-                  <span className="text-sm font-medium text-primary">
-                    Command
-                  </span>
-                ) : isSearchOnly ? (
-                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
-                    <Search className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                ) : (
-                  <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-                )}
-                <Input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder={
-                    isSearchOnly
-                      ? "Search events..."
-                      : isCommandMode
-                        ? "Type a command..."
-                        : "Search or jump to..."
-                  }
-                  value={searchQuery}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    setSearchQuery(e.target.value);
-                  }}
-                  onFocus={(e) => e.stopPropagation()}
-                  onBlur={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Backspace" && searchQuery === ">") {
-                      setSearchQuery("");
-                    } else if (e.key === "Escape") {
-                      onOpenChange(false);
-                    } else if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setSelectedIndex((prev) =>
-                        Math.min(prev + 1, currentListLength - 1),
-                      );
-                    } else if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setSelectedIndex((prev) => Math.max(prev - 1, 0));
-                    } else if (e.key === "Enter" && currentListLength > 0) {
-                      e.preventDefault();
-                      if (isCommandMode) {
-                        executeCommand(matchingCommands[selectedIndex]);
-                      } else if (
-                        !isCommandMode &&
-                        showEventSearch &&
-                        selectedIndex < totalSearchEvents
-                      ) {
-                        handleSearchEventSelect(searchEvents[selectedIndex]);
-                      } else if (!isSearchOnly) {
-                        const navIndex = selectedIndex - totalSearchEvents;
-                        const item = filteredItems[navIndex];
-                        if (item) {
-                          goForward(item.targetView as PaletteView);
-                        }
-                      }
-                    }
-                  }}
-                  className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSearchQuery("")}
-                    className="p-1 h-auto"
-                  >
-                    <svg
-                      className="h-4 w-4 text-muted-foreground"
-                      viewBox="0 0 16 16"
-                      fill="currentColor"
-                    >
-                      <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
-                    </svg>
-                  </Button>
-                )}
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
+        >
+          {/* Search Header - GitHub style */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+            {isCommandMode && !isSearchOnly ? (
+              <span className="text-sm font-medium text-primary">Command</span>
+            ) : isSearchOnly ? (
+              <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
+                <Search className="h-3.5 w-3.5 text-primary" />
               </div>
-              {/* Results List */}
-              <div ref={listRef} className="flex-1 overflow-y-auto py-2">
-                {isCommandMode ? (
-                  matchingCommands.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      No command found.
-                    </div>
-                  ) : (
-                    <div className="px-2">
-                      {matchingCommands.map((cmd, index) => (
+            ) : (
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            )}
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder={
+                isSearchOnly
+                  ? "Search events..."
+                  : isCommandMode
+                    ? "Type a command..."
+                    : "Search or jump to..."
+              }
+              value={searchQuery}
+              onChange={(e) => {
+                e.stopPropagation();
+                setSearchQuery(e.target.value);
+              }}
+              onFocus={(e) => e.stopPropagation()}
+              onBlur={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Backspace" && searchQuery === ">") {
+                  setSearchQuery("");
+                } else if (e.key === "Escape") {
+                  onOpenChange(false);
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSelectedIndex((prev) =>
+                    Math.min(prev + 1, currentListLength - 1),
+                  );
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSelectedIndex((prev) => Math.max(prev - 1, 0));
+                } else if (e.key === "Enter" && currentListLength > 0) {
+                  e.preventDefault();
+                  if (isCommandMode) {
+                    executeCommand(matchingCommands[selectedIndex]);
+                  } else if (
+                    !isCommandMode &&
+                    showEventSearch &&
+                    selectedIndex < totalSearchEvents
+                  ) {
+                    handleSearchEventSelect(searchEvents[selectedIndex]);
+                  } else if (!isSearchOnly) {
+                    const navIndex = selectedIndex - totalSearchEvents;
+                    const item = filteredItems[navIndex];
+                    if (item) {
+                      goForward(item.targetView as PaletteView);
+                    }
+                  }
+                }
+              }}
+              className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="p-1 h-auto"
+              >
+                <svg
+                  className="h-4 w-4 text-muted-foreground"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                >
+                  <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
+                </svg>
+              </Button>
+            )}
+          </div>
+          {/* Results List */}
+          <div ref={listRef} className="flex-1 overflow-y-auto py-2">
+            {isCommandMode ? (
+              matchingCommands.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  No command found.
+                </div>
+              ) : (
+                <div className="px-2">
+                  {matchingCommands.map((cmd, index) => (
+                    <button
+                      key={cmd.command}
+                      data-index={index}
+                      type="button"
+                      onClick={() => executeCommand(cmd)}
+                      className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
+                        index === selectedIndex
+                          ? "bg-accent/50"
+                          : "hover:bg-accent/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center w-6 h-6 shrink-0">
+                        <cmd.icon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm flex-1 truncate">
+                        {cmd.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
+                        {cmd.description}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : isSearchOnly ? (
+              /* Search-only mode: just event results */
+              showEventSearch ? (
+                searchEvents.length > 0 ? (
+                  <EventSearchResults
+                    events={searchEvents}
+                    isLoading={searchLoading}
+                    onSelect={handleSearchEventSelect}
+                    selectedIndex={selectedIndex}
+                    baseIndex={0}
+                  />
+                ) : searchLoading ? (
+                  <EventSearchResults
+                    events={[]}
+                    isLoading={true}
+                    onSelect={handleSearchEventSelect}
+                    selectedIndex={selectedIndex}
+                    baseIndex={0}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <Search className="h-8 w-8 text-muted-foreground/20" />
+                    <p className="text-sm text-muted-foreground">
+                      {debouncedQuery.trim().length >= 2
+                        ? `No events found for "${debouncedQuery}"`
+                        : "Type to search your events"}
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <Search className="h-8 w-8 text-muted-foreground/20" />
+                  <p className="text-sm text-muted-foreground">
+                    Search across all your events by title, description, or
+                    location
+                  </p>
+                </div>
+              )
+            ) : (
+              <>
+                {/* Event search results */}
+                {showEventSearch && (
+                  <EventSearchResults
+                    events={searchEvents}
+                    isLoading={searchLoading}
+                    onSelect={handleSearchEventSelect}
+                    selectedIndex={selectedIndex}
+                    baseIndex={0}
+                  />
+                )}
+                {/* Navigation/settings results */}
+                {filteredItems.length === 0 &&
+                !showEventSearch &&
+                !debouncedQuery.trim() ? (
+                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    No results found.
+                  </div>
+                ) : filteredItems.length > 0 ? (
+                  <div className="px-2">
+                    {showEventSearch && searchEvents.length > 0 && (
+                      <div className="px-2 pt-1 pb-1">
+                        <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">
+                          Settings
+                        </span>
+                      </div>
+                    )}
+                    {filteredItems.map((item, index) => {
+                      const globalIndex = totalSearchEvents + index;
+                      return (
                         <button
-                          key={cmd.command}
-                          data-index={index}
+                          key={item.id}
+                          data-index={globalIndex}
                           type="button"
-                          onClick={() => executeCommand(cmd)}
+                          onClick={() =>
+                            goForward(item.targetView as PaletteView)
+                          }
                           className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
-                            index === selectedIndex
+                            globalIndex === selectedIndex
                               ? "bg-accent/50"
                               : "hover:bg-accent/50"
                           }`}
                         >
                           <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                            <cmd.icon className="h-4 w-4 text-muted-foreground" />
+                            <item.icon className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <span className="text-sm flex-1 truncate">
-                            {cmd.label}
+                            {item.label}
                           </span>
                           <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
-                            {cmd.description}
+                            {item.description}
                           </span>
                           <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
-                      ))}
-                    </div>
-                  )
-                ) : isSearchOnly ? (
-                  /* Search-only mode: just event results */
-                  showEventSearch ? (
-                    searchEvents.length > 0 ? (
-                      <EventSearchResults
-                        events={searchEvents}
-                        isLoading={searchLoading}
-                        onSelect={handleSearchEventSelect}
-                        selectedIndex={selectedIndex}
-                        baseIndex={0}
-                      />
-                    ) : searchLoading ? (
-                      <EventSearchResults
-                        events={[]}
-                        isLoading={true}
-                        onSelect={handleSearchEventSelect}
-                        selectedIndex={selectedIndex}
-                        baseIndex={0}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-10 gap-2">
-                        <Search className="h-8 w-8 text-muted-foreground/20" />
-                        <p className="text-sm text-muted-foreground">
-                          {debouncedQuery.trim().length >= 2
-                            ? `No events found for "${debouncedQuery}"`
-                            : "Type to search your events"}
-                        </p>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-10 gap-2">
-                      <Search className="h-8 w-8 text-muted-foreground/20" />
-                      <p className="text-sm text-muted-foreground">
-                        Search across all your events by title, description, or location
-                      </p>
-                    </div>
-                  )
-                ) : (
-                  <>
-                    {/* Event search results */}
-                    {showEventSearch && (
-                      <EventSearchResults
-                        events={searchEvents}
-                        isLoading={searchLoading}
-                        onSelect={handleSearchEventSelect}
-                        selectedIndex={selectedIndex}
-                        baseIndex={0}
-                      />
-                    )}
-                    {/* Navigation/settings results */}
-                    {filteredItems.length === 0 &&
-                    !showEventSearch &&
-                    !debouncedQuery.trim() ? (
-                      <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                        No results found.
-                      </div>
-                    ) : filteredItems.length > 0 ? (
-                      <div className="px-2">
-                        {showEventSearch && searchEvents.length > 0 && (
-                          <div className="px-2 pt-1 pb-1">
-                            <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">
-                              Settings
-                            </span>
-                          </div>
-                        )}
-                        {filteredItems.map((item, index) => {
-                          const globalIndex = totalSearchEvents + index;
-                          return (
-                            <button
-                              key={item.id}
-                              data-index={globalIndex}
-                              type="button"
-                              onClick={() =>
-                                goForward(item.targetView as PaletteView)
-                              }
-                              className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
-                                globalIndex === selectedIndex
-                                  ? "bg-accent/50"
-                                  : "hover:bg-accent/50"
-                              }`}
-                            >
-                              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                                <item.icon className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <span className="text-sm flex-1 truncate">
-                                {item.label}
-                              </span>
-                              <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
-                                {item.description}
-                              </span>
-                              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : showEventSearch && searchEvents.length === 0 && !searchLoading ? (
-                      <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                        No events found for &quot;{debouncedQuery}&quot;
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </div>
-              {/* Footer Tip */}
-              <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between">
-                {isSearchOnly ? (
-                  <span className="flex items-center gap-2">
-                    <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">esc</kbd>
-                    to close
-                  </span>
-                ) : (
-                  <span>
-                    Type{" "}
-                    <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                      &gt;
-                    </kbd>{" "}
-                    for commands
-                  </span>
-                )}
-                <span className="hidden sm:flex items-center gap-2">
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                    ↑↓
-                  </kbd>{" "}
-                  to navigate
-                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                    ↵
-                  </kbd>{" "}
-                  to select
-                </span>
-              </div>
-            </div>
-    );
-  }
+                      );
+                    })}
+                  </div>
+                ) : showEventSearch &&
+                  searchEvents.length === 0 &&
+                  !searchLoading ? (
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    No events found for &quot;{debouncedQuery}&quot;
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+          {/* Footer Tip */}
+          <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between">
+            {isSearchOnly ? (
+              <span className="flex items-center gap-2">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                  esc
+                </kbd>
+                to close
+              </span>
+            ) : (
+              <span>
+                Type{" "}
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                  &gt;
+                </kbd>{" "}
+                for commands
+              </span>
+            )}
+            <span className="hidden sm:flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                ↑↓
+              </kbd>{" "}
+              to navigate
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                ↵
+              </kbd>{" "}
+              to select
+            </span>
+          </div>
+        </div>
+      );
+    }
 
     if (currentView === "appearance") {
       return (
@@ -796,12 +833,7 @@ export function CommandPalette({
     }
 
     if (currentView === "security") {
-      return (
-        <SecuritySettings
-          goBack={goBack}
-          goForward={goForward}
-        />
-      );
+      return <SecuritySettings goBack={goBack} goForward={goForward} />;
     }
 
     if (currentView === "passkeys") {
@@ -914,4 +946,3 @@ export function CommandPalette({
     </Dialog>
   );
 }
-

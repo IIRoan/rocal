@@ -24,11 +24,10 @@ export function TransitionContainer({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const lastViewKey = useRef(viewKey);
   const [containerHeight, setContainerHeight] = useState<number | undefined>(
-    undefined
+    undefined,
   );
-  const heightAnimating = useRef(false);
+  const [heightAnimating, setHeightAnimating] = useState(false);
 
   const measureHeight = useCallback(() => {
     return contentRef.current?.scrollHeight;
@@ -36,7 +35,9 @@ export function TransitionContainer({
 
   // Keep a ref to latest children so transition timers can read fresh content
   const latestChildren = useRef(children);
-  latestChildren.current = children;
+  useEffect(() => {
+    latestChildren.current = children;
+  });
 
   // Track height passively when idle (handles within-view resizes)
   useEffect(() => {
@@ -54,27 +55,32 @@ export function TransitionContainer({
 
   // Update displayed content for same-view changes (e.g. data refetch)
   // Only when not in the middle of an exit transition
-  useEffect(() => {
+  const [prevChildren, setPrevChildren] = useState(children);
+  if (children !== prevChildren) {
+    setPrevChildren(children);
     if (phase !== "exiting") {
       setDisplayChildren(children);
     }
-  }, [children, phase]);
+  }
 
   // Handle view transitions — only runs when viewKey changes
-  useEffect(() => {
-    if (viewKey === lastViewKey.current) return;
+  const [prevViewKey, setPrevViewKey] = useState(viewKey);
+  if (viewKey !== prevViewKey) {
+    setPrevViewKey(viewKey);
+    setHeightAnimating(false);
+    // Phase 1: Fade out current content
+    setPhase("exiting");
+  }
 
-    lastViewKey.current = viewKey;
+  // Lock height when entering exiting phase, then schedule the transition timers
+  useEffect(() => {
+    if (phase !== "exiting") return;
 
     // Lock current height before anything changes
     const prevH = measureHeight();
     if (prevH !== undefined) {
-      heightAnimating.current = false;
       setContainerHeight(prevH);
     }
-
-    // Phase 1: Fade out current content
-    setPhase("exiting");
 
     const timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -89,26 +95,29 @@ export function TransitionContainer({
           requestAnimationFrame(() => {
             const newH = measureHeight();
             if (newH !== undefined) {
-              heightAnimating.current = true;
+              setHeightAnimating(true);
               setContainerHeight(newH);
             }
           });
         });
-      }, EXIT_MS)
+      }, EXIT_MS),
     );
 
     // Phase 3: Settle — transition complete
     timers.push(
-      setTimeout(() => {
-        setPhase("idle");
-        heightAnimating.current = false;
-        const h = measureHeight();
-        if (h !== undefined) setContainerHeight(h);
-      }, EXIT_MS + Math.max(ENTER_MS, HEIGHT_MS))
+      setTimeout(
+        () => {
+          setPhase("idle");
+          setHeightAnimating(false);
+          const h = measureHeight();
+          if (h !== undefined) setContainerHeight(h);
+        },
+        EXIT_MS + Math.max(ENTER_MS, HEIGHT_MS),
+      ),
     );
 
     return () => timers.forEach(clearTimeout);
-  }, [viewKey, measureHeight]);
+  }, [phase, measureHeight]);
 
   // Compute inline styles for the content based on phase
   const contentStyle: React.CSSProperties =
@@ -123,9 +132,8 @@ export function TransitionContainer({
       ref={containerRef}
       className="relative overflow-hidden"
       style={{
-        height:
-          containerHeight !== undefined ? `${containerHeight}px` : "auto",
-        transition: heightAnimating.current
+        height: containerHeight !== undefined ? `${containerHeight}px` : "auto",
+        transition: heightAnimating
           ? `height ${HEIGHT_MS}ms ${HEIGHT_EASING}`
           : "none",
       }}

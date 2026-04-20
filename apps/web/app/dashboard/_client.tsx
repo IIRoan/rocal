@@ -43,17 +43,22 @@ const AppSidebar = dynamic(
 );
 
 const MobileCalendarWrapper = dynamic(
-  () => import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
+  () =>
+    import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
   { ssr: false, loading: () => <MobileCalendarSkeleton /> },
 );
 
 const CalendarWithData = dynamic(
-  () => import("@/components/calendar-with-data").then((mod) => mod.CalendarWithData),
+  () =>
+    import("@/components/calendar-with-data").then(
+      (mod) => mod.CalendarWithData,
+    ),
   { ssr: false },
 );
 
 const CommandPalette = dynamic(
-  () => import("@/components/command-palette").then((mod) => mod.CommandPalette),
+  () =>
+    import("@/components/command-palette").then((mod) => mod.CommandPalette),
   { ssr: false },
 );
 
@@ -142,7 +147,8 @@ function DashboardSearchParamHandlers({
         const existingEvent = calendarData.events.find(
           (event) => event.id === eventId,
         );
-        const event = existingEvent || (await calendarApiService.getEvent(eventId));
+        const event =
+          existingEvent || (await calendarApiService.getEvent(eventId));
 
         if (cancelled) {
           return;
@@ -166,13 +172,7 @@ function DashboardSearchParamHandlers({
     return () => {
       cancelled = true;
     };
-  }, [
-    eventId,
-    isPending,
-    session?.user,
-    calendarData,
-    openEventEditor,
-  ]);
+  }, [eventId, isPending, session?.user, calendarData, openEventEditor]);
 
   useEffect(() => {
     if (!palette || handledPaletteRef.current === palette) {

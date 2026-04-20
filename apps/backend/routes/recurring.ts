@@ -14,7 +14,7 @@ export const recurringRoutes = new Elysia({
   .use(requireAuth)
   .post(
     "/validate",
-    async ({ body }: any) => {
+    async ({ body }: { body: { rule: string | Record<string, unknown> } }) => {
       return recurringService.validate(body.rule);
     },
     {
@@ -54,7 +54,16 @@ export const recurringRoutes = new Elysia({
 
   .post(
     "/preview",
-    async ({ body }: any) => {
+    async ({
+      body,
+    }: {
+      body: {
+        eventStart: string;
+        eventEnd: string;
+        recurrenceRule: string | Record<string, unknown>;
+        previewDays?: number;
+      };
+    }) => {
       return recurringService.preview({
         eventStart: body.eventStart,
         eventEnd: body.eventEnd,
@@ -104,7 +113,21 @@ export const recurringRoutes = new Elysia({
 
   .put(
     "/event/:id",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      body: {
+        editScope: "this_only" | "this_and_future" | "all";
+        occurrenceDate?: string;
+        updates: Record<string, unknown>;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return recurringService.editSeries({
         userId,
@@ -156,7 +179,20 @@ export const recurringRoutes = new Elysia({
 
   .delete(
     "/event/:id",
-    async ({ params, query, user, request }: any) => {
+    async ({
+      params,
+      query,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      query: {
+        deleteScope: "this_only" | "this_and_future" | "all";
+        occurrenceDate?: string;
+      };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       return recurringService.deleteSeries({
         userId,
