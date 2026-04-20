@@ -8,7 +8,6 @@ import type {
   RecurringEditInput,
   RecurringDeleteInput,
   RecurringDeleteResult,
-  RecurrencePattern,
 } from "../contracts/recurring.contract";
 import { ValidationError } from "../lib/errors";
 import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
@@ -40,7 +39,12 @@ export class RecurringService implements IRecurringService {
           ? RecurrenceEngine.getRecurrenceDescription(parsedRule)
           : null;
 
-      return { valid: errors.length === 0, errors, description, rule: parsedRule };
+      return {
+        valid: errors.length === 0,
+        errors,
+        description,
+        rule: parsedRule,
+      };
     } catch {
       return {
         valid: false,
@@ -131,7 +135,9 @@ export class RecurringService implements IRecurringService {
             parentEventId: eventId,
             recurrence: null,
             userId,
-            start: updates.start ? new Date(updates.start) : existingEvent.start,
+            start: updates.start
+              ? new Date(updates.start)
+              : existingEvent.start,
             end: updates.end ? new Date(updates.end) : existingEvent.end,
           },
           include: { category: true, calendar: true },
@@ -163,7 +169,9 @@ export class RecurringService implements IRecurringService {
           existingEvent.recurrence!,
         );
         if (originalRule) {
-          originalRule.until = new Date(splitDate.getTime() - 24 * 60 * 60 * 1000);
+          originalRule.until = new Date(
+            splitDate.getTime() - 24 * 60 * 60 * 1000,
+          );
           await this.prisma.calendarEvent.update({
             where: { id: eventId },
             data: {
@@ -190,7 +198,8 @@ export class RecurringService implements IRecurringService {
               ? new Date(updates.end)
               : new Date(
                   splitDate.getTime() +
-                    (existingEvent.end.getTime() - existingEvent.start.getTime()),
+                    (existingEvent.end.getTime() -
+                      existingEvent.start.getTime()),
                 ),
           },
           include: { category: true, calendar: true },
@@ -222,7 +231,9 @@ export class RecurringService implements IRecurringService {
     }
   }
 
-  async deleteSeries(input: RecurringDeleteInput): Promise<RecurringDeleteResult> {
+  async deleteSeries(
+    input: RecurringDeleteInput,
+  ): Promise<RecurringDeleteResult> {
     const { userId, eventId, deleteScope, occurrenceDate } = input;
 
     logger.info("DELETE RECURRING EVENT REQUEST:", {
@@ -251,17 +262,24 @@ export class RecurringService implements IRecurringService {
 
         const exceptionDate = new Date(occurrenceDate);
 
-        const existingException = await this.prisma.recurrenceException.findUnique({
-          where: {
-            parentEventId_exceptionDate: { parentEventId: eventId, exceptionDate },
-          },
-        });
+        const existingException =
+          await this.prisma.recurrenceException.findUnique({
+            where: {
+              parentEventId_exceptionDate: {
+                parentEventId: eventId,
+                exceptionDate,
+              },
+            },
+          });
 
         if (existingException) {
           if (existingException.type !== "deleted") {
             await this.prisma.recurrenceException.update({
               where: {
-                parentEventId_exceptionDate: { parentEventId: eventId, exceptionDate },
+                parentEventId_exceptionDate: {
+                  parentEventId: eventId,
+                  exceptionDate,
+                },
               },
               data: { type: "deleted" },
             });
@@ -294,7 +312,9 @@ export class RecurringService implements IRecurringService {
           existingEvent.recurrence!,
         );
         if (originalRule) {
-          originalRule.until = new Date(splitDate.getTime() - 24 * 60 * 60 * 1000);
+          originalRule.until = new Date(
+            splitDate.getTime() - 24 * 60 * 60 * 1000,
+          );
           await this.prisma.calendarEvent.update({
             where: { id: eventId },
             data: {

@@ -24,7 +24,15 @@ export const calendarSharingRoutes = new Elysia({
 })
   .get(
     "/shared/:token",
-    async ({ params, set, request }: any) => {
+    async ({
+      params,
+      set,
+      request,
+    }: {
+      params: { token: string };
+      set: { headers: Record<string, string | number | undefined> };
+      request: Request;
+    }) => {
       const baseUrl = resolveBackendBaseUrl(request);
       const sourceUrl = `${baseUrl}/api/calendars/shared/${encodeURIComponent(params.token)}`;
 
@@ -51,7 +59,15 @@ export const calendarSharingRoutes = new Elysia({
   .use(requireAuth)
   .get(
     "/:id/share-link",
-    async ({ params, user, request }: any) => {
+    async ({
+      params,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       const baseUrl = resolveBackendBaseUrl(request);
       return calendarSharingService.getShareLink({
@@ -71,7 +87,17 @@ export const calendarSharingRoutes = new Elysia({
   )
   .post(
     "/:id/share-link",
-    async ({ params, body, user, request }: any) => {
+    async ({
+      params,
+      body,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      body?: { regenerate?: boolean };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       const baseUrl = resolveBackendBaseUrl(request);
       return calendarSharingService.createShareLink({
@@ -97,7 +123,15 @@ export const calendarSharingRoutes = new Elysia({
   )
   .delete(
     "/:id/share-link",
-    async ({ params, user, request }: any) => {
+    async ({
+      params,
+      user,
+      request,
+    }: {
+      params: { id: string };
+      user?: unknown;
+      request: Request;
+    }) => {
       const { id: userId } = await ensureAuthenticatedUser(user, request);
       const baseUrl = resolveBackendBaseUrl(request);
       return calendarSharingService.disableShareLink({

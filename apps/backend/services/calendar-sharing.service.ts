@@ -4,13 +4,13 @@ import type {
   ShareLinkInput,
   CreateShareLinkInput,
 } from "../contracts/calendar-sharing.contract";
-import type {
-  CalendarShareLinkResponse,
-  DisableCalendarShareLinkResponse,
+import {
+  type CalendarShareLinkResponse,
+  type DisableCalendarShareLinkResponse,
+  buildIcsCalendar,
 } from "@workspace/calendar-ics";
 import { NotFoundError, ValidationError } from "../lib/errors";
-import { buildIcsCalendar } from "@workspace/calendar-ics";
-import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
+import { toIcsBuildEvent } from "../lib/ics-export";
 
 const SHARE_TOKEN_LENGTH = 40;
 const SHARE_TOKEN_ALPHABET =
@@ -61,7 +61,9 @@ export class CalendarSharingService implements ICalendarSharingService {
     };
   }
 
-  async getShareLink(input: ShareLinkInput): Promise<CalendarShareLinkResponse> {
+  async getShareLink(
+    input: ShareLinkInput,
+  ): Promise<CalendarShareLinkResponse> {
     const { userId, calendarId, baseUrl } = input;
 
     const calendar = await this.prisma.calendar.findFirst({
@@ -88,7 +90,9 @@ export class CalendarSharingService implements ICalendarSharingService {
     return this.serializeShareLink(calendar, baseUrl);
   }
 
-  async createShareLink(input: CreateShareLinkInput): Promise<CalendarShareLinkResponse> {
+  async createShareLink(
+    input: CreateShareLinkInput,
+  ): Promise<CalendarShareLinkResponse> {
     const { userId, calendarId, baseUrl, regenerate = false } = input;
 
     const calendar = await this.prisma.calendar.findFirst({
@@ -130,7 +134,9 @@ export class CalendarSharingService implements ICalendarSharingService {
     return this.serializeShareLink(updatedCalendar, baseUrl);
   }
 
-  async disableShareLink(input: ShareLinkInput): Promise<DisableCalendarShareLinkResponse> {
+  async disableShareLink(
+    input: ShareLinkInput,
+  ): Promise<DisableCalendarShareLinkResponse> {
     const { userId, calendarId } = input;
 
     const calendar = await this.prisma.calendar.findFirst({
