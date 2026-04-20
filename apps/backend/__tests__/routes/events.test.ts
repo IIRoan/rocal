@@ -112,7 +112,9 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(eventsRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(eventsRoutes);
 }
 
 async function readText(response: Response) {
@@ -196,6 +198,32 @@ describe("eventsRoutes – color validation", () => {
         expect.objectContaining({
           data: expect.objectContaining({ color: "#A1B2C3" }),
         }),
+      );
+    });
+
+    it("falls back to resolve the authenticated user from the request context", async () => {
+      mockEnsureAuthenticatedUser.mockClear();
+      mockPrisma.calendarEvent.create.mockResolvedValue({
+        id: "event-1",
+        ...validEventBody,
+        color: null,
+        userId: "user-1",
+        category: null,
+        calendar: ownedCalendar,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(validEventBody),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Request),
       );
     });
 
@@ -290,7 +318,6 @@ describe("eventsRoutes – color validation", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             color: "rose",
-            updatedAt: existingEvent.updatedAt.toISOString(),
           }),
         }),
       );
@@ -299,6 +326,7 @@ describe("eventsRoutes – color validation", () => {
     });
 
     it("accepts valid hex color on update", async () => {
+      mockEnsureAuthenticatedUser.mockClear();
       mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
       mockPrisma.calendarEvent.update.mockResolvedValue({
         ...existingEvent,
@@ -311,12 +339,15 @@ describe("eventsRoutes – color validation", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             color: "#FF5733",
-            updatedAt: existingEvent.updatedAt.toISOString(),
           }),
         }),
       );
 
       expect(response.status).toBe(200);
+      expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Request),
+      );
     });
 
     it("rejects invalid color on update", async () => {
@@ -328,7 +359,6 @@ describe("eventsRoutes – color validation", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             color: "chartreuse",
-            updatedAt: existingEvent.updatedAt.toISOString(),
           }),
         }),
       );

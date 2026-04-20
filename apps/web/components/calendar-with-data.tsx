@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
+import React, {
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { createLogger } from "@workspace/logger";
 import {
   EventCalendar,
@@ -41,7 +47,8 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { openEventEditor, previewEvent } = useCommandPalette();
 
   // Context-menu preview: ghost event shown while right-click menu is open
-  const [contextPreviewEvent, setContextPreviewEvent] = useState<CalendarEvent | null>(null);
+  const [contextPreviewEvent, setContextPreviewEvent] =
+    useState<CalendarEvent | null>(null);
 
   // Get the initial view from settings, fallback to month
   const initialView = settings?.defaultView || "month";
@@ -97,16 +104,20 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
   // Use the shared calendar data
   const calendarData = useSharedCalendarData();
+  const { prefetchRange } = calendarData;
 
   // Context-menu preview handler: resolves calendar fallback before storing
-  const handleSetPreview = useCallback((event: CalendarEvent | null) => {
-    if (event && !event.calendarId) {
-      const fallbackId = calendarData.calendars?.[0]?.id || "";
-      setContextPreviewEvent({ ...event, calendarId: fallbackId });
-    } else {
-      setContextPreviewEvent(event);
-    }
-  }, [calendarData.calendars]);
+  const handleSetPreview = useCallback(
+    (event: CalendarEvent | null) => {
+      if (event && !event.calendarId) {
+        const fallbackId = calendarData.calendars?.[0]?.id || "";
+        setContextPreviewEvent({ ...event, calendarId: fallbackId });
+      } else {
+        setContextPreviewEvent(event);
+      }
+    },
+    [calendarData.calendars],
+  );
 
   // Set the date range when component mounts (only once)
   const initializedRef = useRef(false);
@@ -120,7 +131,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       calendarData.setDateRange(defaultDateRange);
       initializedRef.current = true;
     }
-  }, [defaultDateRange, settingsLoading, calendarData]); // Add dependencies to ensure proper initialization
+  }, [defaultDateRange, settingsLoading, calendarData, initialView]); // Add dependencies to ensure proper initialization
 
   // View-aware prefetch: when the view or date changes, prefetch adjacent periods
   useEffect(() => {
@@ -131,7 +142,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     const deferredRanges = ranges.slice(2);
 
     for (const range of eagerRanges) {
-      calendarData.prefetchRange(range);
+      prefetchRange(range);
     }
 
     if (deferredRanges.length === 0) {
@@ -140,7 +151,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
     const runDeferredPrefetch = () => {
       for (const range of deferredRanges) {
-        calendarData.prefetchRange(range);
+        prefetchRange(range);
       }
     };
 
@@ -157,7 +168,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
     const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, calendarData.prefetchRange]);
+  }, [currentDate, currentView, prefetchRange]);
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(
@@ -224,7 +235,8 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     // Merge context-menu preview (ghost event while right-click menu is open)
     if (contextPreviewEvent) {
       const calendar = calendarMap.get(contextPreviewEvent.calendarId);
-      const previewColor = contextPreviewEvent.color || calendar?.color || undefined;
+      const previewColor =
+        contextPreviewEvent.color || calendar?.color || undefined;
       transformedEventsList.push({
         ...contextPreviewEvent,
         description: contextPreviewEvent.description ?? undefined,

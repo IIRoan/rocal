@@ -12,7 +12,9 @@ import { auth } from "../../lib/auth";
 import { UnauthorizedError } from "../../lib/errors";
 import { requireAuth } from "../../lib/auth-guard";
 
-const mockGetSession = auth.api.getSession as jest.Mock<() => Promise<any>>;
+const mockGetSession = auth.api.getSession as unknown as jest.Mock<
+  () => Promise<any>
+>;
 const deriveHook = requireAuth.event.transform![0]!.fn as (ctx: any) => Promise<any>;
 const beforeHandleHook =
   requireAuth.event.beforeHandle![0]!.fn as (ctx: any) => void;
@@ -28,6 +30,7 @@ describe("requireAuth", () => {
     ).resolves.toEqual({
       user: { id: "user-1", email: "user@example.com" },
       session: { id: "session-1" },
+      authenticatedUser: { id: "user-1", email: "user@example.com" },
     });
 
     expect(mockGetSession).not.toHaveBeenCalled();
@@ -46,6 +49,7 @@ describe("requireAuth", () => {
     ).resolves.toEqual({
       user: { id: "user-2", email: "fallback@example.com" },
       session: { id: "session-2" },
+      authenticatedUser: { id: "user-2", email: "fallback@example.com" },
     });
   });
 
@@ -56,7 +60,11 @@ describe("requireAuth", () => {
       deriveHook({
         request: new Request("http://localhost"),
       }),
-    ).resolves.toEqual({ user: null, session: null });
+    ).resolves.toEqual({
+      user: null,
+      session: null,
+      authenticatedUser: null,
+    });
 
     mockGetSession.mockRejectedValueOnce(new Error("session failed"));
 
@@ -64,7 +72,11 @@ describe("requireAuth", () => {
       deriveHook({
         request: new Request("http://localhost"),
       }),
-    ).resolves.toEqual({ user: null, session: null });
+    ).resolves.toEqual({
+      user: null,
+      session: null,
+      authenticatedUser: null,
+    });
   });
 
   it("throws UnauthorizedError when beforeHandle receives no valid user", () => {
@@ -74,5 +86,21 @@ describe("requireAuth", () => {
 
   it("allows requests with a valid user id", () => {
     expect(() => beforeHandleHook({ user: { id: "user-1" } })).not.toThrow();
+  });
+
+  it("exposes authenticatedUser alongside the legacy auth context", async () => {
+    const user = { id: "user-1", email: "user@example.com" };
+
+    await expect(
+      deriveHook({
+        user,
+        session: { id: "session-1" },
+        request: new Request("http://localhost"),
+      }),
+    ).resolves.toEqual({
+      user,
+      session: { id: "session-1" },
+      authenticatedUser: user,
+    });
   });
 });

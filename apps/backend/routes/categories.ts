@@ -1,207 +1,124 @@
 import { Elysia, t } from "elysia";
-import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/auth-guard";
-import {
-  ALLOWED_CALENDAR_COLORS,
-  isValidCalendarColor,
-} from "../lib/colors";
+import type { AuthenticatedUser } from "../lib/auth-utils";
+import { strictObject } from "../lib/validation";
+import { authenticatedRouteDetail } from "../lib/openapi";
+import { resolveRouteUser } from "../lib/request-user";
+import { prisma } from "../lib/prisma";
+import { CategoryService } from "../services/category.service";
 
-import { auth } from "../lib/auth";
-import { ensureAuthenticatedUser } from "../lib/auth-utils";
+const categoryService = new CategoryService(prisma);
 
-export const categoriesRoutes = new Elysia({ prefix: "/categories" })
+export const categoriesRoutes = new Elysia({
+  prefix: "/categories",
+  normalize: false,
+})
   .use(requireAuth)
-  .get(
-    "/",
-    async ({ user, request }: any) => {
-      user = await ensureAuthenticatedUser(user, request as Request);
-      // Fetch user's active categories with usage count
-      const categories = await prisma.eventCategory.findMany({
-        where: {
-          userId: user.id,
-          isActive: true,
+  .guard(authenticatedRouteDetail("Categories"), (app) =>
+    app
+      .get(
+        "/",
+        async ({
+          authenticatedUser,
+          request,
+        }: {
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return categoryService.list(user.id);
         },
-        include: {
-          _count: {
-            select: {
-              events: true,
-            },
+        {
+          detail: {
+            summary: "Get user categories",
           },
         },
-        orderBy: {
-          name: "asc",
-        },
-      });
+      )
 
-      // Transform to include usage count
-      const categoriesWithCount = categories.map((category) => ({
-        ...category,
-        usageCount: category._count.events,
-        _count: undefined,
-      }));
-
-      return { categories: categoriesWithCount };
-    },
-    {},
-  )
-
-  .post(
-    "/",
-    async ({ body, user, request }: any) => {
-      // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
-
-      const { name, color } = body;
-
-      // Validate required fields
-      if (!name || !color) {
-        throw new Error("Name and color are required fields");
-      }
-
-      // Validate color against allowed values (allow predefined colors or hex colors)
-      if (!isValidCalendarColor(color)) {
-        throw new Error(
-          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
-        );
-      }
-
-      // Check for name uniqueness per user
-      const existingCategory = await prisma.eventCategory.findFirst({
-        where: {
-          userId: user.id,
-          name: name.trim(),
-        },
-      });
-
-      if (existingCategory) {
-        throw new Error("A category with this name already exists");
-      }
-
-      // Create the category
-      const category = await prisma.eventCategory.create({
-        data: {
-          name: name.trim(),
-          color,
-          userId: user.id,
-        },
-      });
-
-      return category;
-    },
-    {
-      body: t.Object({
-        name: t.String(),
-        color: t.String(),
-      }),
-    },
-  )
-
-  .put(
-    "/:id",
-    async ({ params, body, user, request }: any) => {
-      // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
-
-      const { id } = params;
-      const updates = body;
-
-      // Verify category ownership
-      const existingCategory = await prisma.eventCategory.findFirst({
-        where: {
-          id,
-          userId: user.id,
-        },
-      });
-
-      if (!existingCategory) {
-        throw new Error("Category not found or access denied");
-      }
-
-      // Validate color if provided (allow predefined colors or hex colors)
-      if (updates.color && !isValidCalendarColor(updates.color)) {
-        throw new Error(
-          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
-        );
-      }
-
-      // Check for name uniqueness if name is being updated
-      if (updates.name && updates.name.trim() !== existingCategory.name) {
-        const duplicateCategory = await prisma.eventCategory.findFirst({
-          where: {
+      .post(
+        "/",
+        async ({
+          body,
+          authenticatedUser,
+          request,
+        }: {
+          body: { name: string; color: string };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return categoryService.create({
             userId: user.id,
-            name: updates.name.trim(),
-            id: { not: id },
+            name: body.name,
+            color: body.color,
+          });
+        },
+        {
+          body: strictObject({
+            name: t.String(),
+            color: t.String(),
+          }),
+          detail: {
+            summary: "Create a category",
           },
-        });
-
-        if (duplicateCategory) {
-          throw new Error("A category with this name already exists");
-        }
-      }
-
-      // Update the category
-      const updatedCategory = await prisma.eventCategory.update({
-        where: { id },
-        data: {
-          ...updates,
-          name: updates.name ? updates.name.trim() : undefined,
         },
-      });
+      )
 
-      return updatedCategory;
-    },
-    {
-      params: t.Object({
-        id: t.String(),
-      }),
-      body: t.Object({
-        name: t.Optional(t.String()),
-        color: t.Optional(t.String()),
-      }),
-    },
-  )
-
-  .delete(
-    "/:id",
-    async ({ params, user, request }: any) => {
-      // Robust user check with fallback
-      user = await ensureAuthenticatedUser(user, request as Request);
-
-      const { id } = params;
-
-      // Verify category ownership
-      const existingCategory = await prisma.eventCategory.findFirst({
-        where: {
-          id,
-          userId: user.id,
+      .put(
+        "/:id",
+        async ({
+          params,
+          body,
+          authenticatedUser,
+          request,
+        }: {
+          params: { id: string };
+          body: { name?: string; color?: string };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return categoryService.update({
+            userId: user.id,
+            categoryId: params.id,
+            name: body.name,
+            color: body.color,
+          });
         },
-      });
-
-      if (!existingCategory) {
-        throw new Error("Category not found or access denied");
-      }
-
-      // Handle orphaned events by setting their categoryId to null
-      await prisma.calendarEvent.updateMany({
-        where: {
-          categoryId: id,
-          userId: user.id,
+        {
+          params: strictObject({ id: t.String() }),
+          body: strictObject({
+            name: t.Optional(t.String()),
+            color: t.Optional(t.String()),
+          }),
+          detail: {
+            summary: "Update a category",
+          },
         },
-        data: {
-          categoryId: null,
+      )
+
+      .delete(
+        "/:id",
+        async ({
+          params,
+          authenticatedUser,
+          request,
+        }: {
+          params: { id: string };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return categoryService.delete({
+            userId: user.id,
+            categoryId: params.id,
+          });
         },
-      });
-
-      // Delete the category
-      await prisma.eventCategory.delete({
-        where: { id },
-      });
-
-      return { success: true, message: "Category deleted successfully" };
-    },
-    {
-      params: t.Object({
-        id: t.String(),
-      }),
-    },
+        {
+          params: strictObject({ id: t.String() }),
+          detail: {
+            summary: "Delete a category",
+          },
+        },
+      ),
   );

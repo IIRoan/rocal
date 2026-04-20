@@ -70,7 +70,9 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(calendarsRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(calendarsRoutes);
 }
 
 async function readJson(response: Response) {

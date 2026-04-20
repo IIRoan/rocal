@@ -70,7 +70,7 @@ const betterAuth = new Elysia({ name: "better-auth" })
   });
 
 export const createAPI = (prefix = "") => {
-  const app = new Elysia({ prefix });
+  const app = new Elysia({ prefix, normalize: false });
 
   // Initialize Calendar sync service
   const calendarSyncService = CalendarSyncService.getInstance();

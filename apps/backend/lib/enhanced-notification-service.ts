@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Enhanced Notification Service
  *
@@ -16,18 +17,44 @@ import type {
   EventNotification,
   User,
   UserSettings,
+  Calendar,
+  EventCategory,
 } from "../generated/prisma";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import { createLogger } from "@workspace/logger";
 // Conditional import to avoid Next.js build issues
-let EventReminderEmail: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let EventReminderEmail: ((...args: any[]) => React.JSX.Element) | undefined;
 if (!process.env.SKIP_EMAIL_TEMPLATES) {
   EventReminderEmail =
     require("../emails/templates/event-reminder").EventReminderEmail;
 }
 
 const logger = createLogger("backend:enhanced-notifications");
+
+type EventWithRelations = CalendarEvent & {
+  calendar?: Calendar | null;
+  category?: EventCategory | null;
+};
+
+type NotificationEventData = EventNotification & {
+  event: EventWithRelations & {
+    user: User & { settings?: UserSettings | null };
+  };
+};
+
+interface FormattedEventDetails {
+  timeUntilEvent: string;
+  eventDate: string;
+  eventTime: string;
+  duration?: string;
+  location?: string;
+  categoryName?: string;
+  categoryColor: string;
+  description?: string;
+  reminderText: string;
+}
 
 export interface NotificationStatus {
   isRunning: boolean;
@@ -342,7 +369,7 @@ export class EnhancedNotificationService {
         });
       });
     } catch (error) {
-      logger.error("Failed to log service startup:", error);
+      logger.error("Failed to log service startup", error);
       // Don't throw - this is just for monitoring
     }
   }
@@ -668,11 +695,12 @@ export class EnhancedNotificationService {
             // Process each notification configuration
             for (const config of notifications) {
               try {
-                const schedule = NotificationCalculator.buildNotificationSchedule(
-                  actualEventStart,
-                  config.minutesBefore,
-                  event.timezone,
-                );
+                const schedule =
+                  NotificationCalculator.buildNotificationSchedule(
+                    actualEventStart,
+                    config.minutesBefore,
+                    event.timezone,
+                  );
 
                 // Calculate exact notification time
                 const calcResult =
@@ -1124,13 +1152,7 @@ export class EnhancedNotificationService {
    * @returns Result indicating success/failure and retry information
    */
   private async sendNotificationWithRetry(
-    notification: EventNotification & {
-      event: CalendarEvent & {
-        user: User & { settings?: UserSettings | null };
-        calendar?: any;
-        category?: any;
-      };
-    },
+    notification: NotificationEventData,
   ): Promise<NotificationDeliveryResult> {
     try {
       await this.sendNotification(notification);
@@ -1156,13 +1178,7 @@ export class EnhancedNotificationService {
    * @param result - The delivery result with error information
    */
   private async handleNotificationFailure(
-    notification: EventNotification & {
-      event: CalendarEvent & {
-        user: User & { settings?: UserSettings | null };
-        calendar?: any;
-        category?: any;
-      };
-    },
+    notification: NotificationEventData,
     result: NotificationDeliveryResult,
   ): Promise<void> {
     const existingRetry = this.retryQueue.get(notification.id);
@@ -1510,13 +1526,7 @@ export class EnhancedNotificationService {
    * @param notification - The notification to send with included event and user data
    */
   private async sendNotification(
-    notification: EventNotification & {
-      event: CalendarEvent & {
-        user: User & { settings?: UserSettings | null };
-        calendar?: any;
-        category?: any;
-      };
-    },
+    notification: NotificationEventData,
   ): Promise<void> {
     const { event } = notification;
     const user = event.user;
@@ -1626,10 +1636,8 @@ export class EnhancedNotificationService {
    * @param minutesBefore - Minutes before the event
    */
   private async sendEmailNotification(
-    event: CalendarEvent & {
+    event: EventWithRelations & {
       user: User & { settings?: UserSettings | null };
-      calendar?: any;
-      category?: any;
     },
     user: User & { settings?: UserSettings | null },
     minutesBefore: number,
@@ -1717,10 +1725,8 @@ export class EnhancedNotificationService {
    * @returns Enhanced email content with HTML and text versions
    */
   private async generateEnhancedEmailContent(
-    event: CalendarEvent & {
+    event: EventWithRelations & {
       user: User & { settings?: UserSettings | null };
-      calendar?: any;
-      category?: any;
     },
     user: User & { settings?: UserSettings | null },
     minutesBefore: number,
@@ -1772,7 +1778,7 @@ export class EnhancedNotificationService {
    * @returns Formatted event details
    */
   private formatEventDetailsForEmail(
-    event: CalendarEvent & { calendar?: any; category?: any },
+    event: EventWithRelations,
     timeFormat: string,
     timezone: string,
     minutesBefore: number,
@@ -1815,7 +1821,7 @@ export class EnhancedNotificationService {
   private async renderEmailTemplateWithCaching(
     event: CalendarEvent,
     user: User,
-    formattedDetails: any,
+    formattedDetails: FormattedEventDetails,
     userTheme: "light" | "dark" | "system",
   ): Promise<string> {
     // Create cache key for template rendering (for performance)
@@ -1833,6 +1839,9 @@ export class EnhancedNotificationService {
     }
 
     // Render template with enhanced props
+    if (!EventReminderEmail) {
+      throw new Error("Email template not available");
+    }
     const emailHTML = await render(
       EventReminderEmail({
         eventTitle: event.title,
@@ -1877,7 +1886,7 @@ export class EnhancedNotificationService {
    */
   private generatePlainTextEmail(
     event: CalendarEvent,
-    formattedDetails: any,
+    formattedDetails: FormattedEventDetails,
   ): string {
     const lines = [
       "📅 ROCANI - Event Reminder",
@@ -2081,7 +2090,7 @@ export class EnhancedNotificationService {
     }
 
     const errorMessage = error.message.toLowerCase();
-    const errorCode = (error as any).code;
+    const errorCode = (error as { code?: string }).code;
 
     // Retryable database errors
     const retryableErrors = [
@@ -2144,7 +2153,7 @@ export class EnhancedNotificationService {
     }
 
     const errorMessage = error.message.toLowerCase();
-    const errorCode = (error as any).code;
+    const errorCode = (error as { code?: string }).code;
 
     // Retryable update errors (concurrent access, deadlocks, etc.)
     const retryableUpdateErrors = [
@@ -2432,7 +2441,7 @@ export class EnhancedNotificationService {
         day: "numeric",
         timeZone: timezone,
       });
-    } catch (error) {
+    } catch {
       // Fallback to UTC if timezone is invalid
       return date.toLocaleDateString("en-US", {
         weekday: "long",
@@ -2464,7 +2473,7 @@ export class EnhancedNotificationService {
         hour12: !is24Hour,
         timeZone: timezone,
       });
-    } catch (error) {
+    } catch {
       // Fallback to UTC if timezone is invalid
       return date.toLocaleTimeString("en-US", {
         hour: "numeric",
@@ -2545,7 +2554,7 @@ export class EnhancedNotificationService {
   private generateTemplateCacheKey(
     event: CalendarEvent,
     user: User,
-    formattedDetails: any,
+    formattedDetails: FormattedEventDetails,
     userTheme: string,
   ): string {
     // Create a hash-like key based on relevant data
@@ -2607,7 +2616,7 @@ export class EnhancedNotificationService {
     // For now, just log browser notifications
     // In a real implementation, you would send this via WebSocket or push notification
     logger.info(
-      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}"`,
+      `🔔 Browser notification would be sent to ${user.email} for event "${event.title}" (${minutesBefore} min before)`,
     );
   }
 
@@ -2761,9 +2770,7 @@ export class EnhancedNotificationService {
         },
       });
 
-      logger.ok(
-        `✅ Deleted ${deletedLogsResult.count} old notification logs`,
-      );
+      logger.ok(`✅ Deleted ${deletedLogsResult.count} old notification logs`);
 
       // Step 2: Clean up old sent notifications that are no longer needed
       // Only delete notifications that are:

@@ -463,6 +463,7 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		CalendarUrl:    buildFrontendURL("/dashboard", nil),
 		SettingsUrl:    buildFrontendURL("/settings", nil),
 		PrivacyUrl:     buildFrontendURL("/privacy", nil),
+		LogoUrl:        "https://solace.onl/favicon-192x192.png",
 	}
 
 	html, err := templates.RenderEventReminder(templateData)
@@ -657,11 +658,16 @@ func (ns *NotificationServer) formatReminderSummary(minutesBefore int) string {
 		return fmt.Sprintf("%d hours", hours)
 	}
 
-	if hours == 1 {
-		return fmt.Sprintf("1 hour %d minutes", remainingMinutes)
+	minuteLabel := "minutes"
+	if remainingMinutes == 1 {
+		minuteLabel = "minute"
 	}
 
-	return fmt.Sprintf("%d hours %d minutes", hours, remainingMinutes)
+	if hours == 1 {
+		return fmt.Sprintf("1 hour %d %s", remainingMinutes, minuteLabel)
+	}
+
+	return fmt.Sprintf("%d hours %d %s", hours, remainingMinutes, minuteLabel)
 }
 
 func sanitizeMailFragment(value string) string {
