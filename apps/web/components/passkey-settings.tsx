@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,16 +33,11 @@ export function PasskeySettings({
   const [showAddPasskey, setShowAddPasskey] = useState(startInAddMode);
   const [passkeyName, setPasskeyName] = useState("");
 
-  // Reset to add mode when props change
-  const [prevStartInAddMode, setPrevStartInAddMode] = useState(startInAddMode);
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (startInAddMode !== prevStartInAddMode || open !== prevOpen) {
-    setPrevStartInAddMode(startInAddMode);
-    setPrevOpen(open);
+  useEffect(() => {
     if (startInAddMode && open) {
       setShowAddPasskey(true);
     }
-  }
+  }, [open, startInAddMode]);
 
   // Passkey utility functions
   const getDeviceIcon = (deviceType: string) => {

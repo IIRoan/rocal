@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import type { PrismaClient } from "../generated/prisma/index.js";
 import type {
   ISubscriptionService,
@@ -22,6 +23,15 @@ import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:subscription-service");
+const CALENDAR_FETCH_TIMEOUT_MS = 10_000;
+const MAX_CALENDAR_REDIRECTS = 5;
+const CALENDAR_FETCH_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+  Accept: "text/calendar,text/plain,*/*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+};
 
 export class SubscriptionService implements ISubscriptionService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -38,6 +48,132 @@ export class SubscriptionService implements ISubscriptionService {
     }
 
     return userSettings.timezone || "UTC";
+  }
+
+  private validateExternalCalendarUrl(url: string): URL {
+    const parsedUrl = new URL(url);
+
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      throw new Error("Only HTTP and HTTPS URLs are supported");
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+    if (this.isPrivateHostname(hostname)) {
+      throw new Error(
+        "URLs pointing to internal or private networks are not allowed",
+      );
+    }
+
+    return parsedUrl;
+  }
+
+  private isPrivateHostname(hostname: string): boolean {
+    if (
+      hostname === "localhost" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::" ||
+      hostname === "::1" ||
+      hostname.endsWith(".local")
+    ) {
+      return true;
+    }
+
+    if (hostname.startsWith("::ffff:")) {
+      return this.isPrivateHostname(hostname.slice("::ffff:".length));
+    }
+
+    const ipVersion = isIP(hostname);
+
+    if (ipVersion === 4) {
+      const [firstOctet = 0, secondOctet = 0] = hostname
+        .split(".")
+        .map((octet) => Number.parseInt(octet, 10));
+
+      return (
+        firstOctet === 0 ||
+        firstOctet === 10 ||
+        firstOctet === 127 ||
+        (firstOctet === 169 && secondOctet === 254) ||
+        (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) ||
+        (firstOctet === 192 && secondOctet === 168)
+      );
+    }
+
+    if (ipVersion === 6) {
+      return (
+        hostname === "::1" ||
+        hostname === "::" ||
+        hostname.startsWith("fc") ||
+        hostname.startsWith("fd") ||
+        /^fe[89ab]/.test(hostname)
+      );
+    }
+
+    return false;
+  }
+
+  private async fetchCalendarResponse(
+    url: string,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<Response> {
+    let currentUrl = this.validateExternalCalendarUrl(url).toString();
+
+    for (
+      let redirectCount = 0;
+      redirectCount <= MAX_CALENDAR_REDIRECTS;
+      redirectCount++
+    ) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        CALENDAR_FETCH_TIMEOUT_MS,
+      );
+
+      try {
+        const response = await fetch(currentUrl, {
+          headers: {
+            ...CALENDAR_FETCH_HEADERS,
+            ...extraHeaders,
+          },
+          redirect: "manual",
+          signal: controller.signal,
+        });
+
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          if (redirectCount === MAX_CALENDAR_REDIRECTS) {
+            throw new Error("Too many redirects while fetching calendar URL");
+          }
+
+          const location = response.headers.get("location");
+
+          if (!location) {
+            throw new Error(
+              "Calendar server returned a redirect without a location",
+            );
+          }
+
+          currentUrl = this.validateExternalCalendarUrl(
+            new URL(location, currentUrl).toString(),
+          ).toString();
+          continue;
+        }
+
+        return response;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error(
+            `Calendar request timed out after ${CALENDAR_FETCH_TIMEOUT_MS / 1000} seconds`,
+          );
+        }
+
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    throw new Error("Too many redirects while fetching calendar URL");
   }
 
   async list(userId: string) {
@@ -70,35 +206,7 @@ export class SubscriptionService implements ISubscriptionService {
     // Test the URL
     let testParseResult;
     try {
-      const parsedUrl = new URL(url);
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new Error("Only HTTP and HTTPS URLs are supported");
-      }
-      const hostname = parsedUrl.hostname.toLowerCase();
-      if (
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "::1" ||
-        hostname === "0.0.0.0" ||
-        hostname.endsWith(".local") ||
-        hostname.startsWith("10.") ||
-        hostname.startsWith("192.168.") ||
-        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
-      ) {
-        throw new Error(
-          "URLs pointing to internal or private networks are not allowed",
-        );
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-          Accept: "text/calendar,text/plain,*/*",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Cache-Control": "no-cache",
-        },
-      });
+      const response = await this.fetchCalendarResponse(url);
 
       if (!response.ok) {
         if (response.status >= 500) {
@@ -351,18 +459,11 @@ export class SubscriptionService implements ISubscriptionService {
     const startTime = Date.now();
 
     try {
-      const response = await fetch(subscription.url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-          Accept: "text/calendar,text/plain,*/*",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Cache-Control": "no-cache",
-          ...(subscription.etag && { "If-None-Match": subscription.etag }),
-          ...(subscription.lastModified && {
-            "If-Modified-Since": subscription.lastModified,
-          }),
-        },
+      const response = await this.fetchCalendarResponse(subscription.url, {
+        ...(subscription.etag && { "If-None-Match": subscription.etag }),
+        ...(subscription.lastModified && {
+          "If-Modified-Since": subscription.lastModified,
+        }),
       });
 
       if (response.status === 304) {
