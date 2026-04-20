@@ -1,26 +1,24 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
 interface TransitionContainerProps {
-  direction: "forward" | "back";
   children: React.ReactNode;
   viewKey?: string;
 }
 
-// Timing constants
-const EXIT_MS = 70; // old content fades out
-const ENTER_MS = 140; // new content fades in
-const HEIGHT_MS = 300; // container height animates
-const HEIGHT_EASING = "cubic-bezier(0.25, 1, 0.5, 1)"; // fast start, gentle settle
+const ENTER_MS = 160;
+const HEIGHT_MS = 180;
+const TRANSITION_EASING = "cubic-bezier(0, 0, 0.2, 1)";
+const ENTER_OFFSET_PX = 4;
 
-type Phase = "idle" | "exiting" | "entering";
+type Phase = "idle" | "pre-enter" | "entering";
 
 export function TransitionContainer({
-  direction,
   children,
   viewKey,
 }: TransitionContainerProps) {
   const [displayChildren, setDisplayChildren] = useState(children);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState<number | undefined>(
@@ -32,6 +30,27 @@ export function TransitionContainer({
     return contentRef.current?.scrollHeight;
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => {
+      setPrefersReducedMotion(mediaQuery.matches);
+    };
+
+    updatePreference();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updatePreference);
+      return () => mediaQuery.removeEventListener("change", updatePreference);
+    }
+
+    mediaQuery.addListener(updatePreference);
+    return () => mediaQuery.removeListener(updatePreference);
+  }, []);
+
   // Keep a ref to latest children so transition timers can read fresh content
   const latestChildren = useRef(children);
   useEffect(() => {
@@ -41,6 +60,7 @@ export function TransitionContainer({
   // Track height passively when idle (handles within-view resizes)
   useEffect(() => {
     if (phase !== "idle" || !contentRef.current) return;
+
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const h =
@@ -53,7 +73,7 @@ export function TransitionContainer({
   }, [phase]);
 
   // Update displayed content for same-view changes (e.g. data refetch)
-  // Only when not in the middle of an exit transition
+  // without interrupting the initial fade-in frame of a view switch.
   const prevChildrenRef = useRef(children);
   useEffect(() => {
     if (children === prevChildrenRef.current) {
@@ -62,7 +82,7 @@ export function TransitionContainer({
 
     prevChildrenRef.current = children;
 
-    if (phase !== "exiting") {
+    if (phase !== "pre-enter") {
       const frameId = requestAnimationFrame(() => {
         setDisplayChildren(children);
       });
@@ -79,22 +99,9 @@ export function TransitionContainer({
 
     prevViewKeyRef.current = viewKey;
 
-    const frameId = requestAnimationFrame(() => {
-      setHeightAnimating(false);
-      setPhase("exiting");
-    });
-
-    return () => cancelAnimationFrame(frameId);
-  }, [viewKey]);
-
-  // Lock height when entering exiting phase, then schedule the transition timers
-  useEffect(() => {
-    if (phase !== "exiting") return;
-
     const frameIds: number[] = [];
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    // Lock current height before anything changes
     const prevH = measureHeight();
     if (prevH !== undefined) {
       const frameId = requestAnimationFrame(() => {
@@ -103,71 +110,89 @@ export function TransitionContainer({
       frameIds.push(frameId);
     }
 
-    // Phase 2: After exit, swap content + start height animation + fade in
+    setDisplayChildren(latestChildren.current);
+
+    if (prefersReducedMotion) {
+      const frameId = requestAnimationFrame(() => {
+        const nextH = measureHeight();
+        if (nextH !== undefined) {
+          setContainerHeight(nextH);
+        }
+        setHeightAnimating(false);
+        setPhase("idle");
+      });
+      frameIds.push(frameId);
+
+      return () => {
+        for (const queuedFrameId of frameIds) {
+          cancelAnimationFrame(queuedFrameId);
+        }
+      };
+    }
+
+    setHeightAnimating(false);
+    setPhase("pre-enter");
+
+    const enterFrameId = requestAnimationFrame(() => {
+      const measureFrameId = requestAnimationFrame(() => {
+        const nextH = measureHeight();
+        if (nextH !== undefined) {
+          setHeightAnimating(true);
+          setContainerHeight(nextH);
+        }
+        setPhase("entering");
+      });
+
+      frameIds.push(measureFrameId);
+    });
+    frameIds.push(enterFrameId);
+
     timers.push(
       setTimeout(() => {
-        setDisplayChildren(latestChildren.current);
-        setPhase("entering");
-
-        // Measure new content height after React renders it
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const newH = measureHeight();
-            if (newH !== undefined) {
-              setHeightAnimating(true);
-              setContainerHeight(newH);
-            }
-          });
-        });
-      }, EXIT_MS),
+        setPhase("idle");
+        setHeightAnimating(false);
+        const settledHeight = measureHeight();
+        if (settledHeight !== undefined) {
+          setContainerHeight(settledHeight);
+        }
+      }, Math.max(ENTER_MS, HEIGHT_MS)),
     );
 
-    // Phase 3: Settle — transition complete
-    timers.push(
-      setTimeout(
-        () => {
-          setPhase("idle");
-          setHeightAnimating(false);
-          const h = measureHeight();
-          if (h !== undefined) setContainerHeight(h);
-        },
-        EXIT_MS + Math.max(ENTER_MS, HEIGHT_MS),
-      ),
-    );
     return () => {
-      for (const frameId of frameIds) {
-        cancelAnimationFrame(frameId);
+      for (const queuedFrameId of frameIds) {
+        cancelAnimationFrame(queuedFrameId);
       }
       for (const timer of timers) {
         clearTimeout(timer);
       }
     };
-  }, [phase, measureHeight]);
+  }, [measureHeight, prefersReducedMotion, viewKey]);
 
-  // Compute inline styles for the content based on phase
   const contentStyle: React.CSSProperties =
-    phase === "exiting"
+    phase === "pre-enter"
       ? {
           opacity: 0,
-          transform: `translateX(${direction === "forward" ? "-8px" : "8px"})`,
-          transition: `opacity ${EXIT_MS}ms ease-out, transform ${EXIT_MS}ms ease-out`,
+          transform: `translateY(${ENTER_OFFSET_PX}px)`,
+          willChange: "opacity, transform",
         }
       : phase === "entering"
         ? {
             opacity: 1,
-            transform: "translateX(0)",
-            transition: `opacity ${ENTER_MS}ms ease-in, transform ${ENTER_MS}ms ease-in`,
+            transform: "translateY(0)",
+            willChange: "opacity, transform",
+            transition: `opacity ${ENTER_MS}ms ${TRANSITION_EASING}, transform ${ENTER_MS}ms ${TRANSITION_EASING}`,
           }
-        : { opacity: 1, transform: "translateX(0)" };
+        : { opacity: 1, transform: "translateY(0)" };
 
   return (
     <div
       className="relative overflow-hidden"
       style={{
         height: containerHeight !== undefined ? `${containerHeight}px` : "auto",
-        transition: heightAnimating
-          ? `height ${HEIGHT_MS}ms ${HEIGHT_EASING}`
-          : "none",
+        transition:
+          heightAnimating && !prefersReducedMotion
+            ? `height ${HEIGHT_MS}ms ${TRANSITION_EASING}`
+            : "none",
       }}
     >
       <div ref={contentRef} style={contentStyle}>
