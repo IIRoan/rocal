@@ -53,7 +53,9 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(settingsRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(settingsRoutes);
 }
 
 async function readJson(response: Response) {
@@ -171,7 +173,7 @@ describe("settingsRoutes", () => {
 
     expect(response.status).toBe(500);
     await expect(readText(response)).resolves.toBe(
-      "Invalid working days format - must be valid JSON array",
+      "Working days must be a JSON array of numbers 0-6",
     );
   });
 

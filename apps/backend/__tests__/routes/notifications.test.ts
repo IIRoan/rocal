@@ -73,7 +73,9 @@ const mockBuildNotificationSchedule =
   NotificationCalculator.buildNotificationSchedule as jest.Mock;
 
 function createApp() {
-  return new Elysia().use(errorHandler).use(notificationsRoutes);
+  return new Elysia({ normalize: false })
+    .use(errorHandler)
+    .use(notificationsRoutes);
 }
 
 function eventFixture(
@@ -120,6 +122,7 @@ describe("notificationsRoutes", () => {
   });
 
   it("returns mapped notification rows for owned events", async () => {
+    mockEnsureAuthenticatedUser.mockClear();
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
     mockPrisma.$queryRaw.mockResolvedValue([
       {
@@ -164,6 +167,10 @@ describe("notificationsRoutes", () => {
         count: 1,
       },
     });
+    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+      undefined,
+      expect.any(Request),
+    );
   });
 
   it("surfaces not-found and wrapped database failures during reads", async () => {
@@ -298,6 +305,31 @@ describe("notificationsRoutes", () => {
     );
   });
 
+  it("rejects unexpected notification fields", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/notifications/event/event-extra-field", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          notifications: [
+            {
+              notificationType: "email",
+              minutesBefore: 15,
+              isEnabled: true,
+              unexpected: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.text()).resolves.toContain(
+      "Property 'notifications.0.unexpected' should not be provided",
+    );
+    expect(mockPrisma.calendarEvent.findFirst).not.toHaveBeenCalled();
+  });
+
   it("returns a no-op success when updating a recurring instance", async () => {
     const response = await createApp().handle(
       new Request(
@@ -422,10 +454,9 @@ describe("notificationsRoutes", () => {
       }),
     );
 
+    const responseBody = await response.text();
     expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe(
-      "Failed to update event notifications",
-    );
+    expect(responseBody).toBe("Failed to update event notifications");
   });
 
   it("deletes notifications for owned events and no-ops for recurring instances", async () => {
@@ -476,9 +507,8 @@ describe("notificationsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe(
-      "Failed to delete event notifications",
-    );
+    const body = await response.text();
+    expect(body).toBe("Failed to delete event notifications");
   });
 
   it("enforces the update rate limit", async () => {

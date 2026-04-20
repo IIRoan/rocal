@@ -55,9 +55,10 @@ const socialRedirectUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
   frontendUrl;
 
-const cookieSameSite = (
-  process.env.AUTH_COOKIE_SAME_SITE || "lax"
-) as "lax" | "strict" | "none";
+const cookieSameSite = (process.env.AUTH_COOKIE_SAME_SITE || "lax") as
+  | "lax"
+  | "strict"
+  | "none";
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -73,6 +74,9 @@ const getRpId = (url: string) => {
 };
 
 export const auth = betterAuth({
+  emailAndPassword: {
+    enabled: true,
+  },
   plugins: [
     passkey({
       rpID: getRpId(passkeyOrigin),
@@ -137,4 +141,5 @@ export const auth = betterAuth({
   socialProviderConfig: {
     redirectURL: socialRedirectUrl,
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;

@@ -4,7 +4,11 @@ This repository is a monorepo containing a web frontend, a backend API, and a no
 
 ## High-Level Architecture
 - **apps/web**: Next.js frontend built with React 19, Tailwind CSS v4, and `shadcn/ui`. It generates a static export (`out/`) that is wrapped as a native mobile application via Capacitor and Ionic. It uses `react-native-web` for cross-platform components.
-- **apps/backend**: API server built with Elysia.js running on Bun. It uses Prisma ORM with PostgreSQL and Better Auth for authentication (including passkey support). AI functionality utilizes `@openrouter/ai-sdk-provider`.
+- **apps/backend**: API server built with Elysia.js running on Bun. Uses Prisma ORM with PostgreSQL and Better Auth for authentication (including passkey support). AI functionality utilizes `@openrouter/ai-sdk-provider`. The backend follows a service-layer architecture:
+  - `routes/` — Thin HTTP adapters handling auth, request validation (TypeBox schemas), rate limiting, and response headers. Routes delegate all business logic to services.
+  - `contracts/` — TypeScript interfaces and DTO types defining each service's operations. These are the source of truth for service signatures.
+  - `services/` — All business logic lives here: input validation, database queries, transformations, notification scheduling. Services receive `PrismaClient` via constructor injection and never touch HTTP types.
+  - `lib/` — Shared utilities (auth, error types, Prisma client, recurrence engine, ICS export, notification calculator, etc.).
 - **apps/notifications**: A Go service responsible for scheduled email notifications via Resend API and HTML templates.
 - **packages/***: Shared libraries such as `@workspace/ui` (components), `logger`, TS/ESLint configurations, and domain-specific logic (`calendar-core`, `calendar-client`, `mobile-ui`).
 

@@ -43,17 +43,22 @@ const AppSidebar = dynamic(
 );
 
 const MobileCalendarWrapper = dynamic(
-  () => import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
+  () =>
+    import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
   { ssr: false, loading: () => <MobileCalendarSkeleton /> },
 );
 
 const CalendarWithData = dynamic(
-  () => import("@/components/calendar-with-data").then((mod) => mod.CalendarWithData),
+  () =>
+    import("@/components/calendar-with-data").then(
+      (mod) => mod.CalendarWithData,
+    ),
   { ssr: false },
 );
 
 const CommandPalette = dynamic(
-  () => import("@/components/command-palette").then((mod) => mod.CommandPalette),
+  () =>
+    import("@/components/command-palette").then((mod) => mod.CommandPalette),
   { ssr: false },
 );
 
@@ -142,7 +147,8 @@ function DashboardSearchParamHandlers({
         const existingEvent = calendarData.events.find(
           (event) => event.id === eventId,
         );
-        const event = existingEvent || (await calendarApiService.getEvent(eventId));
+        const event =
+          existingEvent || (await calendarApiService.getEvent(eventId));
 
         if (cancelled) {
           return;
@@ -166,13 +172,7 @@ function DashboardSearchParamHandlers({
     return () => {
       cancelled = true;
     };
-  }, [
-    eventId,
-    isPending,
-    session?.user,
-    calendarData,
-    openEventEditor,
-  ]);
+  }, [eventId, isPending, session?.user, calendarData, openEventEditor]);
 
   useEffect(() => {
     if (!palette || handledPaletteRef.current === palette) {
@@ -317,6 +317,7 @@ function MobileLayoutContent() {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const calendarData = useSharedCalendarData();
+  const { prefetchRange } = calendarData;
 
   const handleLogout = async () => {
     try {
@@ -400,7 +401,7 @@ function MobileLayoutContent() {
     const deferredRanges = ranges.slice(2);
 
     for (const range of eagerRanges) {
-      calendarData.prefetchRange(range);
+      prefetchRange(range);
     }
 
     if (deferredRanges.length === 0) {
@@ -409,7 +410,7 @@ function MobileLayoutContent() {
 
     const runDeferredPrefetch = () => {
       for (const range of deferredRanges) {
-        calendarData.prefetchRange(range);
+        prefetchRange(range);
       }
     };
 
@@ -426,7 +427,7 @@ function MobileLayoutContent() {
 
     const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, calendarData.prefetchRange]);
+  }, [currentDate, currentView, prefetchRange]);
 
   const isInitialLoading =
     settingsLoading ||
@@ -500,7 +501,7 @@ function MobileLayoutContent() {
       onUpdateNotifications={calendarData.updateNotifications}
       onEventEdit={openEventEditor}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
-      prefetchRange={calendarData.prefetchRange}
+      prefetchRange={prefetchRange}
     />
   );
 }

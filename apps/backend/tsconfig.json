@@ -1,6 +1,10 @@
 {
+  "extends": "../../packages/typescript-config/base.json",
   "compilerOptions": {
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "module": "ESNext",
     "target": "ESNext",
     "moduleResolution": "bundler",
@@ -10,13 +14,30 @@
     "resolveJsonModule": true,
     "moduleDetection": "force",
     "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
     "noEmit": true,
-    "jsx": "react-jsx",
-    "baseUrl": ".",
+    "types": [
+      "bun-types",
+      "node"
+    ],
     "paths": {
-      "@workspace/calendar-ics": ["../../packages/calendar-ics/src/index.ts"],
-      "@workspace/calendar-ics/*": ["../../packages/calendar-ics/src/*"]
+      "@workspace/calendar-ics": [
+        "../../packages/calendar-ics/src/index.ts"
+      ],
+      "@workspace/calendar-ics/*": [
+        "../../packages/calendar-ics/src/*"
+      ]
     }
   },
-  "include": ["**/*.ts", "../../packages/calendar-ics/src/**/*.ts"]
+  "include": [
+    "**/*.ts",
+    "../../packages/calendar-ics/src/**/*.ts"
+  ],
+  "exclude": [
+    "coverage",
+    "server"
+  ]
 }

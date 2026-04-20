@@ -24,7 +24,9 @@ jest.mock("../../lib/auth", () => ({
 import { auth } from "../../lib/auth";
 import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 
-const mockGetSession = auth.api.getSession as jest.Mock<() => Promise<any>>;
+const mockGetSession = auth.api.getSession as unknown as jest.Mock<
+  () => Promise<any>
+>;
 
 describe("ensureAuthenticatedUser", () => {
   it("returns the existing user when the context already has an id", async () => {

@@ -10,7 +10,8 @@
     "test": "bun run build:emails && go test ./...",
     "test:coverage": "bun run build:emails && go test ./... -covermode=atomic -coverprofile=coverage.out && go tool cover -func=coverage.out",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "lint": "tsc --project tsconfig.json --noEmit"
+    "lint": "tsc --project tsconfig.json --noEmit",
+    "test:mail": "bun run build:emails && go run main.go --test --test-to testmail.jubilant164@passmail.net"
   },
   "dependencies": {
     "@react-email/render": "^1.4.0",
@@ -23,6 +24,6 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "tsx": "^4.20.6",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   }
 }
