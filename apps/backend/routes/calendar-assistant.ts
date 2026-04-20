@@ -11,21 +11,52 @@ import { resolveRouteUser } from "../lib/request-user";
 const calendarAssistantService = new CalendarAssistantService(prisma);
 
 const calendarAssistantBodySchema = strictObject({
-  query: t.String({ description: "User query for the calendar assistant" }),
-  timezone: t.Optional(t.String({ description: "IANA timezone identifier" })),
-  now: t.Optional(t.String({ description: "Current date/time in ISO 8601" })),
+  query: t.String({
+    description:
+      "Natural-language request for the assistant, such as creating, moving, deleting, or summarizing events.",
+    examples: [
+      "Move my design review to next Tuesday at 3pm",
+      "What is on my calendar tomorrow morning?",
+    ],
+  }),
+  timezone: t.Optional(
+    t.String({
+      description:
+        "IANA timezone identifier used to interpret relative date phrases and render time-aware answers.",
+      examples: ["America/New_York", "Europe/London"],
+    }),
+  ),
+  now: t.Optional(
+    t.String({
+      description:
+        "Current client-side date and time in ISO 8601 format. Supplying this makes relative expressions like 'tomorrow afternoon' deterministic.",
+      examples: ["2025-01-15T13:30:00.000Z"],
+    }),
+  ),
   events: t.Optional(
     t.Array(
       strictObject({
-        id: t.String(),
-        title: t.String(),
-        description: t.Optional(t.String()),
-        start: t.String(),
-        end: t.String(),
-        allDay: t.Optional(t.Boolean()),
-        location: t.Optional(t.String()),
-        calendarId: t.String(),
+        id: t.String({ description: "Event identifier." }),
+        title: t.String({ description: "Event title." }),
+        description: t.Optional(
+          t.String({ description: "Optional event description." }),
+        ),
+        start: t.String({ description: "Event start timestamp in ISO 8601." }),
+        end: t.String({ description: "Event end timestamp in ISO 8601." }),
+        allDay: t.Optional(
+          t.Boolean({ description: "Whether the event spans the full day." }),
+        ),
+        location: t.Optional(
+          t.String({ description: "Optional event location." }),
+        ),
+        calendarId: t.String({
+          description: "Owning calendar identifier.",
+        }),
       }),
+      {
+        description:
+          "Optional client-provided event context that the assistant can use for faster or more grounded reasoning.",
+      },
     ),
   ),
 });
@@ -97,6 +128,8 @@ export const calendarAssistantRoute = new Elysia({
         body: calendarAssistantBodySchema,
         detail: {
           summary: "Chat with the AI calendar assistant",
+          description:
+            "Sends a natural-language calendar request to the assistant. Depending on the prompt, the assistant may answer questions, propose changes, or create, update, and delete events on behalf of the authenticated user.",
         },
       },
     ),

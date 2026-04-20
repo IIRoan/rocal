@@ -30,7 +30,9 @@ export const categoriesRoutes = new Elysia({
         },
         {
           detail: {
-            summary: "Get user categories",
+            summary: "List user categories",
+            description:
+              "Returns every category owned by the authenticated user. Categories are lightweight labels that can be attached to events for filtering, grouping, and color-coding in the client.",
           },
         },
       )
@@ -55,11 +57,20 @@ export const categoriesRoutes = new Elysia({
         },
         {
           body: strictObject({
-            name: t.String(),
-            color: t.String(),
+            name: t.String({
+              description: "Human-readable category name shown in the UI.",
+              examples: ["Deep work", "Personal", "Travel"],
+            }),
+            color: t.String({
+              description:
+                "Display color for the category. Hex values are recommended for predictable rendering.",
+              examples: ["#0f766e", "#dc2626", "#2563eb"],
+            }),
           }),
           detail: {
             summary: "Create a category",
+            description:
+              "Creates a new personal category for the authenticated user. Categories can later be assigned to events to improve visual organization and filtering.",
           },
         },
       )
@@ -86,13 +97,27 @@ export const categoriesRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Category identifier.",
+            }),
+          }),
           body: strictObject({
-            name: t.Optional(t.String()),
-            color: t.Optional(t.String()),
+            name: t.Optional(
+              t.String({
+                description: "Updated category name.",
+              }),
+            ),
+            color: t.Optional(
+              t.String({
+                description: "Updated category color.",
+              }),
+            ),
           }),
           detail: {
             summary: "Update a category",
+            description:
+              "Updates mutable category fields. Omit any field you do not want to change.",
           },
         },
       )
@@ -115,9 +140,15 @@ export const categoriesRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Category identifier.",
+            }),
+          }),
           detail: {
             summary: "Delete a category",
+            description:
+              "Deletes a category owned by the authenticated user. Existing events that referenced the category are preserved, but the category relationship is removed.",
           },
         },
       ),

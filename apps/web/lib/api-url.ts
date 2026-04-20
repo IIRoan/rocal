@@ -14,6 +14,16 @@ const toSafeRelativePath = (path?: string | null) => {
   return path;
 };
 
+const toOrigin = (value?: string | null) => {
+  if (!value) return null;
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
 export const getApiBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl) {
@@ -100,4 +110,60 @@ export const getAuthCallbackUrl = (nextPath?: string | null) => {
 
 export const getAuthErrorCallbackUrl = (nextPath?: string | null) => {
   return getAuthCallbackUrl(nextPath);
+};
+
+export const getSafeAuthCallbackUrl = (callbackUrl?: string | null) => {
+  if (!callbackUrl) return null;
+
+  try {
+    const resolvedUrl = new URL(callbackUrl, getAppBaseUrl());
+    const allowedOrigins = new Set(
+      [
+        getAppBaseUrl(),
+        getApiBaseUrl(),
+        process.env.NEXT_PUBLIC_APP_URL,
+        process.env.NEXT_PUBLIC_API_URL,
+      ]
+        .map((value) => toOrigin(value))
+        .filter((value): value is string => Boolean(value)),
+    );
+
+    if (!allowedOrigins.has(resolvedUrl.origin)) {
+      return null;
+    }
+
+    return resolvedUrl.toString();
+  } catch {
+    return null;
+  }
+};
+
+export const resolveAuthRedirectTarget = (
+  nextPath?: string | null,
+  callbackUrl?: string | null,
+) => {
+  const safeCallbackUrl = getSafeAuthCallbackUrl(callbackUrl);
+
+  if (safeCallbackUrl) {
+    const appOrigin = toOrigin(getAppBaseUrl());
+    const callbackOrigin = toOrigin(safeCallbackUrl);
+
+    if (appOrigin && callbackOrigin && appOrigin === callbackOrigin) {
+      const callbackTarget = new URL(safeCallbackUrl);
+      return {
+        href: `${callbackTarget.pathname}${callbackTarget.search}${callbackTarget.hash}`,
+        external: false,
+      };
+    }
+
+    return {
+      href: safeCallbackUrl,
+      external: true,
+    };
+  }
+
+  return {
+    href: toSafeRelativePath(nextPath),
+    external: false,
+  };
 };
