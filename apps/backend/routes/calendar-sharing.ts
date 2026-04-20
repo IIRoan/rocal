@@ -51,10 +51,16 @@ export const calendarSharingRoutes = new Elysia({
       return result.icsContent;
     },
     {
-      params: strictObject({ token: t.String() }),
+      params: strictObject({
+        token: t.String({
+          description: "Share token embedded in the public ICS URL.",
+        }),
+      }),
       detail: {
         tags: ["ICS Sharing"],
         summary: "Public shared calendar feed (.ics)",
+        description:
+          "Returns a token-protected read-only ICS feed that can be subscribed to by external calendar clients such as Apple Calendar, Google Calendar, or Outlook.",
       },
     },
   )
@@ -81,9 +87,15 @@ export const calendarSharingRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Calendar identifier.",
+            }),
+          }),
           detail: {
             summary: "Get calendar ICS share-link status",
+            description:
+              "Returns the current share-link state for a calendar, including whether sharing is enabled and the public URL when one exists.",
           },
         },
       )
@@ -96,7 +108,7 @@ export const calendarSharingRoutes = new Elysia({
           authenticatedUser,
         }: {
           params: { id: string };
-          body?: { regenerate?: boolean };
+          body: { regenerate?: boolean } | null;
           request: Request;
           authenticatedUser?: AuthenticatedUser;
         }) => {
@@ -110,14 +122,25 @@ export const calendarSharingRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Calendar identifier.",
+            }),
+          }),
           body: t.Optional(
             strictObject({
-              regenerate: t.Optional(t.Boolean()),
+              regenerate: t.Optional(
+                t.Boolean({
+                  description:
+                    "When true, rotates the share token and invalidates any previously issued public URL.",
+                }),
+              ),
             }),
           ),
           detail: {
             summary: "Enable or regenerate calendar ICS share-link",
+            description:
+              "Creates a new public ICS URL or rotates the existing token for an already shared calendar.",
           },
         },
       )
@@ -141,9 +164,15 @@ export const calendarSharingRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Calendar identifier.",
+            }),
+          }),
           detail: {
             summary: "Disable calendar ICS share-link",
+            description:
+              "Revokes the public ICS URL for the calendar. Existing external subscribers will stop receiving updates once the link is disabled.",
           },
         },
       ),

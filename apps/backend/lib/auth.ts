@@ -1,10 +1,11 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
-import { oneTimeToken } from "better-auth/plugins";
+import { oneTimeToken, openAPI } from "better-auth/plugins";
 import { PrismaClient } from "../generated/prisma";
 
 const prisma = new PrismaClient();
+export const BETTER_AUTH_BASE_PATH = "/api/auth";
 
 const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
 const frontendUrl =
@@ -78,6 +79,9 @@ export const auth = betterAuth({
     enabled: true,
   },
   plugins: [
+    openAPI({
+      disableDefaultReference: true,
+    }),
     passkey({
       rpID: getRpId(passkeyOrigin),
       rpName: "Rocani",
@@ -117,7 +121,7 @@ export const auth = betterAuth({
         }
       : {},
   baseURL: backendUrl,
-  basePath: "/api/auth",
+  basePath: BETTER_AUTH_BASE_PATH,
   trustedOrigins,
   session: {
     cookieCache: {
@@ -143,3 +147,40 @@ export const auth = betterAuth({
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
+
+type AuthOpenApiSchema = {
+  components?: Record<string, unknown>;
+  paths?: Record<string, Record<string, { tags?: string[] }>>;
+};
+
+let authOpenApiSchemaPromise: Promise<AuthOpenApiSchema> | null = null;
+
+async function getGeneratedAuthOpenApiSchema(): Promise<AuthOpenApiSchema> {
+  authOpenApiSchemaPromise ??= Promise.resolve(
+    auth.api.generateOpenAPISchema(),
+  ) as Promise<AuthOpenApiSchema>;
+
+  return authOpenApiSchemaPromise;
+}
+
+export async function getAuthOpenApiDocumentation(
+  prefix = BETTER_AUTH_BASE_PATH,
+) {
+  const normalizedPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+  const schema = await getGeneratedAuthOpenApiSchema();
+  const prefixedPaths: Record<string, Record<string, { tags?: string[] }>> = {};
+
+  for (const [path, pathItem] of Object.entries(schema.paths ?? {})) {
+    const operationPath = `${normalizedPrefix}${path}`;
+    prefixedPaths[operationPath] = pathItem;
+
+    for (const operation of Object.values(pathItem)) {
+      operation.tags = ["Better Auth"];
+    }
+  }
+
+  return {
+    components: schema.components ?? {},
+    paths: prefixedPaths,
+  };
+}

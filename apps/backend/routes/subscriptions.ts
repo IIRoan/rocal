@@ -34,7 +34,9 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
         },
         {
           detail: {
-            summary: "Get all calendar subscriptions for user",
+            summary: "List calendar subscriptions",
+            description:
+              "Returns the authenticated user's external calendar subscriptions, including sync status and metadata needed to manage read-only mirrored calendars.",
           },
         },
       )
@@ -60,9 +62,22 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
         },
         {
           body: strictObject({
-            name: t.String(),
-            url: t.String({ format: "uri" }),
-            color: t.Optional(t.String()),
+            name: t.String({
+              description: "Display name for the synced calendar.",
+              examples: ["Team holidays", "Vendor schedule"],
+            }),
+            url: t.String({
+              format: "uri",
+              description: "Absolute URL to the remote ICS feed.",
+              examples: ["https://example.com/calendar.ics"],
+            }),
+            color: t.Optional(
+              t.String({
+                description:
+                  "Optional color applied to the generated sync-only calendar.",
+                examples: ["#7c3aed"],
+              }),
+            ),
           }),
           detail: {
             summary: "Subscribe to an external calendar",
@@ -101,17 +116,41 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Subscription identifier.",
+            }),
+          }),
           body: strictObject({
-            name: t.Optional(t.String()),
-            color: t.Optional(t.String()),
-            isActive: t.Optional(t.Boolean()),
+            name: t.Optional(
+              t.String({
+                description: "Updated subscription display name.",
+              }),
+            ),
+            color: t.Optional(
+              t.String({
+                description: "Updated calendar color.",
+              }),
+            ),
+            isActive: t.Optional(
+              t.Boolean({
+                description:
+                  "Whether scheduled background sync should continue running for this subscription.",
+              }),
+            ),
             syncIntervalMinutes: t.Optional(
-              t.Number({ minimum: 5, maximum: 1440 }),
+              t.Number({
+                minimum: 5,
+                maximum: 1440,
+                description:
+                  "Polling interval in minutes for automatic sync jobs.",
+              }),
             ),
           }),
           detail: {
             summary: "Update calendar subscription",
+            description:
+              "Adjusts subscription metadata and sync behavior. This is useful for pausing a feed, recoloring the mirrored calendar, or changing the polling cadence.",
           },
         },
       )
@@ -134,9 +173,18 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Subscription identifier.",
+            }),
+          }),
           query: strictObject({
-            deleteEvents: t.Optional(t.Boolean()),
+            deleteEvents: t.Optional(
+              t.Boolean({
+                description:
+                  "When true, also remove events that were previously imported from the subscription.",
+              }),
+            ),
           }),
           detail: {
             summary: "Delete calendar subscription",
@@ -164,9 +212,15 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
           });
         },
         {
-          params: strictObject({ id: t.String() }),
+          params: strictObject({
+            id: t.String({
+              description: "Subscription identifier.",
+            }),
+          }),
           detail: {
             summary: "Manually trigger subscription sync",
+            description:
+              "Immediately fetches the remote ICS feed and reconciles imported events without waiting for the next scheduled sync interval.",
           },
         },
       )
@@ -192,14 +246,24 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
         },
         {
           body: strictObject({
-            calendarId: t.String(),
-            icsContent: t.String(),
-            fileName: t.Optional(t.String()),
+            calendarId: t.String({
+              description: "Destination calendar that should receive the imported events.",
+            }),
+            icsContent: t.String({
+              description: "Raw ICS file contents.",
+            }),
+            fileName: t.Optional(
+              t.String({
+                description:
+                  "Optional original filename used for diagnostics or import summaries.",
+                examples: ["conference-schedule.ics"],
+              }),
+            ),
           }),
           detail: {
             summary: "Import ICS file manually",
             description:
-              "Manually imports events from an ICS file content into a specific calendar.",
+              "Parses a raw ICS payload and imports its events into a specific calendar. This is useful for one-off imports when no ongoing subscription is needed.",
           },
         },
       ),
