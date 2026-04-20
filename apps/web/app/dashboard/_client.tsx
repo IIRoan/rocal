@@ -317,6 +317,7 @@ function MobileLayoutContent() {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const calendarData = useSharedCalendarData();
+  const { prefetchRange } = calendarData;
 
   const handleLogout = async () => {
     try {
@@ -400,7 +401,7 @@ function MobileLayoutContent() {
     const deferredRanges = ranges.slice(2);
 
     for (const range of eagerRanges) {
-      calendarData.prefetchRange(range);
+      prefetchRange(range);
     }
 
     if (deferredRanges.length === 0) {
@@ -409,7 +410,7 @@ function MobileLayoutContent() {
 
     const runDeferredPrefetch = () => {
       for (const range of deferredRanges) {
-        calendarData.prefetchRange(range);
+        prefetchRange(range);
       }
     };
 
@@ -426,7 +427,7 @@ function MobileLayoutContent() {
 
     const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, calendarData.prefetchRange]);
+  }, [currentDate, currentView, prefetchRange]);
 
   const isInitialLoading =
     settingsLoading ||
@@ -500,7 +501,7 @@ function MobileLayoutContent() {
       onUpdateNotifications={calendarData.updateNotifications}
       onEventEdit={openEventEditor}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
-      prefetchRange={calendarData.prefetchRange}
+      prefetchRange={prefetchRange}
     />
   );
 }

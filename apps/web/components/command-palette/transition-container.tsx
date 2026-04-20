@@ -22,7 +22,6 @@ export function TransitionContainer({
   const [displayChildren, setDisplayChildren] = useState(children);
   const [phase, setPhase] = useState<Phase>("idle");
 
-  const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState<number | undefined>(
     undefined,
@@ -37,7 +36,7 @@ export function TransitionContainer({
   const latestChildren = useRef(children);
   useEffect(() => {
     latestChildren.current = children;
-  });
+  }, [children]);
 
   // Track height passively when idle (handles within-view resizes)
   useEffect(() => {
@@ -55,34 +54,54 @@ export function TransitionContainer({
 
   // Update displayed content for same-view changes (e.g. data refetch)
   // Only when not in the middle of an exit transition
-  const [prevChildren, setPrevChildren] = useState(children);
-  if (children !== prevChildren) {
-    setPrevChildren(children);
-    if (phase !== "exiting") {
-      setDisplayChildren(children);
+  const prevChildrenRef = useRef(children);
+  useEffect(() => {
+    if (children === prevChildrenRef.current) {
+      return;
     }
-  }
+
+    prevChildrenRef.current = children;
+
+    if (phase !== "exiting") {
+      const frameId = requestAnimationFrame(() => {
+        setDisplayChildren(children);
+      });
+      return () => cancelAnimationFrame(frameId);
+    }
+  }, [children, phase]);
 
   // Handle view transitions — only runs when viewKey changes
-  const [prevViewKey, setPrevViewKey] = useState(viewKey);
-  if (viewKey !== prevViewKey) {
-    setPrevViewKey(viewKey);
-    setHeightAnimating(false);
-    // Phase 1: Fade out current content
-    setPhase("exiting");
-  }
+  const prevViewKeyRef = useRef(viewKey);
+  useEffect(() => {
+    if (viewKey === prevViewKeyRef.current) {
+      return;
+    }
+
+    prevViewKeyRef.current = viewKey;
+
+    const frameId = requestAnimationFrame(() => {
+      setHeightAnimating(false);
+      setPhase("exiting");
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [viewKey]);
 
   // Lock height when entering exiting phase, then schedule the transition timers
   useEffect(() => {
     if (phase !== "exiting") return;
 
+    const frameIds: number[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     // Lock current height before anything changes
     const prevH = measureHeight();
     if (prevH !== undefined) {
-      setContainerHeight(prevH);
+      const frameId = requestAnimationFrame(() => {
+        setContainerHeight(prevH);
+      });
+      frameIds.push(frameId);
     }
-
-    const timers: ReturnType<typeof setTimeout>[] = [];
 
     // Phase 2: After exit, swap content + start height animation + fade in
     timers.push(
@@ -115,21 +134,34 @@ export function TransitionContainer({
         EXIT_MS + Math.max(ENTER_MS, HEIGHT_MS),
       ),
     );
-
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      for (const frameId of frameIds) {
+        cancelAnimationFrame(frameId);
+      }
+      for (const timer of timers) {
+        clearTimeout(timer);
+      }
+    };
   }, [phase, measureHeight]);
 
   // Compute inline styles for the content based on phase
   const contentStyle: React.CSSProperties =
     phase === "exiting"
-      ? { opacity: 0, transition: `opacity ${EXIT_MS}ms ease-out` }
+      ? {
+          opacity: 0,
+          transform: `translateX(${direction === "forward" ? "-8px" : "8px"})`,
+          transition: `opacity ${EXIT_MS}ms ease-out, transform ${EXIT_MS}ms ease-out`,
+        }
       : phase === "entering"
-        ? { opacity: 1, transition: `opacity ${ENTER_MS}ms ease-in` }
-        : { opacity: 1 };
+        ? {
+            opacity: 1,
+            transform: "translateX(0)",
+            transition: `opacity ${ENTER_MS}ms ease-in, transform ${ENTER_MS}ms ease-in`,
+          }
+        : { opacity: 1, transform: "translateX(0)" };
 
   return (
     <div
-      ref={containerRef}
       className="relative overflow-hidden"
       style={{
         height: containerHeight !== undefined ? `${containerHeight}px` : "auto",

@@ -21,7 +21,7 @@
         "bun-types": "^1.3.11",
         "minimatch": "10.1.1",
         "prettier": "3.7.4",
-        "typescript": "6.0.2",
+        "typescript": "5.9.3",
       },
     },
     "apps/backend": {
@@ -62,7 +62,7 @@
         "eslint-plugin-sonarjs": "^3.0.5",
         "globals": "^16.4.0",
         "prisma": "^6.12.0",
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
         "typescript-eslint": "^8.24.1",
       },
     },
@@ -80,7 +80,7 @@
         "@types/react": "^19.1.8",
         "@types/react-dom": "^19.1.6",
         "tsx": "^4.20.6",
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
       },
     },
     "apps/web": {
@@ -148,7 +148,7 @@
         "picocolors": "^1.1.1",
         "postcss": "^8.5.8",
         "tailwindcss": "^4.2.1",
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
       },
     },
     "packages/calendar-ics": {
@@ -159,7 +159,7 @@
         "node-ical": "^0.20.1",
       },
       "devDependencies": {
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
       },
     },
     "packages/eslint-config": {
@@ -176,7 +176,7 @@
         "eslint-plugin-react": "^7.37.4",
         "eslint-plugin-react-hooks": "^5.1.0",
         "globals": "^15.15.0",
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
         "typescript-eslint": "^8.24.1",
       },
     },
@@ -184,7 +184,7 @@
       "name": "@workspace/logger",
       "version": "0.10.0",
       "devDependencies": {
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
       },
     },
     "packages/mobile-ui": {
@@ -246,7 +246,7 @@
         "eslint": "^9.20.1",
         "minimatch": "^10.1.1",
         "tailwindcss": "^4.1.11",
-        "typescript": "^6.0.2",
+        "typescript": "^5.9.3",
       },
     },
   },
@@ -2895,7 +2895,7 @@
 
     "typed-array-length": ["typed-array-length@1.0.7", "", { "dependencies": { "call-bind": "^1.0.7", "for-each": "^0.3.3", "gopd": "^1.0.1", "is-typed-array": "^1.1.13", "possible-typed-array-names": "^1.0.0", "reflect.getprototypeof": "^1.0.6" } }, "sha512-3KS2b+kL7fsuk/eJZ7EQdnEmQoaho/r6KUef7hxvltNA5DR8NAUM+8wJMbJyZ4G9/7i3v5zPBIMN5aybAh2/Jg=="],
 
-    "typescript": ["typescript@6.0.2", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-bGdAIrZ0wiGDo5l8c++HWtbaNCWTS4UTv7RaTH/ThVIgjkveJt83m74bBHMJkuCbslY8ixgLBVZJIOiQlQTjfQ=="],
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "typescript-eslint": ["typescript-eslint@8.57.2", "", { "dependencies": { "@typescript-eslint/eslint-plugin": "8.57.2", "@typescript-eslint/parser": "8.57.2", "@typescript-eslint/typescript-estree": "8.57.2", "@typescript-eslint/utils": "8.57.2" }, "peerDependencies": { "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.0.0" } }, "sha512-VEPQ0iPgWO/sBaZOU1xo4nuNdODVOajPnTIbog2GKYr31nIlZ0fWPoCQgGfF3ETyBl1vn63F/p50Um9Z4J8O8A=="],
 

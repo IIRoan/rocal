@@ -64,6 +64,34 @@ export interface ApiErrorResponse {
   timestamp: string;
 }
 
+function getValidationDetails(error: unknown) {
+  if (!error || typeof error !== "object" || !("all" in error)) {
+    return undefined;
+  }
+
+  const rawIssues = (error as { all?: unknown }).all;
+  if (!Array.isArray(rawIssues) || rawIssues.length === 0) {
+    return undefined;
+  }
+
+  const issues = rawIssues
+    .filter((issue): issue is Record<string, unknown> => !!issue && typeof issue === "object")
+    .map((issue) => ({
+      path: typeof issue.path === "string" ? issue.path : undefined,
+      message:
+        typeof issue.message === "string"
+          ? issue.message
+          : typeof issue.summary === "string"
+            ? issue.summary
+            : "Invalid value",
+      expected:
+        typeof issue.expected === "string" ? issue.expected : undefined,
+      found: "found" in issue ? issue.found : undefined,
+    }));
+
+  return issues.length > 0 ? { issues } : undefined;
+}
+
 // Error handling middleware
 export const errorHandler = new Elysia({ name: "error-handler" }).onError(
   ({ code, error, set }) => {
@@ -84,6 +112,7 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
           error: "Validation Error",
           message: error.message,
           statusCode: 400,
+          details: getValidationDetails(error),
           timestamp,
         } as ApiErrorResponse;
 

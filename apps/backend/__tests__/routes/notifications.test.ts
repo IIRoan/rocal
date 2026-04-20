@@ -122,6 +122,7 @@ describe("notificationsRoutes", () => {
   });
 
   it("returns mapped notification rows for owned events", async () => {
+    mockEnsureAuthenticatedUser.mockClear();
     mockPrisma.calendarEvent.findFirst.mockResolvedValue(eventFixture());
     mockPrisma.$queryRaw.mockResolvedValue([
       {
@@ -166,6 +167,10 @@ describe("notificationsRoutes", () => {
         count: 1,
       },
     });
+    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+      undefined,
+      expect.any(Request),
+    );
   });
 
   it("surfaces not-found and wrapped database failures during reads", async () => {
