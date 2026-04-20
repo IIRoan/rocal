@@ -104,6 +104,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
   // Use the shared calendar data
   const calendarData = useSharedCalendarData();
+  const { prefetchRange } = calendarData;
 
   // Context-menu preview handler: resolves calendar fallback before storing
   const handleSetPreview = useCallback(
@@ -141,7 +142,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     const deferredRanges = ranges.slice(2);
 
     for (const range of eagerRanges) {
-      calendarData.prefetchRange(range);
+      prefetchRange(range);
     }
 
     if (deferredRanges.length === 0) {
@@ -150,7 +151,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
     const runDeferredPrefetch = () => {
       for (const range of deferredRanges) {
-        calendarData.prefetchRange(range);
+        prefetchRange(range);
       }
     };
 
@@ -167,7 +168,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
     const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, calendarData.prefetchRange]);
+  }, [currentDate, currentView, prefetchRange]);
 
   // Create theme settings for the calendar
   const themeSettings = useMemo(

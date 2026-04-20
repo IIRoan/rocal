@@ -9,7 +9,7 @@ export type AuthenticatedUser = {
   name?: string | null;
 } & Record<string, unknown>;
 
-function hasUserId(user: unknown): user is AuthenticatedUser {
+export function hasUserId(user: unknown): user is AuthenticatedUser {
   return !!user && typeof user === "object" && "id" in user;
 }
 

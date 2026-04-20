@@ -54,8 +54,21 @@ export function useSettingsState(): SettingsContextValue {
   // Apply theme when settings are loaded
   useEffect(() => {
     if (settingsQuery.data?.theme) {
-      applyTheme(settingsQuery.data.theme);
+      // Check if there's a pending theme sync from the login page
+      const pendingTheme = localStorage.getItem("pending-theme-sync") as
+        | "light"
+        | "dark"
+        | "system"
+        | null;
+      if (pendingTheme && pendingTheme !== settingsQuery.data.theme) {
+        localStorage.removeItem("pending-theme-sync");
+        updateSettingsMutation.mutate({ theme: pendingTheme });
+      } else {
+        localStorage.removeItem("pending-theme-sync");
+        applyTheme(settingsQuery.data.theme);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsQuery.data?.theme]);
 
   return {

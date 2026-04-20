@@ -3,8 +3,10 @@ import { requireAuth } from "../lib/auth-guard";
 import { prisma } from "../lib/prisma";
 import { CalendarAssistantService } from "../services/calendar-assistant.service";
 import { strictObject } from "../lib/validation";
-import { ensureAuthenticatedUser } from "../lib/auth-utils";
+import type { AuthenticatedUser } from "../lib/auth-utils";
 import type { AssistantChatInput } from "../contracts/calendar-assistant.contract";
+import { authenticatedRouteDetail } from "../lib/openapi";
+import { resolveRouteUser } from "../lib/request-user";
 
 const calendarAssistantService = new CalendarAssistantService(prisma);
 
@@ -33,70 +35,69 @@ export const calendarAssistantRoute = new Elysia({
   normalize: false,
 })
   .use(requireAuth)
-  .post(
-    "/",
-    async ({
-      body,
-      request,
-      set,
-      user,
-    }: {
-      body: {
-        query: string;
-        timezone?: string;
-        now?: string;
-        events?: AssistantChatInput["events"];
-      };
-      request: Request;
-      set: {
-        status?: number | string;
-        headers: Record<string, string | number | undefined>;
-      };
-      user?: { id?: string } | null;
-    }) => {
-      try {
-        const authenticatedUser = await ensureAuthenticatedUser(user, request);
-
-        const cookies = request.headers.get("cookie") || "";
-
-        const result = await calendarAssistantService.chat({
-          userId: authenticatedUser.id,
-          query: body.query,
-          timezone: body.timezone,
-          now: body.now,
-          events: body.events,
-          cookies,
-          request,
-        });
-
-        if (result.error && !result.reply) {
-          set.status = 400;
-        }
-
-        return result;
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "";
-        const reply = message.includes("parse")
-          ? "I had trouble understanding that calendar request. Try rephrasing it with a clearer date or time."
-          : "Something went wrong while handling that calendar request.";
-
-        set.status = 400;
-        return {
-          reply,
-          createdEvent: null,
-          updatedEvent: null,
-          deletedEventId: null,
-          events: [],
-          error: message || "Unknown error",
+  .guard(authenticatedRouteDetail("Calendar Assistant"), (app) =>
+    app.post(
+      "/",
+      async ({
+        body,
+        request,
+        set,
+        authenticatedUser,
+      }: {
+        body: {
+          query: string;
+          timezone?: string;
+          now?: string;
+          events?: AssistantChatInput["events"];
         };
-      }
-    },
-    {
-      body: calendarAssistantBodySchema,
-      detail: {
-        tags: ["Calendar Assistant"],
-        summary: "Chat with the AI calendar assistant",
-        security: [{ bearerAuth: [] }],
+        request: Request;
+        set: {
+          status?: number | string;
+          headers: Record<string, string | number | undefined>;
+        };
+        authenticatedUser?: AuthenticatedUser;
+      }) => {
+        try {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          const cookies = request.headers.get("cookie") || "";
+
+          const result = await calendarAssistantService.chat({
+            userId: user.id,
+            query: body.query,
+            timezone: body.timezone,
+            now: body.now,
+            events: body.events,
+            cookies,
+            request,
+          });
+
+          if (result.error && !result.reply) {
+            set.status = 400;
+          }
+
+          return result;
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "";
+          const reply = message.includes("parse")
+            ? "I had trouble understanding that calendar request. Try rephrasing it with a clearer date or time."
+            : "Something went wrong while handling that calendar request.";
+
+          set.status = 400;
+          return {
+            reply,
+            createdEvent: null,
+            updatedEvent: null,
+            deletedEventId: null,
+            events: [],
+            error: message || "Unknown error",
+          };
+        }
       },
-    },
+      {
+        body: calendarAssistantBodySchema,
+        detail: {
+          summary: "Chat with the AI calendar assistant",
+        },
+      },
+    ),
   );

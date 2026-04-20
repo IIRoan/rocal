@@ -1,46 +1,52 @@
 import { Elysia } from "elysia";
 import { auth } from "./auth";
 import { UnauthorizedError } from "./errors";
+import { hasUserId, type AuthenticatedUser } from "./auth-utils";
 
 type AuthGuardContext = {
   request: Request;
-  user?: { id?: string } | null;
+  user?: AuthenticatedUser | null;
   session?: unknown;
 };
 
 type AuthGuardBeforeHandleContext = {
-  user?: { id?: string } | null;
+  user?: AuthenticatedUser | null;
 };
 
-// Auth guard plugin - ensure authenticated user/session exist before handlers run
+// Auth guard plugin - preserve legacy user/session context and expose authenticatedUser for routes.
 export const requireAuth = new Elysia({ name: "require-auth" })
   .derive(async (ctx: AuthGuardContext) => {
-    // 1. If user is already strictly valid from betterAuth, use it
-    if (ctx.user?.id) {
-      return { user: ctx.user, session: ctx.session };
+    if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
+      return {
+        user: ctx.user,
+        session: ctx.session,
+        authenticatedUser: ctx.user,
+      };
     }
 
-    // 2. Otherwise, attempt to fetch session explicitly (fallback mechanism)
     try {
       const authData = await auth.api.getSession({
         headers: ctx.request.headers as Headers,
       });
 
-      if (authData?.user?.id) {
+      if (hasUserId(authData?.user) && typeof authData.user.id === "string") {
         return {
           user: authData.user,
           session: authData.session,
+          authenticatedUser: authData.user,
         };
       }
     } catch {
-      // console.error("AuthGuard: Session fetch failed", error);
+      // Swallow auth provider errors and normalize them into UnauthorizedError.
     }
 
-    // 3. Return explicit nulls so onBeforeHandle can catch it
-    return { user: null, session: null };
+    return {
+      user: null,
+      session: null,
+      authenticatedUser: null,
+    };
   })
   .onBeforeHandle(({ user }: AuthGuardBeforeHandleContext) => {
-    // Strictly enforce that user exists and has an ID
     if (!user || typeof user !== "object" || !user.id) {
       throw new UnauthorizedError();
     }

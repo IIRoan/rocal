@@ -201,6 +201,32 @@ describe("eventsRoutes – color validation", () => {
       );
     });
 
+    it("falls back to resolve the authenticated user from the request context", async () => {
+      mockEnsureAuthenticatedUser.mockClear();
+      mockPrisma.calendarEvent.create.mockResolvedValue({
+        id: "event-1",
+        ...validEventBody,
+        color: null,
+        userId: "user-1",
+        category: null,
+        calendar: ownedCalendar,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(validEventBody),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Request),
+      );
+    });
+
     it("accepts event without color (null)", async () => {
       const created = {
         id: "event-1",
@@ -300,6 +326,7 @@ describe("eventsRoutes – color validation", () => {
     });
 
     it("accepts valid hex color on update", async () => {
+      mockEnsureAuthenticatedUser.mockClear();
       mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
       mockPrisma.calendarEvent.update.mockResolvedValue({
         ...existingEvent,
@@ -317,6 +344,10 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(200);
+      expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Request),
+      );
     });
 
     it("rejects invalid color on update", async () => {

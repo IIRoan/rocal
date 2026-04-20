@@ -75,6 +75,64 @@ describe("errors", () => {
     });
   });
 
+  it("includes structured issue details for validation errors when available", () => {
+    const validationError = Object.assign(new Error("Invalid body"), {
+      all: [
+        {
+          path: "/title",
+          message: "Expected string",
+          expected: "string",
+          found: 42,
+        },
+        {
+          path: "/start",
+          summary: "Expected ISO string",
+        },
+      ],
+    });
+
+    expect(invokeOnError("VALIDATION", validationError)).toEqual({
+      set: { status: 400 },
+      result: expect.objectContaining({
+        error: "Validation Error",
+        message: "Invalid body",
+        statusCode: 400,
+        details: {
+          issues: [
+            {
+              path: "/title",
+              message: "Expected string",
+              expected: "string",
+              found: 42,
+            },
+            {
+              path: "/start",
+              message: "Expected ISO string",
+              expected: undefined,
+              found: undefined,
+            },
+          ],
+        },
+      }),
+    });
+  });
+
+  it("omits validation details when the issue payload is malformed", () => {
+    const validationError = Object.assign(new Error("Invalid body"), {
+      all: "not-an-array",
+    });
+
+    expect(invokeOnError("VALIDATION", validationError)).toEqual({
+      set: { status: 400 },
+      result: expect.objectContaining({
+        error: "Validation Error",
+        message: "Invalid body",
+        statusCode: 400,
+        details: undefined,
+      }),
+    });
+  });
+
   it("maps custom validation and authorization errors", () => {
     expect(
       invokeOnError("UNKNOWN", new ValidationError("Bad input", "name")),
