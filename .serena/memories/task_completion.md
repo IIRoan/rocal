@@ -1,1 +1,0 @@
-After code changes, at minimum run targeted diagnostics on edited files. For broader validation use `bun run lint`, `bun run typecheck`, and relevant tests via `bun run test` from repo root. For backend-specific Prisma work, run the appropriate db command from apps/backend. Avoid reverting unrelated worktree changes.
