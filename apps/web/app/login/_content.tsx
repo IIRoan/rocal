@@ -44,7 +44,12 @@ export function LoginForm() {
   }, [nextPath]);
 
   const syncThemeAfterAuth = useCallback(async () => {
-    if (currentTheme && (currentTheme === "light" || currentTheme === "dark" || currentTheme === "system")) {
+    if (
+      currentTheme &&
+      (currentTheme === "light" ||
+        currentTheme === "dark" ||
+        currentTheme === "system")
+    ) {
       try {
         await calendarApiService.updateUserSettings({ theme: currentTheme });
       } catch {
@@ -263,7 +268,9 @@ export function LoginForm() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
+                    autoComplete={
+                      isSignUp ? "new-password" : "current-password"
+                    }
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -275,7 +282,6 @@ export function LoginForm() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
                     aria-label={
                       showPassword ? "Hide password" : "Show password"
                     }
