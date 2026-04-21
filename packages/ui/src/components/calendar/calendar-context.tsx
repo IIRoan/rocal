@@ -69,6 +69,41 @@ interface CalendarProviderProps {
   onRefreshCalendars?: () => Promise<Calendar[]>;
 }
 
+function getBootstrapCalendarDate(): Date {
+  if (typeof document !== "undefined") {
+    const raw = document.documentElement.dataset.calendarBootstrapDate;
+    if (raw) {
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    const rawDate = new URLSearchParams(window.location.search).get("date");
+    const match = rawDate?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (match) {
+      const parsed = new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        12,
+        0,
+        0,
+        0,
+      );
+
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+  }
+
+  return new Date();
+}
+
 export function CalendarProvider({
   children,
   initialCalendars = [],
@@ -120,7 +155,9 @@ export function CalendarProvider({
     [],
   );
 
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(() =>
+    getBootstrapCalendarDate(),
+  );
   const [currentView, setCurrentViewState] = useState<CalendarView>("month");
   const setCurrentView = useCallback((view: CalendarView) => {
     setCurrentViewState(view);

@@ -8,6 +8,20 @@ import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
 
 export const FORCE_LOADING_DESIGN_PREVIEW = false;
 
+function getBootstrapLoadingDate(): Date | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const raw = document.documentElement.dataset.calendarBootstrapDate;
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 interface LogoSpinnerProps {
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
@@ -91,18 +105,24 @@ function LoadingBoard({
   messageContext = "PAGE_LOAD",
   enableCycling = true,
 }: LoadingBoardProps) {
+  const [now] = useState<Date | null>(() => {
+    const bootstrapDate = getBootstrapLoadingDate();
+    if (bootstrapDate) {
+      return bootstrapDate;
+    }
+
+    return typeof window === "undefined" ? null : new Date();
+  });
   const { message: cyclingMessage, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !message,
   });
 
   const displayText = message || cyclingMessage;
-
-  const now = new Date();
-  const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dayNum = now.getDate().toString().padStart(2, "0");
-  const monthName = now.toLocaleDateString("en-US", { month: "long" });
-  const year = now.getFullYear();
+  const dayName = now?.toLocaleDateString("en-US", { weekday: "long" }) || "";
+  const dayNum = now ? now.getDate().toString().padStart(2, "0") : "";
+  const monthName = now?.toLocaleDateString("en-US", { month: "long" }) || "";
+  const year = now?.getFullYear().toString() || "";
 
   return (
     <div className="relative flex h-full flex-col justify-between overflow-hidden p-8 sm:p-14">
@@ -114,7 +134,11 @@ function LoadingBoard({
             Solace
           </span>
         </div>
-        <span className="text-[9px] font-semibold uppercase tracking-[0.4em] text-muted-foreground/30">
+        <span
+          className="text-[9px] font-semibold uppercase tracking-[0.4em] text-muted-foreground/30"
+          data-calendar-bootstrap="dayName"
+          suppressHydrationWarning
+        >
           {dayName}
         </span>
       </div>
@@ -123,16 +147,26 @@ function LoadingBoard({
       <div className="relative select-none text-center leading-none">
         <span
           className="block font-bold text-foreground/[0.07]"
+          data-calendar-bootstrap="dayNum"
+          suppressHydrationWarning
           style={{ fontSize: "clamp(140px, 38vw, 380px)", lineHeight: 1 }}
         >
           {dayNum}
         </span>
         {/* Month + year overlay, centered on the number */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <span className="text-[clamp(22px,4vw,52px)] font-bold tracking-[-0.02em] text-foreground">
+          <span
+            className="text-[clamp(22px,4vw,52px)] font-bold tracking-[-0.02em] text-foreground"
+            data-calendar-bootstrap="monthName"
+            suppressHydrationWarning
+          >
             {monthName}
           </span>
-          <span className="text-base font-medium text-muted-foreground/50">
+          <span
+            className="text-base font-medium text-muted-foreground/50"
+            data-calendar-bootstrap="year"
+            suppressHydrationWarning
+          >
             {year}
           </span>
         </div>
@@ -177,7 +211,7 @@ export function PageLoadingOverlay({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[9999] bg-background animate-fade-in",
+        "fixed inset-0 z-[9999] bg-background",
         className,
       )}
     >
