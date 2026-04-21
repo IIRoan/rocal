@@ -58,7 +58,6 @@ export function MobileCalendarWrapper({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const isMobile = useIsMobile();
-  const hasInitializedMobileDate = React.useRef(false);
 
   const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
 
@@ -83,14 +82,6 @@ export function MobileCalendarWrapper({
       setCurrentView(props.initialView);
     }
   }, []); // Only run once on mount
-
-  React.useEffect(() => {
-    if (isMobile && !hasInitializedMobileDate.current) {
-      hasInitializedMobileDate.current = true;
-      const today = new Date();
-      setCurrentDate(today);
-    }
-  }, [isMobile, setCurrentDate]);
 
   const handleDateChange = (date: Date) => setCurrentDate(date);
   const handleToday = () => setCurrentDate(new Date());

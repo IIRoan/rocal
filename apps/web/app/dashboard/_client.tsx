@@ -46,7 +46,12 @@ const AppSidebar = dynamic(
 const MobileCalendarWrapper = dynamic(
   () =>
     import("@workspace/ui/components").then((mod) => mod.MobileCalendarWrapper),
-  { ssr: false, loading: () => <MobileCalendarSkeleton /> },
+  {
+    ssr: false,
+    loading: () => (
+      <MobileDashboardLoadingScreen messageContext="CALENDAR_LOAD" />
+    ),
+  },
 );
 
 const CalendarWithData = dynamic(
@@ -106,6 +111,23 @@ function DashboardLoadingScreen() {
       <PageLoadingOverlay
         isLoading={true}
         messageContext="AUTH_FLOW"
+        enableCycling={true}
+      />
+    </>
+  );
+}
+
+function MobileDashboardLoadingScreen({
+  messageContext,
+}: {
+  messageContext: "CALENDAR_LOAD" | "SETTINGS_LOAD" | "DATA_SYNC";
+}) {
+  return (
+    <>
+      <MobileCalendarSkeleton />
+      <PageLoadingOverlay
+        isLoading={true}
+        messageContext={messageContext}
         enableCycling={true}
       />
     </>
@@ -441,20 +463,15 @@ function MobileLayoutContent() {
 
   if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
-      <>
-        <MobileCalendarSkeleton />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext={
-            settingsLoading
-              ? "SETTINGS_LOAD"
-              : isInitialLoading
-                ? "CALENDAR_LOAD"
-                : "DATA_SYNC"
-          }
-          enableCycling={true}
-        />
-      </>
+      <MobileDashboardLoadingScreen
+        messageContext={
+          settingsLoading
+            ? "SETTINGS_LOAD"
+            : isInitialLoading
+              ? "CALENDAR_LOAD"
+              : "DATA_SYNC"
+        }
+      />
     );
   }
 
