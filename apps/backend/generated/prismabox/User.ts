@@ -11,7 +11,6 @@ export const UserPlain = t.Object(
     email: t.String(),
     emailVerified: t.Boolean(),
     image: __nullable__(t.String()),
-    hasAiAccess: t.Boolean(),
     createdAt: t.Date(),
     updatedAt: t.Date(),
   },
@@ -217,7 +216,6 @@ export const UserPlainInputCreate = t.Object(
     email: t.String(),
     emailVerified: t.Optional(t.Boolean()),
     image: t.Optional(__nullable__(t.String())),
-    hasAiAccess: t.Optional(t.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -228,7 +226,6 @@ export const UserPlainInputUpdate = t.Object(
     email: t.Optional(t.String()),
     emailVerified: t.Optional(t.Boolean()),
     image: t.Optional(__nullable__(t.String())),
-    hasAiAccess: t.Optional(t.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -615,7 +612,6 @@ export const UserWhere = t.Partial(
           email: t.String(),
           emailVerified: t.Boolean(),
           image: t.String(),
-          hasAiAccess: t.Boolean(),
           createdAt: t.Date(),
           updatedAt: t.Date(),
         },
@@ -662,7 +658,6 @@ export const UserWhereUnique = t.Recursive(
               email: t.String(),
               emailVerified: t.Boolean(),
               image: t.String(),
-              hasAiAccess: t.Boolean(),
               createdAt: t.Date(),
               updatedAt: t.Date(),
             },
@@ -683,7 +678,6 @@ export const UserSelect = t.Partial(
       email: t.Boolean(),
       emailVerified: t.Boolean(),
       image: t.Boolean(),
-      hasAiAccess: t.Boolean(),
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       sessions: t.Boolean(),
@@ -735,9 +729,6 @@ export const UserOrderBy = t.Partial(
         additionalProperties: false,
       }),
       image: t.Union([t.Literal("asc"), t.Literal("desc")], {
-        additionalProperties: false,
-      }),
-      hasAiAccess: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       createdAt: t.Union([t.Literal("asc"), t.Literal("desc")], {

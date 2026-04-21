@@ -75,14 +75,9 @@ export const apiDocumentationTags = [
     description:
       "Token-based public ICS exports and authenticated share-link management for calendars.",
   },
-  {
-    name: "Calendar Assistant",
-    description:
-      "AI-assisted calendar workflows that interpret natural language and perform event actions.",
-  },
 ];
 
-export const apiDocumentationDescription = `Rocani exposes a session-based calendar API for calendars, events, subscriptions, reminders, public ICS feeds, and AI-assisted planning.
+export const apiDocumentationDescription = `Rocani exposes a session-based calendar API for calendars, events, subscriptions, reminders, and public ICS feeds.
 
 ## Authentication
 These docs assume browser-based Better Auth sessions. In production the session cookie is typically \`__Secure-better-auth.session_token\`; in local development it falls back to \`better-auth.session_token\`. Sign in through GitHub OAuth first, then open the docs in the same browser session.

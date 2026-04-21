@@ -3,7 +3,6 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
-  hasAiAccess?: boolean;
 }
 
 export type CalendarView = "month" | "week" | "3day" | "day" | "agenda";

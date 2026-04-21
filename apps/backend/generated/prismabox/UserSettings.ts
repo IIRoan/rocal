@@ -40,7 +40,6 @@ export const UserSettingsRelations = t.Object(
         email: t.String(),
         emailVerified: t.Boolean(),
         image: __nullable__(t.String()),
-        hasAiAccess: t.Boolean(),
         createdAt: t.Date(),
         updatedAt: t.Date(),
       },

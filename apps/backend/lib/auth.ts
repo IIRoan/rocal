@@ -92,15 +92,6 @@ export const auth = betterAuth({
       storeToken: "hashed",
     }),
   ],
-  user: {
-    additionalFields: {
-      hasAiAccess: {
-        type: "boolean",
-        required: false,
-        defaultValue: false,
-      },
-    },
-  },
   account: {
     // Mobile OAuth often starts in the webview and finishes in the system browser.
     // In local/dev this can split state cookies across contexts.
