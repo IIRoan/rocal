@@ -591,12 +591,12 @@ export function HomePageClient() {
 
   return (
     <section
-      className="relative min-h-[100dvh] flex overflow-hidden"
-      style={{
-        opacity: isExiting ? 0 : 1,
-        transform: isExiting ? "translateY(12px) scale(0.985)" : "translateY(0) scale(1)",
-        transition: "opacity 480ms cubic-bezier(0.4,0,0.2,1), transform 480ms cubic-bezier(0.4,0,0.2,1)",
-      }}
+      className="relative min-h-[100dvh] flex overflow-hidden animate-in fade-in-0 duration-300 ease-out"
+      style={isExiting ? {
+        opacity: 0,
+        transform: "translateY(12px) scale(0.985)",
+        transition: "opacity 220ms cubic-bezier(0.4,0,1,1), transform 220ms cubic-bezier(0.4,0,1,1)",
+      } : undefined}
     >
       {/* Full-bleed wallpaper */}
       <Image

@@ -197,6 +197,8 @@ interface PageLoadingOverlayProps {
   messageContext?: keyof typeof COMBINED_MESSAGES;
   className?: string;
   enableCycling?: boolean;
+  /** Render above other overlays (z-[10000] vs z-[9999]) */
+  priority?: boolean;
 }
 
 export function PageLoadingOverlay({
@@ -205,13 +207,30 @@ export function PageLoadingOverlay({
   messageContext = "PAGE_LOAD",
   className,
   enableCycling = true,
+  priority = false,
 }: PageLoadingOverlayProps) {
-  if (!isLoading) return null;
+  const [visible, setVisible] = useState(isLoading);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    if (isLoading) {
+      setVisible(true);
+      setFading(false);
+    } else {
+      setFading(true);
+      const t = setTimeout(() => setVisible(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [isLoading]);
+
+  if (!visible) return null;
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[9999] bg-background",
+        "fixed inset-0 bg-background",
+        priority ? "z-[10000]" : "z-[9999]",
+        fading && "animate-out fade-out-0 fill-mode-forwards duration-300",
         className,
       )}
     >
