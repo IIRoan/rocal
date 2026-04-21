@@ -17,6 +17,7 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 const log = createLogger("login");
 
 export function LoginForm() {
+  const [isExiting, setIsExiting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
@@ -25,6 +26,8 @@ export function LoginForm() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [overlayFading, setOverlayFading] = useState(false);
+  const [overlayVisible, setOverlayVisible] = useState(true);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -45,13 +48,14 @@ export function LoginForm() {
 
   const redirectAfterAuth = useCallback(() => {
     const target = getRedirectTarget();
-
-    if (target.external) {
-      window.location.replace(target.href);
-      return;
-    }
-
-    router.replace(target.href);
+    setIsExiting(true);
+    setTimeout(() => {
+      if (target.external) {
+        window.location.replace(target.href);
+        return;
+      }
+      router.replace(target.href);
+    }, 220);
   }, [getRedirectTarget, router]);
 
   const syncThemeAfterAuth = useCallback(async () => {
@@ -81,6 +85,15 @@ export function LoginForm() {
       handleSessionRedirect();
     }
   }, [session, isPending, handleSessionRedirect]);
+
+  // Fade out the loading overlay when session check is done with no session
+  useEffect(() => {
+    if (!isPending && !isCheckingSession && !session?.user) {
+      setOverlayFading(true);
+      const t = setTimeout(() => setOverlayVisible(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [isPending, isCheckingSession, session?.user]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.PublicKeyCredential) {
@@ -184,12 +197,16 @@ export function LoginForm() {
     }
   };
 
-  if (isPending || isCheckingSession) {
-    return <LoginLoading />;
-  }
-
   return (
-    <section className="min-h-[100dvh] flex">
+    <>
+      <section
+        className="min-h-[100dvh] flex"
+        style={isExiting ? {
+          opacity: 0,
+          transform: "translateY(12px) scale(0.985)",
+          transition: "opacity 220ms cubic-bezier(0.4,0,1,1), transform 220ms cubic-bezier(0.4,0,1,1)",
+        } : undefined}
+      >
       {/* Left side - Form */}
       <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
         {/* Subtle gradient background */}
@@ -431,6 +448,20 @@ export function LoginForm() {
         </div>
       </div>
     </section>
+
+      {overlayVisible && (
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-background${overlayFading ? " animate-out fade-out-0 fill-mode-forwards duration-300" : ""}`}
+        >
+          <Logo
+            width={44}
+            height={44}
+            className="text-primary animate-pulse"
+            style={{ animationDuration: "2s" }}
+          />
+        </div>
+      )}
+    </>
   );
 }
 

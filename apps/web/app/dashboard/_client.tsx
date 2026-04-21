@@ -462,32 +462,41 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }, [isPending, session?.user, router]);
 
   if (isPending || !session?.user) {
-    return <DashboardLoadingScreen />;
+    return (
+      <>
+        <DashboardSkeleton />
+        <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" enableCycling={true} priority />
+      </>
+    );
   }
 
   return (
-    <SettingsProvider>
-      <CalendarDataProvider>
-        <CalendarProviderWrapper>
-          <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
-            <Suspense fallback={null}>
-              <CalendarUrlSyncWrapper />
-              <DashboardSearchParamHandlers onOpenPalette={openPalette} />
-            </Suspense>
+    <>
+      <SettingsProvider>
+        <CalendarDataProvider>
+          <CalendarProviderWrapper>
+            <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
+              <Suspense fallback={null}>
+                <CalendarUrlSyncWrapper />
+                <DashboardSearchParamHandlers onOpenPalette={openPalette} />
+              </Suspense>
 
-            <SidebarProvider>
-              <SidebarWithContext />
-              <SidebarInset>{children}</SidebarInset>
-            </SidebarProvider>
-          </CommandPaletteProvider>
+              <SidebarProvider>
+                <SidebarWithContext />
+                <SidebarInset>{children}</SidebarInset>
+              </SidebarProvider>
+            </CommandPaletteProvider>
 
-          <CommandPalette
-            open={commandPaletteOpen}
-            onOpenChange={setCommandPaletteOpen}
-            initialSearchQuery={initialQuery}
-          />
-        </CalendarProviderWrapper>
-      </CalendarDataProvider>
-    </SettingsProvider>
+            <CommandPalette
+              open={commandPaletteOpen}
+              onOpenChange={setCommandPaletteOpen}
+              initialSearchQuery={initialQuery}
+            />
+          </CalendarProviderWrapper>
+        </CalendarDataProvider>
+      </SettingsProvider>
+
+      <PageLoadingOverlay isLoading={false} messageContext="AUTH_FLOW" enableCycling={true} priority />
+    </>
   );
 }
