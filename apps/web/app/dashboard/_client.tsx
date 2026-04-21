@@ -24,12 +24,10 @@ import { useCommandPalette as useCommandPaletteContext } from "@/components/comm
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import { getApiBaseUrl } from "@/lib/api-url";
 import { buildViewPrefetchRanges } from "@/hooks/use-calendar-events-loader";
 import {
   useMemo,
   useEffect,
-  useState,
   useRef,
   Suspense,
   type ReactNode,
@@ -67,42 +65,6 @@ const CommandPalette = dynamic(
     import("@/components/command-palette").then((mod) => mod.CommandPalette),
   { ssr: false },
 );
-
-type CalendarAssistantResponse = {
-  reply: string;
-  createdEvent: {
-    id: string;
-    title: string;
-    description?: string | null;
-    start: string;
-    end: string;
-    allDay?: boolean;
-    location?: string | null;
-    calendarId: string;
-  } | null;
-  updatedEvent: {
-    id: string;
-    title: string;
-    description?: string | null;
-    start: string;
-    end: string;
-    allDay?: boolean;
-    location?: string | null;
-    calendarId: string;
-  } | null;
-  deletedEventId: string | null;
-  events?: Array<{
-    id: string;
-    title: string;
-    description?: string | null;
-    start: string;
-    end: string;
-    allDay?: boolean;
-    location?: string | null;
-    calendarId: string;
-  }>;
-  error?: string;
-};
 
 function DashboardLoadingScreen() {
   return (
@@ -223,9 +185,6 @@ function SidebarWithContext() {
   } = useCommandPaletteContext();
   const { settings } = useSettings();
   const calendarData = useSharedCalendarData();
-  const [aiQuery, setAiQuery] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -257,70 +216,12 @@ function SidebarWithContext() {
     openEventEditor(newEvent);
   };
 
-  const handleAiSubmit = async () => {
-    const query = aiQuery.trim();
-    if (!query || aiLoading) {
-      return;
-    }
-
-    setAiLoading(true);
-    setAiResponse("");
-
-    try {
-      const assistantUrl = `${getApiBaseUrl()}/api/calendar-assistant`;
-      const response = await fetch(assistantUrl, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          timezone:
-            settings?.timezone ||
-            Intl.DateTimeFormat().resolvedOptions().timeZone,
-          now: new Date().toISOString(),
-        }),
-      });
-
-      const responseText = await response.text();
-      let data: CalendarAssistantResponse;
-
-      try {
-        data = JSON.parse(responseText) as CalendarAssistantResponse;
-      } catch (parseError) {
-        log.error("Failed to parse AI response:", parseError);
-        log.error("Response text:", responseText);
-        throw new Error("I received an invalid response. Please try again.");
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          data?.reply || data?.error || "Calendar assistant request failed",
-        );
-      }
-
-      if (data.createdEvent || data.updatedEvent || data.deletedEventId) {
-        await calendarData.refetch();
-      }
-
-      setAiResponse(data.reply);
-      setAiQuery("");
-    } catch (error: any) {
-      setAiResponse(
-        error?.message ||
-          "I can only help with calendar event actions and calendar event info.",
-      );
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
   return (
     <AppSidebar
       user={{
         name: session?.user.name || "Unknown User",
         email: session?.user.email || "",
         avatar: session?.user.image || undefined,
-        hasAiAccess: !!(session?.user as any)?.hasAiAccess,
       }}
       onLogout={handleLogout}
       onOpenSettings={openPalette}
@@ -481,7 +382,6 @@ function MobileLayoutContent() {
         name: session?.user.name || "Unknown User",
         email: session?.user.email || "",
         avatar: session?.user.image || undefined,
-        hasAiAccess: !!(session?.user as any)?.hasAiAccess,
       }}
       onLogout={handleLogout}
       onOpenSettings={() => {
