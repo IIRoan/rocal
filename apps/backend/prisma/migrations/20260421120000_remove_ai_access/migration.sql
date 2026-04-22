@@ -1,1 +1,2 @@
-ALTER TABLE "user" DROP COLUMN IF EXISTS "has_ai_access";
+-- Preserved to avoid dropping live historical data from existing databases.
+SELECT 1;

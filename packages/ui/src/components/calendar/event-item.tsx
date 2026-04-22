@@ -12,6 +12,7 @@ import {
   isHexColor,
   getColorSwatchValue,
 } from "./utils";
+import { EncryptionStatusBadge } from "./encryption-status";
 import { CalendarEvent, type CalendarView } from "./types";
 import { cn } from "../../lib/utils";
 import { formatEventDescription } from "./event-description-formatter";
@@ -258,6 +259,7 @@ export function EventItem({
         >
           {children || (
             <span className="truncate flex items-center gap-1">
+              <EncryptionStatusBadge item={event} />
               <span className="truncate">{event.title}</span>
             </span>
           )}
@@ -301,6 +303,7 @@ export function EventItem({
           onTouchStart={onTouchStart}
         >
           <div className="flex items-center gap-0.5 w-full min-w-0 overflow-hidden">
+            <EncryptionStatusBadge item={event} />
             <span
               className="font-medium flex-1 min-w-0 truncate whitespace-nowrap"
               title={event.title}
@@ -335,6 +338,7 @@ export function EventItem({
         {...dndAttributes}
       >
         <div className="text-sm font-medium flex items-center gap-2">
+          <EncryptionStatusBadge item={event} />
           <span className="truncate">{event.title}</span>
         </div>
         {!event.allDay && (

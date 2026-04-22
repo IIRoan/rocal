@@ -42,6 +42,10 @@ export const CalendarSubscriptionRelations = t.Object(
       {
         id: t.String(),
         name: t.String(),
+        encryptedName: __nullable__(t.String()),
+        blindIndexTokens: __nullable__(t.String()),
+        encryptionState: t.String(),
+        encryptionKeyVersion: t.Integer(),
         color: t.String(),
         kind: t.String(),
         isPublic: t.Boolean(),

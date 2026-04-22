@@ -11,7 +11,11 @@ jest.mock("../../lib/prisma", () => ({
     },
     calendar: {
       findFirst: jest.fn(async (): Promise<any> => null),
+      updateMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
+    $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
+      callback((jest.requireMock("../../lib/prisma") as { prisma: any }).prisma),
+    ),
   },
 }));
 
@@ -49,7 +53,9 @@ const mockPrisma = prisma as unknown as {
   };
   calendar: {
     findFirst: jest.Mock<() => Promise<any>>;
+    updateMany: jest.Mock<() => Promise<any>>;
   };
+  $transaction: jest.Mock;
 };
 
 function createApp() {
@@ -259,6 +265,38 @@ describe("settingsRoutes", () => {
         timezone: "UTC",
         defaultCalendarId: "calendar-1",
         workingDays: "[1,2,3,4,5]",
+      },
+    });
+    await expect(readJson(response)).resolves.toEqual(savedSettings);
+  });
+
+  it("disables calendar sharing when full event encryption is enabled", async () => {
+    const savedSettings = {
+      id: "settings-1",
+      userId: "user-1",
+      timezone: "UTC",
+      eventEncryptionMode: "full",
+    };
+    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    mockPrisma.userSettings.upsert.mockResolvedValue(savedSettings);
+
+    const response = await createApp().handle(
+      new Request("http://localhost/settings/", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          eventEncryptionMode: "full",
+        }),
+      }),
+    );
+
+    expect(mockPrisma.$transaction).toHaveBeenCalled();
+    expect(mockPrisma.calendar.updateMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", icsShareEnabled: true },
+      data: {
+        icsShareEnabled: false,
+        icsShareToken: null,
+        updatedAt: expect.any(Date),
       },
     });
     await expect(readJson(response)).resolves.toEqual(savedSettings);

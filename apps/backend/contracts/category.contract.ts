@@ -6,6 +6,10 @@ export type CategoryCreateInput = {
   userId: string;
   name: string;
   color: string;
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: string;
+  encryptionKeyVersion?: number;
 };
 
 export type CategoryUpdateInput = {
@@ -13,6 +17,10 @@ export type CategoryUpdateInput = {
   categoryId: string;
   name?: string;
   color?: string;
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: string;
+  encryptionKeyVersion?: number;
 };
 
 export type CategoryDeleteInput = {

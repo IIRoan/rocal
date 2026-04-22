@@ -7,6 +7,7 @@ import {
   BETTER_AUTH_BASE_PATH,
   getAuthOpenApiDocumentation,
 } from "./lib/auth";
+import { e2eeRoutes } from "./routes/e2ee";
 import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
 import { calendarsRoutes } from "./routes/calendars";
@@ -307,6 +308,7 @@ export const createAPI = (prefix = "") => {
         },
       },
     )
+    .use(e2eeRoutes)
     .use(eventsRoutes)
     .use(calendarSharingRoutes)
     .use(categoriesRoutes)

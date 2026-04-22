@@ -11,6 +11,11 @@ export { EventsPopup } from "./events-popup";
 export { NotificationManager, type EventNotification } from "./notification-manager";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
+export {
+  EncryptionStatusBadge,
+  getEncryptionStatusMeta,
+  resolveEncryptionState,
+} from "./encryption-status";
 export { formatEventDescription } from "./event-description-formatter";
 export {
   CalendarSkeleton,
