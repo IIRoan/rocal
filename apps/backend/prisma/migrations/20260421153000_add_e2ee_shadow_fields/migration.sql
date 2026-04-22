@@ -16,10 +16,6 @@ ADD COLUMN "blind_index_tokens" TEXT,
 ADD COLUMN "encryption_state" TEXT NOT NULL DEFAULT 'plaintext',
 ADD COLUMN "encryption_key_version" INTEGER NOT NULL DEFAULT 1;
 
-CREATE INDEX "calendar_event_blind_index_tokens_gin_idx"
-ON "calendar_event"
-USING GIN (("blind_index_tokens"::jsonb));
-
 CREATE TABLE "user_encryption_device" (
   "id" TEXT NOT NULL,
   "user_id" TEXT NOT NULL,

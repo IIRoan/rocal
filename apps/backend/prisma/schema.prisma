@@ -36,6 +36,7 @@ model User {
   settings       UserSettings?
   subscriptions  CalendarSubscription[]
   encryptionDevices UserEncryptionDevice[]
+  encryptionPassword UserEncryptionPassword?
 
   passkeys Passkey[]
 
@@ -332,6 +333,23 @@ model UserEncryptionDevice {
   @@unique([userId, deviceId])
   @@index([userId, lastSeenAt])
   @@map("user_encryption_device")
+}
+
+model UserEncryptionPassword {
+  id                String   @id @default(cuid())
+  userId            String   @unique @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kdfAlgorithm      String   @default("PBKDF2-SHA-256") @map("kdf_algorithm")
+  kdfSalt           String   @map("kdf_salt")
+  kdfIterations     Int      @default(310000) @map("kdf_iterations")
+  wrappedAccountKey String   @map("wrapped_account_key")
+  wrappedSearchKey  String   @map("wrapped_search_key")
+  wrapAlgorithm     String   @default("AES-GCM-256") @map("wrap_algorithm")
+  keyVersion        Int      @default(1) @map("key_version")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("user_encryption_password")
 }
 
 // Calendar Subscription Models

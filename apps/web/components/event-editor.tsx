@@ -306,6 +306,7 @@ export function EventEditor({
                 <EncryptionStatusBadge
                   item={eventForm.selectedEvent}
                   className="ml-2"
+                  showLabel
                 />
               )}
             </div>
@@ -377,6 +378,7 @@ export function EventEditor({
             <EncryptionStatusBadge
               item={eventForm.selectedEvent}
               className="ml-1"
+              showLabel
             />
           )}
           <div className="flex-1" />
@@ -475,6 +477,7 @@ export function EventEditor({
             <EncryptionStatusBadge
               item={eventForm.selectedEvent}
               className="ml-1"
+              showLabel
             />
           )}
           <div className="flex-1" />
@@ -728,6 +731,7 @@ function EventEditorPopover({
             <EncryptionStatusBadge
               item={eventForm.selectedEvent}
               className="ml-1"
+              showLabel
             />
           )}
           <div className="flex-1" />

@@ -2,6 +2,7 @@ import { createLogger } from "@workspace/logger";
 import { e2eeApiService } from "./e2ee-api-service";
 import {
   clearActiveE2eeSession,
+  getActiveE2eeSession,
   setActiveE2eeSession,
 } from "./e2ee-session";
 import {
@@ -10,6 +11,7 @@ import {
   type StoredE2eeDeviceRecord,
 } from "./e2ee-storage";
 import {
+  createPasswordEnvelope,
   exportWrappingPublicKey,
   generateAccountKey,
   generateBlindIndexKey,
@@ -18,12 +20,23 @@ import {
   isWebCryptoAvailable,
   unwrapAccountKey,
   unwrapBlindIndexKey,
+  unwrapPasswordEnvelope,
   wrapSymmetricKey,
 } from "./e2ee-crypto";
-import type { E2eeDeviceRecord } from "./types/calendar";
+import {
+  clearPendingAuthPassword,
+  consumePendingAuthPassword,
+} from "./e2ee-password-cache";
+import type { E2eeBootstrapResponse, E2eeDeviceRecord } from "./types/calendar";
 
 const log = createLogger("e2ee-bootstrap");
-const bootstrapPromises = new Map<string, Promise<boolean>>();
+
+export interface E2eeBootstrapAttempt {
+  activated: boolean;
+  bootstrap: E2eeBootstrapResponse | null;
+}
+
+const bootstrapPromises = new Map<string, Promise<E2eeBootstrapAttempt>>();
 let bootstrapGeneration = 0;
 let activeBootstrapUserId: string | null = null;
 
@@ -46,6 +59,13 @@ function buildDeviceLabel(): string | undefined {
   return isMobile ? `${platform} mobile` : `${platform} browser`;
 }
 
+function createAttempt(
+  activated: boolean,
+  bootstrap: E2eeBootstrapResponse | null,
+): E2eeBootstrapAttempt {
+  return { activated, bootstrap };
+}
+
 function beginBootstrap(userId: string): number {
   if (activeBootstrapUserId !== userId) {
     bootstrapGeneration += 1;
@@ -58,9 +78,22 @@ function beginBootstrap(userId: string): number {
 }
 
 function isBootstrapCurrent(userId: string, generation: number): boolean {
-  return (
-    activeBootstrapUserId === userId && bootstrapGeneration === generation
-  );
+  return activeBootstrapUserId === userId && bootstrapGeneration === generation;
+}
+
+function activateSession(
+  userId: string,
+  deviceId: string,
+  accountKey: CryptoKey,
+  blindIndexKey: CryptoKey,
+): void {
+  setActiveE2eeSession({
+    userId,
+    deviceId,
+    accountKey,
+    blindIndexKey,
+    activatedAt: new Date(),
+  });
 }
 
 async function activateFromRemote(
@@ -68,9 +101,10 @@ async function activateFromRemote(
   generation: number,
   localRecord: StoredE2eeDeviceRecord,
   remoteRecord: E2eeDeviceRecord,
-): Promise<boolean> {
+  bootstrap: E2eeBootstrapResponse,
+): Promise<E2eeBootstrapAttempt> {
   if (!isBootstrapCurrent(userId, generation)) {
-    return false;
+    return createAttempt(false, bootstrap);
   }
 
   const accountKey = await unwrapAccountKey(
@@ -83,18 +117,11 @@ async function activateFromRemote(
   );
 
   if (!isBootstrapCurrent(userId, generation)) {
-    return false;
+    return createAttempt(false, bootstrap);
   }
 
-  setActiveE2eeSession({
-    userId,
-    deviceId: remoteRecord.deviceId,
-    accountKey,
-    blindIndexKey,
-    activatedAt: new Date(),
-  });
-
-  return true;
+  activateSession(userId, remoteRecord.deviceId, accountKey, blindIndexKey);
+  return createAttempt(true, bootstrap);
 }
 
 async function uploadDevice(
@@ -112,13 +139,12 @@ async function uploadDevice(
   });
 }
 
-async function createInitialDevice(
+async function createDeviceRecord(
   userId: string,
-  generation: number,
-): Promise<boolean> {
+  accountKey: CryptoKey,
+  blindIndexKey: CryptoKey,
+): Promise<StoredE2eeDeviceRecord> {
   const wrappingKeyPair = await generateWrappingKeyPair();
-  const accountKey = await generateAccountKey();
-  const blindIndexKey = await generateBlindIndexKey();
   const publicKey = await exportWrappingPublicKey(wrappingKeyPair.publicKey);
   const wrappedAccountKey = await wrapSymmetricKey(
     accountKey,
@@ -128,8 +154,9 @@ async function createInitialDevice(
     blindIndexKey,
     wrappingKeyPair.publicKey,
   );
+  const timestamp = new Date().toISOString();
 
-  const localRecord: StoredE2eeDeviceRecord = {
+  return {
     userId,
     deviceId: generateDeviceId(),
     publicKey,
@@ -138,35 +165,86 @@ async function createInitialDevice(
     wrappedSearchKey,
     wrapAlgorithm: "RSA-OAEP-256",
     keyVersion: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
   };
+}
 
-  await uploadDevice(localRecord);
+async function provisionLocalDevice(
+  userId: string,
+  accountKey: CryptoKey,
+  blindIndexKey: CryptoKey,
+): Promise<E2eeDeviceRecord> {
+  const localRecord = await createDeviceRecord(userId, accountKey, blindIndexKey);
+  const remoteRecord = await uploadDevice(localRecord);
   await putStoredE2eeDevice(localRecord);
+  return remoteRecord;
+}
+
+async function createInitialDevice(
+  userId: string,
+  generation: number,
+  bootstrap: E2eeBootstrapResponse,
+): Promise<E2eeBootstrapAttempt> {
+  const accountKey = await generateAccountKey();
+  const blindIndexKey = await generateBlindIndexKey();
+  const remoteRecord = await provisionLocalDevice(userId, accountKey, blindIndexKey);
 
   if (!isBootstrapCurrent(userId, generation)) {
-    return false;
+    return createAttempt(false, bootstrap);
   }
 
-  setActiveE2eeSession({
-    userId,
-    deviceId: localRecord.deviceId,
-    accountKey,
-    blindIndexKey,
-    activatedAt: new Date(),
+  activateSession(userId, remoteRecord.deviceId, accountKey, blindIndexKey);
+  return createAttempt(true, {
+    ...bootstrap,
+    devices: [remoteRecord, ...bootstrap.devices],
   });
+}
 
-  return true;
+async function activateFromPasswordEnvelope(
+  userId: string,
+  generation: number,
+  bootstrap: E2eeBootstrapResponse,
+  password: string,
+): Promise<E2eeBootstrapAttempt> {
+  if (!bootstrap.passwordEnvelope) {
+    return createAttempt(false, bootstrap);
+  }
+
+  const { accountKey, blindIndexKey } = await unwrapPasswordEnvelope(
+    password,
+    bootstrap.passwordEnvelope,
+  );
+
+  if (!isBootstrapCurrent(userId, generation)) {
+    return createAttempt(false, bootstrap);
+  }
+
+  const localRecord = await getStoredE2eeDevice(userId);
+  const matchingRemote = localRecord
+    ? bootstrap.devices.find((device) => device.deviceId === localRecord.deviceId)
+    : undefined;
+
+  const deviceId = matchingRemote
+    ? matchingRemote.deviceId
+    : (await provisionLocalDevice(userId, accountKey, blindIndexKey)).deviceId;
+
+  if (!isBootstrapCurrent(userId, generation)) {
+    return createAttempt(false, bootstrap);
+  }
+
+  activateSession(userId, deviceId, accountKey, blindIndexKey);
+  clearPendingAuthPassword();
+  return createAttempt(true, bootstrap);
 }
 
 async function bootstrapUser(
   userId: string,
   generation: number,
-): Promise<boolean> {
+): Promise<E2eeBootstrapAttempt> {
   if (!isWebCryptoAvailable()) {
     clearActiveE2eeSession();
-    return false;
+    return createAttempt(false, null);
   }
 
   const [remoteBootstrap, localRecord] = await Promise.all([
@@ -175,7 +253,7 @@ async function bootstrapUser(
   ]);
 
   if (!isBootstrapCurrent(userId, generation)) {
-    return false;
+    return createAttempt(false, remoteBootstrap);
   }
 
   const matchingRemote = localRecord
@@ -185,46 +263,128 @@ async function bootstrapUser(
     : undefined;
 
   if (localRecord && matchingRemote) {
-    return await activateFromRemote(
+    return activateFromRemote(
       userId,
       generation,
       localRecord,
       matchingRemote,
+      remoteBootstrap,
     );
   }
 
-  if (localRecord && remoteBootstrap.devices.length === 0) {
+  if (localRecord) {
     const remoteRecord = await uploadDevice(localRecord);
 
     if (!isBootstrapCurrent(userId, generation)) {
-      return false;
+      return createAttempt(false, remoteBootstrap);
     }
 
-    return await activateFromRemote(
+    return activateFromRemote(
       userId,
       generation,
       localRecord,
       remoteRecord,
+      {
+        ...remoteBootstrap,
+        devices: [remoteRecord, ...remoteBootstrap.devices],
+      },
     );
   }
 
-  if (!localRecord && remoteBootstrap.devices.length === 0) {
-    return await createInitialDevice(userId, generation);
+  if (remoteBootstrap.passwordEnvelope) {
+    const pendingPassword = consumePendingAuthPassword();
+
+    if (pendingPassword) {
+      try {
+        return await activateFromPasswordEnvelope(
+          userId,
+          generation,
+          remoteBootstrap,
+          pendingPassword,
+        );
+      } catch (error) {
+        log.info("Pending auth password did not unlock E2EE envelope", {
+          userId,
+          error,
+        });
+      }
+    }
+  }
+
+  if (remoteBootstrap.devices.length === 0) {
+    return createInitialDevice(userId, generation, remoteBootstrap);
   }
 
   clearActiveE2eeSession();
-  log.info(
-    "E2EE shadow-write bootstrap exists on another device; local key transfer is not implemented yet.",
-    { userId },
-  );
 
-  return false;
+  if (remoteBootstrap.passwordEnvelope) {
+    log.info("E2EE bootstrap requires password unlock on this device.", {
+      userId,
+    });
+  } else {
+    log.info(
+      "E2EE shadow-write bootstrap exists on another device; password migration is required.",
+      { userId },
+    );
+  }
+
+  return createAttempt(false, remoteBootstrap);
 }
 
-export function ensureE2eeBootstrap(userId: string): Promise<boolean> {
+export async function storePasswordEnvelopeForActiveSession(
+  userId: string,
+  password: string,
+): Promise<boolean> {
+  const session = getActiveE2eeSession();
+
+  if (!session || session.userId !== userId) {
+    return false;
+  }
+
+  const envelope = await createPasswordEnvelope(
+    session.accountKey,
+    session.blindIndexKey,
+    password,
+  );
+
+  await e2eeApiService.upsertPasswordEnvelope(envelope);
+  clearPendingAuthPassword();
+  return true;
+}
+
+export async function unlockE2eeWithPassword(
+  userId: string,
+  password: string,
+): Promise<boolean> {
+  if (!userId || !isWebCryptoAvailable()) {
+    return false;
+  }
+
+  const generation = beginBootstrap(userId);
+  const bootstrap = await e2eeApiService.getBootstrap();
+
+  if (!bootstrap.passwordEnvelope) {
+    return false;
+  }
+
+  try {
+    const result = await activateFromPasswordEnvelope(
+      userId,
+      generation,
+      bootstrap,
+      password,
+    );
+    return result.activated;
+  } catch (error) {
+    log.info("Failed to unlock E2EE envelope with password", { userId, error });
+    return false;
+  }
+}
+
+export function ensureE2eeBootstrap(userId: string): Promise<E2eeBootstrapAttempt> {
   if (!userId) {
     clearActiveE2eeSession();
-    return Promise.resolve(false);
+    return Promise.resolve(createAttempt(false, null));
   }
 
   const generation = beginBootstrap(userId);
@@ -237,7 +397,7 @@ export function ensureE2eeBootstrap(userId: string): Promise<boolean> {
   const bootstrapPromise = bootstrapUser(userId, generation)
     .catch((error) => {
       if (!isBootstrapCurrent(userId, generation)) {
-        return false;
+        return createAttempt(false, null);
       }
 
       clearActiveE2eeSession();
@@ -246,7 +406,7 @@ export function ensureE2eeBootstrap(userId: string): Promise<boolean> {
         error,
       });
 
-      return false;
+      return createAttempt(false, null);
     })
     .finally(() => {
       if (bootstrapPromises.get(userId) === bootstrapPromise) {
@@ -258,7 +418,7 @@ export function ensureE2eeBootstrap(userId: string): Promise<boolean> {
   return bootstrapPromise;
 }
 
-export function waitForPendingE2eeBootstrap(): Promise<boolean> | null {
+export function waitForPendingE2eeBootstrap(): Promise<unknown> | null {
   if (!activeBootstrapUserId) {
     return null;
   }
@@ -271,4 +431,5 @@ export function resetE2eeBootstrap(): void {
   activeBootstrapUserId = null;
   bootstrapPromises.clear();
   clearActiveE2eeSession();
+  clearPendingAuthPassword();
 }

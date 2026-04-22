@@ -76,6 +76,28 @@ export class CalendarApiService {
     return session;
   }
 
+  private normalizeCalendarForUi(calendar: Calendar): Calendar {
+    return {
+      ...calendar,
+      encryptionState:
+        calendar.encryptionState ??
+        (calendar.encryptedName ? "shadow_write" : "plaintext"),
+      encryptedName: null,
+      blindIndexTokens: null,
+    };
+  }
+
+  private normalizeCategoryForUi(category: EventCategory): EventCategory {
+    return {
+      ...category,
+      encryptionState:
+        category.encryptionState ??
+        (category.encryptedName ? "shadow_write" : "plaintext"),
+      encryptedName: null,
+      blindIndexTokens: null,
+    };
+  }
+
   private normalizeEventForUi(event: CalendarEvent): CalendarEvent {
     return {
       ...event,
@@ -190,6 +212,12 @@ export class CalendarApiService {
       return {
         ...response,
         events: await this.hydrateEncryptedEvents(response.events),
+        calendars: response.calendars.map((calendar) =>
+          this.normalizeCalendarForUi(calendar),
+        ),
+        categories: response.categories.map((category) =>
+          this.normalizeCategoryForUi(category),
+        ),
       };
     } catch (error) {
       throw this.transformError(error, "Failed to fetch events");
@@ -286,7 +314,9 @@ export class CalendarApiService {
     try {
       const response =
         await this.client.get<CalendarsResponse>("/api/calendars");
-      return response.calendars;
+      return response.calendars.map((calendar) =>
+        this.normalizeCalendarForUi(calendar),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch calendars");
     }
@@ -299,7 +329,7 @@ export class CalendarApiService {
         "/api/calendars",
         payload,
       );
-      return response;
+      return this.normalizeCalendarForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create calendar");
     }
@@ -315,7 +345,7 @@ export class CalendarApiService {
         `/api/calendars/${id}`,
         payload,
       );
-      return response;
+      return this.normalizeCalendarForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update calendar");
     }
@@ -337,7 +367,9 @@ export class CalendarApiService {
     try {
       const response =
         await this.client.get<CategoriesResponse>("/api/categories");
-      return response.categories;
+      return response.categories.map((category) =>
+        this.normalizeCategoryForUi(category),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch categories");
     }
@@ -352,7 +384,7 @@ export class CalendarApiService {
         "/api/categories",
         payload,
       );
-      return response;
+      return this.normalizeCategoryForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create category");
     }
@@ -368,7 +400,7 @@ export class CalendarApiService {
         `/api/categories/${id}`,
         payload,
       );
-      return response;
+      return this.normalizeCategoryForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update category");
     }

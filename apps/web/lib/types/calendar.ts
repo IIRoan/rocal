@@ -366,6 +366,20 @@ export interface E2eeDeviceRecord {
   updatedAt: Date;
 }
 
+export interface E2eePasswordRecord {
+  id: string;
+  userId: string;
+  kdfAlgorithm: string;
+  kdfSalt: string;
+  kdfIterations: number;
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  wrapAlgorithm: string;
+  keyVersion: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface E2eeBootstrapCalendar {
   id: string;
   name: string;
@@ -388,9 +402,68 @@ export interface E2eeBootstrapResponse {
     content: "AES-GCM-256";
     blindIndex: "HMAC-SHA-256";
     wrapping: string;
+    passwordWrapping: string;
   };
   devices: E2eeDeviceRecord[];
+  passwordEnvelope: E2eePasswordRecord | null;
   calendars: E2eeBootstrapCalendar[];
+}
+
+export interface E2eeResetSnapshotCalendar {
+  id: string;
+  name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+  color: EventColor;
+  kind: CalendarKind;
+  isDefault: boolean;
+  isVisible: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeResetSnapshotCategory {
+  id: string;
+  name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+  color: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeResetSnapshotEvent {
+  id: string;
+  title: string;
+  description?: string | null;
+  encryptedContent?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+  start: Date;
+  end: Date;
+  timezone?: string | null;
+  allDay: boolean;
+  location?: string | null;
+  color?: string | null;
+  calendarId: string;
+  categoryId?: string | null;
+  reminder?: number | null;
+  recurrence?: string | null;
+  parentEventId?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeResetSnapshotResponse {
+  calendars: E2eeResetSnapshotCalendar[];
+  categories: E2eeResetSnapshotCategory[];
+  events: E2eeResetSnapshotEvent[];
 }
 
 export interface UpsertE2eeDeviceRequest {
@@ -398,6 +471,16 @@ export interface UpsertE2eeDeviceRequest {
   deviceLabel?: string;
   publicKey: string;
   publicKeyAlgorithm?: string;
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  wrapAlgorithm?: string;
+  keyVersion?: number;
+}
+
+export interface UpsertE2eePasswordRequest {
+  kdfAlgorithm?: string;
+  kdfSalt: string;
+  kdfIterations?: number;
   wrappedAccountKey: string;
   wrappedSearchKey: string;
   wrapAlgorithm?: string;

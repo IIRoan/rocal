@@ -7,7 +7,17 @@ jest.mock("../../lib/prisma", () => ({
       findMany: jest.fn(async (): Promise<any> => []),
       upsert: jest.fn(async (): Promise<any> => null),
     },
+    userEncryptionPassword: {
+      findUnique: jest.fn(async (): Promise<any> => null),
+      upsert: jest.fn(async (): Promise<any> => null),
+    },
     calendar: {
+      findMany: jest.fn(async (): Promise<any> => []),
+    },
+    eventCategory: {
+      findMany: jest.fn(async (): Promise<any> => []),
+    },
+    calendarEvent: {
       findMany: jest.fn(async (): Promise<any> => []),
     },
   },
@@ -43,7 +53,17 @@ const mockPrisma = prisma as unknown as {
     findMany: jest.Mock<() => Promise<any>>;
     upsert: jest.Mock<() => Promise<any>>;
   };
+  userEncryptionPassword: {
+    findUnique: jest.Mock<() => Promise<any>>;
+    upsert: jest.Mock<() => Promise<any>>;
+  };
   calendar: {
+    findMany: jest.Mock<() => Promise<any>>;
+  };
+  eventCategory: {
+    findMany: jest.Mock<() => Promise<any>>;
+  };
+  calendarEvent: {
     findMany: jest.Mock<() => Promise<any>>;
   };
 };
@@ -112,6 +132,7 @@ describe("e2eeRoutes", () => {
         content: "AES-GCM-256",
         blindIndex: "HMAC-SHA-256",
         wrapping: "RSA-OAEP-256",
+        passwordWrapping: "AES-GCM-256",
       },
       devices: [
         {
@@ -130,6 +151,7 @@ describe("e2eeRoutes", () => {
           updatedAt: "2026-04-21T12:00:00.000Z",
         },
       ],
+      passwordEnvelope: null,
       calendars: [
         {
           id: "calendar-1",
@@ -145,6 +167,90 @@ describe("e2eeRoutes", () => {
           createdAt: "2026-04-20T11:00:00.000Z",
           updatedAt: "2026-04-21T12:00:00.000Z",
         },
+      ],
+    });
+  });
+
+  it("returns raw records for password reset re-encryption", async () => {
+    mockPrisma.calendar.findMany.mockResolvedValue([
+      {
+        id: "calendar-1",
+        name: "Work",
+        encryptedName: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-1"]),
+        encryptionState: "shadow_write",
+        encryptionKeyVersion: 1,
+        color: "blue",
+        kind: "owned",
+        isDefault: true,
+        isVisible: true,
+        createdAt: new Date("2026-04-20T11:00:00.000Z"),
+        updatedAt: new Date("2026-04-21T12:00:00.000Z"),
+      },
+    ]);
+    mockPrisma.eventCategory.findMany.mockResolvedValue([
+      {
+        id: "category-1",
+        name: "Focus",
+        encryptedName: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-2"]),
+        encryptionState: "shadow_write",
+        encryptionKeyVersion: 1,
+        color: "violet",
+        isActive: true,
+        createdAt: new Date("2026-04-20T11:00:00.000Z"),
+        updatedAt: new Date("2026-04-21T12:00:00.000Z"),
+      },
+    ]);
+    mockPrisma.calendarEvent.findMany.mockResolvedValue([
+      {
+        id: "event-1",
+        title: "Planning",
+        description: "Discuss roadmap",
+        encryptedContent: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-3"]),
+        encryptionState: "shadow_write",
+        encryptionKeyVersion: 1,
+        start: new Date("2026-05-01T10:00:00.000Z"),
+        end: new Date("2026-05-01T11:00:00.000Z"),
+        timezone: "UTC",
+        allDay: false,
+        location: "Room 7",
+        color: "blue",
+        calendarId: "calendar-1",
+        categoryId: "category-1",
+        reminder: 15,
+        recurrence: null,
+        parentEventId: null,
+        createdAt: new Date("2026-04-20T11:00:00.000Z"),
+        updatedAt: new Date("2026-04-21T12:00:00.000Z"),
+      },
+    ]);
+
+    const response = await createApp().handle(
+      new Request("http://localhost/e2ee/reset-snapshot"),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(readJson(response)).resolves.toEqual({
+      calendars: [
+        expect.objectContaining({
+          id: "calendar-1",
+          blindIndexTokens: ["idx-1"],
+        }),
+      ],
+      categories: [
+        expect.objectContaining({
+          id: "category-1",
+          blindIndexTokens: ["idx-2"],
+        }),
+      ],
+      events: [
+        expect.objectContaining({
+          id: "event-1",
+          blindIndexTokens: ["idx-3"],
+          encryptedContent: "ciphertext",
+        }),
       ],
     });
   });

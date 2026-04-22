@@ -353,4 +353,66 @@ describe("CalendarApiService encryption wrappers", () => {
     expect(mockAttachCategoryEncryptionShadow).toHaveBeenCalledWith(request);
     expect(client.put).toHaveBeenCalledWith("/api/categories/cat-1", payload);
   });
+
+  it("normalizes calendars for UI renders", async () => {
+    client.get.mockResolvedValue({
+      calendars: [
+        {
+          id: "cal-1",
+          name: "Work",
+          encryptedName: "ciphertext",
+          blindIndexTokens: ["idx-1"],
+          color: "blue",
+          kind: "owned",
+          isPublic: false,
+          isVisible: true,
+          isDefault: false,
+          isSyncOnly: false,
+          userId: "user-1",
+          createdAt: new Date("2026-04-01T10:00:00.000Z"),
+          updatedAt: new Date("2026-04-01T10:00:00.000Z"),
+        },
+      ],
+    } as never);
+
+    const result = await service.getCalendars();
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "cal-1",
+        encryptionState: "shadow_write",
+        encryptedName: null,
+        blindIndexTokens: null,
+      }),
+    ]);
+  });
+
+  it("normalizes categories for UI renders", async () => {
+    client.get.mockResolvedValue({
+      categories: [
+        {
+          id: "cat-1",
+          name: "Personal",
+          encryptedName: "ciphertext",
+          blindIndexTokens: ["idx-1"],
+          color: "emerald",
+          isActive: true,
+          userId: "user-1",
+          createdAt: new Date("2026-04-01T10:00:00.000Z"),
+          updatedAt: new Date("2026-04-01T10:00:00.000Z"),
+        },
+      ],
+    } as never);
+
+    const result = await service.getCategories();
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "cat-1",
+        encryptionState: "shadow_write",
+        encryptedName: null,
+        blindIndexTokens: null,
+      }),
+    ]);
+  });
 });

@@ -221,6 +221,24 @@ export const UserRelations = t.Object(
       ),
       { additionalProperties: false },
     ),
+    encryptionPassword: __nullable__(
+      t.Object(
+        {
+          id: t.String(),
+          userId: t.String(),
+          kdfAlgorithm: t.String(),
+          kdfSalt: t.String(),
+          kdfIterations: t.Integer(),
+          wrappedAccountKey: t.String(),
+          wrappedSearchKey: t.String(),
+          wrapAlgorithm: t.String(),
+          keyVersion: t.Integer(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     passkeys: t.Array(
       t.Object(
         {
@@ -401,6 +419,19 @@ export const UserRelationsInputCreate = t.Object(
               },
               { additionalProperties: false },
             ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    encryptionPassword: t.Optional(
+      t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
             { additionalProperties: false },
           ),
         },
@@ -644,6 +675,20 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      encryptionPassword: t.Partial(
+        t.Object(
+          {
+            connect: t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            disconnect: t.Boolean(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       passkeys: t.Partial(
         t.Object(
           {
@@ -764,6 +809,7 @@ export const UserSelect = t.Partial(
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
       encryptionDevices: t.Boolean(),
+      encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
       _count: t.Boolean(),
     },
@@ -783,6 +829,7 @@ export const UserInclude = t.Partial(
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
       encryptionDevices: t.Boolean(),
+      encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
       _count: t.Boolean(),
     },
