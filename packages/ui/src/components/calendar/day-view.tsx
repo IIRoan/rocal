@@ -15,6 +15,7 @@ import {
 
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
+import { EncryptionStatusBadge } from "./encryption-status";
 import { EventItem } from "./event-item";
 import { isMultiDayEvent, eventOverlapsRange } from "./utils";
 import { WeekCellsHeight, StartHour, EndHour } from "./constants";
@@ -276,7 +277,10 @@ export function DayView({
                     onView={onEventView}
                   >
                     {/* Always show the title in day view for better usability */}
-                    <div>{event.title}</div>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <EncryptionStatusBadge item={event} />
+                        <span className="truncate">{event.title}</span>
+                      </div>
                   </EventItem>
                 );
               })}

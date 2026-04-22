@@ -3,7 +3,10 @@
 import React from "react";
 import { format } from "date-fns";
 import { CalendarIcon, MapPin, Loader2, Search } from "lucide-react";
-import type { CalendarEvent } from "@workspace/ui/components/calendar";
+import {
+  EncryptionStatusBadge,
+  type CalendarEvent,
+} from "@workspace/ui/components/calendar";
 
 interface EventSearchResultsProps {
   events: CalendarEvent[];
@@ -83,7 +86,15 @@ export function EventSearchResults({
               className={`w-2 h-2 rounded-full shrink-0 ${getColorClass(eventColor)}`}
             />
             <div className="flex-1 min-w-0">
-              <span className="text-sm truncate block">{event.title}</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm truncate block flex-1">
+                  {event.title}
+                </span>
+                <EncryptionStatusBadge
+                  item={event}
+                  className="opacity-80"
+                />
+              </div>
               <span className="text-xs text-muted-foreground">
                 {dateStr} &middot; {timeStr}
               </span>

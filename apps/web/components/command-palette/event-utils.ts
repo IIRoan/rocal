@@ -36,14 +36,7 @@ export const resetEventForm = (
   setters.setEventLocation("");
   setters.setEventCalendarId(calendars?.[0]?.id || "");
   setters.setEventReminder(null);
-  // Add default 15-minute email notification for new events
-  setters.setEventNotifications([
-    {
-      notificationType: "email",
-      minutesBefore: 15,
-      isEnabled: true,
-    },
-  ]);
+  setters.setEventNotifications([]);
 };
 
 export const validateEventForm = (

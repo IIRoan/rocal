@@ -15,7 +15,10 @@ import {
   type PaletteView,
   type PresetColor,
 } from "./command-palette/index";
-import { getColorSwatchValue } from "@workspace/ui/components/calendar";
+import {
+  EncryptionStatusBadge,
+  getColorSwatchValue,
+} from "@workspace/ui/components/calendar";
 
 import {
   Dialog,
@@ -273,7 +276,15 @@ export function CalendarManager({
                         style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm truncate">{calendar.name}</div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="text-sm truncate flex-1">
+                            {calendar.name}
+                          </div>
+                          <EncryptionStatusBadge
+                            item={calendar}
+                            className="opacity-80"
+                          />
+                        </div>
                         {calendar.isSyncOnly ? (
                           <div className="text-xs text-muted-foreground">
                             Synced (read-only)
@@ -306,8 +317,14 @@ export function CalendarManager({
                             style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm truncate">
-                              {calendar.name}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-sm truncate flex-1">
+                                {calendar.name}
+                              </div>
+                              <EncryptionStatusBadge
+                                item={calendar}
+                                className="opacity-80"
+                              />
                             </div>
                             <div className="text-xs text-muted-foreground">
                               Public holiday calendar
@@ -338,8 +355,14 @@ export function CalendarManager({
                             style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm truncate">
-                              {calendar.name}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-sm truncate flex-1">
+                                {calendar.name}
+                              </div>
+                              <EncryptionStatusBadge
+                                item={calendar}
+                                className="opacity-80"
+                              />
                             </div>
                             <div className="text-xs text-muted-foreground">
                               External subscription

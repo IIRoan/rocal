@@ -5,6 +5,7 @@ import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
+import type { RecurringRuleInput } from "../contracts/recurring.contract";
 import { RecurringService } from "../services/recurring.service";
 
 const recurringService = new RecurringService(prisma);
@@ -18,7 +19,7 @@ export const recurringRoutes = new Elysia({
     app
       .post(
         "/validate",
-        ({ body }: { body: { rule: string | Record<string, unknown> } }) => {
+        ({ body }: { body: { rule: RecurringRuleInput } }) => {
           return recurringService.validate(body.rule);
         },
         {
@@ -64,7 +65,7 @@ export const recurringRoutes = new Elysia({
           body: {
             eventStart: string;
             eventEnd: string;
-            recurrenceRule: string | Record<string, unknown>;
+            recurrenceRule: RecurringRuleInput;
             previewDays?: number;
           };
         }) => {

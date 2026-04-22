@@ -25,7 +25,16 @@ export class CalendarService implements ICalendarService {
   }
 
   async create(input: CalendarCreateInput) {
-    const { userId, name, color, isDefault } = input;
+    const {
+      userId,
+      name,
+      color,
+      isDefault,
+      encryptedName,
+      blindIndexTokens,
+      encryptionState,
+      encryptionKeyVersion,
+    } = input;
 
     if (!name?.trim()) {
       throw new ValidationError(
@@ -69,6 +78,14 @@ export class CalendarService implements ICalendarService {
     return this.prisma.calendar.create({
       data: {
         name: name.trim(),
+        ...(encryptedName !== undefined ? { encryptedName } : {}),
+        ...(blindIndexTokens !== undefined
+          ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
+          : {}),
+        ...(encryptionState !== undefined ? { encryptionState } : {}),
+        ...(encryptionKeyVersion !== undefined
+          ? { encryptionKeyVersion }
+          : {}),
         color,
         kind: "owned",
         isPublic: false,
@@ -80,7 +97,18 @@ export class CalendarService implements ICalendarService {
   }
 
   async update(input: CalendarUpdateInput) {
-    const { userId, calendarId, name, color, isVisible, isDefault } = input;
+    const {
+      userId,
+      calendarId,
+      name,
+      color,
+      isVisible,
+      isDefault,
+      encryptedName,
+      blindIndexTokens,
+      encryptionState,
+      encryptionKeyVersion,
+    } = input;
 
     const existingCalendar = await this.prisma.calendar.findFirst({
       where: { id: calendarId, userId },
@@ -146,6 +174,16 @@ export class CalendarService implements ICalendarService {
     if (name !== undefined) updateData.name = name.trim();
     if (color !== undefined) updateData.color = color;
     if (isVisible !== undefined) updateData.isVisible = isVisible;
+    if (encryptedName !== undefined) updateData.encryptedName = encryptedName;
+    if (blindIndexTokens !== undefined) {
+      updateData.blindIndexTokens = JSON.stringify(blindIndexTokens);
+    }
+    if (encryptionState !== undefined) {
+      updateData.encryptionState = encryptionState;
+    }
+    if (encryptionKeyVersion !== undefined) {
+      updateData.encryptionKeyVersion = encryptionKeyVersion;
+    }
     if (isDefault !== undefined) {
       updateData.isDefault = isDefault;
       if (isDefault) {

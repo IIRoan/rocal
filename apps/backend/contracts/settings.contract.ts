@@ -1,4 +1,6 @@
-import type { UserSettings } from "../generated/prisma/index.js";
+import type { UserSettings as PrismaUserSettings } from "../generated/prisma/index.js";
+
+export type PublicUserSettings = Omit<PrismaUserSettings, "defaultReminder">;
 
 export type SettingsUpdateInput = {
   userId: string;
@@ -13,7 +15,7 @@ export type SettingsUpdateInput = {
   emailNotifications?: boolean;
   browserNotifications?: boolean;
   reminderSound?: boolean;
-  defaultReminder?: number | null;
+  eventEncryptionMode?: "hybrid" | "full";
   defaultEventDuration?: number;
   defaultCalendarId?: string | null;
   compactView?: boolean;
@@ -22,7 +24,7 @@ export type SettingsUpdateInput = {
 };
 
 export interface ISettingsService {
-  get(userId: string): Promise<UserSettings>;
-  update(input: SettingsUpdateInput): Promise<UserSettings>;
+  get(userId: string): Promise<PublicUserSettings>;
+  update(input: SettingsUpdateInput): Promise<PublicUserSettings>;
   reset(userId: string): Promise<{ success: boolean; message: string }>;
 }

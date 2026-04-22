@@ -5,6 +5,10 @@ export type CalendarCreateInput = {
   name: string;
   color: string;
   isDefault?: boolean;
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: string;
+  encryptionKeyVersion?: number;
 };
 
 export type CalendarUpdateInput = {
@@ -14,6 +18,10 @@ export type CalendarUpdateInput = {
   color?: string;
   isVisible?: boolean;
   isDefault?: boolean;
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: string;
+  encryptionKeyVersion?: number;
 };
 
 export type CalendarDeleteInput = {

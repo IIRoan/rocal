@@ -48,6 +48,7 @@ type EventData struct {
 	Start         time.Time
 	End           time.Time
 	AllDay        bool
+	EncryptionState string
 	Location      string
 	CalendarName  string
 	Description   string
@@ -295,6 +296,7 @@ func (ns *NotificationServer) fetchDueNotifications(currentMinute time.Time) ([]
 			ce.start,
 			ce."end",
 			ce.all_day,
+			ce.encryption_state,
 			ce.location,
 			ce.description,
 			c.name,
@@ -341,6 +343,7 @@ func (ns *NotificationServer) fetchDueNotifications(currentMinute time.Time) ([]
 			&item.Event.Start,
 			&item.Event.End,
 			&item.Event.AllDay,
+			&item.Event.EncryptionState,
 			&location,
 			&description,
 			&item.Event.CalendarName,
@@ -438,23 +441,45 @@ func (ns *NotificationServer) insertNotificationLog(notification NotificationDat
 	return nil
 }
 
+func (ns *NotificationServer) shouldRedactReminderContent(event EventData) bool {
+	return strings.TrimSpace(event.EncryptionState) == "encrypted"
+}
+
 func (ns *NotificationServer) generateEmailContent(event EventData, user UserData, minutesBefore int, eventID string) (*EmailContent, error) {
 	formattedDetails, err := ns.formatEventDetailsForEmail(event, user.TimeZone, minutesBefore)
 	if err != nil {
 		return nil, err
 	}
 
+	eventTitle := event.Title
+	eventLocation := event.Location
+	calendarName := event.CalendarName
+	categoryName := event.CategoryName
+	categoryColor := event.CategoryColor
+	description := event.Description
+	duration := formattedDetails.Duration
+
+	if ns.shouldRedactReminderContent(event) {
+		eventTitle = "Encrypted event"
+		eventLocation = ""
+		calendarName = ""
+		categoryName = ""
+		categoryColor = ""
+		description = ""
+		duration = ""
+	}
+
 	templateData := templates.EmailTemplateData{
-		EventTitle:     event.Title,
+		EventTitle:     eventTitle,
 		EventDate:      formattedDetails.EventDate,
 		EventTime:      formattedDetails.EventTime,
-		EventLocation:  event.Location,
-		CalendarName:   event.CalendarName,
-		CategoryName:   event.CategoryName,
-		CategoryColor:  event.CategoryColor,
-		Description:    event.Description,
+		EventLocation:  eventLocation,
+		CalendarName:   calendarName,
+		CategoryName:   categoryName,
+		CategoryColor:  categoryColor,
+		Description:    description,
 		TimeUntilEvent: formattedDetails.TimeUntilEvent,
-		Duration:       formattedDetails.Duration,
+		Duration:       duration,
 		ReminderText:   formattedDetails.ReminderText,
 		UserName:       user.Name,
 		UserEmail:      user.Email,
@@ -564,6 +589,14 @@ func (ns *NotificationServer) formatReminderText(minutesBefore int) string {
 }
 
 func (ns *NotificationServer) generateEmailSubject(event EventData, minutesBefore int) string {
+	if ns.shouldRedactReminderContent(event) {
+		if minutesBefore <= 0 {
+			return "Event reminder starting now"
+		}
+
+		return fmt.Sprintf("Event reminder in %s", ns.formatReminderSummary(minutesBefore))
+	}
+
 	if minutesBefore <= 0 {
 		return fmt.Sprintf("%s starting now", event.Title)
 	}
@@ -625,6 +658,14 @@ func (ns *NotificationServer) getFromAddress(event EventData, minutesBefore int)
 }
 
 func (ns *NotificationServer) senderDisplayName(event EventData, minutesBefore int) string {
+	if ns.shouldRedactReminderContent(event) {
+		if minutesBefore <= 0 {
+			return "Event reminder starting now"
+		}
+
+		return fmt.Sprintf("Event reminder in %s", ns.formatReminderSummary(minutesBefore))
+	}
+
 	title := sanitizeMailFragment(event.Title)
 	if title == "" {
 		title = "reminder"

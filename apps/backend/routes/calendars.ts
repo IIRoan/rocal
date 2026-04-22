@@ -25,6 +25,30 @@ const createCalendarBodySchema = strictObject({
         "Whether this should be the default calendar (default: false)",
     }),
   ),
+  encryptedName: t.Optional(
+    t.String({
+      description: "Client-encrypted shadow copy of the calendar name.",
+    }),
+  ),
+  blindIndexTokens: t.Optional(
+    t.Array(
+      t.String({
+        description: "Blind-index token hash for encrypted search rollout.",
+      }),
+    ),
+  ),
+  encryptionState: t.Optional(
+    t.String({
+      description:
+        "Encryption rollout state for this row (for example: plaintext or shadow_write).",
+    }),
+  ),
+  encryptionKeyVersion: t.Optional(
+    t.Number({
+      minimum: 1,
+      description: "Client-managed encryption key version.",
+    }),
+  ),
 });
 
 const updateCalendarBodySchema = strictObject({
@@ -46,6 +70,30 @@ const updateCalendarBodySchema = strictObject({
   ),
   isDefault: t.Optional(
     t.Boolean({ description: "Whether this should be the default calendar" }),
+  ),
+  encryptedName: t.Optional(
+    t.String({
+      description: "Client-encrypted shadow copy of the calendar name.",
+    }),
+  ),
+  blindIndexTokens: t.Optional(
+    t.Array(
+      t.String({
+        description: "Blind-index token hash for encrypted search rollout.",
+      }),
+    ),
+  ),
+  encryptionState: t.Optional(
+    t.String({
+      description:
+        "Encryption rollout state for this row (for example: plaintext or shadow_write).",
+    }),
+  ),
+  encryptionKeyVersion: t.Optional(
+    t.Number({
+      minimum: 1,
+      description: "Client-managed encryption key version.",
+    }),
   ),
 });
 
@@ -98,7 +146,15 @@ export const calendarsRoutes = new Elysia({
           authenticatedUser,
           request,
         }: {
-          body: { name: string; color: string; isDefault?: boolean };
+          body: {
+            name: string;
+            color: string;
+            isDefault?: boolean;
+            encryptedName?: string;
+            blindIndexTokens?: string[];
+            encryptionState?: string;
+            encryptionKeyVersion?: number;
+          };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
         }) => {
@@ -108,6 +164,10 @@ export const calendarsRoutes = new Elysia({
             name: body.name,
             color: body.color,
             isDefault: body.isDefault,
+            encryptedName: body.encryptedName,
+            blindIndexTokens: body.blindIndexTokens,
+            encryptionState: body.encryptionState,
+            encryptionKeyVersion: body.encryptionKeyVersion,
           });
         },
         {
@@ -133,6 +193,10 @@ export const calendarsRoutes = new Elysia({
             color?: string;
             isVisible?: boolean;
             isDefault?: boolean;
+            encryptedName?: string;
+            blindIndexTokens?: string[];
+            encryptionState?: string;
+            encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -145,6 +209,10 @@ export const calendarsRoutes = new Elysia({
             color: body.color,
             isVisible: body.isVisible,
             isDefault: body.isDefault,
+            encryptedName: body.encryptedName,
+            blindIndexTokens: body.blindIndexTokens,
+            encryptionState: body.encryptionState,
+            encryptionKeyVersion: body.encryptionKeyVersion,
           });
         },
         {

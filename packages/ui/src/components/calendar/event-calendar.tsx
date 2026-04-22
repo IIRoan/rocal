@@ -101,7 +101,6 @@ export interface EventCalendarProps {
   showWeekNumbers?: boolean;
   compactView?: boolean;
   timeFormat?: "12h" | "24h";
-  defaultReminder?: number | null;
   defaultEventDuration?: number;
   defaultCalendarId?: string | null;
   weekStartDay?: number;
@@ -151,7 +150,6 @@ export function EventCalendar({
   showWeekNumbers = false,
   compactView = false,
   timeFormat = "24h",
-  defaultReminder = null,
   defaultEventDuration = 60,
   defaultCalendarId = null,
   weekStartDay = 1,

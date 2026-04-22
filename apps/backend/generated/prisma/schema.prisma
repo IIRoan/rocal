@@ -18,22 +18,23 @@ datasource db {
 }
 
 model User {
-  id             String                 @id @default(cuid())
-  name           String
-  email          String                 @unique
-  emailVerified  Boolean                @default(false) @map("email_verified")
-  image          String?
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
-  sessions       Session[]
-  accounts       Account[]
+  id                String                 @id @default(cuid())
+  name              String
+  email             String                 @unique
+  emailVerified     Boolean                @default(false) @map("email_verified")
+  image             String?
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  sessions          Session[]
+  accounts          Account[]
   // Calendar relationships
-  events         CalendarEvent[]
-  categories     EventCategory[]
-  calendars      Calendar[]
-  participations EventParticipant[]
-  settings       UserSettings?
-  subscriptions  CalendarSubscription[]
+  events            CalendarEvent[]
+  categories        EventCategory[]
+  calendars         Calendar[]
+  participations    EventParticipant[]
+  settings          UserSettings?
+  subscriptions     CalendarSubscription[]
+  encryptionDevices UserEncryptionDevice[]
 
   passkeys Passkey[]
 
@@ -88,38 +89,46 @@ model Verification {
 // Calendar Models
 
 model Calendar {
-  id              String                 @id @default(cuid())
-  name            String
-  color           String // blue, orange, violet, rose, emerald
-  kind            String                 @default("owned") @map("kind") // owned, subscribed, public_holiday
-  isPublic        Boolean                @default(false) @map("is_public")
-  isVisible       Boolean                @default(true) @map("is_visible")
-  isDefault       Boolean                @default(false) @map("is_default")
-  isSyncOnly      Boolean                @default(false) @map("is_sync_only") // Read-only calendar synced from external subscription
-  icsShareToken   String?                @unique @map("ics_share_token")
-  icsShareEnabled Boolean                @default(false) @map("ics_share_enabled")
-  userId          String                 @map("user_id")
-  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events          CalendarEvent[]
-  sharedCalendars CalendarSharing[]
-  subscriptions   CalendarSubscription[]
-  createdAt       DateTime               @default(now()) @map("created_at")
-  updatedAt       DateTime               @updatedAt @map("updated_at")
+  id                   String                 @id @default(cuid())
+  name                 String
+  encryptedName        String?                @map("encrypted_name")
+  blindIndexTokens     String?                @map("blind_index_tokens")
+  encryptionState      String                 @default("plaintext") @map("encryption_state")
+  encryptionKeyVersion Int                    @default(1) @map("encryption_key_version")
+  color                String // blue, orange, violet, rose, emerald
+  kind                 String                 @default("owned") @map("kind") // owned, subscribed, public_holiday
+  isPublic             Boolean                @default(false) @map("is_public")
+  isVisible            Boolean                @default(true) @map("is_visible")
+  isDefault            Boolean                @default(false) @map("is_default")
+  isSyncOnly           Boolean                @default(false) @map("is_sync_only") // Read-only calendar synced from external subscription
+  icsShareToken        String?                @unique @map("ics_share_token")
+  icsShareEnabled      Boolean                @default(false) @map("ics_share_enabled")
+  userId               String                 @map("user_id")
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events               CalendarEvent[]
+  sharedCalendars      CalendarSharing[]
+  subscriptions        CalendarSubscription[]
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
 
   @@unique([userId, name])
   @@map("calendar")
 }
 
 model EventCategory {
-  id        String          @id @default(cuid())
-  name      String
-  color     String // blue, orange, violet, rose, emerald
-  isActive  Boolean         @default(true) @map("is_active")
-  userId    String          @map("user_id")
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events    CalendarEvent[]
-  createdAt DateTime        @default(now()) @map("created_at")
-  updatedAt DateTime        @updatedAt @map("updated_at")
+  id                   String          @id @default(cuid())
+  name                 String
+  encryptedName        String?         @map("encrypted_name")
+  blindIndexTokens     String?         @map("blind_index_tokens")
+  encryptionState      String          @default("plaintext") @map("encryption_state")
+  encryptionKeyVersion Int             @default(1) @map("encryption_key_version")
+  color                String // blue, orange, violet, rose, emerald
+  isActive             Boolean         @default(true) @map("is_active")
+  userId               String          @map("user_id")
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events               CalendarEvent[]
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
 
   @@unique([userId, name])
   @@map("event_category")
@@ -129,6 +138,10 @@ model CalendarEvent {
   id                   String                @id @default(cuid())
   title                String
   description          String?
+  encryptedContent     String?               @map("encrypted_content")
+  blindIndexTokens     String?               @map("blind_index_tokens")
+  encryptionState      String                @default("plaintext") @map("encryption_state")
+  encryptionKeyVersion Int                   @default(1) @map("encryption_key_version")
   start                DateTime
   end                  DateTime
   allDay               Boolean               @default(false) @map("all_day")
@@ -199,6 +212,7 @@ model UserSettings {
   emailNotifications   Boolean  @default(true)
   browserNotifications Boolean  @default(true)
   reminderSound        Boolean  @default(true)
+  eventEncryptionMode  String   @default("hybrid") @map("event_encryption_mode") // hybrid, full
   // Default event settings
   defaultReminder      Int? // Default reminder in minutes
   defaultEventDuration Int      @default(60) // Default event duration in minutes
@@ -296,6 +310,27 @@ model Passkey {
   aaguid       String?
 
   @@map("passkey")
+}
+
+model UserEncryptionDevice {
+  id                 String   @id @default(cuid())
+  userId             String   @map("user_id")
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId           String   @map("device_id")
+  deviceLabel        String?  @map("device_label")
+  publicKey          String   @map("public_key")
+  publicKeyAlgorithm String   @default("RSA-OAEP-256") @map("public_key_algorithm")
+  wrappedAccountKey  String   @map("wrapped_account_key")
+  wrappedSearchKey   String   @map("wrapped_search_key")
+  wrapAlgorithm      String   @default("RSA-OAEP-256") @map("wrap_algorithm")
+  keyVersion         Int      @default(1) @map("key_version")
+  lastSeenAt         DateTime @default(now()) @map("last_seen_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, deviceId])
+  @@index([userId, lastSeenAt])
+  @@map("user_encryption_device")
 }
 
 // Calendar Subscription Models

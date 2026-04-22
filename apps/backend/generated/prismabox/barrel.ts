@@ -12,6 +12,7 @@ export * from "./RecurrenceException";
 export * from "./EventNotification";
 export * from "./NotificationLog";
 export * from "./Passkey";
+export * from "./UserEncryptionDevice";
 export * from "./CalendarSubscription";
 export * from "./CalendarSyncLog";
 export * from "./__nullable__";

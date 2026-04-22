@@ -11,6 +11,7 @@ import type { UserSettings } from "@/lib/types/calendar";
 import {
   NotificationManager,
   formatEventDescription,
+  EncryptionStatusBadge,
 } from "@workspace/ui/components/calendar";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
@@ -301,6 +302,12 @@ export function EventEditor({
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
             <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
               <h2 className="text-base font-semibold">{dialogTitle}</h2>
+              {eventForm.selectedEvent?.id && (
+                <EncryptionStatusBadge
+                  item={eventForm.selectedEvent}
+                  className="ml-2"
+                />
+              )}
             </div>
             <MobileEventEditorBody
               eventForm={eventForm}
@@ -366,6 +373,12 @@ export function EventEditor({
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">{dialogTitle}</span>
+          {eventForm.selectedEvent?.id && (
+            <EncryptionStatusBadge
+              item={eventForm.selectedEvent}
+              className="ml-1"
+            />
+          )}
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -458,6 +471,12 @@ export function EventEditor({
             <Plus className="h-4 w-4 text-muted-foreground ml-1" />
           )}
           <span className="text-sm font-medium">{dialogTitle}</span>
+          {eventForm.selectedEvent?.id && (
+            <EncryptionStatusBadge
+              item={eventForm.selectedEvent}
+              className="ml-1"
+            />
+          )}
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -705,6 +724,12 @@ function EventEditorPopover({
             <Plus className="h-4 w-4 text-muted-foreground ml-1" />
           )}
           <span className="text-sm font-medium">{dialogTitle}</span>
+          {eventForm.selectedEvent?.id && (
+            <EncryptionStatusBadge
+              item={eventForm.selectedEvent}
+              className="ml-1"
+            />
+          )}
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -1297,7 +1322,6 @@ function MobileEventEditorBody({
                       notifications={eventForm.eventNotifications}
                       onChange={eventForm.handleNotificationChange}
                       loading={eventForm.notificationsLoading}
-                      defaultReminder={localSettings?.defaultReminder}
                     />
                   </div>
                 </div>

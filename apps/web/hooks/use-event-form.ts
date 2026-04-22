@@ -237,13 +237,7 @@ export function useEventForm({
           setNotificationsLoading(false);
         }
       } else {
-        setEventNotifications([
-          {
-            notificationType: "email",
-            minutesBefore: 15,
-            isEnabled: true,
-          },
-        ]);
+        setEventNotifications([]);
       }
     },
     [queryClient],
@@ -269,13 +263,7 @@ export function useEventForm({
       calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
     );
     setEventReminder(null);
-    setEventNotifications([
-      {
-        notificationType: "email",
-        minutesBefore: 15,
-        isEnabled: true,
-      },
-    ]);
+    setEventNotifications([]);
     setIsRecurring(false);
     setRecurrenceRule(null);
     setShowRecurringDeleteModal(false);
@@ -467,6 +455,17 @@ export function useEventForm({
         }
       }
 
+      const reminderMinutes = finalNotifications
+        .filter(
+          (notification) =>
+            notification.isEnabled && notification.notificationType === "email",
+        )
+        .map((notification) => Number(notification.minutesBefore) || 0)
+        .filter((minutes) => minutes > 0);
+
+      eventData.reminder =
+        reminderMinutes.length > 0 ? Math.min(...reminderMinutes) : null;
+
       setEventSaving(true);
       try {
         const isUpdate =
@@ -485,7 +484,7 @@ export function useEventForm({
             allDay: eventData.allDay,
             location: eventData.location,
             calendarId: eventData.calendarId,
-            reminder: undefined,
+            reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? null,
           });
           toast.success(`Event "${eventTitle}" updated`);
@@ -499,7 +498,7 @@ export function useEventForm({
             allDay: eventData.allDay,
             location: eventData.location,
             calendarId: eventData.calendarId,
-            reminder: undefined,
+            reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? undefined,
           });
           savedEventId = newEvent.id;
