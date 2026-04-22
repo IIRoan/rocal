@@ -7,6 +7,7 @@ import { getApiBaseUrl, getMobileAuthCallbackUrl } from "@/lib/api-url";
 import { authClient } from "@/lib/auth-client";
 import { Logo } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui";
+import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 
 const log = createLogger("mobile-auth-bridge");
 
@@ -61,7 +62,9 @@ export function MobileAuthCompleteContent() {
   useEffect(() => {
     timerRef.current = setInterval(() => {
       elapsedSecondsRef.current += 1;
-      setStatusMessage(getStatusMessage(currentStep, elapsedSecondsRef.current));
+      setStatusMessage(
+        getStatusMessage(currentStep, elapsedSecondsRef.current),
+      );
     }, 1000);
 
     return () => {
@@ -144,7 +147,11 @@ export function MobileAuthCompleteContent() {
 
         log.debug("OTT generated, preparing redirect");
 
-        const redirectUrl = getMobileAuthCallbackUrl(nextPath, undefined, data.token);
+        const redirectUrl = getMobileAuthCallbackUrl(
+          nextPath,
+          undefined,
+          data.token,
+        );
         setAppRedirectUrl(redirectUrl);
         setCurrentStep("success");
         setStatusMessage("Success! Opening app...");
@@ -161,7 +168,8 @@ export function MobileAuthCompleteContent() {
         log.error("Auth flow failed:", error);
         setCurrentStep("error");
 
-        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        const errorMsg =
+          error instanceof Error ? error.message : "Unknown error";
 
         if (errorMsg === "Session check timeout") {
           setErrorMessage(
@@ -215,7 +223,9 @@ export function MobileAuthCompleteContent() {
             aria-label="Solace"
           />
           <div className="flex flex-col items-center gap-2">
-            <h1 className="text-xl font-semibold text-foreground">Opening App</h1>
+            <h1 className="text-xl font-semibold text-foreground">
+              Opening App
+            </h1>
             <p className="text-sm text-muted-foreground">{statusMessage}</p>
           </div>
           {appRedirectUrl && (
@@ -237,7 +247,10 @@ export function MobileAuthCompleteContent() {
         {errorCode && (
           <div className="bg-destructive text-destructive-foreground p-4 rounded-md mb-4 w-full max-w-sm text-center">
             <p className="font-bold">Authentication Error</p>
-            <p className="text-sm">An error occurred during the login process. The specific error code is provided below for debugging.</p>
+            <p className="text-sm">
+              An error occurred during the login process. The specific error
+              code is provided below for debugging.
+            </p>
             <p className="mt-2 text-xs font-mono bg-destructive-foreground/10 py-1 px-2 rounded-sm">
               Error Code: {errorCode}
             </p>
@@ -266,7 +279,9 @@ export function MobileAuthCompleteContent() {
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-semibold text-foreground mb-2">Login Failed</h1>
+            <h1 className="text-xl font-semibold text-foreground mb-2">
+              Login Failed
+            </h1>
             <p className="text-sm text-muted-foreground mb-6">{errorMessage}</p>
             <div className="flex gap-3">
               <button
@@ -337,15 +352,5 @@ export function MobileAuthCompleteContent() {
 }
 
 export function MobileAuthLoading() {
-  return (
-    <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex items-center justify-center px-4 py-6 sm:py-8 bg-background">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <Logo width={56} height={56} className="text-primary" aria-label="Solace" />
-        <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" aria-hidden="true" />
-          <span>Loading...</span>
-        </div>
-      </div>
-    </section>
-  );
+  return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
 }

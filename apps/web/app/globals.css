@@ -390,12 +390,20 @@
 
 /* Hex color theme adaptation - automatically adjusts custom hex colors for light/dark mode */
 .event-hex-adaptive {
-  background-color: color-mix(in oklch, var(--event-hex-color) 25%, oklch(0.96 0.005 0));
+  background-color: color-mix(
+    in oklch,
+    var(--event-hex-color) 25%,
+    oklch(0.96 0.005 0)
+  );
   color: color-mix(in oklch, var(--event-hex-color) 85%, oklch(0.15 0 0));
 }
 
 .dark .event-hex-adaptive {
-  background-color: color-mix(in oklch, var(--event-hex-color) 40%, oklch(0.18 0 0));
+  background-color: color-mix(
+    in oklch,
+    var(--event-hex-color) 40%,
+    oklch(0.18 0 0)
+  );
   color: color-mix(in oklch, var(--event-hex-color) 30%, oklch(0.95 0 0));
 }
 
@@ -473,7 +481,11 @@
     transition:
       background-color 0.25s ease,
       color 0.25s ease;
-    font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
+    font-feature-settings:
+      "cv02" 1,
+      "cv03" 1,
+      "cv04" 1,
+      "cv11" 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -659,6 +671,53 @@
     scroll-behavior: smooth;
   }
 
+  @supports (view-transition-name: none) {
+    @view-transition {
+      navigation: auto;
+    }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 160ms;
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      animation-fill-mode: both;
+    }
+
+    ::view-transition-old(root) {
+      animation-name: route-root-exit;
+    }
+
+    ::view-transition-new(root) {
+      animation-name: route-root-enter;
+    }
+  }
+
+  @keyframes route-root-exit {
+    from {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.994);
+      filter: blur(1.5px);
+    }
+  }
+
+  @keyframes route-root-enter {
+    from {
+      opacity: 0;
+      transform: scale(1.004);
+      filter: blur(1.5px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+
   /* Reduce motion block removed - was blocking animations based on Windows setting */
 
   /* Enhanced focus states for accessibility */
@@ -808,13 +867,21 @@
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   /* Legacy keyframes kept for other uses */
@@ -879,11 +946,15 @@
   @media (max-width: 768px) {
     /* Safe area insets for mobile devices */
     .safe-area-inset-top {
-      padding-top: calc(env(safe-area-inset-top, 0) * 0.5); /* Reduced by half */
+      padding-top: calc(
+        env(safe-area-inset-top, 0) * 0.5
+      ); /* Reduced by half */
     }
 
     .safe-area-inset-bottom {
-      padding-bottom: calc(env(safe-area-inset-bottom, 0) * 0.5); /* Reduced by half */
+      padding-bottom: calc(
+        env(safe-area-inset-bottom, 0) * 0.5
+      ); /* Reduced by half */
     }
 
     .safe-area-inset-left {
