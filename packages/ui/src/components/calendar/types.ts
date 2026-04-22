@@ -5,6 +5,8 @@ export interface User {
   avatar?: string;
 }
 
+export type EncryptionState = "plaintext" | "shadow_write" | "encrypted";
+
 export type CalendarView = "month" | "week" | "3day" | "day" | "agenda";
 
 export const CALENDAR_VIEWS: readonly CalendarView[] = [
@@ -18,6 +20,10 @@ export const CALENDAR_VIEWS: readonly CalendarView[] = [
 export interface Calendar {
   id: string;
   name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
   color: EventColor;
   kind: "owned" | "subscribed" | "public_holiday";
   isPublic: boolean;
@@ -33,6 +39,10 @@ export interface CalendarEvent {
   id: string;
   title: string;
   description?: string;
+  encryptedContent?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
   start: Date;
   end: Date;
   timezone?: string | null;

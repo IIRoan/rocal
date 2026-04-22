@@ -8,10 +8,77 @@ import type {
   NotificationDeleteResult,
 } from "../contracts/notification.contract";
 import { ValidationError, NotFoundError } from "../lib/errors";
+import {
+  normalizeEventEncryptionMode,
+  resolveEventPersistencePolicy,
+} from "../lib/event-encryption";
 import { NotificationCalculator } from "../lib/notification-calculator";
 
 export class NotificationService implements INotificationService {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private async reconcileEventPersistenceAfterReminderChange(
+    userId: string,
+    event: NonNullable<
+      Awaited<ReturnType<NotificationService["validateEventOwnership"]>>
+    >,
+    reminderMinutes: number | null,
+  ): Promise<void> {
+    const [calendar, userSettings] = await Promise.all([
+      this.prisma.calendar.findFirst({
+        where: { id: event.calendarId, userId },
+        select: { id: true, icsShareEnabled: true },
+      }),
+      this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: { eventEncryptionMode: true },
+      }),
+    ]);
+
+    if (!calendar) {
+      throw new NotFoundError("Calendar not found or access denied");
+    }
+
+    const encryptionMode = normalizeEventEncryptionMode(
+      userSettings?.eventEncryptionMode,
+    );
+    const persistencePolicy = resolveEventPersistencePolicy({
+      mode: encryptionMode,
+      hasEncryptedPayload:
+        typeof event.encryptedContent === "string" &&
+        event.encryptedContent.trim().length > 0,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      reminderMinutes,
+      calendarShareEnabled: calendar.icsShareEnabled,
+    });
+
+    if (
+      persistencePolicy.encryptionState !== "encrypted" &&
+      event.encryptionState === "encrypted"
+    ) {
+      throw new ValidationError(
+        "This event is fully encrypted. Reopen and save it before enabling reminder emails in hybrid mode.",
+      );
+    }
+
+    // Reminder changes are one of the few non-editor flows that legitimately
+    // change whether the server must retain plaintext fields. Recompute the
+    // persistence policy here so hybrid rows only keep plaintext while sharing
+    // or reminder delivery still needs it.
+    await this.prisma.calendarEvent.update({
+      where: { id: event.id },
+      data: {
+        title: persistencePolicy.title,
+        description: persistencePolicy.description,
+        location: persistencePolicy.location,
+        encryptionState: persistencePolicy.encryptionState,
+        reminder: reminderMinutes,
+        updatedAt: new Date(),
+      },
+    });
+  }
 
   private async validateEventOwnership(eventId: string, userId: string) {
     if (
@@ -28,6 +95,12 @@ export class NotificationService implements INotificationService {
         start: true,
         timezone: true,
         title: true,
+        description: true,
+        location: true,
+        calendarId: true,
+        reminder: true,
+        encryptedContent: true,
+        encryptionState: true,
         isSynced: true,
       },
     });
@@ -149,6 +222,21 @@ export class NotificationService implements INotificationService {
         "Duplicate notification configurations are not allowed",
       );
     }
+
+    const emailNotifications = notifications.filter(
+      (notification) =>
+        notification.isEnabled && notification.notificationType === "email",
+    );
+    const reminderMinutes =
+      emailNotifications.length > 0
+        ? Math.min(...emailNotifications.map((notification) => notification.minutesBefore))
+        : null;
+
+    await this.reconcileEventPersistenceAfterReminderChange(
+      userId,
+      event,
+      reminderMinutes,
+    );
 
     await this.prisma.eventNotification.deleteMany({ where: { eventId } });
 
@@ -278,6 +366,8 @@ export class NotificationService implements INotificationService {
     const deleteResult = await this.prisma.eventNotification.deleteMany({
       where: { eventId },
     });
+
+    await this.reconcileEventPersistenceAfterReminderChange(userId, event, null);
 
     return {
       success: true,

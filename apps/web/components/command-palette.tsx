@@ -233,7 +233,7 @@ export function CommandPalette({
           emailNotifications: newSettings.emailNotifications,
           browserNotifications: newSettings.browserNotifications,
           reminderSound: newSettings.reminderSound,
-          defaultReminder: newSettings.defaultReminder,
+          eventEncryptionMode: newSettings.eventEncryptionMode,
           defaultEventDuration: newSettings.defaultEventDuration,
           defaultCalendarId: newSettings.defaultCalendarId,
           compactView: newSettings.compactView,
@@ -828,7 +828,14 @@ export function CommandPalette({
     }
 
     if (currentView === "security") {
-      return <SecuritySettings goBack={goBack} goForward={goForward} />;
+      return (
+        <SecuritySettings
+          localSettings={localSettings}
+          updateSetting={updateSetting}
+          goBack={goBack}
+          goForward={goForward}
+        />
+      );
     }
 
     if (currentView === "passkeys") {

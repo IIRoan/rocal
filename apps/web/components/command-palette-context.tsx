@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  startTransition,
+} from "react";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
 export type EventEditorMode = "modal" | "popover";
@@ -107,7 +113,9 @@ export function CommandPaletteProvider({
     setInitialEventViewMode(options?.eventViewMode || "view");
     // Create preview event for popover mode (timeline clicks)
     if (options?.mode === "popover" && event) {
-      setPreviewEvent({ ...event, isPreview: true });
+      startTransition(() => {
+        setPreviewEvent({ ...event, isPreview: true });
+      });
     } else {
       setPreviewEvent(null);
     }
@@ -116,7 +124,9 @@ export function CommandPaletteProvider({
   };
 
   const updatePreviewEvent = (updates: Partial<CalendarEvent>) => {
-    setPreviewEvent((prev) => (prev ? { ...prev, ...updates } : null));
+    startTransition(() => {
+      setPreviewEvent((prev) => (prev ? { ...prev, ...updates } : null));
+    });
   };
 
   const clearPreviewEvent = () => {

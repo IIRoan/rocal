@@ -56,7 +56,7 @@ export const settingsRoutes = new Elysia({
             emailNotifications?: boolean;
             browserNotifications?: boolean;
             reminderSound?: boolean;
-            defaultReminder?: number | null;
+            eventEncryptionMode?: "hybrid" | "full";
             defaultEventDuration?: number;
             defaultCalendarId?: string | null;
             compactView?: boolean;
@@ -104,8 +104,8 @@ export const settingsRoutes = new Elysia({
             emailNotifications: t.Optional(t.Boolean()),
             browserNotifications: t.Optional(t.Boolean()),
             reminderSound: t.Optional(t.Boolean()),
-            defaultReminder: t.Optional(
-              t.Union([t.Number({ minimum: 1 }), t.Null()]),
+            eventEncryptionMode: t.Optional(
+              t.Union([t.Literal("hybrid"), t.Literal("full")]),
             ),
             defaultEventDuration: t.Optional(t.Number({ minimum: 1 })),
             defaultCalendarId: t.Optional(t.Union([t.String(), t.Null()])),

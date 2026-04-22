@@ -24,6 +24,7 @@ export const eventsRoutes = new Elysia({
       }: {
         query: {
           q: string;
+          blindIndexTokens?: string;
           limit?: number;
           offset?: number;
           startDate?: string;
@@ -36,6 +37,10 @@ export const eventsRoutes = new Elysia({
         return eventService.search({
           userId: user.id,
           query: query.q,
+          blindIndexTokens: query.blindIndexTokens
+            ?.split(",")
+            .map((token) => token.trim())
+            .filter(Boolean),
           limit: query.limit,
           offset: query.offset,
           startDate: query.startDate,
@@ -53,6 +58,12 @@ export const eventsRoutes = new Elysia({
               description: "Max results to return (default 20, max 50)",
               minimum: 1,
               maximum: 50,
+            }),
+          ),
+          blindIndexTokens: t.Optional(
+            t.String({
+              description:
+                "Comma-separated blind-index tokens for encrypted event search.",
             }),
           ),
           offset: t.Optional(
@@ -75,7 +86,7 @@ export const eventsRoutes = new Elysia({
         detail: {
           summary: "Search events by text",
           description:
-            "Full-text search across event title, description, and location. Uses PostgreSQL tsvector for fast lookups with ILIKE fallback for short queries.",
+              "Full-text search across plaintext event fields with blind-index fallback for encrypted events.",
         },
       },
     )
@@ -136,6 +147,10 @@ export const eventsRoutes = new Elysia({
             timezone?: string;
             reminder?: number | null;
             recurrence?: string;
+            encryptedContent?: string;
+            blindIndexTokens?: string[];
+            encryptionState?: string;
+            encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -208,6 +223,30 @@ export const eventsRoutes = new Elysia({
               t.String({
                 description:
                   "JSON string of recurrence rule for recurring events",
+              }),
+            ),
+            encryptedContent: t.Optional(
+              t.String({
+                description: "Client-encrypted shadow copy of sensitive event content.",
+              }),
+            ),
+            blindIndexTokens: t.Optional(
+              t.Array(
+                t.String({
+                  description: "Blind-index token hash for encrypted search rollout.",
+                }),
+              ),
+            ),
+            encryptionState: t.Optional(
+              t.String({
+                description:
+                  "Encryption rollout state for this row (for example: plaintext or shadow_write).",
+              }),
+            ),
+            encryptionKeyVersion: t.Optional(
+              t.Number({
+                minimum: 1,
+                description: "Client-managed encryption key version.",
               }),
             ),
           }),
@@ -303,6 +342,10 @@ export const eventsRoutes = new Elysia({
             categoryId?: string;
             reminder?: number | null;
             recurrence?: string | null;
+            encryptedContent?: string;
+            blindIndexTokens?: string[];
+            encryptionState?: string;
+            encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -386,6 +429,30 @@ export const eventsRoutes = new Elysia({
                 }),
                 t.Null(),
               ]),
+            ),
+            encryptedContent: t.Optional(
+              t.String({
+                description: "Client-encrypted shadow copy of sensitive event content.",
+              }),
+            ),
+            blindIndexTokens: t.Optional(
+              t.Array(
+                t.String({
+                  description: "Blind-index token hash for encrypted search rollout.",
+                }),
+              ),
+            ),
+            encryptionState: t.Optional(
+              t.String({
+                description:
+                  "Encryption rollout state for this row (for example: plaintext or shadow_write).",
+              }),
+            ),
+            encryptionKeyVersion: t.Optional(
+              t.Number({
+                minimum: 1,
+                description: "Client-managed encryption key version.",
+              }),
             ),
           }),
           detail: {

@@ -1,0 +1,1 @@
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20260316231953_add_ai_access';
