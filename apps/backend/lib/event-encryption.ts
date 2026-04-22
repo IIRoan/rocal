@@ -34,6 +34,12 @@ export function isEventFullyEncrypted(
   return encryptionState === "encrypted";
 }
 
+function requiresPlaintextShadow(
+  input: ResolveEventPersistencePolicyInput,
+): boolean {
+  return !!input.calendarShareEnabled || (input.reminderMinutes ?? 0) > 0;
+}
+
 export function resolveEventPersistencePolicy(
   input: ResolveEventPersistencePolicyInput,
 ): ResolvedEventPersistencePolicy {
@@ -41,8 +47,6 @@ export function resolveEventPersistencePolicy(
   const title = input.title.trim();
   const description = normalizeOptionalText(input.description);
   const location = normalizeOptionalText(input.location);
-  const requiresPlaintext =
-    (input.reminderMinutes ?? null) !== null || !!input.calendarShareEnabled;
 
   if (!input.hasEncryptedPayload) {
     return {
@@ -62,19 +66,19 @@ export function resolveEventPersistencePolicy(
     };
   }
 
-  if (requiresPlaintext) {
+  if (!requiresPlaintextShadow(input)) {
     return {
-      encryptionState: "shadow_write",
-      title,
-      description,
-      location,
+      encryptionState: "encrypted",
+      title: "",
+      description: null,
+      location: null,
     };
   }
 
   return {
-    encryptionState: "encrypted",
-    title: "",
-    description: null,
-    location: null,
+    encryptionState: "shadow_write",
+    title,
+    description,
+    location,
   };
 }

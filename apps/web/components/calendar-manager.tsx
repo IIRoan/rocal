@@ -542,6 +542,13 @@ export function CalendarManager({
                     <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                   </button>
                   <span className="text-sm font-medium">Edit Calendar</span>
+                  {editingCalendar && (
+                    <EncryptionStatusBadge
+                      item={editingCalendar}
+                      className="ml-auto"
+                      showLabel
+                    />
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">

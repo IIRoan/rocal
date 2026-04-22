@@ -28,7 +28,7 @@ describe("event encryption policy", () => {
     });
   });
 
-  it("stores ciphertext-only rows when hybrid mode has no plaintext-dependent feature", () => {
+  it("stores hybrid events as fully encrypted when no plaintext dependency exists", () => {
     expect(
       resolveEventPersistencePolicy({
         mode: "hybrid",
@@ -54,6 +54,24 @@ describe("event encryption policy", () => {
         description: "Discuss roadmap",
         location: "Room 7",
         reminderMinutes: 30,
+      }),
+    ).toEqual({
+      encryptionState: "shadow_write",
+      title: "Planning",
+      description: "Discuss roadmap",
+      location: "Room 7",
+    });
+  });
+
+  it("keeps shadow-write plaintext when calendar sharing requires readable content", () => {
+    expect(
+      resolveEventPersistencePolicy({
+        mode: "hybrid",
+        hasEncryptedPayload: true,
+        title: "Planning",
+        description: "Discuss roadmap",
+        location: "Room 7",
+        calendarShareEnabled: true,
       }),
     ).toEqual({
       encryptionState: "shadow_write",
