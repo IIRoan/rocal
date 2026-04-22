@@ -925,6 +925,7 @@ func TestSendTestEmailRequiresResend(t *testing.T) {
 }
 
 func TestStartRequiresDatabase(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
 	server := newTestServer(t)
 
 	err := server.Start()

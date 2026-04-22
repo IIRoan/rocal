@@ -281,7 +281,6 @@ describe("eventsRoutes – color validation", () => {
             ...validEventBody,
             encryptedContent: "ciphertext",
             blindIndexTokens: ["idx-1", "idx-2"],
-            encryptionState: "shadow_write",
             encryptionKeyVersion: 2,
           }),
         }),
@@ -301,6 +300,25 @@ describe("eventsRoutes – color validation", () => {
           }),
         }),
       );
+    });
+
+    it("rejects client-controlled encryptionState on create", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            encryptionState: "encrypted",
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(422);
+      await expect(readText(response)).resolves.toContain(
+        "Property 'encryptionState' should not be provided",
+      );
+      expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
     });
 
     it("keeps plaintext shadow fields when a reminder requires readable content", async () => {
@@ -456,7 +474,6 @@ describe("eventsRoutes – color validation", () => {
           body: JSON.stringify({
             encryptedContent: "ciphertext",
             blindIndexTokens: ["idx-1"],
-            encryptionState: "shadow_write",
             encryptionKeyVersion: 2,
           }),
         }),
@@ -476,6 +493,26 @@ describe("eventsRoutes – color validation", () => {
           }),
         }),
       );
+    });
+
+    it("rejects client-controlled encryptionState on update", async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/event-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            encryptionState: "plaintext",
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(422);
+      await expect(readText(response)).resolves.toContain(
+        "Property 'encryptionState' should not be provided",
+      );
+      expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
     });
 
     it("accepts valid hex color on update", async () => {

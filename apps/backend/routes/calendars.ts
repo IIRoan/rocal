@@ -2,6 +2,10 @@ import { Elysia, t } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";
+import {
+  rowEncryptionStateSchema,
+  type RowEncryptionState,
+} from "../lib/encryption-state";
 import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
@@ -37,12 +41,7 @@ const createCalendarBodySchema = strictObject({
       }),
     ),
   ),
-  encryptionState: t.Optional(
-    t.String({
-      description:
-        "Encryption rollout state for this row (for example: plaintext or shadow_write).",
-    }),
-  ),
+  encryptionState: t.Optional(rowEncryptionStateSchema),
   encryptionKeyVersion: t.Optional(
     t.Number({
       minimum: 1,
@@ -83,12 +82,7 @@ const updateCalendarBodySchema = strictObject({
       }),
     ),
   ),
-  encryptionState: t.Optional(
-    t.String({
-      description:
-        "Encryption rollout state for this row (for example: plaintext or shadow_write).",
-    }),
-  ),
+  encryptionState: t.Optional(rowEncryptionStateSchema),
   encryptionKeyVersion: t.Optional(
     t.Number({
       minimum: 1,
@@ -152,7 +146,7 @@ export const calendarsRoutes = new Elysia({
             isDefault?: boolean;
             encryptedName?: string;
             blindIndexTokens?: string[];
-            encryptionState?: string;
+            encryptionState?: RowEncryptionState;
             encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
@@ -195,7 +189,7 @@ export const calendarsRoutes = new Elysia({
             isDefault?: boolean;
             encryptedName?: string;
             blindIndexTokens?: string[];
-            encryptionState?: string;
+            encryptionState?: RowEncryptionState;
             encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
