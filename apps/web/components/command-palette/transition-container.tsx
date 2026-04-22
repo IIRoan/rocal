@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { gsap } from "@workspace/ui/lib/gsap";
+import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
 interface TransitionContainerProps {
   children: React.ReactNode;
@@ -7,49 +9,18 @@ interface TransitionContainerProps {
 
 const ENTER_MS = 160;
 const HEIGHT_MS = 180;
-const TRANSITION_EASING = "cubic-bezier(0, 0, 0.2, 1)";
 const ENTER_OFFSET_PX = 4;
-
-type Phase = "idle" | "pre-enter" | "entering";
 
 export function TransitionContainer({
   children,
   viewKey,
 }: TransitionContainerProps) {
   const [displayChildren, setDisplayChildren] = useState(children);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [containerHeight, setContainerHeight] = useState<number | undefined>(
-    undefined,
-  );
-  const [heightAnimating, setHeightAnimating] = useState(false);
-
-  const measureHeight = useCallback(() => {
-    return contentRef.current?.scrollHeight;
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updatePreference = () => {
-      setPrefersReducedMotion(mediaQuery.matches);
-    };
-
-    updatePreference();
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updatePreference);
-      return () => mediaQuery.removeEventListener("change", updatePreference);
-    }
-
-    mediaQuery.addListener(updatePreference);
-    return () => mediaQuery.removeListener(updatePreference);
-  }, []);
+  const activeTimelineRef = useRef<gsap.core.Timeline | null>(null);
 
   // Keep a ref to latest children so transition timers can read fresh content
   const latestChildren = useRef(children);
@@ -57,20 +28,69 @@ export function TransitionContainer({
     latestChildren.current = children;
   }, [children]);
 
-  // Track height passively when idle (handles within-view resizes)
+  // Passive height tracking: when the active view's content resizes (e.g.
+  // async list growth, expanding a row) without a viewKey change, smoothly
+  // animate the container height instead of snapping. Skipped while a
+  // viewKey transition timeline is in flight, since that timeline owns the
+  // height.
+  const isTransitioningRef = useRef(false);
   useEffect(() => {
-    if (phase !== "idle" || !contentRef.current) return;
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const container = containerRef.current;
+    const content = contentRef.current;
+
+    if (!container || !content) {
+      return;
+    }
 
     const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const h =
-          entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
-        if (h > 0) setContainerHeight(h);
+      if (isTransitioningRef.current) {
+        return;
       }
+
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+
+      const nextHeight =
+        entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+
+      if (nextHeight <= 0) {
+        return;
+      }
+
+      const currentHeight = container.getBoundingClientRect().height;
+
+      if (Math.abs(currentHeight - nextHeight) < 0.5) {
+        return;
+      }
+
+      if (prefersReducedMotion) {
+        gsap.set(container, { height: "auto" });
+        return;
+      }
+
+      gsap.to(container, {
+        height: nextHeight,
+        duration: HEIGHT_MS / 1000,
+        ease: "power2.out",
+        overwrite: "auto",
+        onComplete: () => {
+          gsap.set(container, { height: "auto" });
+        },
+      });
     });
-    observer.observe(contentRef.current);
-    return () => observer.disconnect();
-  }, [phase]);
+
+    observer.observe(content);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [prefersReducedMotion]);
 
   // Update displayed content for same-view changes (e.g. data refetch)
   // without interrupting the initial fade-in frame of a view switch.
@@ -82,13 +102,11 @@ export function TransitionContainer({
 
     prevChildrenRef.current = children;
 
-    if (phase !== "pre-enter") {
-      const frameId = requestAnimationFrame(() => {
-        setDisplayChildren(children);
-      });
-      return () => cancelAnimationFrame(frameId);
-    }
-  }, [children, phase]);
+    const frameId = requestAnimationFrame(() => {
+      setDisplayChildren(children);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [children]);
 
   // Handle view transitions — only runs when viewKey changes
   const prevViewKeyRef = useRef(viewKey);
@@ -99,105 +117,77 @@ export function TransitionContainer({
 
     prevViewKeyRef.current = viewKey;
 
-    const frameIds: number[] = [];
-    const timers: ReturnType<typeof setTimeout>[] = [];
-
-    const prevH = measureHeight();
-    if (prevH !== undefined) {
-      const frameId = requestAnimationFrame(() => {
-        setContainerHeight(prevH);
-      });
-      frameIds.push(frameId);
-    }
+    const container = containerRef.current;
+    const currentContent = contentRef.current;
 
     setDisplayChildren(latestChildren.current);
 
-    if (prefersReducedMotion) {
-      const frameId = requestAnimationFrame(() => {
-        const nextH = measureHeight();
-        if (nextH !== undefined) {
-          setContainerHeight(nextH);
-        }
-        setHeightAnimating(false);
-        setPhase("idle");
-      });
-      frameIds.push(frameId);
-
-      return () => {
-        for (const queuedFrameId of frameIds) {
-          cancelAnimationFrame(queuedFrameId);
-        }
-      };
+    if (!container || !currentContent) {
+      return;
     }
 
-    setHeightAnimating(false);
-    setPhase("pre-enter");
+    activeTimelineRef.current?.kill();
 
-    const enterFrameId = requestAnimationFrame(() => {
-      const measureFrameId = requestAnimationFrame(() => {
-        const nextH = measureHeight();
-        if (nextH !== undefined) {
-          setHeightAnimating(true);
-          setContainerHeight(nextH);
-        }
-        setPhase("entering");
+    const previousHeight = currentContent.scrollHeight;
+    isTransitioningRef.current = true;
+    gsap.set(container, { height: previousHeight, overflow: "hidden" });
+
+    const frameId = requestAnimationFrame(() => {
+      const nextContent = contentRef.current;
+
+      if (!nextContent) {
+        isTransitioningRef.current = false;
+        return;
+      }
+
+      const nextHeight = nextContent.scrollHeight;
+
+      if (prefersReducedMotion) {
+        gsap.set(container, { height: "auto", clearProps: "overflow" });
+        isTransitioningRef.current = false;
+        return;
+      }
+
+      activeTimelineRef.current = gsap.timeline({
+        defaults: { ease: "power2.out" },
+        onComplete: () => {
+          gsap.set(container, { height: "auto", clearProps: "overflow" });
+          isTransitioningRef.current = false;
+        },
       });
 
-      frameIds.push(measureFrameId);
+      activeTimelineRef.current
+        .fromTo(
+          nextContent,
+          { autoAlpha: 0, y: ENTER_OFFSET_PX },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: ENTER_MS / 1000,
+            clearProps: "opacity,transform",
+          },
+          0,
+        )
+        .to(
+          container,
+          {
+            height: nextHeight,
+            duration: HEIGHT_MS / 1000,
+          },
+          0,
+        );
     });
-    frameIds.push(enterFrameId);
-
-    timers.push(
-      setTimeout(() => {
-        setPhase("idle");
-        setHeightAnimating(false);
-        const settledHeight = measureHeight();
-        if (settledHeight !== undefined) {
-          setContainerHeight(settledHeight);
-        }
-      }, Math.max(ENTER_MS, HEIGHT_MS)),
-    );
 
     return () => {
-      for (const queuedFrameId of frameIds) {
-        cancelAnimationFrame(queuedFrameId);
-      }
-      for (const timer of timers) {
-        clearTimeout(timer);
-      }
+      cancelAnimationFrame(frameId);
+      activeTimelineRef.current?.kill();
+      isTransitioningRef.current = false;
     };
-  }, [measureHeight, prefersReducedMotion, viewKey]);
-
-  const contentStyle: React.CSSProperties =
-    phase === "pre-enter"
-      ? {
-          opacity: 0,
-          transform: `translateY(${ENTER_OFFSET_PX}px)`,
-          willChange: "opacity, transform",
-        }
-      : phase === "entering"
-        ? {
-            opacity: 1,
-            transform: "translateY(0)",
-            willChange: "opacity, transform",
-            transition: `opacity ${ENTER_MS}ms ${TRANSITION_EASING}, transform ${ENTER_MS}ms ${TRANSITION_EASING}`,
-          }
-        : { opacity: 1, transform: "translateY(0)" };
+  }, [prefersReducedMotion, viewKey]);
 
   return (
-    <div
-      className="relative overflow-hidden"
-      style={{
-        height: containerHeight !== undefined ? `${containerHeight}px` : "auto",
-        transition:
-          heightAnimating && !prefersReducedMotion
-            ? `height ${HEIGHT_MS}ms ${TRANSITION_EASING}`
-            : "none",
-      }}
-    >
-      <div ref={contentRef} style={contentStyle}>
-        {displayChildren}
-      </div>
+    <div ref={containerRef} className="relative overflow-hidden">
+      <div ref={contentRef}>{displayChildren}</div>
     </div>
   );
 }

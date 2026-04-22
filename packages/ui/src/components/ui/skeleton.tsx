@@ -13,9 +13,9 @@ function Skeleton({
 }: SkeletonProps) {
   const animationClass = animate
     ? {
-        default: "animate-pulse",
-        shimmer: "animate-shimmer",
-        wave: "animate-wave",
+        default: "[animation:pulse_1.8s_ease-in-out_infinite]",
+        shimmer: "[animation:shimmer_1.5s_ease-in-out_infinite]",
+        wave: "[animation:wave_2.4s_ease-in-out_infinite]",
       }[variant]
     : "";
 
@@ -33,7 +33,7 @@ function Skeleton({
       {...props}
     >
       {variant === "wave" && (
-        <div className="absolute inset-0 -translate-x-full animate-wave bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent [animation:wave_2.4s_ease-in-out_infinite]" />
       )}
     </div>
   );
