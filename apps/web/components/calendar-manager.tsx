@@ -276,14 +276,8 @@ export function CalendarManager({
                         style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="text-sm truncate flex-1">
-                            {calendar.name}
-                          </div>
-                          <EncryptionStatusBadge
-                            item={calendar}
-                            className="opacity-80"
-                          />
+                        <div className="text-sm truncate">
+                          {calendar.name}
                         </div>
                         {calendar.isSyncOnly ? (
                           <div className="text-xs text-muted-foreground">
@@ -295,6 +289,10 @@ export function CalendarManager({
                           </div>
                         ) : null}
                       </div>
+                      <EncryptionStatusBadge
+                        item={calendar}
+                        className="opacity-80"
+                      />
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />                    </button>
                   ))}
                 </div>
@@ -317,19 +315,17 @@ export function CalendarManager({
                             style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="text-sm truncate flex-1">
-                                {calendar.name}
-                              </div>
-                              <EncryptionStatusBadge
-                                item={calendar}
-                                className="opacity-80"
-                              />
+                            <div className="text-sm truncate">
+                              {calendar.name}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               Public holiday calendar
                             </div>
                           </div>
+                          <EncryptionStatusBadge
+                            item={calendar}
+                            className="opacity-80"
+                          />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                         </button>
                       ))}
@@ -355,19 +351,17 @@ export function CalendarManager({
                             style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="text-sm truncate flex-1">
-                                {calendar.name}
-                              </div>
-                              <EncryptionStatusBadge
-                                item={calendar}
-                                className="opacity-80"
-                              />
+                            <div className="text-sm truncate">
+                              {calendar.name}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               External subscription
                             </div>
                           </div>
+                          <EncryptionStatusBadge
+                            item={calendar}
+                            className="opacity-80"
+                          />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                         </button>
                       ))}

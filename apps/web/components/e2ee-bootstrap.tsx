@@ -4,9 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "@workspace/logger";
 import { Button } from "@workspace/ui/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
-import { KeyRound, RefreshCw, Shield } from "lucide-react";
+import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
+import { KeyRound, LogOut, Shield } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import {
   ensureE2eeBootstrap,
@@ -18,6 +24,7 @@ import {
   clearPendingAuthPassword,
   consumePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import { signOut } from "@/lib/auth-client";
 
 const log = createLogger("e2ee-bootstrap");
 
@@ -254,120 +261,203 @@ export function E2eeBootstrap() {
     }
   }, [password, queryClient, userId]);
 
+  const handleSignOut = useCallback(async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await signOut();
+    } catch (signOutError) {
+      log.warn("Failed to sign out from encryption gate", {
+        userId,
+        error: signOutError,
+      });
+    } finally {
+      window.location.href = "/";
+    }
+  }, [userId]);
+
   if (mode === "hidden") {
     return null;
   }
 
-  const title =
-    mode === "unlock"
-      ? "Unlock encrypted data"
-      : mode === "legacy"
-        ? "Finish encryption migration"
-        : "Protect your encryption keys";
+  const isUnlock = mode === "unlock";
+  const isLegacy = mode === "legacy";
 
-  const description =
-    mode === "unlock"
-      ? "Enter the password that wraps your end-to-end encryption keys on this device."
-      : mode === "legacy"
-        ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and set an encryption password once."
-        : "Choose a password that wraps your encryption keys so you can unlock them on other devices after sign-in.";
+  const title = isUnlock
+    ? "Unlock encrypted data"
+    : isLegacy
+      ? "Finish encryption migration"
+      : "Protect your encryption keys";
+
+  const description = isUnlock
+    ? "Enter the password that wraps your end-to-end encryption keys on this device."
+    : isLegacy
+      ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and set an encryption password once."
+      : "Choose a password that wraps your encryption keys so you can unlock them on other devices after sign-in.";
+
+  const Icon = isUnlock ? KeyRound : Shield;
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting || isLegacy) {
+      return;
+    }
+    if (isUnlock) {
+      void handleUnlock();
+    } else {
+      void handleSetup();
+    }
+  };
+
+  const primaryLabel = isSubmitting
+    ? "Working..."
+    : isUnlock
+      ? "Unlock"
+      : isLegacy
+        ? "Retry"
+        : "Save password";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-border/60 bg-card/95 p-6 shadow-2xl">
-        <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            {mode === "unlock" ? (
-              <KeyRound className="h-5 w-5" />
-            ) : (
-              <Shield className="h-5 w-5" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-        </div>
+    <Dialog open onOpenChange={() => undefined}>
+      <DialogContent
+        variant="spotlight"
+        showClose={false}
+        aria-describedby={undefined}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl"
+      >
+        <VisuallyHidden>
+          <DialogTitle>{title}</DialogTitle>
+        </VisuallyHidden>
 
-        {mode === "legacy" ? (
-          <div className="mt-6 space-y-4">
-            {error ? (
-              <p className="rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </p>
-            ) : null}
-            <Button
-              type="button"
-              className="w-full"
-              onClick={rerunBootstrap}
-              disabled={isSubmitting}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </Button>
-          </div>
-        ) : (
-          <div className="mt-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="e2ee-password">Encryption password</Label>
-              <Input
-                id="e2ee-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete={mode === "unlock" ? "current-password" : "new-password"}
-                autoFocus
-                disabled={isSubmitting}
-              />
+        <form onSubmit={handleSubmit} className="flex flex-col">
+          {/* Header — command palette style */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
+              <Icon className="h-3.5 w-3.5 text-primary" />
             </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium leading-tight truncate">
+                {title}
+              </div>
+            </div>
+          </div>
 
-            {mode === "setup" ? (
-              <div className="space-y-2">
-                <Label htmlFor="e2ee-password-confirm">Confirm password</Label>
-                <Input
-                  id="e2ee-password-confirm"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  autoComplete="new-password"
-                  disabled={isSubmitting}
-                />
+          {/* Body */}
+          <div className="px-4 py-3 space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {description}
+            </p>
+
+            {!isLegacy ? (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="e2ee-password"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    Encryption password
+                  </Label>
+                  <Input
+                    id="e2ee-password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete={
+                      isUnlock ? "current-password" : "new-password"
+                    }
+                    autoFocus
+                    disabled={isSubmitting}
+                    className="h-9"
+                  />
+                </div>
+
+                {mode === "setup" ? (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="e2ee-password-confirm"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Confirm password
+                    </Label>
+                    <Input
+                      id="e2ee-password-confirm"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      autoComplete="new-password"
+                      disabled={isSubmitting}
+                      className="h-9"
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
             {error ? (
-              <p className="rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
                 {error}
               </p>
             ) : null}
+          </div>
 
-            <div className="flex gap-3">
-              {mode === "unlock" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={rerunBootstrap}
-                  disabled={isSubmitting}
-                >
-                  Refresh
-                </Button>
-              ) : null}
+          {/* Footer — command palette style */}
+          <div className="px-3 py-2 border-t border-border/50 flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1.5">
+              {isLegacy ? (
+                <>End-to-end encrypted</>
+              ) : (
+                <>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                    Enter
+                  </kbd>
+                  to {isUnlock ? "unlock" : "save"}
+                </>
+              )}
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
               <Button
                 type="button"
-                className="flex-1"
-                onClick={mode === "unlock" ? handleUnlock : handleSetup}
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
                 disabled={isSubmitting}
+                className="h-8"
               >
-                {isSubmitting
-                  ? "Working..."
-                  : mode === "unlock"
-                    ? "Unlock"
-                    : "Save password"}
+                <LogOut className="mr-1.5 h-3.5 w-3.5" />
+                Sign out
               </Button>
+              {isLegacy ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={rerunBootstrap}
+                  disabled={isSubmitting}
+                  className="h-8"
+                >
+                  {primaryLabel}
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmitting}
+                  className="h-8"
+                >
+                  {primaryLabel}
+                </Button>
+              )}
             </div>
           </div>
-        )}
-      </div>
-    </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
