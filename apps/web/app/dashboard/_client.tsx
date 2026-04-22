@@ -1,9 +1,10 @@
 "use client";
 
 import { useSession, signOut } from "@/lib/auth-client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import dynamic from "next/dynamic";
+import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
   SidebarInset,
@@ -25,13 +26,7 @@ import { useCalendarContext } from "@workspace/ui/components/calendar";
 import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { buildViewPrefetchRanges } from "@/hooks/use-calendar-events-loader";
-import {
-  useMemo,
-  useEffect,
-  useRef,
-  Suspense,
-  type ReactNode,
-} from "react";
+import { useMemo, useEffect, useRef, Suspense, type ReactNode } from "react";
 import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
 
 const log = createLogger("dashboard");
@@ -438,7 +433,7 @@ export function DashboardPageContent() {
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const { data: session, isPending } = useSession();
-  const router = useRouter();
+  const router = useSmoothRouter();
   const {
     open: commandPaletteOpen,
     setOpen: setCommandPaletteOpen,
@@ -457,7 +452,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         (window as any).Capacitor?.isNativePlatform?.()
           ? "/mobile-login"
           : "/login";
-      router.replace(`${loginPath}?next=${encodeURIComponent(currentPath)}`);
+      router.replace(
+        `${loginPath}?next=${encodeURIComponent(currentPath)}`,
+        undefined,
+        { messageContext: "AUTH_FLOW" },
+      );
     }
   }, [isPending, session?.user, router]);
 
@@ -465,7 +464,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     return (
       <>
         <DashboardSkeleton />
-        <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" enableCycling={true} priority />
+        <PageLoadingOverlay
+          isLoading={true}
+          messageContext="AUTH_FLOW"
+          enableCycling={true}
+          priority
+        />
       </>
     );
   }
@@ -496,7 +500,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </CalendarDataProvider>
       </SettingsProvider>
 
-      <PageLoadingOverlay isLoading={false} messageContext="AUTH_FLOW" enableCycling={true} priority />
+      <PageLoadingOverlay
+        isLoading={false}
+        messageContext="AUTH_FLOW"
+        enableCycling={true}
+        priority
+      />
     </>
   );
 }

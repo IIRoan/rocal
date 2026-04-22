@@ -72,7 +72,10 @@ export function LogoSpinner({
       >
         <div className="absolute inset-[8px] rounded-[inherit] border border-border/50" />
         <Logo
-          className={cn("relative text-primary animate-pulse", sizeClasses[size])}
+          className={cn(
+            "relative text-primary animate-pulse",
+            sizeClasses[size],
+          )}
           fill="currentColor"
           style={{ animationDuration: "2s" }}
         />
@@ -177,7 +180,9 @@ function LoadingBoard({
         <p
           className={cn(
             "mb-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/40 transition-opacity duration-300",
-            isTransitioning && enableCycling && !message ? "opacity-20" : "opacity-100",
+            isTransitioning && enableCycling && !message
+              ? "opacity-20"
+              : "opacity-100",
           )}
         >
           {displayText}
@@ -197,6 +202,7 @@ interface PageLoadingOverlayProps {
   messageContext?: keyof typeof COMBINED_MESSAGES;
   className?: string;
   enableCycling?: boolean;
+  fadeDurationMs?: number;
   /** Render above other overlays (z-[10000] vs z-[9999]) */
   priority?: boolean;
 }
@@ -207,6 +213,7 @@ export function PageLoadingOverlay({
   messageContext = "PAGE_LOAD",
   className,
   enableCycling = true,
+  fadeDurationMs = 300,
   priority = false,
 }: PageLoadingOverlayProps) {
   const [visible, setVisible] = useState(isLoading);
@@ -218,10 +225,10 @@ export function PageLoadingOverlay({
       setFading(false);
     } else {
       setFading(true);
-      const t = setTimeout(() => setVisible(false), 300);
+      const t = setTimeout(() => setVisible(false), fadeDurationMs);
       return () => clearTimeout(t);
     }
-  }, [isLoading]);
+  }, [fadeDurationMs, isLoading]);
 
   if (!visible) return null;
 
@@ -233,6 +240,7 @@ export function PageLoadingOverlay({
         fading && "animate-out fade-out-0 fill-mode-forwards duration-300",
         className,
       )}
+      style={fading ? { animationDuration: `${fadeDurationMs}ms` } : undefined}
     >
       <LoadingBoard
         message={message}
