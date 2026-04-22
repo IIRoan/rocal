@@ -139,13 +139,14 @@ export function GlobalLoadingScreen({
   if (variant === "minimal") {
     return (
       <div
+        data-gsap-skip="true"
         className={cn(
           "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
           className,
         )}
       >
         <div className="flex items-center space-x-2">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
           <span className="text-sm font-medium text-muted-foreground">
             {message ?? "Loading"}
             {dots}
@@ -158,6 +159,7 @@ export function GlobalLoadingScreen({
   // Enhanced splash/detailed variants share the same improved UI
   return (
     <div
+      data-gsap-skip="true"
       className={cn(
         "fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm",
         className,
@@ -194,7 +196,7 @@ export function GlobalLoadingScreen({
         <div className="w-full max-w-sm">
           <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-primary/60 to-primary animate-pulse rounded-full"
+              className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary [animation:pulse_1.4s_ease-in-out_infinite]"
               style={{ width: "75%", animationDuration: "1.4s" }}
             />
           </div>
@@ -269,12 +271,13 @@ export function SectionLoading({
 }: SectionLoadingProps) {
   return (
     <div
+      data-gsap-skip="true"
       className={cn(
         "flex flex-col items-center justify-center p-8 text-center space-y-4",
         className,
       )}
     >
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+      <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary [animation:spin_1s_linear_infinite]" />
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">{title}</h3>
         <p className="text-sm text-muted-foreground">{description}</p>
@@ -298,12 +301,12 @@ export function LoadingOverlay({
   className,
 }: LoadingOverlayProps) {
   return (
-    <div className={cn("relative", className)}>
+    <div data-gsap-skip="true" className={cn("relative", className)}>
       {children}
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
           <div className="flex items-center space-x-2">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
             <span className="text-sm font-medium">{message}</span>
           </div>
         </div>
