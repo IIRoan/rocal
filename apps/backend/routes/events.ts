@@ -149,7 +149,6 @@ export const eventsRoutes = new Elysia({
             recurrence?: string;
             encryptedContent?: string;
             blindIndexTokens?: string[];
-            encryptionState?: string;
             encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
@@ -236,12 +235,6 @@ export const eventsRoutes = new Elysia({
                   description: "Blind-index token hash for encrypted search rollout.",
                 }),
               ),
-            ),
-            encryptionState: t.Optional(
-              t.String({
-                description:
-                  "Encryption rollout state for this row (for example: plaintext or shadow_write).",
-              }),
             ),
             encryptionKeyVersion: t.Optional(
               t.Number({
@@ -344,7 +337,6 @@ export const eventsRoutes = new Elysia({
             recurrence?: string | null;
             encryptedContent?: string;
             blindIndexTokens?: string[];
-            encryptionState?: string;
             encryptionKeyVersion?: number;
           };
           authenticatedUser?: AuthenticatedUser;
@@ -441,12 +433,6 @@ export const eventsRoutes = new Elysia({
                   description: "Blind-index token hash for encrypted search rollout.",
                 }),
               ),
-            ),
-            encryptionState: t.Optional(
-              t.String({
-                description:
-                  "Encryption rollout state for this row (for example: plaintext or shadow_write).",
-              }),
             ),
             encryptionKeyVersion: t.Optional(
               t.Number({

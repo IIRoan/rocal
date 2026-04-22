@@ -160,6 +160,29 @@ describe("categoriesRoutes", () => {
     expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported encryptionState values", async () => {
+    mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+
+    const response = await createApp().handle(
+      new Request("http://localhost/categories/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Work",
+          color: "#123456",
+          encryptionState: "invalid_state",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(readText(response)).resolves.toContain(
+      "Expected union value",
+    );
+    expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid category colors", async () => {
     mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
 

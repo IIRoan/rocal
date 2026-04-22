@@ -1,3 +1,4 @@
+import type { RowEncryptionState } from "../lib/encryption-state";
 import type { Calendar } from "../generated/prisma/index.js";
 
 export type CalendarCreateInput = {
@@ -7,7 +8,7 @@ export type CalendarCreateInput = {
   isDefault?: boolean;
   encryptedName?: string;
   blindIndexTokens?: string[];
-  encryptionState?: string;
+  encryptionState?: RowEncryptionState;
   encryptionKeyVersion?: number;
 };
 
@@ -20,7 +21,7 @@ export type CalendarUpdateInput = {
   isDefault?: boolean;
   encryptedName?: string;
   blindIndexTokens?: string[];
-  encryptionState?: string;
+  encryptionState?: RowEncryptionState;
   encryptionKeyVersion?: number;
 };
 

@@ -1,1 +1,4 @@
-DELETE FROM "_prisma_migrations" WHERE migration_name = '20260316231953_add_ai_access';
+-- Intentionally non-executable.
+-- Do not modify Prisma's internal migration table from a checked-in script.
+-- If migration history needs repair, use Prisma's documented migration workflow
+-- or handle the one-off fix out-of-band.

@@ -30,7 +30,6 @@ export type EventCreateInput = {
   recurrence?: string;
   encryptedContent?: string;
   blindIndexTokens?: string[];
-  encryptionState?: string;
   encryptionKeyVersion?: number;
 };
 
@@ -51,7 +50,6 @@ export type EventUpdateInput = {
   recurrence?: string | null;
   encryptedContent?: string;
   blindIndexTokens?: string[];
-  encryptionState?: string;
   encryptionKeyVersion?: number;
 };
 

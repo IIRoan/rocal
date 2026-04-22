@@ -51,6 +51,8 @@ import {
 } from "./types/calendar";
 // Browser notifications removed
 
+const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+
 export class CalendarApiService {
   private client: HttpClient;
 
@@ -85,6 +87,18 @@ export class CalendarApiService {
     };
   }
 
+  private normalizeUndecryptableEncryptedEvent(
+    event: CalendarEvent,
+  ): CalendarEvent {
+    return this.normalizeEventForUi({
+      ...event,
+      title: event.title?.trim() || ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+      description: null,
+      location: null,
+      encryptionState: "encrypted",
+    });
+  }
+
   private async hydrateEncryptedEvent(
     event: CalendarEvent,
   ): Promise<CalendarEvent> {
@@ -98,7 +112,7 @@ export class CalendarApiService {
 
     const session = await this.getE2eeSession();
     if (!session) {
-      return event;
+      return this.normalizeUndecryptableEncryptedEvent(event);
     }
 
     try {
@@ -111,12 +125,15 @@ export class CalendarApiService {
 
       return this.normalizeEventForUi({
         ...event,
-        title: decrypted.title || event.title,
+        title:
+          decrypted.title?.trim() ||
+          event.title?.trim() ||
+          ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
         description: decrypted.description ?? null,
         location: decrypted.location ?? null,
       });
     } catch {
-      return event;
+      return this.normalizeUndecryptableEncryptedEvent(event);
     }
   }
 

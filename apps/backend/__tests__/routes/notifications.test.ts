@@ -427,7 +427,7 @@ describe("notificationsRoutes", () => {
       where: { eventId: "event-create" },
     });
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-create" },
+      where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: 10,
         encryptionState: "shadow_write",
@@ -511,7 +511,7 @@ describe("notificationsRoutes", () => {
 
     expect(deleteResponse.status).toBe(200);
     expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "event-delete" },
+      where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: null,
         encryptionState: "encrypted",
