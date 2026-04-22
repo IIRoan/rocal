@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
+import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
+import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
   PageLoadingOverlay,
@@ -742,6 +744,10 @@ export function HomePageClient() {
   const { data: session, isPending } = useSession();
   const router = useSmoothRouter();
   const [isExiting, setIsExiting] = useState(false);
+  const rootRef = useRef<HTMLElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const shouldShowLoadingOverlay =
+    FORCE_LOADING_DESIGN_PREVIEW || isPending || Boolean(session?.user);
 
   useEffect(() => {
     if (!isPending && session?.user) {
@@ -751,7 +757,64 @@ export function HomePageClient() {
     }
   }, [isPending, session?.user, router]);
 
-  if (FORCE_LOADING_DESIGN_PREVIEW || isPending || session?.user) {
+  useGSAP(
+    () => {
+      if (prefersReducedMotion || shouldShowLoadingOverlay) {
+        return;
+      }
+
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+      timeline
+        .fromTo(
+          "[data-hero-scrim]",
+          { autoAlpha: 0 },
+          { autoAlpha: 1, duration: 0.45 },
+          0,
+        )
+        .fromTo(
+          [
+            "[data-hero-logo-row]",
+            "[data-hero-heading]",
+            "[data-hero-copy]",
+            "[data-hero-cta]",
+            "[data-hero-footer]",
+          ],
+          { autoAlpha: 0, y: 24 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.62,
+            stagger: 0.08,
+          },
+          0.08,
+        )
+        .fromTo(
+          "[data-hero-preview-shell]",
+          {
+            autoAlpha: 0,
+            x: 52,
+            y: 18,
+            scale: 0.96,
+          },
+          {
+            autoAlpha: 1,
+            x: 0,
+            y: 0,
+            scale: 1,
+            duration: 0.78,
+            ease: "expo.out",
+          },
+          0.18,
+        );
+    },
+    {
+      scope: rootRef,
+      dependencies: [prefersReducedMotion, shouldShowLoadingOverlay],
+    },
+  );
+
+  if (shouldShowLoadingOverlay) {
     return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
   }
 
@@ -765,7 +828,10 @@ export function HomePageClient() {
   };
 
   return (
-    <section className="relative min-h-[100dvh] flex overflow-hidden animate-in fade-in-0 duration-300 ease-out">
+    <section
+      ref={rootRef}
+      className="relative min-h-[100dvh] flex overflow-hidden"
+    >
       {/* Full-bleed wallpaper */}
       <Image
         src="/wallpaper02.jpg"
@@ -776,12 +842,18 @@ export function HomePageClient() {
         className="pointer-events-none object-cover"
       />
       {/* Directional overlay — heavier on the left so text is always readable */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/95 via-background/70 to-background/20" />
+      <div
+        data-hero-scrim
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/95 via-background/70 to-background/20"
+      />
 
       {/* Left — hero text */}
       <div className="relative z-10 flex w-full flex-col justify-center px-8 py-16 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="max-w-md">
-          <div className="mb-10 flex items-center justify-between">
+          <div
+            data-hero-logo-row
+            className="mb-10 flex items-center justify-between"
+          >
             <Logo
               width={44}
               height={44}
@@ -790,16 +862,23 @@ export function HomePageClient() {
             />
             <ThemeToggle />
           </div>
-          <h1 className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h1
+            data-hero-heading
+            className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl"
+          >
             Shared calendars,
             <br />
             without the chaos.
           </h1>
-          <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
+          <p
+            data-hero-copy
+            className="mb-8 text-sm leading-relaxed text-muted-foreground"
+          >
             Solace is a calm, focused calendar built for shared schedules,
             recurring events, and real notifications — no ads, no noise.
           </p>
           <Button
+            data-hero-cta
             size="lg"
             className="h-11 w-full rounded-lg font-medium"
             onClick={handleLoginClick}
@@ -808,7 +887,10 @@ export function HomePageClient() {
             Get started
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
+          <p
+            data-hero-footer
+            className="mt-6 text-center text-xs text-muted-foreground"
+          >
             Before continuing, please read our{" "}
             <Link
               href="/privacy"
@@ -826,6 +908,7 @@ export function HomePageClient() {
         style={{ perspective: "1200px" }}
       >
         <div
+          data-hero-preview-shell
           className="w-full overflow-hidden rounded-2xl shadow-[0_32px_80px_-12px_rgba(0,0,0,0.5)]"
           style={{
             transform: "rotateY(-5deg) rotateX(2deg)",

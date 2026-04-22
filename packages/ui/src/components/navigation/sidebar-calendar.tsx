@@ -12,29 +12,21 @@ import {
   endOfMonth,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { motion } from "motion/react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import { CalendarEvent } from "../calendar/types";
 import { resolveInlineColorValue } from "../calendar/utils";
 import { cn } from "../../lib/utils";
 import { useHorizontalSwipeGesture } from "../../hooks/use-horizontal-swipe-gesture";
 import { useMiniCalendarMonthData } from "../../hooks/use-mini-calendar-month-data";
-
-const monthSlideVariants = {
-  enter: (direction: 1 | -1) => ({
-    x: direction > 0 ? 18 : -18,
-  }),
-  center: {
-    x: 0,
-  },
-  exit: (direction: 1 | -1) => ({
-    x: direction > 0 ? -18 : 18,
-  }),
-};
+import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
+import { gsap, useGSAP } from "../../lib/gsap";
 
 interface SidebarCalendarProps {
   events?: CalendarEvent[];
-  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  getCachedEventsForRange?: (range: {
+    start: Date;
+    end: Date;
+  }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   onDateSelect?: (date: Date) => void;
   className?: string;
@@ -53,7 +45,9 @@ export function SidebarCalendar({
   const [calendarMonth, setCalendarMonth] = useState<Date>(currentDate);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const monthStageRef = useRef<HTMLDivElement>(null);
   const swipeLockRef = useRef(false);
+  const shouldReduceMotion = usePrefersReducedMotion();
 
   const visibleCalendarIds = useMemo(
     () => new Set(getVisibleCalendars().map((calendar) => calendar.id)),
@@ -124,6 +118,40 @@ export function SidebarCalendar({
     threshold: 40,
   });
 
+  useGSAP(
+    () => {
+      const node = monthStageRef.current;
+
+      if (!node) {
+        return;
+      }
+
+      if (shouldReduceMotion) {
+        gsap.set(node, { clearProps: "opacity,transform" });
+        return;
+      }
+
+      gsap.fromTo(
+        node,
+        {
+          x: slideDirection > 0 ? 18 : -18,
+          autoAlpha: 0,
+        },
+        {
+          x: 0,
+          autoAlpha: 1,
+          duration: 0.18,
+          ease: "power2.out",
+          overwrite: "auto",
+        },
+      );
+    },
+    {
+      dependencies: [monthKey, shouldReduceMotion, slideDirection],
+      scope: monthStageRef,
+    },
+  );
+
   return (
     <div ref={containerRef} className={cn("w-full", className)}>
       <div className="flex w-full items-center justify-between mb-1">
@@ -138,8 +166,12 @@ export function SidebarCalendar({
           }}
           className="text-sm tracking-tight text-left hover:opacity-80 transition-opacity"
         >
-          <span className="font-semibold text-foreground">{format(calendarMonth, "MMMM")}</span>
-          <span className="text-muted-foreground ml-0.5">{format(calendarMonth, "yyyy")}</span>
+          <span className="font-semibold text-foreground">
+            {format(calendarMonth, "MMMM")}
+          </span>
+          <span className="text-muted-foreground ml-0.5">
+            {format(calendarMonth, "yyyy")}
+          </span>
         </button>
         <div className="flex items-center">
           <button
@@ -164,14 +196,7 @@ export function SidebarCalendar({
       </div>
 
       <div className="relative overflow-hidden">
-        <motion.div
-          key={monthKey}
-          custom={slideDirection}
-          variants={monthSlideVariants}
-          initial="enter"
-          animate="center"
-          transition={{ duration: 0.09, ease: [0.22, 1, 0.36, 1] }}
-        >
+        <div key={monthKey} ref={monthStageRef}>
           <div className="grid grid-cols-7 mb-0.5">
             {weekdayLabels.map((label, index) => (
               <div
@@ -226,7 +251,9 @@ export function SidebarCalendar({
                     />
                   )}
                   <span className="relative z-10 text-inherit data-[selected=true]:text-primary-foreground">
-                    <span className={cn(isSelected && "text-primary-foreground")}>
+                    <span
+                      className={cn(isSelected && "text-primary-foreground")}
+                    >
                       {format(day, "d")}
                     </span>
                   </span>
@@ -260,7 +287,7 @@ export function SidebarCalendar({
               );
             })}
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

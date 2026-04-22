@@ -43,6 +43,7 @@ function TooltipContent({
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
+        forceMount
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(

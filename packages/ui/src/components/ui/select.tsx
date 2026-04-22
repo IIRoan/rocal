@@ -62,6 +62,7 @@ function SelectContent({
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
+        forceMount
         data-slot="select-content"
         className={cn(
           // Base popover styling

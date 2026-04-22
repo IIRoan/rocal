@@ -29,6 +29,7 @@ function PopoverContent({
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+        forceMount
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}

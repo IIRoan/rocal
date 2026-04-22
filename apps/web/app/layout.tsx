@@ -1,6 +1,10 @@
 import { MobilePage } from "@workspace/mobile-ui";
 import { Toaster } from "@workspace/ui/components/ui";
-import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
+import {
+  GsapAnimationProvider,
+  ThemeProvider,
+  LoadingProvider,
+} from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { solaceDisplay, solaceSans } from "@workspace/ui/lib/fonts";
 import { SettingsProvider } from "@/components/settings-provider";
@@ -69,6 +73,7 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: calendarBootstrapScript }}
         />
+        <GsapAnimationProvider />
         <RouteTransitionProvider>
           <MobileRuntimeBridge>
             <LoggerBootstrap />

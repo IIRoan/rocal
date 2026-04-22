@@ -402,6 +402,32 @@ export function CommandPalette({
     }
   }, [selectedIndex, currentListLength]);
 
+  // Global ">" keydown: enter command mode from any sub-view
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== ">") return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setNavHistory(["main"]);
+      setSearchQuery(">");
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.setSelectionRange(1, 1);
+      });
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
   if (loading || !localSettings) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -741,35 +767,6 @@ export function CommandPalette({
               </>
             )}
           </div>
-          {/* Footer Tip */}
-          <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between">
-            {isSearchOnly ? (
-              <span className="flex items-center gap-2">
-                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                  esc
-                </kbd>
-                to close
-              </span>
-            ) : (
-              <span>
-                Type{" "}
-                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                  &gt;
-                </kbd>{" "}
-                for commands
-              </span>
-            )}
-            <span className="hidden sm:flex items-center gap-2">
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                ↑↓
-              </kbd>{" "}
-              to navigate
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                ↵
-              </kbd>{" "}
-              to select
-            </span>
-          </div>
         </div>
       );
     }
@@ -926,7 +923,7 @@ export function CommandPalette({
         variant="spotlight"
         showClose={false}
         aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl"
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
       >
         <VisuallyHidden>
           <DialogTitle>{getDialogTitle()}</DialogTitle>
@@ -934,6 +931,27 @@ export function CommandPalette({
         <TransitionContainer viewKey={currentView}>
           {renderContent()}
         </TransitionContainer>
+        {currentView !== "events" && (
+          <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
+            <span>
+              Type{" "}
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                &gt;
+              </kbd>{" "}
+              for commands
+            </span>
+            <span className="hidden sm:flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                ↑↓
+              </kbd>{" "}
+              to navigate
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                ↵
+              </kbd>{" "}
+              to select
+            </span>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
