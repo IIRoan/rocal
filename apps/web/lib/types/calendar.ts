@@ -58,7 +58,6 @@ export interface NameEncryptionShadowRequest {
 export interface EventContentEncryptionShadowRequest {
   encryptedContent?: string;
   blindIndexTokens?: string[];
-  encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
 }
 

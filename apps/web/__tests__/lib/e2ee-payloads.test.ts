@@ -141,7 +141,6 @@ describe("e2ee payload helpers", () => {
         ciphertext: "ciphertext",
       }),
       blindIndexTokens: ["idx-1", "idx-2"],
-      encryptionState: "encrypted",
       encryptionKeyVersion: 1,
     });
   });

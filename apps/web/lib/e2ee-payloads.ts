@@ -11,7 +11,6 @@ import { createBlindIndexTokens, encryptJsonPayload } from "./e2ee-crypto";
 import { getActiveE2eeSession } from "./e2ee-session";
 
 const NAME_ENCRYPTION_STATE = "shadow_write";
-const EVENT_ENCRYPTION_STATE = "encrypted";
 const ENCRYPTION_KEY_VERSION = 1;
 
 function trimOptional(value: string | null | undefined): string | undefined {
@@ -129,7 +128,6 @@ export async function attachEventEncryptionShadow<
     ...request,
     encryptedContent,
     blindIndexTokens,
-    encryptionState: EVENT_ENCRYPTION_STATE,
     encryptionKeyVersion: ENCRYPTION_KEY_VERSION,
   };
 }

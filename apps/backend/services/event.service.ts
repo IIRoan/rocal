@@ -72,6 +72,21 @@ export class EventService implements IEventService {
       return { events: [], total: 0 };
     }
 
+    const hasPlaintextSearch = Boolean(searchQuery);
+    const plaintextSearchVector =
+      "to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))";
+    const plaintextSearchFilter = hasPlaintextSearch
+      ? `${plaintextSearchVector}
+          @@ plainto_tsquery('english', $2)
+          OR e.title ILIKE '%' || $2 || '%'`
+      : "FALSE";
+    const rankExpression = hasPlaintextSearch
+      ? `ts_rank(
+          ${plaintextSearchVector},
+          plainto_tsquery('english', $2)
+        )`
+      : "0";
+
     const limitVal = Math.min(Math.max(Number(limit) || 20, 1), 50);
     const offsetVal = Math.max(Number(offset) || 0, 0);
 
@@ -108,18 +123,13 @@ export class EventService implements IEventService {
         e.encryption_state, e.encryption_key_version,
         c.id as "calendar.id", c.name as "calendar.name", c.color as "calendar.color",
         cat.id as "category.id", cat.name as "category.name", cat.color as "category.color",
-        ts_rank(
-          to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, '')),
-          plainto_tsquery('english', $2)
-        ) as rank
+        ${rankExpression} as rank
       FROM calendar_event e
       LEFT JOIN calendar c ON e.calendar_id = c.id
       LEFT JOIN event_category cat ON e.category_id = cat.id
       WHERE e.user_id = $1
         AND (
-          to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))
-          @@ plainto_tsquery('english', $2)
-          OR e.title ILIKE '%' || $2 || '%'
+          ${plaintextSearchFilter}
           ${blindIndexFilter}
         )
         ${dateFilter}
@@ -133,9 +143,7 @@ export class EventService implements IEventService {
       FROM calendar_event e
       WHERE e.user_id = $1
         AND (
-          to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))
-          @@ plainto_tsquery('english', $2)
-          OR e.title ILIKE '%' || $2 || '%'
+          ${plaintextSearchFilter}
           ${blindIndexFilter}
         )
         ${dateFilter}`,

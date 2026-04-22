@@ -180,6 +180,66 @@ describe("CalendarApiService encryption wrappers", () => {
     expect(result.title).toBe("Decrypted event");
   });
 
+  it("normalizes encrypted events when no session is available", async () => {
+    mockGetActiveE2eeSession.mockReturnValue(null);
+    mockWaitForPendingE2eeBootstrap.mockReturnValue(null);
+    client.get.mockResolvedValue({
+      id: "event-1",
+      title: "",
+      encryptedContent: JSON.stringify({ iv: "iv", ciphertext: "ciphertext" }),
+      blindIndexTokens: ["idx-1"],
+      encryptionState: "encrypted",
+      start: new Date("2026-05-01T10:00:00.000Z"),
+      end: new Date("2026-05-01T11:00:00.000Z"),
+      calendarId: "cal-1",
+      userId: "user-1",
+      createdAt: new Date("2026-04-01T10:00:00.000Z"),
+      updatedAt: new Date("2026-04-01T10:00:00.000Z"),
+    } as never);
+
+    const result = await service.getEvent("event-1");
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        title: "Encrypted event",
+        encryptionState: "encrypted",
+        encryptedContent: null,
+        blindIndexTokens: null,
+        description: null,
+        location: null,
+      }),
+    );
+    expect(mockDecryptJsonPayload).not.toHaveBeenCalled();
+  });
+
+  it("normalizes encrypted events when decryption fails", async () => {
+    mockDecryptJsonPayload.mockRejectedValueOnce(new Error("decrypt failed") as never);
+    client.get.mockResolvedValue({
+      id: "event-1",
+      title: "",
+      encryptedContent: JSON.stringify({ iv: "iv", ciphertext: "ciphertext" }),
+      blindIndexTokens: ["idx-1"],
+      encryptionState: "encrypted",
+      start: new Date("2026-05-01T10:00:00.000Z"),
+      end: new Date("2026-05-01T11:00:00.000Z"),
+      calendarId: "cal-1",
+      userId: "user-1",
+      createdAt: new Date("2026-04-01T10:00:00.000Z"),
+      updatedAt: new Date("2026-04-01T10:00:00.000Z"),
+    } as never);
+
+    const result = await service.getEvent("event-1");
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        title: "Encrypted event",
+        encryptionState: "encrypted",
+        encryptedContent: null,
+        blindIndexTokens: null,
+      }),
+    );
+  });
+
   it("adds blind-index search tokens and decrypts search results", async () => {
     client.get.mockResolvedValue({
       events: [

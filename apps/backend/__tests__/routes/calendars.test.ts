@@ -205,6 +205,26 @@ describe("calendarsRoutes – color validation", () => {
         expect(text).toContain(color);
       }
     });
+
+    it("rejects unsupported encryptionState values", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/calendars/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: "Test",
+            color: "blue",
+            encryptionState: "invalid_state",
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(422);
+      await expect(readText(response)).resolves.toContain(
+        "Expected union value",
+      );
+      expect(mockPrisma.calendar.create).not.toHaveBeenCalled();
+    });
   });
 
   describe("PUT /calendars/:id – update", () => {
