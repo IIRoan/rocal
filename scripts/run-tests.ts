@@ -32,6 +32,12 @@ const suites: TestSuite[] = [
     args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
   },
   {
+    name: "web",
+    cwd: path.join(rootDir, "apps", "web"),
+    command: "bun",
+    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
+  },
+  {
     name: "ui",
     cwd: path.join(rootDir, "packages", "ui"),
     command: "bun",

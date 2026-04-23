@@ -1,6 +1,7 @@
 export type EventSearchInput = {
   userId: string;
   query: string;
+  blindIndexTokens?: string[];
   limit?: number;
   offset?: number;
   startDate?: string;
@@ -27,6 +28,9 @@ export type EventCreateInput = {
   timezone?: string;
   reminder?: number | null;
   recurrence?: string;
+  encryptedContent?: string;
+  blindIndexTokens?: string[];
+  encryptionKeyVersion?: number;
 };
 
 export type EventUpdateInput = {
@@ -44,6 +48,9 @@ export type EventUpdateInput = {
   timezone?: string;
   reminder?: number | null;
   recurrence?: string | null;
+  encryptedContent?: string;
+  blindIndexTokens?: string[];
+  encryptionKeyVersion?: number;
 };
 
 export type EventDeleteResult = {

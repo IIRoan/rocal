@@ -316,16 +316,6 @@ export const SEARCH_INDEX = [
     parent: "notifications",
     parentLabel: "Notifications",
   },
-  {
-    id: "default-reminder",
-    label: "Default Reminder",
-    icon: Bell,
-    description: "Set default reminder time",
-    targetView: "notifications",
-    keywords: ["reminder", "default", "notification", "alert"],
-    parent: "notifications",
-    parentLabel: "Notifications",
-  },
   // Calendar defaults
   {
     id: "week-start",

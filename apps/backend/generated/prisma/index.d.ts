@@ -84,6 +84,16 @@ export type NotificationLog = $Result.DefaultSelection<Prisma.$NotificationLogPa
  */
 export type Passkey = $Result.DefaultSelection<Prisma.$PasskeyPayload>
 /**
+ * Model UserEncryptionDevice
+ * 
+ */
+export type UserEncryptionDevice = $Result.DefaultSelection<Prisma.$UserEncryptionDevicePayload>
+/**
+ * Model UserEncryptionPassword
+ * 
+ */
+export type UserEncryptionPassword = $Result.DefaultSelection<Prisma.$UserEncryptionPasswordPayload>
+/**
  * Model CalendarSubscription
  * 
  */
@@ -351,6 +361,26 @@ export class PrismaClient<
     * ```
     */
   get passkey(): Prisma.PasskeyDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.userEncryptionDevice`: Exposes CRUD operations for the **UserEncryptionDevice** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more UserEncryptionDevices
+    * const userEncryptionDevices = await prisma.userEncryptionDevice.findMany()
+    * ```
+    */
+  get userEncryptionDevice(): Prisma.UserEncryptionDeviceDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.userEncryptionPassword`: Exposes CRUD operations for the **UserEncryptionPassword** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more UserEncryptionPasswords
+    * const userEncryptionPasswords = await prisma.userEncryptionPassword.findMany()
+    * ```
+    */
+  get userEncryptionPassword(): Prisma.UserEncryptionPasswordDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.calendarSubscription`: Exposes CRUD operations for the **CalendarSubscription** model.
@@ -826,6 +856,8 @@ export namespace Prisma {
     EventNotification: 'EventNotification',
     NotificationLog: 'NotificationLog',
     Passkey: 'Passkey',
+    UserEncryptionDevice: 'UserEncryptionDevice',
+    UserEncryptionPassword: 'UserEncryptionPassword',
     CalendarSubscription: 'CalendarSubscription',
     CalendarSyncLog: 'CalendarSyncLog'
   };
@@ -846,7 +878,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "session" | "account" | "verification" | "calendar" | "eventCategory" | "calendarEvent" | "eventParticipant" | "userSettings" | "calendarSharing" | "recurrenceException" | "eventNotification" | "notificationLog" | "passkey" | "calendarSubscription" | "calendarSyncLog"
+      modelProps: "user" | "session" | "account" | "verification" | "calendar" | "eventCategory" | "calendarEvent" | "eventParticipant" | "userSettings" | "calendarSharing" | "recurrenceException" | "eventNotification" | "notificationLog" | "passkey" | "userEncryptionDevice" | "userEncryptionPassword" | "calendarSubscription" | "calendarSyncLog"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1886,6 +1918,154 @@ export namespace Prisma {
           }
         }
       }
+      UserEncryptionDevice: {
+        payload: Prisma.$UserEncryptionDevicePayload<ExtArgs>
+        fields: Prisma.UserEncryptionDeviceFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.UserEncryptionDeviceFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.UserEncryptionDeviceFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>
+          }
+          findFirst: {
+            args: Prisma.UserEncryptionDeviceFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.UserEncryptionDeviceFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>
+          }
+          findMany: {
+            args: Prisma.UserEncryptionDeviceFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>[]
+          }
+          create: {
+            args: Prisma.UserEncryptionDeviceCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>
+          }
+          createMany: {
+            args: Prisma.UserEncryptionDeviceCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.UserEncryptionDeviceCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>[]
+          }
+          delete: {
+            args: Prisma.UserEncryptionDeviceDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>
+          }
+          update: {
+            args: Prisma.UserEncryptionDeviceUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>
+          }
+          deleteMany: {
+            args: Prisma.UserEncryptionDeviceDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.UserEncryptionDeviceUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.UserEncryptionDeviceUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>[]
+          }
+          upsert: {
+            args: Prisma.UserEncryptionDeviceUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionDevicePayload>
+          }
+          aggregate: {
+            args: Prisma.UserEncryptionDeviceAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateUserEncryptionDevice>
+          }
+          groupBy: {
+            args: Prisma.UserEncryptionDeviceGroupByArgs<ExtArgs>
+            result: $Utils.Optional<UserEncryptionDeviceGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.UserEncryptionDeviceCountArgs<ExtArgs>
+            result: $Utils.Optional<UserEncryptionDeviceCountAggregateOutputType> | number
+          }
+        }
+      }
+      UserEncryptionPassword: {
+        payload: Prisma.$UserEncryptionPasswordPayload<ExtArgs>
+        fields: Prisma.UserEncryptionPasswordFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.UserEncryptionPasswordFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.UserEncryptionPasswordFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>
+          }
+          findFirst: {
+            args: Prisma.UserEncryptionPasswordFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.UserEncryptionPasswordFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>
+          }
+          findMany: {
+            args: Prisma.UserEncryptionPasswordFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>[]
+          }
+          create: {
+            args: Prisma.UserEncryptionPasswordCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>
+          }
+          createMany: {
+            args: Prisma.UserEncryptionPasswordCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.UserEncryptionPasswordCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>[]
+          }
+          delete: {
+            args: Prisma.UserEncryptionPasswordDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>
+          }
+          update: {
+            args: Prisma.UserEncryptionPasswordUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>
+          }
+          deleteMany: {
+            args: Prisma.UserEncryptionPasswordDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.UserEncryptionPasswordUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.UserEncryptionPasswordUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>[]
+          }
+          upsert: {
+            args: Prisma.UserEncryptionPasswordUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserEncryptionPasswordPayload>
+          }
+          aggregate: {
+            args: Prisma.UserEncryptionPasswordAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateUserEncryptionPassword>
+          }
+          groupBy: {
+            args: Prisma.UserEncryptionPasswordGroupByArgs<ExtArgs>
+            result: $Utils.Optional<UserEncryptionPasswordGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.UserEncryptionPasswordCountArgs<ExtArgs>
+            result: $Utils.Optional<UserEncryptionPasswordCountAggregateOutputType> | number
+          }
+        }
+      }
       CalendarSubscription: {
         payload: Prisma.$CalendarSubscriptionPayload<ExtArgs>
         fields: Prisma.CalendarSubscriptionFieldRefs
@@ -2144,6 +2324,8 @@ export namespace Prisma {
     eventNotification?: EventNotificationOmit
     notificationLog?: NotificationLogOmit
     passkey?: PasskeyOmit
+    userEncryptionDevice?: UserEncryptionDeviceOmit
+    userEncryptionPassword?: UserEncryptionPasswordOmit
     calendarSubscription?: CalendarSubscriptionOmit
     calendarSyncLog?: CalendarSyncLogOmit
   }
@@ -2233,6 +2415,7 @@ export namespace Prisma {
     calendars: number
     participations: number
     subscriptions: number
+    encryptionDevices: number
     passkeys: number
   }
 
@@ -2244,6 +2427,7 @@ export namespace Prisma {
     calendars?: boolean | UserCountOutputTypeCountCalendarsArgs
     participations?: boolean | UserCountOutputTypeCountParticipationsArgs
     subscriptions?: boolean | UserCountOutputTypeCountSubscriptionsArgs
+    encryptionDevices?: boolean | UserCountOutputTypeCountEncryptionDevicesArgs
     passkeys?: boolean | UserCountOutputTypeCountPasskeysArgs
   }
 
@@ -2305,6 +2489,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountSubscriptionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CalendarSubscriptionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountEncryptionDevicesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserEncryptionDeviceWhereInput
   }
 
   /**
@@ -2667,6 +2858,8 @@ export namespace Prisma {
     participations?: boolean | User$participationsArgs<ExtArgs>
     settings?: boolean | User$settingsArgs<ExtArgs>
     subscriptions?: boolean | User$subscriptionsArgs<ExtArgs>
+    encryptionDevices?: boolean | User$encryptionDevicesArgs<ExtArgs>
+    encryptionPassword?: boolean | User$encryptionPasswordArgs<ExtArgs>
     passkeys?: boolean | User$passkeysArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
@@ -2711,6 +2904,8 @@ export namespace Prisma {
     participations?: boolean | User$participationsArgs<ExtArgs>
     settings?: boolean | User$settingsArgs<ExtArgs>
     subscriptions?: boolean | User$subscriptionsArgs<ExtArgs>
+    encryptionDevices?: boolean | User$encryptionDevicesArgs<ExtArgs>
+    encryptionPassword?: boolean | User$encryptionPasswordArgs<ExtArgs>
     passkeys?: boolean | User$passkeysArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
@@ -2728,6 +2923,8 @@ export namespace Prisma {
       participations: Prisma.$EventParticipantPayload<ExtArgs>[]
       settings: Prisma.$UserSettingsPayload<ExtArgs> | null
       subscriptions: Prisma.$CalendarSubscriptionPayload<ExtArgs>[]
+      encryptionDevices: Prisma.$UserEncryptionDevicePayload<ExtArgs>[]
+      encryptionPassword: Prisma.$UserEncryptionPasswordPayload<ExtArgs> | null
       passkeys: Prisma.$PasskeyPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -3140,6 +3337,8 @@ export namespace Prisma {
     participations<T extends User$participationsArgs<ExtArgs> = {}>(args?: Subset<T, User$participationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EventParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     settings<T extends User$settingsArgs<ExtArgs> = {}>(args?: Subset<T, User$settingsArgs<ExtArgs>>): Prisma__UserSettingsClient<$Result.GetResult<Prisma.$UserSettingsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     subscriptions<T extends User$subscriptionsArgs<ExtArgs> = {}>(args?: Subset<T, User$subscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSubscriptionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    encryptionDevices<T extends User$encryptionDevicesArgs<ExtArgs> = {}>(args?: Subset<T, User$encryptionDevicesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    encryptionPassword<T extends User$encryptionPasswordArgs<ExtArgs> = {}>(args?: Subset<T, User$encryptionPasswordArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     passkeys<T extends User$passkeysArgs<ExtArgs> = {}>(args?: Subset<T, User$passkeysArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PasskeyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -3749,6 +3948,49 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CalendarSubscriptionScalarFieldEnum | CalendarSubscriptionScalarFieldEnum[]
+  }
+
+  /**
+   * User.encryptionDevices
+   */
+  export type User$encryptionDevicesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    where?: UserEncryptionDeviceWhereInput
+    orderBy?: UserEncryptionDeviceOrderByWithRelationInput | UserEncryptionDeviceOrderByWithRelationInput[]
+    cursor?: UserEncryptionDeviceWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: UserEncryptionDeviceScalarFieldEnum | UserEncryptionDeviceScalarFieldEnum[]
+  }
+
+  /**
+   * User.encryptionPassword
+   */
+  export type User$encryptionPasswordArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    where?: UserEncryptionPasswordWhereInput
   }
 
   /**
@@ -7067,13 +7309,27 @@ export namespace Prisma {
 
   export type AggregateCalendar = {
     _count: CalendarCountAggregateOutputType | null
+    _avg: CalendarAvgAggregateOutputType | null
+    _sum: CalendarSumAggregateOutputType | null
     _min: CalendarMinAggregateOutputType | null
     _max: CalendarMaxAggregateOutputType | null
+  }
+
+  export type CalendarAvgAggregateOutputType = {
+    encryptionKeyVersion: number | null
+  }
+
+  export type CalendarSumAggregateOutputType = {
+    encryptionKeyVersion: number | null
   }
 
   export type CalendarMinAggregateOutputType = {
     id: string | null
     name: string | null
+    encryptedName: string | null
+    blindIndexTokens: string | null
+    encryptionState: string | null
+    encryptionKeyVersion: number | null
     color: string | null
     kind: string | null
     isPublic: boolean | null
@@ -7090,6 +7346,10 @@ export namespace Prisma {
   export type CalendarMaxAggregateOutputType = {
     id: string | null
     name: string | null
+    encryptedName: string | null
+    blindIndexTokens: string | null
+    encryptionState: string | null
+    encryptionKeyVersion: number | null
     color: string | null
     kind: string | null
     isPublic: boolean | null
@@ -7106,6 +7366,10 @@ export namespace Prisma {
   export type CalendarCountAggregateOutputType = {
     id: number
     name: number
+    encryptedName: number
+    blindIndexTokens: number
+    encryptionState: number
+    encryptionKeyVersion: number
     color: number
     kind: number
     isPublic: number
@@ -7121,9 +7385,21 @@ export namespace Prisma {
   }
 
 
+  export type CalendarAvgAggregateInputType = {
+    encryptionKeyVersion?: true
+  }
+
+  export type CalendarSumAggregateInputType = {
+    encryptionKeyVersion?: true
+  }
+
   export type CalendarMinAggregateInputType = {
     id?: true
     name?: true
+    encryptedName?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     color?: true
     kind?: true
     isPublic?: true
@@ -7140,6 +7416,10 @@ export namespace Prisma {
   export type CalendarMaxAggregateInputType = {
     id?: true
     name?: true
+    encryptedName?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     color?: true
     kind?: true
     isPublic?: true
@@ -7156,6 +7436,10 @@ export namespace Prisma {
   export type CalendarCountAggregateInputType = {
     id?: true
     name?: true
+    encryptedName?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     color?: true
     kind?: true
     isPublic?: true
@@ -7208,6 +7492,18 @@ export namespace Prisma {
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
+     * Select which fields to average
+    **/
+    _avg?: CalendarAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: CalendarSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
      * Select which fields to find the minimum value
     **/
     _min?: CalendarMinAggregateInputType
@@ -7238,6 +7534,8 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: CalendarCountAggregateInputType | true
+    _avg?: CalendarAvgAggregateInputType
+    _sum?: CalendarSumAggregateInputType
     _min?: CalendarMinAggregateInputType
     _max?: CalendarMaxAggregateInputType
   }
@@ -7245,6 +7543,10 @@ export namespace Prisma {
   export type CalendarGroupByOutputType = {
     id: string
     name: string
+    encryptedName: string | null
+    blindIndexTokens: string | null
+    encryptionState: string
+    encryptionKeyVersion: number
     color: string
     kind: string
     isPublic: boolean
@@ -7257,6 +7559,8 @@ export namespace Prisma {
     createdAt: Date
     updatedAt: Date
     _count: CalendarCountAggregateOutputType | null
+    _avg: CalendarAvgAggregateOutputType | null
+    _sum: CalendarSumAggregateOutputType | null
     _min: CalendarMinAggregateOutputType | null
     _max: CalendarMaxAggregateOutputType | null
   }
@@ -7278,6 +7582,10 @@ export namespace Prisma {
   export type CalendarSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7299,6 +7607,10 @@ export namespace Prisma {
   export type CalendarSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7316,6 +7628,10 @@ export namespace Prisma {
   export type CalendarSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7333,6 +7649,10 @@ export namespace Prisma {
   export type CalendarSelectScalar = {
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7346,7 +7666,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "color" | "kind" | "isPublic" | "isVisible" | "isDefault" | "isSyncOnly" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
+  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "encryptedName" | "blindIndexTokens" | "encryptionState" | "encryptionKeyVersion" | "color" | "kind" | "isPublic" | "isVisible" | "isDefault" | "isSyncOnly" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
   export type CalendarInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     events?: boolean | Calendar$eventsArgs<ExtArgs>
@@ -7372,6 +7692,10 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       name: string
+      encryptedName: string | null
+      blindIndexTokens: string | null
+      encryptionState: string
+      encryptionKeyVersion: number
       color: string
       kind: string
       isPublic: boolean
@@ -7812,6 +8136,10 @@ export namespace Prisma {
   interface CalendarFieldRefs {
     readonly id: FieldRef<"Calendar", 'String'>
     readonly name: FieldRef<"Calendar", 'String'>
+    readonly encryptedName: FieldRef<"Calendar", 'String'>
+    readonly blindIndexTokens: FieldRef<"Calendar", 'String'>
+    readonly encryptionState: FieldRef<"Calendar", 'String'>
+    readonly encryptionKeyVersion: FieldRef<"Calendar", 'Int'>
     readonly color: FieldRef<"Calendar", 'String'>
     readonly kind: FieldRef<"Calendar", 'String'>
     readonly isPublic: FieldRef<"Calendar", 'Boolean'>
@@ -8315,13 +8643,27 @@ export namespace Prisma {
 
   export type AggregateEventCategory = {
     _count: EventCategoryCountAggregateOutputType | null
+    _avg: EventCategoryAvgAggregateOutputType | null
+    _sum: EventCategorySumAggregateOutputType | null
     _min: EventCategoryMinAggregateOutputType | null
     _max: EventCategoryMaxAggregateOutputType | null
+  }
+
+  export type EventCategoryAvgAggregateOutputType = {
+    encryptionKeyVersion: number | null
+  }
+
+  export type EventCategorySumAggregateOutputType = {
+    encryptionKeyVersion: number | null
   }
 
   export type EventCategoryMinAggregateOutputType = {
     id: string | null
     name: string | null
+    encryptedName: string | null
+    blindIndexTokens: string | null
+    encryptionState: string | null
+    encryptionKeyVersion: number | null
     color: string | null
     isActive: boolean | null
     userId: string | null
@@ -8332,6 +8674,10 @@ export namespace Prisma {
   export type EventCategoryMaxAggregateOutputType = {
     id: string | null
     name: string | null
+    encryptedName: string | null
+    blindIndexTokens: string | null
+    encryptionState: string | null
+    encryptionKeyVersion: number | null
     color: string | null
     isActive: boolean | null
     userId: string | null
@@ -8342,6 +8688,10 @@ export namespace Prisma {
   export type EventCategoryCountAggregateOutputType = {
     id: number
     name: number
+    encryptedName: number
+    blindIndexTokens: number
+    encryptionState: number
+    encryptionKeyVersion: number
     color: number
     isActive: number
     userId: number
@@ -8351,9 +8701,21 @@ export namespace Prisma {
   }
 
 
+  export type EventCategoryAvgAggregateInputType = {
+    encryptionKeyVersion?: true
+  }
+
+  export type EventCategorySumAggregateInputType = {
+    encryptionKeyVersion?: true
+  }
+
   export type EventCategoryMinAggregateInputType = {
     id?: true
     name?: true
+    encryptedName?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     color?: true
     isActive?: true
     userId?: true
@@ -8364,6 +8726,10 @@ export namespace Prisma {
   export type EventCategoryMaxAggregateInputType = {
     id?: true
     name?: true
+    encryptedName?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     color?: true
     isActive?: true
     userId?: true
@@ -8374,6 +8740,10 @@ export namespace Prisma {
   export type EventCategoryCountAggregateInputType = {
     id?: true
     name?: true
+    encryptedName?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     color?: true
     isActive?: true
     userId?: true
@@ -8420,6 +8790,18 @@ export namespace Prisma {
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
+     * Select which fields to average
+    **/
+    _avg?: EventCategoryAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: EventCategorySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
      * Select which fields to find the minimum value
     **/
     _min?: EventCategoryMinAggregateInputType
@@ -8450,6 +8832,8 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: EventCategoryCountAggregateInputType | true
+    _avg?: EventCategoryAvgAggregateInputType
+    _sum?: EventCategorySumAggregateInputType
     _min?: EventCategoryMinAggregateInputType
     _max?: EventCategoryMaxAggregateInputType
   }
@@ -8457,12 +8841,18 @@ export namespace Prisma {
   export type EventCategoryGroupByOutputType = {
     id: string
     name: string
+    encryptedName: string | null
+    blindIndexTokens: string | null
+    encryptionState: string
+    encryptionKeyVersion: number
     color: string
     isActive: boolean
     userId: string
     createdAt: Date
     updatedAt: Date
     _count: EventCategoryCountAggregateOutputType | null
+    _avg: EventCategoryAvgAggregateOutputType | null
+    _sum: EventCategorySumAggregateOutputType | null
     _min: EventCategoryMinAggregateOutputType | null
     _max: EventCategoryMaxAggregateOutputType | null
   }
@@ -8484,6 +8874,10 @@ export namespace Prisma {
   export type EventCategorySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     isActive?: boolean
     userId?: boolean
@@ -8497,6 +8891,10 @@ export namespace Prisma {
   export type EventCategorySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     isActive?: boolean
     userId?: boolean
@@ -8508,6 +8906,10 @@ export namespace Prisma {
   export type EventCategorySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     isActive?: boolean
     userId?: boolean
@@ -8519,6 +8921,10 @@ export namespace Prisma {
   export type EventCategorySelectScalar = {
     id?: boolean
     name?: boolean
+    encryptedName?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     color?: boolean
     isActive?: boolean
     userId?: boolean
@@ -8526,7 +8932,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type EventCategoryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "color" | "isActive" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["eventCategory"]>
+  export type EventCategoryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "encryptedName" | "blindIndexTokens" | "encryptionState" | "encryptionKeyVersion" | "color" | "isActive" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["eventCategory"]>
   export type EventCategoryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     events?: boolean | EventCategory$eventsArgs<ExtArgs>
@@ -8548,6 +8954,10 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       name: string
+      encryptedName: string | null
+      blindIndexTokens: string | null
+      encryptionState: string
+      encryptionKeyVersion: number
       color: string
       isActive: boolean
       userId: string
@@ -8980,6 +9390,10 @@ export namespace Prisma {
   interface EventCategoryFieldRefs {
     readonly id: FieldRef<"EventCategory", 'String'>
     readonly name: FieldRef<"EventCategory", 'String'>
+    readonly encryptedName: FieldRef<"EventCategory", 'String'>
+    readonly blindIndexTokens: FieldRef<"EventCategory", 'String'>
+    readonly encryptionState: FieldRef<"EventCategory", 'String'>
+    readonly encryptionKeyVersion: FieldRef<"EventCategory", 'Int'>
     readonly color: FieldRef<"EventCategory", 'String'>
     readonly isActive: FieldRef<"EventCategory", 'Boolean'>
     readonly userId: FieldRef<"EventCategory", 'String'>
@@ -9436,10 +9850,12 @@ export namespace Prisma {
   }
 
   export type CalendarEventAvgAggregateOutputType = {
+    encryptionKeyVersion: number | null
     reminder: number | null
   }
 
   export type CalendarEventSumAggregateOutputType = {
+    encryptionKeyVersion: number | null
     reminder: number | null
   }
 
@@ -9447,6 +9863,10 @@ export namespace Prisma {
     id: string | null
     title: string | null
     description: string | null
+    encryptedContent: string | null
+    blindIndexTokens: string | null
+    encryptionState: string | null
+    encryptionKeyVersion: number | null
     start: Date | null
     end: Date | null
     allDay: boolean | null
@@ -9472,6 +9892,10 @@ export namespace Prisma {
     id: string | null
     title: string | null
     description: string | null
+    encryptedContent: string | null
+    blindIndexTokens: string | null
+    encryptionState: string | null
+    encryptionKeyVersion: number | null
     start: Date | null
     end: Date | null
     allDay: boolean | null
@@ -9497,6 +9921,10 @@ export namespace Prisma {
     id: number
     title: number
     description: number
+    encryptedContent: number
+    blindIndexTokens: number
+    encryptionState: number
+    encryptionKeyVersion: number
     start: number
     end: number
     allDay: number
@@ -9521,10 +9949,12 @@ export namespace Prisma {
 
 
   export type CalendarEventAvgAggregateInputType = {
+    encryptionKeyVersion?: true
     reminder?: true
   }
 
   export type CalendarEventSumAggregateInputType = {
+    encryptionKeyVersion?: true
     reminder?: true
   }
 
@@ -9532,6 +9962,10 @@ export namespace Prisma {
     id?: true
     title?: true
     description?: true
+    encryptedContent?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     start?: true
     end?: true
     allDay?: true
@@ -9557,6 +9991,10 @@ export namespace Prisma {
     id?: true
     title?: true
     description?: true
+    encryptedContent?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     start?: true
     end?: true
     allDay?: true
@@ -9582,6 +10020,10 @@ export namespace Prisma {
     id?: true
     title?: true
     description?: true
+    encryptedContent?: true
+    blindIndexTokens?: true
+    encryptionState?: true
+    encryptionKeyVersion?: true
     start?: true
     end?: true
     allDay?: true
@@ -9694,6 +10136,10 @@ export namespace Prisma {
     id: string
     title: string
     description: string | null
+    encryptedContent: string | null
+    blindIndexTokens: string | null
+    encryptionState: string
+    encryptionKeyVersion: number
     start: Date
     end: Date
     allDay: boolean
@@ -9738,6 +10184,10 @@ export namespace Prisma {
     id?: boolean
     title?: boolean
     description?: boolean
+    encryptedContent?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     start?: boolean
     end?: boolean
     allDay?: boolean
@@ -9770,6 +10220,10 @@ export namespace Prisma {
     id?: boolean
     title?: boolean
     description?: boolean
+    encryptedContent?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     start?: boolean
     end?: boolean
     allDay?: boolean
@@ -9798,6 +10252,10 @@ export namespace Prisma {
     id?: boolean
     title?: boolean
     description?: boolean
+    encryptedContent?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     start?: boolean
     end?: boolean
     allDay?: boolean
@@ -9826,6 +10284,10 @@ export namespace Prisma {
     id?: boolean
     title?: boolean
     description?: boolean
+    encryptedContent?: boolean
+    blindIndexTokens?: boolean
+    encryptionState?: boolean
+    encryptionKeyVersion?: boolean
     start?: boolean
     end?: boolean
     allDay?: boolean
@@ -9847,7 +10309,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type CalendarEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "start" | "end" | "allDay" | "location" | "color" | "timezone" | "isPrivate" | "reminder" | "recurrence" | "parentEventId" | "isSynced" | "externalId" | "subscriptionId" | "syncedAt" | "userId" | "calendarId" | "categoryId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarEvent"]>
+  export type CalendarEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "encryptedContent" | "blindIndexTokens" | "encryptionState" | "encryptionKeyVersion" | "start" | "end" | "allDay" | "location" | "color" | "timezone" | "isPrivate" | "reminder" | "recurrence" | "parentEventId" | "isSynced" | "externalId" | "subscriptionId" | "syncedAt" | "userId" | "calendarId" | "categoryId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarEvent"]>
   export type CalendarEventInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     calendar?: boolean | CalendarDefaultArgs<ExtArgs>
@@ -9882,6 +10344,10 @@ export namespace Prisma {
       id: string
       title: string
       description: string | null
+      encryptedContent: string | null
+      blindIndexTokens: string | null
+      encryptionState: string
+      encryptionKeyVersion: number
       start: Date
       end: Date
       allDay: boolean
@@ -10333,6 +10799,10 @@ export namespace Prisma {
     readonly id: FieldRef<"CalendarEvent", 'String'>
     readonly title: FieldRef<"CalendarEvent", 'String'>
     readonly description: FieldRef<"CalendarEvent", 'String'>
+    readonly encryptedContent: FieldRef<"CalendarEvent", 'String'>
+    readonly blindIndexTokens: FieldRef<"CalendarEvent", 'String'>
+    readonly encryptionState: FieldRef<"CalendarEvent", 'String'>
+    readonly encryptionKeyVersion: FieldRef<"CalendarEvent", 'Int'>
     readonly start: FieldRef<"CalendarEvent", 'DateTime'>
     readonly end: FieldRef<"CalendarEvent", 'DateTime'>
     readonly allDay: FieldRef<"CalendarEvent", 'Boolean'>
@@ -11991,6 +12461,7 @@ export namespace Prisma {
     emailNotifications: boolean | null
     browserNotifications: boolean | null
     reminderSound: boolean | null
+    eventEncryptionMode: string | null
     defaultReminder: number | null
     defaultEventDuration: number | null
     defaultCalendarId: string | null
@@ -12015,6 +12486,7 @@ export namespace Prisma {
     emailNotifications: boolean | null
     browserNotifications: boolean | null
     reminderSound: boolean | null
+    eventEncryptionMode: string | null
     defaultReminder: number | null
     defaultEventDuration: number | null
     defaultCalendarId: string | null
@@ -12039,6 +12511,7 @@ export namespace Prisma {
     emailNotifications: number
     browserNotifications: number
     reminderSound: number
+    eventEncryptionMode: number
     defaultReminder: number
     defaultEventDuration: number
     defaultCalendarId: number
@@ -12081,6 +12554,7 @@ export namespace Prisma {
     emailNotifications?: true
     browserNotifications?: true
     reminderSound?: true
+    eventEncryptionMode?: true
     defaultReminder?: true
     defaultEventDuration?: true
     defaultCalendarId?: true
@@ -12105,6 +12579,7 @@ export namespace Prisma {
     emailNotifications?: true
     browserNotifications?: true
     reminderSound?: true
+    eventEncryptionMode?: true
     defaultReminder?: true
     defaultEventDuration?: true
     defaultCalendarId?: true
@@ -12129,6 +12604,7 @@ export namespace Prisma {
     emailNotifications?: true
     browserNotifications?: true
     reminderSound?: true
+    eventEncryptionMode?: true
     defaultReminder?: true
     defaultEventDuration?: true
     defaultCalendarId?: true
@@ -12240,6 +12716,7 @@ export namespace Prisma {
     emailNotifications: boolean
     browserNotifications: boolean
     reminderSound: boolean
+    eventEncryptionMode: string
     defaultReminder: number | null
     defaultEventDuration: number
     defaultCalendarId: string | null
@@ -12283,6 +12760,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: boolean
     defaultReminder?: boolean
     defaultEventDuration?: boolean
     defaultCalendarId?: boolean
@@ -12308,6 +12786,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: boolean
     defaultReminder?: boolean
     defaultEventDuration?: boolean
     defaultCalendarId?: boolean
@@ -12333,6 +12812,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: boolean
     defaultReminder?: boolean
     defaultEventDuration?: boolean
     defaultCalendarId?: boolean
@@ -12358,6 +12838,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: boolean
     defaultReminder?: boolean
     defaultEventDuration?: boolean
     defaultCalendarId?: boolean
@@ -12368,7 +12849,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type UserSettingsOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "theme" | "defaultView" | "weekStartDay" | "timezone" | "timeFormat" | "workingHoursStart" | "workingHoursEnd" | "workingDays" | "emailNotifications" | "browserNotifications" | "reminderSound" | "defaultReminder" | "defaultEventDuration" | "defaultCalendarId" | "compactView" | "showWeekNumbers" | "showDeclinedEvents" | "createdAt" | "updatedAt", ExtArgs["result"]["userSettings"]>
+  export type UserSettingsOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "theme" | "defaultView" | "weekStartDay" | "timezone" | "timeFormat" | "workingHoursStart" | "workingHoursEnd" | "workingDays" | "emailNotifications" | "browserNotifications" | "reminderSound" | "eventEncryptionMode" | "defaultReminder" | "defaultEventDuration" | "defaultCalendarId" | "compactView" | "showWeekNumbers" | "showDeclinedEvents" | "createdAt" | "updatedAt", ExtArgs["result"]["userSettings"]>
   export type UserSettingsInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -12398,6 +12879,7 @@ export namespace Prisma {
       emailNotifications: boolean
       browserNotifications: boolean
       reminderSound: boolean
+      eventEncryptionMode: string
       defaultReminder: number | null
       defaultEventDuration: number
       defaultCalendarId: string | null
@@ -12843,6 +13325,7 @@ export namespace Prisma {
     readonly emailNotifications: FieldRef<"UserSettings", 'Boolean'>
     readonly browserNotifications: FieldRef<"UserSettings", 'Boolean'>
     readonly reminderSound: FieldRef<"UserSettings", 'Boolean'>
+    readonly eventEncryptionMode: FieldRef<"UserSettings", 'String'>
     readonly defaultReminder: FieldRef<"UserSettings", 'Int'>
     readonly defaultEventDuration: FieldRef<"UserSettings", 'Int'>
     readonly defaultCalendarId: FieldRef<"UserSettings", 'String'>
@@ -18874,6 +19357,2376 @@ export namespace Prisma {
 
 
   /**
+   * Model UserEncryptionDevice
+   */
+
+  export type AggregateUserEncryptionDevice = {
+    _count: UserEncryptionDeviceCountAggregateOutputType | null
+    _avg: UserEncryptionDeviceAvgAggregateOutputType | null
+    _sum: UserEncryptionDeviceSumAggregateOutputType | null
+    _min: UserEncryptionDeviceMinAggregateOutputType | null
+    _max: UserEncryptionDeviceMaxAggregateOutputType | null
+  }
+
+  export type UserEncryptionDeviceAvgAggregateOutputType = {
+    keyVersion: number | null
+  }
+
+  export type UserEncryptionDeviceSumAggregateOutputType = {
+    keyVersion: number | null
+  }
+
+  export type UserEncryptionDeviceMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    deviceId: string | null
+    deviceLabel: string | null
+    publicKey: string | null
+    publicKeyAlgorithm: string | null
+    wrappedAccountKey: string | null
+    wrappedSearchKey: string | null
+    wrapAlgorithm: string | null
+    keyVersion: number | null
+    lastSeenAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type UserEncryptionDeviceMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    deviceId: string | null
+    deviceLabel: string | null
+    publicKey: string | null
+    publicKeyAlgorithm: string | null
+    wrappedAccountKey: string | null
+    wrappedSearchKey: string | null
+    wrapAlgorithm: string | null
+    keyVersion: number | null
+    lastSeenAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type UserEncryptionDeviceCountAggregateOutputType = {
+    id: number
+    userId: number
+    deviceId: number
+    deviceLabel: number
+    publicKey: number
+    publicKeyAlgorithm: number
+    wrappedAccountKey: number
+    wrappedSearchKey: number
+    wrapAlgorithm: number
+    keyVersion: number
+    lastSeenAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type UserEncryptionDeviceAvgAggregateInputType = {
+    keyVersion?: true
+  }
+
+  export type UserEncryptionDeviceSumAggregateInputType = {
+    keyVersion?: true
+  }
+
+  export type UserEncryptionDeviceMinAggregateInputType = {
+    id?: true
+    userId?: true
+    deviceId?: true
+    deviceLabel?: true
+    publicKey?: true
+    publicKeyAlgorithm?: true
+    wrappedAccountKey?: true
+    wrappedSearchKey?: true
+    wrapAlgorithm?: true
+    keyVersion?: true
+    lastSeenAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type UserEncryptionDeviceMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    deviceId?: true
+    deviceLabel?: true
+    publicKey?: true
+    publicKeyAlgorithm?: true
+    wrappedAccountKey?: true
+    wrappedSearchKey?: true
+    wrapAlgorithm?: true
+    keyVersion?: true
+    lastSeenAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type UserEncryptionDeviceCountAggregateInputType = {
+    id?: true
+    userId?: true
+    deviceId?: true
+    deviceLabel?: true
+    publicKey?: true
+    publicKeyAlgorithm?: true
+    wrappedAccountKey?: true
+    wrappedSearchKey?: true
+    wrapAlgorithm?: true
+    keyVersion?: true
+    lastSeenAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type UserEncryptionDeviceAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which UserEncryptionDevice to aggregate.
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionDevices to fetch.
+     */
+    orderBy?: UserEncryptionDeviceOrderByWithRelationInput | UserEncryptionDeviceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: UserEncryptionDeviceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionDevices from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionDevices.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned UserEncryptionDevices
+    **/
+    _count?: true | UserEncryptionDeviceCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: UserEncryptionDeviceAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: UserEncryptionDeviceSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: UserEncryptionDeviceMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: UserEncryptionDeviceMaxAggregateInputType
+  }
+
+  export type GetUserEncryptionDeviceAggregateType<T extends UserEncryptionDeviceAggregateArgs> = {
+        [P in keyof T & keyof AggregateUserEncryptionDevice]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateUserEncryptionDevice[P]>
+      : GetScalarType<T[P], AggregateUserEncryptionDevice[P]>
+  }
+
+
+
+
+  export type UserEncryptionDeviceGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserEncryptionDeviceWhereInput
+    orderBy?: UserEncryptionDeviceOrderByWithAggregationInput | UserEncryptionDeviceOrderByWithAggregationInput[]
+    by: UserEncryptionDeviceScalarFieldEnum[] | UserEncryptionDeviceScalarFieldEnum
+    having?: UserEncryptionDeviceScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: UserEncryptionDeviceCountAggregateInputType | true
+    _avg?: UserEncryptionDeviceAvgAggregateInputType
+    _sum?: UserEncryptionDeviceSumAggregateInputType
+    _min?: UserEncryptionDeviceMinAggregateInputType
+    _max?: UserEncryptionDeviceMaxAggregateInputType
+  }
+
+  export type UserEncryptionDeviceGroupByOutputType = {
+    id: string
+    userId: string
+    deviceId: string
+    deviceLabel: string | null
+    publicKey: string
+    publicKeyAlgorithm: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm: string
+    keyVersion: number
+    lastSeenAt: Date
+    createdAt: Date
+    updatedAt: Date
+    _count: UserEncryptionDeviceCountAggregateOutputType | null
+    _avg: UserEncryptionDeviceAvgAggregateOutputType | null
+    _sum: UserEncryptionDeviceSumAggregateOutputType | null
+    _min: UserEncryptionDeviceMinAggregateOutputType | null
+    _max: UserEncryptionDeviceMaxAggregateOutputType | null
+  }
+
+  type GetUserEncryptionDeviceGroupByPayload<T extends UserEncryptionDeviceGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<UserEncryptionDeviceGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof UserEncryptionDeviceGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], UserEncryptionDeviceGroupByOutputType[P]>
+            : GetScalarType<T[P], UserEncryptionDeviceGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type UserEncryptionDeviceSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    deviceId?: boolean
+    deviceLabel?: boolean
+    publicKey?: boolean
+    publicKeyAlgorithm?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    lastSeenAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["userEncryptionDevice"]>
+
+  export type UserEncryptionDeviceSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    deviceId?: boolean
+    deviceLabel?: boolean
+    publicKey?: boolean
+    publicKeyAlgorithm?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    lastSeenAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["userEncryptionDevice"]>
+
+  export type UserEncryptionDeviceSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    deviceId?: boolean
+    deviceLabel?: boolean
+    publicKey?: boolean
+    publicKeyAlgorithm?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    lastSeenAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["userEncryptionDevice"]>
+
+  export type UserEncryptionDeviceSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    deviceId?: boolean
+    deviceLabel?: boolean
+    publicKey?: boolean
+    publicKeyAlgorithm?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    lastSeenAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type UserEncryptionDeviceOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "deviceId" | "deviceLabel" | "publicKey" | "publicKeyAlgorithm" | "wrappedAccountKey" | "wrappedSearchKey" | "wrapAlgorithm" | "keyVersion" | "lastSeenAt" | "createdAt" | "updatedAt", ExtArgs["result"]["userEncryptionDevice"]>
+  export type UserEncryptionDeviceInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type UserEncryptionDeviceIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type UserEncryptionDeviceIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $UserEncryptionDevicePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "UserEncryptionDevice"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      deviceId: string
+      deviceLabel: string | null
+      publicKey: string
+      publicKeyAlgorithm: string
+      wrappedAccountKey: string
+      wrappedSearchKey: string
+      wrapAlgorithm: string
+      keyVersion: number
+      lastSeenAt: Date
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["userEncryptionDevice"]>
+    composites: {}
+  }
+
+  type UserEncryptionDeviceGetPayload<S extends boolean | null | undefined | UserEncryptionDeviceDefaultArgs> = $Result.GetResult<Prisma.$UserEncryptionDevicePayload, S>
+
+  type UserEncryptionDeviceCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<UserEncryptionDeviceFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: UserEncryptionDeviceCountAggregateInputType | true
+    }
+
+  export interface UserEncryptionDeviceDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['UserEncryptionDevice'], meta: { name: 'UserEncryptionDevice' } }
+    /**
+     * Find zero or one UserEncryptionDevice that matches the filter.
+     * @param {UserEncryptionDeviceFindUniqueArgs} args - Arguments to find a UserEncryptionDevice
+     * @example
+     * // Get one UserEncryptionDevice
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends UserEncryptionDeviceFindUniqueArgs>(args: SelectSubset<T, UserEncryptionDeviceFindUniqueArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one UserEncryptionDevice that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {UserEncryptionDeviceFindUniqueOrThrowArgs} args - Arguments to find a UserEncryptionDevice
+     * @example
+     * // Get one UserEncryptionDevice
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends UserEncryptionDeviceFindUniqueOrThrowArgs>(args: SelectSubset<T, UserEncryptionDeviceFindUniqueOrThrowArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first UserEncryptionDevice that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceFindFirstArgs} args - Arguments to find a UserEncryptionDevice
+     * @example
+     * // Get one UserEncryptionDevice
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends UserEncryptionDeviceFindFirstArgs>(args?: SelectSubset<T, UserEncryptionDeviceFindFirstArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first UserEncryptionDevice that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceFindFirstOrThrowArgs} args - Arguments to find a UserEncryptionDevice
+     * @example
+     * // Get one UserEncryptionDevice
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends UserEncryptionDeviceFindFirstOrThrowArgs>(args?: SelectSubset<T, UserEncryptionDeviceFindFirstOrThrowArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more UserEncryptionDevices that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all UserEncryptionDevices
+     * const userEncryptionDevices = await prisma.userEncryptionDevice.findMany()
+     * 
+     * // Get first 10 UserEncryptionDevices
+     * const userEncryptionDevices = await prisma.userEncryptionDevice.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const userEncryptionDeviceWithIdOnly = await prisma.userEncryptionDevice.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends UserEncryptionDeviceFindManyArgs>(args?: SelectSubset<T, UserEncryptionDeviceFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a UserEncryptionDevice.
+     * @param {UserEncryptionDeviceCreateArgs} args - Arguments to create a UserEncryptionDevice.
+     * @example
+     * // Create one UserEncryptionDevice
+     * const UserEncryptionDevice = await prisma.userEncryptionDevice.create({
+     *   data: {
+     *     // ... data to create a UserEncryptionDevice
+     *   }
+     * })
+     * 
+     */
+    create<T extends UserEncryptionDeviceCreateArgs>(args: SelectSubset<T, UserEncryptionDeviceCreateArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many UserEncryptionDevices.
+     * @param {UserEncryptionDeviceCreateManyArgs} args - Arguments to create many UserEncryptionDevices.
+     * @example
+     * // Create many UserEncryptionDevices
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends UserEncryptionDeviceCreateManyArgs>(args?: SelectSubset<T, UserEncryptionDeviceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many UserEncryptionDevices and returns the data saved in the database.
+     * @param {UserEncryptionDeviceCreateManyAndReturnArgs} args - Arguments to create many UserEncryptionDevices.
+     * @example
+     * // Create many UserEncryptionDevices
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many UserEncryptionDevices and only return the `id`
+     * const userEncryptionDeviceWithIdOnly = await prisma.userEncryptionDevice.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends UserEncryptionDeviceCreateManyAndReturnArgs>(args?: SelectSubset<T, UserEncryptionDeviceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a UserEncryptionDevice.
+     * @param {UserEncryptionDeviceDeleteArgs} args - Arguments to delete one UserEncryptionDevice.
+     * @example
+     * // Delete one UserEncryptionDevice
+     * const UserEncryptionDevice = await prisma.userEncryptionDevice.delete({
+     *   where: {
+     *     // ... filter to delete one UserEncryptionDevice
+     *   }
+     * })
+     * 
+     */
+    delete<T extends UserEncryptionDeviceDeleteArgs>(args: SelectSubset<T, UserEncryptionDeviceDeleteArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one UserEncryptionDevice.
+     * @param {UserEncryptionDeviceUpdateArgs} args - Arguments to update one UserEncryptionDevice.
+     * @example
+     * // Update one UserEncryptionDevice
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends UserEncryptionDeviceUpdateArgs>(args: SelectSubset<T, UserEncryptionDeviceUpdateArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more UserEncryptionDevices.
+     * @param {UserEncryptionDeviceDeleteManyArgs} args - Arguments to filter UserEncryptionDevices to delete.
+     * @example
+     * // Delete a few UserEncryptionDevices
+     * const { count } = await prisma.userEncryptionDevice.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends UserEncryptionDeviceDeleteManyArgs>(args?: SelectSubset<T, UserEncryptionDeviceDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more UserEncryptionDevices.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many UserEncryptionDevices
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends UserEncryptionDeviceUpdateManyArgs>(args: SelectSubset<T, UserEncryptionDeviceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more UserEncryptionDevices and returns the data updated in the database.
+     * @param {UserEncryptionDeviceUpdateManyAndReturnArgs} args - Arguments to update many UserEncryptionDevices.
+     * @example
+     * // Update many UserEncryptionDevices
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more UserEncryptionDevices and only return the `id`
+     * const userEncryptionDeviceWithIdOnly = await prisma.userEncryptionDevice.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends UserEncryptionDeviceUpdateManyAndReturnArgs>(args: SelectSubset<T, UserEncryptionDeviceUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one UserEncryptionDevice.
+     * @param {UserEncryptionDeviceUpsertArgs} args - Arguments to update or create a UserEncryptionDevice.
+     * @example
+     * // Update or create a UserEncryptionDevice
+     * const userEncryptionDevice = await prisma.userEncryptionDevice.upsert({
+     *   create: {
+     *     // ... data to create a UserEncryptionDevice
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the UserEncryptionDevice we want to update
+     *   }
+     * })
+     */
+    upsert<T extends UserEncryptionDeviceUpsertArgs>(args: SelectSubset<T, UserEncryptionDeviceUpsertArgs<ExtArgs>>): Prisma__UserEncryptionDeviceClient<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of UserEncryptionDevices.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceCountArgs} args - Arguments to filter UserEncryptionDevices to count.
+     * @example
+     * // Count the number of UserEncryptionDevices
+     * const count = await prisma.userEncryptionDevice.count({
+     *   where: {
+     *     // ... the filter for the UserEncryptionDevices we want to count
+     *   }
+     * })
+    **/
+    count<T extends UserEncryptionDeviceCountArgs>(
+      args?: Subset<T, UserEncryptionDeviceCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], UserEncryptionDeviceCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a UserEncryptionDevice.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends UserEncryptionDeviceAggregateArgs>(args: Subset<T, UserEncryptionDeviceAggregateArgs>): Prisma.PrismaPromise<GetUserEncryptionDeviceAggregateType<T>>
+
+    /**
+     * Group by UserEncryptionDevice.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionDeviceGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends UserEncryptionDeviceGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: UserEncryptionDeviceGroupByArgs['orderBy'] }
+        : { orderBy?: UserEncryptionDeviceGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, UserEncryptionDeviceGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetUserEncryptionDeviceGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the UserEncryptionDevice model
+   */
+  readonly fields: UserEncryptionDeviceFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for UserEncryptionDevice.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__UserEncryptionDeviceClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the UserEncryptionDevice model
+   */
+  interface UserEncryptionDeviceFieldRefs {
+    readonly id: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly userId: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly deviceId: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly deviceLabel: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly publicKey: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly publicKeyAlgorithm: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly wrappedAccountKey: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly wrappedSearchKey: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly wrapAlgorithm: FieldRef<"UserEncryptionDevice", 'String'>
+    readonly keyVersion: FieldRef<"UserEncryptionDevice", 'Int'>
+    readonly lastSeenAt: FieldRef<"UserEncryptionDevice", 'DateTime'>
+    readonly createdAt: FieldRef<"UserEncryptionDevice", 'DateTime'>
+    readonly updatedAt: FieldRef<"UserEncryptionDevice", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * UserEncryptionDevice findUnique
+   */
+  export type UserEncryptionDeviceFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionDevice to fetch.
+     */
+    where: UserEncryptionDeviceWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionDevice findUniqueOrThrow
+   */
+  export type UserEncryptionDeviceFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionDevice to fetch.
+     */
+    where: UserEncryptionDeviceWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionDevice findFirst
+   */
+  export type UserEncryptionDeviceFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionDevice to fetch.
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionDevices to fetch.
+     */
+    orderBy?: UserEncryptionDeviceOrderByWithRelationInput | UserEncryptionDeviceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for UserEncryptionDevices.
+     */
+    cursor?: UserEncryptionDeviceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionDevices from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionDevices.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of UserEncryptionDevices.
+     */
+    distinct?: UserEncryptionDeviceScalarFieldEnum | UserEncryptionDeviceScalarFieldEnum[]
+  }
+
+  /**
+   * UserEncryptionDevice findFirstOrThrow
+   */
+  export type UserEncryptionDeviceFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionDevice to fetch.
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionDevices to fetch.
+     */
+    orderBy?: UserEncryptionDeviceOrderByWithRelationInput | UserEncryptionDeviceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for UserEncryptionDevices.
+     */
+    cursor?: UserEncryptionDeviceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionDevices from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionDevices.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of UserEncryptionDevices.
+     */
+    distinct?: UserEncryptionDeviceScalarFieldEnum | UserEncryptionDeviceScalarFieldEnum[]
+  }
+
+  /**
+   * UserEncryptionDevice findMany
+   */
+  export type UserEncryptionDeviceFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionDevices to fetch.
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionDevices to fetch.
+     */
+    orderBy?: UserEncryptionDeviceOrderByWithRelationInput | UserEncryptionDeviceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing UserEncryptionDevices.
+     */
+    cursor?: UserEncryptionDeviceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionDevices from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionDevices.
+     */
+    skip?: number
+    distinct?: UserEncryptionDeviceScalarFieldEnum | UserEncryptionDeviceScalarFieldEnum[]
+  }
+
+  /**
+   * UserEncryptionDevice create
+   */
+  export type UserEncryptionDeviceCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * The data needed to create a UserEncryptionDevice.
+     */
+    data: XOR<UserEncryptionDeviceCreateInput, UserEncryptionDeviceUncheckedCreateInput>
+  }
+
+  /**
+   * UserEncryptionDevice createMany
+   */
+  export type UserEncryptionDeviceCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many UserEncryptionDevices.
+     */
+    data: UserEncryptionDeviceCreateManyInput | UserEncryptionDeviceCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * UserEncryptionDevice createManyAndReturn
+   */
+  export type UserEncryptionDeviceCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * The data used to create many UserEncryptionDevices.
+     */
+    data: UserEncryptionDeviceCreateManyInput | UserEncryptionDeviceCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * UserEncryptionDevice update
+   */
+  export type UserEncryptionDeviceUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * The data needed to update a UserEncryptionDevice.
+     */
+    data: XOR<UserEncryptionDeviceUpdateInput, UserEncryptionDeviceUncheckedUpdateInput>
+    /**
+     * Choose, which UserEncryptionDevice to update.
+     */
+    where: UserEncryptionDeviceWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionDevice updateMany
+   */
+  export type UserEncryptionDeviceUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update UserEncryptionDevices.
+     */
+    data: XOR<UserEncryptionDeviceUpdateManyMutationInput, UserEncryptionDeviceUncheckedUpdateManyInput>
+    /**
+     * Filter which UserEncryptionDevices to update
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * Limit how many UserEncryptionDevices to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * UserEncryptionDevice updateManyAndReturn
+   */
+  export type UserEncryptionDeviceUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * The data used to update UserEncryptionDevices.
+     */
+    data: XOR<UserEncryptionDeviceUpdateManyMutationInput, UserEncryptionDeviceUncheckedUpdateManyInput>
+    /**
+     * Filter which UserEncryptionDevices to update
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * Limit how many UserEncryptionDevices to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * UserEncryptionDevice upsert
+   */
+  export type UserEncryptionDeviceUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * The filter to search for the UserEncryptionDevice to update in case it exists.
+     */
+    where: UserEncryptionDeviceWhereUniqueInput
+    /**
+     * In case the UserEncryptionDevice found by the `where` argument doesn't exist, create a new UserEncryptionDevice with this data.
+     */
+    create: XOR<UserEncryptionDeviceCreateInput, UserEncryptionDeviceUncheckedCreateInput>
+    /**
+     * In case the UserEncryptionDevice was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<UserEncryptionDeviceUpdateInput, UserEncryptionDeviceUncheckedUpdateInput>
+  }
+
+  /**
+   * UserEncryptionDevice delete
+   */
+  export type UserEncryptionDeviceDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+    /**
+     * Filter which UserEncryptionDevice to delete.
+     */
+    where: UserEncryptionDeviceWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionDevice deleteMany
+   */
+  export type UserEncryptionDeviceDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which UserEncryptionDevices to delete
+     */
+    where?: UserEncryptionDeviceWhereInput
+    /**
+     * Limit how many UserEncryptionDevices to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * UserEncryptionDevice without action
+   */
+  export type UserEncryptionDeviceDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionDevice
+     */
+    select?: UserEncryptionDeviceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionDevice
+     */
+    omit?: UserEncryptionDeviceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionDeviceInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model UserEncryptionPassword
+   */
+
+  export type AggregateUserEncryptionPassword = {
+    _count: UserEncryptionPasswordCountAggregateOutputType | null
+    _avg: UserEncryptionPasswordAvgAggregateOutputType | null
+    _sum: UserEncryptionPasswordSumAggregateOutputType | null
+    _min: UserEncryptionPasswordMinAggregateOutputType | null
+    _max: UserEncryptionPasswordMaxAggregateOutputType | null
+  }
+
+  export type UserEncryptionPasswordAvgAggregateOutputType = {
+    kdfIterations: number | null
+    keyVersion: number | null
+  }
+
+  export type UserEncryptionPasswordSumAggregateOutputType = {
+    kdfIterations: number | null
+    keyVersion: number | null
+  }
+
+  export type UserEncryptionPasswordMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    kdfAlgorithm: string | null
+    kdfSalt: string | null
+    kdfIterations: number | null
+    wrappedAccountKey: string | null
+    wrappedSearchKey: string | null
+    wrapAlgorithm: string | null
+    keyVersion: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type UserEncryptionPasswordMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    kdfAlgorithm: string | null
+    kdfSalt: string | null
+    kdfIterations: number | null
+    wrappedAccountKey: string | null
+    wrappedSearchKey: string | null
+    wrapAlgorithm: string | null
+    keyVersion: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type UserEncryptionPasswordCountAggregateOutputType = {
+    id: number
+    userId: number
+    kdfAlgorithm: number
+    kdfSalt: number
+    kdfIterations: number
+    wrappedAccountKey: number
+    wrappedSearchKey: number
+    wrapAlgorithm: number
+    keyVersion: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type UserEncryptionPasswordAvgAggregateInputType = {
+    kdfIterations?: true
+    keyVersion?: true
+  }
+
+  export type UserEncryptionPasswordSumAggregateInputType = {
+    kdfIterations?: true
+    keyVersion?: true
+  }
+
+  export type UserEncryptionPasswordMinAggregateInputType = {
+    id?: true
+    userId?: true
+    kdfAlgorithm?: true
+    kdfSalt?: true
+    kdfIterations?: true
+    wrappedAccountKey?: true
+    wrappedSearchKey?: true
+    wrapAlgorithm?: true
+    keyVersion?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type UserEncryptionPasswordMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    kdfAlgorithm?: true
+    kdfSalt?: true
+    kdfIterations?: true
+    wrappedAccountKey?: true
+    wrappedSearchKey?: true
+    wrapAlgorithm?: true
+    keyVersion?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type UserEncryptionPasswordCountAggregateInputType = {
+    id?: true
+    userId?: true
+    kdfAlgorithm?: true
+    kdfSalt?: true
+    kdfIterations?: true
+    wrappedAccountKey?: true
+    wrappedSearchKey?: true
+    wrapAlgorithm?: true
+    keyVersion?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type UserEncryptionPasswordAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which UserEncryptionPassword to aggregate.
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionPasswords to fetch.
+     */
+    orderBy?: UserEncryptionPasswordOrderByWithRelationInput | UserEncryptionPasswordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: UserEncryptionPasswordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionPasswords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionPasswords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned UserEncryptionPasswords
+    **/
+    _count?: true | UserEncryptionPasswordCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: UserEncryptionPasswordAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: UserEncryptionPasswordSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: UserEncryptionPasswordMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: UserEncryptionPasswordMaxAggregateInputType
+  }
+
+  export type GetUserEncryptionPasswordAggregateType<T extends UserEncryptionPasswordAggregateArgs> = {
+        [P in keyof T & keyof AggregateUserEncryptionPassword]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateUserEncryptionPassword[P]>
+      : GetScalarType<T[P], AggregateUserEncryptionPassword[P]>
+  }
+
+
+
+
+  export type UserEncryptionPasswordGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserEncryptionPasswordWhereInput
+    orderBy?: UserEncryptionPasswordOrderByWithAggregationInput | UserEncryptionPasswordOrderByWithAggregationInput[]
+    by: UserEncryptionPasswordScalarFieldEnum[] | UserEncryptionPasswordScalarFieldEnum
+    having?: UserEncryptionPasswordScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: UserEncryptionPasswordCountAggregateInputType | true
+    _avg?: UserEncryptionPasswordAvgAggregateInputType
+    _sum?: UserEncryptionPasswordSumAggregateInputType
+    _min?: UserEncryptionPasswordMinAggregateInputType
+    _max?: UserEncryptionPasswordMaxAggregateInputType
+  }
+
+  export type UserEncryptionPasswordGroupByOutputType = {
+    id: string
+    userId: string
+    kdfAlgorithm: string
+    kdfSalt: string
+    kdfIterations: number
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm: string
+    keyVersion: number
+    createdAt: Date
+    updatedAt: Date
+    _count: UserEncryptionPasswordCountAggregateOutputType | null
+    _avg: UserEncryptionPasswordAvgAggregateOutputType | null
+    _sum: UserEncryptionPasswordSumAggregateOutputType | null
+    _min: UserEncryptionPasswordMinAggregateOutputType | null
+    _max: UserEncryptionPasswordMaxAggregateOutputType | null
+  }
+
+  type GetUserEncryptionPasswordGroupByPayload<T extends UserEncryptionPasswordGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<UserEncryptionPasswordGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof UserEncryptionPasswordGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], UserEncryptionPasswordGroupByOutputType[P]>
+            : GetScalarType<T[P], UserEncryptionPasswordGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type UserEncryptionPasswordSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    kdfAlgorithm?: boolean
+    kdfSalt?: boolean
+    kdfIterations?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["userEncryptionPassword"]>
+
+  export type UserEncryptionPasswordSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    kdfAlgorithm?: boolean
+    kdfSalt?: boolean
+    kdfIterations?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["userEncryptionPassword"]>
+
+  export type UserEncryptionPasswordSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    kdfAlgorithm?: boolean
+    kdfSalt?: boolean
+    kdfIterations?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["userEncryptionPassword"]>
+
+  export type UserEncryptionPasswordSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    kdfAlgorithm?: boolean
+    kdfSalt?: boolean
+    kdfIterations?: boolean
+    wrappedAccountKey?: boolean
+    wrappedSearchKey?: boolean
+    wrapAlgorithm?: boolean
+    keyVersion?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type UserEncryptionPasswordOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "kdfAlgorithm" | "kdfSalt" | "kdfIterations" | "wrappedAccountKey" | "wrappedSearchKey" | "wrapAlgorithm" | "keyVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["userEncryptionPassword"]>
+  export type UserEncryptionPasswordInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type UserEncryptionPasswordIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type UserEncryptionPasswordIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $UserEncryptionPasswordPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "UserEncryptionPassword"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      kdfAlgorithm: string
+      kdfSalt: string
+      kdfIterations: number
+      wrappedAccountKey: string
+      wrappedSearchKey: string
+      wrapAlgorithm: string
+      keyVersion: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["userEncryptionPassword"]>
+    composites: {}
+  }
+
+  type UserEncryptionPasswordGetPayload<S extends boolean | null | undefined | UserEncryptionPasswordDefaultArgs> = $Result.GetResult<Prisma.$UserEncryptionPasswordPayload, S>
+
+  type UserEncryptionPasswordCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<UserEncryptionPasswordFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: UserEncryptionPasswordCountAggregateInputType | true
+    }
+
+  export interface UserEncryptionPasswordDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['UserEncryptionPassword'], meta: { name: 'UserEncryptionPassword' } }
+    /**
+     * Find zero or one UserEncryptionPassword that matches the filter.
+     * @param {UserEncryptionPasswordFindUniqueArgs} args - Arguments to find a UserEncryptionPassword
+     * @example
+     * // Get one UserEncryptionPassword
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends UserEncryptionPasswordFindUniqueArgs>(args: SelectSubset<T, UserEncryptionPasswordFindUniqueArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one UserEncryptionPassword that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {UserEncryptionPasswordFindUniqueOrThrowArgs} args - Arguments to find a UserEncryptionPassword
+     * @example
+     * // Get one UserEncryptionPassword
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends UserEncryptionPasswordFindUniqueOrThrowArgs>(args: SelectSubset<T, UserEncryptionPasswordFindUniqueOrThrowArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first UserEncryptionPassword that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordFindFirstArgs} args - Arguments to find a UserEncryptionPassword
+     * @example
+     * // Get one UserEncryptionPassword
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends UserEncryptionPasswordFindFirstArgs>(args?: SelectSubset<T, UserEncryptionPasswordFindFirstArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first UserEncryptionPassword that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordFindFirstOrThrowArgs} args - Arguments to find a UserEncryptionPassword
+     * @example
+     * // Get one UserEncryptionPassword
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends UserEncryptionPasswordFindFirstOrThrowArgs>(args?: SelectSubset<T, UserEncryptionPasswordFindFirstOrThrowArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more UserEncryptionPasswords that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all UserEncryptionPasswords
+     * const userEncryptionPasswords = await prisma.userEncryptionPassword.findMany()
+     * 
+     * // Get first 10 UserEncryptionPasswords
+     * const userEncryptionPasswords = await prisma.userEncryptionPassword.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const userEncryptionPasswordWithIdOnly = await prisma.userEncryptionPassword.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends UserEncryptionPasswordFindManyArgs>(args?: SelectSubset<T, UserEncryptionPasswordFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a UserEncryptionPassword.
+     * @param {UserEncryptionPasswordCreateArgs} args - Arguments to create a UserEncryptionPassword.
+     * @example
+     * // Create one UserEncryptionPassword
+     * const UserEncryptionPassword = await prisma.userEncryptionPassword.create({
+     *   data: {
+     *     // ... data to create a UserEncryptionPassword
+     *   }
+     * })
+     * 
+     */
+    create<T extends UserEncryptionPasswordCreateArgs>(args: SelectSubset<T, UserEncryptionPasswordCreateArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many UserEncryptionPasswords.
+     * @param {UserEncryptionPasswordCreateManyArgs} args - Arguments to create many UserEncryptionPasswords.
+     * @example
+     * // Create many UserEncryptionPasswords
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends UserEncryptionPasswordCreateManyArgs>(args?: SelectSubset<T, UserEncryptionPasswordCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many UserEncryptionPasswords and returns the data saved in the database.
+     * @param {UserEncryptionPasswordCreateManyAndReturnArgs} args - Arguments to create many UserEncryptionPasswords.
+     * @example
+     * // Create many UserEncryptionPasswords
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many UserEncryptionPasswords and only return the `id`
+     * const userEncryptionPasswordWithIdOnly = await prisma.userEncryptionPassword.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends UserEncryptionPasswordCreateManyAndReturnArgs>(args?: SelectSubset<T, UserEncryptionPasswordCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a UserEncryptionPassword.
+     * @param {UserEncryptionPasswordDeleteArgs} args - Arguments to delete one UserEncryptionPassword.
+     * @example
+     * // Delete one UserEncryptionPassword
+     * const UserEncryptionPassword = await prisma.userEncryptionPassword.delete({
+     *   where: {
+     *     // ... filter to delete one UserEncryptionPassword
+     *   }
+     * })
+     * 
+     */
+    delete<T extends UserEncryptionPasswordDeleteArgs>(args: SelectSubset<T, UserEncryptionPasswordDeleteArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one UserEncryptionPassword.
+     * @param {UserEncryptionPasswordUpdateArgs} args - Arguments to update one UserEncryptionPassword.
+     * @example
+     * // Update one UserEncryptionPassword
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends UserEncryptionPasswordUpdateArgs>(args: SelectSubset<T, UserEncryptionPasswordUpdateArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more UserEncryptionPasswords.
+     * @param {UserEncryptionPasswordDeleteManyArgs} args - Arguments to filter UserEncryptionPasswords to delete.
+     * @example
+     * // Delete a few UserEncryptionPasswords
+     * const { count } = await prisma.userEncryptionPassword.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends UserEncryptionPasswordDeleteManyArgs>(args?: SelectSubset<T, UserEncryptionPasswordDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more UserEncryptionPasswords.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many UserEncryptionPasswords
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends UserEncryptionPasswordUpdateManyArgs>(args: SelectSubset<T, UserEncryptionPasswordUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more UserEncryptionPasswords and returns the data updated in the database.
+     * @param {UserEncryptionPasswordUpdateManyAndReturnArgs} args - Arguments to update many UserEncryptionPasswords.
+     * @example
+     * // Update many UserEncryptionPasswords
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more UserEncryptionPasswords and only return the `id`
+     * const userEncryptionPasswordWithIdOnly = await prisma.userEncryptionPassword.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends UserEncryptionPasswordUpdateManyAndReturnArgs>(args: SelectSubset<T, UserEncryptionPasswordUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one UserEncryptionPassword.
+     * @param {UserEncryptionPasswordUpsertArgs} args - Arguments to update or create a UserEncryptionPassword.
+     * @example
+     * // Update or create a UserEncryptionPassword
+     * const userEncryptionPassword = await prisma.userEncryptionPassword.upsert({
+     *   create: {
+     *     // ... data to create a UserEncryptionPassword
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the UserEncryptionPassword we want to update
+     *   }
+     * })
+     */
+    upsert<T extends UserEncryptionPasswordUpsertArgs>(args: SelectSubset<T, UserEncryptionPasswordUpsertArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of UserEncryptionPasswords.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordCountArgs} args - Arguments to filter UserEncryptionPasswords to count.
+     * @example
+     * // Count the number of UserEncryptionPasswords
+     * const count = await prisma.userEncryptionPassword.count({
+     *   where: {
+     *     // ... the filter for the UserEncryptionPasswords we want to count
+     *   }
+     * })
+    **/
+    count<T extends UserEncryptionPasswordCountArgs>(
+      args?: Subset<T, UserEncryptionPasswordCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], UserEncryptionPasswordCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a UserEncryptionPassword.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends UserEncryptionPasswordAggregateArgs>(args: Subset<T, UserEncryptionPasswordAggregateArgs>): Prisma.PrismaPromise<GetUserEncryptionPasswordAggregateType<T>>
+
+    /**
+     * Group by UserEncryptionPassword.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserEncryptionPasswordGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends UserEncryptionPasswordGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: UserEncryptionPasswordGroupByArgs['orderBy'] }
+        : { orderBy?: UserEncryptionPasswordGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, UserEncryptionPasswordGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetUserEncryptionPasswordGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the UserEncryptionPassword model
+   */
+  readonly fields: UserEncryptionPasswordFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for UserEncryptionPassword.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__UserEncryptionPasswordClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the UserEncryptionPassword model
+   */
+  interface UserEncryptionPasswordFieldRefs {
+    readonly id: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly userId: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly kdfAlgorithm: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly kdfSalt: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly kdfIterations: FieldRef<"UserEncryptionPassword", 'Int'>
+    readonly wrappedAccountKey: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly wrappedSearchKey: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly wrapAlgorithm: FieldRef<"UserEncryptionPassword", 'String'>
+    readonly keyVersion: FieldRef<"UserEncryptionPassword", 'Int'>
+    readonly createdAt: FieldRef<"UserEncryptionPassword", 'DateTime'>
+    readonly updatedAt: FieldRef<"UserEncryptionPassword", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * UserEncryptionPassword findUnique
+   */
+  export type UserEncryptionPasswordFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionPassword to fetch.
+     */
+    where: UserEncryptionPasswordWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionPassword findUniqueOrThrow
+   */
+  export type UserEncryptionPasswordFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionPassword to fetch.
+     */
+    where: UserEncryptionPasswordWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionPassword findFirst
+   */
+  export type UserEncryptionPasswordFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionPassword to fetch.
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionPasswords to fetch.
+     */
+    orderBy?: UserEncryptionPasswordOrderByWithRelationInput | UserEncryptionPasswordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for UserEncryptionPasswords.
+     */
+    cursor?: UserEncryptionPasswordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionPasswords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionPasswords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of UserEncryptionPasswords.
+     */
+    distinct?: UserEncryptionPasswordScalarFieldEnum | UserEncryptionPasswordScalarFieldEnum[]
+  }
+
+  /**
+   * UserEncryptionPassword findFirstOrThrow
+   */
+  export type UserEncryptionPasswordFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionPassword to fetch.
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionPasswords to fetch.
+     */
+    orderBy?: UserEncryptionPasswordOrderByWithRelationInput | UserEncryptionPasswordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for UserEncryptionPasswords.
+     */
+    cursor?: UserEncryptionPasswordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionPasswords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionPasswords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of UserEncryptionPasswords.
+     */
+    distinct?: UserEncryptionPasswordScalarFieldEnum | UserEncryptionPasswordScalarFieldEnum[]
+  }
+
+  /**
+   * UserEncryptionPassword findMany
+   */
+  export type UserEncryptionPasswordFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * Filter, which UserEncryptionPasswords to fetch.
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of UserEncryptionPasswords to fetch.
+     */
+    orderBy?: UserEncryptionPasswordOrderByWithRelationInput | UserEncryptionPasswordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing UserEncryptionPasswords.
+     */
+    cursor?: UserEncryptionPasswordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` UserEncryptionPasswords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` UserEncryptionPasswords.
+     */
+    skip?: number
+    distinct?: UserEncryptionPasswordScalarFieldEnum | UserEncryptionPasswordScalarFieldEnum[]
+  }
+
+  /**
+   * UserEncryptionPassword create
+   */
+  export type UserEncryptionPasswordCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * The data needed to create a UserEncryptionPassword.
+     */
+    data: XOR<UserEncryptionPasswordCreateInput, UserEncryptionPasswordUncheckedCreateInput>
+  }
+
+  /**
+   * UserEncryptionPassword createMany
+   */
+  export type UserEncryptionPasswordCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many UserEncryptionPasswords.
+     */
+    data: UserEncryptionPasswordCreateManyInput | UserEncryptionPasswordCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * UserEncryptionPassword createManyAndReturn
+   */
+  export type UserEncryptionPasswordCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * The data used to create many UserEncryptionPasswords.
+     */
+    data: UserEncryptionPasswordCreateManyInput | UserEncryptionPasswordCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * UserEncryptionPassword update
+   */
+  export type UserEncryptionPasswordUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * The data needed to update a UserEncryptionPassword.
+     */
+    data: XOR<UserEncryptionPasswordUpdateInput, UserEncryptionPasswordUncheckedUpdateInput>
+    /**
+     * Choose, which UserEncryptionPassword to update.
+     */
+    where: UserEncryptionPasswordWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionPassword updateMany
+   */
+  export type UserEncryptionPasswordUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update UserEncryptionPasswords.
+     */
+    data: XOR<UserEncryptionPasswordUpdateManyMutationInput, UserEncryptionPasswordUncheckedUpdateManyInput>
+    /**
+     * Filter which UserEncryptionPasswords to update
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * Limit how many UserEncryptionPasswords to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * UserEncryptionPassword updateManyAndReturn
+   */
+  export type UserEncryptionPasswordUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * The data used to update UserEncryptionPasswords.
+     */
+    data: XOR<UserEncryptionPasswordUpdateManyMutationInput, UserEncryptionPasswordUncheckedUpdateManyInput>
+    /**
+     * Filter which UserEncryptionPasswords to update
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * Limit how many UserEncryptionPasswords to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * UserEncryptionPassword upsert
+   */
+  export type UserEncryptionPasswordUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * The filter to search for the UserEncryptionPassword to update in case it exists.
+     */
+    where: UserEncryptionPasswordWhereUniqueInput
+    /**
+     * In case the UserEncryptionPassword found by the `where` argument doesn't exist, create a new UserEncryptionPassword with this data.
+     */
+    create: XOR<UserEncryptionPasswordCreateInput, UserEncryptionPasswordUncheckedCreateInput>
+    /**
+     * In case the UserEncryptionPassword was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<UserEncryptionPasswordUpdateInput, UserEncryptionPasswordUncheckedUpdateInput>
+  }
+
+  /**
+   * UserEncryptionPassword delete
+   */
+  export type UserEncryptionPasswordDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+    /**
+     * Filter which UserEncryptionPassword to delete.
+     */
+    where: UserEncryptionPasswordWhereUniqueInput
+  }
+
+  /**
+   * UserEncryptionPassword deleteMany
+   */
+  export type UserEncryptionPasswordDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which UserEncryptionPasswords to delete
+     */
+    where?: UserEncryptionPasswordWhereInput
+    /**
+     * Limit how many UserEncryptionPasswords to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * UserEncryptionPassword without action
+   */
+  export type UserEncryptionPasswordDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserEncryptionPassword
+     */
+    select?: UserEncryptionPasswordSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the UserEncryptionPassword
+     */
+    omit?: UserEncryptionPasswordOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserEncryptionPasswordInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model CalendarSubscription
    */
 
@@ -21381,6 +24234,10 @@ export namespace Prisma {
   export const CalendarScalarFieldEnum: {
     id: 'id',
     name: 'name',
+    encryptedName: 'encryptedName',
+    blindIndexTokens: 'blindIndexTokens',
+    encryptionState: 'encryptionState',
+    encryptionKeyVersion: 'encryptionKeyVersion',
     color: 'color',
     kind: 'kind',
     isPublic: 'isPublic',
@@ -21400,6 +24257,10 @@ export namespace Prisma {
   export const EventCategoryScalarFieldEnum: {
     id: 'id',
     name: 'name',
+    encryptedName: 'encryptedName',
+    blindIndexTokens: 'blindIndexTokens',
+    encryptionState: 'encryptionState',
+    encryptionKeyVersion: 'encryptionKeyVersion',
     color: 'color',
     isActive: 'isActive',
     userId: 'userId',
@@ -21414,6 +24275,10 @@ export namespace Prisma {
     id: 'id',
     title: 'title',
     description: 'description',
+    encryptedContent: 'encryptedContent',
+    blindIndexTokens: 'blindIndexTokens',
+    encryptionState: 'encryptionState',
+    encryptionKeyVersion: 'encryptionKeyVersion',
     start: 'start',
     end: 'end',
     allDay: 'allDay',
@@ -21465,6 +24330,7 @@ export namespace Prisma {
     emailNotifications: 'emailNotifications',
     browserNotifications: 'browserNotifications',
     reminderSound: 'reminderSound',
+    eventEncryptionMode: 'eventEncryptionMode',
     defaultReminder: 'defaultReminder',
     defaultEventDuration: 'defaultEventDuration',
     defaultCalendarId: 'defaultCalendarId',
@@ -21551,6 +24417,42 @@ export namespace Prisma {
   };
 
   export type PasskeyScalarFieldEnum = (typeof PasskeyScalarFieldEnum)[keyof typeof PasskeyScalarFieldEnum]
+
+
+  export const UserEncryptionDeviceScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    deviceId: 'deviceId',
+    deviceLabel: 'deviceLabel',
+    publicKey: 'publicKey',
+    publicKeyAlgorithm: 'publicKeyAlgorithm',
+    wrappedAccountKey: 'wrappedAccountKey',
+    wrappedSearchKey: 'wrappedSearchKey',
+    wrapAlgorithm: 'wrapAlgorithm',
+    keyVersion: 'keyVersion',
+    lastSeenAt: 'lastSeenAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type UserEncryptionDeviceScalarFieldEnum = (typeof UserEncryptionDeviceScalarFieldEnum)[keyof typeof UserEncryptionDeviceScalarFieldEnum]
+
+
+  export const UserEncryptionPasswordScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    kdfAlgorithm: 'kdfAlgorithm',
+    kdfSalt: 'kdfSalt',
+    kdfIterations: 'kdfIterations',
+    wrappedAccountKey: 'wrappedAccountKey',
+    wrappedSearchKey: 'wrappedSearchKey',
+    wrapAlgorithm: 'wrapAlgorithm',
+    keyVersion: 'keyVersion',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type UserEncryptionPasswordScalarFieldEnum = (typeof UserEncryptionPasswordScalarFieldEnum)[keyof typeof UserEncryptionPasswordScalarFieldEnum]
 
 
   export const CalendarSubscriptionScalarFieldEnum: {
@@ -21704,6 +24606,8 @@ export namespace Prisma {
     participations?: EventParticipantListRelationFilter
     settings?: XOR<UserSettingsNullableScalarRelationFilter, UserSettingsWhereInput> | null
     subscriptions?: CalendarSubscriptionListRelationFilter
+    encryptionDevices?: UserEncryptionDeviceListRelationFilter
+    encryptionPassword?: XOR<UserEncryptionPasswordNullableScalarRelationFilter, UserEncryptionPasswordWhereInput> | null
     passkeys?: PasskeyListRelationFilter
   }
 
@@ -21723,6 +24627,8 @@ export namespace Prisma {
     participations?: EventParticipantOrderByRelationAggregateInput
     settings?: UserSettingsOrderByWithRelationInput
     subscriptions?: CalendarSubscriptionOrderByRelationAggregateInput
+    encryptionDevices?: UserEncryptionDeviceOrderByRelationAggregateInput
+    encryptionPassword?: UserEncryptionPasswordOrderByWithRelationInput
     passkeys?: PasskeyOrderByRelationAggregateInput
   }
 
@@ -21745,6 +24651,8 @@ export namespace Prisma {
     participations?: EventParticipantListRelationFilter
     settings?: XOR<UserSettingsNullableScalarRelationFilter, UserSettingsWhereInput> | null
     subscriptions?: CalendarSubscriptionListRelationFilter
+    encryptionDevices?: UserEncryptionDeviceListRelationFilter
+    encryptionPassword?: XOR<UserEncryptionPasswordNullableScalarRelationFilter, UserEncryptionPasswordWhereInput> | null
     passkeys?: PasskeyListRelationFilter
   }, "id" | "email">
 
@@ -22003,6 +24911,10 @@ export namespace Prisma {
     NOT?: CalendarWhereInput | CalendarWhereInput[]
     id?: StringFilter<"Calendar"> | string
     name?: StringFilter<"Calendar"> | string
+    encryptedName?: StringNullableFilter<"Calendar"> | string | null
+    blindIndexTokens?: StringNullableFilter<"Calendar"> | string | null
+    encryptionState?: StringFilter<"Calendar"> | string
+    encryptionKeyVersion?: IntFilter<"Calendar"> | number
     color?: StringFilter<"Calendar"> | string
     kind?: StringFilter<"Calendar"> | string
     isPublic?: BoolFilter<"Calendar"> | boolean
@@ -22023,6 +24935,10 @@ export namespace Prisma {
   export type CalendarOrderByWithRelationInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrderInput | SortOrder
+    blindIndexTokens?: SortOrderInput | SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -22048,6 +24964,10 @@ export namespace Prisma {
     OR?: CalendarWhereInput[]
     NOT?: CalendarWhereInput | CalendarWhereInput[]
     name?: StringFilter<"Calendar"> | string
+    encryptedName?: StringNullableFilter<"Calendar"> | string | null
+    blindIndexTokens?: StringNullableFilter<"Calendar"> | string | null
+    encryptionState?: StringFilter<"Calendar"> | string
+    encryptionKeyVersion?: IntFilter<"Calendar"> | number
     color?: StringFilter<"Calendar"> | string
     kind?: StringFilter<"Calendar"> | string
     isPublic?: BoolFilter<"Calendar"> | boolean
@@ -22067,6 +24987,10 @@ export namespace Prisma {
   export type CalendarOrderByWithAggregationInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrderInput | SortOrder
+    blindIndexTokens?: SortOrderInput | SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -22079,8 +25003,10 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: CalendarCountOrderByAggregateInput
+    _avg?: CalendarAvgOrderByAggregateInput
     _max?: CalendarMaxOrderByAggregateInput
     _min?: CalendarMinOrderByAggregateInput
+    _sum?: CalendarSumOrderByAggregateInput
   }
 
   export type CalendarScalarWhereWithAggregatesInput = {
@@ -22089,6 +25015,10 @@ export namespace Prisma {
     NOT?: CalendarScalarWhereWithAggregatesInput | CalendarScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Calendar"> | string
     name?: StringWithAggregatesFilter<"Calendar"> | string
+    encryptedName?: StringNullableWithAggregatesFilter<"Calendar"> | string | null
+    blindIndexTokens?: StringNullableWithAggregatesFilter<"Calendar"> | string | null
+    encryptionState?: StringWithAggregatesFilter<"Calendar"> | string
+    encryptionKeyVersion?: IntWithAggregatesFilter<"Calendar"> | number
     color?: StringWithAggregatesFilter<"Calendar"> | string
     kind?: StringWithAggregatesFilter<"Calendar"> | string
     isPublic?: BoolWithAggregatesFilter<"Calendar"> | boolean
@@ -22108,6 +25038,10 @@ export namespace Prisma {
     NOT?: EventCategoryWhereInput | EventCategoryWhereInput[]
     id?: StringFilter<"EventCategory"> | string
     name?: StringFilter<"EventCategory"> | string
+    encryptedName?: StringNullableFilter<"EventCategory"> | string | null
+    blindIndexTokens?: StringNullableFilter<"EventCategory"> | string | null
+    encryptionState?: StringFilter<"EventCategory"> | string
+    encryptionKeyVersion?: IntFilter<"EventCategory"> | number
     color?: StringFilter<"EventCategory"> | string
     isActive?: BoolFilter<"EventCategory"> | boolean
     userId?: StringFilter<"EventCategory"> | string
@@ -22120,6 +25054,10 @@ export namespace Prisma {
   export type EventCategoryOrderByWithRelationInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrderInput | SortOrder
+    blindIndexTokens?: SortOrderInput | SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     isActive?: SortOrder
     userId?: SortOrder
@@ -22136,6 +25074,10 @@ export namespace Prisma {
     OR?: EventCategoryWhereInput[]
     NOT?: EventCategoryWhereInput | EventCategoryWhereInput[]
     name?: StringFilter<"EventCategory"> | string
+    encryptedName?: StringNullableFilter<"EventCategory"> | string | null
+    blindIndexTokens?: StringNullableFilter<"EventCategory"> | string | null
+    encryptionState?: StringFilter<"EventCategory"> | string
+    encryptionKeyVersion?: IntFilter<"EventCategory"> | number
     color?: StringFilter<"EventCategory"> | string
     isActive?: BoolFilter<"EventCategory"> | boolean
     userId?: StringFilter<"EventCategory"> | string
@@ -22148,14 +25090,20 @@ export namespace Prisma {
   export type EventCategoryOrderByWithAggregationInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrderInput | SortOrder
+    blindIndexTokens?: SortOrderInput | SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     isActive?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: EventCategoryCountOrderByAggregateInput
+    _avg?: EventCategoryAvgOrderByAggregateInput
     _max?: EventCategoryMaxOrderByAggregateInput
     _min?: EventCategoryMinOrderByAggregateInput
+    _sum?: EventCategorySumOrderByAggregateInput
   }
 
   export type EventCategoryScalarWhereWithAggregatesInput = {
@@ -22164,6 +25112,10 @@ export namespace Prisma {
     NOT?: EventCategoryScalarWhereWithAggregatesInput | EventCategoryScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"EventCategory"> | string
     name?: StringWithAggregatesFilter<"EventCategory"> | string
+    encryptedName?: StringNullableWithAggregatesFilter<"EventCategory"> | string | null
+    blindIndexTokens?: StringNullableWithAggregatesFilter<"EventCategory"> | string | null
+    encryptionState?: StringWithAggregatesFilter<"EventCategory"> | string
+    encryptionKeyVersion?: IntWithAggregatesFilter<"EventCategory"> | number
     color?: StringWithAggregatesFilter<"EventCategory"> | string
     isActive?: BoolWithAggregatesFilter<"EventCategory"> | boolean
     userId?: StringWithAggregatesFilter<"EventCategory"> | string
@@ -22178,6 +25130,10 @@ export namespace Prisma {
     id?: StringFilter<"CalendarEvent"> | string
     title?: StringFilter<"CalendarEvent"> | string
     description?: StringNullableFilter<"CalendarEvent"> | string | null
+    encryptedContent?: StringNullableFilter<"CalendarEvent"> | string | null
+    blindIndexTokens?: StringNullableFilter<"CalendarEvent"> | string | null
+    encryptionState?: StringFilter<"CalendarEvent"> | string
+    encryptionKeyVersion?: IntFilter<"CalendarEvent"> | number
     start?: DateTimeFilter<"CalendarEvent"> | Date | string
     end?: DateTimeFilter<"CalendarEvent"> | Date | string
     allDay?: BoolFilter<"CalendarEvent"> | boolean
@@ -22209,6 +25165,10 @@ export namespace Prisma {
     id?: SortOrder
     title?: SortOrder
     description?: SortOrderInput | SortOrder
+    encryptedContent?: SortOrderInput | SortOrder
+    blindIndexTokens?: SortOrderInput | SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     start?: SortOrder
     end?: SortOrder
     allDay?: SortOrder
@@ -22243,6 +25203,10 @@ export namespace Prisma {
     NOT?: CalendarEventWhereInput | CalendarEventWhereInput[]
     title?: StringFilter<"CalendarEvent"> | string
     description?: StringNullableFilter<"CalendarEvent"> | string | null
+    encryptedContent?: StringNullableFilter<"CalendarEvent"> | string | null
+    blindIndexTokens?: StringNullableFilter<"CalendarEvent"> | string | null
+    encryptionState?: StringFilter<"CalendarEvent"> | string
+    encryptionKeyVersion?: IntFilter<"CalendarEvent"> | number
     start?: DateTimeFilter<"CalendarEvent"> | Date | string
     end?: DateTimeFilter<"CalendarEvent"> | Date | string
     allDay?: BoolFilter<"CalendarEvent"> | boolean
@@ -22274,6 +25238,10 @@ export namespace Prisma {
     id?: SortOrder
     title?: SortOrder
     description?: SortOrderInput | SortOrder
+    encryptedContent?: SortOrderInput | SortOrder
+    blindIndexTokens?: SortOrderInput | SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     start?: SortOrder
     end?: SortOrder
     allDay?: SortOrder
@@ -22307,6 +25275,10 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"CalendarEvent"> | string
     title?: StringWithAggregatesFilter<"CalendarEvent"> | string
     description?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    encryptedContent?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    blindIndexTokens?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    encryptionState?: StringWithAggregatesFilter<"CalendarEvent"> | string
+    encryptionKeyVersion?: IntWithAggregatesFilter<"CalendarEvent"> | number
     start?: DateTimeWithAggregatesFilter<"CalendarEvent"> | Date | string
     end?: DateTimeWithAggregatesFilter<"CalendarEvent"> | Date | string
     allDay?: BoolWithAggregatesFilter<"CalendarEvent"> | boolean
@@ -22414,6 +25386,7 @@ export namespace Prisma {
     emailNotifications?: BoolFilter<"UserSettings"> | boolean
     browserNotifications?: BoolFilter<"UserSettings"> | boolean
     reminderSound?: BoolFilter<"UserSettings"> | boolean
+    eventEncryptionMode?: StringFilter<"UserSettings"> | string
     defaultReminder?: IntNullableFilter<"UserSettings"> | number | null
     defaultEventDuration?: IntFilter<"UserSettings"> | number
     defaultCalendarId?: StringNullableFilter<"UserSettings"> | string | null
@@ -22439,6 +25412,7 @@ export namespace Prisma {
     emailNotifications?: SortOrder
     browserNotifications?: SortOrder
     reminderSound?: SortOrder
+    eventEncryptionMode?: SortOrder
     defaultReminder?: SortOrderInput | SortOrder
     defaultEventDuration?: SortOrder
     defaultCalendarId?: SortOrderInput | SortOrder
@@ -22467,6 +25441,7 @@ export namespace Prisma {
     emailNotifications?: BoolFilter<"UserSettings"> | boolean
     browserNotifications?: BoolFilter<"UserSettings"> | boolean
     reminderSound?: BoolFilter<"UserSettings"> | boolean
+    eventEncryptionMode?: StringFilter<"UserSettings"> | string
     defaultReminder?: IntNullableFilter<"UserSettings"> | number | null
     defaultEventDuration?: IntFilter<"UserSettings"> | number
     defaultCalendarId?: StringNullableFilter<"UserSettings"> | string | null
@@ -22492,6 +25467,7 @@ export namespace Prisma {
     emailNotifications?: SortOrder
     browserNotifications?: SortOrder
     reminderSound?: SortOrder
+    eventEncryptionMode?: SortOrder
     defaultReminder?: SortOrderInput | SortOrder
     defaultEventDuration?: SortOrder
     defaultCalendarId?: SortOrderInput | SortOrder
@@ -22524,6 +25500,7 @@ export namespace Prisma {
     emailNotifications?: BoolWithAggregatesFilter<"UserSettings"> | boolean
     browserNotifications?: BoolWithAggregatesFilter<"UserSettings"> | boolean
     reminderSound?: BoolWithAggregatesFilter<"UserSettings"> | boolean
+    eventEncryptionMode?: StringWithAggregatesFilter<"UserSettings"> | string
     defaultReminder?: IntNullableWithAggregatesFilter<"UserSettings"> | number | null
     defaultEventDuration?: IntWithAggregatesFilter<"UserSettings"> | number
     defaultCalendarId?: StringNullableWithAggregatesFilter<"UserSettings"> | string | null
@@ -22914,6 +25891,191 @@ export namespace Prisma {
     aaguid?: StringNullableWithAggregatesFilter<"Passkey"> | string | null
   }
 
+  export type UserEncryptionDeviceWhereInput = {
+    AND?: UserEncryptionDeviceWhereInput | UserEncryptionDeviceWhereInput[]
+    OR?: UserEncryptionDeviceWhereInput[]
+    NOT?: UserEncryptionDeviceWhereInput | UserEncryptionDeviceWhereInput[]
+    id?: StringFilter<"UserEncryptionDevice"> | string
+    userId?: StringFilter<"UserEncryptionDevice"> | string
+    deviceId?: StringFilter<"UserEncryptionDevice"> | string
+    deviceLabel?: StringNullableFilter<"UserEncryptionDevice"> | string | null
+    publicKey?: StringFilter<"UserEncryptionDevice"> | string
+    publicKeyAlgorithm?: StringFilter<"UserEncryptionDevice"> | string
+    wrappedAccountKey?: StringFilter<"UserEncryptionDevice"> | string
+    wrappedSearchKey?: StringFilter<"UserEncryptionDevice"> | string
+    wrapAlgorithm?: StringFilter<"UserEncryptionDevice"> | string
+    keyVersion?: IntFilter<"UserEncryptionDevice"> | number
+    lastSeenAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    createdAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    updatedAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type UserEncryptionDeviceOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    deviceId?: SortOrder
+    deviceLabel?: SortOrderInput | SortOrder
+    publicKey?: SortOrder
+    publicKeyAlgorithm?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    lastSeenAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type UserEncryptionDeviceWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId_deviceId?: UserEncryptionDeviceUserIdDeviceIdCompoundUniqueInput
+    AND?: UserEncryptionDeviceWhereInput | UserEncryptionDeviceWhereInput[]
+    OR?: UserEncryptionDeviceWhereInput[]
+    NOT?: UserEncryptionDeviceWhereInput | UserEncryptionDeviceWhereInput[]
+    userId?: StringFilter<"UserEncryptionDevice"> | string
+    deviceId?: StringFilter<"UserEncryptionDevice"> | string
+    deviceLabel?: StringNullableFilter<"UserEncryptionDevice"> | string | null
+    publicKey?: StringFilter<"UserEncryptionDevice"> | string
+    publicKeyAlgorithm?: StringFilter<"UserEncryptionDevice"> | string
+    wrappedAccountKey?: StringFilter<"UserEncryptionDevice"> | string
+    wrappedSearchKey?: StringFilter<"UserEncryptionDevice"> | string
+    wrapAlgorithm?: StringFilter<"UserEncryptionDevice"> | string
+    keyVersion?: IntFilter<"UserEncryptionDevice"> | number
+    lastSeenAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    createdAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    updatedAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId_deviceId">
+
+  export type UserEncryptionDeviceOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    deviceId?: SortOrder
+    deviceLabel?: SortOrderInput | SortOrder
+    publicKey?: SortOrder
+    publicKeyAlgorithm?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    lastSeenAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: UserEncryptionDeviceCountOrderByAggregateInput
+    _avg?: UserEncryptionDeviceAvgOrderByAggregateInput
+    _max?: UserEncryptionDeviceMaxOrderByAggregateInput
+    _min?: UserEncryptionDeviceMinOrderByAggregateInput
+    _sum?: UserEncryptionDeviceSumOrderByAggregateInput
+  }
+
+  export type UserEncryptionDeviceScalarWhereWithAggregatesInput = {
+    AND?: UserEncryptionDeviceScalarWhereWithAggregatesInput | UserEncryptionDeviceScalarWhereWithAggregatesInput[]
+    OR?: UserEncryptionDeviceScalarWhereWithAggregatesInput[]
+    NOT?: UserEncryptionDeviceScalarWhereWithAggregatesInput | UserEncryptionDeviceScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    userId?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    deviceId?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    deviceLabel?: StringNullableWithAggregatesFilter<"UserEncryptionDevice"> | string | null
+    publicKey?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    publicKeyAlgorithm?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    wrappedAccountKey?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    wrappedSearchKey?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    wrapAlgorithm?: StringWithAggregatesFilter<"UserEncryptionDevice"> | string
+    keyVersion?: IntWithAggregatesFilter<"UserEncryptionDevice"> | number
+    lastSeenAt?: DateTimeWithAggregatesFilter<"UserEncryptionDevice"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"UserEncryptionDevice"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"UserEncryptionDevice"> | Date | string
+  }
+
+  export type UserEncryptionPasswordWhereInput = {
+    AND?: UserEncryptionPasswordWhereInput | UserEncryptionPasswordWhereInput[]
+    OR?: UserEncryptionPasswordWhereInput[]
+    NOT?: UserEncryptionPasswordWhereInput | UserEncryptionPasswordWhereInput[]
+    id?: StringFilter<"UserEncryptionPassword"> | string
+    userId?: StringFilter<"UserEncryptionPassword"> | string
+    kdfAlgorithm?: StringFilter<"UserEncryptionPassword"> | string
+    kdfSalt?: StringFilter<"UserEncryptionPassword"> | string
+    kdfIterations?: IntFilter<"UserEncryptionPassword"> | number
+    wrappedAccountKey?: StringFilter<"UserEncryptionPassword"> | string
+    wrappedSearchKey?: StringFilter<"UserEncryptionPassword"> | string
+    wrapAlgorithm?: StringFilter<"UserEncryptionPassword"> | string
+    keyVersion?: IntFilter<"UserEncryptionPassword"> | number
+    createdAt?: DateTimeFilter<"UserEncryptionPassword"> | Date | string
+    updatedAt?: DateTimeFilter<"UserEncryptionPassword"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type UserEncryptionPasswordOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kdfAlgorithm?: SortOrder
+    kdfSalt?: SortOrder
+    kdfIterations?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type UserEncryptionPasswordWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId?: string
+    AND?: UserEncryptionPasswordWhereInput | UserEncryptionPasswordWhereInput[]
+    OR?: UserEncryptionPasswordWhereInput[]
+    NOT?: UserEncryptionPasswordWhereInput | UserEncryptionPasswordWhereInput[]
+    kdfAlgorithm?: StringFilter<"UserEncryptionPassword"> | string
+    kdfSalt?: StringFilter<"UserEncryptionPassword"> | string
+    kdfIterations?: IntFilter<"UserEncryptionPassword"> | number
+    wrappedAccountKey?: StringFilter<"UserEncryptionPassword"> | string
+    wrappedSearchKey?: StringFilter<"UserEncryptionPassword"> | string
+    wrapAlgorithm?: StringFilter<"UserEncryptionPassword"> | string
+    keyVersion?: IntFilter<"UserEncryptionPassword"> | number
+    createdAt?: DateTimeFilter<"UserEncryptionPassword"> | Date | string
+    updatedAt?: DateTimeFilter<"UserEncryptionPassword"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId">
+
+  export type UserEncryptionPasswordOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kdfAlgorithm?: SortOrder
+    kdfSalt?: SortOrder
+    kdfIterations?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: UserEncryptionPasswordCountOrderByAggregateInput
+    _avg?: UserEncryptionPasswordAvgOrderByAggregateInput
+    _max?: UserEncryptionPasswordMaxOrderByAggregateInput
+    _min?: UserEncryptionPasswordMinOrderByAggregateInput
+    _sum?: UserEncryptionPasswordSumOrderByAggregateInput
+  }
+
+  export type UserEncryptionPasswordScalarWhereWithAggregatesInput = {
+    AND?: UserEncryptionPasswordScalarWhereWithAggregatesInput | UserEncryptionPasswordScalarWhereWithAggregatesInput[]
+    OR?: UserEncryptionPasswordScalarWhereWithAggregatesInput[]
+    NOT?: UserEncryptionPasswordScalarWhereWithAggregatesInput | UserEncryptionPasswordScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    userId?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    kdfAlgorithm?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    kdfSalt?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    kdfIterations?: IntWithAggregatesFilter<"UserEncryptionPassword"> | number
+    wrappedAccountKey?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    wrappedSearchKey?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    wrapAlgorithm?: StringWithAggregatesFilter<"UserEncryptionPassword"> | string
+    keyVersion?: IntWithAggregatesFilter<"UserEncryptionPassword"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"UserEncryptionPassword"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"UserEncryptionPassword"> | Date | string
+  }
+
   export type CalendarSubscriptionWhereInput = {
     AND?: CalendarSubscriptionWhereInput | CalendarSubscriptionWhereInput[]
     OR?: CalendarSubscriptionWhereInput[]
@@ -23126,6 +26288,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -23145,6 +26309,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -23164,6 +26330,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -23183,6 +26351,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -23469,6 +26639,10 @@ export namespace Prisma {
   export type CalendarCreateInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -23488,6 +26662,10 @@ export namespace Prisma {
   export type CalendarUncheckedCreateInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -23507,6 +26685,10 @@ export namespace Prisma {
   export type CalendarUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -23526,6 +26708,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -23545,6 +26731,10 @@ export namespace Prisma {
   export type CalendarCreateManyInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -23561,6 +26751,10 @@ export namespace Prisma {
   export type CalendarUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -23576,6 +26770,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -23592,6 +26790,10 @@ export namespace Prisma {
   export type EventCategoryCreateInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     createdAt?: Date | string
@@ -23603,6 +26805,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedCreateInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     userId: string
@@ -23614,6 +26820,10 @@ export namespace Prisma {
   export type EventCategoryUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23625,6 +26835,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
@@ -23636,6 +26850,10 @@ export namespace Prisma {
   export type EventCategoryCreateManyInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     userId: string
@@ -23646,6 +26864,10 @@ export namespace Prisma {
   export type EventCategoryUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23655,6 +26877,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
@@ -23666,6 +26892,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -23694,6 +26924,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -23722,6 +26956,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -23750,6 +26988,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -23778,6 +27020,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -23803,6 +27049,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -23825,6 +27075,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -23927,6 +27181,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: string
     defaultReminder?: number | null
     defaultEventDuration?: number
     defaultCalendarId?: string | null
@@ -23952,6 +27207,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: string
     defaultReminder?: number | null
     defaultEventDuration?: number
     defaultCalendarId?: string | null
@@ -23975,6 +27231,7 @@ export namespace Prisma {
     emailNotifications?: BoolFieldUpdateOperationsInput | boolean
     browserNotifications?: BoolFieldUpdateOperationsInput | boolean
     reminderSound?: BoolFieldUpdateOperationsInput | boolean
+    eventEncryptionMode?: StringFieldUpdateOperationsInput | string
     defaultReminder?: NullableIntFieldUpdateOperationsInput | number | null
     defaultEventDuration?: IntFieldUpdateOperationsInput | number
     defaultCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -24000,6 +27257,7 @@ export namespace Prisma {
     emailNotifications?: BoolFieldUpdateOperationsInput | boolean
     browserNotifications?: BoolFieldUpdateOperationsInput | boolean
     reminderSound?: BoolFieldUpdateOperationsInput | boolean
+    eventEncryptionMode?: StringFieldUpdateOperationsInput | string
     defaultReminder?: NullableIntFieldUpdateOperationsInput | number | null
     defaultEventDuration?: IntFieldUpdateOperationsInput | number
     defaultCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -24024,6 +27282,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: string
     defaultReminder?: number | null
     defaultEventDuration?: number
     defaultCalendarId?: string | null
@@ -24047,6 +27306,7 @@ export namespace Prisma {
     emailNotifications?: BoolFieldUpdateOperationsInput | boolean
     browserNotifications?: BoolFieldUpdateOperationsInput | boolean
     reminderSound?: BoolFieldUpdateOperationsInput | boolean
+    eventEncryptionMode?: StringFieldUpdateOperationsInput | string
     defaultReminder?: NullableIntFieldUpdateOperationsInput | number | null
     defaultEventDuration?: IntFieldUpdateOperationsInput | number
     defaultCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -24071,6 +27331,7 @@ export namespace Prisma {
     emailNotifications?: BoolFieldUpdateOperationsInput | boolean
     browserNotifications?: BoolFieldUpdateOperationsInput | boolean
     reminderSound?: BoolFieldUpdateOperationsInput | boolean
+    eventEncryptionMode?: StringFieldUpdateOperationsInput | string
     defaultReminder?: NullableIntFieldUpdateOperationsInput | number | null
     defaultEventDuration?: IntFieldUpdateOperationsInput | number
     defaultCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -24497,6 +27758,214 @@ export namespace Prisma {
     aaguid?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
+  export type UserEncryptionDeviceCreateInput = {
+    id?: string
+    deviceId: string
+    deviceLabel?: string | null
+    publicKey: string
+    publicKeyAlgorithm?: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    lastSeenAt?: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutEncryptionDevicesInput
+  }
+
+  export type UserEncryptionDeviceUncheckedCreateInput = {
+    id?: string
+    userId: string
+    deviceId: string
+    deviceLabel?: string | null
+    publicKey: string
+    publicKeyAlgorithm?: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    lastSeenAt?: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionDeviceUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutEncryptionDevicesNestedInput
+  }
+
+  export type UserEncryptionDeviceUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionDeviceCreateManyInput = {
+    id?: string
+    userId: string
+    deviceId: string
+    deviceLabel?: string | null
+    publicKey: string
+    publicKeyAlgorithm?: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    lastSeenAt?: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionDeviceUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionDeviceUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionPasswordCreateInput = {
+    id?: string
+    kdfAlgorithm?: string
+    kdfSalt: string
+    kdfIterations?: number
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutEncryptionPasswordInput
+  }
+
+  export type UserEncryptionPasswordUncheckedCreateInput = {
+    id?: string
+    userId: string
+    kdfAlgorithm?: string
+    kdfSalt: string
+    kdfIterations?: number
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionPasswordUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kdfAlgorithm?: StringFieldUpdateOperationsInput | string
+    kdfSalt?: StringFieldUpdateOperationsInput | string
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutEncryptionPasswordNestedInput
+  }
+
+  export type UserEncryptionPasswordUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    kdfAlgorithm?: StringFieldUpdateOperationsInput | string
+    kdfSalt?: StringFieldUpdateOperationsInput | string
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionPasswordCreateManyInput = {
+    id?: string
+    userId: string
+    kdfAlgorithm?: string
+    kdfSalt: string
+    kdfIterations?: number
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionPasswordUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kdfAlgorithm?: StringFieldUpdateOperationsInput | string
+    kdfSalt?: StringFieldUpdateOperationsInput | string
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionPasswordUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    kdfAlgorithm?: StringFieldUpdateOperationsInput | string
+    kdfSalt?: StringFieldUpdateOperationsInput | string
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CalendarSubscriptionCreateInput = {
     id?: string
     name: string
@@ -24808,6 +28277,17 @@ export namespace Prisma {
     none?: CalendarSubscriptionWhereInput
   }
 
+  export type UserEncryptionDeviceListRelationFilter = {
+    every?: UserEncryptionDeviceWhereInput
+    some?: UserEncryptionDeviceWhereInput
+    none?: UserEncryptionDeviceWhereInput
+  }
+
+  export type UserEncryptionPasswordNullableScalarRelationFilter = {
+    is?: UserEncryptionPasswordWhereInput | null
+    isNot?: UserEncryptionPasswordWhereInput | null
+  }
+
   export type PasskeyListRelationFilter = {
     every?: PasskeyWhereInput
     some?: PasskeyWhereInput
@@ -24844,6 +28324,10 @@ export namespace Prisma {
   }
 
   export type CalendarSubscriptionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type UserEncryptionDeviceOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -25082,6 +28566,17 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
   export type CalendarSharingListRelationFilter = {
     every?: CalendarSharingWhereInput
     some?: CalendarSharingWhereInput
@@ -25100,6 +28595,10 @@ export namespace Prisma {
   export type CalendarCountOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -25113,9 +28612,17 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type CalendarAvgOrderByAggregateInput = {
+    encryptionKeyVersion?: SortOrder
+  }
+
   export type CalendarMaxOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -25132,6 +28639,10 @@ export namespace Prisma {
   export type CalendarMinOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -25145,6 +28656,26 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type CalendarSumOrderByAggregateInput = {
+    encryptionKeyVersion?: SortOrder
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
   export type EventCategoryUserIdNameCompoundUniqueInput = {
     userId: string
     name: string
@@ -25153,6 +28684,10 @@ export namespace Prisma {
   export type EventCategoryCountOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     isActive?: SortOrder
     userId?: SortOrder
@@ -25160,9 +28695,17 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type EventCategoryAvgOrderByAggregateInput = {
+    encryptionKeyVersion?: SortOrder
+  }
+
   export type EventCategoryMaxOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     isActive?: SortOrder
     userId?: SortOrder
@@ -25173,11 +28716,19 @@ export namespace Prisma {
   export type EventCategoryMinOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
+    encryptedName?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     color?: SortOrder
     isActive?: SortOrder
     userId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+  }
+
+  export type EventCategorySumOrderByAggregateInput = {
+    encryptionKeyVersion?: SortOrder
   }
 
   export type IntNullableFilter<$PrismaModel = never> = {
@@ -25225,6 +28776,10 @@ export namespace Prisma {
     id?: SortOrder
     title?: SortOrder
     description?: SortOrder
+    encryptedContent?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     start?: SortOrder
     end?: SortOrder
     allDay?: SortOrder
@@ -25247,6 +28802,7 @@ export namespace Prisma {
   }
 
   export type CalendarEventAvgOrderByAggregateInput = {
+    encryptionKeyVersion?: SortOrder
     reminder?: SortOrder
   }
 
@@ -25254,6 +28810,10 @@ export namespace Prisma {
     id?: SortOrder
     title?: SortOrder
     description?: SortOrder
+    encryptedContent?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     start?: SortOrder
     end?: SortOrder
     allDay?: SortOrder
@@ -25279,6 +28839,10 @@ export namespace Prisma {
     id?: SortOrder
     title?: SortOrder
     description?: SortOrder
+    encryptedContent?: SortOrder
+    blindIndexTokens?: SortOrder
+    encryptionState?: SortOrder
+    encryptionKeyVersion?: SortOrder
     start?: SortOrder
     end?: SortOrder
     allDay?: SortOrder
@@ -25301,6 +28865,7 @@ export namespace Prisma {
   }
 
   export type CalendarEventSumOrderByAggregateInput = {
+    encryptionKeyVersion?: SortOrder
     reminder?: SortOrder
   }
 
@@ -25360,17 +28925,6 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
-  export type IntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
-  }
-
   export type UserSettingsCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -25385,6 +28939,7 @@ export namespace Prisma {
     emailNotifications?: SortOrder
     browserNotifications?: SortOrder
     reminderSound?: SortOrder
+    eventEncryptionMode?: SortOrder
     defaultReminder?: SortOrder
     defaultEventDuration?: SortOrder
     defaultCalendarId?: SortOrder
@@ -25417,6 +28972,7 @@ export namespace Prisma {
     emailNotifications?: SortOrder
     browserNotifications?: SortOrder
     reminderSound?: SortOrder
+    eventEncryptionMode?: SortOrder
     defaultReminder?: SortOrder
     defaultEventDuration?: SortOrder
     defaultCalendarId?: SortOrder
@@ -25441,6 +28997,7 @@ export namespace Prisma {
     emailNotifications?: SortOrder
     browserNotifications?: SortOrder
     reminderSound?: SortOrder
+    eventEncryptionMode?: SortOrder
     defaultReminder?: SortOrder
     defaultEventDuration?: SortOrder
     defaultCalendarId?: SortOrder
@@ -25457,22 +29014,6 @@ export namespace Prisma {
     workingHoursEnd?: SortOrder
     defaultReminder?: SortOrder
     defaultEventDuration?: SortOrder
-  }
-
-  export type IntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
   }
 
   export type CalendarSharingCalendarIdSharedWithCompoundUniqueInput = {
@@ -25694,6 +29235,119 @@ export namespace Prisma {
     counter?: SortOrder
   }
 
+  export type UserEncryptionDeviceUserIdDeviceIdCompoundUniqueInput = {
+    userId: string
+    deviceId: string
+  }
+
+  export type UserEncryptionDeviceCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    deviceId?: SortOrder
+    deviceLabel?: SortOrder
+    publicKey?: SortOrder
+    publicKeyAlgorithm?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    lastSeenAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserEncryptionDeviceAvgOrderByAggregateInput = {
+    keyVersion?: SortOrder
+  }
+
+  export type UserEncryptionDeviceMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    deviceId?: SortOrder
+    deviceLabel?: SortOrder
+    publicKey?: SortOrder
+    publicKeyAlgorithm?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    lastSeenAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserEncryptionDeviceMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    deviceId?: SortOrder
+    deviceLabel?: SortOrder
+    publicKey?: SortOrder
+    publicKeyAlgorithm?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    lastSeenAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserEncryptionDeviceSumOrderByAggregateInput = {
+    keyVersion?: SortOrder
+  }
+
+  export type UserEncryptionPasswordCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kdfAlgorithm?: SortOrder
+    kdfSalt?: SortOrder
+    kdfIterations?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserEncryptionPasswordAvgOrderByAggregateInput = {
+    kdfIterations?: SortOrder
+    keyVersion?: SortOrder
+  }
+
+  export type UserEncryptionPasswordMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kdfAlgorithm?: SortOrder
+    kdfSalt?: SortOrder
+    kdfIterations?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserEncryptionPasswordMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kdfAlgorithm?: SortOrder
+    kdfSalt?: SortOrder
+    kdfIterations?: SortOrder
+    wrappedAccountKey?: SortOrder
+    wrappedSearchKey?: SortOrder
+    wrapAlgorithm?: SortOrder
+    keyVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserEncryptionPasswordSumOrderByAggregateInput = {
+    kdfIterations?: SortOrder
+    keyVersion?: SortOrder
+  }
+
   export type CalendarSyncLogListRelationFilter = {
     every?: CalendarSyncLogWhereInput
     some?: CalendarSyncLogWhereInput
@@ -25886,6 +29540,19 @@ export namespace Prisma {
     connect?: CalendarSubscriptionWhereUniqueInput | CalendarSubscriptionWhereUniqueInput[]
   }
 
+  export type UserEncryptionDeviceCreateNestedManyWithoutUserInput = {
+    create?: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput> | UserEncryptionDeviceCreateWithoutUserInput[] | UserEncryptionDeviceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: UserEncryptionDeviceCreateOrConnectWithoutUserInput | UserEncryptionDeviceCreateOrConnectWithoutUserInput[]
+    createMany?: UserEncryptionDeviceCreateManyUserInputEnvelope
+    connect?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+  }
+
+  export type UserEncryptionPasswordCreateNestedOneWithoutUserInput = {
+    create?: XOR<UserEncryptionPasswordCreateWithoutUserInput, UserEncryptionPasswordUncheckedCreateWithoutUserInput>
+    connectOrCreate?: UserEncryptionPasswordCreateOrConnectWithoutUserInput
+    connect?: UserEncryptionPasswordWhereUniqueInput
+  }
+
   export type PasskeyCreateNestedManyWithoutUserInput = {
     create?: XOR<PasskeyCreateWithoutUserInput, PasskeyUncheckedCreateWithoutUserInput> | PasskeyCreateWithoutUserInput[] | PasskeyUncheckedCreateWithoutUserInput[]
     connectOrCreate?: PasskeyCreateOrConnectWithoutUserInput | PasskeyCreateOrConnectWithoutUserInput[]
@@ -25946,6 +29613,19 @@ export namespace Prisma {
     connectOrCreate?: CalendarSubscriptionCreateOrConnectWithoutUserInput | CalendarSubscriptionCreateOrConnectWithoutUserInput[]
     createMany?: CalendarSubscriptionCreateManyUserInputEnvelope
     connect?: CalendarSubscriptionWhereUniqueInput | CalendarSubscriptionWhereUniqueInput[]
+  }
+
+  export type UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput> | UserEncryptionDeviceCreateWithoutUserInput[] | UserEncryptionDeviceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: UserEncryptionDeviceCreateOrConnectWithoutUserInput | UserEncryptionDeviceCreateOrConnectWithoutUserInput[]
+    createMany?: UserEncryptionDeviceCreateManyUserInputEnvelope
+    connect?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+  }
+
+  export type UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<UserEncryptionPasswordCreateWithoutUserInput, UserEncryptionPasswordUncheckedCreateWithoutUserInput>
+    connectOrCreate?: UserEncryptionPasswordCreateOrConnectWithoutUserInput
+    connect?: UserEncryptionPasswordWhereUniqueInput
   }
 
   export type PasskeyUncheckedCreateNestedManyWithoutUserInput = {
@@ -26079,6 +29759,30 @@ export namespace Prisma {
     deleteMany?: CalendarSubscriptionScalarWhereInput | CalendarSubscriptionScalarWhereInput[]
   }
 
+  export type UserEncryptionDeviceUpdateManyWithoutUserNestedInput = {
+    create?: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput> | UserEncryptionDeviceCreateWithoutUserInput[] | UserEncryptionDeviceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: UserEncryptionDeviceCreateOrConnectWithoutUserInput | UserEncryptionDeviceCreateOrConnectWithoutUserInput[]
+    upsert?: UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput | UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: UserEncryptionDeviceCreateManyUserInputEnvelope
+    set?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    disconnect?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    delete?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    connect?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    update?: UserEncryptionDeviceUpdateWithWhereUniqueWithoutUserInput | UserEncryptionDeviceUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: UserEncryptionDeviceUpdateManyWithWhereWithoutUserInput | UserEncryptionDeviceUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: UserEncryptionDeviceScalarWhereInput | UserEncryptionDeviceScalarWhereInput[]
+  }
+
+  export type UserEncryptionPasswordUpdateOneWithoutUserNestedInput = {
+    create?: XOR<UserEncryptionPasswordCreateWithoutUserInput, UserEncryptionPasswordUncheckedCreateWithoutUserInput>
+    connectOrCreate?: UserEncryptionPasswordCreateOrConnectWithoutUserInput
+    upsert?: UserEncryptionPasswordUpsertWithoutUserInput
+    disconnect?: UserEncryptionPasswordWhereInput | boolean
+    delete?: UserEncryptionPasswordWhereInput | boolean
+    connect?: UserEncryptionPasswordWhereUniqueInput
+    update?: XOR<XOR<UserEncryptionPasswordUpdateToOneWithWhereWithoutUserInput, UserEncryptionPasswordUpdateWithoutUserInput>, UserEncryptionPasswordUncheckedUpdateWithoutUserInput>
+  }
+
   export type PasskeyUpdateManyWithoutUserNestedInput = {
     create?: XOR<PasskeyCreateWithoutUserInput, PasskeyUncheckedCreateWithoutUserInput> | PasskeyCreateWithoutUserInput[] | PasskeyUncheckedCreateWithoutUserInput[]
     connectOrCreate?: PasskeyCreateOrConnectWithoutUserInput | PasskeyCreateOrConnectWithoutUserInput[]
@@ -26201,6 +29905,30 @@ export namespace Prisma {
     deleteMany?: CalendarSubscriptionScalarWhereInput | CalendarSubscriptionScalarWhereInput[]
   }
 
+  export type UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput> | UserEncryptionDeviceCreateWithoutUserInput[] | UserEncryptionDeviceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: UserEncryptionDeviceCreateOrConnectWithoutUserInput | UserEncryptionDeviceCreateOrConnectWithoutUserInput[]
+    upsert?: UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput | UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: UserEncryptionDeviceCreateManyUserInputEnvelope
+    set?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    disconnect?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    delete?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    connect?: UserEncryptionDeviceWhereUniqueInput | UserEncryptionDeviceWhereUniqueInput[]
+    update?: UserEncryptionDeviceUpdateWithWhereUniqueWithoutUserInput | UserEncryptionDeviceUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: UserEncryptionDeviceUpdateManyWithWhereWithoutUserInput | UserEncryptionDeviceUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: UserEncryptionDeviceScalarWhereInput | UserEncryptionDeviceScalarWhereInput[]
+  }
+
+  export type UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<UserEncryptionPasswordCreateWithoutUserInput, UserEncryptionPasswordUncheckedCreateWithoutUserInput>
+    connectOrCreate?: UserEncryptionPasswordCreateOrConnectWithoutUserInput
+    upsert?: UserEncryptionPasswordUpsertWithoutUserInput
+    disconnect?: UserEncryptionPasswordWhereInput | boolean
+    delete?: UserEncryptionPasswordWhereInput | boolean
+    connect?: UserEncryptionPasswordWhereUniqueInput
+    update?: XOR<XOR<UserEncryptionPasswordUpdateToOneWithWhereWithoutUserInput, UserEncryptionPasswordUpdateWithoutUserInput>, UserEncryptionPasswordUncheckedUpdateWithoutUserInput>
+  }
+
   export type PasskeyUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<PasskeyCreateWithoutUserInput, PasskeyUncheckedCreateWithoutUserInput> | PasskeyCreateWithoutUserInput[] | PasskeyUncheckedCreateWithoutUserInput[]
     connectOrCreate?: PasskeyCreateOrConnectWithoutUserInput | PasskeyCreateOrConnectWithoutUserInput[]
@@ -26293,6 +30021,14 @@ export namespace Prisma {
     connectOrCreate?: CalendarSubscriptionCreateOrConnectWithoutCalendarInput | CalendarSubscriptionCreateOrConnectWithoutCalendarInput[]
     createMany?: CalendarSubscriptionCreateManyCalendarInputEnvelope
     connect?: CalendarSubscriptionWhereUniqueInput | CalendarSubscriptionWhereUniqueInput[]
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
   }
 
   export type UserUpdateOneRequiredWithoutCalendarsNestedInput = {
@@ -26655,14 +30391,6 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
-  export type IntFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
-  }
-
   export type UserUpdateOneRequiredWithoutSettingsNestedInput = {
     create?: XOR<UserCreateWithoutSettingsInput, UserUncheckedCreateWithoutSettingsInput>
     connectOrCreate?: UserCreateOrConnectWithoutSettingsInput
@@ -26727,6 +30455,34 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutPasskeysInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutPasskeysInput, UserUpdateWithoutPasskeysInput>, UserUncheckedUpdateWithoutPasskeysInput>
+  }
+
+  export type UserCreateNestedOneWithoutEncryptionDevicesInput = {
+    create?: XOR<UserCreateWithoutEncryptionDevicesInput, UserUncheckedCreateWithoutEncryptionDevicesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutEncryptionDevicesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutEncryptionDevicesNestedInput = {
+    create?: XOR<UserCreateWithoutEncryptionDevicesInput, UserUncheckedCreateWithoutEncryptionDevicesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutEncryptionDevicesInput
+    upsert?: UserUpsertWithoutEncryptionDevicesInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutEncryptionDevicesInput, UserUpdateWithoutEncryptionDevicesInput>, UserUncheckedUpdateWithoutEncryptionDevicesInput>
+  }
+
+  export type UserCreateNestedOneWithoutEncryptionPasswordInput = {
+    create?: XOR<UserCreateWithoutEncryptionPasswordInput, UserUncheckedCreateWithoutEncryptionPasswordInput>
+    connectOrCreate?: UserCreateOrConnectWithoutEncryptionPasswordInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutEncryptionPasswordNestedInput = {
+    create?: XOR<UserCreateWithoutEncryptionPasswordInput, UserUncheckedCreateWithoutEncryptionPasswordInput>
+    connectOrCreate?: UserCreateOrConnectWithoutEncryptionPasswordInput
+    upsert?: UserUpsertWithoutEncryptionPasswordInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutEncryptionPasswordInput, UserUpdateWithoutEncryptionPasswordInput>, UserUncheckedUpdateWithoutEncryptionPasswordInput>
   }
 
   export type UserCreateNestedOneWithoutSubscriptionsInput = {
@@ -26960,33 +30716,6 @@ export namespace Prisma {
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
-  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedIntNullableFilter<$PrismaModel>
-    _max?: NestedIntNullableFilter<$PrismaModel>
-  }
-
-  export type NestedFloatNullableFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
-  }
-
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -27012,6 +30741,33 @@ export namespace Prisma {
     gt?: number | FloatFieldRefInput<$PrismaModel>
     gte?: number | FloatFieldRefInput<$PrismaModel>
     not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
 
   export type SessionCreateWithoutUserInput = {
@@ -27088,6 +30844,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -27115,6 +30875,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -27151,6 +30915,10 @@ export namespace Prisma {
   export type EventCategoryCreateWithoutUserInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     createdAt?: Date | string
@@ -27161,6 +30929,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedCreateWithoutUserInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     createdAt?: Date | string
@@ -27181,6 +30953,10 @@ export namespace Prisma {
   export type CalendarCreateWithoutUserInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -27199,6 +30975,10 @@ export namespace Prisma {
   export type CalendarUncheckedCreateWithoutUserInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -27265,6 +31045,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: string
     defaultReminder?: number | null
     defaultEventDuration?: number
     defaultCalendarId?: string | null
@@ -27288,6 +31069,7 @@ export namespace Prisma {
     emailNotifications?: boolean
     browserNotifications?: boolean
     reminderSound?: boolean
+    eventEncryptionMode?: string
     defaultReminder?: number | null
     defaultEventDuration?: number
     defaultCalendarId?: string | null
@@ -27345,6 +31127,77 @@ export namespace Prisma {
   export type CalendarSubscriptionCreateManyUserInputEnvelope = {
     data: CalendarSubscriptionCreateManyUserInput | CalendarSubscriptionCreateManyUserInput[]
     skipDuplicates?: boolean
+  }
+
+  export type UserEncryptionDeviceCreateWithoutUserInput = {
+    id?: string
+    deviceId: string
+    deviceLabel?: string | null
+    publicKey: string
+    publicKeyAlgorithm?: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    lastSeenAt?: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionDeviceUncheckedCreateWithoutUserInput = {
+    id?: string
+    deviceId: string
+    deviceLabel?: string | null
+    publicKey: string
+    publicKeyAlgorithm?: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    lastSeenAt?: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionDeviceCreateOrConnectWithoutUserInput = {
+    where: UserEncryptionDeviceWhereUniqueInput
+    create: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput>
+  }
+
+  export type UserEncryptionDeviceCreateManyUserInputEnvelope = {
+    data: UserEncryptionDeviceCreateManyUserInput | UserEncryptionDeviceCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserEncryptionPasswordCreateWithoutUserInput = {
+    id?: string
+    kdfAlgorithm?: string
+    kdfSalt: string
+    kdfIterations?: number
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionPasswordUncheckedCreateWithoutUserInput = {
+    id?: string
+    kdfAlgorithm?: string
+    kdfSalt: string
+    kdfIterations?: number
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionPasswordCreateOrConnectWithoutUserInput = {
+    where: UserEncryptionPasswordWhereUniqueInput
+    create: XOR<UserEncryptionPasswordCreateWithoutUserInput, UserEncryptionPasswordUncheckedCreateWithoutUserInput>
   }
 
   export type PasskeyCreateWithoutUserInput = {
@@ -27471,6 +31324,10 @@ export namespace Prisma {
     id?: StringFilter<"CalendarEvent"> | string
     title?: StringFilter<"CalendarEvent"> | string
     description?: StringNullableFilter<"CalendarEvent"> | string | null
+    encryptedContent?: StringNullableFilter<"CalendarEvent"> | string | null
+    blindIndexTokens?: StringNullableFilter<"CalendarEvent"> | string | null
+    encryptionState?: StringFilter<"CalendarEvent"> | string
+    encryptionKeyVersion?: IntFilter<"CalendarEvent"> | number
     start?: DateTimeFilter<"CalendarEvent"> | Date | string
     end?: DateTimeFilter<"CalendarEvent"> | Date | string
     allDay?: BoolFilter<"CalendarEvent"> | boolean
@@ -27514,6 +31371,10 @@ export namespace Prisma {
     NOT?: EventCategoryScalarWhereInput | EventCategoryScalarWhereInput[]
     id?: StringFilter<"EventCategory"> | string
     name?: StringFilter<"EventCategory"> | string
+    encryptedName?: StringNullableFilter<"EventCategory"> | string | null
+    blindIndexTokens?: StringNullableFilter<"EventCategory"> | string | null
+    encryptionState?: StringFilter<"EventCategory"> | string
+    encryptionKeyVersion?: IntFilter<"EventCategory"> | number
     color?: StringFilter<"EventCategory"> | string
     isActive?: BoolFilter<"EventCategory"> | boolean
     userId?: StringFilter<"EventCategory"> | string
@@ -27543,6 +31404,10 @@ export namespace Prisma {
     NOT?: CalendarScalarWhereInput | CalendarScalarWhereInput[]
     id?: StringFilter<"Calendar"> | string
     name?: StringFilter<"Calendar"> | string
+    encryptedName?: StringNullableFilter<"Calendar"> | string | null
+    blindIndexTokens?: StringNullableFilter<"Calendar"> | string | null
+    encryptionState?: StringFilter<"Calendar"> | string
+    encryptionKeyVersion?: IntFilter<"Calendar"> | number
     color?: StringFilter<"Calendar"> | string
     kind?: StringFilter<"Calendar"> | string
     isPublic?: BoolFilter<"Calendar"> | boolean
@@ -27609,6 +31474,7 @@ export namespace Prisma {
     emailNotifications?: BoolFieldUpdateOperationsInput | boolean
     browserNotifications?: BoolFieldUpdateOperationsInput | boolean
     reminderSound?: BoolFieldUpdateOperationsInput | boolean
+    eventEncryptionMode?: StringFieldUpdateOperationsInput | string
     defaultReminder?: NullableIntFieldUpdateOperationsInput | number | null
     defaultEventDuration?: IntFieldUpdateOperationsInput | number
     defaultCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27632,6 +31498,7 @@ export namespace Prisma {
     emailNotifications?: BoolFieldUpdateOperationsInput | boolean
     browserNotifications?: BoolFieldUpdateOperationsInput | boolean
     reminderSound?: BoolFieldUpdateOperationsInput | boolean
+    eventEncryptionMode?: StringFieldUpdateOperationsInput | string
     defaultReminder?: NullableIntFieldUpdateOperationsInput | number | null
     defaultEventDuration?: IntFieldUpdateOperationsInput | number
     defaultCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27676,6 +31543,78 @@ export namespace Prisma {
     calendarId?: StringFilter<"CalendarSubscription"> | string
     createdAt?: DateTimeFilter<"CalendarSubscription"> | Date | string
     updatedAt?: DateTimeFilter<"CalendarSubscription"> | Date | string
+  }
+
+  export type UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput = {
+    where: UserEncryptionDeviceWhereUniqueInput
+    update: XOR<UserEncryptionDeviceUpdateWithoutUserInput, UserEncryptionDeviceUncheckedUpdateWithoutUserInput>
+    create: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput>
+  }
+
+  export type UserEncryptionDeviceUpdateWithWhereUniqueWithoutUserInput = {
+    where: UserEncryptionDeviceWhereUniqueInput
+    data: XOR<UserEncryptionDeviceUpdateWithoutUserInput, UserEncryptionDeviceUncheckedUpdateWithoutUserInput>
+  }
+
+  export type UserEncryptionDeviceUpdateManyWithWhereWithoutUserInput = {
+    where: UserEncryptionDeviceScalarWhereInput
+    data: XOR<UserEncryptionDeviceUpdateManyMutationInput, UserEncryptionDeviceUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type UserEncryptionDeviceScalarWhereInput = {
+    AND?: UserEncryptionDeviceScalarWhereInput | UserEncryptionDeviceScalarWhereInput[]
+    OR?: UserEncryptionDeviceScalarWhereInput[]
+    NOT?: UserEncryptionDeviceScalarWhereInput | UserEncryptionDeviceScalarWhereInput[]
+    id?: StringFilter<"UserEncryptionDevice"> | string
+    userId?: StringFilter<"UserEncryptionDevice"> | string
+    deviceId?: StringFilter<"UserEncryptionDevice"> | string
+    deviceLabel?: StringNullableFilter<"UserEncryptionDevice"> | string | null
+    publicKey?: StringFilter<"UserEncryptionDevice"> | string
+    publicKeyAlgorithm?: StringFilter<"UserEncryptionDevice"> | string
+    wrappedAccountKey?: StringFilter<"UserEncryptionDevice"> | string
+    wrappedSearchKey?: StringFilter<"UserEncryptionDevice"> | string
+    wrapAlgorithm?: StringFilter<"UserEncryptionDevice"> | string
+    keyVersion?: IntFilter<"UserEncryptionDevice"> | number
+    lastSeenAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    createdAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+    updatedAt?: DateTimeFilter<"UserEncryptionDevice"> | Date | string
+  }
+
+  export type UserEncryptionPasswordUpsertWithoutUserInput = {
+    update: XOR<UserEncryptionPasswordUpdateWithoutUserInput, UserEncryptionPasswordUncheckedUpdateWithoutUserInput>
+    create: XOR<UserEncryptionPasswordCreateWithoutUserInput, UserEncryptionPasswordUncheckedCreateWithoutUserInput>
+    where?: UserEncryptionPasswordWhereInput
+  }
+
+  export type UserEncryptionPasswordUpdateToOneWithWhereWithoutUserInput = {
+    where?: UserEncryptionPasswordWhereInput
+    data: XOR<UserEncryptionPasswordUpdateWithoutUserInput, UserEncryptionPasswordUncheckedUpdateWithoutUserInput>
+  }
+
+  export type UserEncryptionPasswordUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kdfAlgorithm?: StringFieldUpdateOperationsInput | string
+    kdfSalt?: StringFieldUpdateOperationsInput | string
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionPasswordUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kdfAlgorithm?: StringFieldUpdateOperationsInput | string
+    kdfSalt?: StringFieldUpdateOperationsInput | string
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type PasskeyUpsertWithWhereUniqueWithoutUserInput = {
@@ -27726,6 +31665,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -27744,6 +31685,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -27778,6 +31721,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -27796,6 +31741,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -27814,6 +31761,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -27832,6 +31781,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -27866,6 +31817,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -27884,6 +31837,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -27902,6 +31857,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -27920,6 +31877,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -27932,6 +31891,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -27959,6 +31922,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -28092,6 +32059,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -28110,6 +32079,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -28190,6 +32161,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -28208,6 +32181,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -28220,6 +32195,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -28247,6 +32226,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -28306,6 +32289,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -28324,6 +32309,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -28358,6 +32345,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -28376,6 +32365,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -28387,6 +32378,10 @@ export namespace Prisma {
   export type CalendarCreateWithoutEventsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -28405,6 +32400,10 @@ export namespace Prisma {
   export type CalendarUncheckedCreateWithoutEventsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -28428,6 +32427,10 @@ export namespace Prisma {
   export type EventCategoryCreateWithoutEventsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     createdAt?: Date | string
@@ -28438,6 +32441,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedCreateWithoutEventsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     userId: string
@@ -28568,6 +32575,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -28586,6 +32595,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -28603,6 +32614,10 @@ export namespace Prisma {
   export type CalendarUpdateWithoutEventsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28621,6 +32636,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateWithoutEventsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28650,6 +32669,10 @@ export namespace Prisma {
   export type EventCategoryUpdateWithoutEventsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -28660,6 +32683,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedUpdateWithoutEventsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     userId?: StringFieldUpdateOperationsInput | string
@@ -28749,6 +32776,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -28776,6 +32807,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -28819,6 +32854,8 @@ export namespace Prisma {
     calendars?: CalendarCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -28837,6 +32874,8 @@ export namespace Prisma {
     calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -28860,6 +32899,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -28887,6 +32930,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -28936,6 +32983,8 @@ export namespace Prisma {
     calendars?: CalendarUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -28954,6 +33003,8 @@ export namespace Prisma {
     calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -28972,6 +33023,8 @@ export namespace Prisma {
     calendars?: CalendarCreateNestedManyWithoutUserInput
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -28990,6 +33043,8 @@ export namespace Prisma {
     calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -29024,6 +33079,8 @@ export namespace Prisma {
     calendars?: CalendarUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -29042,12 +33099,18 @@ export namespace Prisma {
     calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CalendarCreateWithoutSharedCalendarsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -29066,6 +33129,10 @@ export namespace Prisma {
   export type CalendarUncheckedCreateWithoutSharedCalendarsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -29100,6 +33167,10 @@ export namespace Prisma {
   export type CalendarUpdateWithoutSharedCalendarsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -29118,6 +33189,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateWithoutSharedCalendarsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -29137,6 +33212,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -29164,6 +33243,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -29207,6 +33290,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -29234,6 +33321,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -29261,6 +33352,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -29288,6 +33383,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -29331,6 +33430,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -29358,6 +33461,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -29397,6 +33504,8 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPasskeysInput = {
@@ -29415,6 +33524,8 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPasskeysInput = {
@@ -29449,6 +33560,8 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPasskeysInput = {
@@ -29467,6 +33580,200 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutEncryptionDevicesInput = {
+    id?: string
+    name: string
+    email: string
+    emailVerified?: boolean
+    image?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    events?: CalendarEventCreateNestedManyWithoutUserInput
+    categories?: EventCategoryCreateNestedManyWithoutUserInput
+    calendars?: CalendarCreateNestedManyWithoutUserInput
+    participations?: EventParticipantCreateNestedManyWithoutUserInput
+    settings?: UserSettingsCreateNestedOneWithoutUserInput
+    subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
+    passkeys?: PasskeyCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutEncryptionDevicesInput = {
+    id?: string
+    name: string
+    email: string
+    emailVerified?: boolean
+    image?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    events?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    categories?: EventCategoryUncheckedCreateNestedManyWithoutUserInput
+    calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
+    participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
+    settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
+    passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutEncryptionDevicesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutEncryptionDevicesInput, UserUncheckedCreateWithoutEncryptionDevicesInput>
+  }
+
+  export type UserUpsertWithoutEncryptionDevicesInput = {
+    update: XOR<UserUpdateWithoutEncryptionDevicesInput, UserUncheckedUpdateWithoutEncryptionDevicesInput>
+    create: XOR<UserCreateWithoutEncryptionDevicesInput, UserUncheckedCreateWithoutEncryptionDevicesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutEncryptionDevicesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutEncryptionDevicesInput, UserUncheckedUpdateWithoutEncryptionDevicesInput>
+  }
+
+  export type UserUpdateWithoutEncryptionDevicesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    emailVerified?: BoolFieldUpdateOperationsInput | boolean
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    events?: CalendarEventUpdateManyWithoutUserNestedInput
+    categories?: EventCategoryUpdateManyWithoutUserNestedInput
+    calendars?: CalendarUpdateManyWithoutUserNestedInput
+    participations?: EventParticipantUpdateManyWithoutUserNestedInput
+    settings?: UserSettingsUpdateOneWithoutUserNestedInput
+    subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
+    passkeys?: PasskeyUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutEncryptionDevicesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    emailVerified?: BoolFieldUpdateOperationsInput | boolean
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    events?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    categories?: EventCategoryUncheckedUpdateManyWithoutUserNestedInput
+    calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
+    participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
+    settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
+    passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutEncryptionPasswordInput = {
+    id?: string
+    name: string
+    email: string
+    emailVerified?: boolean
+    image?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    events?: CalendarEventCreateNestedManyWithoutUserInput
+    categories?: EventCategoryCreateNestedManyWithoutUserInput
+    calendars?: CalendarCreateNestedManyWithoutUserInput
+    participations?: EventParticipantCreateNestedManyWithoutUserInput
+    settings?: UserSettingsCreateNestedOneWithoutUserInput
+    subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    passkeys?: PasskeyCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutEncryptionPasswordInput = {
+    id?: string
+    name: string
+    email: string
+    emailVerified?: boolean
+    image?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    events?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    categories?: EventCategoryUncheckedCreateNestedManyWithoutUserInput
+    calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
+    participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
+    settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutEncryptionPasswordInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutEncryptionPasswordInput, UserUncheckedCreateWithoutEncryptionPasswordInput>
+  }
+
+  export type UserUpsertWithoutEncryptionPasswordInput = {
+    update: XOR<UserUpdateWithoutEncryptionPasswordInput, UserUncheckedUpdateWithoutEncryptionPasswordInput>
+    create: XOR<UserCreateWithoutEncryptionPasswordInput, UserUncheckedCreateWithoutEncryptionPasswordInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutEncryptionPasswordInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutEncryptionPasswordInput, UserUncheckedUpdateWithoutEncryptionPasswordInput>
+  }
+
+  export type UserUpdateWithoutEncryptionPasswordInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    emailVerified?: BoolFieldUpdateOperationsInput | boolean
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    events?: CalendarEventUpdateManyWithoutUserNestedInput
+    categories?: EventCategoryUpdateManyWithoutUserNestedInput
+    calendars?: CalendarUpdateManyWithoutUserNestedInput
+    participations?: EventParticipantUpdateManyWithoutUserNestedInput
+    settings?: UserSettingsUpdateOneWithoutUserNestedInput
+    subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    passkeys?: PasskeyUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutEncryptionPasswordInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    emailVerified?: BoolFieldUpdateOperationsInput | boolean
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    events?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    categories?: EventCategoryUncheckedUpdateManyWithoutUserNestedInput
+    calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
+    participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
+    settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSubscriptionsInput = {
@@ -29484,6 +33791,8 @@ export namespace Prisma {
     calendars?: CalendarCreateNestedManyWithoutUserInput
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
 
@@ -29502,6 +33811,8 @@ export namespace Prisma {
     calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
 
@@ -29513,6 +33824,10 @@ export namespace Prisma {
   export type CalendarCreateWithoutSubscriptionsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -29531,6 +33846,10 @@ export namespace Prisma {
   export type CalendarUncheckedCreateWithoutSubscriptionsInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -29613,6 +33932,8 @@ export namespace Prisma {
     calendars?: CalendarUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
 
@@ -29631,6 +33952,8 @@ export namespace Prisma {
     calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
 
@@ -29648,6 +33971,10 @@ export namespace Prisma {
   export type CalendarUpdateWithoutSubscriptionsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -29666,6 +33993,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateWithoutSubscriptionsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -29827,6 +34158,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -29850,6 +34185,10 @@ export namespace Prisma {
   export type EventCategoryCreateManyUserInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     isActive?: boolean
     createdAt?: Date | string
@@ -29859,6 +34198,10 @@ export namespace Prisma {
   export type CalendarCreateManyUserInput = {
     id?: string
     name: string
+    encryptedName?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     color: string
     kind?: string
     isPublic?: boolean
@@ -29892,6 +34235,21 @@ export namespace Prisma {
     etag?: string | null
     lastModified?: string | null
     calendarId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserEncryptionDeviceCreateManyUserInput = {
+    id?: string
+    deviceId: string
+    deviceLabel?: string | null
+    publicKey: string
+    publicKeyAlgorithm?: string
+    wrappedAccountKey: string
+    wrappedSearchKey: string
+    wrapAlgorithm?: string
+    keyVersion?: number
+    lastSeenAt?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -29988,6 +34346,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30015,6 +34377,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30042,6 +34408,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30065,6 +34435,10 @@ export namespace Prisma {
   export type EventCategoryUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -30075,6 +34449,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -30085,6 +34463,10 @@ export namespace Prisma {
   export type EventCategoryUncheckedUpdateManyWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -30094,6 +34476,10 @@ export namespace Prisma {
   export type CalendarUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -30112,6 +34498,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -30130,6 +34520,10 @@ export namespace Prisma {
   export type CalendarUncheckedUpdateManyWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
+    encryptedName?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -30219,6 +34613,51 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type UserEncryptionDeviceUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionDeviceUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserEncryptionDeviceUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    deviceId?: StringFieldUpdateOperationsInput | string
+    deviceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKey?: StringFieldUpdateOperationsInput | string
+    publicKeyAlgorithm?: StringFieldUpdateOperationsInput | string
+    wrappedAccountKey?: StringFieldUpdateOperationsInput | string
+    wrappedSearchKey?: StringFieldUpdateOperationsInput | string
+    wrapAlgorithm?: StringFieldUpdateOperationsInput | string
+    keyVersion?: IntFieldUpdateOperationsInput | number
+    lastSeenAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type PasskeyUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30262,6 +34701,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -30312,6 +34755,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30339,6 +34786,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30366,6 +34817,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30470,6 +34925,10 @@ export namespace Prisma {
     id?: string
     title: string
     description?: string | null
+    encryptedContent?: string | null
+    blindIndexTokens?: string | null
+    encryptionState?: string
+    encryptionKeyVersion?: number
     start: Date | string
     end: Date | string
     allDay?: boolean
@@ -30494,6 +34953,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30521,6 +34984,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean
@@ -30548,6 +35015,10 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptedContent?: NullableStringFieldUpdateOperationsInput | string | null
+    blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
+    encryptionState?: StringFieldUpdateOperationsInput | string
+    encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
     start?: DateTimeFieldUpdateOperationsInput | Date | string
     end?: DateTimeFieldUpdateOperationsInput | Date | string
     allDay?: BoolFieldUpdateOperationsInput | boolean

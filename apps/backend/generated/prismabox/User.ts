@@ -62,6 +62,10 @@ export const UserRelations = t.Object(
           id: t.String(),
           title: t.String(),
           description: __nullable__(t.String()),
+          encryptedContent: __nullable__(t.String()),
+          blindIndexTokens: __nullable__(t.String()),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           start: t.Date(),
           end: t.Date(),
           allDay: t.Boolean(),
@@ -91,6 +95,10 @@ export const UserRelations = t.Object(
         {
           id: t.String(),
           name: t.String(),
+          encryptedName: __nullable__(t.String()),
+          blindIndexTokens: __nullable__(t.String()),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           color: t.String(),
           isActive: t.Boolean(),
           userId: t.String(),
@@ -106,6 +114,10 @@ export const UserRelations = t.Object(
         {
           id: t.String(),
           name: t.String(),
+          encryptedName: __nullable__(t.String()),
+          blindIndexTokens: __nullable__(t.String()),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           color: t.String(),
           kind: t.String(),
           isPublic: t.Boolean(),
@@ -153,6 +165,7 @@ export const UserRelations = t.Object(
           emailNotifications: t.Boolean(),
           browserNotifications: t.Boolean(),
           reminderSound: t.Boolean(),
+          eventEncryptionMode: t.String(),
           defaultReminder: __nullable__(t.Integer()),
           defaultEventDuration: t.Integer(),
           defaultCalendarId: __nullable__(t.String()),
@@ -186,6 +199,45 @@ export const UserRelations = t.Object(
         { additionalProperties: false },
       ),
       { additionalProperties: false },
+    ),
+    encryptionDevices: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          userId: t.String(),
+          deviceId: t.String(),
+          deviceLabel: __nullable__(t.String()),
+          publicKey: t.String(),
+          publicKeyAlgorithm: t.String(),
+          wrappedAccountKey: t.String(),
+          wrappedSearchKey: t.String(),
+          wrapAlgorithm: t.String(),
+          keyVersion: t.Integer(),
+          lastSeenAt: t.Date(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    encryptionPassword: __nullable__(
+      t.Object(
+        {
+          id: t.String(),
+          userId: t.String(),
+          kdfAlgorithm: t.String(),
+          kdfSalt: t.String(),
+          kdfIterations: t.Integer(),
+          wrappedAccountKey: t.String(),
+          wrappedSearchKey: t.String(),
+          wrapAlgorithm: t.String(),
+          keyVersion: t.Integer(),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
     ),
     passkeys: t.Array(
       t.Object(
@@ -351,6 +403,35 @@ export const UserRelationsInputCreate = t.Object(
               },
               { additionalProperties: false },
             ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    encryptionDevices: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    encryptionPassword: t.Optional(
+      t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
             { additionalProperties: false },
           ),
         },
@@ -569,6 +650,45 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      encryptionDevices: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      encryptionPassword: t.Partial(
+        t.Object(
+          {
+            connect: t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            disconnect: t.Boolean(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       passkeys: t.Partial(
         t.Object(
           {
@@ -688,6 +808,8 @@ export const UserSelect = t.Partial(
       participations: t.Boolean(),
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
+      encryptionDevices: t.Boolean(),
+      encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
       _count: t.Boolean(),
     },
@@ -706,6 +828,8 @@ export const UserInclude = t.Partial(
       participations: t.Boolean(),
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
+      encryptionDevices: t.Boolean(),
+      encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
       _count: t.Boolean(),
     },

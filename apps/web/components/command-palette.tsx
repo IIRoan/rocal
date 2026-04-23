@@ -174,11 +174,16 @@ export function CommandPalette({
     }
   }, [open, currentView, initialSearchQuery]);
 
-  const goForward = useCallback((next: PaletteView) => {
-    setSearchQuery("");
-    setPasskeyAddMode(false);
-    setNavHistory((h) => [...h, next]);
-  }, []);
+  const goForward = useCallback(
+    (next: PaletteView, options?: { preservePasskeyAddMode?: boolean }) => {
+      setSearchQuery("");
+      if (!options?.preservePasskeyAddMode) {
+        setPasskeyAddMode(false);
+      }
+      setNavHistory((h) => [...h, next]);
+    },
+    [],
+  );
 
   const goBack = () => {
     setSearchQuery("");
@@ -233,7 +238,7 @@ export function CommandPalette({
           emailNotifications: newSettings.emailNotifications,
           browserNotifications: newSettings.browserNotifications,
           reminderSound: newSettings.reminderSound,
-          defaultReminder: newSettings.defaultReminder,
+          eventEncryptionMode: newSettings.eventEncryptionMode,
           defaultEventDuration: newSettings.defaultEventDuration,
           defaultCalendarId: newSettings.defaultCalendarId,
           compactView: newSettings.compactView,
@@ -307,7 +312,7 @@ export function CommandPalette({
           break;
         case "newPasskey":
           setPasskeyAddMode(true);
-          goForward("passkeys");
+          goForward("passkeys", { preservePasskeyAddMode: true });
           break;
         case "openPasskeys":
           setPasskeyAddMode(false);
@@ -825,7 +830,14 @@ export function CommandPalette({
     }
 
     if (currentView === "security") {
-      return <SecuritySettings goBack={goBack} goForward={goForward} />;
+      return (
+        <SecuritySettings
+          localSettings={localSettings}
+          updateSetting={updateSetting}
+          goBack={goBack}
+          goForward={goForward}
+        />
+      );
     }
 
     if (currentView === "passkeys") {
