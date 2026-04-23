@@ -2,6 +2,7 @@
 
 A monorepo application with three main services: web frontend, API backend, and notifications service.
 
+
 ## Project Structure
 
 - **apps/web** - Next.js frontend with shadcn/ui components

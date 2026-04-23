@@ -36,17 +36,11 @@ function DialogOverlay({
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
+      forceMount
       data-slot="dialog-overlay"
       className={cn(
-        // Base
-        "fixed inset-0 z-50 bg-black/50",
-        // Animate opacity only (backdrop-filter transition causes issues in Firefox/Edge)
-        "transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-        "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
-        // Subtle blur when supported (no transition - just applied)
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
         "supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:data-[state=open]:backdrop-blur-md",
-        // Respect reduced motion
-        "motion-reduce:transition-none",
         className,
       )}
       style={{
@@ -79,37 +73,37 @@ function DialogContent({
   showClose = true,
   ...props
 }: DialogContentProps) {
-  // Variant presets - positioning only (no transform classes, those are in CSS animations)
+  // NOTE: spotlight intentionally sits in the upper viewport (top-[15%]) and
+  // only translates on X — vertical position is fixed, NOT centered. Don't
+  // change to `top-1/2 -translate-y-1/2` without a UX review; the command
+  // palette and similar surfaces rely on this near-top placement.
   const positionClasses =
     variant === "center"
-      ? "left-1/2 top-1/2"
+      ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
       : variant === "spotlight"
-        ? "left-1/2 top-[15%]"
+        ? "left-1/2 top-[15%] -translate-x-1/2"
         : variant === "top"
-          ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)]"
-          : "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)]";
+          ? "left-1/2 top-[calc(env(safe-area-inset-top)+1rem)] -translate-x-1/2"
+          : "left-1/2 bottom-[calc(env(safe-area-inset-bottom)+1rem)] -translate-x-1/2";
 
-  // Animation classes for spotlight variant (uses CSS keyframes via data-state)
-  const animationClasses =
-    variant === "spotlight"
-      ? "dialog-spotlight-animation"
-      : variant === "center"
-        ? "dialog-center-animation"
-        : variant === "top"
-          ? "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 data-[state=open]:translate-y-0 data-[state=closed]:-translate-y-4 transition-all duration-200"
-          : "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 data-[state=open]:translate-y-0 data-[state=closed]:translate-y-4 transition-all duration-200";
-
-  // Suggested sizing defaults per variant
   const sizeDefaults =
     variant === "center"
       ? "w-[520px] max-w-[calc(100dvw-1rem)] sm:max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
       : variant === "spotlight"
-        ? "w-[560px] max-w-[calc(100dvw-2rem)]"
+        ? "w-[560px] max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
         : variant === "top"
           ? "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]"
           : "w-[720px] max-w-[min(calc(100dvw-1rem),840px)]";
 
-  // Radius per variant
+  const animationClasses =
+    variant === "top"
+      ? "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2"
+      : variant === "bottom"
+        ? "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-bottom-2 data-[state=open]:slide-in-from-bottom-2"
+        : variant === "spotlight"
+          ? "dialog-spotlight-animation"
+          : "dialog-center-animation";
+
   const radius =
     variant === "spotlight"
       ? "rounded-lg"
@@ -121,17 +115,16 @@ function DialogContent({
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        forceMount
         data-slot="dialog-content"
         data-variant={variant}
         className={cn(
           // Base
-          "bg-background fixed z-50 overflow-hidden border shadow-lg",
+          "bg-background fixed z-50 overflow-hidden border shadow-lg duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
           radius,
           sizeDefaults,
           positionClasses,
           animationClasses,
-          // Reduce motion support
-          "motion-reduce:transition-none",
           className,
         )}
         {...props}

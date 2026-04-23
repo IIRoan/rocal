@@ -5,13 +5,12 @@ import { Browser } from "@capacitor/browser";
 import { useState, useEffect, useCallback } from "react";
 import { signIn, authClient, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
-import {
-  getMobileAuthBridgeUrl,
-  getApiBaseUrl,
-} from "@/lib/api-url";
-import { useRouter, useSearchParams } from "next/navigation";
+import { getMobileAuthBridgeUrl, getApiBaseUrl } from "@/lib/api-url";
+import { useSearchParams } from "next/navigation";
 import { Lock, Github, Key, Smartphone, Fingerprint } from "lucide-react";
+import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { Logo } from "@workspace/ui/components/layout";
+import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
 import { clearPendingAuthPassword } from "@/lib/e2ee-password-cache";
 
@@ -23,10 +22,12 @@ export function MobileLoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPasskeySupported, setIsPasskeySupported] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const [hasPasskeysRegistered, setHasPasskeysRegistered] = useState<boolean | null>(null);
+  const [hasPasskeysRegistered, setHasPasskeysRegistered] = useState<
+    boolean | null
+  >(null);
   const [isFromOAuthCallback, setIsFromOAuthCallback] = useState(false);
   const { data: session, isPending } = useSession();
-  const router = useRouter();
+  const router = useSmoothRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next");
   const errorParam = searchParams.get("error");
@@ -40,12 +41,15 @@ export function MobileLoginForm() {
 
   const handleSessionRedirect = useCallback(() => {
     if (session?.user) {
-      router.replace(getRedirectTarget());
+      router.replace(getRedirectTarget(), undefined, {
+        messageContext: "AUTH_FLOW",
+      });
     }
   }, [session, router, getRedirectTarget]);
 
   useEffect(() => {
-    const fromOAuth = typeof window !== "undefined" &&
+    const fromOAuth =
+      typeof window !== "undefined" &&
       sessionStorage.getItem("github_auth_started") === "true";
 
     if (fromOAuth) {
@@ -59,8 +63,10 @@ export function MobileLoginForm() {
       const errorMessages: Record<string, string> = {
         oauth_error: "Authentication failed. Please try again.",
         mobile_session_missing: "Session not found. Please log in again.",
-        mobile_handoff_init_failed: "Failed to transfer login to app. Please try again.",
-        mobile_handoff_verify_failed: "Could not verify login. Please try again.",
+        mobile_handoff_init_failed:
+          "Failed to transfer login to app. Please try again.",
+        mobile_handoff_verify_failed:
+          "Could not verify login. Please try again.",
       };
       setError(errorMessages[errorParam] || "An error occurred during login.");
     }
@@ -71,15 +77,27 @@ export function MobileLoginForm() {
       setIsCheckingSession(false);
 
       if (isFromOAuthCallback && session?.user) {
-        router.replace(`/auth/mobile-complete?next=${encodeURIComponent(getRedirectTarget())}`);
+        router.replace(
+          `/auth/mobile-complete?next=${encodeURIComponent(getRedirectTarget())}`,
+          undefined,
+          { messageContext: "AUTH_FLOW" },
+        );
       } else if (session?.user) {
         handleSessionRedirect();
       }
     }
-  }, [isPending, session, isFromOAuthCallback, getRedirectTarget, router, handleSessionRedirect]);
+  }, [
+    isPending,
+    session,
+    isFromOAuthCallback,
+    getRedirectTarget,
+    router,
+    handleSessionRedirect,
+  ]);
 
   useEffect(() => {
-    const hasWebAuthn = typeof window !== "undefined" && "PublicKeyCredential" in window;
+    const hasWebAuthn =
+      typeof window !== "undefined" && "PublicKeyCredential" in window;
     setIsPasskeySupported(hasWebAuthn);
   }, []);
 
@@ -108,7 +126,9 @@ export function MobileLoginForm() {
 
       if (result?.data?.user || result?.user) {
         setTimeout(() => {
-          router.replace(getRedirectTarget());
+          router.replace(getRedirectTarget(), undefined, {
+            messageContext: "AUTH_FLOW",
+          });
         }, 100);
       } else {
         setTimeout(() => {
@@ -152,6 +172,7 @@ export function MobileLoginForm() {
       if (Capacitor.isNativePlatform()) {
         await Browser.open({ url: authUrl });
       } else {
+        router.startRouteTransition({ messageContext: "AUTH_FLOW" });
         window.location.assign(authUrl);
       }
     } catch (error: any) {
@@ -226,7 +247,9 @@ export function MobileLoginForm() {
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <Smartphone className="h-7 w-7 text-primary" />
             </div>
-            <h1 className="text-xl font-semibold text-foreground">Mobile Sign In</h1>
+            <h1 className="text-xl font-semibold text-foreground">
+              Mobile Sign In
+            </h1>
             <p className="text-sm text-muted-foreground">
               Quick and secure access to Solace
             </p>
@@ -325,7 +348,8 @@ export function MobileLoginForm() {
             {!isPasskeySupported && (
               <div className="mt-4 p-3 rounded-lg bg-muted/50 text-center">
                 <p className="text-xs text-muted-foreground">
-                  Your device doesn&apos;t support passkeys. Use GitHub to sign in.
+                  Your device doesn&apos;t support passkeys. Use GitHub to sign
+                  in.
                 </p>
               </div>
             )}
@@ -337,27 +361,5 @@ export function MobileLoginForm() {
 }
 
 export function MobileLoginLoading() {
-  return (
-    <section className="min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom flex items-center justify-center px-4 py-6 sm:py-8 bg-background">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <Logo
-          width={56}
-          height={56}
-          className="text-primary"
-          aria-label="Solace"
-        />
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-            aria-hidden="true"
-          />
-          <span>Loading…</span>
-        </div>
-      </div>
-    </section>
-  );
+  return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
 }

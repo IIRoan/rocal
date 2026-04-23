@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -164,21 +164,12 @@ export function SubscriptionManagement({
     enabled: open,
   });
 
-  // Auto-open edit view when navigated here with a specific calendar ID
-  const [prevEditCalendarId, setPrevEditCalendarId] = useState(
-    initialEditCalendarId,
-  );
-  const [prevSubscriptionsLength, setPrevSubscriptionsLength] = useState(
-    subscriptions.length,
-  );
-  const editCalendarIdChanged = initialEditCalendarId !== prevEditCalendarId;
-  const subscriptionsLengthChanged =
-    subscriptions.length !== prevSubscriptionsLength;
-  if (editCalendarIdChanged || subscriptionsLengthChanged) {
-    if (editCalendarIdChanged) setPrevEditCalendarId(initialEditCalendarId);
-    if (subscriptionsLengthChanged)
-      setPrevSubscriptionsLength(subscriptions.length);
-
+  // Auto-open edit view when navigated here with a specific calendar ID.
+  // Using useEffect instead of the "during render" derived-state pattern so
+  // that cached React Query data (subscriptions already populated on mount)
+  // is handled correctly — the during-render approach missed the case where
+  // subscriptions.length never changes from its initial value.
+  useEffect(() => {
     if (
       currentView === "subscriptions-edit" &&
       initialEditCalendarId &&
@@ -200,7 +191,8 @@ export function SubscriptionManagement({
         setSuccess(null);
       }
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView, initialEditCalendarId, subscriptions]);
 
   // Mutations
   const createMutation = useMutation({
@@ -514,7 +506,10 @@ export function SubscriptionManagement({
   const content = (
     <div
       className="flex flex-col"
-      style={{ minHeight: "360px", maxHeight: "calc(100dvh - 200px)" }}
+      style={{
+        minHeight: currentView === "subscriptions-edit" ? undefined : "360px",
+        maxHeight: "calc(100dvh - 200px)",
+      }}
     >
       {/* ─── MAIN VIEW ─── */}
       {currentView === "subscriptions" && (

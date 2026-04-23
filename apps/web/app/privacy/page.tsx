@@ -136,6 +136,7 @@ export default function PrivacyPage() {
             alt="Solace — collaborate better"
             className="h-full w-full object-cover"
             fill
+            loading="eager"
             unoptimized
           />
           {/* Overlay gradient */}

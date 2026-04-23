@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { gsap } from "../../lib/gsap";
 import { cn } from "../../lib/utils";
 import { default as Logo } from "../layout/logo";
 import { useCyclingMessage } from "../../hooks/use-cycling-message";
+import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
 import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
 
 export const FORCE_LOADING_DESIGN_PREVIEW = false;
@@ -39,6 +41,9 @@ export function LogoSpinner({
   messageContext = "PAGE_LOAD",
   enableCycling = true,
 }: LogoSpinnerProps) {
+  const logoRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
@@ -62,6 +67,36 @@ export function LogoSpinner({
     xl: "h-24 w-24 rounded-[1.75rem]",
   };
 
+  useEffect(() => {
+    const logoNode = logoRef.current;
+
+    if (!logoNode) {
+      return;
+    }
+
+    gsap.killTweensOf(logoNode);
+
+    if (prefersReducedMotion) {
+      gsap.set(logoNode, { clearProps: "opacity,scale" });
+      return;
+    }
+
+    const tween = gsap.to(logoNode, {
+      opacity: 0.58,
+      scale: 1.04,
+      duration: 1.2,
+      ease: "sine.inOut",
+      repeat: -1,
+      yoyo: true,
+      transformOrigin: "center center",
+    });
+
+    return () => {
+      tween.kill();
+      gsap.set(logoNode, { clearProps: "opacity,scale" });
+    };
+  }, [prefersReducedMotion]);
+
   return (
     <div className={cn("flex flex-col items-center gap-3", className)}>
       <div
@@ -71,11 +106,12 @@ export function LogoSpinner({
         )}
       >
         <div className="absolute inset-[8px] rounded-[inherit] border border-border/50" />
-        <Logo
-          className={cn("relative text-primary animate-pulse", sizeClasses[size])}
-          fill="currentColor"
-          style={{ animationDuration: "2s" }}
-        />
+        <div ref={logoRef} className="relative">
+          <Logo
+            className={cn("relative text-primary", sizeClasses[size])}
+            fill="currentColor"
+          />
+        </div>
       </div>
 
       {showText && (
@@ -105,6 +141,8 @@ function LoadingBoard({
   messageContext = "PAGE_LOAD",
   enableCycling = true,
 }: LoadingBoardProps) {
+  const sweepRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [now] = useState<Date | null>(() => {
     const bootstrapDate = getBootstrapLoadingDate();
     if (bootstrapDate) {
@@ -123,6 +161,37 @@ function LoadingBoard({
   const dayNum = now ? now.getDate().toString().padStart(2, "0") : "";
   const monthName = now?.toLocaleDateString("en-US", { month: "long" }) || "";
   const year = now?.getFullYear().toString() || "";
+
+  useEffect(() => {
+    const sweepNode = sweepRef.current;
+
+    if (!sweepNode) {
+      return;
+    }
+
+    gsap.killTweensOf(sweepNode);
+
+    if (prefersReducedMotion) {
+      gsap.set(sweepNode, { clearProps: "transform" });
+      return;
+    }
+
+    const tween = gsap.fromTo(
+      sweepNode,
+      { xPercent: -120 },
+      {
+        xPercent: 120,
+        duration: 2.4,
+        ease: "sine.inOut",
+        repeat: -1,
+      },
+    );
+
+    return () => {
+      tween.kill();
+      gsap.set(sweepNode, { clearProps: "transform" });
+    };
+  }, [prefersReducedMotion]);
 
   return (
     <div className="relative flex h-full flex-col justify-between overflow-hidden p-8 sm:p-14">
@@ -177,13 +246,18 @@ function LoadingBoard({
         <p
           className={cn(
             "mb-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/40 transition-opacity duration-300",
-            isTransitioning && enableCycling && !message ? "opacity-20" : "opacity-100",
+            isTransitioning && enableCycling && !message
+              ? "opacity-20"
+              : "opacity-100",
           )}
         >
           {displayText}
         </p>
         <div className="relative h-px w-full overflow-hidden bg-border/40">
-          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-primary/80 to-transparent [animation:wave_2.4s_ease-in-out_infinite]" />
+          <div
+            ref={sweepRef}
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/80 to-transparent"
+          />
         </div>
       </div>
     </div>
@@ -197,6 +271,7 @@ interface PageLoadingOverlayProps {
   messageContext?: keyof typeof COMBINED_MESSAGES;
   className?: string;
   enableCycling?: boolean;
+  fadeDurationMs?: number;
   /** Render above other overlays (z-[10000] vs z-[9999]) */
   priority?: boolean;
 }
@@ -207,32 +282,57 @@ export function PageLoadingOverlay({
   messageContext = "PAGE_LOAD",
   className,
   enableCycling = true,
+  fadeDurationMs = 300,
   priority = false,
 }: PageLoadingOverlayProps) {
   const [visible, setVisible] = useState(isLoading);
-  const [fading, setFading] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     if (isLoading) {
       setVisible(true);
-      setFading(false);
-    } else {
-      setFading(true);
-      const t = setTimeout(() => setVisible(false), 300);
-      return () => clearTimeout(t);
+      return;
     }
-  }, [isLoading]);
+
+    if (prefersReducedMotion || fadeDurationMs <= 0) {
+      setVisible(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVisible(false);
+    }, fadeDurationMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [fadeDurationMs, isLoading, prefersReducedMotion]);
 
   if (!visible) return null;
 
+  const shouldAnimateOpacity = !prefersReducedMotion && fadeDurationMs > 0;
+
   return (
     <div
+      data-gsap-skip="true"
+      data-page-loading-overlay="true"
       className={cn(
         "fixed inset-0 bg-background",
         priority ? "z-[10000]" : "z-[9999]",
-        fading && "animate-out fade-out-0 fill-mode-forwards duration-300",
         className,
       )}
+      style={
+        shouldAnimateOpacity
+          ? {
+              opacity: isLoading ? 1 : 0,
+              pointerEvents: isLoading ? "auto" : "none",
+              transition: `opacity ${fadeDurationMs}ms ease`,
+              willChange: "opacity",
+            }
+          : isLoading
+            ? undefined
+            : { pointerEvents: "none" }
+      }
     >
       <LoadingBoard
         message={message}
@@ -259,6 +359,9 @@ export function InlineLogoSpinner({
   messageContext = "PAGE_LOAD",
   enableCycling = false,
 }: InlineLogoSpinnerProps) {
+  const logoRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   // Use cycling messages if no static text provided
   const { message, isTransitioning } = useCyclingMessage({
     context: messageContext,
@@ -273,13 +376,44 @@ export function InlineLogoSpinner({
     md: "h-6 w-6",
   };
 
+  useEffect(() => {
+    const logoNode = logoRef.current;
+
+    if (!logoNode) {
+      return;
+    }
+
+    gsap.killTweensOf(logoNode);
+
+    if (prefersReducedMotion) {
+      gsap.set(logoNode, { clearProps: "opacity,scale" });
+      return;
+    }
+
+    const tween = gsap.to(logoNode, {
+      opacity: 0.58,
+      scale: 1.04,
+      duration: 1.2,
+      ease: "sine.inOut",
+      repeat: -1,
+      yoyo: true,
+      transformOrigin: "center center",
+    });
+
+    return () => {
+      tween.kill();
+      gsap.set(logoNode, { clearProps: "opacity,scale" });
+    };
+  }, [prefersReducedMotion]);
+
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Logo
-        className={cn("text-primary animate-pulse", sizeClasses[size])}
-        fill="currentColor"
-        style={{ animationDuration: "2s" }}
-      />
+      <div ref={logoRef}>
+        <Logo
+          className={cn("text-primary", sizeClasses[size])}
+          fill="currentColor"
+        />
+      </div>
       <span
         className={cn(
           "text-sm text-muted-foreground transition-opacity duration-300",

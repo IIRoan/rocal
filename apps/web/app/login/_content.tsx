@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { signIn, signUp, authClient, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Github, Key, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
+import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
@@ -38,7 +41,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
 
   const { data: session, isPending } = useSession();
-  const router = useRouter();
+  const router = useSmoothRouter();
   const searchParams = useSearchParams();
   const { theme: currentTheme } = useTheme();
   const nextPath = searchParams.get("next");
@@ -53,13 +56,18 @@ export function LoginForm() {
   const redirectAfterAuth = useCallback(() => {
     const target = getRedirectTarget();
     setIsExiting(true);
-    setTimeout(() => {
-      if (target.external) {
-        window.location.replace(target.href);
-        return;
-      }
-      router.replace(target.href);
-    }, 220);
+    if (target.external) {
+      router.startRouteTransition({
+        messageContext: "AUTH_FLOW",
+        minimumVisibleMs: 120,
+      });
+      window.location.replace(target.href);
+      return;
+    }
+    router.replace(target.href, undefined, {
+      messageContext: "AUTH_FLOW",
+      minimumVisibleMs: 120,
+    });
   }, [getRedirectTarget, router]);
 
   const syncThemeAfterAuth = useCallback(async () => {
@@ -208,196 +216,167 @@ export function LoginForm() {
 
   return (
     <>
-      <section
-        className="min-h-[100dvh] flex"
-        style={isExiting ? {
-          opacity: 0,
-          transform: "translateY(12px) scale(0.985)",
-          transition: "opacity 220ms cubic-bezier(0.4,0,1,1), transform 220ms cubic-bezier(0.4,0,1,1)",
-        } : undefined}
-      >
-      {/* Left side - Form */}
-      <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
-        {/* Subtle gradient background */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
+      <section className="min-h-[100dvh] flex">
+        {/* Left side - Form */}
+        <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
+          {/* Subtle gradient background */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
 
-        <div className="relative z-10 mx-auto w-full max-w-md">
-          {/* Logo + Theme toggle */}
-          <div className="mb-10 flex items-center justify-between">
-            <Logo
-              width={44}
-              height={44}
-              className="text-primary"
-              aria-label="Solace"
-            />
-            <ThemeToggle />
-          </div>
+          <div className="relative z-10 mx-auto w-full max-w-md">
+            {/* Logo + Theme toggle */}
+            <div className="mb-10 flex items-center justify-between">
+              <Logo
+                width={44}
+                height={44}
+                className="text-primary"
+                aria-label="Solace"
+              />
+              <ThemeToggle />
+            </div>
 
-          {/* Heading */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {isSignUp ? "Create an account" : "Welcome back"}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isSignUp
-                ? "Sign up and get started with Solace"
-                : "Sign in to continue to Solace"}
-            </p>
-          </div>
+            {/* Heading */}
+            <div className="mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                {isSignUp ? "Create an account" : "Welcome back"}
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {isSignUp
+                  ? "Sign up and get started with Solace"
+                  : "Sign in to continue to Solace"}
+              </p>
+            </div>
 
-          <div>
-            {/* Error message */}
-            {error && (
-              <div
-                className="mb-5 rounded-lg bg-destructive/10 border border-destructive/20 p-3"
-                role="alert"
-              >
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
-            )}
+            <div>
+              {/* Error message */}
+              {error && (
+                <div
+                  className="mb-5 rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+                  role="alert"
+                >
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
 
-            {/* Email/Password form */}
-            <form onSubmit={handleEmailAuth} className="space-y-5">
-              {isSignUp && (
+              {/* Email/Password form */}
+              <form onSubmit={handleEmailAuth} className="space-y-5">
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium">
+                      Full name
+                    </Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      type="text"
+                      autoComplete="name"
+                      placeholder="Enter your name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required={isSignUp}
+                      disabled={emailLoading}
+                      className="h-11 rounded-lg"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium">
-                    Full name
+                  <Label htmlFor="email" className="text-sm font-medium">
+                    Email
                   </Label>
                   <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required={isSignUp}
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
                     disabled={emailLoading}
                     className="h-11 rounded-lg"
                   />
                 </div>
-              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={emailLoading}
-                  className="h-11 rounded-lg"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete={
-                      isSignUp ? "new-password" : "current-password"
-                    }
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={emailLoading}
-                    className="h-11 rounded-lg pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={emailLoading}
-                className="w-full h-11 rounded-lg font-medium mt-2"
-                aria-busy={emailLoading}
-              >
-                {emailLoading ? (
-                  <>
-                    <div
-                      className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
-                      aria-hidden="true"
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={
+                        isSignUp ? "new-password" : "current-password"
+                      }
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={emailLoading}
+                      className="h-11 rounded-lg pr-10"
                     />
-                    <span>
-                      {isSignUp ? "Creating account…" : "Signing in…"}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>{isSignUp ? "Create account" : "Sign in"}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </form>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground font-medium">
-                or continue with
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            {/* Social login buttons */}
-            <div className="flex gap-3">
-              <Button
-                onClick={handleGitHubLogin}
-                disabled={isLoading}
-                variant="outline"
-                className="flex-1 h-11 rounded-lg"
-                aria-busy={isLoading}
-              >
-                {isLoading ? (
-                  <div
-                    className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                    style={{ borderTopColor: "currentColor", opacity: 1 }}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <>
-                    <Github className="h-4 w-4" />
-                    <span>GitHub</span>
-                  </>
-                )}
-              </Button>
-
-              {isPasskeySupported && (
                 <Button
-                  onClick={handlePasskeyLogin}
-                  disabled={passkeyLoading}
+                  type="submit"
+                  disabled={emailLoading}
+                  className="w-full h-11 rounded-lg font-medium mt-2"
+                  aria-busy={emailLoading}
+                >
+                  {emailLoading ? (
+                    <>
+                      <div
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+                        aria-hidden="true"
+                      />
+                      <span>
+                        {isSignUp ? "Creating account…" : "Signing in…"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{isSignUp ? "Create account" : "Sign in"}</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 my-6">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">
+                  or continue with
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* Social login buttons */}
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleGitHubLogin}
+                  disabled={isLoading}
                   variant="outline"
                   className="flex-1 h-11 rounded-lg"
-                  aria-busy={passkeyLoading}
+                  aria-busy={isLoading}
                 >
-                  {passkeyLoading ? (
+                  {isLoading ? (
                     <div
                       className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
                       style={{ borderTopColor: "currentColor", opacity: 1 }}
@@ -405,97 +384,95 @@ export function LoginForm() {
                     />
                   ) : (
                     <>
-                      <Key className="h-4 w-4" />
-                      <span>Passkey</span>
+                      <Github className="h-4 w-4" />
+                      <span>GitHub</span>
                     </>
                   )}
                 </Button>
-              )}
+
+                {isPasskeySupported && (
+                  <Button
+                    onClick={handlePasskeyLogin}
+                    disabled={passkeyLoading}
+                    variant="outline"
+                    className="flex-1 h-11 rounded-lg"
+                    aria-busy={passkeyLoading}
+                  >
+                    {passkeyLoading ? (
+                      <div
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                        style={{ borderTopColor: "currentColor", opacity: 1 }}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <>
+                        <Key className="h-4 w-4" />
+                        <span>Passkey</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              {/* Toggle sign in / sign up */}
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                {isSignUp
+                  ? "Already have an account?"
+                  : "Don't have an account?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setError(null);
+                  }}
+                  className="font-medium text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
+                >
+                  {isSignUp ? "Sign in" : "Sign up"}
+                </button>
+              </p>
             </div>
 
-            {/* Toggle sign in / sign up */}
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setError(null);
-                }}
-                className="font-medium text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
+            {/* Footer links */}
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Before continuing, please read our{" "}
+              <Link
+                href="/privacy"
+                className="font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
-                {isSignUp ? "Sign in" : "Sign up"}
-              </button>
+                privacy commitments
+              </Link>
             </p>
           </div>
-
-          {/* Footer links */}
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Before continuing, please read our{" "}
-            <a
-              href="/privacy"
-              className="font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              privacy commitments
-            </a>
-          </p>
         </div>
-      </div>
 
-      {/* Right side - Wallpaper (hidden on mobile) */}
-      <div className="hidden lg:block lg:w-1/2 relative">
-        <div className="absolute inset-4 rounded-2xl overflow-hidden shadow-2xl">
-          <Image
-            src="/wallpaper.jpg"
-            alt="Solace — collaborate better"
-            className="h-full w-full object-cover"
-            fill
-            unoptimized
-          />
-          {/* Overlay gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+        {/* Right side - Wallpaper (hidden on mobile) */}
+        <div className="hidden lg:block lg:w-1/2 relative">
+          <div className="absolute inset-4 rounded-2xl overflow-hidden shadow-2xl">
+            <Image
+              src="/wallpaper.jpg"
+              alt="Solace — collaborate better"
+              className="h-full w-full object-cover"
+              fill
+              loading="eager"
+              unoptimized
+            />
+            {/* Overlay gradient */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
       {overlayVisible && (
-        <div
-          className={`fixed inset-0 z-50 flex items-center justify-center bg-background${overlayFading ? " animate-out fade-out-0 fill-mode-forwards duration-300" : ""}`}
-        >
-          <Logo
-            width={44}
-            height={44}
-            className="text-primary animate-pulse"
-            style={{ animationDuration: "2s" }}
-          />
-        </div>
+        <PageLoadingOverlay
+          isLoading={!overlayFading}
+          messageContext="AUTH_FLOW"
+          fadeDurationMs={300}
+        />
       )}
     </>
   );
 }
 
 export function LoginLoading() {
-  return (
-    <section className="min-h-[100dvh] flex items-center justify-center px-4 py-6 sm:py-8">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <Logo
-          width={56}
-          height={56}
-          className="text-primary"
-          aria-label="Solace"
-        />
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          <div
-            className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-            aria-hidden="true"
-          />
-          <span>Loading…</span>
-        </div>
-      </div>
-    </section>
-  );
+  return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
 }

@@ -35,6 +35,7 @@ function DrawerOverlay({
 }: React.ComponentProps<typeof DrawerPrimitive.Overlay>) {
   return (
     <DrawerPrimitive.Overlay
+      forceMount
       data-slot="drawer-overlay"
       className={cn(
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 supports-[backdrop-filter]:backdrop-blur-sm",
@@ -54,6 +55,7 @@ function DrawerContent({
     <DrawerPortal data-slot="drawer-portal">
       <DrawerOverlay />
       <DrawerPrimitive.Content
+        forceMount
         data-slot="drawer-content"
         className={cn(
           "group/drawer-content bg-background fixed z-50 flex h-auto flex-col",
