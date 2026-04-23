@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   createContext,
   useCallback,
   useContext,
@@ -47,7 +48,11 @@ const RouteTransitionContext = createContext<
   RouteTransitionContextValue | undefined
 >(undefined);
 
-export function RouteTransitionProvider({ children }: { children: ReactNode }) {
+function RouteTransitionRouteTracker({
+  onRouteKeyChange,
+}: {
+  onRouteKeyChange: (routeKey: string) => void;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const routeKey = useMemo(() => {
@@ -55,8 +60,17 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
     return search ? `${pathname}?${search}` : pathname;
   }, [pathname, searchParams]);
 
-  const currentRouteKeyRef = useRef(routeKey);
-  const previousRouteKeyRef = useRef(routeKey);
+  useEffect(() => {
+    onRouteKeyChange(routeKey);
+  }, [onRouteKeyChange, routeKey]);
+
+  return null;
+}
+
+export function RouteTransitionProvider({ children }: { children: ReactNode }) {
+  const [routeKey, setRouteKey] = useState<string | null>(null);
+  const currentRouteKeyRef = useRef<string | null>(null);
+  const previousRouteKeyRef = useRef<string | null>(null);
   const didHydrateRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
   const unmountTimerRef = useRef<number | null>(null);
@@ -69,6 +83,11 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
     startedAt: 0,
     minimumVisibleMs: DEFAULT_MINIMUM_VISIBLE_MS,
   });
+  const handleRouteKeyChange = useCallback((nextRouteKey: string) => {
+    setRouteKey((currentRouteKey) =>
+      currentRouteKey === nextRouteKey ? currentRouteKey : nextRouteKey,
+    );
+  }, []);
 
   const clearTimers = useCallback(() => {
     if (hideTimerRef.current !== null) {
@@ -140,6 +159,10 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   }, [clearTimers]);
 
   useEffect(() => {
+    if (routeKey === null) {
+      return;
+    }
+
     currentRouteKeyRef.current = routeKey;
   }, [routeKey]);
 
@@ -163,6 +186,10 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   }, [overlayState.active, overlayState.mounted]);
 
   useEffect(() => {
+    if (routeKey === null) {
+      return;
+    }
+
     if (!didHydrateRef.current) {
       didHydrateRef.current = true;
       previousRouteKeyRef.current = routeKey;
@@ -246,11 +273,17 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const currentRouteKey =
+        currentRouteKeyRef.current ??
+        (window.location.search
+          ? `${window.location.pathname}${window.location.search}`
+          : window.location.pathname);
+
       const nextRouteKey = nextUrl.search
         ? `${nextUrl.pathname}${nextUrl.search}`
         : nextUrl.pathname;
 
-      if (nextRouteKey === currentRouteKeyRef.current) {
+      if (nextRouteKey === currentRouteKey) {
         return;
       }
 
@@ -258,11 +291,16 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
     };
 
     const handlePopState = () => {
+      const currentRouteKey =
+        currentRouteKeyRef.current ??
+        (window.location.search
+          ? `${window.location.pathname}${window.location.search}`
+          : window.location.pathname);
       const nextRouteKey = window.location.search
         ? `${window.location.pathname}${window.location.search}`
         : window.location.pathname;
 
-      if (nextRouteKey === currentRouteKeyRef.current) {
+      if (nextRouteKey === currentRouteKey) {
         return;
       }
 
@@ -295,6 +333,9 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
 
   return (
     <RouteTransitionContext.Provider value={contextValue}>
+      <Suspense fallback={null}>
+        <RouteTransitionRouteTracker onRouteKeyChange={handleRouteKeyChange} />
+      </Suspense>
       {children}
       {overlayState.mounted ? (
         <PageLoadingOverlay
