@@ -514,8 +514,8 @@ describe("notificationsRoutes", () => {
       where: { id: "event-1" },
       data: expect.objectContaining({
         reminder: null,
-        encryptionState: "shadow_write",
-        title: "Planning",
+        encryptionState: "encrypted",
+        title: "",
       }),
     });
     await expect(deleteResponse.json()).resolves.toEqual({
