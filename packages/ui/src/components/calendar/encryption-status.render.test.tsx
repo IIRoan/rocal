@@ -24,6 +24,7 @@ jest.mock("lucide-react", () => {
 
   return {
     Lock: makeIcon("lock"),
+    ShieldAlert: makeIcon("shield-alert"),
     ShieldCheck: makeIcon("shield-check"),
   };
 });
