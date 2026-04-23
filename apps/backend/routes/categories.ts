@@ -1,6 +1,10 @@
 import { Elysia, t } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import type { AuthenticatedUser } from "../lib/auth-utils";
+import {
+  rowEncryptionStateSchema,
+  type RowEncryptionState,
+} from "../lib/encryption-state";
 import { strictObject } from "../lib/validation";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
@@ -44,7 +48,14 @@ export const categoriesRoutes = new Elysia({
           authenticatedUser,
           request,
         }: {
-          body: { name: string; color: string };
+          body: {
+            name: string;
+            color: string;
+            encryptedName?: string;
+            blindIndexTokens?: string[];
+            encryptionState?: RowEncryptionState;
+            encryptionKeyVersion?: number;
+          };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
         }) => {
@@ -53,6 +64,10 @@ export const categoriesRoutes = new Elysia({
             userId: user.id,
             name: body.name,
             color: body.color,
+            encryptedName: body.encryptedName,
+            blindIndexTokens: body.blindIndexTokens,
+            encryptionState: body.encryptionState,
+            encryptionKeyVersion: body.encryptionKeyVersion,
           });
         },
         {
@@ -66,6 +81,25 @@ export const categoriesRoutes = new Elysia({
                 "Display color for the category. Hex values are recommended for predictable rendering.",
               examples: ["#0f766e", "#dc2626", "#2563eb"],
             }),
+            encryptedName: t.Optional(
+              t.String({
+                description: "Client-encrypted shadow copy of the category name.",
+              }),
+            ),
+            blindIndexTokens: t.Optional(
+              t.Array(
+                t.String({
+                  description: "Blind-index token hash for encrypted search rollout.",
+                }),
+              ),
+            ),
+            encryptionState: t.Optional(rowEncryptionStateSchema),
+            encryptionKeyVersion: t.Optional(
+              t.Number({
+                minimum: 1,
+                description: "Client-managed encryption key version.",
+              }),
+            ),
           }),
           detail: {
             summary: "Create a category",
@@ -84,7 +118,14 @@ export const categoriesRoutes = new Elysia({
           request,
         }: {
           params: { id: string };
-          body: { name?: string; color?: string };
+          body: {
+            name?: string;
+            color?: string;
+            encryptedName?: string;
+            blindIndexTokens?: string[];
+            encryptionState?: RowEncryptionState;
+            encryptionKeyVersion?: number;
+          };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
         }) => {
@@ -94,6 +135,10 @@ export const categoriesRoutes = new Elysia({
             categoryId: params.id,
             name: body.name,
             color: body.color,
+            encryptedName: body.encryptedName,
+            blindIndexTokens: body.blindIndexTokens,
+            encryptionState: body.encryptionState,
+            encryptionKeyVersion: body.encryptionKeyVersion,
           });
         },
         {
@@ -111,6 +156,25 @@ export const categoriesRoutes = new Elysia({
             color: t.Optional(
               t.String({
                 description: "Updated category color.",
+              }),
+            ),
+            encryptedName: t.Optional(
+              t.String({
+                description: "Client-encrypted shadow copy of the category name.",
+              }),
+            ),
+            blindIndexTokens: t.Optional(
+              t.Array(
+                t.String({
+                  description: "Blind-index token hash for encrypted search rollout.",
+                }),
+              ),
+            ),
+            encryptionState: t.Optional(rowEncryptionStateSchema),
+            encryptionKeyVersion: t.Optional(
+              t.Number({
+                minimum: 1,
+                description: "Client-managed encryption key version.",
               }),
             ),
           }),

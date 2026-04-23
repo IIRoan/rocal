@@ -38,7 +38,15 @@ export class CategoryService implements ICategoryService {
   }
 
   async create(input: CategoryCreateInput) {
-    const { userId, name, color } = input;
+    const {
+      userId,
+      name,
+      color,
+      encryptedName,
+      blindIndexTokens,
+      encryptionState,
+      encryptionKeyVersion,
+    } = input;
 
     if (!name || !color) {
       throw new Error("Name and color are required fields");
@@ -61,6 +69,14 @@ export class CategoryService implements ICategoryService {
     return this.prisma.eventCategory.create({
       data: {
         name: name.trim(),
+        ...(encryptedName !== undefined ? { encryptedName } : {}),
+        ...(blindIndexTokens !== undefined
+          ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
+          : {}),
+        ...(encryptionState !== undefined ? { encryptionState } : {}),
+        ...(encryptionKeyVersion !== undefined
+          ? { encryptionKeyVersion }
+          : {}),
         color,
         userId,
       },
@@ -68,7 +84,16 @@ export class CategoryService implements ICategoryService {
   }
 
   async update(input: CategoryUpdateInput) {
-    const { userId, categoryId, name, color } = input;
+    const {
+      userId,
+      categoryId,
+      name,
+      color,
+      encryptedName,
+      blindIndexTokens,
+      encryptionState,
+      encryptionKeyVersion,
+    } = input;
 
     const existingCategory = await this.prisma.eventCategory.findFirst({
       where: { id: categoryId, userId },
@@ -103,6 +128,14 @@ export class CategoryService implements ICategoryService {
       data: {
         ...(name !== undefined ? { name: name.trim() } : {}),
         ...(color !== undefined ? { color } : {}),
+        ...(encryptedName !== undefined ? { encryptedName } : {}),
+        ...(blindIndexTokens !== undefined
+          ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
+          : {}),
+        ...(encryptionState !== undefined ? { encryptionState } : {}),
+        ...(encryptionKeyVersion !== undefined
+          ? { encryptionKeyVersion }
+          : {}),
       },
     });
   }

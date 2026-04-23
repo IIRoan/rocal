@@ -170,6 +170,10 @@ exports.Prisma.VerificationScalarFieldEnum = {
 exports.Prisma.CalendarScalarFieldEnum = {
   id: 'id',
   name: 'name',
+  encryptedName: 'encryptedName',
+  blindIndexTokens: 'blindIndexTokens',
+  encryptionState: 'encryptionState',
+  encryptionKeyVersion: 'encryptionKeyVersion',
   color: 'color',
   kind: 'kind',
   isPublic: 'isPublic',
@@ -186,6 +190,10 @@ exports.Prisma.CalendarScalarFieldEnum = {
 exports.Prisma.EventCategoryScalarFieldEnum = {
   id: 'id',
   name: 'name',
+  encryptedName: 'encryptedName',
+  blindIndexTokens: 'blindIndexTokens',
+  encryptionState: 'encryptionState',
+  encryptionKeyVersion: 'encryptionKeyVersion',
   color: 'color',
   isActive: 'isActive',
   userId: 'userId',
@@ -197,6 +205,10 @@ exports.Prisma.CalendarEventScalarFieldEnum = {
   id: 'id',
   title: 'title',
   description: 'description',
+  encryptedContent: 'encryptedContent',
+  blindIndexTokens: 'blindIndexTokens',
+  encryptionState: 'encryptionState',
+  encryptionKeyVersion: 'encryptionKeyVersion',
   start: 'start',
   end: 'end',
   allDay: 'allDay',
@@ -242,6 +254,7 @@ exports.Prisma.UserSettingsScalarFieldEnum = {
   emailNotifications: 'emailNotifications',
   browserNotifications: 'browserNotifications',
   reminderSound: 'reminderSound',
+  eventEncryptionMode: 'eventEncryptionMode',
   defaultReminder: 'defaultReminder',
   defaultEventDuration: 'defaultEventDuration',
   defaultCalendarId: 'defaultCalendarId',
@@ -312,6 +325,36 @@ exports.Prisma.PasskeyScalarFieldEnum = {
   aaguid: 'aaguid'
 };
 
+exports.Prisma.UserEncryptionDeviceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  deviceId: 'deviceId',
+  deviceLabel: 'deviceLabel',
+  publicKey: 'publicKey',
+  publicKeyAlgorithm: 'publicKeyAlgorithm',
+  wrappedAccountKey: 'wrappedAccountKey',
+  wrappedSearchKey: 'wrappedSearchKey',
+  wrapAlgorithm: 'wrapAlgorithm',
+  keyVersion: 'keyVersion',
+  lastSeenAt: 'lastSeenAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserEncryptionPasswordScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  kdfAlgorithm: 'kdfAlgorithm',
+  kdfSalt: 'kdfSalt',
+  kdfIterations: 'kdfIterations',
+  wrappedAccountKey: 'wrappedAccountKey',
+  wrappedSearchKey: 'wrappedSearchKey',
+  wrapAlgorithm: 'wrapAlgorithm',
+  keyVersion: 'keyVersion',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.CalendarSubscriptionScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -374,6 +417,8 @@ exports.Prisma.ModelName = {
   EventNotification: 'EventNotification',
   NotificationLog: 'NotificationLog',
   Passkey: 'Passkey',
+  UserEncryptionDevice: 'UserEncryptionDevice',
+  UserEncryptionPassword: 'UserEncryptionPassword',
   CalendarSubscription: 'CalendarSubscription',
   CalendarSyncLog: 'CalendarSyncLog'
 };

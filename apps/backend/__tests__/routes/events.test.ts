@@ -46,6 +46,8 @@ jest.mock("../../lib/prisma", () => ({
     userSettings: {
       findUnique: jest.fn(async (): Promise<any> => ({
         timezone: "UTC",
+        eventEncryptionMode: "hybrid",
+        emailNotifications: true,
       })),
     },
   },
@@ -134,6 +136,7 @@ const ownedCalendar = {
   color: "blue",
   kind: "owned",
   isSyncOnly: false,
+  icsShareEnabled: false,
   userId: "user-1",
 };
 
@@ -255,6 +258,132 @@ describe("eventsRoutes – color validation", () => {
       );
     });
 
+    it("persists encrypted shadow fields when provided on create", async () => {
+      mockPrisma.calendarEvent.create.mockResolvedValue({
+        id: "event-enc-1",
+        ...validEventBody,
+        title: "Test Event",
+        description: null,
+        location: null,
+        color: null,
+        encryptedContent: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-1", "idx-2"]),
+        encryptionState: "shadow_write",
+        encryptionKeyVersion: 2,
+        userId: "user-1",
+        category: null,
+        calendar: ownedCalendar,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            encryptedContent: "ciphertext",
+            blindIndexTokens: ["idx-1", "idx-2"],
+            encryptionKeyVersion: 2,
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: "",
+            description: null,
+            location: null,
+            encryptedContent: "ciphertext",
+            blindIndexTokens: JSON.stringify(["idx-1", "idx-2"]),
+            encryptionState: "encrypted",
+            encryptionKeyVersion: 2,
+          }),
+        }),
+      );
+    });
+
+    it("rejects client-controlled encryptionState on create", async () => {
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            encryptionState: "encrypted",
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(422);
+      await expect(readText(response)).resolves.toContain(
+        "Property 'encryptionState' should not be provided",
+      );
+      expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
+    });
+
+    it("keeps plaintext shadow fields when a reminder requires readable content", async () => {
+      mockPrisma.calendarEvent.create.mockResolvedValue({
+        id: "event-reminder-1",
+        ...validEventBody,
+        color: null,
+        encryptedContent: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-1"]),
+        encryptionState: "shadow_write",
+        encryptionKeyVersion: 1,
+        reminder: 30,
+        userId: "user-1",
+        category: null,
+        calendar: ownedCalendar,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            reminder: 30,
+            encryptedContent: "ciphertext",
+            blindIndexTokens: ["idx-1"],
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: "Test Event",
+            encryptionState: "shadow_write",
+            reminder: 30,
+          }),
+        }),
+      );
+    });
+
+    it("rejects full mode event creation without encrypted content", async () => {
+      mockPrisma.userSettings.findUnique.mockResolvedValueOnce({
+        timezone: "UTC",
+        eventEncryptionMode: "full",
+        emailNotifications: true,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(validEventBody),
+        }),
+      );
+
+      expect(response.status).toBe(500);
+      await expect(readText(response)).resolves.toBe(
+        "Full event encryption requires an active encryption session.",
+      );
+    });
+
     it.each(["chartreuse", "BLUE", "rgb(0,0,0)", "#GGGGGG", "#12345"])(
       "rejects invalid color '%s'",
       async (color) => {
@@ -292,12 +421,17 @@ describe("eventsRoutes – color validation", () => {
     const existingEvent = {
       id: "event-1",
       title: "Test Event",
+      description: "Discuss roadmap",
+      location: "Room 7",
       start: new Date("2026-05-01T10:00:00.000Z"),
       end: new Date("2026-05-01T11:00:00.000Z"),
       color: "blue",
       calendarId: "cal-1",
       userId: "user-1",
       isSynced: false,
+      encryptedContent: "ciphertext",
+      encryptionState: "shadow_write",
+      reminder: null,
       recurrence: null,
       parentEventId: null,
       updatedAt: new Date("2026-04-01T00:00:00.000Z"),
@@ -323,6 +457,64 @@ describe("eventsRoutes – color validation", () => {
       );
 
       expect(response.status).toBe(200);
+    });
+
+    it("persists encrypted shadow fields on update", async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
+      mockPrisma.calendarEvent.update.mockResolvedValue({
+        ...existingEvent,
+        encryptedContent: "ciphertext",
+        blindIndexTokens: JSON.stringify(["idx-1"]),
+        encryptionState: "shadow_write",
+        encryptionKeyVersion: 2,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/event-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            encryptedContent: "ciphertext",
+            blindIndexTokens: ["idx-1"],
+            encryptionKeyVersion: 2,
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: "",
+            description: null,
+            location: null,
+            encryptedContent: "ciphertext",
+            blindIndexTokens: JSON.stringify(["idx-1"]),
+            encryptionState: "encrypted",
+            encryptionKeyVersion: 2,
+          }),
+        }),
+      );
+    });
+
+    it("rejects client-controlled encryptionState on update", async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue(existingEvent);
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/event-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            encryptionState: "plaintext",
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(422);
+      await expect(readText(response)).resolves.toContain(
+        "Property 'encryptionState' should not be provided",
+      );
+      expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
     });
 
     it("accepts valid hex color on update", async () => {

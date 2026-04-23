@@ -11,6 +11,7 @@ import type { UserSettings } from "@/lib/types/calendar";
 import {
   NotificationManager,
   formatEventDescription,
+  EncryptionStatusBadge,
 } from "@workspace/ui/components/calendar";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
@@ -92,6 +93,11 @@ import {
 import { Calendar as CalendarUI } from "@workspace/ui/components/ui/calendar";
 import { Switch } from "@workspace/ui/components/ui/switch";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/ui/tooltip";
+import {
   Bell,
   RotateCcw,
   CalendarIcon,
@@ -107,6 +113,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Download,
+  RefreshCw,
 } from "lucide-react";
 
 import type { EventEditorMode } from "./command-palette-context";
@@ -301,6 +308,13 @@ export function EventEditor({
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
             <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
               <h2 className="text-base font-semibold">{dialogTitle}</h2>
+              {eventForm.selectedEvent?.id && !isViewMode && (
+                <EncryptionStatusBadge
+                  item={eventForm.selectedEvent}
+                  className="ml-2"
+                  showLabel
+                />
+              )}
             </div>
             <MobileEventEditorBody
               eventForm={eventForm}
@@ -366,6 +380,13 @@ export function EventEditor({
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">{dialogTitle}</span>
+          {eventForm.selectedEvent?.id && !isViewMode && (
+            <EncryptionStatusBadge
+              item={eventForm.selectedEvent}
+              className="ml-1"
+              showLabel
+            />
+          )}
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -458,6 +479,13 @@ export function EventEditor({
             <Plus className="h-4 w-4 text-muted-foreground ml-1" />
           )}
           <span className="text-sm font-medium">{dialogTitle}</span>
+          {eventForm.selectedEvent?.id && !isViewMode && (
+            <EncryptionStatusBadge
+              item={eventForm.selectedEvent}
+              className="ml-1"
+              showLabel
+            />
+          )}
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -705,6 +733,13 @@ function EventEditorPopover({
             <Plus className="h-4 w-4 text-muted-foreground ml-1" />
           )}
           <span className="text-sm font-medium">{dialogTitle}</span>
+          {eventForm.selectedEvent?.id && !isViewMode && (
+            <EncryptionStatusBadge
+              item={eventForm.selectedEvent}
+              className="ml-1"
+              showLabel
+            />
+          )}
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -819,10 +854,29 @@ function MobileEventEditorBody({
               <span className="text-sm font-medium truncate block">
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
-              {eventForm.selectedEvent?.isSynced && (
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary mt-0.5">
-                  Synced
-                </span>
+              {eventForm.selectedEvent?.id && (
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {eventForm.selectedEvent.isSynced && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          aria-label="Synced from external calendar"
+                          className="inline-flex items-center justify-center shrink-0 cursor-default"
+                        >
+                          <RefreshCw
+                            className="h-3 w-3 text-foreground/55"
+                            strokeWidth={2.25}
+                            aria-hidden
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Synced from external calendar
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  <EncryptionStatusBadge item={eventForm.selectedEvent} />
+                </div>
               )}
             </div>
           </div>
@@ -1297,7 +1351,6 @@ function MobileEventEditorBody({
                       notifications={eventForm.eventNotifications}
                       onChange={eventForm.handleNotificationChange}
                       loading={eventForm.notificationsLoading}
-                      defaultReminder={localSettings?.defaultReminder}
                     />
                   </div>
                 </div>

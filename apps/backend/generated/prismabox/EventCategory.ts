@@ -8,6 +8,10 @@ export const EventCategoryPlain = t.Object(
   {
     id: t.String(),
     name: t.String(),
+    encryptedName: __nullable__(t.String()),
+    blindIndexTokens: __nullable__(t.String()),
+    encryptionState: t.String(),
+    encryptionKeyVersion: t.Integer(),
     color: t.String(),
     isActive: t.Boolean(),
     userId: t.String(),
@@ -37,6 +41,10 @@ export const EventCategoryRelations = t.Object(
           id: t.String(),
           title: t.String(),
           description: __nullable__(t.String()),
+          encryptedContent: __nullable__(t.String()),
+          blindIndexTokens: __nullable__(t.String()),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           start: t.Date(),
           end: t.Date(),
           allDay: t.Boolean(),
@@ -66,13 +74,25 @@ export const EventCategoryRelations = t.Object(
 );
 
 export const EventCategoryPlainInputCreate = t.Object(
-  { name: t.String(), color: t.String(), isActive: t.Optional(t.Boolean()) },
+  {
+    name: t.String(),
+    encryptedName: t.Optional(__nullable__(t.String())),
+    blindIndexTokens: t.Optional(__nullable__(t.String())),
+    encryptionState: t.Optional(t.String()),
+    encryptionKeyVersion: t.Optional(t.Integer()),
+    color: t.String(),
+    isActive: t.Optional(t.Boolean()),
+  },
   { additionalProperties: false },
 );
 
 export const EventCategoryPlainInputUpdate = t.Object(
   {
     name: t.Optional(t.String()),
+    encryptedName: t.Optional(__nullable__(t.String())),
+    blindIndexTokens: t.Optional(__nullable__(t.String())),
+    encryptionState: t.Optional(t.String()),
+    encryptionKeyVersion: t.Optional(t.Integer()),
     color: t.Optional(t.String()),
     isActive: t.Optional(t.Boolean()),
   },
@@ -166,6 +186,10 @@ export const EventCategoryWhere = t.Partial(
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
           name: t.String(),
+          encryptedName: t.String(),
+          blindIndexTokens: t.String(),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           color: t.String(),
           isActive: t.Boolean(),
           userId: t.String(),
@@ -226,6 +250,10 @@ export const EventCategoryWhereUnique = t.Recursive(
             {
               id: t.String(),
               name: t.String(),
+              encryptedName: t.String(),
+              blindIndexTokens: t.String(),
+              encryptionState: t.String(),
+              encryptionKeyVersion: t.Integer(),
               color: t.String(),
               isActive: t.Boolean(),
               userId: t.String(),
@@ -246,6 +274,10 @@ export const EventCategorySelect = t.Partial(
     {
       id: t.Boolean(),
       name: t.Boolean(),
+      encryptedName: t.Boolean(),
+      blindIndexTokens: t.Boolean(),
+      encryptionState: t.Boolean(),
+      encryptionKeyVersion: t.Boolean(),
       color: t.Boolean(),
       isActive: t.Boolean(),
       userId: t.Boolean(),
@@ -273,6 +305,18 @@ export const EventCategoryOrderBy = t.Partial(
         additionalProperties: false,
       }),
       name: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      encryptedName: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      blindIndexTokens: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      encryptionState: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      encryptionKeyVersion: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       color: t.Union([t.Literal("asc"), t.Literal("desc")], {

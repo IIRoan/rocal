@@ -45,9 +45,29 @@ export type EventColor =
   | "teal"
   | string;
 
+export type EncryptionState = "plaintext" | "shadow_write" | "encrypted";
+export type EventEncryptionMode = "hybrid" | "full";
+
+export interface NameEncryptionShadowRequest {
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+}
+
+export interface EventContentEncryptionShadowRequest {
+  encryptedContent?: string;
+  blindIndexTokens?: string[];
+  encryptionKeyVersion?: number;
+}
+
 export interface Calendar {
   id: string;
   name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
   color: EventColor;
   kind: CalendarKind;
   isPublic: boolean;
@@ -63,6 +83,10 @@ export interface CalendarEvent {
   id: string;
   title: string;
   description?: string | null;
+  encryptedContent?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
   start: Date;
   end: Date;
   timezone?: string | null;
@@ -91,6 +115,10 @@ export interface CalendarEvent {
 export interface EventCategory {
   id: string;
   name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
   color: string;
   isActive: boolean;
   userId: string;
@@ -114,7 +142,7 @@ export interface CategoriesResponse {
   categories: EventCategory[];
 }
 
-export interface CreateEventRequest {
+export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
   description?: string;
   start: string; // ISO date string
@@ -129,7 +157,7 @@ export interface CreateEventRequest {
   recurrence?: string; // JSON string of recurrence rule
 }
 
-export interface CreateCalendarRequest {
+export interface CreateCalendarRequest extends NameEncryptionShadowRequest {
   name: string;
   color: EventColor;
   isDefault?: boolean;
@@ -143,7 +171,7 @@ export interface UpdateEventRequest extends Partial<CreateEventRequest> {
   id?: string;
 }
 
-export interface CreateCategoryRequest {
+export interface CreateCategoryRequest extends NameEncryptionShadowRequest {
   name: string;
   color: EventColor;
 }
@@ -181,7 +209,7 @@ export interface UserSettings {
   emailNotifications: boolean;
   browserNotifications: boolean;
   reminderSound: boolean;
-  defaultReminder?: number | null; // default reminder in minutes
+  eventEncryptionMode: EventEncryptionMode;
   defaultEventDuration: number; // default event duration in minutes
   defaultCalendarId?: string | null;
   compactView: boolean;
@@ -321,3 +349,140 @@ export type CreateCalendarShareLinkRequestPayload =
   CreateCalendarShareLinkRequest;
 export type DisableCalendarShareLinkResponsePayload =
   DisableCalendarShareLinkResponse;
+
+export interface E2eeDeviceRecord {
+  id: string;
+  userId: string;
+  deviceId: string;
+  deviceLabel: string | null;
+  publicKey: string;
+  publicKeyAlgorithm: string;
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  wrapAlgorithm: string;
+  keyVersion: number;
+  lastSeenAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eePasswordRecord {
+  id: string;
+  userId: string;
+  kdfAlgorithm: string;
+  kdfSalt: string;
+  kdfIterations: number;
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  wrapAlgorithm: string;
+  keyVersion: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeBootstrapCalendar {
+  id: string;
+  name: string;
+  encryptedName: string | null;
+  blindIndexTokens: string[];
+  encryptionState: EncryptionState;
+  encryptionKeyVersion: number;
+  color: EventColor;
+  kind: CalendarKind;
+  isDefault: boolean;
+  isVisible: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeBootstrapResponse {
+  enabled: boolean;
+  rolloutStage: "shadow_write";
+  algorithms: {
+    content: "AES-GCM-256";
+    blindIndex: "HMAC-SHA-256";
+    wrapping: string;
+    passwordWrapping: string;
+  };
+  devices: E2eeDeviceRecord[];
+  passwordEnvelope: E2eePasswordRecord | null;
+  calendars: E2eeBootstrapCalendar[];
+}
+
+export interface E2eeResetSnapshotCalendar {
+  id: string;
+  name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+  color: EventColor;
+  kind: CalendarKind;
+  isDefault: boolean;
+  isVisible: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeResetSnapshotCategory {
+  id: string;
+  name: string;
+  encryptedName?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+  color: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeResetSnapshotEvent {
+  id: string;
+  title: string;
+  description?: string | null;
+  encryptedContent?: string | null;
+  blindIndexTokens?: string[] | null;
+  encryptionState?: EncryptionState;
+  encryptionKeyVersion?: number;
+  start: Date;
+  end: Date;
+  timezone?: string | null;
+  allDay: boolean;
+  location?: string | null;
+  color?: string | null;
+  calendarId: string;
+  categoryId?: string | null;
+  reminder?: number | null;
+  recurrence?: string | null;
+  parentEventId?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface E2eeResetSnapshotResponse {
+  calendars: E2eeResetSnapshotCalendar[];
+  categories: E2eeResetSnapshotCategory[];
+  events: E2eeResetSnapshotEvent[];
+}
+
+export interface UpsertE2eeDeviceRequest {
+  deviceId: string;
+  deviceLabel?: string;
+  publicKey: string;
+  publicKeyAlgorithm?: string;
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  wrapAlgorithm?: string;
+  keyVersion?: number;
+}
+
+export interface UpsertE2eePasswordRequest {
+  kdfAlgorithm?: string;
+  kdfSalt: string;
+  kdfIterations?: number;
+  wrappedAccountKey: string;
+  wrappedSearchKey: string;
+  wrapAlgorithm?: string;
+  keyVersion?: number;
+}

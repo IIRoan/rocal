@@ -15,7 +15,10 @@ import {
   type PaletteView,
   type PresetColor,
 } from "./command-palette/index";
-import { getColorSwatchValue } from "@workspace/ui/components/calendar";
+import {
+  EncryptionStatusBadge,
+  getColorSwatchValue,
+} from "@workspace/ui/components/calendar";
 
 import {
   Dialog,
@@ -273,7 +276,9 @@ export function CalendarManager({
                         style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm truncate">{calendar.name}</div>
+                        <div className="text-sm truncate">
+                          {calendar.name}
+                        </div>
                         {calendar.isSyncOnly ? (
                           <div className="text-xs text-muted-foreground">
                             Synced (read-only)
@@ -284,6 +289,10 @@ export function CalendarManager({
                           </div>
                         ) : null}
                       </div>
+                      <EncryptionStatusBadge
+                        item={calendar}
+                        className="opacity-80"
+                      />
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />                    </button>
                   ))}
                 </div>
@@ -313,6 +322,10 @@ export function CalendarManager({
                               Public holiday calendar
                             </div>
                           </div>
+                          <EncryptionStatusBadge
+                            item={calendar}
+                            className="opacity-80"
+                          />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                         </button>
                       ))}
@@ -345,6 +358,10 @@ export function CalendarManager({
                               External subscription
                             </div>
                           </div>
+                          <EncryptionStatusBadge
+                            item={calendar}
+                            className="opacity-80"
+                          />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                         </button>
                       ))}
@@ -519,6 +536,13 @@ export function CalendarManager({
                     <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                   </button>
                   <span className="text-sm font-medium">Edit Calendar</span>
+                  {editingCalendar && (
+                    <EncryptionStatusBadge
+                      item={editingCalendar}
+                      className="ml-auto"
+                      showLabel
+                    />
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">

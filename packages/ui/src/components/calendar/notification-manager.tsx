@@ -49,7 +49,6 @@ interface NotificationManagerProps {
   notifications: EventNotification[];
   onChange: (notifications: EventNotification[]) => void;
   loading?: boolean;
-  defaultReminder?: number | null;
 }
 
 function ReminderRow({
@@ -160,7 +159,6 @@ export function NotificationManager({
   notifications,
   onChange,
   loading = false,
-  defaultReminder = null,
 }: NotificationManagerProps) {
   const isMobile = useIsMobile();
 
@@ -185,22 +183,6 @@ export function NotificationManager({
 
   return (
     <div className="space-y-1">
-      {/* Default reminder */}
-      {defaultReminder && (
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-primary/10">
-            <Bell className="h-4 w-4 text-primary" />
-          </div>
-          <div className="flex-1 flex items-center justify-between px-3 h-9 rounded-lg bg-muted/30">
-            <span className="text-sm font-medium text-foreground">
-              {formatTimeShort(defaultReminder)} before
-            </span>
-            <span className="text-muted-foreground text-xs">(default)</span>
-          </div>
-        </div>
-      )}
-
-      {/* Custom reminders */}
       {notifications.map((notification, index) => (
         <ReminderRow
           key={index}

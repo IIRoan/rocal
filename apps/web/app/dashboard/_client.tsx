@@ -399,7 +399,6 @@ function MobileLayoutContent() {
       showWeekNumbers={settings?.showWeekNumbers}
       compactView={settings?.compactView}
       timeFormat={settings?.timeFormat}
-      defaultReminder={settings?.defaultReminder}
       defaultEventDuration={settings?.defaultEventDuration}
       defaultCalendarId={settings?.defaultCalendarId}
       weekStartDay={settings?.weekStartDay}

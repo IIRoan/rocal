@@ -5,9 +5,16 @@ jest.mock("../../lib/prisma", () => ({
   prisma: {
     calendarEvent: {
       findFirst: jest.fn(async (): Promise<any> => null),
+      update: jest.fn(async (): Promise<any> => null),
     },
     eventNotification: {
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
+    },
+    calendar: {
+      findFirst: jest.fn(async (): Promise<any> => ({ id: "cal-1", icsShareEnabled: false })),
+    },
+    userSettings: {
+      findUnique: jest.fn(async (): Promise<any> => ({ eventEncryptionMode: "hybrid" })),
     },
     $queryRaw: jest.fn(async (): Promise<any> => []),
     $executeRaw: jest.fn(async (): Promise<any> => 1),
@@ -62,9 +69,16 @@ const mockEnsureAuthenticatedUser =
 const mockPrisma = prisma as unknown as {
   calendarEvent: {
     findFirst: jest.Mock<() => Promise<any>>;
+    update: jest.Mock<() => Promise<any>>;
   };
   eventNotification: {
     deleteMany: jest.Mock<() => Promise<any>>;
+  };
+  calendar: {
+    findFirst: jest.Mock<() => Promise<any>>;
+  };
+  userSettings: {
+    findUnique: jest.Mock<() => Promise<any>>;
   };
   $queryRaw: jest.Mock<() => Promise<any>>;
   $executeRaw: jest.Mock<() => Promise<any>>;
@@ -84,6 +98,12 @@ function eventFixture(
     start: Date;
     timezone: string;
     title: string;
+    description: string | null;
+    location: string | null;
+    calendarId: string;
+    reminder: number | null;
+    encryptedContent: string | null;
+    encryptionState: string;
     isSynced: boolean;
   }> = {},
 ) {
@@ -92,6 +112,12 @@ function eventFixture(
     start: new Date("2024-02-01T12:30:00.000Z"),
     timezone: "UTC",
     title: "Planning",
+    description: "Discuss roadmap",
+    location: "Room 7",
+    calendarId: "cal-1",
+    reminder: null,
+    encryptedContent: "ciphertext",
+    encryptionState: "shadow_write",
     isSynced: false,
     ...overrides,
   };
@@ -100,6 +126,13 @@ function eventFixture(
 describe("notificationsRoutes", () => {
   beforeEach(() => {
     mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    mockPrisma.calendar.findFirst.mockResolvedValue({
+      id: "cal-1",
+      icsShareEnabled: false,
+    });
+    mockPrisma.userSettings.findUnique.mockResolvedValue({
+      eventEncryptionMode: "hybrid",
+    });
   });
 
   it("returns no notifications for recurring instance ids", async () => {
@@ -393,6 +426,13 @@ describe("notificationsRoutes", () => {
     expect(mockPrisma.eventNotification.deleteMany).toHaveBeenCalledWith({
       where: { eventId: "event-create" },
     });
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+      data: expect.objectContaining({
+        reminder: 10,
+        encryptionState: "shadow_write",
+      }),
+    });
     expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(
@@ -470,6 +510,14 @@ describe("notificationsRoutes", () => {
     );
 
     expect(deleteResponse.status).toBe(200);
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+      data: expect.objectContaining({
+        reminder: null,
+        encryptionState: "encrypted",
+        title: "",
+      }),
+    });
     await expect(deleteResponse.json()).resolves.toEqual({
       success: true,
       message: "Successfully deleted 2 notifications for event",
@@ -492,6 +540,38 @@ describe("notificationsRoutes", () => {
       message: "No notifications to delete for this event type",
       deletedCount: 0,
     });
+  });
+
+  it("rejects hybrid reminder updates for fully encrypted events without plaintext", async () => {
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      eventFixture({
+        title: "",
+        description: null,
+        location: null,
+        encryptionState: "encrypted",
+      }),
+    );
+
+    const response = await createApp().handle(
+      new Request("http://localhost/notifications/event/event-encrypted", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          notifications: [
+            {
+              notificationType: "email",
+              minutesBefore: 15,
+              isEnabled: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.text()).resolves.toBe(
+      "This event is fully encrypted. Reopen and save it before enabling reminder emails in hybrid mode.",
+    );
   });
 
   it("wraps unexpected delete failures", async () => {

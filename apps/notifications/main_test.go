@@ -368,6 +368,59 @@ func TestGenerateEmailContentAndSubject(t *testing.T) {
 	}
 }
 
+func TestGenerateEmailContentAndSubjectForEncryptedEvent(t *testing.T) {
+	t.Setenv("FRONTEND_URL", "https://app.solace.test")
+	t.Setenv("EMAIL_FROM_ADDRESS", "Notifications <no-reply@example.com>")
+	server := newTestServer(t)
+
+	event := EventData{
+		Title:           "Private Planning",
+		Start:           time.Date(2026, time.May, 12, 9, 0, 0, 0, time.UTC),
+		End:             time.Date(2026, time.May, 12, 10, 30, 0, 0, time.UTC),
+		AllDay:          false,
+		EncryptionState: "encrypted",
+		Location:        "Secret Room",
+		CalendarName:    "Board",
+		Description:     "Classified",
+		CategoryName:    "Leadership",
+	}
+	user := UserData{Name: "Roan", Email: "roan@example.com", TimeZone: "UTC"}
+
+	content, err := server.generateEmailContent(event, user, 30, "evt-1")
+	if err != nil {
+		t.Fatalf("unexpected generateEmailContent error: %v", err)
+	}
+
+	if !strings.Contains(content.HTML, "Encrypted event") {
+		t.Fatalf("expected HTML to contain generic encrypted title, got %q", content.HTML)
+	}
+	if strings.Contains(content.HTML, "Private Planning") || strings.Contains(content.HTML, "Secret Room") || strings.Contains(content.HTML, "Classified") {
+		t.Fatalf("expected HTML to redact encrypted event content, got %q", content.HTML)
+	}
+	if strings.Contains(content.Text, "Private Planning") || strings.Contains(content.Text, "Secret Room") || strings.Contains(content.Text, "Classified") {
+		t.Fatalf("expected text email to redact encrypted event content, got %q", content.Text)
+	}
+
+	if subject := server.generateEmailSubject(event, 30); subject != "Event reminder in 30 minutes" {
+		t.Fatalf("unexpected encrypted subject %q", subject)
+	}
+	if display := server.senderDisplayName(event, 30); display != "Event reminder in 30 minutes" {
+		t.Fatalf("unexpected encrypted sender display %q", display)
+	}
+
+	from, err := server.getFromAddress(event, 30)
+	if err != nil {
+		t.Fatalf("unexpected from-address error: %v", err)
+	}
+	parsed, err := mail.ParseAddress(from)
+	if err != nil {
+		t.Fatalf("expected valid mail address, got error: %v", err)
+	}
+	if parsed.Name != "Event reminder in 30 minutes" {
+		t.Fatalf("expected encrypted sender display name, got %q", parsed.Name)
+	}
+}
+
 func TestGetStatusAndHandlers(t *testing.T) {
 	server := newTestServer(t)
 	now := time.Date(2026, time.April, 18, 12, 0, 0, 0, time.UTC)
@@ -872,6 +925,7 @@ func TestSendTestEmailRequiresResend(t *testing.T) {
 }
 
 func TestStartRequiresDatabase(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
 	server := newTestServer(t)
 
 	err := server.Start()

@@ -15,6 +15,10 @@ import { ensureUserCalendars } from "../lib/user-setup";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
+import {
+  normalizeEventEncryptionMode,
+  resolveEventPersistencePolicy,
+} from "../lib/event-encryption";
 import { buildIcsEventFile } from "@workspace/calendar-ics";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 import { createLogger } from "@workspace/logger";
@@ -25,6 +29,10 @@ export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
 
   constructor(private readonly prisma: PrismaClient) {}
+
+  private hasEncryptedPayload(value?: string | null): boolean {
+    return typeof value === "string" && value.trim().length > 0;
+  }
 
   private async resolveEventTimezone(
     userId: string,
@@ -45,51 +53,88 @@ export class EventService implements IEventService {
   async search(
     input: EventSearchInput,
   ): Promise<{ events: unknown[]; total: number }> {
-    const { userId, query: q, limit, offset, startDate, endDate } = input;
+    const {
+      userId,
+      query: q,
+      blindIndexTokens,
+      limit,
+      offset,
+      startDate,
+      endDate,
+    } = input;
     const searchQuery = q?.trim();
+    const normalizedBlindIndexTokens = (blindIndexTokens || []).filter(Boolean);
 
-    if (!searchQuery || searchQuery.length < 2) {
+    if (
+      (!searchQuery || searchQuery.length < 2) &&
+      normalizedBlindIndexTokens.length === 0
+    ) {
       return { events: [], total: 0 };
     }
+
+    const hasPlaintextSearch = Boolean(searchQuery);
+    const plaintextSearchVector =
+      "to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))";
+    const plaintextSearchFilter = hasPlaintextSearch
+      ? `${plaintextSearchVector}
+          @@ plainto_tsquery('english', $2)
+          OR e.title ILIKE '%' || $2 || '%'`
+      : "FALSE";
+    const rankExpression = hasPlaintextSearch
+      ? `ts_rank(
+          ${plaintextSearchVector},
+          plainto_tsquery('english', $2)
+        )`
+      : "0";
 
     const limitVal = Math.min(Math.max(Number(limit) || 20, 1), 50);
     const offsetVal = Math.max(Number(offset) || 0, 0);
 
+    const params: (string | number | Date)[] = [userId, searchQuery || ""];
+    let blindIndexFilter = "";
+    if (normalizedBlindIndexTokens.length > 0) {
+      const tokenPlaceholders = normalizedBlindIndexTokens.map(
+        (_, index) => `$${params.length + index + 1}`,
+      );
+      blindIndexFilter = `
+          OR (
+            e.blind_index_tokens IS NOT NULL
+            AND e.blind_index_tokens::jsonb ?| ARRAY[${tokenPlaceholders.join(", ")}]
+          )`;
+      params.push(...normalizedBlindIndexTokens);
+    }
+
     let dateFilter = "";
-    const params: (string | number | Date)[] = [
-      userId,
-      searchQuery,
-      limitVal,
-      offsetVal,
-    ];
     if (startDate && endDate) {
-      dateFilter = `AND e.start <= ${params.length + 1}::timestamp AND e.end >= ${params.length + 2}::timestamp`;
+      dateFilter = `AND e.start <= $${params.length + 1}::timestamp AND e.end >= $${params.length + 2}::timestamp`;
       params.push(new Date(startDate), new Date(endDate));
     }
+
+    const countParams = [...params];
+    const limitParam = `$${params.length + 1}`;
+    const offsetParam = `$${params.length + 2}`;
+    params.push(limitVal, offsetVal);
 
     const results = await this.prisma.$queryRawUnsafe(
       `SELECT
         e.id, e.title, e.description, e.start, e.end, e.all_day, e.location, e.color,
         e.calendar_id, e.category_id, e.timezone, e.recurrence, e.user_id,
-        e.created_at, e.updated_at,
+        e.created_at, e.updated_at, e.encrypted_content, e.blind_index_tokens,
+        e.encryption_state, e.encryption_key_version,
         c.id as "calendar.id", c.name as "calendar.name", c.color as "calendar.color",
         cat.id as "category.id", cat.name as "category.name", cat.color as "category.color",
-        ts_rank(
-          to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, '')),
-          plainto_tsquery('english', $2)
-        ) as rank
+        ${rankExpression} as rank
       FROM calendar_event e
       LEFT JOIN calendar c ON e.calendar_id = c.id
       LEFT JOIN event_category cat ON e.category_id = cat.id
       WHERE e.user_id = $1
         AND (
-          to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))
-          @@ plainto_tsquery('english', $2)
-          OR e.title ILIKE '%' || $2 || '%'
+          ${plaintextSearchFilter}
+          ${blindIndexFilter}
         )
         ${dateFilter}
       ORDER BY rank DESC, e.start DESC
-      LIMIT $3 OFFSET $4`,
+      LIMIT ${limitParam} OFFSET ${offsetParam}`,
       ...params,
     );
 
@@ -98,12 +143,11 @@ export class EventService implements IEventService {
       FROM calendar_event e
       WHERE e.user_id = $1
         AND (
-          to_tsvector('english', coalesce(e.title, '') || ' ' || coalesce(e.description, '') || ' ' || coalesce(e.location, ''))
-          @@ plainto_tsquery('english', $2)
-          OR e.title ILIKE '%' || $2 || '%'
+          ${plaintextSearchFilter}
+          ${blindIndexFilter}
         )
         ${dateFilter}`,
-      ...params.slice(0, params.length - 2),
+      ...countParams,
     );
 
     const total = (countResult as { total: number }[])?.[0]?.total ?? 0;
@@ -119,6 +163,10 @@ export class EventService implements IEventService {
       color: row.color,
       timezone: row.timezone,
       recurrence: row.recurrence,
+      encryptedContent: row.encrypted_content,
+      blindIndexTokens: row.blind_index_tokens,
+      encryptionState: row.encryption_state,
+      encryptionKeyVersion: row.encryption_key_version,
       calendarId: row.calendar_id,
       categoryId: row.category_id,
       userId: row.user_id,
@@ -383,6 +431,9 @@ export class EventService implements IEventService {
         categoryId,
         timezone,
         recurrence,
+        encryptedContent,
+        blindIndexTokens,
+        encryptionKeyVersion,
       } = input;
       let { reminder } = input;
 
@@ -538,21 +589,59 @@ export class EventService implements IEventService {
         reminder = reminderValue;
       }
 
-      const eventTimezone = await this.resolveEventTimezone(userId, timezone);
+      const userSettings = await this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: {
+          timezone: true,
+          emailNotifications: true,
+          eventEncryptionMode: true,
+        },
+      });
+      const eventTimezone = timezone?.trim() || userSettings?.timezone || "UTC";
+
+      const hasEncryptedPayload = this.hasEncryptedPayload(encryptedContent);
+      const encryptionMode = normalizeEventEncryptionMode(
+        userSettings?.eventEncryptionMode,
+      );
+
+      if (encryptionMode === "full" && !hasEncryptedPayload) {
+        throw new ValidationError(
+          "Full event encryption requires an active encryption session.",
+          "encryptedContent",
+        );
+      }
+
+      const persistencePolicy = resolveEventPersistencePolicy({
+        mode: encryptionMode,
+        hasEncryptedPayload,
+        title,
+        description,
+        location,
+        reminderMinutes: reminder ?? null,
+        calendarShareEnabled: calendar.icsShareEnabled,
+      });
 
       const event = await this.prisma.calendarEvent.create({
         data: {
-          title: title.trim(),
-          description: description?.trim() || null,
+          title: persistencePolicy.title,
+          description: persistencePolicy.description,
+          ...(encryptedContent !== undefined ? { encryptedContent } : {}),
+          ...(blindIndexTokens !== undefined
+            ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
+            : {}),
+          encryptionState: persistencePolicy.encryptionState,
+          ...(encryptionKeyVersion !== undefined
+            ? { encryptionKeyVersion }
+            : {}),
           start: startDate,
           end: endDate,
           timezone: eventTimezone,
           allDay: allDay || false,
-          location: location?.trim() || null,
+          location: persistencePolicy.location,
           color: color || null,
           calendarId,
           categoryId: categoryId || null,
-          reminder: reminder || null,
+          reminder: reminder ?? null,
           recurrence: recurrence || null,
           userId,
         },
@@ -564,10 +653,6 @@ export class EventService implements IEventService {
 
       try {
         if (reminder && reminder > 0) {
-          const userSettings = await this.prisma.userSettings.findUnique({
-            where: { userId },
-          });
-
           if (userSettings?.emailNotifications !== false) {
             const notificationSchedule =
               NotificationCalculator.buildNotificationSchedule(
@@ -682,11 +767,6 @@ export class EventService implements IEventService {
         }
       }
 
-      const eventTimezone =
-        input.timezone !== undefined
-          ? await this.resolveEventTimezone(userId, input.timezone)
-          : existingEvent.timezone;
-
       const finalStartDate = startDate || existingEvent.start;
       const finalEndDate = endDate || existingEvent.end;
 
@@ -742,40 +822,28 @@ export class EventService implements IEventService {
         }
       }
 
+      let targetCalendar = null;
       if (input.calendarId !== undefined) {
-        const calendar = await this.prisma.calendar.findFirst({
+        targetCalendar = await this.prisma.calendar.findFirst({
           where: {
             id: input.calendarId,
             userId,
           },
         });
 
-        if (!calendar) {
+        if (!targetCalendar) {
           throw new ValidationError(
             "Invalid calendar or calendar does not belong to user",
             "calendarId",
           );
         }
 
-        if (calendar.kind !== "owned" || calendar.isSyncOnly) {
+        if (targetCalendar.kind !== "owned" || targetCalendar.isSyncOnly) {
           throw new ValidationError(
             "Cannot move events to a read-only calendar.",
             "calendarId",
           );
         }
-      }
-
-      // Reject edits to events owned by an external subscription
-      const eventForSyncCheck = await this.prisma.calendarEvent.findFirst({
-        where: { id: id, userId },
-        include: { calendar: true },
-      });
-
-      if (eventForSyncCheck?.isSynced) {
-        throw new ValidationError(
-          "Cannot edit synced events. These events are managed by the external subscription.",
-          "id",
-        );
       }
 
       if (input.categoryId !== undefined && input.categoryId) {
@@ -810,14 +878,112 @@ export class EventService implements IEventService {
         }
       }
 
+      const finalCalendar =
+        targetCalendar ||
+        (await this.prisma.calendar.findFirst({
+          where: {
+            id: existingEvent.calendarId,
+            userId,
+          },
+          select: {
+            id: true,
+            kind: true,
+            isSyncOnly: true,
+            icsShareEnabled: true,
+          },
+        }));
+
+      if (!finalCalendar) {
+        throw new ValidationError(
+          "Invalid calendar or calendar does not belong to user",
+          "calendarId",
+        );
+      }
+
+      const userSettings = await this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: {
+          timezone: true,
+          emailNotifications: true,
+          eventEncryptionMode: true,
+        },
+      });
+      const eventTimezone =
+        input.timezone !== undefined
+          ? input.timezone?.trim() || userSettings?.timezone || "UTC"
+          : existingEvent.timezone;
+
+      const encryptionMode = normalizeEventEncryptionMode(
+        userSettings?.eventEncryptionMode,
+      );
+      const existingHasEncryptedPayload = this.hasEncryptedPayload(
+        existingEvent.encryptedContent,
+      );
+      const finalEncryptedContent =
+        input.encryptedContent !== undefined
+          ? input.encryptedContent
+          : existingEvent.encryptedContent;
+      const hasEncryptedPayload = this.hasEncryptedPayload(finalEncryptedContent);
+      const sensitiveFieldsProvided =
+        input.title !== undefined ||
+        input.description !== undefined ||
+        input.location !== undefined;
+
+      if (
+        sensitiveFieldsProvided &&
+        input.encryptedContent === undefined &&
+        (existingHasEncryptedPayload || encryptionMode === "full")
+      ) {
+        throw new ValidationError(
+          "Encrypted content payload is required when updating protected event fields.",
+          "encryptedContent",
+        );
+      }
+
+      if (encryptionMode === "full" && !hasEncryptedPayload) {
+        throw new ValidationError(
+          "Full event encryption requires an active encryption session.",
+          "encryptedContent",
+        );
+      }
+
+      const nextTitle =
+        input.title !== undefined ? input.title.trim() : existingEvent.title;
+      const nextDescription =
+        input.description !== undefined
+          ? input.description?.trim() || null
+          : existingEvent.description;
+      const nextLocation =
+        input.location !== undefined
+          ? input.location?.trim() || null
+          : existingEvent.location;
+      const finalReminderValue =
+        input.reminder !== undefined ? reminderValue ?? null : existingEvent.reminder;
+      const persistencePolicy = resolveEventPersistencePolicy({
+        mode: encryptionMode,
+        hasEncryptedPayload,
+        title: nextTitle,
+        description: nextDescription,
+        location: nextLocation,
+        reminderMinutes: finalReminderValue,
+        calendarShareEnabled: finalCalendar.icsShareEnabled,
+      });
+
+      if (
+        persistencePolicy.encryptionState !== "encrypted" &&
+        existingEvent.encryptionState === "encrypted" &&
+        !sensitiveFieldsProvided
+      ) {
+        throw new ValidationError(
+          "This event is fully encrypted. Reopen and save it before enabling reminders or sharing.",
+          "encryptedContent",
+        );
+      }
+
       const updateData: Record<string, unknown> = {};
 
-      if (input.title !== undefined) {
-        updateData.title = input.title.trim();
-      }
-      if (input.description !== undefined) {
-        updateData.description = input.description?.trim() || null;
-      }
+      updateData.title = persistencePolicy.title;
+      updateData.description = persistencePolicy.description;
       if (startDate) {
         updateData.start = finalStartDate;
       }
@@ -830,9 +996,7 @@ export class EventService implements IEventService {
       if (input.timezone !== undefined) {
         updateData.timezone = eventTimezone;
       }
-      if (input.location !== undefined) {
-        updateData.location = input.location?.trim() || null;
-      }
+      updateData.location = persistencePolicy.location;
       if (input.color !== undefined) {
         updateData.color = input.color || null;
       }
@@ -843,7 +1007,7 @@ export class EventService implements IEventService {
         updateData.categoryId = input.categoryId || null;
       }
       if (input.reminder !== undefined) {
-        updateData.reminder = reminderValue || null;
+        updateData.reminder = reminderValue ?? null;
       }
       if (input.recurrence !== undefined) {
         if (input.recurrence) {
@@ -874,6 +1038,17 @@ export class EventService implements IEventService {
         updateData.recurrence = input.recurrence || null;
       }
 
+      if (input.encryptedContent !== undefined) {
+        updateData.encryptedContent = input.encryptedContent;
+      }
+      if (input.blindIndexTokens !== undefined) {
+        updateData.blindIndexTokens = JSON.stringify(input.blindIndexTokens);
+      }
+      updateData.encryptionState = persistencePolicy.encryptionState;
+      if (input.encryptionKeyVersion !== undefined) {
+        updateData.encryptionKeyVersion = input.encryptionKeyVersion;
+      }
+
       updateData.updatedAt = new Date();
 
       const updatedEvent = await this.prisma.calendarEvent.update({
@@ -902,13 +1077,7 @@ export class EventService implements IEventService {
           }[] = [];
 
           if (reminderChanged) {
-            const finalReminderValue = reminderValue || updatedEvent.reminder;
-
             if (finalReminderValue && finalReminderValue > 0) {
-              const userSettings = await this.prisma.userSettings.findUnique({
-                where: { userId },
-              });
-
               if (userSettings?.emailNotifications !== false) {
                 notificationConfigs.push({
                   notificationType: "email",
@@ -1116,6 +1285,16 @@ export class EventService implements IEventService {
             );
           }
 
+          if (
+            targetCalendar.icsShareEnabled &&
+            events.some((event) => event.encryptionState === "encrypted")
+          ) {
+            throw new ValidationError(
+              "Fully encrypted events cannot be moved into a shared calendar until they are reopened and saved.",
+              "targetCalendarId",
+            );
+          }
+
           result = await this.prisma.calendarEvent.updateMany({
             where: {
               id: { in: eventIds },
@@ -1166,10 +1345,18 @@ export class EventService implements IEventService {
         case "duplicate": {
           const duplicatedEvents = [];
           for (const event of events) {
+            const duplicateTitle =
+              event.encryptionState === "encrypted"
+                ? event.title
+                : `${event.title} (Copy)`;
             const duplicated = await this.prisma.calendarEvent.create({
               data: {
-                title: `${event.title} (Copy)`,
+                title: duplicateTitle,
                 description: event.description,
+                encryptedContent: event.encryptedContent,
+                blindIndexTokens: event.blindIndexTokens,
+                encryptionState: event.encryptionState,
+                encryptionKeyVersion: event.encryptionKeyVersion,
                 start: event.start,
                 end: event.end,
                 allDay: event.allDay,
@@ -1299,6 +1486,12 @@ export class EventService implements IEventService {
 
     if (!event) {
       throw new ValidationError("Event not found or access denied");
+    }
+
+    if (event.encryptionState === "encrypted") {
+      throw new ValidationError(
+        "Fully encrypted events cannot be exported as ICS.",
+      );
     }
 
     let exportedEvent = toIcsBuildEvent(event);

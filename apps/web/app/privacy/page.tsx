@@ -34,7 +34,9 @@ export default function PrivacyPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Solace is a passion project with a non-profit motive. The goal is
               to help people manage time with less friction, not to build ad
-              profiles, sell data, or turn your calendar into a product.
+              profiles, sell data, or turn your calendar into a product. We are
+              also rolling out client-side encryption for core calendar text,
+              and this page explains the current migration state plainly.
             </p>
           </div>
 
@@ -47,8 +49,9 @@ export default function PrivacyPage() {
               <p className="mt-2">
                 The database keeps the pieces needed to run the app: your user
                 profile, email address, login sessions, calendars, events,
-                categories, collaborators, reminder rules, settings, and
-                reminder delivery records.
+                categories, collaborators, reminder rules, settings, reminder
+                delivery records, and encrypted shadow copies for core calendar
+                text on enrolled devices.
               </p>
             </div>
 
@@ -63,7 +66,26 @@ export default function PrivacyPage() {
                 the app also stores the account identifiers needed to keep that
                 login working. If you connect shared or external calendars, it
                 stores the subscription and sync metadata needed to keep those
-                calendars up to date.
+                calendars up to date. During the current encryption rollout,
+                enrolled devices also generate encrypted shadow copies of event
+                titles, descriptions, locations, calendar names, and category
+                names before those writes reach the backend.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Encryption rollout
+              </h2>
+              <p className="mt-2">
+                Solace has started a shadow-write migration toward client-side
+                encryption for core calendar content. That means encrypted
+                copies are now being written for supported devices, but the
+                system still keeps plaintext fields and operational metadata
+                while search, reminders, sync, exports, and compatibility flows
+                are being reworked. The current model is stronger than
+                plaintext-only storage, but it is not zero-access encryption
+                yet.
               </p>
             </div>
 
