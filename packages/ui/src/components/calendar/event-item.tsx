@@ -248,7 +248,7 @@ export function EventItem({
         >
           {children || (
             <span className="truncate flex items-center gap-1">
-              <EncryptionStatusBadge item={event} />
+              <EncryptionStatusBadge item={event} asIcon />
               <span className="truncate">{event.title}</span>
             </span>
           )}
@@ -311,7 +311,7 @@ export function EventItem({
           {showStacked ? (
             <>
               <div className="flex items-center gap-1 w-full min-w-0">
-                <EncryptionStatusBadge item={event} />
+                <EncryptionStatusBadge item={event} asIcon />
                 <span
                   className="font-semibold flex-1 min-w-0 truncate tracking-tight"
                   title={event.title}
@@ -329,7 +329,7 @@ export function EventItem({
             </>
           ) : (
             <div className="flex items-baseline gap-1.5 w-full min-w-0 overflow-hidden">
-              <EncryptionStatusBadge item={event} />
+              <EncryptionStatusBadge item={event} asIcon />
               <span
                 className={cn(
                   "flex-1 min-w-0 truncate whitespace-nowrap tracking-tight",
@@ -410,7 +410,7 @@ export function EventItem({
           {/* Content */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <EncryptionStatusBadge item={event} />
+              <EncryptionStatusBadge item={event} asIcon />
               <span className="truncate text-[15px] font-semibold leading-snug text-foreground tracking-tight group-data-past-event/ev:line-through">
                 {event.title}
               </span>

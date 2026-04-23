@@ -143,18 +143,45 @@ interface EncryptionStatusBadgeProps {
    * information.
    */
   hidePlaintext?: boolean;
+  /**
+   * When true, renders only the status icon (non-interactive span). Use this
+   * when embedding inside another button/clickable element to avoid nested
+   * interactive elements (which break hydration / a11y).
+   */
+  asIcon?: boolean;
 }
 
 export function EncryptionStatusBadge({
   item,
   className,
   hidePlaintext = true,
+  asIcon = false,
 }: EncryptionStatusBadgeProps) {
   const meta = getEncryptionStatusMeta(item);
   const { Icon } = meta;
 
   if (hidePlaintext && meta.state === "plaintext") {
     return null;
+  }
+
+  if (asIcon) {
+    return (
+      <span
+        aria-label={meta.label}
+        title={meta.label}
+        className={cn(
+          "inline-flex items-center justify-center shrink-0",
+          "h-3.5 w-3.5",
+          className,
+        )}
+      >
+        <Icon
+          className={cn("h-3 w-3", meta.iconClassName)}
+          aria-hidden
+          strokeWidth={2.25}
+        />
+      </span>
+    );
   }
 
   return (

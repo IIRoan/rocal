@@ -12,6 +12,7 @@ import {
   NotificationManager,
   formatEventDescription,
   EncryptionStatusBadge,
+  getEncryptionStatusMeta,
 } from "@workspace/ui/components/calendar";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import { RecurringEventForm } from "./command-palette/recurring-event-form";
@@ -20,6 +21,7 @@ import { useEventForm } from "@/hooks/use-event-form";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { ShadcnAutocomleteTimePicker } from "@workspace/ui/components/ui/autocompletetimepicker";
 import { toast } from "sonner";
+import { getActiveE2eeSession } from "@/lib/e2ee-session";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -170,7 +172,9 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@workspace/ui/components/ui/drawer";
+import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
+import { gsap } from "@workspace/ui/lib/gsap";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { Textarea } from "@workspace/ui/components/ui/textarea";
@@ -210,6 +214,7 @@ import {
   CloudDownload,
   Server,
   PenOff,
+  ShieldCheck,
 } from "lucide-react";
 
 import type { EventEditorMode } from "./command-palette-context";
@@ -692,69 +697,278 @@ function EventEditorPopover({
   recurringModal,
 }: EventEditorPopoverProps) {
   const popoverRef = React.useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // Encryption outcome preview for the header icon
+  const _encSelectedCalendar = React.useMemo(
+    () => calendars.find((c) => c.id === eventForm.eventCalendarId),
+    [calendars, eventForm.eventCalendarId],
+  );
+  const _encHasSession = React.useMemo(
+    () => getActiveE2eeSession() !== null,
+    [],
+  );
+  const _encNotifCount = React.useMemo(
+    () => eventForm.eventNotifications.filter((n) => n.isEnabled).length,
+    [eventForm.eventNotifications],
+  );
+  const _encPreview = React.useMemo(() => {
+    if (!_encHasSession) return { encryptionState: "plaintext" as const };
+    if (_encSelectedCalendar?.forceFullEncryption) return { forceFullEncryption: true };
+    if (localSettings?.eventEncryptionMode === "full") return { encryptionState: "encrypted" as const };
+    if (_encNotifCount > 0) return { encryptionState: "shadow_write" as const };
+    return { encryptionState: "encrypted" as const };
+  }, [_encHasSession, _encSelectedCalendar, localSettings, _encNotifCount]);
+  const _encMeta = React.useMemo(
+    () => getEncryptionStatusMeta(_encPreview),
+    [_encPreview],
+  );
+  const _encHint = !_encHasSession
+    ? "Unlock encryption on this device to store this event encrypted."
+    : _encSelectedCalendar?.forceFullEncryption
+      ? "This calendar forces ciphertext-only storage."
+      : localSettings?.eventEncryptionMode === "full"
+        ? "Your current setting stores this event as ciphertext only."
+        : _encNotifCount > 0
+          ? "Enabled reminders keep a hybrid plaintext shadow for delivery."
+          : "No reminder shadow needed — this event will be stored as ciphertext only.";
 
   // Calculate position synchronously before paint to avoid flash
   // useLayoutEffect runs before browser paint, so position is set before first render
   const [position, setPosition] = React.useState<{
     top: number;
     left: number;
+    maxHeight: number;
   } | null>(null);
-  const positionRef = React.useRef<{ top: number; left: number } | null>(null);
+  const positionRef = React.useRef<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
+  const appliedPositionRef = React.useRef<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
+  const allowPositionAnimationRef = React.useRef(false);
 
-  // Calculate position synchronously - runs before paint
+  // Calculate position synchronously - runs before paint. We retry on the
+  // next animation frame and again ~80ms later in case the preview event
+  // hasn't been mounted/measured yet (DnD overlays, suspense, etc.).
   React.useLayoutEffect(() => {
     if (!open || !anchorPosition) {
-      if (!open) setPosition(null);
+      if (!open) {
+        setPosition(null);
+        positionRef.current = null;
+      }
       return;
     }
 
     const POPOVER_WIDTH = 420;
-    const POPOVER_MAX_HEIGHT = 580;
+    const POPOVER_MAX_HEIGHT = 750;
+    const POPOVER_MIN_HEIGHT = 320;
     const VIEWPORT_PADDING = 16;
     const GAP = 12;
 
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const compute = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
 
-    // If we have a preview event rendered in timeline, anchor beside it
-    const previewEl = document.querySelector(
-      "[data-preview-event='true']",
-    ) as HTMLElement | null;
-    let anchorX = anchorPosition.x;
-    let anchorY = anchorPosition.y;
+      const previewEl = document.querySelector(
+        "[data-preview-event='true']",
+      ) as HTMLElement | null;
 
-    if (previewEl) {
+      if (!previewEl) {
+        return false;
+      }
+
       const rect = previewEl.getBoundingClientRect();
-      anchorX = rect.right + GAP;
-      anchorY = rect.top;
+      if (rect.width === 0 || rect.height === 0) {
+        return false;
+      }
+
+      let left: number;
+      let top: number;
+      const spaceRight = viewportWidth - rect.right - GAP - VIEWPORT_PADDING;
+      const spaceLeft = rect.left - GAP - VIEWPORT_PADDING;
+
+      // Prefer right side; flip to left if it doesn't fit; otherwise pin to
+      // the viewport edge on the roomier side, but never overlap the preview.
+      if (spaceRight >= POPOVER_WIDTH) {
+        left = rect.right + GAP;
+      } else if (spaceLeft >= POPOVER_WIDTH) {
+        left = rect.left - POPOVER_WIDTH - GAP;
+      } else if (spaceRight >= spaceLeft) {
+        left = viewportWidth - POPOVER_WIDTH - VIEWPORT_PADDING;
+      } else {
+        left = VIEWPORT_PADDING;
+      }
+
+      top = rect.top;
+
+      // Vertical placement: anchor to preview top, but if the popover's actual
+      // content would overflow the viewport bottom, grow upward by shifting
+      // top up — keeps the popover's bottom edge near the preview/viewport
+      // bottom. Only when content exceeds the entire viewport do we cap
+      // max-height and let the body scroll.
+      const bottomLimit = viewportHeight - VIEWPORT_PADDING;
+      const viewportMax = viewportHeight - VIEWPORT_PADDING * 2;
+
+      // Measure NATURAL content height (ignoring our own max-height clamp) so
+      // growth is content-driven. The popover wraps three flex children:
+      // header (shrink-0), body (overflow-y-auto), footer (shrink-0). Summing
+      // header.offsetHeight + body.scrollHeight + footer.offsetHeight gives the
+      // true unclamped content size.
+      let measured = 0;
+      const root = popoverRef.current;
+      if (root) {
+        const children = Array.from(root.children) as HTMLElement[];
+        for (const child of children) {
+          const isScrollable =
+            getComputedStyle(child).overflowY !== "visible" &&
+            child.scrollHeight > child.clientHeight;
+          measured += isScrollable ? child.scrollHeight : child.offsetHeight;
+        }
+        // Fallback if measurement returned 0 (very first paint)
+        if (measured === 0) measured = root.offsetHeight;
+        // Compensate for the popover chrome (borders) so we don't end up with
+        // a 1-2px internal overflow that produces a tiny scrollbar.
+        measured += root.offsetHeight - root.clientHeight + 2;
+      }
+      const desiredHeight = Math.min(
+        POPOVER_MAX_HEIGHT,
+        Math.max(measured, POPOVER_MIN_HEIGHT),
+      );
+
+      let maxHeight = Math.min(desiredHeight, viewportMax);
+
+      if (top + maxHeight > bottomLimit) {
+        // Shift the top upward so the bottom hugs the viewport edge.
+        top = bottomLimit - maxHeight;
+      }
+      if (top < VIEWPORT_PADDING) {
+        top = VIEWPORT_PADDING;
+        maxHeight = Math.min(maxHeight, bottomLimit - top);
+      }
+
+      const newPos = { top, left, maxHeight };
+      const prev = positionRef.current;
+      if (
+        !prev ||
+        prev.top !== newPos.top ||
+        prev.left !== newPos.left ||
+        prev.maxHeight !== newPos.maxHeight
+      ) {
+        positionRef.current = newPos;
+        setPosition(newPos);
+      }
+      return true;
+    };
+
+    compute();
+    const raf = requestAnimationFrame(compute);
+    const t = window.setTimeout(compute, 80);
+    // Recompute on resize so the popover stays clamped to the viewport
+    const onResize = () => compute();
+    window.addEventListener("resize", onResize);
+    // Recompute when popover content height changes (toggling
+    // location/description/recurrence/reminder sections). We observe the
+    // outer popover AND its children — when content grows past max-height,
+    // the outer size stays clamped but the inner body's scrollHeight changes,
+    // so observing the body (and its children) is what triggers a re-layout.
+    let ro: ResizeObserver | null = null;
+    if (popoverRef.current && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => compute());
+      ro.observe(popoverRef.current);
+      for (const child of Array.from(popoverRef.current.children)) {
+        ro.observe(child);
+        for (const grand of Array.from(child.children)) {
+          ro.observe(grand);
+        }
+      }
+    }
+    let mo: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined") {
+      mo = new MutationObserver(() => {
+        compute();
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
+      mo?.disconnect();
+    };
+  }, [open, anchorPosition, showLocation, showDescription]);
+
+  React.useEffect(() => {
+    if (!open) {
+      allowPositionAnimationRef.current = false;
+      return;
     }
 
-    let left = anchorX;
-    let top = anchorY;
+    allowPositionAnimationRef.current = false;
+    const t = window.setTimeout(() => {
+      allowPositionAnimationRef.current = true;
+    }, 180);
 
-    // Horizontal: prefer right side of anchor, flip to left if overflow
-    if (left + POPOVER_WIDTH + VIEWPORT_PADDING > viewportWidth) {
-      left = Math.max(
-        VIEWPORT_PADDING,
-        previewEl
-          ? previewEl.getBoundingClientRect().left - POPOVER_WIDTH - GAP
-          : anchorX - POPOVER_WIDTH - GAP,
+    return () => {
+      window.clearTimeout(t);
+      allowPositionAnimationRef.current = false;
+    };
+  }, [open]);
+
+  React.useLayoutEffect(() => {
+    const popover = popoverRef.current;
+    if (!open || !position || !popover) {
+      appliedPositionRef.current = null;
+      return;
+    }
+
+    const previous = appliedPositionRef.current;
+
+    if (
+      !previous ||
+      prefersReducedMotion ||
+      !allowPositionAnimationRef.current
+    ) {
+      gsap.set(popover, {
+        top: position.top,
+        left: position.left,
+        maxHeight: position.maxHeight,
+      });
+    } else if (
+      previous.top !== position.top ||
+      previous.left !== position.left ||
+      previous.maxHeight !== position.maxHeight
+    ) {
+      gsap.killTweensOf(popover);
+      gsap.fromTo(
+        popover,
+        {
+          top: previous.top,
+          left: previous.left,
+          maxHeight: previous.maxHeight,
+        },
+        {
+          top: position.top,
+          left: position.left,
+          maxHeight: position.maxHeight,
+          duration: 0.22,
+          ease: "power2.out",
+          overwrite: "auto",
+        },
       );
     }
 
-    // Vertical: clamp to viewport
-    if (top + POPOVER_MAX_HEIGHT + VIEWPORT_PADDING > viewportHeight) {
-      top = Math.max(
-        VIEWPORT_PADDING,
-        viewportHeight - POPOVER_MAX_HEIGHT - VIEWPORT_PADDING,
-      );
-    }
-    if (top < VIEWPORT_PADDING) top = VIEWPORT_PADDING;
+    appliedPositionRef.current = position;
 
-    const newPos = { top, left };
-    positionRef.current = newPos;
-    setPosition(newPos);
-  }, [open, anchorPosition]);
+    return () => {
+      gsap.killTweensOf(popover);
+    };
+  }, [open, position, prefersReducedMotion]);
 
   // Close on Escape
   React.useEffect(() => {
@@ -810,10 +1024,11 @@ function EventEditorPopover({
       {/* Popover panel - command palette style */}
       <div
         ref={popoverRef}
-        className="fixed z-50 w-[420px] max-h-[750px] bg-popover border border-border shadow-xl rounded-lg flex flex-col overflow-hidden"
+        className="fixed z-50 w-[420px] bg-popover border border-border shadow-xl rounded-lg flex flex-col overflow-hidden"
         style={{
           top: position?.top ?? 0,
           left: position?.left ?? 0,
+          maxHeight: position?.maxHeight ?? 750,
         }}
       >
         {/* Header - command palette style with option toggles */}
@@ -932,8 +1147,57 @@ function MobileEventEditorBody({
   calendars,
   desktop,
 }: BodyProps) {
+  const selectedCalendar = React.useMemo(
+    () => calendars.find((calendar) => calendar.id === eventForm.eventCalendarId),
+    [calendars, eventForm.eventCalendarId],
+  );
+  const enabledNotificationCount = React.useMemo(
+    () => eventForm.eventNotifications.filter((n) => n.isEnabled).length,
+    [eventForm.eventNotifications],
+  );
+  const hasActiveEncryptionSession = React.useMemo(
+    () => getActiveE2eeSession() !== null,
+    [],
+  );
+  const encryptionPreview = React.useMemo(() => {
+    if (!hasActiveEncryptionSession) {
+      return { encryptionState: "plaintext" as const };
+    }
+
+    if (selectedCalendar?.forceFullEncryption) {
+      return { forceFullEncryption: true };
+    }
+
+    if (localSettings?.eventEncryptionMode === "full") {
+      return { encryptionState: "encrypted" as const };
+    }
+
+    if (enabledNotificationCount > 0) {
+      return { encryptionState: "shadow_write" as const };
+    }
+
+    return { encryptionState: "encrypted" as const };
+  }, [
+    enabledNotificationCount,
+    hasActiveEncryptionSession,
+    localSettings?.eventEncryptionMode,
+    selectedCalendar?.forceFullEncryption,
+  ]);
+  const encryptionMeta = React.useMemo(
+    () => getEncryptionStatusMeta(encryptionPreview),
+    [encryptionPreview],
+  );
+  const encryptionHint = !hasActiveEncryptionSession
+    ? "Unlock encryption on this device to store this event encrypted."
+    : selectedCalendar?.forceFullEncryption
+      ? "This calendar forces ciphertext-only storage."
+      : localSettings?.eventEncryptionMode === "full"
+        ? "Your current setting stores this event as ciphertext only."
+        : enabledNotificationCount > 0
+          ? "Enabled reminders keep a hybrid plaintext shadow for delivery."
+          : "No reminder shadow is needed, so this event will be stored as ciphertext only.";
   const bodyClass = desktop
-    ? "px-3 py-2 space-y-3 flex-1 overflow-y-auto min-h-0"
+    ? "px-3 py-2 space-y-3 flex-1 overflow-y-auto min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
     : "p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar";
 
   return (
@@ -1140,33 +1404,35 @@ function MobileEventEditorBody({
             className={`${desktop ? "h-9 text-sm" : "text-lg font-semibold h-10"}`}
             autoFocus
           />
+          <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+            <div className="flex h-5 w-5 items-center justify-center shrink-0">
+              <encryptionMeta.Icon
+                className={encryptionMeta.iconClassName}
+                strokeWidth={2.25}
+                aria-hidden
+              />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium leading-tight">
+                {encryptionMeta.label}
+              </div>
+              <div className="text-[11px] leading-snug text-muted-foreground mt-0.5">
+                {encryptionHint}
+              </div>
+            </div>
+          </div>
 
           {/* Primary Controls */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Calendar Select */}
-            <div>
-              <div className="px-3 py-1 text-xs font-medium text-muted-foreground">
-                Calendar
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Calendar</Label>
               <Select
                 value={eventForm.eventCalendarId}
                 onValueChange={eventForm.setEventCalendarId}
               >
-                <SelectTrigger
-                  className={`${desktop ? "h-9 border-0 bg-transparent hover:bg-accent/50" : "h-9"} text-sm`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <div
-                      className="size-2.5 rounded-full flex-shrink-0"
-                      style={{
-                        backgroundColor:
-                          calendars.find(
-                            (c) => c.id === eventForm.eventCalendarId,
-                          )?.color || "hsl(var(--primary))",
-                      }}
-                    />
-                    <SelectValue />
-                  </div>
+                <SelectTrigger className="h-9 w-full text-sm">
+                  <SelectValue placeholder="Select calendar" />
                 </SelectTrigger>
                 <SelectContent>
                   {calendars.filter((c) => !c.isSyncOnly).map((calendar) => (
@@ -1185,10 +1451,8 @@ function MobileEventEditorBody({
             </div>
 
             {/* Date & Time */}
-            <div>
-              <div className="px-3 py-1 text-xs font-medium text-muted-foreground">
-                Date & Time
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Date & Time</Label>
               <div className="space-y-2">
                 {/* Date pickers - Start and End */}
                 <div className="flex items-center gap-2">
@@ -1201,7 +1465,7 @@ function MobileEventEditorBody({
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="flex-1 h-9 justify-start font-normal cursor-pointer"
+                          className="flex-1 h-9 justify-start font-normal cursor-pointer bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground"
                         >
                           <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                           {format(eventForm.eventStartDate, "EEE, MMM d")}
@@ -1283,7 +1547,7 @@ function MobileEventEditorBody({
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="flex-1 h-9 justify-start font-normal cursor-pointer"
+                          className="flex-1 h-9 justify-start font-normal cursor-pointer bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground"
                         >
                           <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                           {format(eventForm.eventEndDate, "EEE, MMM d")}
@@ -1368,7 +1632,7 @@ function MobileEventEditorBody({
                         eventForm.handleStartTimeChange(timeString);
                       }}
                       is24Hour={localSettings?.timeFormat === "24h"}
-                      className={`flex-1 ${desktop ? "h-9" : "h-9"} cursor-pointer`}
+                      className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
                     />
                     <span className="text-muted-foreground text-sm font-medium">
                       →
@@ -1387,7 +1651,7 @@ function MobileEventEditorBody({
                         eventForm.handleEndTimeChange(timeString);
                       }}
                       is24Hour={localSettings?.timeFormat === "24h"}
-                      className={`flex-1 ${desktop ? "h-9" : "h-9"} cursor-pointer`}
+                      className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
                     />
                   </div>
                 ) : null}
@@ -1665,4 +1929,3 @@ function EventEditorFooter({
     </div>
   );
 }
-
