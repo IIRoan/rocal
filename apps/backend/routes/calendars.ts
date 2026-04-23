@@ -48,6 +48,12 @@ const createCalendarBodySchema = strictObject({
       description: "Client-managed encryption key version.",
     }),
   ),
+  forceFullEncryption: t.Optional(
+    t.Boolean({
+      description:
+        "When true, all events in this calendar are stored as ciphertext only, regardless of the user's global encryption mode.",
+    }),
+  ),
 });
 
 const updateCalendarBodySchema = strictObject({
@@ -87,6 +93,12 @@ const updateCalendarBodySchema = strictObject({
     t.Number({
       minimum: 1,
       description: "Client-managed encryption key version.",
+    }),
+  ),
+  forceFullEncryption: t.Optional(
+    t.Boolean({
+      description:
+        "When true, all events in this calendar are stored as ciphertext only, regardless of the user's global encryption mode. Toggling this on backfills existing encrypted events to drop their plaintext shadows.",
     }),
   ),
 });
@@ -148,6 +160,7 @@ export const calendarsRoutes = new Elysia({
             blindIndexTokens?: string[];
             encryptionState?: RowEncryptionState;
             encryptionKeyVersion?: number;
+            forceFullEncryption?: boolean;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -162,6 +175,7 @@ export const calendarsRoutes = new Elysia({
             blindIndexTokens: body.blindIndexTokens,
             encryptionState: body.encryptionState,
             encryptionKeyVersion: body.encryptionKeyVersion,
+            forceFullEncryption: body.forceFullEncryption,
           });
         },
         {
@@ -191,6 +205,7 @@ export const calendarsRoutes = new Elysia({
             blindIndexTokens?: string[];
             encryptionState?: RowEncryptionState;
             encryptionKeyVersion?: number;
+            forceFullEncryption?: boolean;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -207,6 +222,7 @@ export const calendarsRoutes = new Elysia({
             blindIndexTokens: body.blindIndexTokens,
             encryptionState: body.encryptionState,
             encryptionKeyVersion: body.encryptionKeyVersion,
+            forceFullEncryption: body.forceFullEncryption,
           });
         },
         {

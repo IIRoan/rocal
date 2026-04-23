@@ -150,6 +150,13 @@ export function useEventForm({
   const updateNotificationsMutation = useMutation({
     mutationFn: ({ eventId, data }: { eventId: string; data: any[] }) =>
       calendarApiService.updateEventNotifications(eventId, data),
+    onSuccess: (_result, variables) => {
+      // Invalidate the cached notifications list so the editor shows the
+      // freshly saved entries instead of the stale 5-minute cache.
+      queryClient.invalidateQueries({
+        queryKey: ["eventNotifications", variables.eventId],
+      });
+    },
   });
 
   const deleteRecurringEventMutation = useMutation({

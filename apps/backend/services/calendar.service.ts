@@ -34,6 +34,7 @@ export class CalendarService implements ICalendarService {
       blindIndexTokens,
       encryptionState,
       encryptionKeyVersion,
+      forceFullEncryption,
     } = input;
 
     if (!name?.trim()) {
@@ -86,6 +87,7 @@ export class CalendarService implements ICalendarService {
         ...(encryptionKeyVersion !== undefined
           ? { encryptionKeyVersion }
           : {}),
+        ...(forceFullEncryption !== undefined ? { forceFullEncryption } : {}),
         color,
         kind: "owned",
         isPublic: false,
@@ -108,6 +110,7 @@ export class CalendarService implements ICalendarService {
       blindIndexTokens,
       encryptionState,
       encryptionKeyVersion,
+      forceFullEncryption,
     } = input;
 
     const existingCalendar = await this.prisma.calendar.findFirst({
@@ -122,7 +125,8 @@ export class CalendarService implements ICalendarService {
       isVisible !== undefined &&
       name === undefined &&
       color === undefined &&
-      isDefault === undefined;
+      isDefault === undefined &&
+      forceFullEncryption === undefined;
 
     if (existingCalendar.kind !== "owned" && !isVisibilityOnlyUpdate) {
       throw new ValidationError(
@@ -194,12 +198,42 @@ export class CalendarService implements ICalendarService {
       }
     }
 
+    const enablingForceFullEncryption =
+      forceFullEncryption === true &&
+      existingCalendar.forceFullEncryption !== true;
+
+    if (forceFullEncryption !== undefined) {
+      updateData.forceFullEncryption = forceFullEncryption;
+    }
+
     updateData.updatedAt = new Date();
 
-    return this.prisma.calendar.update({
+    const updatedCalendar = await this.prisma.calendar.update({
       where: { id: calendarId },
       data: updateData,
     });
+
+    if (enablingForceFullEncryption) {
+      // Backfill: any event in this calendar that already has an encrypted
+      // payload should drop its plaintext shadows and become fully ciphertext.
+      // Events without an encryptedContent payload (legacy plaintext) are
+      // left untouched – they require a client-side re-encryption pass.
+      await this.prisma.calendarEvent.updateMany({
+        where: {
+          calendarId,
+          userId,
+          encryptedContent: { not: null },
+        },
+        data: {
+          title: "",
+          description: null,
+          location: null,
+          encryptionState: "encrypted",
+        },
+      });
+    }
+
+    return updatedCalendar;
   }
 
   async delete(input: CalendarDeleteInput): Promise<CalendarDeleteResult> {

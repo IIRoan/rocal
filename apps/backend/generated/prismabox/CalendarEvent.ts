@@ -58,6 +58,7 @@ export const CalendarEventRelations = t.Object(
         blindIndexTokens: __nullable__(t.String()),
         encryptionState: t.String(),
         encryptionKeyVersion: t.Integer(),
+        forceFullEncryption: t.Boolean(),
         color: t.String(),
         kind: t.String(),
         isPublic: t.Boolean(),

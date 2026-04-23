@@ -68,6 +68,7 @@ export interface Calendar {
   blindIndexTokens?: string[] | null;
   encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
+  forceFullEncryption?: boolean;
   color: EventColor;
   kind: CalendarKind;
   isPublic: boolean;
@@ -161,6 +162,7 @@ export interface CreateCalendarRequest extends NameEncryptionShadowRequest {
   name: string;
   color: EventColor;
   isDefault?: boolean;
+  forceFullEncryption?: boolean;
 }
 
 export interface UpdateCalendarRequest extends Partial<CreateCalendarRequest> {
