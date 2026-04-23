@@ -292,12 +292,12 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            title: "Test Event",
+            title: "",
             description: null,
             location: null,
             encryptedContent: "ciphertext",
             blindIndexTokens: JSON.stringify(["idx-1", "idx-2"]),
-            encryptionState: "shadow_write",
+            encryptionState: "encrypted",
             encryptionKeyVersion: 2,
           }),
         }),
@@ -485,12 +485,12 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            title: "Test Event",
-            description: "Discuss roadmap",
-            location: "Room 7",
+            title: "",
+            description: null,
+            location: null,
             encryptedContent: "ciphertext",
             blindIndexTokens: JSON.stringify(["idx-1"]),
-            encryptionState: "shadow_write",
+            encryptionState: "encrypted",
             encryptionKeyVersion: 2,
           }),
         }),

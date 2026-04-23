@@ -21,11 +21,14 @@ import { EventService } from "../../services/event.service";
 
 describe("EventService.search", () => {
   it("does not keep plaintext match-all clauses when the trimmed query is blank", async () => {
+    const queryRawUnsafe = jest.fn<
+      (sql: string, ...params: Array<string | number | Date>) => Promise<any[]>
+    >(async () => []);
+    queryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0 }]);
     const prisma = {
-      $queryRawUnsafe: jest
-        .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ total: 0 }]),
+      $queryRawUnsafe: queryRawUnsafe,
     };
 
     const service = new EventService(prisma as never);
@@ -36,8 +39,8 @@ describe("EventService.search", () => {
       blindIndexTokens: ["idx-1"],
     });
 
-    const [resultsSql] = prisma.$queryRawUnsafe.mock.calls[0] as [string];
-    const [countSql] = prisma.$queryRawUnsafe.mock.calls[1] as [string];
+    const resultsSql = prisma.$queryRawUnsafe.mock.calls[0]?.[0] as string;
+    const countSql = prisma.$queryRawUnsafe.mock.calls[1]?.[0] as string;
 
     expect(resultsSql).toContain("FALSE");
     expect(resultsSql).not.toContain("OR e.title ILIKE '%' || $2 || '%'");

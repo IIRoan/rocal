@@ -41,7 +41,7 @@ describe("getEncryptionStatusMeta", () => {
     expect(getEncryptionStatusMeta({ encryptionState: "encrypted" })).toEqual(
       expect.objectContaining({
         state: "encrypted",
-        label: "Encrypted",
+        label: "End-to-end encrypted",
         shortLabel: "Encrypted",
       }),
     );

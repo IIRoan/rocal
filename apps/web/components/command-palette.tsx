@@ -174,11 +174,16 @@ export function CommandPalette({
     }
   }, [open, currentView, initialSearchQuery]);
 
-  const goForward = useCallback((next: PaletteView) => {
-    setSearchQuery("");
-    setPasskeyAddMode(false);
-    setNavHistory((h) => [...h, next]);
-  }, []);
+  const goForward = useCallback(
+    (next: PaletteView, options?: { preservePasskeyAddMode?: boolean }) => {
+      setSearchQuery("");
+      if (!options?.preservePasskeyAddMode) {
+        setPasskeyAddMode(false);
+      }
+      setNavHistory((h) => [...h, next]);
+    },
+    [],
+  );
 
   const goBack = () => {
     setSearchQuery("");
@@ -307,7 +312,7 @@ export function CommandPalette({
           break;
         case "newPasskey":
           setPasskeyAddMode(true);
-          goForward("passkeys");
+          goForward("passkeys", { preservePasskeyAddMode: true });
           break;
         case "openPasskeys":
           setPasskeyAddMode(false);

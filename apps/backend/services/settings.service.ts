@@ -7,10 +7,11 @@ import type {
 import { ValidationError } from "../lib/errors";
 import { normalizeEventEncryptionMode } from "../lib/event-encryption";
 
-function toPublicUserSettings(settings: {
-  defaultReminder: number | null;
-} & Record<string, unknown>): PublicUserSettings {
-  const { defaultReminder: _defaultReminder, ...publicSettings } = settings;
+function toPublicUserSettings(
+  settings: PublicUserSettings & { defaultReminder: number | null },
+): PublicUserSettings {
+  const { defaultReminder, ...publicSettings } = settings;
+  void defaultReminder;
   return publicSettings as PublicUserSettings;
 }
 
