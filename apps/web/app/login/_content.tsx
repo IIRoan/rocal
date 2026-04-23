@@ -16,6 +16,10 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import {
+  clearPendingAuthPassword,
+  storePendingAuthPassword,
+} from "@/lib/e2ee-password-cache";
 
 const log = createLogger("login");
 
@@ -143,12 +147,15 @@ export function LoginForm() {
         }
       }
 
+      storePendingAuthPassword(password);
+
       await syncThemeAfterAuth();
       setTimeout(() => {
         redirectAfterAuth();
       }, 100);
     } catch (err: any) {
       log.error("Email auth failed:", err);
+      clearPendingAuthPassword();
       setError(err.message || "Authentication failed. Please try again.");
       setEmailLoading(false);
     }
@@ -158,6 +165,7 @@ export function LoginForm() {
     try {
       setPasskeyLoading(true);
       setError(null);
+      clearPendingAuthPassword();
 
       const result = await authClient.signIn.passkey({
         autoFocus: true,
@@ -185,6 +193,7 @@ export function LoginForm() {
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true);
+      clearPendingAuthPassword();
       // Store current theme so it can be synced after OAuth redirect
       if (currentTheme) {
         localStorage.setItem("pending-theme-sync", currentTheme);

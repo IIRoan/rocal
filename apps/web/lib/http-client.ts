@@ -230,13 +230,24 @@ export class HttpClient {
     if (typeof obj === "object") {
       const transformed: any = {};
       for (const [key, value] of Object.entries(obj)) {
+        if (key === "blindIndexTokens" && typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            transformed[key] = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            transformed[key] = [];
+          }
+          continue;
+        }
+
         // Transform common date field names
         if (
           (key === "start" ||
             key === "end" ||
             key === "createdAt" ||
             key === "updatedAt" ||
-            key === "syncedAt") &&
+            key === "syncedAt" ||
+            key === "lastSeenAt") &&
           typeof value === "string"
         ) {
           const dateValue = new Date(value);

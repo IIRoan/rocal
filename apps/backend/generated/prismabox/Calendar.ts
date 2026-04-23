@@ -8,6 +8,10 @@ export const CalendarPlain = t.Object(
   {
     id: t.String(),
     name: t.String(),
+    encryptedName: __nullable__(t.String()),
+    blindIndexTokens: __nullable__(t.String()),
+    encryptionState: t.String(),
+    encryptionKeyVersion: t.Integer(),
     color: t.String(),
     kind: t.String(),
     isPublic: t.Boolean(),
@@ -43,6 +47,10 @@ export const CalendarRelations = t.Object(
           id: t.String(),
           title: t.String(),
           description: __nullable__(t.String()),
+          encryptedContent: __nullable__(t.String()),
+          blindIndexTokens: __nullable__(t.String()),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           start: t.Date(),
           end: t.Date(),
           allDay: t.Boolean(),
@@ -112,6 +120,10 @@ export const CalendarRelations = t.Object(
 export const CalendarPlainInputCreate = t.Object(
   {
     name: t.String(),
+    encryptedName: t.Optional(__nullable__(t.String())),
+    blindIndexTokens: t.Optional(__nullable__(t.String())),
+    encryptionState: t.Optional(t.String()),
+    encryptionKeyVersion: t.Optional(t.Integer()),
     color: t.String(),
     kind: t.Optional(t.String()),
     isPublic: t.Optional(t.Boolean()),
@@ -127,6 +139,10 @@ export const CalendarPlainInputCreate = t.Object(
 export const CalendarPlainInputUpdate = t.Object(
   {
     name: t.Optional(t.String()),
+    encryptedName: t.Optional(__nullable__(t.String())),
+    blindIndexTokens: t.Optional(__nullable__(t.String())),
+    encryptionState: t.Optional(t.String()),
+    encryptionKeyVersion: t.Optional(t.Integer()),
     color: t.Optional(t.String()),
     kind: t.Optional(t.String()),
     isPublic: t.Optional(t.Boolean()),
@@ -308,6 +324,10 @@ export const CalendarWhere = t.Partial(
           OR: t.Array(Self, { additionalProperties: false }),
           id: t.String(),
           name: t.String(),
+          encryptedName: t.String(),
+          blindIndexTokens: t.String(),
+          encryptionState: t.String(),
+          encryptionKeyVersion: t.Integer(),
           color: t.String(),
           kind: t.String(),
           isPublic: t.Boolean(),
@@ -376,6 +396,10 @@ export const CalendarWhereUnique = t.Recursive(
             {
               id: t.String(),
               name: t.String(),
+              encryptedName: t.String(),
+              blindIndexTokens: t.String(),
+              encryptionState: t.String(),
+              encryptionKeyVersion: t.Integer(),
               color: t.String(),
               kind: t.String(),
               isPublic: t.Boolean(),
@@ -402,6 +426,10 @@ export const CalendarSelect = t.Partial(
     {
       id: t.Boolean(),
       name: t.Boolean(),
+      encryptedName: t.Boolean(),
+      blindIndexTokens: t.Boolean(),
+      encryptionState: t.Boolean(),
+      encryptionKeyVersion: t.Boolean(),
       color: t.Boolean(),
       kind: t.Boolean(),
       isPublic: t.Boolean(),
@@ -443,6 +471,18 @@ export const CalendarOrderBy = t.Partial(
         additionalProperties: false,
       }),
       name: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      encryptedName: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      blindIndexTokens: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      encryptionState: t.Union([t.Literal("asc"), t.Literal("desc")], {
+        additionalProperties: false,
+      }),
+      encryptionKeyVersion: t.Union([t.Literal("asc"), t.Literal("desc")], {
         additionalProperties: false,
       }),
       color: t.Union([t.Literal("asc"), t.Literal("desc")], {

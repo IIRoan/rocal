@@ -12,6 +12,7 @@ import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { Logo } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
+import { clearPendingAuthPassword } from "@/lib/e2ee-password-cache";
 
 const log = createLogger("mobile-login");
 
@@ -117,6 +118,7 @@ export function MobileLoginForm() {
     try {
       setPasskeyLoading(true);
       setError(null);
+      clearPendingAuthPassword();
 
       const result = await authClient.signIn.passkey({
         autoFocus: true,
@@ -146,6 +148,7 @@ export function MobileLoginForm() {
     try {
       setIsLoading(true);
       setError(null);
+      clearPendingAuthPassword();
 
       const nextPath = getRedirectTarget();
       const mobileCompleteUrl = `/auth/mobile-complete?next=${encodeURIComponent(nextPath)}`;

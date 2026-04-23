@@ -187,6 +187,11 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     [settings?.theme, updateSettings],
   );
 
+  const calendarMap = useMemo(
+    () => new Map(calendarData.calendars.map((cal) => [cal.id, cal])),
+    [calendarData.calendars],
+  );
+
   // Optimized event filtering with deep memoization
   const visibleCalendarIds = useMemo(() => {
     return new Set(
@@ -196,13 +201,8 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     );
   }, [calendarData.calendars, isCalendarVisible]);
 
-  const transformedEvents = useMemo(() => {
-    // Create a map of calendar IDs to calendar objects for quick lookup
-    const calendarMap = new Map(
-      calendarData.calendars.map((cal) => [cal.id, cal]),
-    );
-
-    const transformedEventsList: CalendarEvent[] = calendarData.events
+  const baseTransformedEvents = useMemo<CalendarEvent[]>(() => {
+    return calendarData.events
       .filter((event) => visibleCalendarIds.has(event.calendarId)) // O(1) lookup
       .map((event) => {
         // Use event's color if it exists, otherwise fall back to calendar color
@@ -219,6 +219,15 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         };
       });
 
+  }, [calendarData.events, visibleCalendarIds, calendarMap]);
+
+  const transformedEvents = useMemo(() => {
+    if (!previewEvent && !contextPreviewEvent) {
+      return baseTransformedEvents;
+    }
+
+    const transformedEventsList: CalendarEvent[] = [...baseTransformedEvents];
+
     // Merge preview event into the list if it exists
     if (previewEvent) {
       const calendar = calendarMap.get(previewEvent.calendarId);
@@ -232,7 +241,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         categoryId: previewEvent.categoryId ?? undefined,
         reminder: (previewEvent as any).reminder ?? undefined,
         isPreview: true,
-      });
+      } as CalendarEvent);
     }
 
     // Merge context-menu preview (ghost event while right-click menu is open)
@@ -248,17 +257,16 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         categoryId: contextPreviewEvent.categoryId ?? undefined,
         reminder: (contextPreviewEvent as any).reminder ?? undefined,
         isPreview: true,
-      });
+      } as CalendarEvent);
     }
 
     return transformedEventsList;
   }, [
-    calendarData.events,
-    calendarData.calendars,
-    visibleCalendarIds,
+    baseTransformedEvents,
+    calendarMap,
     previewEvent,
     contextPreviewEvent,
-  ]); // Add calendars + previewEvent + contextPreviewEvent to deps
+  ]);
 
   // Show calendar skeleton and overlay until ALL core elements are ready:
   // - settings
@@ -315,7 +323,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
       showWeekNumbers={settings?.showWeekNumbers}
       compactView={settings?.compactView}
       timeFormat={settings?.timeFormat}
-      defaultReminder={settings?.defaultReminder}
       defaultEventDuration={settings?.defaultEventDuration}
       defaultCalendarId={settings?.defaultCalendarId}
       weekStartDay={settings?.weekStartDay}

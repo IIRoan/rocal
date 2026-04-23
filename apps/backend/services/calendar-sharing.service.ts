@@ -95,6 +95,17 @@ export class CalendarSharingService implements ICalendarSharingService {
   ): Promise<CalendarShareLinkResponse> {
     const { userId, calendarId, baseUrl, regenerate = false } = input;
 
+    const userSettings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: { eventEncryptionMode: true },
+    });
+
+    if (userSettings?.eventEncryptionMode === "full") {
+      throw new ValidationError(
+        "Calendar sharing is unavailable while full event encryption is enabled.",
+      );
+    }
+
     const calendar = await this.prisma.calendar.findFirst({
       where: { id: calendarId, userId },
       select: {
@@ -112,6 +123,20 @@ export class CalendarSharingService implements ICalendarSharingService {
     if (calendar.isSyncOnly) {
       throw new ValidationError(
         "Cannot share a synced calendar. This calendar is read-only and synced from an external subscription.",
+      );
+    }
+
+    const encryptedEventCount = await this.prisma.calendarEvent.count({
+      where: {
+        calendarId: calendar.id,
+        userId,
+        encryptionState: "encrypted",
+      },
+    });
+
+    if (encryptedEventCount > 0) {
+      throw new ValidationError(
+        "This calendar contains fully encrypted events. Reopen and save those events before enabling sharing.",
       );
     }
 
@@ -182,6 +207,12 @@ export class CalendarSharingService implements ICalendarSharingService {
 
     if (!calendar) {
       throw new NotFoundError("Shared calendar not found");
+    }
+
+    if (calendar.events.some((event) => event.encryptionState === "encrypted")) {
+      throw new ValidationError(
+        "This shared calendar contains fully encrypted events and cannot be exported.",
+      );
     }
 
     const timezoneSource = calendar.events.find(

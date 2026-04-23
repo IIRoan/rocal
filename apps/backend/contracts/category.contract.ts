@@ -1,3 +1,4 @@
+import type { RowEncryptionState } from "../lib/encryption-state";
 import type { EventCategory } from "../generated/prisma/index.js";
 
 export type CategoryWithCount = EventCategory & { usageCount: number };
@@ -6,6 +7,10 @@ export type CategoryCreateInput = {
   userId: string;
   name: string;
   color: string;
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: RowEncryptionState;
+  encryptionKeyVersion?: number;
 };
 
 export type CategoryUpdateInput = {
@@ -13,6 +18,10 @@ export type CategoryUpdateInput = {
   categoryId: string;
   name?: string;
   color?: string;
+  encryptedName?: string;
+  blindIndexTokens?: string[];
+  encryptionState?: RowEncryptionState;
+  encryptionKeyVersion?: number;
 };
 
 export type CategoryDeleteInput = {

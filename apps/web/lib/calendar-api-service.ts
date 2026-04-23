@@ -1,5 +1,13 @@
 import { httpClient, HttpClient } from "./http-client";
 import { getApiBaseUrl } from "./api-url";
+import { waitForPendingE2eeBootstrap } from "./e2ee-bootstrap";
+import { createBlindIndexTokens, decryptJsonPayload } from "./e2ee-crypto";
+import {
+  attachCalendarEncryptionShadow,
+  attachCategoryEncryptionShadow,
+  attachEventEncryptionShadow,
+} from "./e2ee-payloads";
+import { getActiveE2eeSession } from "./e2ee-session";
 import {
   CalendarEvent,
   Calendar,
@@ -43,11 +51,118 @@ import {
 } from "./types/calendar";
 // Browser notifications removed
 
+const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+
 export class CalendarApiService {
   private client: HttpClient;
 
   constructor(client?: HttpClient) {
     this.client = client || httpClient;
+  }
+
+  private async getE2eeSession() {
+    let session = getActiveE2eeSession();
+
+    if (session) {
+      return session;
+    }
+
+    const pendingBootstrap = waitForPendingE2eeBootstrap();
+    if (pendingBootstrap) {
+      await pendingBootstrap.catch(() => undefined);
+      session = getActiveE2eeSession();
+    }
+
+    return session;
+  }
+
+  private normalizeCalendarForUi(calendar: Calendar): Calendar {
+    return {
+      ...calendar,
+      encryptionState:
+        calendar.encryptionState ??
+        (calendar.encryptedName ? "shadow_write" : "plaintext"),
+      encryptedName: null,
+      blindIndexTokens: null,
+    };
+  }
+
+  private normalizeCategoryForUi(category: EventCategory): EventCategory {
+    return {
+      ...category,
+      encryptionState:
+        category.encryptionState ??
+        (category.encryptedName ? "shadow_write" : "plaintext"),
+      encryptedName: null,
+      blindIndexTokens: null,
+    };
+  }
+
+  private normalizeEventForUi(event: CalendarEvent): CalendarEvent {
+    return {
+      ...event,
+      encryptionState:
+        event.encryptionState ??
+        (event.encryptedContent ? "shadow_write" : "plaintext"),
+      encryptedContent: null,
+      blindIndexTokens: null,
+    };
+  }
+
+  private normalizeUndecryptableEncryptedEvent(
+    event: CalendarEvent,
+  ): CalendarEvent {
+    return this.normalizeEventForUi({
+      ...event,
+      title: event.title?.trim() || ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+      description: null,
+      location: null,
+      encryptionState: "encrypted",
+    });
+  }
+
+  private async hydrateEncryptedEvent(
+    event: CalendarEvent,
+  ): Promise<CalendarEvent> {
+    if (
+      event.encryptionState !== "encrypted" ||
+      !event.encryptedContent ||
+      typeof event.encryptedContent !== "string"
+    ) {
+      return this.normalizeEventForUi(event);
+    }
+
+    const session = await this.getE2eeSession();
+    if (!session) {
+      return this.normalizeUndecryptableEncryptedEvent(event);
+    }
+
+    try {
+      const payload = JSON.parse(event.encryptedContent);
+      const decrypted = await decryptJsonPayload<{
+        title: string;
+        description?: string | null;
+        location?: string | null;
+      }>(session.accountKey, payload, "event-content:v1");
+
+      return this.normalizeEventForUi({
+        ...event,
+        title:
+          decrypted.title?.trim() ||
+          event.title?.trim() ||
+          ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+        description: decrypted.description ?? null,
+        location: decrypted.location ?? null,
+      });
+    } catch {
+      return this.normalizeUndecryptableEncryptedEvent(event);
+    }
+  }
+
+  private async hydrateEncryptedEvents(
+    events: CalendarEvent[],
+  ): Promise<CalendarEvent[]> {
+    return Promise.all(events.map((event) => this.hydrateEncryptedEvent(event)));
   }
 
   // Events API methods
@@ -94,7 +209,16 @@ export class CalendarApiService {
       }
 
       // Note: If backend later adds X-Total-Count header or similar metadata, we can extend HttpClient to expose headers here
-      return response;
+      return {
+        ...response,
+        events: await this.hydrateEncryptedEvents(response.events),
+        calendars: response.calendars.map((calendar) =>
+          this.normalizeCalendarForUi(calendar),
+        ),
+        categories: response.categories.map((category) =>
+          this.normalizeCategoryForUi(category),
+        ),
+      };
     } catch (error) {
       throw this.transformError(error, "Failed to fetch events");
     }
@@ -105,7 +229,7 @@ export class CalendarApiService {
       const response = await this.client.get<CalendarEvent>(
         `/api/events/${id}`,
       );
-      return response;
+      return await this.hydrateEncryptedEvent(response);
     } catch (error) {
       throw this.transformError(error, "Failed to fetch event");
     }
@@ -117,6 +241,16 @@ export class CalendarApiService {
   ): Promise<EventSearchResult> {
     try {
       const searchParams = new URLSearchParams({ q: params.q });
+      const session = await this.getE2eeSession();
+      if (session) {
+        const blindIndexTokens = await createBlindIndexTokens(
+          session.blindIndexKey,
+          params.q,
+        );
+        if (blindIndexTokens.length > 0) {
+          searchParams.set("blindIndexTokens", blindIndexTokens.join(","));
+        }
+      }
       if (params.limit) searchParams.set("limit", String(params.limit));
       if (params.offset) searchParams.set("offset", String(params.offset));
       if (params.startDate) searchParams.set("startDate", params.startDate);
@@ -126,7 +260,10 @@ export class CalendarApiService {
         `/api/events/search?${searchParams.toString()}`,
         { signal },
       );
-      return response;
+      return {
+        ...response,
+        events: await this.hydrateEncryptedEvents(response.events),
+      };
     } catch (error) {
       throw this.transformError(error, "Failed to search events");
     }
@@ -134,11 +271,12 @@ export class CalendarApiService {
 
   async createEvent(event: CreateEventRequest): Promise<CalendarEvent> {
     try {
+      const payload = await attachEventEncryptionShadow(event);
       const response = await this.client.post<CalendarEvent>(
         "/api/events",
-        event,
+        payload,
       );
-      return response;
+      return await this.hydrateEncryptedEvent(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create event");
     }
@@ -149,11 +287,12 @@ export class CalendarApiService {
     event: UpdateEventRequest,
   ): Promise<CalendarEvent> {
     try {
+      const payload = await attachEventEncryptionShadow(event);
       const response = await this.client.put<CalendarEvent>(
         `/api/events/${id}`,
-        event,
+        payload,
       );
-      return response;
+      return await this.hydrateEncryptedEvent(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update event");
     }
@@ -175,7 +314,9 @@ export class CalendarApiService {
     try {
       const response =
         await this.client.get<CalendarsResponse>("/api/calendars");
-      return response.calendars;
+      return response.calendars.map((calendar) =>
+        this.normalizeCalendarForUi(calendar),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch calendars");
     }
@@ -183,11 +324,12 @@ export class CalendarApiService {
 
   async createCalendar(calendar: CreateCalendarRequest): Promise<Calendar> {
     try {
+      const payload = await attachCalendarEncryptionShadow(calendar);
       const response = await this.client.post<Calendar>(
         "/api/calendars",
-        calendar,
+        payload,
       );
-      return response;
+      return this.normalizeCalendarForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create calendar");
     }
@@ -198,11 +340,12 @@ export class CalendarApiService {
     calendar: UpdateCalendarRequest,
   ): Promise<Calendar> {
     try {
+      const payload = await attachCalendarEncryptionShadow(calendar);
       const response = await this.client.put<Calendar>(
         `/api/calendars/${id}`,
-        calendar,
+        payload,
       );
-      return response;
+      return this.normalizeCalendarForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update calendar");
     }
@@ -224,7 +367,9 @@ export class CalendarApiService {
     try {
       const response =
         await this.client.get<CategoriesResponse>("/api/categories");
-      return response.categories;
+      return response.categories.map((category) =>
+        this.normalizeCategoryForUi(category),
+      );
     } catch (error) {
       throw this.transformError(error, "Failed to fetch categories");
     }
@@ -234,11 +379,12 @@ export class CalendarApiService {
     category: CreateCategoryRequest,
   ): Promise<EventCategory> {
     try {
+      const payload = await attachCategoryEncryptionShadow(category);
       const response = await this.client.post<EventCategory>(
         "/api/categories",
-        category,
+        payload,
       );
-      return response;
+      return this.normalizeCategoryForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to create category");
     }
@@ -249,11 +395,12 @@ export class CalendarApiService {
     category: UpdateCategoryRequest,
   ): Promise<EventCategory> {
     try {
+      const payload = await attachCategoryEncryptionShadow(category);
       const response = await this.client.put<EventCategory>(
         `/api/categories/${id}`,
-        category,
+        payload,
       );
-      return response;
+      return this.normalizeCategoryForUi(response);
     } catch (error) {
       throw this.transformError(error, "Failed to update category");
     }
