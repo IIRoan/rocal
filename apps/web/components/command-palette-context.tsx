@@ -107,18 +107,20 @@ export function CommandPaletteProvider({
     event?: CalendarEvent,
     options?: EventEditorOptions,
   ) => {
+    const nextPreviewEvent =
+      options?.mode === "popover" && event
+        ? { ...event, isPreview: true }
+        : null;
+
+    // The desktop popover positions itself relative to the preview event in the
+    // timeline. This must be committed in the same render as opening the editor;
+    // if we defer it in a transition, the first layout pass falls back to the
+    // raw click point and can overlap the event until a later recompute.
+    setPreviewEvent(nextPreviewEvent);
     setEventToEdit(event || null);
     setEventEditorMode(options?.mode || "modal");
     setPopoverAnchorPosition(options?.anchorPosition || null);
     setInitialEventViewMode(options?.eventViewMode || "view");
-    // Create preview event for popover mode (timeline clicks)
-    if (options?.mode === "popover" && event) {
-      startTransition(() => {
-        setPreviewEvent({ ...event, isPreview: true });
-      });
-    } else {
-      setPreviewEvent(null);
-    }
     setInitialView("event-editor");
     setIsOpen(true);
   };
@@ -174,4 +176,3 @@ export function CommandPaletteProvider({
     </CommandPaletteContext.Provider>
   );
 }
-

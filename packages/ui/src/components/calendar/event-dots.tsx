@@ -112,7 +112,7 @@ export function EventDots({
                   style={getEventColorStyles(event.color)}
                 >
                   <span className="flex items-center gap-1 min-w-0 truncate">
-                    <EncryptionStatusBadge item={event} />
+                    <EncryptionStatusBadge item={event} asIcon />
                     <span className="truncate">{event.title}</span>
                   </span>
                 </div>
@@ -164,7 +164,7 @@ export function EventDots({
               >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
-                    <EncryptionStatusBadge item={event} />
+                    <EncryptionStatusBadge item={event} asIcon />
                     <span className="truncate">{event.title}</span>
                   </div>
                   {event.location && (
