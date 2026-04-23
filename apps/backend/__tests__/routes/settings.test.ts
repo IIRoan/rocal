@@ -11,6 +11,10 @@ jest.mock("../../lib/prisma", () => ({
     },
     calendar: {
       findFirst: jest.fn(async (): Promise<any> => null),
+      findMany: jest.fn(async (): Promise<any> => []),
+      updateMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
+    },
+    calendarEvent: {
       updateMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
     $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
@@ -53,6 +57,10 @@ const mockPrisma = prisma as unknown as {
   };
   calendar: {
     findFirst: jest.Mock<() => Promise<any>>;
+    findMany: jest.Mock<() => Promise<any>>;
+    updateMany: jest.Mock<() => Promise<any>>;
+  };
+  calendarEvent: {
     updateMany: jest.Mock<() => Promise<any>>;
   };
   $transaction: jest.Mock;
@@ -278,6 +286,10 @@ describe("settingsRoutes", () => {
       eventEncryptionMode: "full",
     };
     mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    mockPrisma.calendar.findMany.mockResolvedValue([
+      { id: "calendar-1" },
+      { id: "calendar-2" },
+    ]);
     mockPrisma.userSettings.upsert.mockResolvedValue(savedSettings);
 
     const response = await createApp().handle(
@@ -296,6 +308,21 @@ describe("settingsRoutes", () => {
       data: {
         icsShareEnabled: false,
         icsShareToken: null,
+        updatedAt: expect.any(Date),
+      },
+    });
+    expect(mockPrisma.calendarEvent.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        calendarId: { in: ["calendar-1", "calendar-2"] },
+        encryptedContent: { not: null },
+        encryptionState: { not: "encrypted" },
+      },
+      data: {
+        title: "",
+        description: null,
+        location: null,
+        encryptionState: "encrypted",
         updatedAt: expect.any(Date),
       },
     });

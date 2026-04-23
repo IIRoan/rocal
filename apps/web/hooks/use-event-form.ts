@@ -22,6 +22,99 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const log = createLogger("event-form");
 
+type NotificationPayload = Pick<
+  EventNotification,
+  "notificationType" | "minutesBefore" | "isEnabled"
+>;
+
+function createLegacyReminderNotification(reminder: number): EventNotification {
+  return {
+    notificationType: "email",
+    minutesBefore: reminder,
+    isEnabled: true,
+  };
+}
+
+function getFallbackNotifications(
+  reminder: number | null | undefined,
+): EventNotification[] {
+  return reminder && reminder > 0
+    ? [createLegacyReminderNotification(reminder)]
+    : [];
+}
+
+function getReminderFromNotifications(
+  notifications: NotificationPayload[],
+): number | null {
+  const reminderMinutes = notifications
+    .filter(
+      (notification) =>
+        notification.isEnabled && notification.notificationType === "email",
+    )
+    .map((notification) => Number(notification.minutesBefore) || 0)
+    .filter((minutes) => minutes > 0);
+
+  return reminderMinutes.length > 0 ? Math.min(...reminderMinutes) : null;
+}
+
+function getDuplicateNotificationTimes(
+  notifications: EventNotification[],
+): number[] {
+  const notificationTimes = notifications
+    .filter((notification) => notification.isEnabled)
+    .map((notification) => notification.minutesBefore);
+
+  return notificationTimes.filter(
+    (time, index) => notificationTimes.indexOf(time) !== index,
+  );
+}
+
+function normalizeNotificationPayload(
+  notifications: EventNotification[],
+): NotificationPayload[] {
+  const uniqueNotifications = new Map<string, NotificationPayload>();
+
+  for (const notification of notifications) {
+    const minutesBefore = Math.max(
+      0,
+      Math.min(43200, Number(notification.minutesBefore) || 0),
+    );
+
+    if (!notification.isEnabled || !Number.isFinite(minutesBefore)) {
+      continue;
+    }
+
+    uniqueNotifications.set(
+      `${notification.notificationType}-${minutesBefore}`,
+      {
+        notificationType: notification.notificationType,
+        minutesBefore,
+        isEnabled: true,
+      },
+    );
+  }
+
+  return Array.from(uniqueNotifications.values());
+}
+
+function replaceLegacyReminder(
+  notifications: EventNotification[],
+  reminder: number | null,
+): EventNotification[] {
+  const nonEmailNotifications = notifications.filter(
+    (notification) => notification.notificationType !== "email",
+  );
+
+  if (!reminder || reminder <= 0) {
+    return nonEmailNotifications;
+  }
+
+  return [
+    ...nonEmailNotifications,
+    createLegacyReminderNotification(reminder),
+  ];
+}
+
 interface UseEventFormProps {
   calendars: Calendar[];
   localSettings: UserSettings;
@@ -117,7 +210,6 @@ export function useEventForm({
   const [eventAllDay, setEventAllDay] = useState(false);
   const [eventLocation, setEventLocation] = useState("");
   const [eventCalendarId, setEventCalendarId] = useState<string>("");
-  const [eventReminder, setEventReminder] = useState<number | null>(null);
   const [eventSaving, setEventSaving] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(
@@ -135,11 +227,25 @@ export function useEventForm({
   }>({});
 
   // Notification state
-  const [eventNotifications, setEventNotifications] = useState<
+  const [eventNotifications, setEventNotificationsState] = useState<
     EventNotification[]
   >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const eventReminder = getReminderFromNotifications(eventNotifications);
+
+  const setEventReminder = useCallback((reminder: number | null) => {
+    setEventNotificationsState((currentNotifications) =>
+      replaceLegacyReminder(currentNotifications, reminder),
+    );
+  }, []);
+
+  const setEventNotifications = useCallback(
+    (notifications: EventNotification[]) => {
+      setEventNotificationsState(notifications);
+    },
+    [],
+  );
 
   // Mutations
   const validateRecurrenceMutation = useMutation({
@@ -178,16 +284,7 @@ export function useEventForm({
   const loadEventData = useCallback(
     async (event: CalendarEvent) => {
       const isNewEvent = !event.id || event.id === "" || event.id === undefined;
-      const fallbackNotifications =
-        event.reminder && event.reminder > 0
-          ? [
-              {
-                notificationType: "email" as const,
-                minutesBefore: event.reminder,
-                isEnabled: true,
-              },
-            ]
-          : [];
+      const fallbackNotifications = getFallbackNotifications(event.reminder);
 
       setSelectedEvent(event);
       setEventViewMode(isNewEvent ? "edit" : "view");
@@ -204,8 +301,8 @@ export function useEventForm({
           calendarsRef.current?.find((c) => !c.isSyncOnly)?.id ||
           "",
       );
-      setEventReminder(event.reminder ?? null);
-      setShowNotifications(false);
+      setEventNotifications(fallbackNotifications);
+      setShowNotifications(fallbackNotifications.length > 0);
 
       // Handle recurring event data
       const hasRecurrence = !!event.recurrence;
@@ -288,7 +385,6 @@ export function useEventForm({
     setEventCalendarId(
       calendarsRef.current?.find((c) => !c.isSyncOnly)?.id || "",
     );
-    setEventReminder(null);
     setEventNotifications([]);
     setIsRecurring(false);
     setRecurrenceRule(null);
@@ -359,7 +455,7 @@ export function useEventForm({
     (notifications: EventNotification[]) => {
       setEventNotifications(notifications);
     },
-    [],
+    [setEventNotifications],
   );
 
   // Save event
@@ -398,15 +494,7 @@ export function useEventForm({
       }
 
       // Validate for duplicate notifications
-      const enabledNotifications = eventNotifications.filter(
-        (n) => n.isEnabled,
-      );
-      const notificationTimes = enabledNotifications.map(
-        (n) => n.minutesBefore,
-      );
-      const duplicateTimes = notificationTimes.filter(
-        (time, index) => notificationTimes.indexOf(time) !== index,
-      );
+      const duplicateTimes = getDuplicateNotificationTimes(eventNotifications);
 
       if (duplicateTimes.length > 0) {
         const uniqueDuplicates = [...new Set(duplicateTimes)];
@@ -464,33 +552,8 @@ export function useEventForm({
           isRecurring && recurrenceRule ? JSON.stringify(recurrenceRule) : null,
       };
 
-      // Convert legacy reminder to notification if needed
-      let finalNotifications = [...eventNotifications];
-      if (eventReminder && eventReminder > 0) {
-        const existingNotification = finalNotifications.find(
-          (n) =>
-            n.minutesBefore === eventReminder && n.notificationType === "email",
-        );
-
-        if (!existingNotification) {
-          finalNotifications.push({
-            notificationType: "email",
-            minutesBefore: eventReminder,
-            isEnabled: true,
-          });
-        }
-      }
-
-      const reminderMinutes = finalNotifications
-        .filter(
-          (notification) =>
-            notification.isEnabled && notification.notificationType === "email",
-        )
-        .map((notification) => Number(notification.minutesBefore) || 0)
-        .filter((minutes) => minutes > 0);
-
-      eventData.reminder =
-        reminderMinutes.length > 0 ? Math.min(...reminderMinutes) : null;
+      const notificationData = normalizeNotificationPayload(eventNotifications);
+      eventData.reminder = getReminderFromNotifications(notificationData);
 
       setEventSaving(true);
       try {
@@ -499,9 +562,10 @@ export function useEventForm({
           selectedEvent.id !== "" &&
           selectedEvent.id !== undefined;
         let savedEventId = selectedEvent?.id;
+        let persistedEvent: CalendarEvent | null = null;
 
         if (isUpdate) {
-          await calendarData.updateEvent(selectedEvent.id, {
+          persistedEvent = await calendarData.updateEvent(selectedEvent.id, {
             title: eventData.title,
             description: eventData.description,
             start: eventData.start.toISOString(),
@@ -513,6 +577,7 @@ export function useEventForm({
             reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? null,
           });
+          savedEventId = persistedEvent?.id ?? selectedEvent.id;
           toast.success(`Event "${eventTitle}" updated`);
         } else {
           const newEvent = await calendarData.createEvent({
@@ -527,41 +592,20 @@ export function useEventForm({
             reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? undefined,
           });
+          persistedEvent = newEvent;
           savedEventId = newEvent.id;
           toast.success(`Event "${eventTitle}" created`);
         }
 
         // Save notifications (non-blocking, sanitized)
         if (savedEventId) {
-          // Sanitize: clamp minutes, remove invalid, dedupe by type+minutes
-          const clamped = finalNotifications
-            .map((n) => ({
-              notificationType: n.notificationType,
-              minutesBefore: Math.max(
-                0,
-                Math.min(43200, Number(n.minutesBefore) || 0),
-              ),
-              isEnabled: !!n.isEnabled,
-            }))
-            .filter((n) => n.isEnabled && Number.isFinite(n.minutesBefore));
-
-          const uniqueMap = new Map<
-            string,
-            {
-              notificationType: "browser" | "email";
-              minutesBefore: number;
-              isEnabled: boolean;
-            }
-          >();
-          for (const n of clamped) {
-            uniqueMap.set(`${n.notificationType}-${n.minutesBefore}`, n);
-          }
-          const notificationData = Array.from(uniqueMap.values());
-
-          // If the event starts in the past, skip notifications entirely
+          // If the event starts in the past, skip creating future reminders,
+          // but still allow an empty update to clear existing rows.
           const now = new Date();
           const startsInFuture = new Date(eventData.start) > now;
-          if (startsInFuture && notificationData.length > 0) {
+          const shouldSyncNotifications =
+            notificationData.length === 0 || startsInFuture;
+          if (shouldSyncNotifications) {
             try {
               await updateNotificationsMutation.mutateAsync({
                 eventId: savedEventId,
@@ -580,6 +624,45 @@ export function useEventForm({
               } as any);
             }
           }
+        }
+
+        if (savedEventId) {
+          const nextEvent: CalendarEvent = {
+            ...(selectedEvent ?? {}),
+            ...eventData,
+            ...(persistedEvent ?? {}),
+            id: persistedEvent?.id ?? savedEventId,
+            reminder:
+              persistedEvent && "reminder" in persistedEvent
+                ? (persistedEvent.reminder ?? null)
+                : (eventData.reminder ?? null),
+            start: new Date(persistedEvent?.start ?? eventData.start),
+            end: new Date(persistedEvent?.end ?? eventData.end),
+            createdAt: new Date(
+              persistedEvent?.createdAt ??
+                selectedEvent?.createdAt ??
+                eventData.createdAt,
+            ),
+            updatedAt: new Date(
+              persistedEvent?.updatedAt ?? eventData.updatedAt,
+            ),
+          };
+
+          queryClient.setQueriesData<CalendarEvent[]>({ queryKey: ["events"] }, (oldEvents) => {
+            if (!oldEvents) {
+              return oldEvents;
+            }
+
+            if (oldEvents.some((event) => event.id === nextEvent.id)) {
+              return oldEvents.map((event) =>
+                event.id === nextEvent.id ? { ...event, ...nextEvent } : event,
+              );
+            }
+
+            return isUpdate ? oldEvents : [...oldEvents, nextEvent];
+          });
+
+          setSelectedEvent(nextEvent);
         }
 
         onEventSaved?.();
@@ -637,9 +720,9 @@ export function useEventForm({
       eventLocation,
       calendars,
       selectedEvent,
-      eventReminder,
       onEventSaved,
       onClose,
+      queryClient,
       resetForm,
       validateRecurrenceMutation,
       updateNotificationsMutation,

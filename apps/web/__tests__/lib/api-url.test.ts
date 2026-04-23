@@ -35,7 +35,12 @@ const originalEnv = {
     process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL,
 };
 
-const originalWindow = globalThis.window;
+type TestGlobal = typeof globalThis & {
+  window?: Window & typeof globalThis;
+};
+
+const testGlobal = globalThis as TestGlobal;
+const originalWindow = testGlobal.window;
 
 describe("api-url helpers", () => {
   beforeEach(() => {
@@ -43,14 +48,14 @@ describe("api-url helpers", () => {
     delete process.env.NEXT_PUBLIC_API_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
     delete process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL;
-    delete (globalThis as typeof globalThis & { window?: Window }).window;
+    delete testGlobal.window;
   });
 
   afterEach(() => {
     if (originalWindow) {
-      globalThis.window = originalWindow;
+      testGlobal.window = originalWindow;
     } else {
-      delete (globalThis as typeof globalThis & { window?: Window }).window;
+      delete testGlobal.window;
     }
 
     process.env.NEXT_PUBLIC_API_URL = originalEnv.NEXT_PUBLIC_API_URL;
@@ -67,23 +72,23 @@ describe("api-url helpers", () => {
 
   it("uses the native webview host for API requests on mobile", () => {
     mockIsNativePlatform.mockReturnValue(true);
-    globalThis.window = {
+    testGlobal.window = {
       location: {
         protocol: "https:",
         hostname: "app.solace.test",
       },
-    } as Window;
+    } as Window & typeof globalThis;
 
     expect(getApiBaseUrl()).toBe("https://app.solace.test:3001");
   });
 
   it("uses the native webview origin as the app base url on mobile", () => {
     mockIsNativePlatform.mockReturnValue(true);
-    globalThis.window = {
+    testGlobal.window = {
       location: {
         origin: "capacitor://localhost",
       },
-    } as Window;
+    } as Window & typeof globalThis;
 
     expect(getAppBaseUrl()).toBe("capacitor://localhost");
   });
