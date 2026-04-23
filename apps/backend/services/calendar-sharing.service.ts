@@ -11,6 +11,10 @@ import {
 } from "@workspace/calendar-ics";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { toIcsBuildEvent } from "../lib/ics-export";
+import {
+  backfillEncryptedEventsToCiphertextOnly,
+  normalizeEventEncryptionMode,
+} from "../lib/event-encryption";
 
 const SHARE_TOKEN_LENGTH = 40;
 const SHARE_TOKEN_ALPHABET =
@@ -164,10 +168,20 @@ export class CalendarSharingService implements ICalendarSharingService {
   ): Promise<DisableCalendarShareLinkResponse> {
     const { userId, calendarId } = input;
 
-    const calendar = await this.prisma.calendar.findFirst({
-      where: { id: calendarId, userId },
-      select: { id: true, isSyncOnly: true },
-    });
+    const [calendar, userSettings] = await Promise.all([
+      this.prisma.calendar.findFirst({
+        where: { id: calendarId, userId },
+        select: {
+          id: true,
+          forceFullEncryption: true,
+          isSyncOnly: true,
+        },
+      }),
+      this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: { eventEncryptionMode: true },
+      }),
+    ]);
 
     if (!calendar) {
       throw new ValidationError("Calendar not found or access denied");
@@ -177,9 +191,19 @@ export class CalendarSharingService implements ICalendarSharingService {
       throw new ValidationError("Cannot modify sharing for a synced calendar.");
     }
 
+    const now = new Date();
     await this.prisma.calendar.update({
       where: { id: calendar.id },
-      data: { icsShareEnabled: false, icsShareToken: null },
+      data: { icsShareEnabled: false, icsShareToken: null, updatedAt: now },
+    });
+
+    await backfillEncryptedEventsToCiphertextOnly(this.prisma, {
+      userId,
+      calendarId: calendar.id,
+      preserveReminderDependentShadows:
+        normalizeEventEncryptionMode(userSettings?.eventEncryptionMode) !==
+          "full" && calendar.forceFullEncryption !== true,
+      now,
     });
 
     return { success: true };

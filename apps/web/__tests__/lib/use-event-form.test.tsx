@@ -41,6 +41,10 @@ const mockGetEventNotifications =
   calendarApiService.getEventNotifications as jest.MockedFunction<
     typeof calendarApiService.getEventNotifications
   >;
+const mockUpdateEventNotifications =
+  calendarApiService.updateEventNotifications as jest.MockedFunction<
+    typeof calendarApiService.updateEventNotifications
+  >;
 
 const calendars = [
   {
@@ -70,14 +74,22 @@ const baseEvent = {
 let container: HTMLDivElement;
 let queryClient: QueryClient;
 let root: Root;
-let latestForm: ReturnType<typeof useEventForm> | null;
+let latestFormRef: { current: ReturnType<typeof useEventForm> | null };
 
-function Harness() {
-  latestForm = useEventForm({
+function Harness({
+  onReady,
+}: {
+  onReady: (form: ReturnType<typeof useEventForm>) => void;
+}) {
+  const form = useEventForm({
     calendars,
     localSettings,
     onClose: () => {},
   });
+
+  React.useEffect(() => {
+    onReady(form);
+  }, [form, onReady]);
 
   return null;
 }
@@ -85,7 +97,11 @@ function Harness() {
 describe("useEventForm reminder hydration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    latestForm = null;
+    mockUpdateEventNotifications.mockResolvedValue({
+      message: "ok",
+      success: true,
+    } as any);
+    latestFormRef = { current: null };
     container = document.createElement("div");
     document.body.appendChild(container);
     queryClient = new QueryClient({
@@ -99,7 +115,11 @@ describe("useEventForm reminder hydration", () => {
     act(() => {
       root.render(
         <QueryClientProvider client={queryClient}>
-          <Harness />
+          <Harness
+            onReady={(form) => {
+              latestFormRef.current = form;
+            }}
+          />
         </QueryClientProvider>,
       );
     });
@@ -129,11 +149,11 @@ describe("useEventForm reminder hydration", () => {
     } as any);
 
     await act(async () => {
-      await (latestForm!.loadEventData as any)(baseEvent);
+      await (latestFormRef.current!.loadEventData as any)(baseEvent);
     });
 
     expect(mockGetEventNotifications).toHaveBeenCalledWith("event-1");
-    expect(latestForm?.eventNotifications).toEqual([
+    expect(latestFormRef.current?.eventNotifications).toEqual([
       {
         id: "notif-1",
         isEnabled: true,
@@ -141,7 +161,7 @@ describe("useEventForm reminder hydration", () => {
         notificationType: "email",
       },
     ]);
-    expect(latestForm?.showNotifications).toBe(true);
+    expect(latestFormRef.current?.showNotifications).toBe(true);
   });
 
   it("falls back to the legacy reminder when no notification rows exist", async () => {
@@ -151,20 +171,20 @@ describe("useEventForm reminder hydration", () => {
     } as any);
 
     await act(async () => {
-      await (latestForm!.loadEventData as any)({
+      await (latestFormRef.current!.loadEventData as any)({
         ...baseEvent,
         reminder: 30,
       });
     });
 
-    expect(latestForm?.eventNotifications).toEqual([
+    expect(latestFormRef.current?.eventNotifications).toEqual([
       {
         isEnabled: true,
         minutesBefore: 30,
         notificationType: "email",
       },
     ]);
-    expect(latestForm?.showNotifications).toBe(true);
+    expect(latestFormRef.current?.showNotifications).toBe(true);
   });
 
   it("keeps the reminder section collapsed when no reminders exist", async () => {
@@ -174,10 +194,243 @@ describe("useEventForm reminder hydration", () => {
     } as any);
 
     await act(async () => {
-      await (latestForm!.loadEventData as any)(baseEvent);
+      await (latestFormRef.current!.loadEventData as any)(baseEvent);
     });
 
-    expect(latestForm?.eventNotifications).toEqual([]);
-    expect(latestForm?.showNotifications).toBe(false);
+    expect(latestFormRef.current?.eventNotifications).toEqual([]);
+    expect(latestFormRef.current?.showNotifications).toBe(false);
+  });
+
+  it("does not re-add the removed minimum reminder when a later reminder remains", async () => {
+    const futureEvent = {
+      ...baseEvent,
+      end: new Date("2099-04-24T17:30:00.000Z"),
+      reminder: 15,
+      start: new Date("2099-04-24T16:45:00.000Z"),
+      title: "Reminder reshuffle",
+    };
+    const calendarData = {
+      updateEvent: jest.fn(async (_eventId: string, event: any) => ({
+        ...futureEvent,
+        ...event,
+        id: "event-1",
+        reminder: 30,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        updatedAt: new Date("2099-04-24T12:00:00.000Z"),
+      })),
+    };
+
+    mockGetEventNotifications.mockResolvedValueOnce({
+      data: {
+        notifications: [
+          {
+            id: "notif-15",
+            isEnabled: true,
+            minutesBefore: 15,
+            notificationType: "email",
+          },
+          {
+            id: "notif-30",
+            isEnabled: true,
+            minutesBefore: 30,
+            notificationType: "email",
+          },
+        ],
+      },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(futureEvent as any);
+    });
+
+    act(() => {
+      latestFormRef.current!.handleNotificationChange([
+        {
+          id: "notif-30",
+          isEnabled: true,
+          minutesBefore: 30,
+          notificationType: "email",
+        },
+      ]);
+    });
+
+    await act(async () => {
+      await latestFormRef.current!.handleEventSave(calendarData);
+    });
+
+    expect(calendarData.updateEvent).toHaveBeenCalledWith("event-1", {
+      title: "Reminder reshuffle",
+      description: undefined,
+      start: "2099-04-24T16:45:00.000Z",
+      end: "2099-04-24T17:30:00.000Z",
+      timezone: "UTC",
+      allDay: false,
+      location: undefined,
+      calendarId: "cal-1",
+      reminder: 30,
+      recurrence: null,
+    });
+    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", [
+      {
+        isEnabled: true,
+        minutesBefore: 30,
+        notificationType: "email",
+      },
+    ]);
+  });
+
+  it("clears the last reminder without requiring manual legacy reminder resets", async () => {
+    const futureEvent = {
+      ...baseEvent,
+      end: new Date("2099-04-24T17:30:00.000Z"),
+      reminder: 15,
+      start: new Date("2099-04-24T16:45:00.000Z"),
+      title: "Last reminder removal",
+    };
+    const calendarData = {
+      updateEvent: jest.fn(async (_eventId: string, event: any) => ({
+        ...futureEvent,
+        ...event,
+        id: "event-1",
+        reminder: null,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        updatedAt: new Date("2099-04-24T12:00:00.000Z"),
+      })),
+    };
+
+    mockGetEventNotifications.mockResolvedValueOnce({
+      data: {
+        notifications: [
+          {
+            id: "notif-15",
+            isEnabled: true,
+            minutesBefore: 15,
+            notificationType: "email",
+          },
+        ],
+      },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(futureEvent as any);
+    });
+
+    act(() => {
+      latestFormRef.current!.handleNotificationChange([]);
+      latestFormRef.current!.setShowNotifications(false);
+    });
+
+    await act(async () => {
+      await latestFormRef.current!.handleEventSave(calendarData);
+    });
+
+    expect(calendarData.updateEvent).toHaveBeenCalledWith("event-1", {
+      title: "Last reminder removal",
+      description: undefined,
+      start: "2099-04-24T16:45:00.000Z",
+      end: "2099-04-24T17:30:00.000Z",
+      timezone: "UTC",
+      allDay: false,
+      location: undefined,
+      calendarId: "cal-1",
+      reminder: null,
+      recurrence: null,
+    });
+    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", []);
+  });
+
+  it("clears persisted notifications when the last reminder is removed and the event is saved", async () => {
+    const futureEvent = {
+      ...baseEvent,
+      end: new Date("2099-04-24T17:30:00.000Z"),
+      reminder: 15,
+      start: new Date("2099-04-24T16:45:00.000Z"),
+      title: "Manon winkel",
+    };
+    const eventsQueryKey = [
+      "events",
+      "2099-04-01T00:00:00.000Z",
+      "2099-04-30T23:59:59.999Z",
+    ] as const;
+    const calendarData = {
+      updateEvent: jest.fn(async (_eventId: string, event: any) => ({
+        ...futureEvent,
+        ...event,
+        id: "event-1",
+        reminder: null,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        updatedAt: new Date("2099-04-24T12:00:00.000Z"),
+      })),
+    };
+
+    queryClient.setQueryData(eventsQueryKey, [futureEvent]);
+
+    mockGetEventNotifications.mockResolvedValueOnce({
+      data: {
+        notifications: [
+          {
+            id: "notif-15",
+            isEnabled: true,
+            minutesBefore: 15,
+            notificationType: "email",
+          },
+        ],
+      },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(futureEvent as any);
+    });
+
+    act(() => {
+      latestFormRef.current!.handleNotificationChange([]);
+      latestFormRef.current!.setShowNotifications(false);
+    });
+
+    await act(async () => {
+      await latestFormRef.current!.handleEventSave(calendarData);
+    });
+
+    expect(calendarData.updateEvent).toHaveBeenCalledWith("event-1", {
+      title: "Manon winkel",
+      description: undefined,
+      start: "2099-04-24T16:45:00.000Z",
+      end: "2099-04-24T17:30:00.000Z",
+      timezone: "UTC",
+      allDay: false,
+      location: undefined,
+      calendarId: "cal-1",
+      reminder: null,
+      recurrence: null,
+    });
+    expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", []);
+
+    const cachedEvents = queryClient.getQueryData<readonly any[]>(eventsQueryKey);
+    expect(cachedEvents).toEqual([
+      expect.objectContaining({
+        id: "event-1",
+        reminder: null,
+        title: "Manon winkel",
+      }),
+    ]);
+
+    mockGetEventNotifications.mockResolvedValueOnce({
+      data: { notifications: [] },
+      success: true,
+    } as any);
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(cachedEvents?.[0] as any);
+    });
+
+    expect(latestFormRef.current?.eventReminder).toBeNull();
+    expect(latestFormRef.current?.eventNotifications).toEqual([]);
+    expect(latestFormRef.current?.showNotifications).toBe(false);
   });
 });

@@ -5,7 +5,10 @@ import type {
   SettingsUpdateInput,
 } from "../contracts/settings.contract";
 import { ValidationError } from "../lib/errors";
-import { normalizeEventEncryptionMode } from "../lib/event-encryption";
+import {
+  backfillEncryptedEventsToCiphertextOnly,
+  normalizeEventEncryptionMode,
+} from "../lib/event-encryption";
 
 function toPublicUserSettings(
   settings: PublicUserSettings & { defaultReminder: number | null },
@@ -119,6 +122,11 @@ export class SettingsService implements ISettingsService {
     const now = new Date();
 
     return this.prisma.$transaction(async (tx) => {
+      const sharedCalendars = await tx.calendar.findMany({
+        where: { userId, icsShareEnabled: true },
+        select: { id: true },
+      });
+
       const settings = await tx.userSettings.upsert({
         where: { userId },
         update: { ...normalizedBody, updatedAt: now },
@@ -132,6 +140,13 @@ export class SettingsService implements ISettingsService {
           icsShareToken: null,
           updatedAt: now,
         },
+      });
+
+      await backfillEncryptedEventsToCiphertextOnly(tx, {
+        userId,
+        calendarIds: sharedCalendars.map((calendar) => calendar.id),
+        preserveReminderDependentShadows: false,
+        now,
       });
 
       return toPublicUserSettings(settings);
