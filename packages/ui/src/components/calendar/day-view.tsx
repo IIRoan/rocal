@@ -278,7 +278,7 @@ export function DayView({
                   >
                     {/* Always show the title in day view for better usability */}
                       <div className="flex items-center gap-1 min-w-0">
-                        <EncryptionStatusBadge item={event} />
+                        <EncryptionStatusBadge item={event} asIcon />
                         <span className="truncate">{event.title}</span>
                       </div>
                   </EventItem>
