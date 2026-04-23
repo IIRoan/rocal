@@ -23,6 +23,104 @@ import { toast } from "sonner";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+function SyncedEventInfoBadge() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Synced from external calendar"
+          className="inline-flex items-center justify-center h-5 w-5 rounded-md text-foreground/60 hover:text-foreground hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <RefreshCw className="h-3 w-3" strokeWidth={2.25} aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="end"
+        className="w-72 p-0 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 px-3.5 py-3 border-b border-border/60">
+          <div className="flex items-center justify-center h-8 w-8 shrink-0 rounded-md bg-foreground/5 text-foreground/70">
+            <RefreshCw className="h-4 w-4" strokeWidth={2.25} aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium leading-tight">
+              Synced event
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+              This event is mirrored from an external calendar provider.
+            </p>
+          </div>
+        </div>
+        <div className="px-3.5 py-3 space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <CloudDownload
+              className="h-3.5 w-3.5 mt-0.5 text-foreground/70 shrink-0"
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <div className="text-xs font-medium leading-tight">
+                Source of truth lives elsewhere
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                Changes made on the original provider flow back into Rocal on
+                the next sync.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <Server
+              className="h-3.5 w-3.5 mt-0.5 text-foreground/70 shrink-0"
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <div className="text-xs font-medium leading-tight">
+                Stored on Rocal during sync
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                Title, time, location and description are pulled in so we can
+                render the event and trigger reminders.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <PenOff
+              className="h-3.5 w-3.5 mt-0.5 text-foreground/70 shrink-0"
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <div className="text-xs font-medium leading-tight">
+                Edits may not push back
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                Depending on the provider, changes you make here can be
+                overwritten on the next sync.
+              </p>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function formatReminderMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1440) {
+    const hours = minutes / 60;
+    return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hour${hours === 1 ? "" : "s"}`;
+  }
+  if (minutes < 10080) {
+    const days = minutes / 1440;
+    return `${Number.isInteger(days) ? days : days.toFixed(1)} day${days === 1 ? "" : "s"}`;
+  }
+  const weeks = minutes / 10080;
+  return `${Number.isInteger(weeks) ? weeks : weeks.toFixed(1)} week${weeks === 1 ? "" : "s"}`;
+}
+
 // Hook to track keyboard visibility on mobile
 function useKeyboardHeight() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -93,11 +191,6 @@ import {
 import { Calendar as CalendarUI } from "@workspace/ui/components/ui/calendar";
 import { Switch } from "@workspace/ui/components/ui/switch";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/ui/tooltip";
-import {
   Bell,
   RotateCcw,
   CalendarIcon,
@@ -114,6 +207,9 @@ import {
   ChevronRight,
   Download,
   RefreshCw,
+  CloudDownload,
+  Server,
+  PenOff,
 } from "lucide-react";
 
 import type { EventEditorMode } from "./command-palette-context";
@@ -844,36 +940,20 @@ function MobileEventEditorBody({
     <div className={bodyClass}>
       {isViewMode ? (
         /* VIEW MODE - command palette style list */
-        <div className="py-2">
+        <div className="py-1.5">
           {/* Title row */}
-          <div className="flex items-center gap-3 px-2 py-2">
-            <div className="flex items-center justify-center w-6 h-6 shrink-0">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium truncate block">
+          <div className="px-2">
+            <div className="flex items-center gap-3 px-2 py-2.5">
+              <div className="flex items-center justify-center w-6 h-6 shrink-0">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <span className="text-sm font-medium truncate flex-1 min-w-0">
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
               {eventForm.selectedEvent?.id && (
-                <div className="mt-1 flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 shrink-0">
                   {eventForm.selectedEvent.isSynced && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span
-                          aria-label="Synced from external calendar"
-                          className="inline-flex items-center justify-center shrink-0 cursor-default"
-                        >
-                          <RefreshCw
-                            className="h-3 w-3 text-foreground/55"
-                            strokeWidth={2.25}
-                            aria-hidden
-                          />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        Synced from external calendar
-                      </TooltipContent>
-                    </Tooltip>
+                    <SyncedEventInfoBadge />
                   )}
                   <EncryptionStatusBadge item={eventForm.selectedEvent} />
                 </div>
@@ -882,17 +962,17 @@ function MobileEventEditorBody({
           </div>
 
           {/* Divider */}
-          <div className="border-t border-border/50 my-1" />
+          <div className="border-t border-border/50 mx-4 my-0.5" />
 
           {/* Details list */}
-          <div className="px-2">
+          <div className="px-2 py-1 space-y-0.5">
             {/* Date & Time */}
             <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors">
               <div className="flex items-center justify-center w-6 h-6 shrink-0">
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm block">
+              <div className="flex-1 min-w-0 leading-tight">
+                <div className="text-sm">
                   {(() => {
                     const startStr = format(
                       eventForm.eventStartDate,
@@ -915,32 +995,78 @@ function MobileEventEditorBody({
                       </>
                     );
                   })()}
-                </span>
-                <span className="text-xs text-muted-foreground">
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
                   {!eventForm.eventAllDay
-                    ? `${eventForm.eventStartTime} - ${eventForm.eventEndTime}`
+                    ? `${eventForm.eventStartTime} – ${eventForm.eventEndTime}`
                     : "All day"}
-                </span>
+                </div>
               </div>
             </div>
 
             {/* Calendar */}
             <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors">
               <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <div
-                  className="w-3 h-3 rounded-full"
+                <span
+                  className="h-3 w-3 rounded-full ring-1 ring-border/60"
                   style={{
-                    backgroundColor:
-                      calendars.find((c) => c.id === eventForm.eventCalendarId)
-                        ?.color || "hsl(var(--primary))",
+                    backgroundColor: getColorSwatchValue(
+                      calendars.find(
+                        (c) => c.id === eventForm.eventCalendarId,
+                      )?.color || "blue",
+                    ),
                   }}
+                  aria-hidden
                 />
               </div>
-              <span className="text-sm">
+              <span className="text-sm truncate flex-1 min-w-0">
                 {calendars.find((c) => c.id === eventForm.eventCalendarId)
                   ?.name || "Unknown Calendar"}
               </span>
             </div>
+
+            {/* Reminders – email */}
+            {(() => {
+              const emailReminders = (eventForm.eventNotifications ?? [])
+                .filter((n) => n.isEnabled !== false)
+                .map((n) => n.minutesBefore)
+                .sort((a, b) => a - b);
+
+              if (
+                eventForm.notificationsLoading ||
+                emailReminders.length > 0
+              ) {
+                return (
+                  <div className="flex items-start gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors">
+                    <div className="flex items-center justify-center w-6 h-6 shrink-0 mt-0.5">
+                      <Bell className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      {emailReminders.map((minutes, idx) => (
+                        <div
+                          key={`email-reminder-${idx}-${minutes}`}
+                          className="flex items-baseline gap-2 text-sm leading-tight"
+                        >
+                          <span>
+                            {formatReminderMinutes(minutes)} before
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            email
+                          </span>
+                        </div>
+                      ))}
+                      {eventForm.notificationsLoading &&
+                        emailReminders.length === 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Loading reminders…
+                          </span>
+                        )}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Location - only if set */}
             {eventForm.eventLocation && (

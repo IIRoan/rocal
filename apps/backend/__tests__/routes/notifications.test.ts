@@ -570,8 +570,53 @@ describe("notificationsRoutes", () => {
 
     expect(response.status).toBe(500);
     await expect(response.text()).resolves.toBe(
-      "This event is fully encrypted. Reopen and save it before enabling reminder emails in hybrid mode.",
+      "This event is stored as ciphertext only, so the server can't attach reminder details to it. Open the event in a signed-in client and save it again to switch it to hybrid encryption before enabling email reminders.",
     );
+  });
+
+  it("allows reminders on encrypted events when the calendar forces full encryption", async () => {
+    mockPrisma.calendar.findFirst.mockResolvedValue({
+      id: "cal-1",
+      icsShareEnabled: false,
+      forceFullEncryption: true,
+    });
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      eventFixture({
+        title: "",
+        description: null,
+        location: null,
+        encryptionState: "encrypted",
+        encryptedContent: "ciphertext",
+      }),
+    );
+
+    const response = await createApp().handle(
+      new Request("http://localhost/notifications/event/event-1", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          notifications: [
+            {
+              notificationType: "email",
+              minutesBefore: 15,
+              isEnabled: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+      data: expect.objectContaining({
+        reminder: 15,
+        encryptionState: "encrypted",
+        title: "",
+        description: null,
+        location: null,
+      }),
+    });
   });
 
   it("wraps unexpected delete failures", async () => {

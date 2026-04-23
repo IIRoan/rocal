@@ -174,6 +174,7 @@ exports.Prisma.CalendarScalarFieldEnum = {
   blindIndexTokens: 'blindIndexTokens',
   encryptionState: 'encryptionState',
   encryptionKeyVersion: 'encryptionKeyVersion',
+  forceFullEncryption: 'forceFullEncryption',
   color: 'color',
   kind: 'kind',
   isPublic: 'isPublic',

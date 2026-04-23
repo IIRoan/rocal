@@ -46,4 +46,52 @@ describe("getEncryptionStatusMeta", () => {
       }),
     );
   });
+
+  it("surfaces force-full-encryption calendars with a dedicated state", () => {
+    expect(
+      getEncryptionStatusMeta({ forceFullEncryption: true }),
+    ).toEqual(
+      expect.objectContaining({
+        state: "force_full",
+        label: "Force-encrypted calendar",
+        shortLabel: "Locked",
+      }),
+    );
+  });
+
+  it("force-full takes precedence over plaintext encryption state", () => {
+    expect(
+      getEncryptionStatusMeta({
+        forceFullEncryption: true,
+        encryptionState: "plaintext",
+      }),
+    ).toEqual(expect.objectContaining({ state: "force_full" }));
+  });
+
+  it("force-full takes precedence over hybrid shadow_write state", () => {
+    expect(
+      getEncryptionStatusMeta({
+        forceFullEncryption: true,
+        encryptionState: "shadow_write",
+        encryptedContent: "x",
+      }),
+    ).toEqual(expect.objectContaining({ state: "force_full" }));
+  });
+});
+
+describe("resolveEncryptionState force-full precedence", () => {
+  it("returns force_full when the flag is set", () => {
+    expect(
+      resolveEncryptionState({ forceFullEncryption: true }),
+    ).toBe("force_full");
+  });
+
+  it("ignores a falsy force flag", () => {
+    expect(
+      resolveEncryptionState({
+        forceFullEncryption: false,
+        encryptionState: "encrypted",
+      }),
+    ).toBe("encrypted");
+  });
 });

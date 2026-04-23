@@ -603,8 +603,12 @@ export class EventService implements IEventService {
       const encryptionMode = normalizeEventEncryptionMode(
         userSettings?.eventEncryptionMode,
       );
+      const calendarForceFullEncryption =
+        calendar.forceFullEncryption === true;
+      const requiresFullEncryption =
+        encryptionMode === "full" || calendarForceFullEncryption;
 
-      if (encryptionMode === "full" && !hasEncryptedPayload) {
+      if (requiresFullEncryption && !hasEncryptedPayload) {
         throw new ValidationError(
           "Full event encryption requires an active encryption session.",
           "encryptedContent",
@@ -619,6 +623,7 @@ export class EventService implements IEventService {
         location,
         reminderMinutes: reminder ?? null,
         calendarShareEnabled: calendar.icsShareEnabled,
+        calendarForceFullEncryption,
       });
 
       const event = await this.prisma.calendarEvent.create({
@@ -890,6 +895,7 @@ export class EventService implements IEventService {
             kind: true,
             isSyncOnly: true,
             icsShareEnabled: true,
+            forceFullEncryption: true,
           },
         }));
 
@@ -916,6 +922,10 @@ export class EventService implements IEventService {
       const encryptionMode = normalizeEventEncryptionMode(
         userSettings?.eventEncryptionMode,
       );
+      const calendarForceFullEncryption =
+        finalCalendar.forceFullEncryption === true;
+      const requiresFullEncryption =
+        encryptionMode === "full" || calendarForceFullEncryption;
       const existingHasEncryptedPayload = this.hasEncryptedPayload(
         existingEvent.encryptedContent,
       );
@@ -932,7 +942,7 @@ export class EventService implements IEventService {
       if (
         sensitiveFieldsProvided &&
         input.encryptedContent === undefined &&
-        (existingHasEncryptedPayload || encryptionMode === "full")
+        (existingHasEncryptedPayload || requiresFullEncryption)
       ) {
         throw new ValidationError(
           "Encrypted content payload is required when updating protected event fields.",
@@ -940,7 +950,7 @@ export class EventService implements IEventService {
         );
       }
 
-      if (encryptionMode === "full" && !hasEncryptedPayload) {
+      if (requiresFullEncryption && !hasEncryptedPayload) {
         throw new ValidationError(
           "Full event encryption requires an active encryption session.",
           "encryptedContent",
@@ -967,6 +977,7 @@ export class EventService implements IEventService {
         location: nextLocation,
         reminderMinutes: finalReminderValue,
         calendarShareEnabled: finalCalendar.icsShareEnabled,
+        calendarForceFullEncryption,
       });
 
       if (

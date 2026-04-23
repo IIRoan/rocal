@@ -44,6 +44,7 @@ import {
   Copy,
   RefreshCw,
   AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 
 interface CalendarManagerProps {
@@ -99,6 +100,9 @@ export function CalendarManager({
   const [shareLinkLoading, setShareLinkLoading] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [calendarForceFullEncryption, setCalendarForceFullEncryption] =
+    useState(false);
+  const [showForceEncryptConfirm, setShowForceEncryptConfirm] = useState(false);
 
   const goForward = (next: PaletteView) => {
     onNavigateTo(next);
@@ -264,6 +268,9 @@ export function CalendarManager({
                         setCalendarName(calendar.name);
                         setCalendarColor(calendar.color);
                         setCalendarIsDefault(calendar.isDefault || false);
+                        setCalendarForceFullEncryption(
+                          calendar.forceFullEncryption || false,
+                        );
                         setCalendarValidationErrors({});
                         setShowRegenerateConfirm(false);
                         void loadShareLink(calendar.id);
@@ -695,6 +702,40 @@ export function CalendarManager({
                       </p>
                     )}
                   </div>
+
+                  {/* Force full encryption */}
+                  <div className="space-y-3 pt-3 border-t border-border/50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          FORCE FULL ENCRYPTION
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Store every event in this calendar as ciphertext only,
+                          regardless of your global encryption mode.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={calendarForceFullEncryption}
+                        onCheckedChange={(checked) => {
+                          if (checked && !calendarForceFullEncryption) {
+                            setShowForceEncryptConfirm(true);
+                          } else {
+                            setCalendarForceFullEncryption(checked);
+                          }
+                        }}
+                      />
+                    </div>
+                    {calendarForceFullEncryption && (
+                      <div className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                        <span>
+                          Reminders and ICS shares from this calendar won&apos;t
+                          include event titles, descriptions, or locations.
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -747,6 +788,7 @@ export function CalendarManager({
                             setEditingCalendar,
                           },
                           () => goBack(),
+                          { forceFullEncryption: calendarForceFullEncryption },
                         )
                       }
                       disabled={calendarSaving || !calendarName.trim()}
@@ -807,6 +849,59 @@ export function CalendarManager({
                 disabled={shareLinkLoading}
               >
                 Confirm Regenerate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={showForceEncryptConfirm}
+          onOpenChange={setShowForceEncryptConfirm}
+        >
+          <DialogContent
+            showClose={false}
+            className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+          >
+            <DialogHeader className="px-5 pt-5 pb-3">
+              <DialogTitle>Force full encryption?</DialogTitle>
+              <DialogDescription>
+                Every event in this calendar will be stored as ciphertext only.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-5 pb-4 space-y-3">
+              <div className="rounded-md border border-border/50 bg-muted/30 p-3">
+                <p className="text-sm flex items-start gap-2">
+                  <ShieldCheck className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                  <span>
+                    Existing encrypted events will have their plaintext shadows
+                    removed. Reminders will still fire but won&apos;t include event
+                    titles or descriptions, and ICS share links won&apos;t expose
+                    event details.
+                  </span>
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                You can turn this off later, but already re-encrypted events
+                will only show plaintext content again after each event is
+                edited and saved on a signed-in client.
+              </p>
+            </div>
+            <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowForceEncryptConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCalendarForceFullEncryption(true);
+                  setShowForceEncryptConfirm(false);
+                }}
+              >
+                Enable
               </Button>
             </DialogFooter>
           </DialogContent>

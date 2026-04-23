@@ -10,6 +10,7 @@ export type CalendarCreateInput = {
   blindIndexTokens?: string[];
   encryptionState?: RowEncryptionState;
   encryptionKeyVersion?: number;
+  forceFullEncryption?: boolean;
 };
 
 export type CalendarUpdateInput = {
@@ -23,6 +24,7 @@ export type CalendarUpdateInput = {
   blindIndexTokens?: string[];
   encryptionState?: RowEncryptionState;
   encryptionKeyVersion?: number;
+  forceFullEncryption?: boolean;
 };
 
 export type CalendarDeleteInput = {

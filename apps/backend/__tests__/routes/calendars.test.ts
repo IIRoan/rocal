@@ -14,6 +14,7 @@ jest.mock("../../lib/prisma", () => ({
     },
     calendarEvent: {
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
+      updateMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
     calendarSubscription: {
       findFirst: jest.fn(async (): Promise<any> => null),
@@ -63,6 +64,7 @@ const mockPrisma = prisma as unknown as {
   };
   calendarEvent: {
     deleteMany: jest.Mock<() => Promise<any>>;
+    updateMany: jest.Mock<() => Promise<any>>;
   };
   calendarSubscription: {
     findFirst: jest.Mock<() => Promise<any>>;
@@ -337,6 +339,131 @@ describe("calendarsRoutes – color validation", () => {
 
       const text = await readText(response);
       expect(text).toContain("Only owned calendars");
+    });
+  });
+
+  describe("forceFullEncryption", () => {
+    const existingCalendar = {
+      id: "cal-1",
+      name: "Work",
+      color: "blue",
+      kind: "owned",
+      userId: "user-1",
+      forceFullEncryption: false,
+    };
+
+    beforeEach(() => {
+      mockPrisma.calendarEvent.updateMany.mockClear();
+      mockPrisma.calendar.update.mockClear();
+      mockPrisma.calendar.create.mockClear();
+    });
+
+    it("persists forceFullEncryption on POST /calendars", async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue(null);
+      mockPrisma.calendar.create.mockResolvedValue({
+        ...existingCalendar,
+        forceFullEncryption: true,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/calendars/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: "Locked",
+            color: "blue",
+            forceFullEncryption: true,
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendar.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ forceFullEncryption: true }),
+        }),
+      );
+    });
+
+    it("persists forceFullEncryption on PUT /calendars/:id", async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue(existingCalendar);
+      mockPrisma.calendar.update.mockResolvedValue({
+        ...existingCalendar,
+        forceFullEncryption: true,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/calendars/cal-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ forceFullEncryption: true }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendar.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ forceFullEncryption: true }),
+        }),
+      );
+    });
+
+    it("backfills existing encrypted events when flipping false → true", async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue({
+        ...existingCalendar,
+        forceFullEncryption: false,
+      });
+      mockPrisma.calendar.update.mockResolvedValue({
+        ...existingCalendar,
+        forceFullEncryption: true,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/calendars/cal-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ forceFullEncryption: true }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendarEvent.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            calendarId: "cal-1",
+            userId: "user-1",
+            encryptedContent: { not: null },
+          }),
+          data: expect.objectContaining({
+            title: "",
+            description: null,
+            location: null,
+            encryptionState: "encrypted",
+          }),
+        }),
+      );
+    });
+
+    it("does not backfill when flag is unchanged or being turned off", async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue({
+        ...existingCalendar,
+        forceFullEncryption: true,
+      });
+      mockPrisma.calendar.update.mockResolvedValue({
+        ...existingCalendar,
+        forceFullEncryption: false,
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/calendars/cal-1", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ forceFullEncryption: false }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.calendarEvent.updateMany).not.toHaveBeenCalled();
     });
   });
 });
