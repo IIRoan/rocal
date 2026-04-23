@@ -7330,6 +7330,7 @@ export namespace Prisma {
     blindIndexTokens: string | null
     encryptionState: string | null
     encryptionKeyVersion: number | null
+    forceFullEncryption: boolean | null
     color: string | null
     kind: string | null
     isPublic: boolean | null
@@ -7350,6 +7351,7 @@ export namespace Prisma {
     blindIndexTokens: string | null
     encryptionState: string | null
     encryptionKeyVersion: number | null
+    forceFullEncryption: boolean | null
     color: string | null
     kind: string | null
     isPublic: boolean | null
@@ -7370,6 +7372,7 @@ export namespace Prisma {
     blindIndexTokens: number
     encryptionState: number
     encryptionKeyVersion: number
+    forceFullEncryption: number
     color: number
     kind: number
     isPublic: number
@@ -7400,6 +7403,7 @@ export namespace Prisma {
     blindIndexTokens?: true
     encryptionState?: true
     encryptionKeyVersion?: true
+    forceFullEncryption?: true
     color?: true
     kind?: true
     isPublic?: true
@@ -7420,6 +7424,7 @@ export namespace Prisma {
     blindIndexTokens?: true
     encryptionState?: true
     encryptionKeyVersion?: true
+    forceFullEncryption?: true
     color?: true
     kind?: true
     isPublic?: true
@@ -7440,6 +7445,7 @@ export namespace Prisma {
     blindIndexTokens?: true
     encryptionState?: true
     encryptionKeyVersion?: true
+    forceFullEncryption?: true
     color?: true
     kind?: true
     isPublic?: true
@@ -7547,6 +7553,7 @@ export namespace Prisma {
     blindIndexTokens: string | null
     encryptionState: string
     encryptionKeyVersion: number
+    forceFullEncryption: boolean
     color: string
     kind: string
     isPublic: boolean
@@ -7586,6 +7593,7 @@ export namespace Prisma {
     blindIndexTokens?: boolean
     encryptionState?: boolean
     encryptionKeyVersion?: boolean
+    forceFullEncryption?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7611,6 +7619,7 @@ export namespace Prisma {
     blindIndexTokens?: boolean
     encryptionState?: boolean
     encryptionKeyVersion?: boolean
+    forceFullEncryption?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7632,6 +7641,7 @@ export namespace Prisma {
     blindIndexTokens?: boolean
     encryptionState?: boolean
     encryptionKeyVersion?: boolean
+    forceFullEncryption?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7653,6 +7663,7 @@ export namespace Prisma {
     blindIndexTokens?: boolean
     encryptionState?: boolean
     encryptionKeyVersion?: boolean
+    forceFullEncryption?: boolean
     color?: boolean
     kind?: boolean
     isPublic?: boolean
@@ -7666,7 +7677,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "encryptedName" | "blindIndexTokens" | "encryptionState" | "encryptionKeyVersion" | "color" | "kind" | "isPublic" | "isVisible" | "isDefault" | "isSyncOnly" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
+  export type CalendarOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "encryptedName" | "blindIndexTokens" | "encryptionState" | "encryptionKeyVersion" | "forceFullEncryption" | "color" | "kind" | "isPublic" | "isVisible" | "isDefault" | "isSyncOnly" | "icsShareToken" | "icsShareEnabled" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["calendar"]>
   export type CalendarInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     events?: boolean | Calendar$eventsArgs<ExtArgs>
@@ -7696,6 +7707,7 @@ export namespace Prisma {
       blindIndexTokens: string | null
       encryptionState: string
       encryptionKeyVersion: number
+      forceFullEncryption: boolean
       color: string
       kind: string
       isPublic: boolean
@@ -8140,6 +8152,7 @@ export namespace Prisma {
     readonly blindIndexTokens: FieldRef<"Calendar", 'String'>
     readonly encryptionState: FieldRef<"Calendar", 'String'>
     readonly encryptionKeyVersion: FieldRef<"Calendar", 'Int'>
+    readonly forceFullEncryption: FieldRef<"Calendar", 'Boolean'>
     readonly color: FieldRef<"Calendar", 'String'>
     readonly kind: FieldRef<"Calendar", 'String'>
     readonly isPublic: FieldRef<"Calendar", 'Boolean'>
@@ -24238,6 +24251,7 @@ export namespace Prisma {
     blindIndexTokens: 'blindIndexTokens',
     encryptionState: 'encryptionState',
     encryptionKeyVersion: 'encryptionKeyVersion',
+    forceFullEncryption: 'forceFullEncryption',
     color: 'color',
     kind: 'kind',
     isPublic: 'isPublic',
@@ -24915,6 +24929,7 @@ export namespace Prisma {
     blindIndexTokens?: StringNullableFilter<"Calendar"> | string | null
     encryptionState?: StringFilter<"Calendar"> | string
     encryptionKeyVersion?: IntFilter<"Calendar"> | number
+    forceFullEncryption?: BoolFilter<"Calendar"> | boolean
     color?: StringFilter<"Calendar"> | string
     kind?: StringFilter<"Calendar"> | string
     isPublic?: BoolFilter<"Calendar"> | boolean
@@ -24939,6 +24954,7 @@ export namespace Prisma {
     blindIndexTokens?: SortOrderInput | SortOrder
     encryptionState?: SortOrder
     encryptionKeyVersion?: SortOrder
+    forceFullEncryption?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -24968,6 +24984,7 @@ export namespace Prisma {
     blindIndexTokens?: StringNullableFilter<"Calendar"> | string | null
     encryptionState?: StringFilter<"Calendar"> | string
     encryptionKeyVersion?: IntFilter<"Calendar"> | number
+    forceFullEncryption?: BoolFilter<"Calendar"> | boolean
     color?: StringFilter<"Calendar"> | string
     kind?: StringFilter<"Calendar"> | string
     isPublic?: BoolFilter<"Calendar"> | boolean
@@ -24991,6 +25008,7 @@ export namespace Prisma {
     blindIndexTokens?: SortOrderInput | SortOrder
     encryptionState?: SortOrder
     encryptionKeyVersion?: SortOrder
+    forceFullEncryption?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -25019,6 +25037,7 @@ export namespace Prisma {
     blindIndexTokens?: StringNullableWithAggregatesFilter<"Calendar"> | string | null
     encryptionState?: StringWithAggregatesFilter<"Calendar"> | string
     encryptionKeyVersion?: IntWithAggregatesFilter<"Calendar"> | number
+    forceFullEncryption?: BoolWithAggregatesFilter<"Calendar"> | boolean
     color?: StringWithAggregatesFilter<"Calendar"> | string
     kind?: StringWithAggregatesFilter<"Calendar"> | string
     isPublic?: BoolWithAggregatesFilter<"Calendar"> | boolean
@@ -26643,6 +26662,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -26666,6 +26686,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -26689,6 +26710,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -26712,6 +26734,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -26735,6 +26758,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -26755,6 +26779,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -26774,6 +26799,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28599,6 +28625,7 @@ export namespace Prisma {
     blindIndexTokens?: SortOrder
     encryptionState?: SortOrder
     encryptionKeyVersion?: SortOrder
+    forceFullEncryption?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -28623,6 +28650,7 @@ export namespace Prisma {
     blindIndexTokens?: SortOrder
     encryptionState?: SortOrder
     encryptionKeyVersion?: SortOrder
+    forceFullEncryption?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -28643,6 +28671,7 @@ export namespace Prisma {
     blindIndexTokens?: SortOrder
     encryptionState?: SortOrder
     encryptionKeyVersion?: SortOrder
+    forceFullEncryption?: SortOrder
     color?: SortOrder
     kind?: SortOrder
     isPublic?: SortOrder
@@ -30957,6 +30986,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -30979,6 +31009,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -31408,6 +31439,7 @@ export namespace Prisma {
     blindIndexTokens?: StringNullableFilter<"Calendar"> | string | null
     encryptionState?: StringFilter<"Calendar"> | string
     encryptionKeyVersion?: IntFilter<"Calendar"> | number
+    forceFullEncryption?: BoolFilter<"Calendar"> | boolean
     color?: StringFilter<"Calendar"> | string
     kind?: StringFilter<"Calendar"> | string
     isPublic?: BoolFilter<"Calendar"> | boolean
@@ -32382,6 +32414,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -32404,6 +32437,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -32618,6 +32652,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -32640,6 +32675,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -33111,6 +33147,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -33133,6 +33170,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -33171,6 +33209,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -33193,6 +33232,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -33828,6 +33868,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -33850,6 +33891,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -33975,6 +34017,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -33997,6 +34040,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -34202,6 +34246,7 @@ export namespace Prisma {
     blindIndexTokens?: string | null
     encryptionState?: string
     encryptionKeyVersion?: number
+    forceFullEncryption?: boolean
     color: string
     kind?: string
     isPublic?: boolean
@@ -34480,6 +34525,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -34502,6 +34548,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -34524,6 +34571,7 @@ export namespace Prisma {
     blindIndexTokens?: NullableStringFieldUpdateOperationsInput | string | null
     encryptionState?: StringFieldUpdateOperationsInput | string
     encryptionKeyVersion?: IntFieldUpdateOperationsInput | number
+    forceFullEncryption?: BoolFieldUpdateOperationsInput | boolean
     color?: StringFieldUpdateOperationsInput | string
     kind?: StringFieldUpdateOperationsInput | string
     isPublic?: BoolFieldUpdateOperationsInput | boolean

@@ -99,4 +99,61 @@ describe("event encryption policy", () => {
       location: null,
     });
   });
+
+  it("force-full calendar overrides hybrid mode and reminder shadows", () => {
+    expect(
+      resolveEventPersistencePolicy({
+        mode: "hybrid",
+        hasEncryptedPayload: true,
+        title: "Planning",
+        description: "Discuss roadmap",
+        location: "Room 7",
+        reminderMinutes: 30,
+        calendarShareEnabled: true,
+        calendarForceFullEncryption: true,
+      }),
+    ).toEqual({
+      encryptionState: "encrypted",
+      title: "",
+      description: null,
+      location: null,
+    });
+  });
+
+  it("force-full calendar still requires an encrypted payload before stripping plaintext", () => {
+    expect(
+      resolveEventPersistencePolicy({
+        mode: "hybrid",
+        hasEncryptedPayload: false,
+        title: "Planning",
+        description: "Discuss roadmap",
+        location: "Room 7",
+        calendarForceFullEncryption: true,
+      }),
+    ).toEqual({
+      encryptionState: "plaintext",
+      title: "Planning",
+      description: "Discuss roadmap",
+      location: "Room 7",
+    });
+  });
+
+  it("falsy force-full flag preserves hybrid shadow_write behavior", () => {
+    expect(
+      resolveEventPersistencePolicy({
+        mode: "hybrid",
+        hasEncryptedPayload: true,
+        title: "Planning",
+        description: "Discuss roadmap",
+        location: "Room 7",
+        reminderMinutes: 30,
+        calendarForceFullEncryption: false,
+      }),
+    ).toEqual({
+      encryptionState: "shadow_write",
+      title: "Planning",
+      description: "Discuss roadmap",
+      location: "Room 7",
+    });
+  });
 });

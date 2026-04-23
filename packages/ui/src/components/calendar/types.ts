@@ -24,6 +24,7 @@ export interface Calendar {
   blindIndexTokens?: string[] | null;
   encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
+  forceFullEncryption?: boolean;
   color: EventColor;
   kind: "owned" | "subscribed" | "public_holiday";
   isPublic: boolean;

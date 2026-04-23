@@ -15,6 +15,7 @@ type ResolveEventPersistencePolicyInput = {
   location?: string | null;
   reminderMinutes?: number | null;
   calendarShareEnabled?: boolean;
+  calendarForceFullEncryption?: boolean;
 };
 
 function normalizeOptionalText(value: string | null | undefined): string | null {
@@ -57,7 +58,10 @@ export function resolveEventPersistencePolicy(
     };
   }
 
-  if (mode === "full") {
+  const effectiveMode: EventEncryptionMode =
+    input.calendarForceFullEncryption ? "full" : mode;
+
+  if (effectiveMode === "full") {
     return {
       encryptionState: "encrypted",
       title: "",

@@ -27,7 +27,11 @@ export class NotificationService implements INotificationService {
     const [calendar, userSettings] = await Promise.all([
       this.prisma.calendar.findFirst({
         where: { id: event.calendarId, userId },
-        select: { id: true, icsShareEnabled: true },
+        select: {
+          id: true,
+          icsShareEnabled: true,
+          forceFullEncryption: true,
+        },
       }),
       this.prisma.userSettings.findUnique({
         where: { userId },
@@ -52,6 +56,7 @@ export class NotificationService implements INotificationService {
       location: event.location,
       reminderMinutes,
       calendarShareEnabled: calendar.icsShareEnabled,
+      calendarForceFullEncryption: calendar.forceFullEncryption,
     });
 
     if (
@@ -59,7 +64,7 @@ export class NotificationService implements INotificationService {
       event.encryptionState === "encrypted"
     ) {
       throw new ValidationError(
-        "This event is fully encrypted. Reopen and save it before enabling reminder emails in hybrid mode.",
+        "This event is stored as ciphertext only, so the server can't attach reminder details to it. Open the event in a signed-in client and save it again to switch it to hybrid encryption before enabling email reminders.",
       );
     }
 
