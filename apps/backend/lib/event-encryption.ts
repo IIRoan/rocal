@@ -1,3 +1,5 @@
+import type { PrismaClient } from "../generated/prisma/index.js";
+
 export type EventEncryptionMode = "hybrid" | "full";
 
 export type ResolvedEventPersistencePolicy = {
@@ -5,6 +7,14 @@ export type ResolvedEventPersistencePolicy = {
   title: string;
   description: string | null;
   location: string | null;
+};
+
+type EventReencryptionBackfillInput = {
+  userId: string;
+  calendarId?: string;
+  calendarIds?: string[];
+  preserveReminderDependentShadows?: boolean;
+  now?: Date;
 };
 
 type ResolveEventPersistencePolicyInput = {
@@ -85,4 +95,69 @@ export function resolveEventPersistencePolicy(
     description,
     location,
   };
+}
+
+export async function backfillEncryptedEventsToCiphertextOnly(
+  prisma: Pick<PrismaClient, "calendarEvent">,
+  input: EventReencryptionBackfillInput,
+): Promise<number> {
+  const {
+    userId,
+    calendarId,
+    calendarIds,
+    preserveReminderDependentShadows = false,
+    now = new Date(),
+  } = input;
+
+  const targetCalendarIds: string[] = Array.from(
+    new Set([...(calendarIds ?? []), ...(calendarId ? [calendarId] : [])]),
+  ).filter((value): value is string => Boolean(value));
+
+  if (targetCalendarIds.length === 0) {
+    return 0;
+  }
+
+  let calendarScope: string | { in: string[] };
+
+  if (targetCalendarIds.length === 1) {
+    const [singleCalendarId] = targetCalendarIds;
+
+    if (!singleCalendarId) {
+      return 0;
+    }
+
+    calendarScope = singleCalendarId;
+  } else {
+    calendarScope = { in: targetCalendarIds };
+  }
+
+  const where: {
+    userId: string;
+    calendarId: string | { in: string[] };
+    encryptedContent: { not: null };
+    encryptionState: { not: "encrypted" };
+    OR?: Array<{ reminder: number | null }>;
+  } = {
+    userId,
+    calendarId: calendarScope,
+    encryptedContent: { not: null },
+    encryptionState: { not: "encrypted" },
+  };
+
+  if (preserveReminderDependentShadows) {
+    where.OR = [{ reminder: null }, { reminder: 0 }];
+  }
+
+  const result = await prisma.calendarEvent.updateMany({
+    where,
+    data: {
+      title: "",
+      description: null,
+      location: null,
+      encryptionState: "encrypted",
+      updatedAt: now,
+    },
+  });
+
+  return result.count;
 }
