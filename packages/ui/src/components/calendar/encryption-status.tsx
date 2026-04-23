@@ -1,4 +1,4 @@
-import { Lock, ShieldCheck } from "lucide-react";
+import { Lock, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { cn } from "../../lib/utils";
 import {
@@ -95,7 +95,7 @@ export function getEncryptionStatusMeta(
         shortLabel: "Hybrid",
         description:
           "Encrypted at rest, but plaintext shadows are kept so reminders and sharing keep working.",
-        Icon: Lock,
+        Icon: ShieldAlert,
         iconClassName: "text-foreground/55",
         protectedFields: ["Encrypted ciphertext copy stored alongside"],
         visibleFields: [
@@ -149,6 +149,12 @@ interface EncryptionStatusBadgeProps {
    * interactive elements (which break hydration / a11y).
    */
   asIcon?: boolean;
+  /**
+   * Override the icon and button size. Defaults to "sm" (h-3 w-3 icon, h-5 w-5
+   * button). Use "md" to match standard toolbar icon buttons (h-4 w-4 icon,
+   * h-7 w-7 button).
+   */
+  iconSize?: "sm" | "md";
 }
 
 export function EncryptionStatusBadge({
@@ -156,9 +162,14 @@ export function EncryptionStatusBadge({
   className,
   hidePlaintext = true,
   asIcon = false,
+  iconSize = "sm",
 }: EncryptionStatusBadgeProps) {
   const meta = getEncryptionStatusMeta(item);
   const { Icon } = meta;
+
+  const iconCls = iconSize === "md" ? "h-7 w-7" : "h-4 w-4";
+  const buttonCls = iconSize === "md" ? "h-7 w-7 rounded" : "h-4 w-4 rounded-sm";
+  const spanCls = iconSize === "md" ? "h-7 w-7" : "h-4 w-4";
 
   if (hidePlaintext && meta.state === "plaintext") {
     return null;
@@ -171,12 +182,12 @@ export function EncryptionStatusBadge({
         title={meta.label}
         className={cn(
           "inline-flex items-center justify-center shrink-0",
-          "h-3.5 w-3.5",
+          spanCls,
           className,
         )}
       >
         <Icon
-          className={cn("h-3 w-3", meta.iconClassName)}
+          className={cn(iconCls, meta.iconClassName)}
           aria-hidden
           strokeWidth={2.25}
         />
@@ -191,15 +202,15 @@ export function EncryptionStatusBadge({
           type="button"
           aria-label={meta.label}
           className={cn(
-            "inline-flex items-center justify-center shrink-0 rounded-sm",
+            "inline-flex items-center justify-center shrink-0",
             "outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
             "transition-colors hover:bg-accent/40",
-            "h-5 w-5",
+            buttonCls,
             className,
           )}
         >
           <Icon
-            className={cn("h-3 w-3", meta.iconClassName)}
+            className={cn(iconCls, meta.iconClassName)}
             aria-hidden
             strokeWidth={2.25}
           />

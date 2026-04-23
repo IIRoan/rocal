@@ -370,6 +370,24 @@ export function EventEditor({
   const isViewMode = eventForm.eventViewMode === "view";
   const isMobile = useIsMobile();
   const keyboardHeight = useKeyboardHeight();
+
+  // Encryption outcome preview — used in headers for new events
+  const _encSelCal = React.useMemo(
+    () => calendars.find((c) => c.id === eventForm.eventCalendarId),
+    [calendars, eventForm.eventCalendarId],
+  );
+  const _encHasSession = React.useMemo(() => getActiveE2eeSession() !== null, []);
+  const _encNotifCount = React.useMemo(
+    () => eventForm.eventNotifications.filter((n) => n.isEnabled).length,
+    [eventForm.eventNotifications],
+  );
+  const encPreviewItem = React.useMemo(() => {
+    if (!_encHasSession) return { encryptionState: "plaintext" as const };
+    if (_encSelCal?.forceFullEncryption) return { forceFullEncryption: true };
+    if (localSettings?.eventEncryptionMode === "full") return { encryptionState: "encrypted" as const };
+    if (_encNotifCount > 0) return { encryptionState: "shadow_write" as const };
+    return { encryptionState: "encrypted" as const };
+  }, [_encHasSession, _encSelCal, localSettings, _encNotifCount]);
   const dialogTitle = !eventForm.selectedEvent?.id
     ? "Create Event"
     : isViewMode
@@ -408,14 +426,15 @@ export function EventEditor({
           >
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
             <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
-              <h2 className="text-base font-semibold">{dialogTitle}</h2>
-              {eventForm.selectedEvent?.id && !isViewMode && (
-                <EncryptionStatusBadge
-                  item={eventForm.selectedEvent}
-                  className="ml-2"
-                  showLabel
-                />
-              )}
+              <h2 className="inline-flex items-center h-5 text-base font-semibold leading-none">
+                {dialogTitle}
+              </h2>
+              <EncryptionStatusBadge
+                item={eventForm.selectedEvent?.id ? eventForm.selectedEvent : encPreviewItem}
+                className="ml-1"
+                hidePlaintext={false}
+                iconSize="sm"
+              />
             </div>
             <MobileEventEditorBody
               eventForm={eventForm}
@@ -480,14 +499,15 @@ export function EventEditor({
           >
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </button>
-          <span className="text-sm font-medium">{dialogTitle}</span>
-          {eventForm.selectedEvent?.id && !isViewMode && (
-            <EncryptionStatusBadge
-              item={eventForm.selectedEvent}
-              className="ml-1"
-              showLabel
-            />
-          )}
+          <span className="inline-flex items-center h-5 text-sm font-medium leading-none">
+            {dialogTitle}
+          </span>
+          <EncryptionStatusBadge
+            item={eventForm.selectedEvent?.id ? eventForm.selectedEvent : encPreviewItem}
+            className="ml-1"
+            hidePlaintext={false}
+            iconSize="sm"
+          />
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -579,14 +599,15 @@ export function EventEditor({
           ) : (
             <Plus className="h-4 w-4 text-muted-foreground ml-1" />
           )}
-          <span className="text-sm font-medium">{dialogTitle}</span>
-          {eventForm.selectedEvent?.id && !isViewMode && (
-            <EncryptionStatusBadge
-              item={eventForm.selectedEvent}
-              className="ml-1"
-              showLabel
-            />
-          )}
+          <span className="inline-flex items-center h-5 text-sm font-medium leading-none">
+            {dialogTitle}
+          </span>
+          <EncryptionStatusBadge
+            item={eventForm.selectedEvent?.id ? eventForm.selectedEvent : encPreviewItem}
+            className="ml-1"
+            hidePlaintext={false}
+            iconSize="sm"
+          />
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -1043,14 +1064,15 @@ function EventEditorPopover({
           ) : (
             <Plus className="h-4 w-4 text-muted-foreground ml-1" />
           )}
-          <span className="text-sm font-medium">{dialogTitle}</span>
-          {eventForm.selectedEvent?.id && !isViewMode && (
-            <EncryptionStatusBadge
-              item={eventForm.selectedEvent}
-              className="ml-1"
-              showLabel
-            />
-          )}
+          <span className="inline-flex items-center h-5 text-sm font-medium leading-none">
+            {dialogTitle}
+          </span>
+          <EncryptionStatusBadge
+            item={eventForm.selectedEvent?.id ? eventForm.selectedEvent : _encPreview}
+            className="ml-0"
+            hidePlaintext={false}
+            iconSize="sm"
+          />
           <div className="flex-1" />
           {/* Option toggles in header - disabled in view mode */}
           {!isViewMode && (
@@ -1214,12 +1236,9 @@ function MobileEventEditorBody({
               <span className="text-sm font-medium truncate flex-1 min-w-0">
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
-              {eventForm.selectedEvent?.id && (
+              {eventForm.selectedEvent?.id && eventForm.selectedEvent.isSynced && (
                 <div className="flex items-center gap-1 shrink-0">
-                  {eventForm.selectedEvent.isSynced && (
-                    <SyncedEventInfoBadge />
-                  )}
-                  <EncryptionStatusBadge item={eventForm.selectedEvent} />
+                  <SyncedEventInfoBadge />
                 </div>
               )}
             </div>
@@ -1404,23 +1423,6 @@ function MobileEventEditorBody({
             className={`${desktop ? "h-9 text-sm" : "text-lg font-semibold h-10"}`}
             autoFocus
           />
-          <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-            <div className="flex h-5 w-5 items-center justify-center shrink-0">
-              <encryptionMeta.Icon
-                className={encryptionMeta.iconClassName}
-                strokeWidth={2.25}
-                aria-hidden
-              />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-medium leading-tight">
-                {encryptionMeta.label}
-              </div>
-              <div className="text-[11px] leading-snug text-muted-foreground mt-0.5">
-                {encryptionHint}
-              </div>
-            </div>
-          </div>
 
           {/* Primary Controls */}
           <div className="space-y-4">
