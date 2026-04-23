@@ -110,6 +110,27 @@ function getFirstStringValue(
   return undefined;
 }
 
+function getTextValue(
+  value: string | ical.ParameterValue | null | undefined,
+): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "val" in value &&
+    typeof value.val === "string"
+  ) {
+    const trimmed = value.val.trim();
+    return trimmed || undefined;
+  }
+
+  return undefined;
+}
+
 function coerceDate(value: unknown): Date | undefined {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value;
@@ -434,12 +455,13 @@ function parseVEvent(
   userTimezone: string,
   calendarTimezone?: string,
 ): ParsedIcsEvent | null {
-  const sourceUid = event.uid?.trim();
+  const sourceUid = getTextValue(event.uid);
   if (!sourceUid) {
     return null;
   }
 
-  if (!event.summary?.trim()) {
+  const title = getTextValue(event.summary);
+  if (!title) {
     return null;
   }
 
@@ -492,12 +514,12 @@ function parseVEvent(
     uid,
     sourceUid,
     recurrenceId,
-    title: event.summary.trim(),
-    description: event.description?.trim() || undefined,
+    title,
+    description: getTextValue(event.description),
     start,
     end,
     allDay,
-    location: event.location?.trim() || undefined,
+    location: getTextValue(event.location),
     recurrence: recurrenceRule,
     timezone,
   };
@@ -512,7 +534,7 @@ function collectEventCandidates(baseEvent: ical.VEvent): IcsEventLike[] {
         continue;
       }
 
-      candidates.push(recurrenceEvent);
+      candidates.push(recurrenceEvent as IcsEventLike);
     }
   }
 
