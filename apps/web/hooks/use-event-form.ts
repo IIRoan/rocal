@@ -178,6 +178,16 @@ export function useEventForm({
   const loadEventData = useCallback(
     async (event: CalendarEvent) => {
       const isNewEvent = !event.id || event.id === "" || event.id === undefined;
+      const fallbackNotifications =
+        event.reminder && event.reminder > 0
+          ? [
+              {
+                notificationType: "email" as const,
+                minutesBefore: event.reminder,
+                isEnabled: true,
+              },
+            ]
+          : [];
 
       setSelectedEvent(event);
       setEventViewMode(isNewEvent ? "edit" : "view");
@@ -195,6 +205,7 @@ export function useEventForm({
           "",
       );
       setEventReminder(event.reminder ?? null);
+      setShowNotifications(false);
 
       // Handle recurring event data
       const hasRecurrence = !!event.recurrence;
@@ -235,16 +246,24 @@ export function useEventForm({
                 minutesBefore: n.minutesBefore,
                 isEnabled: n.isEnabled,
               }));
-            setEventNotifications(emailNotifications);
+            const notificationsToUse =
+              emailNotifications.length > 0
+                ? emailNotifications
+                : fallbackNotifications;
+
+            setEventNotifications(notificationsToUse);
+            setShowNotifications(notificationsToUse.length > 0);
           }
         } catch (error) {
           log.error("Failed to load event notifications:", error);
-          setEventNotifications([]);
+          setEventNotifications(fallbackNotifications);
+          setShowNotifications(fallbackNotifications.length > 0);
         } finally {
           setNotificationsLoading(false);
         }
       } else {
         setEventNotifications([]);
+        setShowNotifications(false);
       }
     },
     [queryClient],
