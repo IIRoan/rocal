@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { createLogger } from "@workspace/logger";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCalendarContext } from "./calendar-context";
 import {
   addDays,
@@ -49,22 +48,55 @@ import { CalendarEvent, CalendarView, CALENDAR_VIEWS } from "./types";
 import dynamic from "next/dynamic";
 import { EventLoadingSkeleton } from "./event-loading-skeleton";
 
-const AgendaView = dynamic(() => import("./agenda-view").then((mod) => mod.AgendaView), {
-  ssr: false,
-  loading: () => <EventLoadingSkeleton view="agenda" compactView={false} className="absolute inset-0 z-10" />
-});
+const AgendaView = dynamic(
+  () => import("./agenda-view").then((mod) => mod.AgendaView),
+  {
+    ssr: false,
+    loading: () => (
+      <EventLoadingSkeleton
+        view="agenda"
+        compactView={false}
+        className="absolute inset-0 z-10"
+      />
+    ),
+  },
+);
 const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), {
   ssr: false,
-  loading: () => <EventLoadingSkeleton view="day" compactView={false} className="absolute inset-0 z-10" />
+  loading: () => (
+    <EventLoadingSkeleton
+      view="day"
+      compactView={false}
+      className="absolute inset-0 z-10"
+    />
+  ),
 });
-const MonthView = dynamic(() => import("./month-view").then((mod) => mod.MonthView), {
-  ssr: false,
-  loading: () => <EventLoadingSkeleton view="month" compactView={false} className="absolute inset-0 z-10" />
-});
-const WeekView = dynamic(() => import("./week-view").then((mod) => mod.WeekView), {
-  ssr: false,
-  loading: () => <EventLoadingSkeleton view="week" compactView={false} className="absolute inset-0 z-10" />
-});
+const MonthView = dynamic(
+  () => import("./month-view").then((mod) => mod.MonthView),
+  {
+    ssr: false,
+    loading: () => (
+      <EventLoadingSkeleton
+        view="month"
+        compactView={false}
+        className="absolute inset-0 z-10"
+      />
+    ),
+  },
+);
+const WeekView = dynamic(
+  () => import("./week-view").then((mod) => mod.WeekView),
+  {
+    ssr: false,
+    loading: () => (
+      <EventLoadingSkeleton
+        view="week"
+        compactView={false}
+        className="absolute inset-0 z-10"
+      />
+    ),
+  },
+);
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { CalendarSkeleton } from "./calendar-skeleton";
@@ -80,6 +112,8 @@ import {
 } from "../ui/dropdown-menu";
 import { Separator } from "../ui/separator";
 import { useDropdownShortcuts } from "../../hooks";
+import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
+import { gsap, useGSAP } from "../../lib/gsap";
 
 export interface EventCalendarProps {
   className?: string;
@@ -169,7 +203,8 @@ export function EventCalendar({
     | { type: "general" };
 
   // Use the shared calendar context instead of local state
-  const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
+  const { currentDate, setCurrentDate, currentView, setCurrentView } =
+    useCalendarContext();
 
   // Use context view, falling back to initialView on first render if context hasn't been set
   const view = currentView;
@@ -186,7 +221,11 @@ export function EventCalendar({
         if (savedViewData) {
           try {
             const parsedData = JSON.parse(savedViewData);
-            if (parsedData.expires && parsedData.expires > Date.now() && (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)) {
+            if (
+              parsedData.expires &&
+              parsedData.expires > Date.now() &&
+              (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)
+            ) {
               setCurrentView(parsedData.view as CalendarView);
               return;
             }
@@ -203,7 +242,11 @@ export function EventCalendar({
         if (savedViewData) {
           try {
             const parsedData = JSON.parse(savedViewData);
-            if (parsedData.expires && parsedData.expires > Date.now() && (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)) {
+            if (
+              parsedData.expires &&
+              parsedData.expires > Date.now() &&
+              (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)
+            ) {
               setCurrentView(parsedData.view as CalendarView);
               return;
             }
@@ -257,14 +300,24 @@ export function EventCalendar({
     if (v === "month") {
       const monthStart = startOfMonth(date);
       const monthEnd = endOfMonth(date);
-      start = startOfWeek(monthStart, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      end = endOfWeek(monthEnd, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      start = startOfWeek(monthStart, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      end = endOfWeek(monthEnd, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
     } else if (v === "week") {
-      start = startOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      end = endOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      start = startOfWeek(date, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      end = endOfWeek(date, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
     } else if (v === "day") {
-      start = new Date(date); start.setHours(0, 0, 0, 0);
-      end = new Date(date); end.setHours(23, 59, 59, 999);
+      start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(date);
+      end.setHours(23, 59, 59, 999);
     } else if (v === "agenda") {
       start = new Date(date);
       end = addDays(date, AgendaDaysToShow - 1);
@@ -340,22 +393,8 @@ export function EventCalendar({
   }, []);
 
   const navDirectionRef = useRef<1 | -1>(1);
-  const shouldReduceMotion = useReducedMotion();
-
-  const viewTransitionVariants = {
-    enter: (dir: number) => ({
-      x: shouldReduceMotion ? 0 : dir > 0 ? 32 : -32,
-      opacity: 0,
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-    },
-    exit: (dir: number) => ({
-      x: shouldReduceMotion ? 0 : dir > 0 ? -24 : 24,
-      opacity: 0,
-    }),
-  };
+  const shouldReduceMotion = usePrefersReducedMotion();
+  const viewStageRef = useRef<HTMLDivElement>(null);
 
   // Navigate and eagerly start the fetch in the same React batch
   const navigateTo = (newDate: Date) => {
@@ -401,17 +440,26 @@ export function EventCalendar({
     let start: Date;
     let end: Date;
     if (view === "month" || view === "agenda") {
-      const base = direction === "next" ? addMonths(currentDate, offset) : addMonths(currentDate, offset);
+      const base =
+        direction === "next"
+          ? addMonths(currentDate, offset)
+          : addMonths(currentDate, offset);
       start = startOfMonth(base);
       end = endOfMonth(base);
     } else if (view === "week") {
-      start = startOfWeek(addWeeks(currentDate, offset), { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      end = endOfWeek(start, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      start = startOfWeek(addWeeks(currentDate, offset), {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      end = endOfWeek(start, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
     } else {
       // day / 3day
       const base = addDays(currentDate, offset);
-      start = new Date(base); start.setHours(0, 0, 0, 0);
-      end = new Date(base); end.setHours(23, 59, 59, 999);
+      start = new Date(base);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(base);
+      end.setHours(23, 59, 59, 999);
     }
     onPrefetchRange({ start, end });
   };
@@ -420,6 +468,50 @@ export function EventCalendar({
     navDirectionRef.current = currentDate < new Date() ? 1 : -1;
     navigateTo(new Date());
   };
+
+  const calendarViewKey = `${view}-${format(
+    currentDate,
+    view === "day" ? "yyyy-MM-dd" : view === "week" ? "yyyy-ww" : "yyyy-MM",
+  )}`;
+  const canAnimateCalendar = !loading && !error;
+
+  useGSAP(
+    () => {
+      if (!canAnimateCalendar) {
+        return;
+      }
+
+      const node = viewStageRef.current;
+
+      if (!node) {
+        return;
+      }
+
+      if (shouldReduceMotion) {
+        gsap.set(node, { clearProps: "opacity,transform" });
+        return;
+      }
+
+      gsap.fromTo(
+        node,
+        {
+          x: navDirectionRef.current > 0 ? 32 : -32,
+          autoAlpha: 0,
+        },
+        {
+          x: 0,
+          autoAlpha: 1,
+          duration: 0.28,
+          ease: "power3.out",
+          overwrite: "auto",
+        },
+      );
+    },
+    {
+      dependencies: [calendarViewKey, canAnimateCalendar, shouldReduceMotion],
+      scope: viewStageRef,
+    },
+  );
 
   // Track last mouse click position for popover positioning on timeline clicks
   const lastClickPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -465,7 +557,9 @@ export function EventCalendar({
     const eventElement = target.closest<HTMLElement>("[data-event-id]");
 
     if (eventElement?.dataset.eventId) {
-      const event = events.find((item) => item.id === eventElement.dataset.eventId);
+      const event = events.find(
+        (item) => item.id === eventElement.dataset.eventId,
+      );
       if (event) {
         onSetPreview?.(null);
         reopenContextMenuAt({ type: "event", event }, e.clientX, e.clientY);
@@ -473,7 +567,9 @@ export function EventCalendar({
       }
     }
 
-    const cellElement = target.closest<HTMLElement>("[data-calendar-cell='true']");
+    const cellElement = target.closest<HTMLElement>(
+      "[data-calendar-cell='true']",
+    );
     if (cellElement?.dataset.cellDate) {
       const startTime = new Date(cellElement.dataset.cellDate);
       const timeValue = Number(cellElement.dataset.cellTime);
@@ -801,7 +897,10 @@ export function EventCalendar({
             <span className="font-bold">{format(start, "MMM")}</span>
             <span className="text-muted-foreground"> - </span>
             <span className="font-bold">{format(end, "MMM")}</span>
-            <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              {format(end, "yyyy")}
+            </span>
           </>
         );
       }
@@ -831,7 +930,10 @@ export function EventCalendar({
             <span className="font-bold">{format(start, "MMM")}</span>
             <span className="text-muted-foreground"> - </span>
             <span className="font-bold">{format(end, "MMM")}</span>
-            <span className="text-muted-foreground"> {format(end, "yyyy")}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              {format(end, "yyyy")}
+            </span>
           </>
         );
       }
@@ -964,10 +1066,25 @@ export function EventCalendar({
               >
                 {(
                   [
-                    { value: "month", label: "Month", icon: LayoutGrid, shortcut: "M" },
-                    { value: "week", label: "Week", icon: Columns3, shortcut: "W" },
+                    {
+                      value: "month",
+                      label: "Month",
+                      icon: LayoutGrid,
+                      shortcut: "M",
+                    },
+                    {
+                      value: "week",
+                      label: "Week",
+                      icon: Columns3,
+                      shortcut: "W",
+                    },
                     { value: "day", label: "Day", icon: Square, shortcut: "D" },
-                    { value: "agenda", label: "Agenda", icon: AlignJustify, shortcut: "A" },
+                    {
+                      value: "agenda",
+                      label: "Agenda",
+                      icon: AlignJustify,
+                      shortcut: "A",
+                    },
                   ] as const
                 ).map(({ value, label, icon: Icon, shortcut }) => {
                   const active = view === value;
@@ -986,7 +1103,8 @@ export function EventCalendar({
                             "text-muted-foreground/70 hover:text-foreground hover:bg-accent/60",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             "disabled:opacity-50 disabled:pointer-events-none",
-                            active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm",
+                            active &&
+                              "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm",
                           )}
                         >
                           <Icon size={14} aria-hidden="true" />
@@ -1004,96 +1122,77 @@ export function EventCalendar({
           </div>
 
           <div className="flex flex-1 flex-col relative min-h-0 overflow-hidden">
-            <AnimatePresence
-              mode="sync"
-              custom={navDirectionRef.current}
-              initial={false}
+            <div
+              key={calendarViewKey}
+              ref={viewStageRef}
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                willChange: "transform, opacity",
+              }}
             >
-              <motion.div
-                key={`${view}-${format(currentDate, view === "day" ? "yyyy-MM-dd" : view === "week" ? "yyyy-ww" : "yyyy-MM")}`}
-                custom={navDirectionRef.current}
-                variants={viewTransitionVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{
-                  x: {
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 40,
-                    mass: 0.6,
-                  },
-                  opacity: { duration: 0.1, ease: "easeOut" },
-                }}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  willChange: "transform, opacity",
-                }}
-              >
-                {view === "month" && (
-                  <MonthView
-                    currentDate={currentDate}
-                    events={deferredEvents}
-                    onEventSelect={handleEventSelect}
-                    onEventCreate={handleEventCreate}
-                    showWeekNumbers={showWeekNumbers}
-                    compactView={compactView}
-                    timeFormat={timeFormat}
-                    weekStartDay={weekStartDay}
-                    workingDays={workingDays}
-                    timezone={timezone}
-                    onEventEdit={onEventEdit}
-                    onEventDelete={(event) => handleEventDelete(event.id)}
-                    onEventView={onEventEdit}
-                  />
-                )}
-                {view === "week" && (
-                  <WeekView
-                    currentDate={currentDate}
-                    events={deferredEvents}
-                    onEventSelect={handleEventSelect}
-                    onEventCreate={handleEventCreate}
-                    compactView={compactView}
-                    timeFormat={timeFormat}
-                    weekStartDay={weekStartDay}
-                    workingDays={workingDays}
-                    timezone={timezone}
-                    onEventEdit={onEventEdit}
-                    onEventDelete={(event) => handleEventDelete(event.id)}
-                    onEventView={onEventEdit}
-                  />
-                )}
-                {view === "day" && (
-                  <DayView
-                    currentDate={currentDate}
-                    events={deferredEvents}
-                    onEventSelect={handleEventSelect}
-                    onEventCreate={handleEventCreate}
-                    compactView={compactView}
-                    timeFormat={timeFormat}
-                    timezone={timezone}
-                    onEventEdit={onEventEdit}
-                    onEventDelete={(event) => handleEventDelete(event.id)}
-                    onEventView={onEventEdit}
-                  />
-                )}
-                {view === "agenda" && (
-                  <AgendaView
-                    currentDate={currentDate}
-                    events={deferredEvents}
-                    onEventSelect={handleEventSelect}
-                    timeFormat={timeFormat}
-                    timezone={timezone}
-                    onEventEdit={onEventEdit}
-                    onEventDelete={(event) => handleEventDelete(event.id)}
-                    onEventView={onEventEdit}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
+              {view === "month" && (
+                <MonthView
+                  currentDate={currentDate}
+                  events={deferredEvents}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  showWeekNumbers={showWeekNumbers}
+                  compactView={compactView}
+                  timeFormat={timeFormat}
+                  weekStartDay={weekStartDay}
+                  workingDays={workingDays}
+                  timezone={timezone}
+                  onEventEdit={onEventEdit}
+                  onEventDelete={(event) => handleEventDelete(event.id)}
+                  onEventView={onEventEdit}
+                />
+              )}
+              {view === "week" && (
+                <WeekView
+                  currentDate={currentDate}
+                  events={deferredEvents}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  compactView={compactView}
+                  timeFormat={timeFormat}
+                  weekStartDay={weekStartDay}
+                  workingDays={workingDays}
+                  timezone={timezone}
+                  onEventEdit={onEventEdit}
+                  onEventDelete={(event) => handleEventDelete(event.id)}
+                  onEventView={onEventEdit}
+                />
+              )}
+              {view === "day" && (
+                <DayView
+                  currentDate={currentDate}
+                  events={deferredEvents}
+                  onEventSelect={handleEventSelect}
+                  onEventCreate={handleEventCreate}
+                  compactView={compactView}
+                  timeFormat={timeFormat}
+                  timezone={timezone}
+                  onEventEdit={onEventEdit}
+                  onEventDelete={(event) => handleEventDelete(event.id)}
+                  onEventView={onEventEdit}
+                />
+              )}
+              {view === "agenda" && (
+                <AgendaView
+                  currentDate={currentDate}
+                  events={deferredEvents}
+                  onEventSelect={handleEventSelect}
+                  timeFormat={timeFormat}
+                  timezone={timezone}
+                  onEventEdit={onEventEdit}
+                  onEventDelete={(event) => handleEventDelete(event.id)}
+                  onEventView={onEventEdit}
+                />
+              )}
+            </div>
           </div>
 
           {/* Event editing now handled by command palette */}

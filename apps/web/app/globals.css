@@ -16,6 +16,55 @@
 @source "../**/*.{ts,tsx}";
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 
+@layer utilities {
+  /*
+   * GSAP drives every transient enter/exit animation in the app. Without this
+   * kill switch the legacy tw-animate-css keyframes would compose with GSAP
+   * tweens and produce double-animations or position glitches. We deliberately
+   * leave `animate-spin` and `animate-pulse` alone — they are infinite, do not
+   * conflict with GSAP exit tweens, and must keep working even if
+   * `GsapAnimationProvider` is not mounted (e.g. in isolated playgrounds).
+   */
+  [class*="animate-shimmer"],
+  [class*="animate-wave"],
+  [class*="animate-fade-in"],
+  [class*="animate-slide-in"],
+  [class*="animate-scale-in"],
+  [class*="animate-bounce-in"],
+  [class*="animate-slide-up"],
+  [class*="animate-slide-fade"],
+  [class*="animate-fade-in-zoom"],
+  [class*="animate-slide-in-top"],
+  [class*="animate-slide-in-bottom"],
+  [class*="animate-slide-in-left"],
+  [class*="animate-slide-in-right"],
+  [class*="animate-in"],
+  [class*="animate-out"],
+  [class*="fade-in-"],
+  [class*="fade-out-"],
+  [class*="zoom-in-"],
+  [class*="zoom-out-"],
+  [class*="slide-in-from-"],
+  [class*="slide-out-to-"] {
+    animation: none !important;
+  }
+
+  /*
+   * Radix surfaces are now rendered with `forceMount`, so their closed state
+   * is part of the static DOM. Without a baseline rule the content paints
+   * fully visible until `GsapAnimationProvider`'s effect runs (causing a
+   * first-paint flash) — and stays visible forever in any tree that does not
+   * mount the provider. Hide closed surfaces by default; GSAP only needs to
+   * tween, not gate visibility.
+   */
+  [data-slot$="-overlay"][data-state="closed"],
+  [data-slot$="-content"][data-state="closed"] {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
 /* Dark mode via class on root element */
 @custom-variant dark (&:is(.dark *));
 
@@ -390,12 +439,20 @@
 
 /* Hex color theme adaptation - automatically adjusts custom hex colors for light/dark mode */
 .event-hex-adaptive {
-  background-color: color-mix(in oklch, var(--event-hex-color) 25%, oklch(0.96 0.005 0));
+  background-color: color-mix(
+    in oklch,
+    var(--event-hex-color) 25%,
+    oklch(0.96 0.005 0)
+  );
   color: color-mix(in oklch, var(--event-hex-color) 85%, oklch(0.15 0 0));
 }
 
 .dark .event-hex-adaptive {
-  background-color: color-mix(in oklch, var(--event-hex-color) 40%, oklch(0.18 0 0));
+  background-color: color-mix(
+    in oklch,
+    var(--event-hex-color) 40%,
+    oklch(0.18 0 0)
+  );
   color: color-mix(in oklch, var(--event-hex-color) 30%, oklch(0.95 0 0));
 }
 
@@ -473,7 +530,11 @@
     transition:
       background-color 0.25s ease,
       color 0.25s ease;
-    font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "cv11" 1;
+    font-feature-settings:
+      "cv02" 1,
+      "cv03" 1,
+      "cv04" 1,
+      "cv11" 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -659,6 +720,53 @@
     scroll-behavior: smooth;
   }
 
+  @supports (view-transition-name: none) {
+    @view-transition {
+      navigation: auto;
+    }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 160ms;
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      animation-fill-mode: both;
+    }
+
+    ::view-transition-old(root) {
+      animation-name: route-root-exit;
+    }
+
+    ::view-transition-new(root) {
+      animation-name: route-root-enter;
+    }
+  }
+
+  @keyframes route-root-exit {
+    from {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.994);
+      filter: blur(1.5px);
+    }
+  }
+
+  @keyframes route-root-enter {
+    from {
+      opacity: 0;
+      transform: scale(1.004);
+      filter: blur(1.5px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+
   /* Reduce motion block removed - was blocking animations based on Windows setting */
 
   /* Enhanced focus states for accessibility */
@@ -678,67 +786,55 @@
   }
 
   /* Command palette / dialog animations */
-  /* Spotlight variant: slides down from top-center */
+  /*
+   * Centered + spotlight dialog variants are positioned via Tailwind v4's
+   * native `translate` property (`-translate-x-1/2 -translate-y-1/2`).
+   * Keyframes MUST NOT touch `transform` or `translate` — doing so would
+   * compose with Tailwind's translate and visibly knock the dialog off
+   * center. Animate only the native `scale` property and `opacity`.
+   */
+  [data-slot="dialog-content"].dialog-spotlight-animation,
+  [data-slot="dialog-content"].dialog-center-animation {
+    will-change: opacity, scale;
+  }
+
   [data-slot="dialog-content"].dialog-spotlight-animation {
-    will-change: opacity, transform;
-    animation: spotlightSlideDown 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: dialogCenteredEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   [data-slot="dialog-content"].dialog-spotlight-animation[data-state="closed"] {
-    animation: spotlightSlideUp 120ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: dialogCenteredExit 120ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  @keyframes spotlightSlideDown {
-    0% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-10px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-
-  @keyframes spotlightSlideUp {
-    0% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-10px);
-    }
-  }
-
-  /* Center variant dialogs: fade + scale from center */
   [data-slot="dialog-content"].dialog-center-animation {
-    will-change: opacity, transform;
-    animation: centerEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: dialogCenteredEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   [data-slot="dialog-content"].dialog-center-animation[data-state="closed"] {
-    animation: centerExit 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: dialogCenteredExit 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  @keyframes centerEnter {
+  @keyframes dialogCenteredEnter {
     from {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.96);
+      scale: 0.97;
     }
+
     to {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      scale: 1;
     }
   }
 
-  @keyframes centerExit {
+  @keyframes dialogCenteredExit {
     from {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      scale: 1;
     }
+
     to {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.96);
+      scale: 0.97;
     }
   }
 
@@ -808,13 +904,21 @@
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   /* Legacy keyframes kept for other uses */
@@ -879,11 +983,15 @@
   @media (max-width: 768px) {
     /* Safe area insets for mobile devices */
     .safe-area-inset-top {
-      padding-top: calc(env(safe-area-inset-top, 0) * 0.5); /* Reduced by half */
+      padding-top: calc(
+        env(safe-area-inset-top, 0) * 0.5
+      ); /* Reduced by half */
     }
 
     .safe-area-inset-bottom {
-      padding-bottom: calc(env(safe-area-inset-bottom, 0) * 0.5); /* Reduced by half */
+      padding-bottom: calc(
+        env(safe-area-inset-bottom, 0) * 0.5
+      ); /* Reduced by half */
     }
 
     .safe-area-inset-left {
