@@ -1,12 +1,17 @@
 import { MobilePage } from "@workspace/mobile-ui";
 import { Toaster } from "@workspace/ui/components/ui";
-import { ThemeProvider, LoadingProvider } from "@workspace/ui/providers";
+import {
+  GsapAnimationProvider,
+  ThemeProvider,
+  LoadingProvider,
+} from "@workspace/ui/providers";
 import { CalendarProvider } from "@workspace/ui/components/calendar";
 import { solaceDisplay, solaceSans } from "@workspace/ui/lib/fonts";
 import { SettingsProvider } from "@/components/settings-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { LoggerBootstrap } from "@/components/logger-bootstrap";
 import { MobileRuntimeBridge } from "@/components/mobile-runtime-bridge";
+import { RouteTransitionProvider } from "@/components/route-transition-provider";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
@@ -59,7 +64,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
         className={`${solaceSans.variable} ${solaceDisplay.variable} bg-background font-sans antialiased`}
       >
@@ -68,24 +73,29 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: calendarBootstrapScript }}
         />
-        <MobileRuntimeBridge>
-          <LoggerBootstrap />
-          <QueryProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <LoadingProvider>
-                <SettingsProvider>
-                  <CalendarProvider><MobilePage>{children}</MobilePage></CalendarProvider>
-                  <Toaster />
-                </SettingsProvider>
-              </LoadingProvider>
-            </ThemeProvider>
-          </QueryProvider>
-        </MobileRuntimeBridge>
+        <GsapAnimationProvider />
+        <RouteTransitionProvider>
+          <MobileRuntimeBridge>
+            <LoggerBootstrap />
+            <QueryProvider>
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="system"
+                enableSystem
+                disableTransitionOnChange
+              >
+                <LoadingProvider>
+                  <SettingsProvider>
+                    <CalendarProvider>
+                      <MobilePage>{children}</MobilePage>
+                    </CalendarProvider>
+                    <Toaster />
+                  </SettingsProvider>
+                </LoadingProvider>
+              </ThemeProvider>
+            </QueryProvider>
+          </MobileRuntimeBridge>
+        </RouteTransitionProvider>
       </body>
     </html>
   );

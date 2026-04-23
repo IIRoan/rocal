@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useSession } from "@/lib/auth-client";
+import { useSmoothRouter } from "@/hooks/use-smooth-router";
+import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
+import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
   PageLoadingOverlay,
@@ -26,15 +28,45 @@ import type React from "react";
 // ─── static data ──────────────────────────────────────────────────────────────
 
 const APRIL_GRID: (number | null)[] = [
-  null, null, 1, 2, 3, 4, 5,
-  6, 7, 8, 9, 10, 11, 12,
-  13, 14, 15, 16, 17, 18, 19,
-  20, 21, 22, 23, 24, 25, 26,
-  27, 28, 29, 30, null, null, null,
+  null,
+  null,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30,
+  null,
+  null,
+  null,
 ];
 
 const MINI_DOTS: Record<number, string[]> = {
-  7:  ["sky"],
+  7: ["sky"],
   10: ["violet", "orange"],
   14: ["sky"],
   17: ["emerald"],
@@ -47,12 +79,18 @@ const MINI_DOTS: Record<number, string[]> = {
 };
 
 const MONTH_EVENTS: Record<number, Array<{ label: string; color: string }>> = {
-  7:  [{ label: "Stand-up", color: "sky" }],
-  10: [{ label: "Client call", color: "violet" }, { label: "Lunch", color: "orange" }],
+  7: [{ label: "Stand-up", color: "sky" }],
+  10: [
+    { label: "Client call", color: "violet" },
+    { label: "Lunch", color: "orange" },
+  ],
   14: [{ label: "Design meeting", color: "sky" }],
   17: [{ label: "Client demo", color: "emerald" }],
   20: [{ label: "Stand-up", color: "sky" }],
-  21: [{ label: "Team sync", color: "sky" }, { label: "Design review", color: "violet" }],
+  21: [
+    { label: "Team sync", color: "sky" },
+    { label: "Design review", color: "violet" },
+  ],
   22: [{ label: "Client demo", color: "emerald" }],
   23: [{ label: "1:1 Alex", color: "violet" }],
   24: [{ label: "Conference", color: "emerald" }],
@@ -77,33 +115,33 @@ interface WeekEvent {
 }
 
 const WEEK_EVENTS: WeekEvent[] = [
-  { day: 1, label: "Stand-up",      color: "sky",     start: 9,    end: 9.5  },
-  { day: 2, label: "Team sync",     color: "sky",     start: 10,   end: 11   },
-  { day: 2, label: "Lunch",         color: "orange",  start: 12.5, end: 13.5 },
-  { day: 2, label: "Design review", color: "violet",  start: 14,   end: 15   },
-  { day: 3, label: "Client demo",   color: "emerald", start: 11,   end: 12   },
-  { day: 4, label: "1:1 Alex",      color: "violet",  start: 15,   end: 15.5 },
-  { day: 5, label: "Conference",    color: "emerald", start: 9,    end: 17   },
+  { day: 1, label: "Stand-up", color: "sky", start: 9, end: 9.5 },
+  { day: 2, label: "Team sync", color: "sky", start: 10, end: 11 },
+  { day: 2, label: "Lunch", color: "orange", start: 12.5, end: 13.5 },
+  { day: 2, label: "Design review", color: "violet", start: 14, end: 15 },
+  { day: 3, label: "Client demo", color: "emerald", start: 11, end: 12 },
+  { day: 4, label: "1:1 Alex", color: "violet", start: 15, end: 15.5 },
+  { day: 5, label: "Conference", color: "emerald", start: 9, end: 17 },
 ];
 
 const DAY_EVENTS: WeekEvent[] = [
-  { day: 2, label: "Team sync",     color: "sky",    start: 10,   end: 11   },
-  { day: 2, label: "Lunch",         color: "orange", start: 12.5, end: 13.5 },
-  { day: 2, label: "Design review", color: "violet", start: 14,   end: 15   },
+  { day: 2, label: "Team sync", color: "sky", start: 10, end: 11 },
+  { day: 2, label: "Lunch", color: "orange", start: 12.5, end: 13.5 },
+  { day: 2, label: "Design review", color: "violet", start: 14, end: 15 },
 ];
 
 const CALENDARS = [
   { name: "Personal", color: "sky" },
-  { name: "Work",     color: "violet" },
-  { name: "Family",   color: "emerald" },
-  { name: "Travel",   color: "orange" },
+  { name: "Work", color: "violet" },
+  { name: "Family", color: "emerald" },
+  { name: "Travel", color: "orange" },
 ];
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const START_H = 8;
-const END_H   = 17;
-const SPAN    = END_H - START_H;
+const END_H = 17;
+const SPAN = END_H - START_H;
 
 function pct(h: number) {
   return `${Math.max(0, Math.min(100, ((h - START_H) / SPAN) * 100))}%`;
@@ -132,13 +170,22 @@ function MiniCalendar({ today }: { today: number }) {
           <span className="ml-0.5 text-muted-foreground">2026</span>
         </span>
         <div className="flex items-center text-muted-foreground">
-          <span className="flex h-6 w-6 items-center justify-center"><ChevronLeft className="h-3.5 w-3.5" /></span>
-          <span className="flex h-6 w-6 items-center justify-center"><ChevronRight className="h-3.5 w-3.5" /></span>
+          <span className="flex h-6 w-6 items-center justify-center">
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </span>
+          <span className="flex h-6 w-6 items-center justify-center">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
         </div>
       </div>
       <div className="mb-0.5 grid grid-cols-7">
-        {["M","T","W","T","F","S","S"].map((l, i) => (
-          <div key={i} className="flex h-6 items-center justify-center text-[10px] font-medium text-muted-foreground/50">{l}</div>
+        {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+          <div
+            key={i}
+            className="flex h-6 items-center justify-center text-[10px] font-medium text-muted-foreground/50"
+          >
+            {l}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-7">
@@ -148,21 +195,30 @@ function MiniCalendar({ today }: { today: number }) {
           const isWeekDay = day >= 20 && day <= 26;
           const dots = MINI_DOTS[day] ?? [];
           return (
-            <div key={day} className="flex flex-col items-center gap-[2px] py-px">
-              <div className={[
-                "flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
-                isCurrentDay
-                  ? "bg-primary/20 font-semibold text-primary"
-                  : isWeekDay
-                  ? "bg-muted/60 text-foreground"
-                  : "text-foreground",
-              ].join(" ")}>
+            <div
+              key={day}
+              className="flex flex-col items-center gap-[2px] py-px"
+            >
+              <div
+                className={[
+                  "flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                  isCurrentDay
+                    ? "bg-primary/20 font-semibold text-primary"
+                    : isWeekDay
+                      ? "bg-muted/60 text-foreground"
+                      : "text-foreground",
+                ].join(" ")}
+              >
                 {day}
               </div>
               {dots.length > 0 && (
                 <div className="flex h-[4px] gap-[2px]">
                   {dots.slice(0, 3).map((c, di) => (
-                    <span key={di} className="h-[4px] w-[4px] rounded-full" style={{ backgroundColor: `var(--event-${c})` }} />
+                    <span
+                      key={di}
+                      className="h-[4px] w-[4px] rounded-full"
+                      style={{ backgroundColor: `var(--event-${c})` }}
+                    />
                   ))}
                 </div>
               )}
@@ -209,12 +265,21 @@ function WeekGrid({ today }: { today: number }) {
         {dayHeaders.map((d) => {
           const isToday = d.n === today;
           return (
-            <div key={d.n} className="flex flex-col items-center gap-0.5 py-1.5">
-              <span className="text-[8px] font-medium uppercase text-muted-foreground/60">{d.short}</span>
-              <span className={[
-                "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium",
-                isToday ? "bg-primary text-primary-foreground" : "text-foreground",
-              ].join(" ")}>
+            <div
+              key={d.n}
+              className="flex flex-col items-center gap-0.5 py-1.5"
+            >
+              <span className="text-[8px] font-medium uppercase text-muted-foreground/60">
+                {d.short}
+              </span>
+              <span
+                className={[
+                  "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium",
+                  isToday
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground",
+                ].join(" ")}
+              >
                 {d.n}
               </span>
             </div>
@@ -225,22 +290,37 @@ function WeekGrid({ today }: { today: number }) {
         <TimeLabels />
         <div className="relative flex-1 grid grid-cols-7">
           {hours.map((h) => (
-            <div key={h} className="absolute left-0 right-0 border-t border-border/30" style={{ top: pct(h) }} />
+            <div
+              key={h}
+              className="absolute left-0 right-0 border-t border-border/30"
+              style={{ top: pct(h) }}
+            />
           ))}
           {hours.map((h) => (
-            <div key={`${h}.5`} className="absolute left-0 right-0 border-t border-border/15" style={{ top: pct(h + 0.5) }} />
+            <div
+              key={`${h}.5`}
+              className="absolute left-0 right-0 border-t border-border/15"
+              style={{ top: pct(h + 0.5) }}
+            />
           ))}
           {/* Current-time line — Tuesday's column only */}
           <div
             className="absolute z-20 pointer-events-none"
-            style={{ top: pct(10.5), left: `${(1 / 7) * 100}%`, width: `${(1 / 7) * 100}%` }}
+            style={{
+              top: pct(10.5),
+              left: `${(1 / 7) * 100}%`,
+              width: `${(1 / 7) * 100}%`,
+            }}
           >
             <div className="absolute inset-x-0 h-px bg-red-500" />
-            <div className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" style={{ left: 0, top: 0 }} />
+            <div
+              className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
+              style={{ left: 0, top: 0 }}
+            />
           </div>
           {WEEK_EVENTS.map((ev, i) => {
             const colIndex = ev.day - 1;
-            const showLabel = (ev.end - ev.start) >= 0.75;
+            const showLabel = ev.end - ev.start >= 0.75;
             return (
               <div
                 key={i}
@@ -253,7 +333,9 @@ function WeekGrid({ today }: { today: number }) {
                   width: `calc(${(1 / 7) * 100}% - 2px)`,
                 }}
               >
-                {showLabel && <span className="truncate block">{ev.label}</span>}
+                {showLabel && (
+                  <span className="truncate block">{ev.label}</span>
+                )}
               </div>
             );
           })}
@@ -268,22 +350,42 @@ function DayGrid({ today }: { today: number }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2">
-        <span className="text-[8px] font-medium uppercase text-muted-foreground/60">Tue</span>
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">{today}</span>
-        <span className="ml-1 text-[9px] text-muted-foreground">April 2026</span>
+        <span className="text-[8px] font-medium uppercase text-muted-foreground/60">
+          Tue
+        </span>
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+          {today}
+        </span>
+        <span className="ml-1 text-[9px] text-muted-foreground">
+          April 2026
+        </span>
       </div>
       <div className="relative flex flex-1 overflow-hidden">
         <TimeLabels />
         <div className="relative flex-1">
           {hours.map((h) => (
-            <div key={h} className="absolute left-0 right-0 border-t border-border/30" style={{ top: pct(h) }} />
+            <div
+              key={h}
+              className="absolute left-0 right-0 border-t border-border/30"
+              style={{ top: pct(h) }}
+            />
           ))}
           {hours.map((h) => (
-            <div key={`${h}.5`} className="absolute left-0 right-0 border-t border-border/15" style={{ top: pct(h + 0.5) }} />
+            <div
+              key={`${h}.5`}
+              className="absolute left-0 right-0 border-t border-border/15"
+              style={{ top: pct(h + 0.5) }}
+            />
           ))}
-          <div className="absolute z-20 pointer-events-none left-0 right-0" style={{ top: pct(10.5) }}>
+          <div
+            className="absolute z-20 pointer-events-none left-0 right-0"
+            style={{ top: pct(10.5) }}
+          >
             <div className="absolute h-px bg-red-500 left-0 right-0" />
-            <div className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" style={{ left: 0, top: 0 }} />
+            <div
+              className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
+              style={{ left: 0, top: 0 }}
+            />
           </div>
           {DAY_EVENTS.map((ev, i) => (
             <div
@@ -310,25 +412,42 @@ function MonthGrid({ today }: { today: number }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div className="grid shrink-0 grid-cols-7 border-b">
-        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d) => (
-          <div key={d} className="py-1.5 text-center text-[9px] font-medium uppercase text-muted-foreground/60">{d}</div>
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+          <div
+            key={d}
+            className="py-1.5 text-center text-[9px] font-medium uppercase text-muted-foreground/60"
+          >
+            {d}
+          </div>
         ))}
       </div>
       <div className="grid flex-1 grid-rows-5">
         {WEEKS.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 [&:last-child>*]:border-b-0">
+          <div
+            key={wi}
+            className="grid grid-cols-7 [&:last-child>*]:border-b-0"
+          >
             {week.map((day, di) => {
               const isToday = day === today;
               const evs = day ? (MONTH_EVENTS[day] ?? []) : [];
               return (
                 <div
                   key={`${wi}-${di}`}
-                  className={["overflow-hidden border-b border-r px-1 pb-0.5 pt-1 last:border-r-0", !day ? "bg-muted/25" : ""].join(" ")}
+                  className={[
+                    "overflow-hidden border-b border-r px-1 pb-0.5 pt-1 last:border-r-0",
+                    !day ? "bg-muted/25" : "",
+                  ].join(" ")}
                 >
                   {day !== null && (
                     <>
-                      <div className={["mb-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
-                        isToday ? "bg-primary/20 font-semibold text-primary" : "text-foreground"].join(" ")}>
+                      <div
+                        className={[
+                          "mb-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                          isToday
+                            ? "bg-primary/20 font-semibold text-primary"
+                            : "text-foreground",
+                        ].join(" ")}
+                      >
                         {day}
                       </div>
                       <div className="space-y-[2px]">
@@ -336,7 +455,10 @@ function MonthGrid({ today }: { today: number }) {
                           <div
                             key={ev.label}
                             className="truncate rounded px-1 py-[1px] text-[9px] font-medium leading-tight"
-                            style={{ backgroundColor: `var(--event-${ev.color})`, color: `var(--event-${ev.color}-foreground)` }}
+                            style={{
+                              backgroundColor: `var(--event-${ev.color})`,
+                              color: `var(--event-${ev.color}-foreground)`,
+                            }}
                           >
                             {ev.label}
                           </div>
@@ -363,9 +485,11 @@ function AppPreview() {
   const [view, setView] = useState<CalView>("Week");
 
   const rangeLabel =
-    view === "Day" ? "Tuesday, April 21" :
-    view === "Week" ? "Apr 20 – 26, 2026" :
-    "April 2026";
+    view === "Day"
+      ? "Tuesday, April 21"
+      : view === "Week"
+        ? "Apr 20 – 26, 2026"
+        : "April 2026";
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border bg-card/95 shadow-xl backdrop-blur-sm">
@@ -386,11 +510,20 @@ function AppPreview() {
           <div className="flex shrink-0 items-center justify-between px-3 pb-2.5 pt-3">
             <div className="flex items-center gap-1.5">
               <Logo width={20} height={20} className="text-primary" />
-              <span className="text-[13px] tracking-[-0.04em] text-foreground" style={{ fontWeight: 380 }}>Solace</span>
+              <span
+                className="text-[13px] tracking-[-0.04em] text-foreground"
+                style={{ fontWeight: 380 }}
+              >
+                Solace
+              </span>
             </div>
             <div className="flex items-center gap-0.5 text-muted-foreground/40">
-              <span className="flex h-6 w-6 items-center justify-center"><Search className="h-3 w-3" /></span>
-              <span className="flex h-6 w-6 items-center justify-center"><PanelLeftClose className="h-3 w-3" /></span>
+              <span className="flex h-6 w-6 items-center justify-center">
+                <Search className="h-3 w-3" />
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center">
+                <PanelLeftClose className="h-3 w-3" />
+              </span>
             </div>
           </div>
           <MiniCalendar today={today} />
@@ -402,13 +535,21 @@ function AppPreview() {
           </div>
           <div className="flex-1 overflow-hidden px-2">
             <div className="mb-1.5 flex items-center justify-between px-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Calendars</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Calendars
+              </span>
               <Settings2 className="h-3 w-3 text-muted-foreground/40" />
             </div>
             <div className="space-y-0.5">
               {CALENDARS.map((cal) => (
-                <div key={cal.name} className="flex h-7 items-center gap-2 rounded-lg px-2 text-[12px] font-medium text-foreground">
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: `var(--event-${cal.color})` }} />
+                <div
+                  key={cal.name}
+                  className="flex h-7 items-center gap-2 rounded-lg px-2 text-[12px] font-medium text-foreground"
+                >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: `var(--event-${cal.color})` }}
+                  />
                   <span className="truncate">{cal.name}</span>
                 </div>
               ))}
@@ -424,7 +565,9 @@ function AppPreview() {
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <ChevronRight className="h-3.5 w-3.5" />
               </div>
-              <span className="ml-1 text-[11px] font-medium text-foreground">{rangeLabel}</span>
+              <span className="ml-1 text-[11px] font-medium text-foreground">
+                {rangeLabel}
+              </span>
             </div>
             <div className="flex items-center rounded-md border border-border/60 bg-background/60 p-0.5">
               {(["Day", "Week", "Month"] as CalView[]).map((v) => (
@@ -433,7 +576,9 @@ function AppPreview() {
                   onClick={() => setView(v)}
                   className={[
                     "rounded px-2 py-0.5 text-[10px] transition-colors",
-                    v === view ? "bg-primary/15 font-medium text-primary" : "text-muted-foreground hover:text-foreground",
+                    v === view
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
                   {v}
@@ -441,8 +586,8 @@ function AppPreview() {
               ))}
             </div>
           </div>
-          {view === "Week"  && <WeekGrid  today={today} />}
-          {view === "Day"   && <DayGrid   today={today} />}
+          {view === "Week" && <WeekGrid today={today} />}
+          {view === "Day" && <DayGrid today={today} />}
           {view === "Month" && <MonthGrid today={today} />}
         </div>
       </div>
@@ -463,14 +608,16 @@ function ThisWeekWidget() {
     { short: "S", n: 26 },
   ];
   const upcoming = [
-    { time: "Now",  label: "Team sync",     color: "sky" },
+    { time: "Now", label: "Team sync", color: "sky" },
     { time: "2:00", label: "Design review", color: "violet" },
-    { time: "Fri",  label: "Conference",    color: "emerald" },
+    { time: "Fri", label: "Conference", color: "emerald" },
   ];
   return (
     <div className="rounded-xl border border-border/60 bg-card/60 p-4 backdrop-blur-sm">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-[12px] font-semibold text-foreground">This week</span>
+        <span className="text-[12px] font-semibold text-foreground">
+          This week
+        </span>
         <span className="text-[11px] text-muted-foreground">Apr 20 – 26</span>
       </div>
       {/* Week strip */}
@@ -480,16 +627,26 @@ function ThisWeekWidget() {
           const dots = MINI_DOTS[d.n] ?? [];
           return (
             <div key={d.n} className="flex flex-col items-center gap-1">
-              <span className="text-[10px] font-medium text-muted-foreground/60">{d.short}</span>
-              <span className={[
-                "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-medium",
-                isToday ? "bg-primary text-primary-foreground" : "text-foreground",
-              ].join(" ")}>
+              <span className="text-[10px] font-medium text-muted-foreground/60">
+                {d.short}
+              </span>
+              <span
+                className={[
+                  "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-medium",
+                  isToday
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground",
+                ].join(" ")}
+              >
                 {d.n}
               </span>
               <div className="flex h-[5px] items-center gap-[2px]">
                 {dots.slice(0, 2).map((c, i) => (
-                  <span key={i} className="h-[4px] w-[4px] rounded-full" style={{ backgroundColor: `var(--event-${c})` }} />
+                  <span
+                    key={i}
+                    className="h-[4px] w-[4px] rounded-full"
+                    style={{ backgroundColor: `var(--event-${c})` }}
+                  />
                 ))}
               </div>
             </div>
@@ -500,9 +657,16 @@ function ThisWeekWidget() {
       <div className="space-y-2 border-t border-border/40 pt-3">
         {upcoming.map((ev) => (
           <div key={ev.label} className="flex items-center gap-3">
-            <span className="w-7 text-right text-[11px] tabular-nums text-muted-foreground/60">{ev.time}</span>
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `var(--event-${ev.color})` }} />
-            <span className="text-[13px] font-medium text-foreground">{ev.label}</span>
+            <span className="w-7 text-right text-[11px] tabular-nums text-muted-foreground/60">
+              {ev.time}
+            </span>
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: `var(--event-${ev.color})` }}
+            />
+            <span className="text-[13px] font-medium text-foreground">
+              {ev.label}
+            </span>
           </div>
         ))}
       </div>
@@ -510,14 +674,25 @@ function ThisWeekWidget() {
   );
 }
 
-function HeroContent({ onLogin, isExiting }: { onLogin: () => void; isExiting: boolean }) {
+function HeroContent({
+  onLogin,
+  isExiting,
+}: {
+  onLogin: () => void;
+  isExiting: boolean;
+}) {
   return (
     <div className="relative z-10 flex w-full flex-col items-center">
       {/* Text + CTA capped at md */}
       <div className="w-full max-w-md">
         {/* Logo + theme toggle */}
         <div className="mb-10 flex items-center justify-between">
-          <Logo width={44} height={44} className="text-primary" aria-label="Solace" />
+          <Logo
+            width={44}
+            height={44}
+            className="text-primary"
+            aria-label="Solace"
+          />
           <ThemeToggle />
         </div>
 
@@ -567,36 +742,95 @@ function HeroContent({ onLogin, isExiting }: { onLogin: () => void; isExiting: b
 
 export function HomePageClient() {
   const { data: session, isPending } = useSession();
-  const router = useRouter();
+  const router = useSmoothRouter();
   const [isExiting, setIsExiting] = useState(false);
+  const rootRef = useRef<HTMLElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const shouldShowLoadingOverlay =
+    FORCE_LOADING_DESIGN_PREVIEW || isPending || Boolean(session?.user);
 
   useEffect(() => {
     if (!isPending && session?.user) {
-      router.replace("/dashboard");
+      router.replace("/dashboard", undefined, {
+        messageContext: "AUTH_FLOW",
+      });
     }
   }, [isPending, session?.user, router]);
 
-  if (FORCE_LOADING_DESIGN_PREVIEW || isPending) {
+  useGSAP(
+    () => {
+      if (prefersReducedMotion || shouldShowLoadingOverlay) {
+        return;
+      }
+
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+      timeline
+        .fromTo(
+          "[data-hero-scrim]",
+          { autoAlpha: 0 },
+          { autoAlpha: 1, duration: 0.45 },
+          0,
+        )
+        .fromTo(
+          [
+            "[data-hero-logo-row]",
+            "[data-hero-heading]",
+            "[data-hero-copy]",
+            "[data-hero-cta]",
+            "[data-hero-footer]",
+          ],
+          { autoAlpha: 0, y: 24 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.62,
+            stagger: 0.08,
+          },
+          0.08,
+        )
+        .fromTo(
+          "[data-hero-preview-shell]",
+          {
+            autoAlpha: 0,
+            x: 52,
+            y: 18,
+            scale: 0.96,
+          },
+          {
+            autoAlpha: 1,
+            x: 0,
+            y: 0,
+            scale: 1,
+            duration: 0.78,
+            ease: "expo.out",
+          },
+          0.18,
+        );
+    },
+    {
+      scope: rootRef,
+      dependencies: [prefersReducedMotion, shouldShowLoadingOverlay],
+    },
+  );
+
+  if (shouldShowLoadingOverlay) {
     return <PageLoadingOverlay isLoading={true} messageContext="AUTH_FLOW" />;
   }
 
-  if (session?.user) return null;
-
   const handleLoginClick = () => {
     setIsExiting(true);
-    setTimeout(() => {
-      router.push(Capacitor.isNativePlatform() ? "/mobile-login" : "/login");
-    }, 480);
+    router.push(
+      Capacitor.isNativePlatform() ? "/mobile-login" : "/login",
+      undefined,
+      { messageContext: "AUTH_FLOW", minimumVisibleMs: 120 },
+    );
   };
 
   return (
     <section
-      className="relative min-h-[100dvh] flex overflow-hidden animate-in fade-in-0 duration-300 ease-out"
-      style={isExiting ? {
-        opacity: 0,
-        transform: "translateY(12px) scale(0.985)",
-        transition: "opacity 220ms cubic-bezier(0.4,0,1,1), transform 220ms cubic-bezier(0.4,0,1,1)",
-      } : undefined}
+      ref={rootRef}
+      className="relative min-h-[100dvh] flex overflow-hidden"
     >
       {/* Full-bleed wallpaper */}
       <Image
@@ -608,23 +842,43 @@ export function HomePageClient() {
         className="pointer-events-none object-cover"
       />
       {/* Directional overlay — heavier on the left so text is always readable */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/95 via-background/70 to-background/20" />
+      <div
+        data-hero-scrim
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/95 via-background/70 to-background/20"
+      />
 
       {/* Left — hero text */}
       <div className="relative z-10 flex w-full flex-col justify-center px-8 py-16 lg:w-1/2 lg:px-16 xl:px-24">
         <div className="max-w-md">
-          <div className="mb-10 flex items-center justify-between">
-            <Logo width={44} height={44} className="text-primary" aria-label="Solace" />
+          <div
+            data-hero-logo-row
+            className="mb-10 flex items-center justify-between"
+          >
+            <Logo
+              width={44}
+              height={44}
+              className="text-primary"
+              aria-label="Solace"
+            />
             <ThemeToggle />
           </div>
-          <h1 className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Shared calendars,<br />without the chaos.
+          <h1
+            data-hero-heading
+            className="mb-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl"
+          >
+            Shared calendars,
+            <br />
+            without the chaos.
           </h1>
-          <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
+          <p
+            data-hero-copy
+            className="mb-8 text-sm leading-relaxed text-muted-foreground"
+          >
             Solace is a calm, focused calendar built for shared schedules,
             recurring events, and real notifications — no ads, no noise.
           </p>
           <Button
+            data-hero-cta
             size="lg"
             className="h-11 w-full rounded-lg font-medium"
             onClick={handleLoginClick}
@@ -633,7 +887,10 @@ export function HomePageClient() {
             Get started
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
+          <p
+            data-hero-footer
+            className="mt-6 text-center text-xs text-muted-foreground"
+          >
             Before continuing, please read our{" "}
             <Link
               href="/privacy"
@@ -651,6 +908,7 @@ export function HomePageClient() {
         style={{ perspective: "1200px" }}
       >
         <div
+          data-hero-preview-shell
           className="w-full overflow-hidden rounded-2xl shadow-[0_32px_80px_-12px_rgba(0,0,0,0.5)]"
           style={{
             transform: "rotateY(-5deg) rotateX(2deg)",
@@ -663,4 +921,3 @@ export function HomePageClient() {
     </section>
   );
 }
- 

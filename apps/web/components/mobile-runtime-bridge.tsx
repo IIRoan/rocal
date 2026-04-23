@@ -16,10 +16,11 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Keyboard, KeyboardResize } from "@capacitor/keyboard";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { setupIonicReact } from "@ionic/react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { getApiBaseUrl } from "@/lib/api-url";
 import { Browser } from "@capacitor/browser";
+import { useSmoothRouter } from "@/hooks/use-smooth-router";
 
 setupIonicReact({
   mode: "ios",
@@ -60,7 +61,7 @@ const normalizeCustomSchemeCallback = (incomingUrl: string) => {
 
 export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router = useSmoothRouter();
   const hasTriggeredInitialRouteRef = useRef(false);
   const completedAuthHandoffTokensRef = useRef<Set<string>>(new Set());
   const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
@@ -117,7 +118,9 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
           if (safeCallbackUrl !== "/dashboard") {
             loginParams.set("next", safeCallbackUrl);
           }
-          router.replace(`/mobile-login?${loginParams.toString()}`);
+          router.replace(`/mobile-login?${loginParams.toString()}`, undefined, {
+            messageContext: "AUTH_FLOW",
+          });
           setAuthErrorMessage("Authentication session was not persisted");
           return;
         }
@@ -127,9 +130,12 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         // Use window.location for more reliable navigation in mobile context
         log.debug("Navigating to", safeCallbackUrl);
         if (window.location.pathname !== safeCallbackUrl) {
+          router.startRouteTransition({ messageContext: "AUTH_FLOW" });
           window.location.replace(safeCallbackUrl);
         } else {
-          router.replace(safeCallbackUrl);
+          router.replace(safeCallbackUrl, undefined, {
+            messageContext: "AUTH_FLOW",
+          });
           setTimeout(() => {
             router.refresh();
           }, 100);
@@ -149,7 +155,9 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
         if (safeCallbackUrl !== "/dashboard") {
           loginParams.set("next", safeCallbackUrl);
         }
-        router.replace(`/mobile-login?${loginParams.toString()}`);
+        router.replace(`/mobile-login?${loginParams.toString()}`, undefined, {
+          messageContext: "AUTH_FLOW",
+        });
         setAuthErrorMessage("Authentication session was not persisted");
       }
     },
@@ -211,7 +219,13 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
               if (nextPath !== "/dashboard") {
                 loginParams.set("next", nextPath);
               }
-              router.replace(`/mobile-login?${loginParams.toString()}`);
+              router.replace(
+                `/mobile-login?${loginParams.toString()}`,
+                undefined,
+                {
+                  messageContext: "AUTH_FLOW",
+                },
+              );
               setAuthErrorMessage("Authentication failed");
               return;
             }
@@ -222,6 +236,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
                 log.debug(
                   "Token already handled, skipping duplicate verification",
                 );
+                router.startRouteTransition({ messageContext: "AUTH_FLOW" });
                 window.location.replace(nextPath);
                 return;
               }
@@ -229,6 +244,7 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
             }
 
             if (!handoffToken) {
+              router.startRouteTransition({ messageContext: "AUTH_FLOW" });
               window.location.replace(nextPath);
               return;
             }
@@ -269,7 +285,13 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
                 if (nextPath !== "/dashboard") {
                   loginParams.set("next", nextPath);
                 }
-                router.replace(`/mobile-login?${loginParams.toString()}`);
+                router.replace(
+                  `/mobile-login?${loginParams.toString()}`,
+                  undefined,
+                  {
+                    messageContext: "AUTH_FLOW",
+                  },
+                );
                 setAuthErrorMessage("Authentication failed");
               });
             return;
@@ -293,7 +315,13 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
                 const loginParams = new URLSearchParams({
                   error: "oauth_error",
                 });
-                router.replace(`/mobile-login?${loginParams.toString()}`);
+                router.replace(
+                  `/mobile-login?${loginParams.toString()}`,
+                  undefined,
+                  {
+                    messageContext: "AUTH_FLOW",
+                  },
+                );
                 setAuthErrorMessage(error.message || "Authentication failed");
                 return;
               }
@@ -310,7 +338,13 @@ export function MobileRuntimeBridge({ children }: MobileRuntimeBridgeProps) {
               const loginParams = new URLSearchParams({
                 error: "oauth_error",
               });
-              router.replace(`/mobile-login?${loginParams.toString()}`);
+              router.replace(
+                `/mobile-login?${loginParams.toString()}`,
+                undefined,
+                {
+                  messageContext: "AUTH_FLOW",
+                },
+              );
               setAuthErrorMessage("Authentication failed");
             });
         },
