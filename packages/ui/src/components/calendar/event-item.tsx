@@ -4,13 +4,14 @@ import { useMemo } from "react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
+import { MapPinIcon } from "@phosphor-icons/react";
 
 import {
   getBorderRadiusClasses,
   getEventColorClasses,
   getEventColorStyles,
   isHexColor,
-  getColorSwatchValue,
+  resolveInlineColorValue,
 } from "./utils";
 import { EncryptionStatusBadge } from "./encryption-status";
 import { CalendarEvent, type CalendarView } from "./types";
@@ -134,10 +135,14 @@ function EventWrapper({
   return (
     <button
       className={cn(
-        "group/ev relative focus-visible:border-ring focus-visible:ring-ring/50 flex h-full w-full overflow-hidden text-left font-medium backdrop-blur-md transition-all duration-200 ease-out outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through hover:-translate-y-px hover:brightness-[1.07] hover:shadow-md hover:z-10 active:translate-y-0 active:brightness-95 active:shadow-sm border border-white/20 shadow-sm",
+        "group/ev relative flex h-full w-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
+        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
+        "data-past-event:opacity-65",
+        "hover:brightness-[1.04] hover:shadow-sm hover:z-10",
+        "active:brightness-[0.97]",
         "touch-manipulation",
-        // Only apply min-height and padding when not compact (small events)
-        compact ? "min-h-0 px-[1px]" : "min-h-[20px] sm:min-h-[24px] px-[2px] sm:px-2",
+        compact ? "min-h-0 px-1" : "min-h-[20px] sm:min-h-[24px] px-1.5 sm:px-2",
         getEventColorClasses(event.color),
         getBorderRadiusClasses(isFirstDay, isLastDay),
         className,
@@ -221,22 +226,6 @@ export function EventItem({
     return differenceInMinutes(displayEnd, displayStart);
   }, [displayStart, displayEnd]);
 
-  const getEventTime = () => {
-    if (event.allDay) return "All day";
-
-    // For short events (less than 45 minutes), only show start time
-    if (durationMinutes < 45) {
-      return formatTimeWithOptionalMinutesTZ(
-        displayStart,
-        timeFormat,
-        timezone,
-      );
-    }
-
-    // For longer events, show both start and end time
-    return `${formatTimeWithOptionalMinutesTZ(displayStart, timeFormat, timezone)} - ${formatTimeWithOptionalMinutesTZ(displayEnd, timeFormat, timezone)}`;
-  };
-
   // Render the event content based on view
   const renderEventContent = () => {
     if (view === "month") {
@@ -269,10 +258,25 @@ export function EventItem({
 
     if (view === "week" || view === "day") {
       // Height-based sizing thresholds
-      const isCompact = height != null && height < 20;
-      const isSmall = height != null && height < 30;
-      const isMedium = height != null && height < 45;
-      const showTimeLine = !isCompact && !isSmall && durationMinutes >= 45 && showTime && !event.allDay;
+      const isCompact = height != null && height < 22;
+      const isSmall = height != null && height < 32;
+      const showStacked =
+        !isCompact &&
+        !isSmall &&
+        durationMinutes >= 45 &&
+        showTime &&
+        !event.allDay;
+
+      const startLabel = formatTimeWithOptionalMinutesTZ(
+        displayStart,
+        timeFormat,
+        timezone,
+      );
+      const endLabel = formatTimeWithOptionalMinutesTZ(
+        displayEnd,
+        timeFormat,
+        timezone,
+      );
 
       return (
         <EventWrapper
@@ -283,17 +287,19 @@ export function EventItem({
           onClick={onClick}
           compact={isCompact}
           className={cn(
-            // No vertical padding when very small
-            isCompact ? "" : isSmall ? "py-px" : "py-0.5 sm:py-1",
-            isCompact ? "items-center" : isSmall ? "items-center" : showTimeLine ? "flex-col" : "items-center",
-            // Font size scales with height
+            isCompact ? "" : isSmall ? "py-px" : "py-1 sm:py-1.5",
+            isCompact || isSmall
+              ? "items-center"
+              : showStacked
+                ? "flex-col justify-start gap-0.5"
+                : "items-center",
             isCompact
               ? "text-[8px] leading-none"
               : isSmall
-                ? "text-[9px] leading-tight"
+                ? "text-[10px] leading-tight"
                 : view === "week"
-                  ? "text-[10px] leading-[1.1] sm:text-[13px] sm:leading-normal"
-                  : "text-[13px]",
+                  ? "text-[11px] leading-tight sm:text-[12.5px] sm:leading-snug"
+                  : "text-[13px] leading-snug",
             className,
           )}
           currentTime={currentTime}
@@ -302,33 +308,71 @@ export function EventItem({
           onMouseDown={onMouseDown}
           onTouchStart={onTouchStart}
         >
-          <div className="flex items-center gap-0.5 w-full min-w-0 overflow-hidden">
-            <EncryptionStatusBadge item={event} />
-            <span
-              className="font-medium flex-1 min-w-0 truncate whitespace-nowrap"
-              title={event.title}
-            >
-              {event.title}
-            </span>
-          </div>
-          {showTimeLine && (
-            <span className="opacity-70 truncate whitespace-nowrap text-[10px]">
-              {getEventTime()}
-            </span>
+          {showStacked ? (
+            <>
+              <div className="flex items-center gap-1 w-full min-w-0">
+                <EncryptionStatusBadge item={event} />
+                <span
+                  className="font-semibold flex-1 min-w-0 truncate tracking-tight"
+                  title={event.title}
+                >
+                  {event.title}
+                </span>
+              </div>
+              <div className="flex items-center w-full min-w-0">
+                <span className="text-[11px] font-normal tabular-nums opacity-80 truncate">
+                  {startLabel}
+                  <span className="opacity-60 mx-1">–</span>
+                  {endLabel}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-baseline gap-1.5 w-full min-w-0 overflow-hidden">
+              <EncryptionStatusBadge item={event} />
+              <span
+                className={cn(
+                  "flex-1 min-w-0 truncate whitespace-nowrap tracking-tight",
+                  isCompact ? "font-medium" : "font-semibold",
+                )}
+                title={event.title}
+              >
+                {event.title}
+              </span>
+              {!isCompact && showTime && !event.allDay && (
+                <span className="shrink-0 text-[10px] font-normal tabular-nums opacity-70 whitespace-nowrap">
+                  {startLabel}
+                </span>
+              )}
+            </div>
           )}
         </EventWrapper>
       );
     }
 
-    // Agenda view - kept separate since it's significantly different
+    // Agenda view — Apple Calendar-inspired flat list row
+    const agendaTimeStart = formatTimeWithOptionalMinutesTZ(
+      new Date(event.start),
+      timeFormat,
+      timezone,
+    );
+    const agendaTimeEnd = formatTimeWithOptionalMinutesTZ(
+      new Date(event.end),
+      timeFormat,
+      timezone,
+    );
+    const accentColor = resolveInlineColorValue(eventColor);
+
     return (
       <button
         className={cn(
-          "group/ev relative overflow-hidden focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1 rounded p-2 text-left transition-all duration-200 ease-out outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90 hover:-translate-y-px hover:brightness-[1.07] hover:shadow-md active:translate-y-0 active:brightness-95 active:shadow-sm shadow-sm",
-          getEventColorClasses(eventColor),
+          "group/ev relative isolate w-full rounded-lg text-left transition-colors duration-150 ease-out outline-none",
+          "hover:bg-muted/60 active:bg-muted/80",
+          "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+          "data-past-event:opacity-55",
           className,
         )}
-        style={getEventColorStyles(eventColor)}
+        style={{ ["--ev-accent" as any]: accentColor }}
         data-past-event={isPast(new Date(event.end)) || undefined}
         data-event-id={event.id}
         onClick={onClick}
@@ -337,23 +381,53 @@ export function EventItem({
         {...dndListeners}
         {...dndAttributes}
       >
-        <div className="text-sm font-medium flex items-center gap-2">
-          <EncryptionStatusBadge item={event} />
-          <span className="truncate">{event.title}</span>
+        <div className="flex items-start gap-3 px-2 py-3">
+          {/* Time column */}
+          <div className="flex w-[68px] shrink-0 flex-col items-end pt-0.5 tabular-nums">
+            {event.allDay ? (
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                All day
+              </span>
+            ) : (
+              <>
+                <span className="text-[15px] font-semibold leading-tight text-foreground">
+                  {agendaTimeStart}
+                </span>
+                <span className="text-[11px] leading-tight text-muted-foreground/70 mt-0.5">
+                  {agendaTimeEnd}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Color indicator */}
+          <span
+            aria-hidden
+            className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
+            style={{ backgroundColor: "var(--ev-accent)" }}
+          />
+
+          {/* Content */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <EncryptionStatusBadge item={event} />
+              <span className="truncate text-[15px] font-semibold leading-snug text-foreground tracking-tight group-data-past-event/ev:line-through">
+                {event.title}
+              </span>
+            </div>
+            {event.location && (
+              <div className="flex items-center gap-1 text-[12px] text-muted-foreground min-w-0">
+                <MapPinIcon size={12} weight="fill" className="shrink-0 opacity-70" />
+                <span className="truncate">{event.location}</span>
+              </div>
+            )}
+            {event.description && (
+              <div className="mt-0.5 text-[12px] leading-snug text-muted-foreground/80 line-clamp-2">
+                {formatEventDescription(event.description)}
+              </div>
+            )}
+          </div>
         </div>
-        {!event.allDay && (
-          <div className="text-xs opacity-70">{getEventTime()}</div>
-        )}
-        {event.location && (
-          <div className="text-xs opacity-70">
-            <span>{event.location}</span>
-          </div>
-        )}
-        {event.description && (
-          <div className="my-1 text-xs opacity-90">
-            {formatEventDescription(event.description)}
-          </div>
-        )}
       </button>
     );
   };

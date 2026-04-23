@@ -8,6 +8,7 @@ import { AgendaDaysToShow } from "./constants";
 import { CalendarEvent } from "./types";
 import { EventItem } from "./event-item";
 import { getAgendaEventsForDay } from "./utils";
+import { cn } from "../../lib/utils";
 
 interface AgendaViewProps {
   currentDate: Date;
@@ -50,7 +51,7 @@ export function AgendaView({
   );
 
   return (
-    <div className="absolute inset-0 border-border/70 border-t ps-4 overflow-y-auto bg-background animate-fade-in">
+    <div className="absolute inset-0 border-border/70 border-t overflow-y-auto bg-background animate-fade-in">
       {!hasEvents ? (
         <div className="flex min-h-[70svh] flex-col items-center justify-center py-16 text-center">
           <span className="text-muted-foreground/50 mb-2">
@@ -62,40 +63,66 @@ export function AgendaView({
           </p>
         </div>
       ) : (
-        days.map((day) => {
-          const dayEvents = getAgendaEventsForDay(events, day);
+        <div className="px-3 sm:px-6 py-4 space-y-6">
+          {days.map((day) => {
+            const dayEvents = getAgendaEventsForDay(events, day);
 
-          if (dayEvents.length === 0) return null;
+            if (dayEvents.length === 0) return null;
 
-          return (
-            <div
-              key={day.toString()}
-              className="border-border/70 relative my-12 border-t"
-            >
-              <span
-                className="bg-background absolute -top-3 left-0 flex h-6 items-center pe-4 text-[10px] uppercase data-today:font-medium sm:pe-4 sm:text-xs"
-                data-today={isToday(day) || undefined}
-              >
-                {format(day, "d MMM, EEEE")}
-              </span>
-              <div className="mt-6 space-y-2">
-                {dayEvents.map((event) => (
-                  <EventItem
-                    key={event.id}
-                    event={event}
-                    view="agenda"
-                    onClick={(e) => handleEventClick(event, e)}
-                    timeFormat={timeFormat}
-                    timezone={timezone}
-                    onEdit={onEventEdit}
-                    onDelete={onEventDelete}
-                    onView={onEventView}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })
+            const today = isToday(day);
+
+            return (
+              <section key={day.toString()} className="flex flex-col gap-1.5">
+                <header
+                  className="sticky top-0 z-10 -mx-3 sm:-mx-6 flex items-baseline gap-3 bg-background/95 px-3 sm:px-6 pt-1 pb-2 backdrop-blur-sm"
+                  data-today={today || undefined}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className={cn(
+                        "text-2xl font-light tabular-nums leading-none tracking-tight",
+                        today ? "text-primary" : "text-foreground",
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px] font-semibold uppercase tracking-wider",
+                        today ? "text-primary" : "text-muted-foreground",
+                      )}
+                    >
+                      {format(day, "EEE")}
+                    </span>
+                  </div>
+                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                    {format(day, "MMMM")}
+                  </span>
+                  {today && (
+                    <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      Today
+                    </span>
+                  )}
+                </header>
+                <div className="flex flex-col">
+                  {dayEvents.map((event) => (
+                    <EventItem
+                      key={event.id}
+                      event={event}
+                      view="agenda"
+                      onClick={(e) => handleEventClick(event, e)}
+                      timeFormat={timeFormat}
+                      timezone={timezone}
+                      onEdit={onEventEdit}
+                      onDelete={onEventDelete}
+                      onView={onEventView}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       )}
     </div>
   );
