@@ -1,4 +1,4 @@
-jest.mock('@rocal/ui/dist/components/calendar/mobile-event-calendar', () => ({
+jest.mock('@solace/ui/dist/components/calendar/mobile-event-calendar', () => ({
   MobileEventCalendar: (props) => <div {...props} />,
 }));
 

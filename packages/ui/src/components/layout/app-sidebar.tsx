@@ -135,7 +135,7 @@ export function AppSidebar({
               className="text-[17px] tracking-[-0.04em] text-foreground"
               style={{ fontWeight: 380 }}
             >
-              rocal
+              solace
             </span>
           </div>
           <div className="flex items-center gap-1">
@@ -433,7 +433,7 @@ function AppSidebarDesktop({
                 className="text-[15px] tracking-[-0.04em] text-foreground"
                 style={{ fontWeight: 380 }}
               >
-                rocal
+                solace
               </span>
             </a>
             <div className="flex items-center gap-0.5">

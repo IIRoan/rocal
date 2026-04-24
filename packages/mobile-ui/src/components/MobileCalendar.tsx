@@ -1,5 +1,5 @@
 import React from 'react';
-import { MobileEventCalendar, MobileEventCalendarProps } from '@rocal/ui/dist/components/calendar/mobile-event-calendar';
+import { MobileEventCalendar, MobileEventCalendarProps } from '@solace/ui/dist/components/calendar/mobile-event-calendar';
 import { Gesture, GestureDetector, Directions } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { View } from 'react-native';

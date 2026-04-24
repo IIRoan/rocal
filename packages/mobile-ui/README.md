@@ -1,6 +1,6 @@
 # Mobile UI
 
-This package contains mobile-specific UI components for the Rocal application.
+This package contains mobile-specific UI components for the Solace application.
 
 ## Components
 
