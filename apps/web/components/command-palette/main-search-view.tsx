@@ -1,0 +1,221 @@
+import type { ComponentType } from "react";
+import { Button } from "@workspace/ui/components/ui/button";
+import { Input } from "@workspace/ui/components/ui/input";
+import { ChevronRight, Search } from "lucide-react";
+
+import type { UseCommandPaletteSearchResult } from "@/hooks/use-command-palette-search";
+import { EventSearchResults } from "./event-search-results";
+
+type CommandPaletteMainSearchViewProps = {
+  search: UseCommandPaletteSearchResult;
+};
+
+function SearchOnlyEmptyState({
+  debouncedQuery,
+}: {
+  debouncedQuery: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 gap-2">
+      <Search className="h-8 w-8 text-muted-foreground/20" />
+      <p className="text-sm text-muted-foreground">
+        {debouncedQuery.trim().length >= 2
+          ? `No events found for "${debouncedQuery}"`
+          : "Type to search your events"}
+      </p>
+    </div>
+  );
+}
+
+function SearchOnlyIntroState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 gap-2">
+      <Search className="h-8 w-8 text-muted-foreground/20" />
+      <p className="text-sm text-muted-foreground">
+        Search across all your events by title, description, or location
+      </p>
+    </div>
+  );
+}
+
+function NavigationResultButton({
+  description,
+  icon: Icon,
+  isSelected,
+  label,
+  onClick,
+  resultIndex,
+}: {
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+  isSelected: boolean;
+  label: string;
+  onClick: () => void;
+  resultIndex: number;
+}) {
+  return (
+    <button
+      data-index={resultIndex}
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
+        isSelected ? "bg-accent/50" : "hover:bg-accent/50"
+      }`}
+    >
+      <div className="flex items-center justify-center w-6 h-6 shrink-0">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <span className="text-sm flex-1 truncate">{label}</span>
+      <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
+        {description}
+      </span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
+
+export function CommandPaletteMainSearchView({
+  search,
+}: CommandPaletteMainSearchViewProps) {
+  return (
+    <div
+      className="flex flex-col"
+      style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
+    >
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+        {search.isCommandMode && !search.isSearchOnly ? (
+          <span className="text-sm font-medium text-primary">Command</span>
+        ) : search.isSearchOnly ? (
+          <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
+            <Search className="h-3.5 w-3.5 text-primary" />
+          </div>
+        ) : (
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+        <Input
+          ref={search.searchInputRef}
+          type="text"
+          placeholder={
+            search.isSearchOnly
+              ? "Search events..."
+              : search.isCommandMode
+                ? "Type a command..."
+                : "Search or jump to..."
+          }
+          value={search.searchQuery}
+          {...search.searchInputInteractionProps}
+          className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+        />
+        {search.searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={search.clearSearchQuery}
+            className="p-1 h-auto"
+          >
+            <svg
+              className="h-4 w-4 text-muted-foreground"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+            >
+              <path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"></path>
+            </svg>
+          </Button>
+        )}
+      </div>
+      <div ref={search.listRef} className="flex-1 overflow-y-auto py-2">
+        {search.isCommandMode ? (
+          search.matchingCommands.length === 0 ? (
+            <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No command found.
+            </div>
+          ) : (
+            <div className="px-2">
+              {search.matchingCommands.map((command, index) => (
+                <NavigationResultButton
+                  key={command.command}
+                  resultIndex={index}
+                  label={command.label}
+                  description={command.description}
+                  icon={command.icon}
+                  isSelected={index === search.selectedIndex}
+                  onClick={() => search.selectCommand(command)}
+                />
+              ))}
+            </div>
+          )
+        ) : search.isSearchOnly ? (
+          search.showEventSearch ? (
+            search.searchEvents.length > 0 || search.searchLoading ? (
+              <EventSearchResults
+                events={search.searchEvents}
+                isLoading={search.searchLoading}
+                onSelect={search.selectSearchEvent}
+                selectedIndex={search.selectedIndex}
+                baseIndex={0}
+              />
+            ) : (
+              <SearchOnlyEmptyState debouncedQuery={search.debouncedQuery} />
+            )
+          ) : (
+            <SearchOnlyIntroState />
+          )
+        ) : (
+          <>
+            {search.showEventSearch && (
+              <EventSearchResults
+                events={search.searchEvents}
+                isLoading={search.searchLoading}
+                onSelect={search.selectSearchEvent}
+                selectedIndex={search.selectedIndex}
+                baseIndex={0}
+              />
+            )}
+            {search.visibleNavigationItems.length === 0 &&
+            !search.showEventSearch &&
+            !search.debouncedQuery.trim() ? (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                No results found.
+              </div>
+            ) : search.visibleNavigationItems.length > 0 ? (
+              <div className="px-2">
+                {search.showEventSearch && search.searchEvents.length > 0 && (
+                  <div className="px-2 pt-1 pb-1">
+                    <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">
+                      Settings
+                    </span>
+                  </div>
+                )}
+                {search.visibleNavigationItems.map((item, index) => {
+                  const globalIndex = search.totalSearchEvents + index;
+
+                  return (
+                    <NavigationResultButton
+                      key={item.id}
+                      resultIndex={globalIndex}
+                      label={item.label}
+                      description={item.description}
+                      icon={item.icon}
+                      isSelected={globalIndex === search.selectedIndex}
+                      onClick={() => search.selectNavigationItem(item)}
+                    />
+                  );
+                })}
+              </div>
+            ) : search.showEventSearch &&
+              search.searchEvents.length === 0 &&
+              !search.searchLoading ? (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                No events found for &quot;{search.debouncedQuery}&quot;
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

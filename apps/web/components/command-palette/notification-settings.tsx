@@ -1,7 +1,7 @@
 import React from "react";
-import { Switch } from "@workspace/ui/components/ui/switch";
 import { Mail, ArrowLeft } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
+import { SettingToggleRow } from "./setting-toggle-row";
 
 interface NotificationSettingsProps {
   localSettings: UserSettings;
@@ -37,27 +37,18 @@ export function NotificationSettings({
                 Notification Types
               </div>
               <div className="p-1">
-                <div
-                  onClick={() =>
+                <SettingToggleRow
+                  checked={localSettings.emailNotifications}
+                  description="Receive event reminders via email"
+                  icon={Mail}
+                  label="Email Notifications"
+                  onToggle={() =>
                     updateSetting(
                       "emailNotifications",
                       !localSettings.emailNotifications,
                     )
                   }
-                  className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer hover:bg-accent/30 transition-colors"
-                >
-                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm">Email Notifications</div>
-                    <div className="text-xs text-muted-foreground">
-                      Receive event reminders via email
-                    </div>
-                  </div>
-                  <Switch
-                    checked={localSettings.emailNotifications}
-                    className="shrink-0 scale-75 origin-right"
-                  />
-                </div>
+                />
               </div>
             </div>
     </div>

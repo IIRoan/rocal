@@ -283,6 +283,7 @@ export function CalendarManager({
                       </div>
                       <EncryptionStatusBadge
                         item={calendar}
+                        asIcon
                         className="opacity-80"
                       />
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />                    </button>
@@ -316,6 +317,7 @@ export function CalendarManager({
                           </div>
                           <EncryptionStatusBadge
                             item={calendar}
+                            asIcon
                             className="opacity-80"
                           />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
@@ -352,6 +354,7 @@ export function CalendarManager({
                           </div>
                           <EncryptionStatusBadge
                             item={calendar}
+                            asIcon
                             className="opacity-80"
                           />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
