@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Input } from "@workspace/ui/components/ui/input";
 import {
   Globe,
@@ -9,6 +9,7 @@ import {
   Search,
 } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
+import { stopEventPropagation } from "@/lib/event-propagation";
 import { TIMEZONE_GROUPS, ALL_TIMEZONES, type PaletteView } from "./constants";
 
 interface TimeRegionSettingsProps {
@@ -27,6 +28,31 @@ export function TimeRegionSettings({
   currentView,
 }: TimeRegionSettingsProps) {
   const [timezoneSearch, setTimezoneSearch] = useState("");
+  const filteredTimezones = useMemo(() => {
+    if (!timezoneSearch) {
+      return [];
+    }
+
+    const normalizedQuery = timezoneSearch.toLowerCase();
+
+    return ALL_TIMEZONES.filter(
+      (timezone) =>
+        timezone.label.toLowerCase().includes(normalizedQuery) ||
+        timezone.value.toLowerCase().includes(normalizedQuery),
+    ).slice(0, 20);
+  }, [timezoneSearch]);
+  const handleTimezoneSelect = useCallback(
+    (timezone: string, options?: { clearSearch?: boolean }) => {
+      updateSetting("timezone", timezone);
+
+      if (options?.clearSearch) {
+        setTimezoneSearch("");
+      }
+
+      goBack();
+    },
+    [updateSetting, goBack],
+  );
 
   if (currentView === "time-region") {
     return (
@@ -114,7 +140,7 @@ export function TimeRegionSettings({
                   placeholder="Search timezones..."
                   value={timezoneSearch}
                   onChange={(e) => setTimezoneSearch(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
+                  onKeyDown={stopEventPropagation}
                   className="flex-1 h-auto py-3 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0"
                   autoComplete="off"
                   autoCorrect="off"
@@ -125,25 +151,13 @@ export function TimeRegionSettings({
               <div className="flex-1 overflow-y-auto min-h-0">
                 {timezoneSearch ? (
                   <div className="p-1">
-                    {ALL_TIMEZONES.filter(
-                      (tz) =>
-                        tz.label
-                          .toLowerCase()
-                          .includes(timezoneSearch.toLowerCase()) ||
-                        tz.value
-                          .toLowerCase()
-                          .includes(timezoneSearch.toLowerCase()),
-                    )
-                      .slice(0, 20)
-                      .map((tz) => (
+                    {filteredTimezones.map((tz) => (
                         <button
                           key={tz.value}
                           type="button"
-                          onClick={() => {
-                            updateSetting("timezone", tz.value);
-                            setTimezoneSearch("");
-                            goBack();
-                          }}
+                          onClick={() =>
+                            handleTimezoneSelect(tz.value, { clearSearch: true })
+                          }
                           className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                         >
                           <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -171,10 +185,7 @@ export function TimeRegionSettings({
                             <button
                               key={tz.value}
                               type="button"
-                              onClick={() => {
-                                updateSetting("timezone", tz.value);
-                                goBack();
-                              }}
+                              onClick={() => handleTimezoneSelect(tz.value)}
                               className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                             >
                               <Globe className="h-4 w-4 text-muted-foreground shrink-0" />

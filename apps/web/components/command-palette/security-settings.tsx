@@ -1,8 +1,8 @@
 import React from "react";
-import { Switch } from "@workspace/ui/components/ui/switch";
 import { Key, ChevronRight, ArrowLeft, Shield } from "lucide-react";
 import type { PaletteView } from "./constants";
 import type { UserSettings } from "@/lib/types/calendar";
+import { SettingToggleRow } from "./setting-toggle-row";
 
 interface SecuritySettingsProps {
   localSettings: UserSettings;
@@ -36,28 +36,18 @@ export function SecuritySettings({
           Event Encryption
         </div>
         <div className="p-1">
-          <button
-            type="button"
-            onClick={() =>
+          <SettingToggleRow
+            checked={isFullEncryptionEnabled}
+            description="Disable calendar share links and keep event content ciphertext-only."
+            icon={Shield}
+            label="Full Event Encryption"
+            onToggle={() =>
               updateSetting(
                 "eventEncryptionMode",
                 isFullEncryptionEnabled ? "hybrid" : "full",
               )
             }
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none"
-          >
-            <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm">Full Event Encryption</div>
-              <div className="text-xs text-muted-foreground">
-                Disable calendar share links and keep event content ciphertext-only.
-              </div>
-            </div>
-            <Switch
-              checked={isFullEncryptionEnabled}
-              className="pointer-events-none shrink-0 scale-75 origin-right"
-            />
-          </button>
+          />
           <div className="px-3 pb-2 pt-1 text-xs text-muted-foreground leading-relaxed">
             Full mode keeps event title, description, and location off the server. Reminder emails stay available but only include timing details.
           </div>
