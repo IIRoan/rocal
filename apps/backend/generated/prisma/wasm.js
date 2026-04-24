@@ -406,7 +406,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/var/home/roan/Documents/rocal/apps/backend/generated/prisma",
+      "value": "C:\\Users\\Roan\\Documents\\solace\\apps\\backend\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -415,7 +415,7 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "rhel-openssl-3.0.x",
+        "value": "windows",
         "native": true
       },
       {
@@ -424,7 +424,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/var/home/roan/Documents/rocal/apps/backend/prisma/schema.prisma",
+    "sourceFilePath": "C:\\Users\\Roan\\Documents\\solace\\apps\\backend\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
