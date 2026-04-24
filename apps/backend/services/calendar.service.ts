@@ -7,7 +7,11 @@ import type {
   CalendarDeleteResult,
 } from "../contracts/calendar.contract";
 import { ValidationError } from "../lib/errors";
-import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
+import {
+  assertValidEntityColor,
+  buildEncryptedNameFields,
+  normalizeEntityName,
+} from "../lib/entity-metadata";
 import { ensureUserCalendars } from "../lib/user-setup";
 
 export class CalendarService implements ICalendarService {
@@ -37,29 +41,14 @@ export class CalendarService implements ICalendarService {
       forceFullEncryption,
     } = input;
 
-    if (!name?.trim()) {
-      throw new ValidationError(
-        "Calendar name is required and cannot be empty",
-        "name",
-      );
-    }
+    const normalizedName = normalizeEntityName(name, {
+      entityLabel: "Calendar",
+    });
 
-    if (!isValidCalendarColor(color)) {
-      throw new ValidationError(
-        `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
-        "color",
-      );
-    }
-
-    if (name.trim().length > 100) {
-      throw new ValidationError(
-        "Calendar name cannot exceed 100 characters",
-        "name",
-      );
-    }
+    assertValidEntityColor(color);
 
     const existingCalendar = await this.prisma.calendar.findFirst({
-      where: { userId, name: name.trim() },
+      where: { userId, name: normalizedName },
     });
 
     if (existingCalendar) {
@@ -78,15 +67,13 @@ export class CalendarService implements ICalendarService {
 
     return this.prisma.calendar.create({
       data: {
-        name: name.trim(),
-        ...(encryptedName !== undefined ? { encryptedName } : {}),
-        ...(blindIndexTokens !== undefined
-          ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
-          : {}),
-        ...(encryptionState !== undefined ? { encryptionState } : {}),
-        ...(encryptionKeyVersion !== undefined
-          ? { encryptionKeyVersion }
-          : {}),
+        name: normalizedName,
+        ...buildEncryptedNameFields({
+          encryptedName,
+          blindIndexTokens,
+          encryptionState,
+          encryptionKeyVersion,
+        }),
         ...(forceFullEncryption !== undefined ? { forceFullEncryption } : {}),
         color,
         kind: "owned",
@@ -113,6 +100,11 @@ export class CalendarService implements ICalendarService {
       forceFullEncryption,
     } = input;
 
+    const normalizedName =
+      name !== undefined
+        ? normalizeEntityName(name, { entityLabel: "Calendar" })
+        : undefined;
+
     const existingCalendar = await this.prisma.calendar.findFirst({
       where: { id: calendarId, userId },
     });
@@ -134,24 +126,11 @@ export class CalendarService implements ICalendarService {
       );
     }
 
-    if (name !== undefined) {
-      if (!name?.trim()) {
-        throw new ValidationError(
-          "Calendar name is required and cannot be empty",
-          "name",
-        );
-      }
-      if (name.trim().length > 100) {
-        throw new ValidationError(
-          "Calendar name cannot exceed 100 characters",
-          "name",
-        );
-      }
-
+    if (normalizedName !== undefined) {
       const existingNameCalendar = await this.prisma.calendar.findFirst({
         where: {
           userId,
-          name: name.trim(),
+          name: normalizedName,
           id: { not: calendarId },
         },
       });
@@ -165,29 +144,23 @@ export class CalendarService implements ICalendarService {
     }
 
     if (color !== undefined) {
-      if (!isValidCalendarColor(color)) {
-        throw new ValidationError(
-          `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
-          "color",
-        );
-      }
+      assertValidEntityColor(color);
     }
 
     const updateData: Prisma.CalendarUpdateInput = {};
 
-    if (name !== undefined) updateData.name = name.trim();
+    if (normalizedName !== undefined) updateData.name = normalizedName;
     if (color !== undefined) updateData.color = color;
     if (isVisible !== undefined) updateData.isVisible = isVisible;
-    if (encryptedName !== undefined) updateData.encryptedName = encryptedName;
-    if (blindIndexTokens !== undefined) {
-      updateData.blindIndexTokens = JSON.stringify(blindIndexTokens);
-    }
-    if (encryptionState !== undefined) {
-      updateData.encryptionState = encryptionState;
-    }
-    if (encryptionKeyVersion !== undefined) {
-      updateData.encryptionKeyVersion = encryptionKeyVersion;
-    }
+    Object.assign(
+      updateData,
+      buildEncryptedNameFields({
+        encryptedName,
+        blindIndexTokens,
+        encryptionState,
+        encryptionKeyVersion,
+      }),
+    );
     if (isDefault !== undefined) {
       updateData.isDefault = isDefault;
       if (isDefault) {

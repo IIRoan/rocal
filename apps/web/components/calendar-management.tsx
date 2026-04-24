@@ -2,6 +2,10 @@
 
 import { useState, type ChangeEvent } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import {
+  getErrorMessage,
+  partitionCalendarsByKind,
+} from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/components/command-palette-context";
 import type { PaletteView } from "@/components/command-palette/index";
@@ -104,17 +108,6 @@ const calendarFormSchema = z.object({
     }, "Please select a valid color"),
 });
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-
-  return fallback;
-};
-
 interface CalendarManagementProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -129,16 +122,8 @@ export function CalendarManagement({
     useCalendarData();
   const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
   const { openCalendarManagement } = useCommandPalette();
-  const ownedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "owned",
-  );
-  const publicCalendars = calendars.filter(
-    (calendar) => calendar.kind === "public_holiday",
-  );
-  const subscribedCalendars = calendars.filter(
-    (calendar) =>
-      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
-  );
+  const { ownedCalendars, publicCalendars, subscribedCalendars } =
+    partitionCalendarsByKind(calendars);
   const { data: subscriptions = [] } = useQuery<
     CalendarSubscription[],
     ApiError

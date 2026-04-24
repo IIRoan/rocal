@@ -3,6 +3,10 @@
 import React, { useState } from "react";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import {
+  getErrorMessage,
+  partitionCalendarsByKind,
+} from "@/lib/calendar-ui-helpers";
 import type { Calendar, CalendarShareLink } from "@/lib/types/calendar";
 import { toast } from "sonner";
 import {
@@ -54,17 +58,6 @@ interface CalendarManagerProps {
   onNavigateTo: (view: PaletteView) => void;
 }
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-
-  return fallback;
-};
-
 export function CalendarManager({
   onBack,
   onGoToSubscriptions,
@@ -73,16 +66,8 @@ export function CalendarManager({
 }: CalendarManagerProps) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
-  const ownedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "owned",
-  );
-  const publicCalendars = calendars.filter(
-    (calendar) => calendar.kind === "public_holiday",
-  );
-  const subscribedCalendars = calendars.filter(
-    (calendar) =>
-      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
-  );
+  const { ownedCalendars, publicCalendars, subscribedCalendars } =
+    partitionCalendarsByKind(calendars);
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
