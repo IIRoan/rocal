@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
 import type {
@@ -79,17 +80,6 @@ type HolidayCalendar = (typeof NATIONAL_HOLIDAY_CALENDARS)[number];
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
   calendar: Calendar | undefined;
-};
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-
-  return fallback;
 };
 
 interface SubscriptionManagementProps {

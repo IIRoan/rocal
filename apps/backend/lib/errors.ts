@@ -10,6 +10,7 @@ export class ValidationError extends Error {
     public field?: string,
   ) {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "ValidationError";
   }
 }
@@ -17,6 +18,7 @@ export class ValidationError extends Error {
 export class NotFoundError extends Error {
   constructor(message: string = "Resource not found") {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "NotFoundError";
   }
 }
@@ -24,6 +26,7 @@ export class NotFoundError extends Error {
 export class UnauthorizedError extends Error {
   constructor(message: string = "Unauthorized access") {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "UnauthorizedError";
   }
 }
@@ -31,6 +34,7 @@ export class UnauthorizedError extends Error {
 export class ForbiddenError extends Error {
   constructor(message: string = "Access forbidden") {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "ForbiddenError";
   }
 }
@@ -41,6 +45,7 @@ export class DatabaseError extends Error {
     public originalError?: Error,
   ) {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "DatabaseError";
   }
 }
@@ -51,6 +56,7 @@ export class NotificationError extends Error {
     public originalError?: Error,
   ) {
     super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name = "NotificationError";
   }
 }
