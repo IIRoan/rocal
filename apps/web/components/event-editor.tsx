@@ -68,7 +68,7 @@ function SyncedEventInfoBadge() {
                 Source of truth lives elsewhere
               </div>
               <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-                Changes made on the original provider flow back into Rocal on
+                Changes made on the original provider flow back into Solace on
                 the next sync.
               </p>
             </div>
@@ -80,7 +80,7 @@ function SyncedEventInfoBadge() {
             />
             <div className="min-w-0">
               <div className="text-xs font-medium leading-tight">
-                Stored on Rocal during sync
+                Stored on Solace during sync
               </div>
               <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
                 Title, time, location and description are pulled in so we can
