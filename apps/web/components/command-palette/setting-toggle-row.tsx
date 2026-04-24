@@ -10,7 +10,7 @@ type SettingToggleRowProps = {
   onToggle: () => void;
 };
 
-function ToggleIndicator({ checked }: { checked: boolean }) {
+export function ToggleIndicator({ checked }: { checked: boolean }) {
   return (
     <span
       aria-hidden="true"
