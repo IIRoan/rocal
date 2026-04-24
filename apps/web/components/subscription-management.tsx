@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
@@ -14,7 +14,10 @@ import type {
   SyncSubscriptionResponse,
   UpdateSubscriptionRequest,
 } from "@/lib/types/calendar";
-import { NATIONAL_HOLIDAY_CALENDARS } from "@workspace/calendar-ics";
+import {
+  NATIONAL_HOLIDAY_CALENDARS,
+  findNationalHolidayCalendarByUrl,
+} from "@workspace/calendar-ics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -42,10 +45,10 @@ import {
   Link2,
   Eye,
   EyeOff,
-  Pencil,
   ChevronRight,
   Rss,
   Search,
+  Copy,
 } from "lucide-react";
 
 const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
@@ -73,9 +76,6 @@ const editableSubscriptionSchema = z.object({
 });
 
 type CustomSubscriptionForm = z.infer<typeof customSubscriptionSchema>;
-type EditableSubscriptionForm = z.infer<typeof editableSubscriptionSchema> & {
-  subscriptionId: string;
-};
 type HolidayCalendar = (typeof NATIONAL_HOLIDAY_CALENDARS)[number];
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
@@ -112,10 +112,15 @@ export function SubscriptionManagement({
       url: "",
       color: "indigo",
     });
-  const [editingSubscription, setEditingSubscription] =
-    useState<EditableSubscriptionForm | null>(null);
-  const [editingSubscriptionData, setEditingSubscriptionData] =
-    useState<CalendarSubscription | null>(null);
+  // Edit form: only the user-editable overrides for the calendar identified
+  // by `initialEditCalendarId`. The underlying source-of-truth (subscription
+  // detail + calendar entry) is derived synchronously from the query cache,
+  // so the form renders fully populated on first paint — no flash.
+  const [editFormOverride, setEditFormOverride] = useState<{
+    forCalendarId: string;
+    name?: string;
+    color?: string;
+  } | null>(null);
 
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
@@ -143,7 +148,9 @@ export function SubscriptionManagement({
     onBack?.();
   };
 
-  // Query
+  // Query — kept enabled while the palette is open. The `initialData` lets
+  // us read whatever the parent (CalendarManager) prefetched into the cache
+  // before the user ever clicked into the edit screen.
   const {
     data: subscriptions = [],
     isLoading: isLoadingSubscriptions,
@@ -152,37 +159,68 @@ export function SubscriptionManagement({
     queryKey: ["subscriptions"],
     queryFn: () => calendarApiService.getSubscriptions(),
     enabled: open,
+    initialData: () =>
+      queryClient.getQueryData<CalendarSubscription[]>(["subscriptions"]),
   });
 
-  // Auto-open edit view when navigated here with a specific calendar ID.
-  // Using useEffect instead of the "during render" derived-state pattern so
-  // that cached React Query data (subscriptions already populated on mount)
-  // is handled correctly — the during-render approach missed the case where
-  // subscriptions.length never changes from its initial value.
-  useEffect(() => {
-    if (
-      currentView === "subscriptions-edit" &&
-      initialEditCalendarId &&
-      subscriptions.length > 0 &&
-      !editingSubscription
-    ) {
-      const match = subscriptions.find(
-        (sub) => sub.calendar.id === initialEditCalendarId,
-      );
-      if (match) {
-        setEditingSubscription({
-          subscriptionId: match.id,
-          name: match.calendar.name,
-          color: match.calendar.color,
-        });
-        setEditingSubscriptionData(match);
-        setEditValidationErrors({});
-        setLocalError(null);
-        setSuccess(null);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentView, initialEditCalendarId, subscriptions]);
+  // The calendar id currently being edited. Sourced from either the parent
+  // (`initialEditCalendarId`, when navigated here from CalendarManager) or
+  // from local navigation within this component (clicking a row in the list).
+  const [internalEditCalendarId, setInternalEditCalendarId] = useState<
+    string | undefined
+  >(undefined);
+  const editTargetCalendarId =
+    initialEditCalendarId ?? internalEditCalendarId;
+
+  // Active override: only honored when it matches the current target. Stale
+  // overrides for a previous target are simply ignored (no effect needed),
+  // and the lazy setter below garbage-collects them on next user input.
+  const activeOverride =
+    editFormOverride && editFormOverride.forCalendarId === editTargetCalendarId
+      ? editFormOverride
+      : null;
+
+  // Synchronously derived: the subscription detail and calendar for the
+  // currently-edited target. Available on first render whenever the query
+  // cache has been populated (typically via parent prefetch).
+  const editingSubscriptionData: CalendarSubscription | null = useMemo(() => {
+    if (!editTargetCalendarId) return null;
+    return (
+      subscriptions.find(
+        (sub) => sub.calendar.id === editTargetCalendarId,
+      ) ?? null
+    );
+  }, [editTargetCalendarId, subscriptions]);
+
+  const editingCalendarEntry = useMemo(() => {
+    if (!editTargetCalendarId) return undefined;
+    return calendars.find((c) => c.id === editTargetCalendarId);
+  }, [editTargetCalendarId, calendars]);
+
+  // Effective form values: user override > subscription detail > calendar entry.
+  const editingName =
+    activeOverride?.name ??
+    editingSubscriptionData?.calendar.name ??
+    editingCalendarEntry?.name ??
+    "";
+  const editingColor =
+    activeOverride?.color ??
+    editingSubscriptionData?.calendar.color ??
+    editingCalendarEntry?.color ??
+    "";
+
+  const updateEditField = (field: "name" | "color", value: string) => {
+    if (!editTargetCalendarId) return;
+    setEditFormOverride((prev) => {
+      const base =
+        prev && prev.forCalendarId === editTargetCalendarId ? prev : null;
+      return {
+        forCalendarId: editTargetCalendarId,
+        name: field === "name" ? value : base?.name,
+        color: field === "color" ? value : base?.color,
+      };
+    });
+  };
 
   // Mutations
   const createMutation = useMutation({
@@ -379,12 +417,8 @@ export function SubscriptionManagement({
   };
 
   const handleOpenEdit = (subscription: CalendarSubscription) => {
-    setEditingSubscription({
-      subscriptionId: subscription.id,
-      name: subscription.calendar.name,
-      color: subscription.calendar.color,
-    });
-    setEditingSubscriptionData(subscription);
+    setInternalEditCalendarId(subscription.calendar.id);
+    setEditFormOverride(null);
     setEditValidationErrors({});
     setLocalError(null);
     setSuccess(null);
@@ -415,9 +449,12 @@ export function SubscriptionManagement({
   };
 
   const handleUpdateSubscription = () => {
-    if (!editingSubscription) return;
+    if (!editingSubscriptionData) return;
 
-    const parsed = editableSubscriptionSchema.safeParse(editingSubscription);
+    const parsed = editableSubscriptionSchema.safeParse({
+      name: editingName,
+      color: editingColor,
+    });
     if (!parsed.success) {
       const errors: typeof editValidationErrors = {};
       for (const issue of parsed.error.issues) {
@@ -430,7 +467,7 @@ export function SubscriptionManagement({
 
     setEditValidationErrors({});
     updateMutation.mutate({
-      id: editingSubscription.subscriptionId,
+      id: editingSubscriptionData.id,
       request: { name: parsed.data.name, color: parsed.data.color },
     });
   };
@@ -491,13 +528,14 @@ export function SubscriptionManagement({
   };
 
   const isHolidayCalendar =
-    editingSubscriptionData?.calendar.kind === "public_holiday";
+    editingSubscriptionData?.calendar.kind === "public_holiday" ||
+    editingCalendarEntry?.kind === "public_holiday";
 
   const content = (
     <div
       className="flex flex-col"
       style={{
-        minHeight: currentView === "subscriptions-edit" ? undefined : "360px",
+        minHeight: "360px",
         maxHeight: "calc(100dvh - 200px)",
       }}
     >
@@ -952,7 +990,7 @@ export function SubscriptionManagement({
       )}
 
       {/* ─── EDIT VIEW ─── */}
-      {currentView === "subscriptions-edit" && editingSubscription && (
+      {currentView === "subscriptions-edit" && editTargetCalendarId && (
         <>
           {/* Header */}
           <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
@@ -962,8 +1000,17 @@ export function SubscriptionManagement({
             >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </button>
-            <Pencil className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-medium">Edit Calendar</span>
+            <span className="text-sm font-medium">
+              {isHolidayCalendar ? "Holiday Calendar" : "External Calendar"}
+            </span>
+            {editingSubscriptionData && !isHolidayCalendar && (
+              <div className="ml-auto">
+                {getStatusBadge(
+                  editingSubscriptionData.lastSyncStatus,
+                  editingSubscriptionData.lastErrorMessage ?? undefined,
+                )}
+              </div>
+            )}
           </div>
 
           {/* Notification bar */}
@@ -980,120 +1027,233 @@ export function SubscriptionManagement({
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="edit-subscription-name"
-                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
-              >
-                Name
-              </Label>
-              <Input
-                id="edit-subscription-name"
-                value={editingSubscription.name}
-                onChange={(e) => {
-                  setEditingSubscription({
-                    ...editingSubscription,
-                    name: e.target.value,
-                  });
-                  if (editValidationErrors.name)
-                    setEditValidationErrors({
-                      ...editValidationErrors,
-                      name: undefined,
-                    });
-                }}
-                className={`h-9 text-sm ${editValidationErrors.name ? "border-destructive" : ""}`}
-              />
-              {editValidationErrors.name && (
-                <p className="flex items-center gap-1 text-xs text-destructive">
-                  <AlertCircle className="h-3 w-3" />
-                  {editValidationErrors.name}
-                </p>
-              )}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {/* Calendar Section */}
+            <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+              Calendar
             </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Color
-              </Label>
-              <ColorPicker
-                value={editingSubscription.color}
-                onChange={(color) => {
-                  setEditingSubscription({ ...editingSubscription, color });
-                  if (editValidationErrors.color)
-                    setEditValidationErrors({
-                      ...editValidationErrors,
-                      color: undefined,
-                    });
-                }}
-                presetColors={PRESET_COLORS}
-              />
-              {editValidationErrors.color && (
-                <p className="flex items-center gap-1 text-xs text-destructive">
-                  <AlertCircle className="h-3 w-3" />
-                  {editValidationErrors.color}
-                </p>
-              )}
-            </div>
-
-            {/* Sync status info — external feeds only */}
-            {editingSubscriptionData && !isHolidayCalendar && (
-              <div className="rounded-md border border-border/50 bg-muted/20 px-3 py-2.5 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Last synced</span>
-                  <span className="font-medium">
-                    {formatLastSync(editingSubscriptionData.lastSyncAt)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Status</span>
-                  {getStatusBadge(
-                    editingSubscriptionData.lastSyncStatus,
-                    editingSubscriptionData.lastErrorMessage,
-                  )}
-                </div>
-                {editingSubscriptionData.lastErrorMessage && (
-                  <div className="flex items-start gap-1 text-xs text-destructive pt-1">
-                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span className="break-words">
-                      {editingSubscriptionData.lastErrorMessage}
-                    </span>
-                  </div>
+            <div className="px-4 pb-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="edit-subscription-name"
+                  className="text-xs text-muted-foreground"
+                >
+                  Name
+                </Label>
+                <Input
+                  id="edit-subscription-name"
+                  value={editingName}
+                  onChange={(e) => {
+                    updateEditField("name", e.target.value);
+                    if (editValidationErrors.name)
+                      setEditValidationErrors({
+                        ...editValidationErrors,
+                        name: undefined,
+                      });
+                  }}
+                  className={`h-8 text-sm ${editValidationErrors.name ? "border-destructive" : ""}`}
+                />
+                {editValidationErrors.name && (
+                  <p className="flex items-center gap-1 text-xs text-destructive">
+                    <AlertCircle className="h-3 w-3" />
+                    {editValidationErrors.name}
+                  </p>
                 )}
               </div>
-            )}
 
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() =>
-                  editingSubscriptionData &&
-                  handleDeleteSubscription(editingSubscriptionData)
-                }
-                disabled={loading}
-                className="h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5" />
-                Remove
-              </Button>
-              <Button
-                type="button"
-                onClick={handleUpdateSubscription}
-                disabled={loading}
-                className="h-9"
-              >
-                {updateMutation.isPending ? (
-                  <>
-                    <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Changes"
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Color</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => {
+                        updateEditField("color", preset.value);
+                        if (editValidationErrors.color)
+                          setEditValidationErrors({
+                            ...editValidationErrors,
+                            color: undefined,
+                          });
+                      }}
+                      className={`h-6 w-6 rounded-full border-2 transition-all ${
+                        editingColor === preset.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{
+                        backgroundColor: getColorSwatchValue(preset.value),
+                      }}
+                      title={preset.label}
+                      aria-label={preset.label}
+                    />
+                  ))}
+                </div>
+                {editValidationErrors.color && (
+                  <p className="flex items-center gap-1 text-xs text-destructive">
+                    <AlertCircle className="h-3 w-3" />
+                    {editValidationErrors.color}
+                  </p>
                 )}
-              </Button>
+              </div>
             </div>
+
+            {/* Holiday calendar info */}
+            {isHolidayCalendar && editingSubscriptionData && (() => {
+              const holidayInfo = findNationalHolidayCalendarByUrl(
+                editingSubscriptionData.url,
+              );
+              return (
+                <div className="px-4 pb-4 border-t border-border/50 pt-3">
+                  <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-2">
+                    <div className="flex items-start gap-2.5">
+                      <Globe className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="text-sm font-medium">
+                          {holidayInfo?.countryName ||
+                            editingSubscriptionData.calendar.name}
+                          {holidayInfo?.language ? (
+                            <span className="text-muted-foreground font-normal">
+                              {" \u00b7 "}
+                              {holidayInfo.language}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Public holidays are read-only and refresh automatically
+                          in the background. Last synced{" "}
+                          {formatLastSync(
+                            editingSubscriptionData.lastSyncAt ?? undefined,
+                          ).toLowerCase()}
+                          .
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Sync Section — external feeds only */}
+            {!isHolidayCalendar && (
+              <>
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                  Sync
+                </div>
+                <div className="p-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editingSubscriptionData &&
+                      handleSyncSubscription(editingSubscriptionData)
+                    }
+                    disabled={loading || !editingSubscriptionData}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:opacity-60"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 text-muted-foreground shrink-0 ${
+                        syncMutation.isPending ? "animate-spin" : ""
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm">Sync now</div>
+                      <div className="text-xs text-muted-foreground">
+                        {editingSubscriptionData
+                          ? `Last synced ${formatLastSync(
+                              editingSubscriptionData.lastSyncAt ?? undefined,
+                            ).toLowerCase()}`
+                          : "Loading sync info\u2026"}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {editingSubscriptionData?.lastErrorMessage && (
+                  <div className="mx-4 mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
+                    <p className="flex items-start gap-2 text-xs text-destructive">
+                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <span className="break-words">
+                        {editingSubscriptionData.lastErrorMessage}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Source Section */}
+                <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+                  Source
+                </div>
+                <div className="px-4 pb-3 space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Feed URL
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={editingSubscriptionData?.url ?? ""}
+                      placeholder={
+                        editingSubscriptionData ? undefined : "Loading\u2026"
+                      }
+                      readOnly
+                      className="h-8 text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        if (!editingSubscriptionData) return;
+                        try {
+                          await navigator.clipboard.writeText(
+                            editingSubscriptionData.url,
+                          );
+                          setSuccess("Feed URL copied to clipboard");
+                        } catch {
+                          setLocalError("Unable to copy link automatically");
+                        }
+                      }}
+                      disabled={!editingSubscriptionData}
+                      className="h-8 px-2"
+                      title="Copy URL"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                editingSubscriptionData &&
+                handleDeleteSubscription(editingSubscriptionData)
+              }
+              disabled={loading || !editingSubscriptionData}
+              className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Remove
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleUpdateSubscription}
+              disabled={loading || !editingSubscriptionData}
+              className="h-8"
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </div>
         </>
       )}
