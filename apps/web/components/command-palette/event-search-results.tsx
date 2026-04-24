@@ -95,6 +95,7 @@ export function EventSearchResults({
             </div>
             <EncryptionStatusBadge
               item={event}
+              asIcon
               className="opacity-80"
             />
             {event.location && (
