@@ -35,6 +35,7 @@ import {
 } from "./command-palette/index";
 import { EventSearchResults } from "./command-palette/event-search-results";
 import { useEventSearch } from "@/hooks/use-event-search";
+import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -522,20 +523,10 @@ export function CommandPalette({
 
   // New event for "events" view
   const getNewEvent = (): CalendarEvent => {
-    const startTime = new Date();
-    startTime.setSeconds(0);
-    startTime.setMilliseconds(0);
-    return {
-      id: undefined as any,
-      title: "",
-      start: startTime,
-      end: new Date(startTime.getTime() + 60 * 60 * 1000),
-      allDay: false,
-      calendarId: localSettings?.defaultCalendarId || calendars?.[0]?.id || "",
-      userId: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    return createDraftCalendarEvent({
+      defaultCalendarId: localSettings?.defaultCalendarId,
+      fallbackCalendarId: calendars?.[0]?.id,
+    });
   };
 
   // Render view content based on currentView
