@@ -94,14 +94,20 @@ export function EventEditorPopover({
         "[data-preview-event='true']",
       ) as HTMLElement | null;
 
-      if (!previewElement) {
-        return false;
-      }
+      const rawRect = previewElement?.getBoundingClientRect();
+      const hasValidRect =
+        rawRect && rawRect.width > 0 && rawRect.height > 0;
 
-      const previewRect = previewElement.getBoundingClientRect();
-      if (previewRect.width === 0 || previewRect.height === 0) {
-        return false;
-      }
+      const previewRect = hasValidRect
+        ? rawRect
+        : {
+            top: anchorPosition.y,
+            left: anchorPosition.x,
+            right: anchorPosition.x,
+            bottom: anchorPosition.y,
+            width: 0,
+            height: 0,
+          };
 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
@@ -196,10 +202,20 @@ export function EventEditorPopover({
       mutationObserver = new MutationObserver(() => {
         computePosition();
       });
-      mutationObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
+      const previewEl = document.querySelector("[data-preview-event='true']");
+      if (previewEl) {
+        mutationObserver.observe(previewEl, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
+      if (popoverRef.current) {
+        mutationObserver.observe(popoverRef.current, {
+          childList: true,
+          subtree: true,
+        });
+      }
     }
 
     return () => {

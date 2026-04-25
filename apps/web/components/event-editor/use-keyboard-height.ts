@@ -9,10 +9,12 @@ export function useKeyboardHeight() {
     }
 
     const visualViewport = window.visualViewport as VisualViewport;
-    let animationFrameId: number;
+    let animationFrameId: number = 0;
 
     const handleResize = () => {
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       animationFrameId = requestAnimationFrame(() => {
         const keyboardSize = Math.max(
           0,

@@ -122,7 +122,7 @@ export function useCommandPaletteSearch({
     [filteredItems, isCommandMode, debouncedQuery],
   );
   const showEventSearch = !isCommandMode && debouncedQuery.trim().length >= 2;
-  const { data: searchEvents = [], isLoading: searchLoading } = useEventSearch(
+  const { data: searchEvents = [], isFetching: searchLoading } = useEventSearch(
     debouncedQuery,
     showEventSearch,
   );
