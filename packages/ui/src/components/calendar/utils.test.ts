@@ -26,6 +26,10 @@ describe("resolveInlineColorValue", () => {
     expect(resolveInlineColorValue()).toBe("var(--event-default)");
   });
 
+  it("falls back to the default event color when color is empty", () => {
+    expect(resolveInlineColorValue("")).toBe("var(--event-default)");
+  });
+
   it("falls back to the default token for unknown named colors", () => {
     expect(resolveInlineColorValue("chartreuse")).toBe("var(--event-default)");
   });
@@ -54,6 +58,7 @@ describe("getEventColorClasses", () => {
     ["pink", "bg-event-pink"],
     ["teal", "bg-event-teal"],
     [undefined, "bg-event-default"],
+    ["", "bg-event-default"],
     ["chartreuse", "bg-event-default"],
   ])("maps %p to the expected utility class", (color, expectedClass) => {
     expect(getEventColorClasses(color)).toContain(expectedClass);

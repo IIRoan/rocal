@@ -114,11 +114,11 @@ describe("RecurringService", () => {
         recurrenceRule: "not-json",
       }),
     ).toThrow(
-      expect.objectContaining<Partial<ValidationError>>({
+      expect.objectContaining({
         name: "ValidationError",
         field: "recurrenceRule",
         message: "Failed to generate preview",
-      }),
+      } satisfies Partial<ValidationError>),
     );
   });
 
@@ -169,12 +169,23 @@ describe("RecurringService", () => {
       },
     });
 
-    const updatedRuleCall = mockPrisma.calendarEvent.update.mock.calls[0]?.[0] as {
-      data: { recurrence: string };
-    };
-    const createdEventCall = mockPrisma.calendarEvent.create.mock.calls[0]?.[0] as {
-      data: Record<string, unknown>;
-    };
+    const updatedRuleCalls =
+      mockPrisma.calendarEvent.update.mock.calls as unknown as Array<
+        [{ data: { recurrence: string } }]
+      >;
+    const createdEventCalls =
+      mockPrisma.calendarEvent.create.mock.calls as unknown as Array<
+        [{ data: Record<string, unknown> }]
+      >;
+    const updatedRuleCall = updatedRuleCalls[0]?.[0];
+    const createdEventCall = createdEventCalls[0]?.[0];
+
+    expect(updatedRuleCall).toBeDefined();
+    expect(createdEventCall).toBeDefined();
+    if (!updatedRuleCall || !createdEventCall) {
+      throw new Error("Expected editSeries to update and create calendar events");
+    }
+
     const updatedRule = RecurrenceEngine.parseRecurrenceRule(
       updatedRuleCall.data.recurrence,
     );
