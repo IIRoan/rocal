@@ -45,7 +45,7 @@ const recurringSeriesRule: RecurrenceRule = {
 const monthlyUntilRule: RecurrenceRule = {
   frequency: "monthly",
   interval: 1,
-  until: "2026-05-01T00:00:00.000Z",
+  until: new Date("2026-05-01T00:00:00.000Z"),
 };
 
 type RecurringDeleteCandidate = Pick<
