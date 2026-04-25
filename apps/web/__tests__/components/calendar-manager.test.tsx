@@ -9,6 +9,7 @@ import {
   it,
   jest,
 } from "@jest/globals";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
 
 jest.mock("../../components/calendar-data-provider", () => ({
@@ -20,6 +21,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
     disableCalendarShareLink: jest.fn(),
     enableCalendarShareLink: jest.fn(),
     getCalendarShareLink: jest.fn(),
+    getSubscriptions: jest.fn(async () => []),
   },
 }));
 
@@ -66,11 +68,13 @@ jest.mock("lucide-react", () => {
     RefreshCw: Icon,
     Save: Icon,
     ShieldCheck: Icon,
+    Star: Icon,
     Trash2: Icon,
   };
 });
 
 import { useSharedCalendarData } from "../../components/calendar-data-provider";
+import { calendarApiService } from "../../lib/calendar-api-service";
 import { CalendarManager } from "../../components/calendar-manager";
 
 (
@@ -82,12 +86,22 @@ const mockUseSharedCalendarData =
 
 let container: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
+
+const mockCalendarApiService = jest.mocked(calendarApiService);
 
 describe("CalendarManager", () => {
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
 
     mockUseSharedCalendarData.mockReturnValue({
       calendars: [
@@ -102,6 +116,7 @@ describe("CalendarManager", () => {
         },
       ],
     } as any);
+    mockCalendarApiService.getSubscriptions.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -115,12 +130,14 @@ describe("CalendarManager", () => {
   it("renders non-interactive encryption badges inside calendar row buttons", async () => {
     await act(async () => {
       root.render(
-        <CalendarManager
-          currentView="calendars"
-          onBack={() => {}}
-          onGoToSubscriptions={() => {}}
-          onNavigateTo={() => {}}
-        />,
+        <QueryClientProvider client={queryClient}>
+          <CalendarManager
+            currentView="calendars"
+            onBack={() => {}}
+            onGoToSubscriptions={() => {}}
+            onNavigateTo={() => {}}
+          />
+        </QueryClientProvider>,
       );
 
       await Promise.resolve();

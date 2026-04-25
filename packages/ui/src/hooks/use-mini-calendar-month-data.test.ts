@@ -113,6 +113,69 @@ describe("buildMiniCalendarDayEventsMap", () => {
     expect(dayEventsMap.get(toMiniCalendarDayKey(gridStart))).toEqual([]);
   });
 
+  it("falls back to the event color when the calendar has no mapped color", () => {
+    const targetDay = addDays(gridStart, 1);
+    const dayEventsMap = buildMiniCalendarDayEventsMap({
+      days,
+      gridStart: startOfDay(gridStart),
+      gridEnd: endOfDay(gridEnd),
+      cachedEvents: [createEvent("event-1", targetDay, "unmapped", "pink")],
+      calendarColorMap,
+    });
+
+    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
+      expect.objectContaining({ id: "event-1", color: "pink" }),
+    ]);
+  });
+
+  it("keeps the indicator color undefined when neither the calendar nor event defines one", () => {
+    const targetDay = addDays(gridStart, 1);
+    const dayEventsMap = buildMiniCalendarDayEventsMap({
+      days,
+      gridStart: startOfDay(gridStart),
+      gridEnd: endOfDay(gridEnd),
+      cachedEvents: [createEvent("event-unstyled", targetDay, "unmapped")],
+      calendarColorMap,
+    });
+
+    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([
+      expect.objectContaining({ id: "event-unstyled", color: undefined }),
+    ]);
+  });
+
+  it("skips events with invalid dates", () => {
+    const targetDay = addDays(gridStart, 1);
+    const invalidEvent: CalendarEvent = {
+      ...createEvent("invalid-event", targetDay, "visible", "teal"),
+      start: new Date("invalid"),
+    };
+
+    const dayEventsMap = buildMiniCalendarDayEventsMap({
+      days,
+      gridStart: startOfDay(gridStart),
+      gridEnd: endOfDay(gridEnd),
+      cachedEvents: [invalidEvent],
+      calendarColorMap,
+      visibleCalendarIds: new Set(["visible"]),
+    });
+
+    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))).toEqual([]);
+  });
+
+  it("skips events that fall completely outside the visible grid", () => {
+    const outsideDay = addDays(gridEnd, 2);
+    const dayEventsMap = buildMiniCalendarDayEventsMap({
+      days,
+      gridStart: startOfDay(gridStart),
+      gridEnd: endOfDay(gridEnd),
+      cachedEvents: [createEvent("outside-event", outsideDay, "visible", "teal")],
+      calendarColorMap,
+      visibleCalendarIds: new Set(["visible"]),
+    });
+
+    expect(dayEventsMap.get(toMiniCalendarDayKey(gridEnd))).toEqual([]);
+  });
+
   it("clamps multi-day events to the visible grid range", () => {
     const spanningEvent: CalendarEvent = {
       id: "spanning",
