@@ -177,16 +177,21 @@ describe("RecurringService", () => {
       mockPrisma.calendarEvent.create.mock.calls as unknown as Array<
         [{ data: Record<string, unknown> }]
       >;
+    const updatedRuleCall = updatedRuleCalls[0]?.[0];
+    const createdEventCall = createdEventCalls[0]?.[0];
 
-    expect(updatedRuleCalls).not.toHaveLength(0);
-    expect(createdEventCalls).not.toHaveLength(0);
+    expect(updatedRuleCall).toBeDefined();
+    expect(createdEventCall).toBeDefined();
+    if (!updatedRuleCall || !createdEventCall) {
+      throw new Error("Expected editSeries to update and create calendar events");
+    }
 
     const updatedRule = RecurrenceEngine.parseRecurrenceRule(
-      updatedRuleCalls[0][0].data.recurrence,
+      updatedRuleCall.data.recurrence,
     );
 
     expect(updatedRule?.until?.toISOString()).toBe("2026-05-18T09:00:00.000Z");
-    expect(createdEventCalls[0][0].data).toEqual(
+    expect(createdEventCall.data).toEqual(
       expect.objectContaining({
         title: "Afternoon sync",
         parentEventId: "event-1",
