@@ -135,6 +135,8 @@ export function useCalendarPresentation({
     [defaultCalendarId],
   );
 
+  const { prefetchRange } = calendarData;
+
   useEffect(() => {
     if (!currentDate || !currentView) {
       return;
@@ -145,7 +147,7 @@ export function useCalendarPresentation({
     const deferredRanges = ranges.slice(2);
 
     for (const range of eagerRanges) {
-      calendarData.prefetchRange(range);
+      prefetchRange(range);
     }
 
     if (deferredRanges.length === 0) {
@@ -154,7 +156,7 @@ export function useCalendarPresentation({
 
     const runDeferredPrefetch = () => {
       for (const range of deferredRanges) {
-        calendarData.prefetchRange(range);
+        prefetchRange(range);
       }
     };
 
@@ -172,7 +174,7 @@ export function useCalendarPresentation({
 
     const id = setTimeout(runDeferredPrefetch, 32);
     return () => clearTimeout(id);
-  }, [currentDate, currentView, calendarData]);
+  }, [currentDate, currentView, prefetchRange]);
 
   return {
     defaultCalendarId,
