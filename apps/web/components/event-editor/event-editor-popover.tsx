@@ -94,37 +94,36 @@ export function EventEditorPopover({
         "[data-preview-event='true']",
       ) as HTMLElement | null;
 
-      const rawRect = previewElement?.getBoundingClientRect();
-      const hasValidRect =
-        rawRect && rawRect.width > 0 && rawRect.height > 0;
+      const previewRect = previewElement?.getBoundingClientRect();
+      const hasValidPreviewRect =
+        previewRect && previewRect.width > 0 && previewRect.height > 0;
 
-      const previewRect = hasValidRect
-        ? rawRect
-        : {
-            top: anchorPosition.y,
-            left: anchorPosition.x,
-            right: anchorPosition.x,
-            bottom: anchorPosition.y,
-            width: 0,
-            height: 0,
-          };
+      const fallbackRect = {
+        top: anchorPosition.y,
+        left: anchorPosition.x,
+        right: anchorPosition.x,
+        bottom: anchorPosition.y,
+        width: 0,
+        height: 0,
+      };
+      const anchorRect = hasValidPreviewRect ? previewRect : fallbackRect;
 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const spaceRight =
-        viewportWidth - previewRect.right - GAP - VIEWPORT_PADDING;
-      const spaceLeft = previewRect.left - GAP - VIEWPORT_PADDING;
+        viewportWidth - anchorRect.right - GAP - VIEWPORT_PADDING;
+      const spaceLeft = anchorRect.left - GAP - VIEWPORT_PADDING;
 
       let left = VIEWPORT_PADDING;
       if (spaceRight >= POPOVER_WIDTH) {
-        left = previewRect.right + GAP;
+        left = anchorRect.right + GAP;
       } else if (spaceLeft >= POPOVER_WIDTH) {
-        left = previewRect.left - POPOVER_WIDTH - GAP;
+        left = anchorRect.left - POPOVER_WIDTH - GAP;
       } else if (spaceRight >= spaceLeft) {
         left = viewportWidth - POPOVER_WIDTH - VIEWPORT_PADDING;
       }
 
-      let top = previewRect.top;
+      let top = anchorRect.top;
       const bottomLimit = viewportHeight - VIEWPORT_PADDING;
       const viewportMax = viewportHeight - VIEWPORT_PADDING * 2;
       let measuredHeight = 0;
