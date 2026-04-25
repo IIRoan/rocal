@@ -64,10 +64,14 @@ describe("CommandPaletteMainSearchView", () => {
       searchEvents: [
         {
           allDay: false,
+          calendarId: "calendar-1",
+          createdAt: new Date("2026-04-24T09:00:00.000Z"),
           end: new Date("2026-04-24T11:00:00.000Z"),
           id: "event-1",
           start: new Date("2026-04-24T10:00:00.000Z"),
           title: "Planning",
+          updatedAt: new Date("2026-04-24T09:00:00.000Z"),
+          userId: "user-1",
         },
       ],
       searchInputInteractionProps: {
