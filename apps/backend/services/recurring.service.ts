@@ -11,6 +11,13 @@ import type {
 } from "../contracts/recurring.contract";
 import { ValidationError } from "../lib/errors";
 import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
+import {
+  buildRecurringEventCreateData,
+  buildRecurringEventUpdateData,
+  parseRecurringRuleInput,
+  requireOccurrenceDate,
+  splitRecurringSeriesRule,
+} from "../lib/recurring-series";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:recurring-service");
@@ -20,10 +27,7 @@ export class RecurringService implements IRecurringService {
 
   validate(rule: RecurringRuleInput): RecurrenceValidateResult {
     try {
-      const parsedRule =
-        typeof rule === "string"
-          ? RecurrenceEngine.parseRecurrenceRule(rule)
-          : (rule as RecurrenceRule);
+      const parsedRule = parseRecurringRuleInput(rule) as RecurrenceRule | null;
 
       if (!parsedRule) {
         return {
@@ -64,10 +68,7 @@ export class RecurringService implements IRecurringService {
         startDate.getTime() + previewDays * 24 * 60 * 60 * 1000,
       );
 
-      const rule =
-        typeof recurrenceRule === "string"
-          ? RecurrenceEngine.parseRecurrenceRule(recurrenceRule)
-          : (recurrenceRule as RecurrenceRule);
+      const rule = parseRecurringRuleInput(recurrenceRule);
 
       if (!rule) {
         throw new ValidationError("Invalid recurrence rule", "recurrenceRule");
@@ -103,43 +104,25 @@ export class RecurringService implements IRecurringService {
   async editSeries(input: RecurringEditInput) {
     const { userId, eventId, editScope, occurrenceDate, updates } = input;
 
-    const existingEvent = await this.prisma.calendarEvent.findFirst({
-      where: { id: eventId, userId, recurrence: { not: null } },
-    });
-
-    if (!existingEvent) {
-      throw new ValidationError("Recurring event not found or access denied");
-    }
+    const existingEvent = await this.getRecurringEvent(userId, eventId);
 
     switch (editScope) {
       case "this_only": {
-        if (!occurrenceDate) {
-          throw new ValidationError(
-            "Occurrence date is required for 'this_only' edit",
-            "occurrenceDate",
-          );
-        }
-
-        const exceptionDate = new Date(occurrenceDate);
+        const exceptionDate = requireOccurrenceDate(
+          occurrenceDate,
+          "this_only",
+          "edit",
+        );
 
         const modifiedEvent = await this.prisma.calendarEvent.create({
-          data: {
-            title: updates.title ?? existingEvent.title,
-            description: updates.description ?? existingEvent.description,
-            allDay: updates.allDay ?? existingEvent.allDay,
-            location: updates.location ?? existingEvent.location,
-            color: updates.color ?? existingEvent.color,
-            reminder: updates.reminder ?? existingEvent.reminder,
-            calendarId: updates.calendarId ?? existingEvent.calendarId,
-            categoryId: updates.categoryId ?? existingEvent.categoryId,
+          data: buildRecurringEventCreateData({
+            existingEvent,
+            updates,
+            userId,
             parentEventId: eventId,
             recurrence: null,
-            userId,
-            start: updates.start
-              ? new Date(updates.start)
-              : existingEvent.start,
-            end: updates.end ? new Date(updates.end) : existingEvent.end,
-          },
+            occurrenceDate: exceptionDate,
+          }),
           include: { category: true, calendar: true },
         });
 
@@ -156,52 +139,34 @@ export class RecurringService implements IRecurringService {
       }
 
       case "this_and_future": {
-        if (!occurrenceDate) {
-          throw new ValidationError(
-            "Occurrence date is required for 'this_and_future' edit",
-            "occurrenceDate",
-          );
-        }
-
-        const splitDate = new Date(occurrenceDate);
-
-        const originalRule = RecurrenceEngine.parseRecurrenceRule(
-          existingEvent.recurrence!,
+        const splitDate = requireOccurrenceDate(
+          occurrenceDate,
+          "this_and_future",
+          "edit",
         );
-        if (originalRule) {
-          originalRule.until = new Date(
-            splitDate.getTime() - 24 * 60 * 60 * 1000,
-          );
+        const updatedRecurrence = splitRecurringSeriesRule(
+          existingEvent.recurrence,
+          splitDate,
+        );
+
+        if (updatedRecurrence) {
           await this.prisma.calendarEvent.update({
             where: { id: eventId },
             data: {
-              recurrence: RecurrenceEngine.createRecurrenceRule(originalRule),
+              recurrence: updatedRecurrence,
             },
           });
         }
 
         const newEvent = await this.prisma.calendarEvent.create({
-          data: {
-            title: updates.title ?? existingEvent.title,
-            description: updates.description ?? existingEvent.description,
-            allDay: updates.allDay ?? existingEvent.allDay,
-            location: updates.location ?? existingEvent.location,
-            color: updates.color ?? existingEvent.color,
-            reminder: updates.reminder ?? existingEvent.reminder,
-            recurrence: updates.recurrence ?? existingEvent.recurrence,
-            calendarId: updates.calendarId ?? existingEvent.calendarId,
-            categoryId: updates.categoryId ?? existingEvent.categoryId,
+          data: buildRecurringEventCreateData({
+            existingEvent,
+            updates,
             userId,
             parentEventId: eventId,
-            start: updates.start ? new Date(updates.start) : splitDate,
-            end: updates.end
-              ? new Date(updates.end)
-              : new Date(
-                  splitDate.getTime() +
-                    (existingEvent.end.getTime() -
-                      existingEvent.start.getTime()),
-                ),
-          },
+            recurrence: updates.recurrence ?? existingEvent.recurrence,
+            occurrenceDate: splitDate,
+          }),
           include: { category: true, calendar: true },
         });
 
@@ -211,12 +176,7 @@ export class RecurringService implements IRecurringService {
       case "all": {
         const updatedEvent = await this.prisma.calendarEvent.update({
           where: { id: eventId },
-          data: {
-            ...updates,
-            start: updates.start ? new Date(updates.start) : undefined,
-            end: updates.end ? new Date(updates.end) : undefined,
-            updatedAt: new Date(),
-          },
+          data: buildRecurringEventUpdateData(updates),
           include: { category: true, calendar: true },
         });
 
@@ -243,24 +203,15 @@ export class RecurringService implements IRecurringService {
       userId,
     });
 
-    const existingEvent = await this.prisma.calendarEvent.findFirst({
-      where: { id: eventId, userId, recurrence: { not: null } },
-    });
-
-    if (!existingEvent) {
-      throw new ValidationError("Recurring event not found or access denied");
-    }
+    const existingEvent = await this.getRecurringEvent(userId, eventId);
 
     switch (deleteScope) {
       case "this_only": {
-        if (!occurrenceDate) {
-          throw new ValidationError(
-            "Occurrence date is required for 'this_only' delete",
-            "occurrenceDate",
-          );
-        }
-
-        const exceptionDate = new Date(occurrenceDate);
+        const exceptionDate = requireOccurrenceDate(
+          occurrenceDate,
+          "this_only",
+          "delete",
+        );
 
         const existingException =
           await this.prisma.recurrenceException.findUnique({
@@ -299,26 +250,21 @@ export class RecurringService implements IRecurringService {
       }
 
       case "this_and_future": {
-        if (!occurrenceDate) {
-          throw new ValidationError(
-            "Occurrence date is required for 'this_and_future' delete",
-            "occurrenceDate",
-          );
-        }
-
-        const splitDate = new Date(occurrenceDate);
-
-        const originalRule = RecurrenceEngine.parseRecurrenceRule(
-          existingEvent.recurrence!,
+        const splitDate = requireOccurrenceDate(
+          occurrenceDate,
+          "this_and_future",
+          "delete",
         );
-        if (originalRule) {
-          originalRule.until = new Date(
-            splitDate.getTime() - 24 * 60 * 60 * 1000,
-          );
+        const updatedRecurrence = splitRecurringSeriesRule(
+          existingEvent.recurrence,
+          splitDate,
+        );
+
+        if (updatedRecurrence) {
           await this.prisma.calendarEvent.update({
             where: { id: eventId },
             data: {
-              recurrence: RecurrenceEngine.createRecurrenceRule(originalRule),
+              recurrence: updatedRecurrence,
             },
           });
         }
@@ -371,5 +317,17 @@ export class RecurringService implements IRecurringService {
         weekdays: { rule: patterns.weekdays(), description: "Every weekday" },
       },
     };
+  }
+
+  private async getRecurringEvent(userId: string, eventId: string) {
+    const existingEvent = await this.prisma.calendarEvent.findFirst({
+      where: { id: eventId, userId, recurrence: { not: null } },
+    });
+
+    if (!existingEvent) {
+      throw new ValidationError("Recurring event not found or access denied");
+    }
+
+    return existingEvent;
   }
 }

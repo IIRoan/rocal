@@ -44,6 +44,25 @@ bun run dev:backend
 bun run dev:notifications
 ```
 
+## Testing and TDD
+
+Run the full test suite:
+```bash
+bun run test
+```
+
+Run backend-only tests while refactoring service code:
+```bash
+bun run test:backend
+cd apps/backend
+bun run test __tests__/services/category.service.test.ts
+```
+
+Cleanup direction for backend work:
+- Write or update service-level characterization tests before moving validation or persistence logic.
+- Keep routes as thin adapters and move reusable normalization and validation into small `apps/backend/lib` domain helpers.
+- Refactor one domain at a time so route contracts remain stable while service internals get simpler.
+
 ## Building
 
 Build all applications:

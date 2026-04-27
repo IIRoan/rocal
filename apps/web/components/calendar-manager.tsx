@@ -1,8 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import {
+  getErrorMessage,
+  partitionCalendarsByKind,
+} from "@/lib/calendar-ui-helpers";
 import type { Calendar, CalendarShareLink } from "@/lib/types/calendar";
 import { toast } from "sonner";
 import {
@@ -12,6 +17,8 @@ import {
   handleCalendarCreate,
   handleCalendarUpdate,
   handleCalendarDelete,
+  SettingToggleRow,
+  ToggleIndicator,
   type PaletteView,
   type PresetColor,
 } from "./command-palette/index";
@@ -31,7 +38,6 @@ import {
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { Button } from "@workspace/ui/components/ui/button";
-import { Switch } from "@workspace/ui/components/ui/switch";
 import {
   ArrowLeft,
   Plus,
@@ -45,6 +51,7 @@ import {
   RefreshCw,
   AlertTriangle,
   ShieldCheck,
+  Star,
 } from "lucide-react";
 
 interface CalendarManagerProps {
@@ -54,17 +61,6 @@ interface CalendarManagerProps {
   onNavigateTo: (view: PaletteView) => void;
 }
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-
-  return fallback;
-};
-
 export function CalendarManager({
   onBack,
   onGoToSubscriptions,
@@ -72,17 +68,19 @@ export function CalendarManager({
   onNavigateTo,
 }: CalendarManagerProps) {
   const calendarData = useSharedCalendarData();
+  const queryClient = useQueryClient();
   const { calendars } = calendarData;
-  const ownedCalendars = calendars.filter(
-    (calendar) => calendar.kind === "owned",
-  );
-  const publicCalendars = calendars.filter(
-    (calendar) => calendar.kind === "public_holiday",
-  );
-  const subscribedCalendars = calendars.filter(
-    (calendar) =>
-      calendar.kind !== "owned" && calendar.kind !== "public_holiday",
-  );
+  const { ownedCalendars, publicCalendars, subscribedCalendars } =
+    partitionCalendarsByKind(calendars);
+
+  // Prefetch subscriptions so the synced-calendar edit screen renders
+  // populated immediately (no Feed URL flash) when the user opens it.
+  useEffect(() => {
+    void queryClient.prefetchQuery({
+      queryKey: ["subscriptions"],
+      queryFn: () => calendarApiService.getSubscriptions(),
+    });
+  }, [queryClient]);
 
   // Calendar management state
   const [calendarName, setCalendarName] = useState("");
@@ -298,6 +296,7 @@ export function CalendarManager({
                       </div>
                       <EncryptionStatusBadge
                         item={calendar}
+                        asIcon
                         className="opacity-80"
                       />
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />                    </button>
@@ -331,6 +330,7 @@ export function CalendarManager({
                           </div>
                           <EncryptionStatusBadge
                             item={calendar}
+                            asIcon
                             className="opacity-80"
                           />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
@@ -367,6 +367,7 @@ export function CalendarManager({
                           </div>
                           <EncryptionStatusBadge
                             item={calendar}
+                            asIcon
                             className="opacity-80"
                           />
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
@@ -382,433 +383,396 @@ export function CalendarManager({
 
   if (currentView === "calendar-create") {
     return (
-            <div className="flex flex-col">
-              {/* Header */}
-              <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                <button
-                  onClick={() => goBack()}
-                  className="p-1 rounded hover:bg-muted/50 transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                </button>
-                <span className="text-sm font-medium">Create Calendar</span>
-              </div>
+      <div className="flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+          <button
+            onClick={() => goBack()}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <span className="text-sm font-medium">Create Calendar</span>
+        </div>
 
-              <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-                {/* Calendar Name */}
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="calendar-name"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    NAME
-                  </Label>
-                  <Input
-                    id="calendar-name"
-                    value={calendarName}
-                    onChange={(e) => {
-                      setCalendarName(e.target.value);
-                      if (calendarValidationErrors.name) {
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="px-4 pt-4 pb-3 space-y-3">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="calendar-name"
+                className="text-xs text-muted-foreground"
+              >
+                Name
+              </Label>
+              <Input
+                id="calendar-name"
+                value={calendarName}
+                onChange={(e) => {
+                  setCalendarName(e.target.value);
+                  if (calendarValidationErrors.name) {
+                    setCalendarValidationErrors({
+                      ...calendarValidationErrors,
+                      name: undefined,
+                    });
+                  }
+                }}
+                placeholder="Calendar name"
+                className={`h-8 text-sm ${calendarValidationErrors.name ? "border-destructive" : ""}`}
+              />
+              {calendarValidationErrors.name && (
+                <p className="text-xs text-destructive">
+                  {calendarValidationErrors.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => {
+                      setCalendarColor(preset.value);
+                      if (calendarValidationErrors.color) {
                         setCalendarValidationErrors({
                           ...calendarValidationErrors,
-                          name: undefined,
+                          color: undefined,
                         });
                       }
                     }}
-                    placeholder="Calendar name"
-                    className={`h-9 text-sm ${calendarValidationErrors.name ? "border-destructive" : ""}`}
+                    className={`h-6 w-6 rounded-full border-2 transition-all ${
+                      calendarColor === preset.value
+                        ? "border-foreground scale-110"
+                        : "border-transparent hover:scale-105"
+                    }`}
+                    style={{
+                      backgroundColor: getColorSwatchValue(preset.value),
+                    }}
+                    title={preset.label}
+                    aria-label={preset.label}
                   />
-                  {calendarValidationErrors.name && (
-                    <p className="text-xs text-destructive">
-                      {calendarValidationErrors.name}
-                    </p>
-                  )}
-                </div>
-
-                {/* Color Selection */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    COLOR
-                  </Label>
-                  <div className="flex flex-wrap gap-2">
-                    {PRESET_COLORS.map((preset) => (
-                      <button
-                        key={preset.value}
-                        type="button"
-                        onClick={() => {
-                          setCalendarColor(preset.value);
-                          if (calendarValidationErrors.color) {
-                            setCalendarValidationErrors({
-                              ...calendarValidationErrors,
-                              color: undefined,
-                            });
-                          }
-                        }}
-                        className={`w-6 h-6 rounded-full border-2 transition-all ${
-                          calendarColor === preset.value
-                            ? "border-foreground scale-110"
-                            : "border-transparent hover:scale-105"
-                        }`}
-                        style={{ backgroundColor: getColorSwatchValue(preset.value) }}
-                        title={preset.label}
-                      />
-                    ))}
-                  </div>
-                  {calendarValidationErrors.color && (
-                    <p className="text-xs text-destructive">
-                      {calendarValidationErrors.color}
-                    </p>
-                  )}
-                </div>
-
-                {/* Default Settings */}
-                <div className="space-y-3 pt-3 border-t border-border/50">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground">
-                        DEFAULT CALENDAR
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use this calendar by default for new events.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={calendarIsDefault}
-                      onCheckedChange={setCalendarIsDefault}
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
-
-              {/* Action Buttons */}
-              <div className="border-t border-border/50 px-4 py-3 flex items-center justify-end gap-2 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => goBack()}
-                  disabled={calendarSaving}
-                  className="h-8"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    handleCalendarCreate(
-                      calendarName,
-                      calendarColor,
-                      calendarIsDefault,
-                      calendars,
-                      calendarData,
-                      {
-                        setCalendarValidationErrors,
-                        setCalendarSaving,
-                        setCalendarName,
-                        setCalendarColor,
-                        setCalendarIsDefault,
-                      },
-                      () => goBack(),
-                    )
-                  }
-                  disabled={calendarSaving || !calendarName.trim()}
-                  className="h-8"
-                >
-                  {calendarSaving ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-3.5 w-3.5 mr-1.5" />
-                      Create
-                    </>
-                  )}
-                </Button>
-              </div>
+              {calendarValidationErrors.color && (
+                <p className="text-xs text-destructive">
+                  {calendarValidationErrors.color}
+                </p>
+              )}
             </div>
+          </div>
+
+          <div className="p-1 border-t border-border/50 mt-1">
+            <SettingToggleRow
+              checked={calendarIsDefault}
+              description="Use this calendar by default for new events."
+              icon={Star}
+              label="Default calendar"
+              onToggle={() => setCalendarIsDefault(!calendarIsDefault)}
+            />
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="border-t border-border/50 px-4 py-3 flex items-center justify-end shrink-0">
+          <Button
+            size="sm"
+            onClick={() =>
+              handleCalendarCreate(
+                calendarName,
+                calendarColor,
+                calendarIsDefault,
+                calendars,
+                calendarData,
+                {
+                  setCalendarValidationErrors,
+                  setCalendarSaving,
+                  setCalendarName,
+                  setCalendarColor,
+                  setCalendarIsDefault,
+                },
+                () => goBack(),
+              )
+            }
+            disabled={calendarSaving || !calendarName.trim()}
+            className="h-8"
+          >
+            {calendarSaving ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Save className="h-3.5 w-3.5 mr-1.5" />
+                Create
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     );
   }
 
   if (currentView === "calendar-edit") {
     return (
       <>
-              <div className="flex flex-col">
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-                  <button
-                    onClick={() => goBack()}
-                    className="p-1 rounded hover:bg-muted/50 transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <span className="text-sm font-medium">Edit Calendar</span>
-                  {editingCalendar && (
-                    <EncryptionStatusBadge
-                      item={editingCalendar}
-                      className="ml-auto"
-                      showLabel
-                    />
-                  )}
-                </div>
+        <div className="flex flex-col">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+            <button
+              onClick={() => goBack()}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <span className="text-sm font-medium">Edit Calendar</span>
+            {editingCalendar && (
+              <EncryptionStatusBadge
+                item={editingCalendar}
+                className="ml-auto"
+                showLabel
+              />
+            )}
+          </div>
 
-                <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-                  {/* Calendar Name */}
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="calendar-name"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      NAME
-                    </Label>
-                    <Input
-                      id="calendar-name"
-                      value={calendarName}
-                      onChange={(e) => {
-                        setCalendarName(e.target.value);
-                        if (calendarValidationErrors.name) {
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="px-4 pt-4 pb-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="calendar-name"
+                  className="text-xs text-muted-foreground"
+                >
+                  Name
+                </Label>
+                <Input
+                  id="calendar-name"
+                  value={calendarName}
+                  onChange={(e) => {
+                    setCalendarName(e.target.value);
+                    if (calendarValidationErrors.name) {
+                      setCalendarValidationErrors({
+                        ...calendarValidationErrors,
+                        name: undefined,
+                      });
+                    }
+                  }}
+                  placeholder="Calendar name"
+                  className={`h-8 text-sm ${calendarValidationErrors.name ? "border-destructive" : ""}`}
+                />
+                {calendarValidationErrors.name && (
+                  <p className="text-xs text-destructive">
+                    {calendarValidationErrors.name}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Color</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_COLORS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => {
+                        setCalendarColor(preset.value);
+                        if (calendarValidationErrors.color) {
                           setCalendarValidationErrors({
                             ...calendarValidationErrors,
-                            name: undefined,
+                            color: undefined,
                           });
                         }
                       }}
-                      placeholder="Calendar name"
-                      className={`h-9 text-sm ${calendarValidationErrors.name ? "border-destructive" : ""}`}
+                      className={`h-6 w-6 rounded-full border-2 transition-all ${
+                        calendarColor === preset.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      }`}
+                      style={{
+                        backgroundColor: getColorSwatchValue(preset.value),
+                      }}
+                      title={preset.label}
+                      aria-label={preset.label}
                     />
-                    {calendarValidationErrors.name && (
-                      <p className="text-xs text-destructive">
-                        {calendarValidationErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Color Selection */}
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">
-                      COLOR
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {PRESET_COLORS.map((preset) => (
-                        <button
-                          key={preset.value}
-                          type="button"
-                          onClick={() => {
-                            setCalendarColor(preset.value);
-                            if (calendarValidationErrors.color) {
-                              setCalendarValidationErrors({
-                                ...calendarValidationErrors,
-                                color: undefined,
-                              });
-                            }
-                          }}
-                          className={`w-6 h-6 rounded-full border-2 transition-all ${
-                            calendarColor === preset.value
-                              ? "border-foreground scale-110"
-                              : "border-transparent hover:scale-105"
-                          }`}
-                          style={{ backgroundColor: getColorSwatchValue(preset.value) }}
-                          title={preset.label}
-                        />
-                      ))}
-                    </div>
-                    {calendarValidationErrors.color && (
-                      <p className="text-xs text-destructive">
-                        {calendarValidationErrors.color}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Default Settings */}
-                  <div className="space-y-3 pt-3 border-t border-border/50">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">
-                          DEFAULT CALENDAR
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Use this calendar by default for new events.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={calendarIsDefault}
-                        onCheckedChange={setCalendarIsDefault}
-                      />
-                    </div>
-                  </div>
-
-                  {/* ICS Sharing */}
-                  <div className="space-y-3 pt-3 border-t border-border/50">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">
-                          ICS SHARING
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Enable a private subscription link for this calendar.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={!!shareLinkInfo?.enabled}
-                        onCheckedChange={(checked) => {
-                          void handleToggleShareLink(checked);
-                        }}
-                        disabled={shareLinkLoading}
-                      />
-                    </div>
-
-                    {shareLinkLoading ? (
-                      <div className="text-xs text-muted-foreground">
-                        Updating sharing settings...
-                      </div>
-                    ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={shareLinkInfo.shareUrl}
-                            readOnly
-                            className="h-8 text-xs"
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCopyShareLink}
-                            className="h-8 px-2"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowRegenerateConfirm(true)}
-                          className="h-7 text-xs"
-                          disabled={shareLinkLoading}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                          Regenerate URL
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <Link2 className="h-3.5 w-3.5" />
-                        Sharing is off.
-                      </div>
-                    )}
-
-                    {shareLinkError && (
-                      <p className="text-xs text-destructive">
-                        {shareLinkError}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Force full encryption */}
-                  <div className="space-y-3 pt-3 border-t border-border/50">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">
-                          FORCE FULL ENCRYPTION
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Store every event in this calendar as ciphertext only,
-                          regardless of your global encryption mode.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={calendarForceFullEncryption}
-                        onCheckedChange={(checked) => {
-                          if (checked && !calendarForceFullEncryption) {
-                            setShowForceEncryptConfirm(true);
-                          } else {
-                            setCalendarForceFullEncryption(checked);
-                          }
-                        }}
-                      />
-                    </div>
-                    {calendarForceFullEncryption && (
-                      <div className="text-xs text-muted-foreground flex items-start gap-1.5">
-                        <ShieldCheck className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-                        <span>
-                          Reminders and ICS shares from this calendar won&apos;t
-                          include event titles, descriptions, or locations.
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-
-                {/* Action Buttons */}
-                <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
-                  {editingCalendar && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        handleCalendarDelete(
-                          editingCalendar,
-                          calendarData,
-                          setCalendarSaving,
-                          () => goBack(),
-                        )
-                      }
-                      disabled={calendarSaving}
-                      className="h-8 text-destructive hover:text-destructive"
-                    >
-                      {calendarSaving ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  )}
-                  <div className="flex gap-2 ml-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => goBack()}
-                      disabled={calendarSaving}
-                      className="h-8"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        handleCalendarUpdate(
-                          calendarName,
-                          calendarColor,
-                          calendarIsDefault,
-                          calendars,
-                          editingCalendar,
-                          calendarData,
-                          {
-                            setCalendarValidationErrors,
-                            setCalendarSaving,
-                            setEditingCalendar,
-                          },
-                          () => goBack(),
-                          { forceFullEncryption: calendarForceFullEncryption },
-                        )
-                      }
-                      disabled={calendarSaving || !calendarName.trim()}
-                      className="h-8"
-                    >
-                      {calendarSaving ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-3.5 w-3.5 mr-1.5" />
-                          Save
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
+                {calendarValidationErrors.color && (
+                  <p className="text-xs text-destructive">
+                    {calendarValidationErrors.color}
+                  </p>
+                )}
               </div>
+            </div>
+
+            <div className="p-1 border-t border-border/50 mt-1">
+              <SettingToggleRow
+                checked={calendarIsDefault}
+                description="Use this calendar by default for new events."
+                icon={Star}
+                label="Default calendar"
+                onToggle={() => setCalendarIsDefault(!calendarIsDefault)}
+              />
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!shareLinkInfo?.enabled}
+                onClick={() => {
+                  if (shareLinkLoading) return;
+                  void handleToggleShareLink(!shareLinkInfo?.enabled);
+                }}
+                disabled={shareLinkLoading}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:opacity-60"
+              >
+                <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm">ICS sharing</div>
+                  <div className="text-xs text-muted-foreground">
+                    Enable a private subscription link for this calendar.
+                  </div>
+                </div>
+                <ToggleIndicator checked={!!shareLinkInfo?.enabled} />
+              </button>
+
+              {shareLinkLoading ? (
+                <div className="px-3 py-2 text-xs text-muted-foreground">
+                  Updating sharing settings...
+                </div>
+              ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
+                <div className="px-3 pt-1 pb-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={shareLinkInfo.shareUrl}
+                      readOnly
+                      className="h-8 text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCopyShareLink}
+                      className="h-8 px-2"
+                      title="Copy link"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowRegenerateConfirm(true)}
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground -ml-1"
+                    disabled={shareLinkLoading}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                    Regenerate URL
+                  </Button>
+                </div>
+              ) : null}
+
+              {shareLinkError && (
+                <p className="px-3 py-1 text-xs text-destructive">
+                  {shareLinkError}
+                </p>
+              )}
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={calendarForceFullEncryption}
+                onClick={() => {
+                  if (!calendarForceFullEncryption) {
+                    setShowForceEncryptConfirm(true);
+                  } else {
+                    setCalendarForceFullEncryption(false);
+                  }
+                }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none"
+              >
+                <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm">Force full encryption</div>
+                  <div className="text-xs text-muted-foreground">
+                    Store every event in this calendar as ciphertext only.
+                  </div>
+                </div>
+                <ToggleIndicator checked={calendarForceFullEncryption} />
+              </button>
+              {calendarForceFullEncryption && (
+                <div className="px-3 pt-1 pb-2 text-xs text-muted-foreground flex items-start gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                  <span>
+                    Reminders and ICS shares from this calendar won&apos;t
+                    include event titles, descriptions, or locations.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between shrink-0">
+            {editingCalendar && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  handleCalendarDelete(
+                    editingCalendar,
+                    calendarData,
+                    setCalendarSaving,
+                    () => goBack(),
+                  )
+                }
+                disabled={calendarSaving}
+                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                {calendarSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Delete
+              </Button>
+            )}
+            <div className="ml-auto">
+              <Button
+                size="sm"
+                onClick={() =>
+                  handleCalendarUpdate(
+                    calendarName,
+                    calendarColor,
+                    calendarIsDefault,
+                    calendars,
+                    editingCalendar,
+                    calendarData,
+                    {
+                      setCalendarValidationErrors,
+                      setCalendarSaving,
+                      setEditingCalendar,
+                    },
+                    () => goBack(),
+                    { forceFullEncryption: calendarForceFullEncryption },
+                  )
+                }
+                disabled={calendarSaving || !calendarName.trim()}
+                className="h-8"
+              >
+                {calendarSaving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
 
         <Dialog
           open={showRegenerateConfirm}

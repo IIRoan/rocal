@@ -6,10 +6,12 @@ import type {
   CategoryDeleteInput,
   CategoryWithCount,
 } from "../contracts/category.contract";
+import { ValidationError } from "../lib/errors";
 import {
-  ALLOWED_CALENDAR_COLORS,
-  isValidCalendarColor,
-} from "../lib/colors";
+  assertValidEntityColor,
+  buildEncryptedNameFields,
+  normalizeEntityName,
+} from "../lib/entity-metadata";
 
 export class CategoryService implements ICategoryService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -48,35 +50,32 @@ export class CategoryService implements ICategoryService {
       encryptionKeyVersion,
     } = input;
 
-    if (!name || !color) {
-      throw new Error("Name and color are required fields");
-    }
+    const normalizedName = normalizeEntityName(name, {
+      entityLabel: "Category",
+    });
 
-    if (!isValidCalendarColor(color)) {
-      throw new Error(
-        `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
-      );
-    }
+    assertValidEntityColor(color);
 
     const existingCategory = await this.prisma.eventCategory.findFirst({
-      where: { userId, name: name.trim() },
+      where: { userId, name: normalizedName },
     });
 
     if (existingCategory) {
-      throw new Error("A category with this name already exists");
+      throw new ValidationError(
+        "A category with this name already exists",
+        "name",
+      );
     }
 
     return this.prisma.eventCategory.create({
       data: {
-        name: name.trim(),
-        ...(encryptedName !== undefined ? { encryptedName } : {}),
-        ...(blindIndexTokens !== undefined
-          ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
-          : {}),
-        ...(encryptionState !== undefined ? { encryptionState } : {}),
-        ...(encryptionKeyVersion !== undefined
-          ? { encryptionKeyVersion }
-          : {}),
+        name: normalizedName,
+        ...buildEncryptedNameFields({
+          encryptedName,
+          blindIndexTokens,
+          encryptionState,
+          encryptionKeyVersion,
+        }),
         color,
         userId,
       },
@@ -95,47 +94,51 @@ export class CategoryService implements ICategoryService {
       encryptionKeyVersion,
     } = input;
 
+    const normalizedName =
+      name !== undefined
+        ? normalizeEntityName(name, { entityLabel: "Category" })
+        : undefined;
+
     const existingCategory = await this.prisma.eventCategory.findFirst({
       where: { id: categoryId, userId },
     });
 
     if (!existingCategory) {
-      throw new Error("Category not found or access denied");
+      throw new ValidationError("Category not found or access denied", "categoryId");
     }
 
-    if (color && !isValidCalendarColor(color)) {
-      throw new Error(
-        `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g., #FF0000)`,
-      );
+    if (color !== undefined) {
+      assertValidEntityColor(color);
     }
 
-    if (name && name.trim() !== existingCategory.name) {
+    if (normalizedName !== undefined && normalizedName !== existingCategory.name) {
       const duplicateCategory = await this.prisma.eventCategory.findFirst({
         where: {
           userId,
-          name: name.trim(),
+          name: normalizedName,
           id: { not: categoryId },
         },
       });
 
       if (duplicateCategory) {
-        throw new Error("A category with this name already exists");
+        throw new ValidationError(
+          "A category with this name already exists",
+          "name",
+        );
       }
     }
 
     return this.prisma.eventCategory.update({
       where: { id: categoryId },
       data: {
-        ...(name !== undefined ? { name: name.trim() } : {}),
+        ...(normalizedName !== undefined ? { name: normalizedName } : {}),
         ...(color !== undefined ? { color } : {}),
-        ...(encryptedName !== undefined ? { encryptedName } : {}),
-        ...(blindIndexTokens !== undefined
-          ? { blindIndexTokens: JSON.stringify(blindIndexTokens) }
-          : {}),
-        ...(encryptionState !== undefined ? { encryptionState } : {}),
-        ...(encryptionKeyVersion !== undefined
-          ? { encryptionKeyVersion }
-          : {}),
+        ...buildEncryptedNameFields({
+          encryptedName,
+          blindIndexTokens,
+          encryptionState,
+          encryptionKeyVersion,
+        }),
       },
     });
   }
@@ -148,7 +151,7 @@ export class CategoryService implements ICategoryService {
     });
 
     if (!existingCategory) {
-      throw new Error("Category not found or access denied");
+      throw new ValidationError("Category not found or access denied", "categoryId");
     }
 
     await this.prisma.calendarEvent.updateMany({

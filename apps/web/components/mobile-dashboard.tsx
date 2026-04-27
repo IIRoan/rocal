@@ -5,7 +5,7 @@ import { MobileCalendarWrapper } from "@workspace/ui/components";
 import { SidebarInset, SidebarProvider } from "@workspace/ui/components/ui";
 import { CalendarWithData } from "@/components/calendar-with-data";
 import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
-import { useCalendarContext } from "@workspace/ui/components/calendar";
+import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 import { User } from "@workspace/ui/components/calendar";
 
 interface MobileDashboardProps {
@@ -24,24 +24,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
     onOpenSettings: openPalette,
     onOpenCalendarManagement: openCalendarManagement,
     onOpenAddEvent: () => {
-      // Create a new event starting at current time
-      const startTime = new Date();
-      startTime.setSeconds(0);
-      startTime.setMilliseconds(0);
-
-      const newEvent = {
-        id: "",
-        title: "",
-        start: startTime,
-        end: new Date(startTime.getTime() + 60 * 60 * 1000), // 1 hour default
-        allDay: false,
-        calendarId: "",
-        userId: "",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      openEventEditor(newEvent);
+      openEventEditor(createDraftCalendarEvent());
     },
   };
 
