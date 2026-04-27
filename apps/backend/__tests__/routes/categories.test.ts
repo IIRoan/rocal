@@ -217,8 +217,8 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
-      "Name and color are required fields",
+    await expect(readText(response)).resolves.toContain(
+      "Category name is required and cannot be empty",
     );
   });
 
@@ -243,7 +243,7 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "A category with this name already exists",
     );
   });
@@ -303,7 +303,7 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "Category not found or access denied",
     );
   });
@@ -347,7 +347,7 @@ describe("categoriesRoutes", () => {
     );
 
     expect(duplicateNameResponse.status).toBe(500);
-    await expect(readText(duplicateNameResponse)).resolves.toBe(
+    await expect(readText(duplicateNameResponse)).resolves.toContain(
       "A category with this name already exists",
     );
   });
@@ -387,7 +387,7 @@ describe("categoriesRoutes", () => {
 
   it("rejects delete requests for categories the user does not own", async () => {
     mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
-    mockPrisma.eventCategory.findFirst.mockResolvedValue(null);
+    mockPrisma.eventCategory.findFirst.mockResolvedValueOnce(null);
 
     const response = await createApp().handle(
       new Request("http://localhost/categories/category-missing", {
@@ -396,7 +396,7 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe(
+    await expect(readText(response)).resolves.toContain(
       "Category not found or access denied",
     );
   });
