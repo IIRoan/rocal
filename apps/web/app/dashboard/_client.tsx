@@ -23,10 +23,11 @@ import { SettingsProvider } from "@/components/settings-provider";
 import { useCommandPalette } from "@/hooks/use-command-palette";
 import { useCommandPalette as useCommandPaletteContext } from "@/components/command-palette-context";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
+import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
+import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import { buildViewPrefetchRanges } from "@/hooks/use-calendar-events-loader";
-import { useMemo, useEffect, useRef, Suspense, type ReactNode } from "react";
+import { useEffect, useRef, Suspense, type ReactNode } from "react";
 import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
 
 const log = createLogger("dashboard");
@@ -180,36 +181,11 @@ function SidebarWithContext() {
   } = useCommandPaletteContext();
   const { settings } = useSettings();
   const calendarData = useSharedCalendarData();
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      window.location.href = "/";
-    } catch (error) {
-      log.error("Logout failed:", error);
-    }
-  };
-
-  const handleCreateEvent = () => {
-    const startTime = new Date();
-    startTime.setSeconds(0);
-    startTime.setMilliseconds(0);
-
-    const newEvent = {
-      id: undefined as any,
-      title: "",
-      start: startTime,
-      end: new Date(startTime.getTime() + 60 * 60 * 1000),
-      allDay: false,
-      calendarId:
-        settings?.defaultCalendarId || calendarData.calendars?.[0]?.id || "",
-      userId: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    openEventEditor(newEvent);
-  };
+  const { handleLogout, openNewEventEditor } = useDashboardUserActions({
+    defaultCalendarId: settings?.defaultCalendarId,
+    fallbackCalendarId: calendarData.calendars?.[0]?.id,
+    openEventEditor,
+  });
 
   return (
     <AppSidebar
@@ -222,7 +198,7 @@ function SidebarWithContext() {
       onOpenSettings={openPalette}
       onOpenCalendarManagement={openCalendarManagement}
       onOpenSearch={openSearchPalette}
-      onCreateEvent={handleCreateEvent}
+      onCreateEvent={openNewEventEditor}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
       prefetchRange={calendarData.prefetchRange}
     />
@@ -236,137 +212,35 @@ function MobileLayoutContent() {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
   const calendarData = useSharedCalendarData();
-  const { prefetchRange } = calendarData;
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      window.location.href = "/";
-    } catch (error) {
-      log.error("Logout failed:", error);
-    }
-  };
-
-  const handleOpenAddEvent = () => {
-    const startTime = new Date();
-    startTime.setSeconds(0);
-    startTime.setMilliseconds(0);
-
-    const newEvent = {
-      id: undefined as any,
-      title: "",
-      start: startTime,
-      end: new Date(startTime.getTime() + 60 * 60 * 1000),
-      allDay: false,
-      calendarId: settings?.defaultCalendarId || "",
-      userId: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    openEventEditor(newEvent);
-  };
-
-  const themeSettings = useMemo(
-    () => ({
-      currentTheme: (settings?.theme || "system") as
-        | "light"
-        | "dark"
-        | "system",
-      updateTheme: async (theme: "light" | "dark" | "system") => {
-        await updateSettings({ theme });
-      },
-    }),
-    [settings?.theme, updateSettings],
-  );
-
-  const visibleCalendarIds = useMemo(() => {
-    return new Set(
-      calendarData.calendars
-        .filter((cal) => isCalendarVisible(cal.id))
-        .map((cal) => cal.id),
-    );
-  }, [calendarData.calendars, isCalendarVisible]);
-
-  const transformedEvents = useMemo(() => {
-    const calendarMap = new Map(
-      calendarData.calendars.map((cal) => [cal.id, cal]),
-    );
-
-    return calendarData.events
-      .filter((event) => visibleCalendarIds.has(event.calendarId))
-      .map((event) => {
-        const calendar = calendarMap.get(event.calendarId);
-        const eventColor = event.color || calendar?.color || undefined;
-
-        return {
-          ...event,
-          description: event.description ?? undefined,
-          color: eventColor as any,
-          location: event.location ?? undefined,
-          categoryId: event.categoryId ?? undefined,
-          reminder: (event as any).reminder ?? undefined,
-        };
-      });
-  }, [calendarData.events, calendarData.calendars, visibleCalendarIds]);
-
-  useEffect(() => {
-    if (!currentDate || !currentView) {
-      return;
-    }
-
-    const ranges = buildViewPrefetchRanges(currentDate, currentView);
-    const eagerRanges = ranges.slice(0, 2);
-    const deferredRanges = ranges.slice(2);
-
-    for (const range of eagerRanges) {
-      prefetchRange(range);
-    }
-
-    if (deferredRanges.length === 0) {
-      return;
-    }
-
-    const runDeferredPrefetch = () => {
-      for (const range of deferredRanges) {
-        prefetchRange(range);
-      }
-    };
-
-    if ("requestIdleCallback" in window) {
-      const id = (window as any).requestIdleCallback(runDeferredPrefetch, {
-        timeout: 400,
-      });
-      return () => {
-        if ("cancelIdleCallback" in window) {
-          (window as any).cancelIdleCallback(id);
-        }
-      };
-    }
-
-    const id = setTimeout(runDeferredPrefetch, 32);
-    return () => clearTimeout(id);
-  }, [currentDate, currentView, prefetchRange]);
-
-  const isInitialLoading =
-    settingsLoading ||
-    (calendarData.calendarsLoading && calendarData.calendars.length === 0) ||
-    (calendarData.categoriesLoading && calendarData.categories.length === 0);
-
-  const isInitialEventsLoading =
-    calendarData.eventsLoading && calendarData.events.length === 0;
-  const isAllInitialLoading = isInitialLoading || isInitialEventsLoading;
+  const { handleLogout, openNewEventEditor } = useDashboardUserActions({
+    defaultCalendarId: settings?.defaultCalendarId,
+    fallbackCalendarId: calendarData.calendars?.[0]?.id,
+    openEventEditor,
+  });
+  const {
+    defaultCalendarId,
+    initialView,
+    isAllInitialLoading,
+    overlayContext,
+    themeSettings,
+    transformedEvents,
+    workingDays,
+  } = useCalendarPresentation({
+    calendarData,
+    settings,
+    settingsLoading,
+    isCalendarVisible,
+    currentDate,
+    currentView,
+    updateTheme: async (theme) => {
+      await updateSettings({ theme });
+    },
+  });
 
   if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
       <MobileDashboardLoadingScreen
-        messageContext={
-          settingsLoading
-            ? "SETTINGS_LOAD"
-            : isInitialLoading
-              ? "CALENDAR_LOAD"
-              : "DATA_SYNC"
-        }
+        messageContext={overlayContext ?? "CALENDAR_LOAD"}
       />
     );
   }
@@ -384,8 +258,8 @@ function MobileLayoutContent() {
         openPalette();
       }}
       onOpenCalendarManagement={openCalendarManagement}
-      onOpenAddEvent={handleOpenAddEvent}
-      initialView={settings?.defaultView || "month"}
+      onOpenAddEvent={openNewEventEditor}
+      initialView={initialView}
       events={transformedEvents}
       categories={calendarData.categories}
       loading={false}
@@ -400,20 +274,16 @@ function MobileLayoutContent() {
       compactView={settings?.compactView}
       timeFormat={settings?.timeFormat}
       defaultEventDuration={settings?.defaultEventDuration}
-      defaultCalendarId={settings?.defaultCalendarId}
+      defaultCalendarId={defaultCalendarId}
       weekStartDay={settings?.weekStartDay}
-      workingDays={
-        settings?.workingDays
-          ? JSON.parse(settings.workingDays)
-          : [1, 2, 3, 4, 5]
-      }
+      workingDays={workingDays}
       timezone={settings?.timezone}
       themeSettings={themeSettings}
       onLoadNotifications={calendarData.loadNotifications}
       onUpdateNotifications={calendarData.updateNotifications}
       onEventEdit={openEventEditor}
       getCachedEventsForRange={calendarData.getCachedEventsForRange}
-      prefetchRange={prefetchRange}
+      prefetchRange={calendarData.prefetchRange}
     />
   );
 }
