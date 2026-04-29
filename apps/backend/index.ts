@@ -7,6 +7,7 @@ import {
   BETTER_AUTH_BASE_PATH,
   getAuthOpenApiDocumentation,
 } from "./lib/auth";
+import { env, parseCsvEnv } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
 import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
@@ -35,18 +36,7 @@ installGlobalConsoleLogger("backend");
 
 const logger = createLogger("backend");
 
-const frontendUrl =
-  process.env.FRONTEND_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  "http://localhost:3000";
-
-const parseCsvEnv = (value?: string) => {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-};
+const { frontendUrl } = env;
 
 const corsOrigins = Array.from(
   new Set([
@@ -55,10 +45,6 @@ const corsOrigins = Array.from(
     "capacitor://localhost",
     "http://localhost",
     "https://localhost",
-    "http://localhost:3000",
-    "https://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://127.0.0.1:3000",
     ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
   ]),
 ).filter(Boolean);
@@ -320,7 +306,7 @@ export const createAPI = (prefix = "") => {
 };
 
 // Start the server when this file is run directly
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const port = env.port;
 const app = createAPI("/api");
 
 // Handle OAuth errors at root (better-auth redirects here on error)
