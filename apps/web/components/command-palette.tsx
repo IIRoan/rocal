@@ -40,7 +40,7 @@ import {
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import {
   Settings,
-  RefreshCw,
+  Loader2,
   ArrowLeft,
 } from "lucide-react";
 import { useNumberedShortcuts } from "@workspace/ui/hooks";
@@ -322,7 +322,7 @@ export function CommandPalette({
           </VisuallyHidden>
           <div className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">Loading...</p>
             </div>
           </div>
