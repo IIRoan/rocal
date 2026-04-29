@@ -5,7 +5,7 @@ import { Button } from "./button";
 import { Input } from "./input";
 import { Label } from "./label";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
-import { cn } from "../../lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 
 export interface PresetColorOption {
   value: string;

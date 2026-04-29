@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "../../lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "./skeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoSpinner } from "./logo-spinner";

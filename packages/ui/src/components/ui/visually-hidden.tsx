@@ -1,20 +1,19 @@
 import * as React from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 
-const VisuallyHidden = React.forwardRef<
-  HTMLSpanElement,
-  React.HTMLAttributes<HTMLSpanElement>
->(({ className, ...props }, ref) => (
-  <span
-    ref={ref}
-    className={cn(
-      "sr-only absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0",
-      className,
-    )}
-    {...props}
-  />
-));
-
-VisuallyHidden.displayName = "VisuallyHidden";
+function VisuallyHidden({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      className={cn(
+        "sr-only absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
 
 export { VisuallyHidden };

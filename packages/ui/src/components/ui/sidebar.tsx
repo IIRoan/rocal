@@ -9,7 +9,7 @@ const SlotComponent = Slot.Slot;
 import { ArrowLineLeftIcon, ArrowLineRightIcon } from "@phosphor-icons/react";
 
 import { useIsMobile } from "../../hooks/use-mobile";
-import { cn } from "../../lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Separator } from "./separator";

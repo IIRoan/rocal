@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { getErrorMessage } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
@@ -28,6 +29,9 @@ import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
@@ -37,8 +41,8 @@ import {
   Plus,
   Trash2,
   RefreshCw,
+  Loader2,
   AlertCircle,
-  CheckCircle,
   AlertTriangle,
   ArrowLeft,
   Globe,
@@ -104,8 +108,6 @@ export function SubscriptionManagement({
   const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
 
   const [holidaySearch, setHolidaySearch] = useState("");
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [newSubscription, setNewSubscription] =
     useState<CustomSubscriptionForm>({
       name: "",
@@ -130,6 +132,10 @@ export function SubscriptionManagement({
     name?: string;
     color?: string;
   }>({});
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const goToSubView = (
     view:
@@ -137,14 +143,10 @@ export function SubscriptionManagement({
       | "subscriptions-holidays"
       | "subscriptions-edit",
   ) => {
-    setLocalError(null);
-    setSuccess(null);
     onNavigateTo(view);
   };
 
   const goBackToMain = () => {
-    setLocalError(null);
-    setSuccess(null);
     onBack?.();
   };
 
@@ -162,6 +164,12 @@ export function SubscriptionManagement({
     initialData: () =>
       queryClient.getQueryData<CalendarSubscription[]>(["subscriptions"]),
   });
+
+  useEffect(() => {
+    if (queryError) {
+      toast.error(getErrorMessage(queryError, "Failed to load subscriptions"));
+    }
+  }, [queryError]);
 
   // The calendar id currently being edited. Sourced from either the parent
   // (`initialEditCalendarId`, when navigated here from CalendarManager) or
@@ -230,14 +238,13 @@ export function SubscriptionManagement({
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
       await queryClient.invalidateQueries({ queryKey: ["events"] });
-      setSuccess("Read-only calendar added successfully.");
+      toast.success("Read-only calendar added successfully.");
       setNewSubscription({ name: "", url: "", color: "indigo" });
       setValidationErrors({});
-      setLocalError(null);
       goBackToMain();
     },
     onError: (error: ApiError) =>
-      setLocalError(getErrorMessage(error, "Failed to create subscription")),
+      toast.error(getErrorMessage(error, "Failed to create subscription")),
   });
 
   const deleteMutation = useMutation<
@@ -250,12 +257,11 @@ export function SubscriptionManagement({
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
       await queryClient.invalidateQueries({ queryKey: ["events"] });
-      setSuccess("Subscription removed.");
-      setLocalError(null);
+      toast.success("Subscription removed.");
       if (currentView === "subscriptions-edit") goBackToMain();
     },
     onError: (error: ApiError) =>
-      setLocalError(getErrorMessage(error, "Failed to remove subscription")),
+      toast.error(getErrorMessage(error, "Failed to remove subscription")),
   });
 
   const syncMutation = useMutation<SyncSubscriptionResponse, ApiError, string>({
@@ -265,11 +271,10 @@ export function SubscriptionManagement({
       await refetchCalendars();
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       const sub = subscriptions.find((subscription) => subscription.id === id);
-      setSuccess(`Synced "${sub?.name || "subscription"}"`);
-      setLocalError(null);
+      toast.success(`Synced "${sub?.name || "subscription"}"`);
     },
     onError: (error: ApiError) =>
-      setLocalError(getErrorMessage(error, "Failed to sync subscription")),
+      toast.error(getErrorMessage(error, "Failed to sync subscription")),
   });
   const updateMutation = useMutation<
     CalendarSubscription,
@@ -285,13 +290,12 @@ export function SubscriptionManagement({
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       await refetchCalendars();
       await queryClient.invalidateQueries({ queryKey: ["events"] });
-      setSuccess("Calendar updated.");
-      setLocalError(null);
+      toast.success("Calendar updated.");
       setEditValidationErrors({});
       goBackToMain();
     },
     onError: (error: ApiError) =>
-      setLocalError(getErrorMessage(error, "Failed to update calendar")),
+      toast.error(getErrorMessage(error, "Failed to update calendar")),
   });
 
   const loading =
@@ -300,11 +304,6 @@ export function SubscriptionManagement({
     deleteMutation.isPending ||
     syncMutation.isPending ||
     updateMutation.isPending;
-  const error =
-    localError ||
-    (queryError
-      ? getErrorMessage(queryError, "Failed to load subscriptions")
-      : null);
 
   const normalizeSubscriptionUrl = (value: string) => {
     try {
@@ -420,20 +419,11 @@ export function SubscriptionManagement({
     setInternalEditCalendarId(subscription.calendar.id);
     setEditFormOverride(null);
     setEditValidationErrors({});
-    setLocalError(null);
-    setSuccess(null);
     goToSubView("subscriptions-edit");
   };
 
   const handleDeleteSubscription = (subscription: CalendarSubscription) => {
-    if (
-      !confirm(
-        `Remove "${subscription.name}"? The read-only calendar and its synced events will be deleted.`,
-      )
-    ) {
-      return;
-    }
-    deleteMutation.mutate(subscription.id);
+    setPendingDelete({ id: subscription.id, name: subscription.name });
   };
 
   const handleCreateHolidayCalendar = (holidayCalendar: HolidayCalendar) => {
@@ -556,33 +546,6 @@ export function SubscriptionManagement({
             <span className="text-sm font-medium">Subscriptions</span>
           </div>
 
-          {/* Notification bar */}
-          {(error || success) && (
-            <div
-              className={`flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 ${
-                error
-                  ? "text-destructive bg-destructive/5"
-                  : "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50"
-              }`}
-            >
-              {error ? (
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              ) : (
-                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-              )}
-              <span className="flex-1">{error ?? success}</span>
-              <button
-                onClick={() => {
-                  setLocalError(null);
-                  setSuccess(null);
-                }}
-                className="opacity-60 hover:opacity-100 transition-opacity"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
           <div className="flex-1 overflow-y-auto min-h-0">
             {/* Actions section */}
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
@@ -626,7 +589,7 @@ export function SubscriptionManagement({
 
             {isLoadingSubscriptions ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
-                <RefreshCw className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 <span className="text-xs">Loading...</span>
               </div>
             ) : readOnlyCalendars.length === 0 ? (
@@ -748,20 +711,6 @@ export function SubscriptionManagement({
             <span className="text-sm font-medium">Add External Feed</span>
           </div>
 
-          {/* Notification bar */}
-          {error && (
-            <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 text-destructive bg-destructive/5">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1">{error}</span>
-              <button
-                onClick={() => setLocalError(null)}
-                className="opacity-60 hover:opacity-100 transition-opacity"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
           <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
             <div className="space-y-1.5">
               <Label
@@ -843,7 +792,7 @@ export function SubscriptionManagement({
               >
                 {createMutation.isPending ? (
                   <>
-                    <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                     Adding...
                   </>
                 ) : (
@@ -872,33 +821,6 @@ export function SubscriptionManagement({
             <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-medium">Holiday Calendars</span>
           </div>
-
-          {/* Notification bar */}
-          {(error || success) && (
-            <div
-              className={`flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 ${
-                error
-                  ? "text-destructive bg-destructive/5"
-                  : "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50"
-              }`}
-            >
-              {error ? (
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              ) : (
-                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-              )}
-              <span className="flex-1">{error ?? success}</span>
-              <button
-                onClick={() => {
-                  setLocalError(null);
-                  setSuccess(null);
-                }}
-                className="opacity-60 hover:opacity-100 transition-opacity"
-              >
-                ✕
-              </button>
-            </div>
-          )}
 
           {/* Search bar */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
@@ -1012,20 +934,6 @@ export function SubscriptionManagement({
               </div>
             )}
           </div>
-
-          {/* Notification bar */}
-          {error && (
-            <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-border/50 shrink-0 text-destructive bg-destructive/5">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1">{error}</span>
-              <button
-                onClick={() => setLocalError(null)}
-                className="opacity-60 hover:opacity-100 transition-opacity"
-              >
-                ✕
-              </button>
-            </div>
-          )}
 
           <div className="flex-1 overflow-y-auto min-h-0">
             {/* Calendar Section */}
@@ -1205,9 +1113,9 @@ export function SubscriptionManagement({
                           await navigator.clipboard.writeText(
                             editingSubscriptionData.url,
                           );
-                          setSuccess("Feed URL copied to clipboard");
+                          toast.success("Feed URL copied to clipboard");
                         } catch {
-                          setLocalError("Unable to copy link automatically");
+                          toast.error("Unable to copy link automatically");
                         }
                       }}
                       disabled={!editingSubscriptionData}
@@ -1247,7 +1155,7 @@ export function SubscriptionManagement({
             >
               {updateMutation.isPending ? (
                 <>
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                   Saving...
                 </>
               ) : (
@@ -1260,25 +1168,74 @@ export function SubscriptionManagement({
     </div>
   );
 
+  const deleteConfirmDialog = (
+    <Dialog
+      open={!!pendingDelete}
+      onOpenChange={(open) => !open && setPendingDelete(null)}
+    >
+      <DialogContent
+        showClose={false}
+        className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+      >
+        <DialogHeader className="px-5 pt-5 pb-3">
+          <DialogTitle>Remove subscription?</DialogTitle>
+          <DialogDescription>
+            Remove &ldquo;{pendingDelete?.name}&rdquo;? The read-only calendar
+            and its synced events will be deleted.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPendingDelete(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              if (pendingDelete) {
+                deleteMutation.mutate(pendingDelete.id);
+              }
+              setPendingDelete(null);
+            }}
+          >
+            Remove
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   // When used standalone (with onOpenChange), wrap in Dialog
   if (onOpenChange) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[520px]"
-        >
-          <VisuallyHidden>
-            <DialogTitle>Calendar Subscriptions</DialogTitle>
-          </VisuallyHidden>
-          {content}
-        </DialogContent>
-      </Dialog>
+      <>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent
+            variant="spotlight"
+            showClose={false}
+            aria-describedby={undefined}
+            className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl max-h-[520px]"
+          >
+            <VisuallyHidden>
+              <DialogTitle>Calendar Subscriptions</DialogTitle>
+            </VisuallyHidden>
+            {content}
+          </DialogContent>
+        </Dialog>
+        {deleteConfirmDialog}
+      </>
     );
   }
 
   // When embedded in command palette, return content directly
-  return content;
+  return (
+    <>
+      {content}
+      {deleteConfirmDialog}
+    </>
+  );
 }

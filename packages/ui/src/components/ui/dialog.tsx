@@ -43,15 +43,6 @@ function DialogOverlay({
         "supports-[backdrop-filter]:backdrop-blur-sm supports-[backdrop-filter]:data-[state=open]:backdrop-blur-md",
         className,
       )}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: "100dvw",
-        height: "100dvh",
-      }}
       {...props}
     />
   );
@@ -147,7 +138,7 @@ function DialogContent({
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="alert-dialog-header"
+      data-slot="dialog-header"
       className={cn("flex flex-col gap-1 text-center sm:text-left", className)}
       {...props}
     />
@@ -157,7 +148,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="alert-dialog-footer"
+      data-slot="dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto",
         className,
@@ -173,7 +164,7 @@ function DialogTitle({
 }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      data-slot="alert-dialog-title"
+      data-slot="dialog-title"
       className={cn("text-lg leading-none font-semibold", className)}
       {...props}
     />
@@ -186,7 +177,7 @@ function DialogDescription({
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      data-slot="alert-dialog-description"
+      data-slot="dialog-description"
       className={cn("text-muted-foreground text-sm", className)}
       {...props}
     />

@@ -406,7 +406,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\Users\\Roan\\Documents\\solace\\apps\\backend\\generated\\prisma",
+      "value": "/var/home/roan/Documents/rocal/apps/backend/generated/prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -415,7 +415,7 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "windows",
+        "value": "rhel-openssl-3.0.x",
         "native": true
       },
       {
@@ -424,7 +424,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\Users\\Roan\\Documents\\solace\\apps\\backend\\prisma\\schema.prisma",
+    "sourceFilePath": "/var/home/roan/Documents/rocal/apps/backend/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -438,6 +438,7 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
