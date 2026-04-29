@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "../../lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "./skeleton";
 
 // Dashboard skeleton for the main layout

@@ -234,10 +234,10 @@ describe("buildViewPrefetchRanges", () => {
     expect(ranges).toHaveLength(4);
 
     for (const range of ranges) {
-      // Each range should be a full padded month (at least 28 + 2×7 = 42 days)
+      // Each range should be a full padded month (at least 28 + 2×7 - 1 = 41 calendar-day difference)
       const span = differenceInCalendarDays(range.end, range.start);
       expect(span).toBeGreaterThanOrEqual(
-        28 + 2 * MONTH_PADDING_DAYS,
+        28 + 2 * MONTH_PADDING_DAYS - 1,
       );
     }
   });

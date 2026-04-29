@@ -8,11 +8,14 @@ import type {
   NotificationDeleteResult,
 } from "../contracts/notification.contract";
 import { ValidationError, NotFoundError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
 import {
   normalizeEventEncryptionMode,
   resolveEventPersistencePolicy,
 } from "../lib/event-encryption";
 import { NotificationCalculator } from "../lib/notification-calculator";
+
+const logger = createLogger("backend:notification-service");
 
 export class NotificationService implements INotificationService {
   constructor(private readonly prisma: PrismaClient) {}

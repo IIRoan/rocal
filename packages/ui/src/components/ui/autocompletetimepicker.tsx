@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Clock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
-import { Button } from "@workspace/ui/components/ui/button";
+import { Button } from "./button";
 import {
   Drawer,
   DrawerContent,
   DrawerTitle,
   DrawerTrigger,
-} from "@workspace/ui/components/ui/drawer";
+} from "./drawer";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-timepicker";
 
