@@ -1,10 +1,14 @@
 #!/usr/bin/env bun
 
-const DEFAULT_APP_URL = "http://localhost:3000";
-const DEFAULT_API_URL = "http://localhost:3001";
+if (!process.env.NEXT_PUBLIC_APP_URL || !process.env.NEXT_PUBLIC_API_URL) {
+  console.error(
+    "[mobile:dev:wifi] NEXT_PUBLIC_APP_URL and NEXT_PUBLIC_API_URL must be set in your environment (e.g. apps/web/.env.local).",
+  );
+  process.exit(1);
+}
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL;
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL;
+const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 const appUrlObj = new URL(appUrl);
 const apiUrlObj = new URL(apiUrl);
