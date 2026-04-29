@@ -7,12 +7,15 @@ import type {
   CalendarDeleteResult,
 } from "../contracts/calendar.contract";
 import { ValidationError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
 import {
   assertValidEntityColor,
   buildEncryptedNameFields,
   normalizeEntityName,
 } from "../lib/entity-metadata";
 import { ensureUserCalendars } from "../lib/user-setup";
+
+const logger = createLogger("backend:calendar-service");
 
 export class CalendarService implements ICalendarService {
   constructor(private readonly prisma: PrismaClient) {}

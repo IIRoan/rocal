@@ -45,7 +45,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/ui/card";
-import { Alert, AlertDescription } from "@workspace/ui/components/ui/alert";
 import { ColorPicker } from "@workspace/ui/components/ui/color-picker";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
@@ -64,7 +63,6 @@ import {
   AlertTriangle,
   MoveRight,
   AlertCircle,
-  CheckCircle,
   Settings,
   Upload,
   FileText,
@@ -75,6 +73,7 @@ import {
   RefreshCw,
   Link2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
@@ -154,8 +153,6 @@ export function CalendarManagement({
     isDefault: false,
   });
 
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importCalendarId, setImportCalendarId] = useState<string>("");
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -170,6 +167,11 @@ export function CalendarManagement({
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [subscriptionView, setSubscriptionView] = useState<PaletteView>("subscriptions");
+  const [pendingUnsubscribe, setPendingUnsubscribe] = useState<{
+    subscriptionId: string;
+    calendarName: string;
+    action: string;
+  } | null>(null);
   const [validationErrors, setValidationErrors] = useState<{
     name?: string;
     color?: string;
@@ -195,12 +197,12 @@ export function CalendarManagement({
       setDeletingCalendar(null);
       setDeleteAction("delete_events");
       setTargetCalendarId("");
-      setSuccess("Calendar deleted successfully!");
+      toast.success("Calendar deleted successfully!");
       // Also invalidate events since they might have been moved or deleted
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (error: ApiError) => {
-      setError(getErrorMessage(error, "Failed to delete calendar"));
+      toast.error(getErrorMessage(error, "Failed to delete calendar"));
     },
   });
 
@@ -211,11 +213,10 @@ export function CalendarManagement({
       await refetchCalendars();
       await queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      setSuccess("Calendar removed successfully!");
-      setError(null);
+      toast.success("Calendar removed successfully!");
     },
     onError: (error: ApiError) => {
-      setError(getErrorMessage(error, "Failed to remove calendar"));
+      toast.error(getErrorMessage(error, "Failed to remove calendar"));
     },
   });
 
@@ -232,7 +233,7 @@ export function CalendarManagement({
       setImportResult(response);
 
       if (response.eventsCreated > 0) {
-        setSuccess(
+        toast.success(
           `Successfully imported ${response.eventsCreated} events from ${importFile?.name}`,
         );
         await refetchCalendars();
@@ -249,7 +250,7 @@ export function CalendarManagement({
       }
     },
     onError: (error: ApiError) => {
-      setError(getErrorMessage(error, "Failed to import ICS file"));
+      toast.error(getErrorMessage(error, "Failed to import ICS file"));
     },
   });
 
@@ -284,9 +285,7 @@ export function CalendarManagement({
 
   const handleCreateCalendar = async () => {
     // Clear any previous errors
-    setError(null);
     setValidationErrors({});
-    setSuccess(null);
 
     // Validate form
     const errors = validateCalendarForm();
@@ -306,7 +305,7 @@ export function CalendarManagement({
       setNewCalendar({ name: "", color: "blue", isDefault: false });
       setShowCreateForm(false);
       setValidationErrors({});
-      setSuccess("Calendar created successfully!");
+      toast.success("Calendar created successfully!");
     } catch (error: unknown) {
       // Handle specific API errors
       const message = getErrorMessage(error, "Failed to create calendar.");
@@ -324,7 +323,7 @@ export function CalendarManagement({
         setValidationErrors({ color: "Please select a valid color" });
       } else {
         // Generic error fallback
-        setError(message);
+        toast.error(message);
       }
     }
   };
@@ -355,9 +354,7 @@ export function CalendarManagement({
     calendar: Calendar,
     updates: Partial<UpdateCalendarRequest>,
   ) => {
-    setError(null);
     setValidationErrors({});
-    setSuccess(null);
 
     // Validate if name is being updated
     if (updates.name) {
@@ -370,7 +367,7 @@ export function CalendarManagement({
 
     try {
       await updateCalendar(calendar.id, updates);
-      setSuccess("Calendar updated successfully!");
+      toast.success("Calendar updated successfully!");
       return true; // Indicate success
     } catch (error: unknown) {
       // Handle specific API errors
@@ -388,7 +385,7 @@ export function CalendarManagement({
       } else if (message.includes("Color must be")) {
         setValidationErrors({ color: "Please select a valid color" });
       } else {
-        setError(message);
+        toast.error(message);
       }
       return false; // Indicate failure
     }
@@ -396,7 +393,6 @@ export function CalendarManagement({
 
   const handleDeleteCalendar = async () => {
     if (!deletingCalendar) return;
-    setError(null);
     deleteCalendarMutation.mutate({
       id: deletingCalendar.id,
       action: deleteAction,
@@ -411,22 +407,18 @@ export function CalendarManagement({
   const handleRemoveSubscribedCalendar = (calendar: Calendar) => {
     const subscription = subscriptionByCalendarId.get(calendar.id);
     if (!subscription) {
-      setError("Unable to find the backing subscription for this calendar.");
+      toast.error("Unable to find the backing subscription for this calendar.");
       return;
     }
 
     const action =
       calendar.kind === "public_holiday" ? "remove" : "unsubscribe from";
 
-    if (
-      !confirm(
-        `Are you sure you want to ${action} "${calendar.name}"? The read-only calendar and its synced events will be deleted.`,
-      )
-    ) {
-      return;
-    }
-
-    deleteSubscriptionMutation.mutate(subscription.id);
+    setPendingUnsubscribe({
+      subscriptionId: subscription.id,
+      calendarName: calendar.name,
+      action,
+    });
   };
 
   const handleSetDefault = (calendar: Calendar) => {
@@ -435,7 +427,6 @@ export function CalendarManagement({
 
   const handleImportICS = async () => {
     if (!importFile || !importCalendarId) return;
-    setError(null);
     setImportResult(null);
     importICSMutation.mutate({
       calendarId: importCalendarId,
@@ -448,11 +439,10 @@ export function CalendarManagement({
     if (file) {
       // Validate file type
       if (!file.name.toLowerCase().endsWith(".ics")) {
-        setError("Please select a valid .ics calendar file");
+        toast.error("Please select a valid .ics calendar file");
         return;
       }
       setImportFile(file);
-      setError(null);
     }
   };
 
@@ -463,8 +453,6 @@ export function CalendarManagement({
   const openShareDialog = async (calendar: Calendar) => {
     setSharingCalendar(calendar);
     setShareLinkInfo(null);
-    setError(null);
-    setSuccess(null);
     setShareLinkLoading(true);
 
     try {
@@ -473,7 +461,7 @@ export function CalendarManagement({
       );
       setShareLinkInfo(shareInfo);
     } catch (error: unknown) {
-      setError(getErrorMessage(error, "Failed to load calendar share link"));
+      toast.error(getErrorMessage(error, "Failed to load calendar share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -482,8 +470,6 @@ export function CalendarManagement({
   const handleEnableShareLink = async (regenerate = false) => {
     if (!sharingCalendar) return;
 
-    setError(null);
-    setSuccess(null);
     setShareLinkLoading(true);
 
     try {
@@ -492,13 +478,13 @@ export function CalendarManagement({
         { regenerate },
       );
       setShareLinkInfo(response);
-      setSuccess(
+      toast.success(
         regenerate
           ? "Calendar share link regenerated successfully"
           : "Calendar share link enabled successfully",
       );
     } catch (error: unknown) {
-      setError(getErrorMessage(error, "Failed to enable calendar share link"));
+      toast.error(getErrorMessage(error, "Failed to enable calendar share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -507,8 +493,6 @@ export function CalendarManagement({
   const handleDisableShareLink = async () => {
     if (!sharingCalendar) return;
 
-    setError(null);
-    setSuccess(null);
     setShareLinkLoading(true);
 
     try {
@@ -519,9 +503,9 @@ export function CalendarManagement({
         enabled: false,
         shareUrl: null,
       });
-      setSuccess("Calendar share link disabled successfully");
+      toast.success("Calendar share link disabled successfully");
     } catch (error: unknown) {
-      setError(getErrorMessage(error, "Failed to disable calendar share link"));
+      toast.error(getErrorMessage(error, "Failed to disable calendar share link"));
     } finally {
       setShareLinkLoading(false);
     }
@@ -532,9 +516,9 @@ export function CalendarManagement({
 
     try {
       await navigator.clipboard.writeText(shareLinkInfo.shareUrl);
-      setSuccess("Share link copied to clipboard");
+      toast.success("Share link copied to clipboard");
     } catch {
-      setError("Unable to copy link automatically. Please copy it manually.");
+      toast.error("Unable to copy link automatically. Please copy it manually.");
     }
   };
 
@@ -564,22 +548,6 @@ export function CalendarManagement({
               Create, edit, and organize your calendars
             </DialogDescription>
           </DialogHeader>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert className="border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950">
-              <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <AlertDescription className="text-emerald-800 dark:text-emerald-200">
-                {success}
-              </AlertDescription>
-            </Alert>
-          )}
 
           <div className="space-y-4">
             {/* Create New Calendar */}
@@ -615,8 +583,6 @@ export function CalendarManagement({
                       size="sm"
                       onClick={() => {
                         setShowImportDialog(true);
-                        setError(null);
-                        setSuccess(null);
                         setImportResult(null);
                       }}
                       title="Import .ics file"
@@ -631,8 +597,6 @@ export function CalendarManagement({
                         setShowCreateForm(!showCreateForm);
                         // Clear errors when opening/closing form
                         setValidationErrors({});
-                        setError(null);
-                        setSuccess(null);
                       }}
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -823,8 +787,6 @@ export function CalendarManagement({
                               onClick={() => {
                                 setEditingCalendar(calendar);
                                 setValidationErrors({});
-                                setError(null);
-                                setSuccess(null);
                               }}
                               title="Edit calendar"
                             >
@@ -1090,7 +1052,6 @@ export function CalendarManagement({
               onClick={() => {
                 setEditingCalendar(null);
                 setValidationErrors({});
-                setError(null);
               }}
             >
               Cancel
@@ -1228,8 +1189,6 @@ export function CalendarManagement({
             setImportFile(null);
             setImportCalendarId("");
             setImportResult(null);
-            setError(null);
-            setSuccess(null);
           }
         }}
       >
@@ -1500,6 +1459,52 @@ export function CalendarManagement({
               disabled={shareLinkLoading}
             >
               Confirm Regenerate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!pendingUnsubscribe}
+        onOpenChange={(open) => !open && setPendingUnsubscribe(null)}
+      >
+        <DialogContent
+          showClose={false}
+          className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+        >
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle>
+              {pendingUnsubscribe?.action === "remove"
+                ? "Remove calendar?"
+                : "Unsubscribe from calendar?"}
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to {pendingUnsubscribe?.action}{" "}
+              &ldquo;{pendingUnsubscribe?.calendarName}&rdquo;? The read-only
+              calendar and its synced events will be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPendingUnsubscribe(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (pendingUnsubscribe) {
+                  deleteSubscriptionMutation.mutate(
+                    pendingUnsubscribe.subscriptionId,
+                  );
+                }
+                setPendingUnsubscribe(null);
+              }}
+            >
+              Remove
             </Button>
           </DialogFooter>
         </DialogContent>

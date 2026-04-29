@@ -58,23 +58,27 @@ function getViewIcon(view: CalendarView, size = 20) {
 }
 
 // Unified tab button component for consistent styling
-const TabButton = React.forwardRef<
-  HTMLButtonElement,
-  {
-    icon: React.ReactNode;
-    label: React.ReactNode;
-    onClick?: () => void;
-    isActive?: boolean;
-    hasDropdown?: boolean;
-    isDropdownOpen?: boolean;
-  }
->(({ icon, label, onClick, isActive = false, hasDropdown = false, isDropdownOpen = false }, ref) => {
+function TabButton({
+  icon,
+  label,
+  onClick,
+  isActive = false,
+  hasDropdown = false,
+  isDropdownOpen = false,
+  ...props
+}: React.ComponentProps<"button"> & {
+  icon: React.ReactNode;
+  label: React.ReactNode;
+  isActive?: boolean;
+  hasDropdown?: boolean;
+  isDropdownOpen?: boolean;
+}) {
   return (
     <button
-      ref={ref}
       type="button"
       onClick={onClick}
       className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-manipulation"
+      {...props}
     >
       <div className={cn(
         "flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150",
@@ -102,9 +106,7 @@ const TabButton = React.forwardRef<
       </div>
     </button>
   );
-});
-
-TabButton.displayName = "TabButton";
+}
 
 export function MobileBottomNav({
   currentDate,
