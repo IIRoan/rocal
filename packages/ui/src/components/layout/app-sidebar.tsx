@@ -17,7 +17,6 @@ import {
 } from "../calendar/types";
 import LogoSvg from "./logo";
 
-import { toast } from "sonner";
 import { NavUser } from "../navigation/nav-user";
 import {
   Sidebar,
@@ -662,21 +661,7 @@ function AppSidebarDesktop({
             </SidebarMenuItem>
           </SidebarMenu>
         )}
-        {process.env.NODE_ENV === "development" && !isCollapsed && (
-          <div className="flex gap-1 px-1">
-            {(["success", "error", "warning", "info"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() =>
-                  toast[type](`Test ${type}`, { description: "Dev toast trigger" })
-                }
-                className="flex-1 rounded-md px-1 py-1 text-[10px] font-medium text-muted-foreground/60 hover:bg-muted/60 hover:text-muted-foreground transition-colors"
-              >
-                {type[0]!.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
+
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
