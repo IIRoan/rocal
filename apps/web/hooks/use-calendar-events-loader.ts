@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, startOfMonth, startOfWeek, subDays, subMonths, subWeeks } from "date-fns";
+import {
+  addMonths,
+  endOfMonth,
+  startOfMonth,
+  subMonths,
+} from "date-fns";
 import { calendarApiService } from "../lib/calendar-api-service";
 import { CalendarEvent, ApiError } from "../lib/types/calendar";
 
@@ -12,65 +17,99 @@ export interface DateRange {
 }
 
 interface UseCalendarEventsLoaderOptions {
-  initialDateRange?: DateRange;
   cacheTimeout?: number;
   autoRefetch?: boolean;
   preloadMonthsAhead?: number;
 }
 
-function normalizeDateRange(dateRange: DateRange): DateRange {
-  const start = startOfWeek(startOfMonth(dateRange.start), { weekStartsOn: 1 });
-  const end = endOfWeek(endOfMonth(dateRange.end), { weekStartsOn: 1 });
+// ---------------------------------------------------------------------------
+// Month-based fetch strategy
+//
+// All API fetches are anchored on a calendar month.  The fetch range pads
+// the calendar month by MONTH_PADDING_DAYS on each side so that every
+// possible month-view grid (any weekStartDay 0–6) is fully covered by a
+// single request.  A week starting on any day can extend at most 6 days
+// before the 1st or after the last day of the month, so 7 days of padding
+// is always sufficient.
+//
+// Switching between day / week / month views within the same calendar month
+// never changes the query key and never triggers a new fetch.
+// ---------------------------------------------------------------------------
+
+/** Days of padding before the 1st and after the last day of the month. */
+const MONTH_PADDING_DAYS = 7;
+
+/** Number of adjacent months to prefetch (±1 and ±2). */
+const PREFETCH_OFFSETS = [-1, 1, -2, 2];
+
+/** Default stale time for event queries (15 minutes). */
+const DEFAULT_STALE_TIME = 15 * 60 * 1000;
+
+/** Garbage-collection time for event queries (30 minutes). */
+const GC_TIME = 30 * 60 * 1000;
+
+/** Padded fetch range for the calendar month containing `date`. */
+function monthFetchRange(date: Date): DateRange {
+  const first = startOfMonth(date);
+  const last = endOfMonth(date);
+
+  const start = new Date(first);
+  start.setDate(start.getDate() - MONTH_PADDING_DAYS);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(last);
+  end.setDate(end.getDate() + MONTH_PADDING_DAYS);
+  end.setHours(23, 59, 59, 999);
+
   return { start, end };
 }
 
-function getRangeQueryKey(dateRange: DateRange | null) {
-  if (!dateRange) return ["events", "none"] as const;
-  return [
-    "events",
-    dateRange.start.toISOString(),
-    dateRange.end.toISOString(),
-  ] as const;
+/** Stable string key for a calendar month: `"YYYY-MM"`. */
+export function monthKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
-function shiftDateRangeByMonths(dateRange: DateRange, months: number): DateRange {
-  return normalizeDateRange({
-    start: addMonths(dateRange.start, months),
-    end: addMonths(dateRange.end, months),
+/**
+ * Map any view range to its anchor month's padded fetch range.
+ *
+ * Uses the midpoint of the range to determine the anchor month.  This is
+ * important because a month-view grid may start in the previous month
+ * (e.g. Dec 29 for January) — the midpoint always falls in the correct
+ * calendar month.
+ */
+export function toFetchRange(viewRange: DateRange): DateRange {
+  const midpoint = new Date(
+    (viewRange.start.getTime() + viewRange.end.getTime()) / 2,
+  );
+  return monthFetchRange(midpoint);
+}
+
+/** Prefetch ranges for adjacent months around `center`. */
+export function buildViewPrefetchRanges(
+  center: Date,
+  _view: string,
+): DateRange[] {
+  return PREFETCH_OFFSETS.map((offset) => {
+    const shift = offset < 0 ? subMonths : addMonths;
+    return monthFetchRange(shift(center, Math.abs(offset)));
   });
 }
 
-// Exported so callers with view context (e.g. CalendarWithData) can fire view-aware prefetches.
-export function buildViewPrefetchRanges(center: Date, view: string): DateRange[] {
-  if (view === "week") {
-    return [-1, 1, -2, 2].map((offset) => {
-      const fn = offset < 0 ? subWeeks : addWeeks;
-      const base = fn(center, Math.abs(offset));
-      return {
-        start: startOfWeek(base, { weekStartsOn: 1 }),
-        end: endOfWeek(base, { weekStartsOn: 1 }),
-      };
-    });
-  }
-  if (view === "day" || view === "3day") {
-    return [-1, 1, -3, 3, -7, 7].map((offset) => {
-      const fn = offset < 0 ? subDays : addDays;
-      const base = fn(center, Math.abs(offset));
-      const start = new Date(base); start.setHours(0, 0, 0, 0);
-      const end = new Date(base); end.setHours(23, 59, 59, 999);
-      return { start, end };
-    });
-  }
-  // month / agenda: ±1 and ±2 months
-  return [-1, 1, -2, 2].map((offset) => {
-    const fn = offset < 0 ? subMonths : addMonths;
-    return normalizeDateRange({
-      start: fn(center, Math.abs(offset)),
-      end: fn(center, Math.abs(offset)),
-    });
-  });
+// ---------------------------------------------------------------------------
+// Query helpers
+// ---------------------------------------------------------------------------
+
+function getMonthQueryKey(month: string | null) {
+  if (!month) return ["events", "none"] as const;
+  return ["events", month] as const;
 }
 
+/**
+ * Validate, deduplicate, and filter events to those intersecting `range`.
+ * Ensures dates are proper Date objects and drops malformed entries.
+ */
 function validateAndCleanEvents(
   items: CalendarEvent[],
   range: DateRange,
@@ -78,133 +117,93 @@ function validateAndCleanEvents(
   const seen = new Set<string>();
   const cleaned: CalendarEvent[] = [];
 
-  for (const e of items) {
-    const start = e.start instanceof Date ? e.start : new Date(e.start);
-    const end = e.end instanceof Date ? e.end : new Date(e.end);
-    const startOk = !isNaN(start.getTime());
-    const endOk = !isNaN(end.getTime());
-    if (!startOk || !endOk || start > end) continue;
+  for (const event of items) {
+    const start =
+      event.start instanceof Date ? event.start : new Date(event.start);
+    const end = event.end instanceof Date ? event.end : new Date(event.end);
 
-    const intersects = start <= range.end && end >= range.start;
-    if (!intersects) continue;
+    // Skip events with invalid or inverted dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) continue;
 
-    if (seen.has(e.id)) continue;
-    seen.add(e.id);
-    cleaned.push({ ...e, start, end });
+    // Skip events that don't overlap the fetch range
+    if (start > range.end || end < range.start) continue;
+
+    // Deduplicate by id
+    if (seen.has(event.id)) continue;
+    seen.add(event.id);
+
+    cleaned.push({ ...event, start, end });
   }
 
   return cleaned;
 }
 
-function parseEventsRangeFromQueryKey(
-  key: readonly unknown[],
-): DateRange | null {
-  if (key.length !== 3 || key[0] !== "events") return null;
-  const startIso = typeof key[1] === "string" ? key[1] : null;
-  const endIso = typeof key[2] === "string" ? key[2] : null;
-  if (!startIso || !endIso) return null;
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
-  return { start, end };
-}
-
-function findBestCachedEventsForRange(
-  queryClient: ReturnType<typeof useQueryClient>,
-  targetRange: DateRange | null,
-): CalendarEvent[] | undefined {
-  if (!targetRange) return undefined;
-
-  const cacheEntries = queryClient.getQueriesData<CalendarEvent[]>({
-    queryKey: ["events"],
-  });
-
-  let bestCovering: { span: number; events: CalendarEvent[] } | null = null;
-  let bestOverlapping: { overlap: number; events: CalendarEvent[] } | null = null;
-
-  for (const [key, value] of cacheEntries) {
-    if (!Array.isArray(value) || value.length === 0) continue;
-    const range = parseEventsRangeFromQueryKey(key as readonly unknown[]);
-    if (!range) continue;
-
-    const covers =
-      range.start.getTime() <= targetRange.start.getTime() &&
-      range.end.getTime() >= targetRange.end.getTime();
-
-    if (covers) {
-      const span = range.end.getTime() - range.start.getTime();
-      if (!bestCovering || span < bestCovering.span) {
-        bestCovering = { span, events: value };
-      }
-      continue;
-    }
-
-    const overlapStart = Math.max(
-      range.start.getTime(),
-      targetRange.start.getTime(),
-    );
-    const overlapEnd = Math.min(range.end.getTime(), targetRange.end.getTime());
-    const overlap = overlapEnd - overlapStart;
-    if (overlap > 0 && (!bestOverlapping || overlap > bestOverlapping.overlap)) {
-      bestOverlapping = { overlap, events: value };
-    }
-  }
-
-  return bestCovering?.events || bestOverlapping?.events;
-}
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
 export function useCalendarEventsLoader(
   options: UseCalendarEventsLoaderOptions = {},
 ) {
   const {
-    initialDateRange,
-    cacheTimeout = 15 * 60 * 1000,
+    cacheTimeout = DEFAULT_STALE_TIME,
     autoRefetch = true,
     preloadMonthsAhead = 2,
   } = options;
 
-  const [currentDateRange, setCurrentDateRange] = useState<DateRange | null>(
-    initialDateRange ? normalizeDateRange(initialDateRange) : null,
-  );
+  // Which calendar month to show.  Set exclusively by `setMonth`, which is
+  // called by CalendarDateSync from `currentDate` in the calendar context.
+  const [activeMonth, setActiveMonth] = useState<string | null>(null);
+
+  // Stable fetch range derived from the active month string.
+  const fetchRange = useMemo<DateRange | null>(() => {
+    if (!activeMonth) return null;
+    const [year, month] = activeMonth.split("-").map(Number);
+    return monthFetchRange(new Date(year, month - 1, 15));
+  }, [activeMonth]);
+
   const queryClient = useQueryClient();
 
-  const fallbackEvents = useMemo(
-    () => findBestCachedEventsForRange(queryClient, currentDateRange),
-    [queryClient, currentDateRange],
-  );
-
   const eventsQuery = useQuery({
-    queryKey: getRangeQueryKey(currentDateRange),
+    queryKey: getMonthQueryKey(activeMonth),
     queryFn: async () => {
-      if (!currentDateRange) return [];
+      if (!fetchRange) return [];
       const res = await calendarApiService.getEvents(
-        currentDateRange.start,
-        currentDateRange.end,
+        fetchRange.start,
+        fetchRange.end,
       );
-      return validateAndCleanEvents(res.events, currentDateRange);
+      return validateAndCleanEvents(res.events, fetchRange);
     },
-    enabled: autoRefetch && !!currentDateRange,
-    placeholderData: (previousData: CalendarEvent[] | undefined) =>
-      previousData ?? fallbackEvents ?? [],
+    enabled: autoRefetch && !!fetchRange,
     staleTime: cacheTimeout,
-    gcTime: 30 * 60 * 1000,
+    gcTime: GC_TIME,
   });
 
+  // Prefetch adjacent months on idle.
   useEffect(() => {
-    if (!currentDateRange || preloadMonthsAhead <= 0) return;
-    // Use month-based prefetch here; view-aware prefetch is handled in CalendarWithData
-    const ranges = buildViewPrefetchRanges(currentDateRange.start, "month");
+    if (!activeMonth || preloadMonthsAhead <= 0) return;
+
+    const [year, month] = activeMonth.split("-").map(Number);
+    const center = new Date(year, month - 1, 15);
 
     const runPrefetch = () => {
-      for (const range of ranges) {
+      for (const offset of PREFETCH_OFFSETS) {
+        const shift = offset < 0 ? subMonths : addMonths;
+        const target = shift(center, Math.abs(offset));
+        const key = monthKey(target);
+        const range = monthFetchRange(target);
+
         queryClient.prefetchQuery({
-          queryKey: getRangeQueryKey(range),
+          queryKey: getMonthQueryKey(key),
           queryFn: async () => {
-            const res = await calendarApiService.getEvents(range.start, range.end);
+            const res = await calendarApiService.getEvents(
+              range.start,
+              range.end,
+            );
             return validateAndCleanEvents(res.events, range);
           },
           staleTime: cacheTimeout,
-          gcTime: 30 * 60 * 1000,
+          gcTime: GC_TIME,
         });
       }
     };
@@ -222,41 +221,52 @@ export function useCalendarEventsLoader(
 
     const timeoutId = setTimeout(runPrefetch, 0);
     return () => clearTimeout(timeoutId);
-  }, [cacheTimeout, currentDateRange, preloadMonthsAhead, queryClient]);
+  }, [activeMonth, cacheTimeout, preloadMonthsAhead, queryClient]);
 
-  const setDateRange = useCallback((dateRange: DateRange) => {
-    const normalized = normalizeDateRange(dateRange);
-    setCurrentDateRange((prev) => {
-      if (
-        prev &&
-        prev.start.getTime() === normalized.start.getTime() &&
-        prev.end.getTime() === normalized.end.getTime()
-      ) {
-        return prev;
-      }
-      return normalized;
-    });
+  /** Set the active month from a Date.  Called by CalendarDateSync. */
+  const setMonth = useCallback((date: Date) => {
+    const key = monthKey(date);
+    setActiveMonth((prev) => (prev === key ? prev : key));
   }, []);
+
+  /**
+   * No-op kept for backward compatibility with EventCalendar's
+   * `onDateRangeChange` prop.  Month selection is driven exclusively
+   * by CalendarDateSync → setMonth.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setDateRange = useCallback((_dateRange: DateRange) => {}, []);
 
   const refetchEvents = useCallback(
     async (dateRange?: DateRange) => {
       if (dateRange) {
-        setDateRange(dateRange);
+        const midpoint = new Date(
+          (dateRange.start.getTime() + dateRange.end.getTime()) / 2,
+        );
+        setMonth(midpoint);
       } else {
         await eventsQuery.refetch();
       }
     },
-    [eventsQuery, setDateRange],
+    [eventsQuery, setMonth],
   );
 
   const prefetchRange = useCallback(
     (range: DateRange) => {
-      const normalized = normalizeDateRange(range);
+      const midpoint = new Date(
+        (range.start.getTime() + range.end.getTime()) / 2,
+      );
+      const key = monthKey(midpoint);
+      const fetchRangeForMonth = monthFetchRange(midpoint);
+
       queryClient.prefetchQuery({
-        queryKey: getRangeQueryKey(normalized),
+        queryKey: getMonthQueryKey(key),
         queryFn: async () => {
-          const res = await calendarApiService.getEvents(normalized.start, normalized.end);
-          return validateAndCleanEvents(res.events, normalized);
+          const res = await calendarApiService.getEvents(
+            fetchRangeForMonth.start,
+            fetchRangeForMonth.end,
+          );
+          return validateAndCleanEvents(res.events, fetchRangeForMonth);
         },
         staleTime: cacheTimeout,
       });
@@ -266,19 +276,24 @@ export function useCalendarEventsLoader(
 
   const getCachedEventsForRange = useCallback(
     (range: DateRange): CalendarEvent[] | undefined => {
-      return findBestCachedEventsForRange(queryClient, normalizeDateRange(range));
+      const midpoint = new Date(
+        (range.start.getTime() + range.end.getTime()) / 2,
+      );
+      return queryClient.getQueryData<CalendarEvent[]>(
+        getMonthQueryKey(monthKey(midpoint)),
+      );
     },
     [queryClient],
   );
 
   return {
-    events: eventsQuery.data || fallbackEvents || [],
+    events: eventsQuery.data ?? [],
     eventsLoading: eventsQuery.isFetching,
     eventsError: eventsQuery.error as unknown as ApiError | null,
-    currentDateRange,
+    currentDateRange: fetchRange,
     setDateRange,
+    setMonth,
     refetchEvents,
-    normalizeDateRange,
     prefetchRange,
     getCachedEventsForRange,
   };

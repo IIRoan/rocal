@@ -1,11 +1,6 @@
 "use client";
 
-import React, {
-  useMemo,
-  useRef,
-  useEffect,
-} from "react";
-import { createLogger } from "@workspace/logger";
+import React from "react";
 import {
   EventCalendar,
   useCalendarContext,
@@ -14,15 +9,11 @@ import {
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useSettings } from "@/hooks/use-settings";
-import { getDefaultCalendarDateRange } from "@/lib/calendar-view-model";
 import { useCommandPalette } from "./command-palette-context";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
   PageLoadingOverlay,
 } from "@workspace/ui/components/ui";
-import type { CalendarEvent } from "@workspace/ui/components/calendar";
-
-const log = createLogger("calendar-with-data");
 
 interface CalendarWithDataProps {
   className?: string;
@@ -55,28 +46,8 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     },
   });
 
-  // Get the initial view from settings, fallback to month
-  const defaultDateRange = useMemo(() => {
-    return getDefaultCalendarDateRange({
-      baseDate: currentDate,
-      view: initialView,
-      weekStartDay: settings?.weekStartDay,
-    });
-  }, [currentDate, initialView, settings?.weekStartDay]);
-
-  // Set the date range when component mounts (only once)
-  const initializedRef = useRef(false);
-  useEffect(() => {
-    if (!initializedRef.current && !settingsLoading) {
-      log.debug("Setting initial date range:", {
-        start: defaultDateRange.start.toISOString(),
-        end: defaultDateRange.end.toISOString(),
-        view: initialView,
-      });
-      calendarData.setDateRange(defaultDateRange);
-      initializedRef.current = true;
-    }
-  }, [defaultDateRange, settingsLoading, calendarData.setDateRange, initialView]);
+  // No initialization effect needed — CalendarDateSync (rendered in the
+  // dashboard layout) drives the active month from currentDate in the context.
 
   if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
@@ -91,9 +62,6 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
     );
   }
 
-  // After initial load, render the interactive calendar.
-  // Pass eventsLoading through so the events area shows a localized overlay
-  // during navigation — the toolbar/header always stays fully visible.
   return (
     <EventCalendar
       className={className}

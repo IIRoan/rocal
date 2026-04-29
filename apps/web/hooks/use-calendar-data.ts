@@ -21,8 +21,7 @@ import { useCalendarEventsLoader, type DateRange } from "./use-calendar-events-l
 const log = createLogger("calendar-data");
 
 interface UseCalendarDataOptions {
-  initialDateRange?: DateRange;
-  cacheTimeout?: number; // kept for compatibility, handled by React Query staleTime
+  cacheTimeout?: number;
   autoRefetch?: boolean;
 }
 
@@ -76,6 +75,7 @@ export interface UseCalendarDataReturn {
 
   // Utility
   setDateRange: (dateRange: DateRange) => void;
+  setMonth: (date: Date) => void;
   clearCache: () => void;
 
   // Mini calendar support
@@ -94,7 +94,6 @@ export function useCalendarData(
   options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
   const {
-    initialDateRange,
     cacheTimeout = 5 * 60 * 1000,
     autoRefetch = true,
   } = options;
@@ -106,11 +105,11 @@ export function useCalendarData(
     eventsLoading,
     eventsError,
     setDateRange,
+    setMonth,
     refetchEvents,
     prefetchRange,
     getCachedEventsForRange,
   } = useCalendarEventsLoader({
-    initialDateRange,
     cacheTimeout,
     autoRefetch,
     preloadMonthsAhead: 2,
@@ -342,6 +341,7 @@ export function useCalendarData(
 
     // Utility
     setDateRange,
+    setMonth,
     clearCache,
 
     // Mini calendar support

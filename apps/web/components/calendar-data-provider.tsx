@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useContext, ReactNode, useMemo } from "react";
+import { createContext, useContext, useEffect, ReactNode } from "react";
 import {
   useCalendarData,
   UseCalendarDataReturn,
 } from "@/hooks/use-calendar-data";
+import { useCalendarContext } from "@workspace/ui/components/calendar";
 
 const CalendarDataContext = createContext<UseCalendarDataReturn | undefined>(
   undefined,
@@ -30,11 +31,27 @@ export function CalendarDataProvider({ children }: CalendarDataProviderProps) {
     cacheTimeout: 10 * 60 * 1000, // 10 minutes cache
   });
 
-  // Don't memoize the entire object, just pass it directly
-  // The hook already handles internal memoization
   return (
     <CalendarDataContext.Provider value={calendarData}>
       {children}
     </CalendarDataContext.Provider>
   );
+}
+
+/**
+ * Syncs the calendar context's currentDate to the data layer's active month.
+ * Must be rendered inside both CalendarDataProvider and CalendarProvider.
+ *
+ * This is the ONLY thing that controls which month's data is fetched.
+ * The EventCalendar onDateRangeChange callbacks are no-ops.
+ */
+export function CalendarDateSync() {
+  const { currentDate } = useCalendarContext();
+  const calendarData = useSharedCalendarData();
+
+  useEffect(() => {
+    calendarData.setMonth(currentDate);
+  }, [currentDate, calendarData.setMonth]);
+
+  return null;
 }
