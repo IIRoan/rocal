@@ -5,10 +5,13 @@ import type {
   SettingsUpdateInput,
 } from "../contracts/settings.contract";
 import { ValidationError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
 import {
   backfillEncryptedEventsToCiphertextOnly,
   normalizeEventEncryptionMode,
 } from "../lib/event-encryption";
+
+const logger = createLogger("backend:settings-service");
 
 function toPublicUserSettings(
   settings: PublicUserSettings & { defaultReminder: number | null },

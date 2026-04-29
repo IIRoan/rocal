@@ -9,7 +9,7 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Label } from "@workspace/ui/components/ui/label";
 import {
   ArrowLeft,
-  RefreshCw,
+  Loader2,
   Plus,
   Trash2,
   Key,
@@ -141,14 +141,12 @@ export function PasskeySettings({
     <div className="flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
           onClick={onBack}
-          className="p-1 h-auto"
+          className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </Button>
+        </button>
         <span className="text-sm font-medium">Passkeys</span>
       </div>
 
@@ -173,7 +171,7 @@ export function PasskeySettings({
 
             {passkeyLoading && passkeys.length === 0 ? (
               <div className="px-4 py-8 text-center">
-                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-muted-foreground" />
+                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">
                   Loading passkeys...
                 </p>
@@ -265,7 +263,7 @@ export function PasskeySettings({
                 >
                   {addPasskeyMutation.isPending ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       Adding...
                     </>
                   ) : (

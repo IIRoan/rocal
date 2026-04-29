@@ -1,4 +1,4 @@
-import Elysia, { t } from "elysia";
+import { Elysia, t } from "elysia";
 import { requireAuth } from "../lib/auth-guard";
 import type { AuthenticatedUser } from "../lib/auth-utils";
 import { authenticatedRouteDetail } from "../lib/openapi";

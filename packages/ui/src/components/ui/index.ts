@@ -45,7 +45,7 @@ export {
   withErrorBoundary,
   useErrorBoundary,
 } from "./error-boundary";
-export { Input, type InputProps } from "./input";
+export { Input } from "./input";
 export { Label } from "./label";
 export { Popover, PopoverContent, PopoverTrigger } from "./popover";
 export { RadioGroup, RadioGroupItem } from "./radio-group";
