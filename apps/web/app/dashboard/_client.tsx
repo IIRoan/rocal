@@ -16,6 +16,7 @@ import {
 import { CommandPaletteProvider } from "@/components/command-palette-context";
 import {
   CalendarDataProvider,
+  CalendarDateSync,
   useSharedCalendarData,
 } from "@/components/calendar-data-provider";
 import { CalendarProviderWrapper } from "@/components/calendar-provider-wrapper";
@@ -136,10 +137,8 @@ function DashboardSearchParamHandlers({
         }
 
         if (event?.start) {
-          calendarData.setDateRange({
-            start: event.start,
-            end: event.end,
-          });
+          // Navigate to the event's month so CalendarDateSync picks it up
+          calendarData.setMonth(new Date(event.start));
         }
 
         openEventEditor(event, { eventViewMode: "view" });
@@ -348,6 +347,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <SettingsProvider>
         <CalendarDataProvider>
           <CalendarProviderWrapper>
+            <CalendarDateSync />
             <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
               <Suspense fallback={null}>
                 <CalendarUrlSyncWrapper />
