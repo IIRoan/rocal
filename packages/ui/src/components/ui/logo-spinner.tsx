@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "../../lib/gsap";
-import { cn } from "../../lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 import { default as Logo } from "../layout/logo";
 import { useCyclingMessage } from "../../hooks/use-cycling-message";
 import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";

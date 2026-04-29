@@ -10,7 +10,10 @@ import {
   buildIcsCalendar,
 } from "@workspace/calendar-ics";
 import { NotFoundError, ValidationError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
 import { toIcsBuildEvent } from "../lib/ics-export";
+
+const logger = createLogger("backend:calendar-sharing-service");
 import {
   backfillEncryptedEventsToCiphertextOnly,
   normalizeEventEncryptionMode,

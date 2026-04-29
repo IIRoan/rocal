@@ -20,6 +20,7 @@ import {
   isEventModified,
 } from "../lib/ics-parser";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
+import { ValidationError, NotFoundError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:subscription-service");
@@ -54,14 +55,15 @@ export class SubscriptionService implements ISubscriptionService {
     const parsedUrl = new URL(url);
 
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      throw new Error("Only HTTP and HTTPS URLs are supported");
+      throw new ValidationError("Only HTTP and HTTPS URLs are supported", "url");
     }
 
     const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
 
     if (this.isPrivateHostname(hostname)) {
-      throw new Error(
+      throw new ValidationError(
         "URLs pointing to internal or private networks are not allowed",
+        "url",
       );
     }
 
@@ -142,14 +144,15 @@ export class SubscriptionService implements ISubscriptionService {
 
         if ([301, 302, 303, 307, 308].includes(response.status)) {
           if (redirectCount === MAX_CALENDAR_REDIRECTS) {
-            throw new Error("Too many redirects while fetching calendar URL");
+            throw new ValidationError("Too many redirects while fetching calendar URL", "url");
           }
 
           const location = response.headers.get("location");
 
           if (!location) {
-            throw new Error(
+            throw new ValidationError(
               "Calendar server returned a redirect without a location",
+              "url",
             );
           }
 
@@ -162,8 +165,9 @@ export class SubscriptionService implements ISubscriptionService {
         return response;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
-          throw new Error(
+          throw new ValidationError(
             `Calendar request timed out after ${CALENDAR_FETCH_TIMEOUT_MS / 1000} seconds`,
+            "url",
           );
         }
 
@@ -173,7 +177,7 @@ export class SubscriptionService implements ISubscriptionService {
       }
     }
 
-    throw new Error("Too many redirects while fetching calendar URL");
+    throw new ValidationError("Too many redirects while fetching calendar URL", "url");
   }
 
   async list(userId: string) {
@@ -191,7 +195,7 @@ export class SubscriptionService implements ISubscriptionService {
     const { userId, name, url, color } = input;
 
     if (!name?.trim()) {
-      throw new Error("Calendar name is required");
+      throw new ValidationError("Calendar name is required", "name");
     }
 
     const existingSubscription =
@@ -200,7 +204,7 @@ export class SubscriptionService implements ISubscriptionService {
       });
 
     if (existingSubscription) {
-      throw new Error("You are already subscribed to this calendar URL");
+      throw new ValidationError("You are already subscribed to this calendar URL", "url");
     }
 
     // Test the URL
@@ -210,20 +214,23 @@ export class SubscriptionService implements ISubscriptionService {
 
       if (!response.ok) {
         if (response.status >= 500) {
-          throw new Error(
+          throw new ValidationError(
             `The calendar server is currently unavailable (${response.status}). Please try again later or contact the calendar provider.`,
+            "url",
           );
         } else if (response.status === 404) {
-          throw new Error(
+          throw new NotFoundError(
             `Calendar not found at the provided URL. Please check the URL and try again.`,
           );
         } else if (response.status === 403 || response.status === 401) {
-          throw new Error(
+          throw new ValidationError(
             `Access denied to the calendar. The calendar may be private or require authentication.`,
+            "url",
           );
         } else {
-          throw new Error(
+          throw new ValidationError(
             `Failed to fetch calendar: ${response.status} ${response.statusText}`,
+            "url",
           );
         }
       }
@@ -236,8 +243,9 @@ export class SubscriptionService implements ISubscriptionService {
         logger.warn("ICS parsing warnings:", testParseResult.errors);
       }
     } catch (error) {
-      throw new Error(
+      throw new ValidationError(
         `Unable to fetch or parse calendar from URL: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "url",
       );
     }
 
@@ -248,8 +256,9 @@ export class SubscriptionService implements ISubscriptionService {
       color || matchingNationalHolidayCalendar?.defaultColor || "#6366f1";
 
     if (color && !isValidCalendarColor(color)) {
-      throw new Error(
+      throw new ValidationError(
         "Invalid calendar color. Please use a valid hex color or one of the allowed named colors.",
+        "color",
       );
     }
 
@@ -305,20 +314,21 @@ export class SubscriptionService implements ISubscriptionService {
     });
 
     if (!subscription) {
-      throw new Error("Subscription not found");
+      throw new NotFoundError("Subscription not found");
     }
 
     const trimmedName = name?.trim();
 
     if (trimmedName !== undefined) {
-      if (!trimmedName) throw new Error("Calendar name is required");
+      if (!trimmedName) throw new ValidationError("Calendar name is required", "name");
       if (trimmedName.length > 100)
-        throw new Error("Calendar name cannot exceed 100 characters");
+        throw new ValidationError("Calendar name cannot exceed 100 characters", "name");
     }
 
     if (color !== undefined && !isValidCalendarColor(color)) {
-      throw new Error(
+      throw new ValidationError(
         `Color must be one of: ${ALLOWED_CALENDAR_COLORS.join(", ")} or a valid hex color (e.g. #FF0000)`,
+        "color",
       );
     }
 
@@ -353,7 +363,7 @@ export class SubscriptionService implements ISubscriptionService {
     });
 
     if (!subscription) {
-      throw new Error("Subscription not found");
+      throw new NotFoundError("Subscription not found");
     }
 
     await this.prisma.calendarEvent.deleteMany({
@@ -382,7 +392,7 @@ export class SubscriptionService implements ISubscriptionService {
     });
 
     if (!subscription) {
-      throw new Error("Subscription not found");
+      throw new NotFoundError("Subscription not found");
     }
 
     return this.syncCalendarSubscription(subscription);
@@ -396,14 +406,14 @@ export class SubscriptionService implements ISubscriptionService {
     });
 
     if (!calendar) {
-      throw new Error("Calendar not found or not owned by user");
+      throw new NotFoundError("Calendar not found or not owned by user");
     }
 
     const userTimezone = await this.getUserTimezone(userId);
     const parseResult = parseICSFile(icsContent, userTimezone);
 
     if (parseResult.events.length === 0) {
-      throw new Error("No valid events found in ICS file");
+      throw new ValidationError("No valid events found in ICS file");
     }
 
     const createdEvents = [];
@@ -493,7 +503,7 @@ export class SubscriptionService implements ISubscriptionService {
       }
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new ValidationError(`HTTP ${response.status}: ${response.statusText}`, "url");
       }
 
       const icsContent = await response.text();

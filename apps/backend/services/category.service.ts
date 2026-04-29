@@ -7,11 +7,14 @@ import type {
   CategoryWithCount,
 } from "../contracts/category.contract";
 import { ValidationError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
 import {
   assertValidEntityColor,
   buildEncryptedNameFields,
   normalizeEntityName,
 } from "../lib/entity-metadata";
+
+const logger = createLogger("backend:category-service");
 
 export class CategoryService implements ICategoryService {
   constructor(private readonly prisma: PrismaClient) {}

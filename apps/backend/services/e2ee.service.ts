@@ -12,6 +12,9 @@ import type {
   UpsertEncryptionPasswordInput,
 } from "../contracts/e2ee.contract";
 import { ValidationError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
+
+const logger = createLogger("backend:e2ee-service");
 
 const DEFAULT_PUBLIC_KEY_ALGORITHM = "RSA-OAEP-256";
 const DEFAULT_WRAP_ALGORITHM = "RSA-OAEP-256";

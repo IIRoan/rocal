@@ -72,18 +72,30 @@ export function monthKey(date: Date): string {
 }
 
 /**
- * Map any view range to its anchor month's padded fetch range.
+ * Map any view range to a padded fetch range that fully contains it.
  *
- * Uses the midpoint of the range to determine the anchor month.  This is
- * important because a month-view grid may start in the previous month
- * (e.g. Dec 29 for January) — the midpoint always falls in the correct
- * calendar month.
+ * Uses the midpoint of the range to determine the primary anchor month.
+ * If the view range extends beyond that month's padded fetch range (e.g.
+ * a 30-day agenda view), the range is expanded to also cover the end
+ * month's padded range.
  */
 export function toFetchRange(viewRange: DateRange): DateRange {
   const midpoint = new Date(
     (viewRange.start.getTime() + viewRange.end.getTime()) / 2,
   );
-  return monthFetchRange(midpoint);
+  const primary = monthFetchRange(midpoint);
+
+  // If the primary range already covers the view, return it directly.
+  if (primary.start <= viewRange.start && primary.end >= viewRange.end) {
+    return primary;
+  }
+
+  // Expand to cover the end month as well.
+  const endMonth = monthFetchRange(viewRange.end);
+  return {
+    start: primary.start < endMonth.start ? primary.start : endMonth.start,
+    end: primary.end > endMonth.end ? primary.end : endMonth.end,
+  };
 }
 
 /** Prefetch ranges for adjacent months around `center`. */
