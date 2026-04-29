@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   appName: 'Solace',
   webDir: 'out',
   server: {
-    // Local auth debugging runs against `http://localhost:3001` via adb reverse.
+    // Local auth debugging runs against the backend API URL via adb reverse.
     // Keep dev on `http://localhost` so cookie semantics match. Production stays https.
     ...(isProduction
       ? {

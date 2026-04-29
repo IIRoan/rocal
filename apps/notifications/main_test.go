@@ -313,7 +313,7 @@ func TestBuildFrontendURL(t *testing.T) {
 		}
 
 		t.Setenv("NEXT_PUBLIC_APP_URL", "")
-		if got := buildFrontendURL("/privacy", nil); got != "http://localhost:3000/privacy" {
+		if got := buildFrontendURL("/privacy", nil); got != "http://localhost/privacy" {
 			t.Fatalf("unexpected localhost fallback %q", got)
 		}
 	})

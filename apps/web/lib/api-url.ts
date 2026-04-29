@@ -1,10 +1,52 @@
 import { Capacitor } from "@capacitor/core";
 
-const BACKEND_PORT = "3001";
-const DEFAULT_APP_URL = "http://localhost:3000";
-const DEFAULT_MOBILE_AUTH_CALLBACK_URL = "app.solace.onl://api/auth";
+const DEFAULT_MOBILE_AUTH_CALLBACK_URL =
+  process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL || "app.solace.onl://api/auth";
 const AUTH_REDIRECT_FALLBACK_PATH = "/dashboard";
 const MOBILE_AUTH_BRIDGE_PATH = "/auth/mobile-complete";
+
+/**
+ * Resolve the API base URL.
+ *
+ * Priority: NEXT_PUBLIC_API_URL env var → native webview derivation → env fallback.
+ */
+export const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // On native platforms, derive the API origin from the webview host + the API URL's port.
+  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    try {
+      const fallback = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+      const apiUrl = new URL(fallback);
+      return `${window.location.protocol}//${window.location.hostname}:${apiUrl.port}`;
+    } catch {
+      return window.location.origin;
+    }
+  }
+
+  // Server-side / SSR fallback — should always be set via NEXT_PUBLIC_API_URL in .env.local
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+};
+
+/**
+ * Resolve the app (frontend) base URL.
+ *
+ * Priority: native webview origin → NEXT_PUBLIC_APP_URL → browser origin → env fallback.
+ */
+export const getAppBaseUrl = () => {
+  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    return window.location.origin;
+  }
+
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined" ? window.location.origin : null) ||
+    "http://localhost:4000"
+  );
+};
 
 const toSafeRelativePath = (path?: string | null) => {
   if (!path || !path.startsWith("/")) {
@@ -24,35 +66,8 @@ const toOrigin = (value?: string | null) => {
   }
 };
 
-export const getApiBaseUrl = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-
-  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-    return `${window.location.protocol}//${window.location.hostname}:${BACKEND_PORT}`;
-  }
-
-  return `http://localhost:${BACKEND_PORT}`;
-};
-
-export const getAppBaseUrl = () => {
-  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-    return window.location.origin;
-  }
-
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== "undefined" ? window.location.origin : DEFAULT_APP_URL)
-  );
-};
-
 export const getMobileAuthCallbackBaseUrl = () => {
-  return (
-    process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
-    DEFAULT_MOBILE_AUTH_CALLBACK_URL
-  );
+  return DEFAULT_MOBILE_AUTH_CALLBACK_URL;
 };
 
 export const getMobileAuthCallbackUrl = (

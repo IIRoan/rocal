@@ -79,7 +79,7 @@ describe("api-url helpers", () => {
       },
     } as Window & typeof globalThis;
 
-    expect(getApiBaseUrl()).toBe("https://app.solace.test:3001");
+    expect(getApiBaseUrl()).toBe("https://app.solace.test:4001");
   });
 
   it("uses the native webview origin as the app base url on mobile", () => {

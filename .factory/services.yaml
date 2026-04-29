@@ -7,7 +7,7 @@ commands:
 services:
   web:
     start: bun run dev
-    stop: lsof -ti :3000 | xargs kill
-    healthcheck: curl -sf http://localhost:3000
-    port: 3000
+    stop: lsof -ti :4000 | xargs kill
+    healthcheck: curl -sf http://localhost:4000
+    port: 4000
     depends_on: []

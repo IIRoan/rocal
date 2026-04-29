@@ -3,43 +3,29 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { oneTimeToken, openAPI } from "better-auth/plugins";
 import { PrismaClient } from "../generated/prisma";
+import { env, parseCsvEnv, toOrigin } from "./env";
 
 const prisma = new PrismaClient();
 export const BETTER_AUTH_BASE_PATH = "/api/auth";
 
-const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
-const frontendUrl =
-  process.env.FRONTEND_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  "http://localhost:3000";
-const mobileAuthCallbackUrl =
-  process.env.MOBILE_AUTH_CALLBACK_URL ||
-  process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
-  "app.solace.onl://api/auth";
-const isProduction = process.env.NODE_ENV === "production";
+const { backendUrl, frontendUrl, mobileAuthCallbackUrl, isProduction, cookieSameSite } = env;
+
+const backendOrigin = toOrigin(backendUrl);
+const frontendOrigin = toOrigin(frontendUrl);
+
 const skipStateCookieCheck =
   process.env.AUTH_SKIP_STATE_COOKIE_CHECK === "true" ||
   (!isProduction && process.env.AUTH_SKIP_STATE_COOKIE_CHECK !== "false");
 
-const parseCsvEnv = (value?: string) => {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-};
-
 const trustedOrigins = Array.from(
   new Set([
     frontendUrl,
+    frontendOrigin,
+    backendOrigin,
     process.env.NEXT_PUBLIC_APP_URL || "",
     "capacitor://localhost",
     "http://localhost",
     "https://localhost",
-    "http://localhost:3000",
-    "https://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://127.0.0.1:3000",
     mobileAuthCallbackUrl,
     "app.solace.onl://api",
     "app.solace.onl://api/auth",
@@ -55,11 +41,6 @@ const socialRedirectUrl =
   process.env.AUTH_REDIRECT_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
   frontendUrl;
-
-const cookieSameSite = (process.env.AUTH_COOKIE_SAME_SITE || "lax") as
-  | "lax"
-  | "strict"
-  | "none";
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
