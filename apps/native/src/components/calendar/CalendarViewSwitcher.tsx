@@ -15,6 +15,10 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { formatViewDateHeader, VIEW_LABELS } from "./view-switcher-utils";
 
+// ─── Detail view options (excludes "month" — the strip replaces it) ─────────
+
+const DETAIL_VIEWS: CalendarView[] = ["week", "3day", "day", "agenda"];
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface CalendarViewSwitcherProps {
@@ -32,6 +36,10 @@ interface CalendarViewSwitcherProps {
   onForwardPress?: () => void;
   /** Callback to navigate backward */
   onBackwardPress?: () => void;
+  /** Whether the month strip is expanded */
+  monthStripExpanded?: boolean;
+  /** Callback to toggle month strip expand/collapse */
+  onToggleMonthStrip?: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -44,6 +52,8 @@ export function CalendarViewSwitcher({
   onTodayPress,
   onForwardPress,
   onBackwardPress,
+  monthStripExpanded,
+  onToggleMonthStrip,
 }: CalendarViewSwitcherProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -66,7 +76,17 @@ export function CalendarViewSwitcher({
           <Text style={styles.navArrow}>‹</Text>
         </Pressable>
 
-        <Text style={styles.dateHeader}>{dateHeader}</Text>
+        <Pressable
+          onPress={onToggleMonthStrip}
+          style={styles.dateHeaderButton}
+          accessibilityRole="button"
+          accessibilityLabel={monthStripExpanded ? "Collapse month calendar" : "Expand month calendar"}
+        >
+          <Text style={styles.dateHeader}>{dateHeader}</Text>
+          <Text style={styles.chevron}>
+            {monthStripExpanded ? "▲" : "▼"}
+          </Text>
+        </Pressable>
 
         <Pressable
           onPress={onTodayPress}
@@ -87,9 +107,9 @@ export function CalendarViewSwitcher({
         </Pressable>
       </View>
 
-      {/* View switcher row */}
+      {/* View switcher row — detail views only (month is the strip) */}
       <View style={styles.viewRow}>
-        {CALENDAR_VIEWS.map((view) => {
+        {DETAIL_VIEWS.map((view) => {
           const isActive = view === activeView;
           return (
             <Pressable
@@ -129,8 +149,6 @@ function createStyles(theme: ThemeTokens) {
       backgroundColor: theme.colors.background,
       paddingHorizontal: theme.spacing["3"],
       paddingVertical: theme.spacing["2"],
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
     },
     navRow: {
       flexDirection: "row" as const,
@@ -140,6 +158,14 @@ function createStyles(theme: ThemeTokens) {
     navButton: {
       paddingHorizontal: theme.spacing["2"],
       paddingVertical: theme.spacing["1"],
+    },
+    dateHeaderButton: {
+      flex: 1,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: theme.spacing["1"],
+      paddingVertical: theme.spacing["2"],
     },
     todayButton: {
       paddingHorizontal: theme.spacing["3"],
@@ -175,13 +201,15 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
     },
     dateHeader: {
-      flex: 1,
       fontSize: theme.typography.fontSize.lg.size,
       lineHeight: theme.typography.fontSize.lg.lineHeight,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-      textAlign: "center" as const,
+    },
+    chevron: {
+      fontSize: 10,
+      color: theme.colors.mutedForeground,
     },
     todayText: {
       fontSize: theme.typography.fontSize.sm.size,

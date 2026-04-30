@@ -244,14 +244,6 @@ describe("Setting changes — optimistic updates", () => {
     settings = createDefaultSettings();
   });
 
-  it("toggles compactView optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, { compactView: true });
-    expect(updated.compactView).toBe(true);
-    // Other settings remain unchanged
-    expect(updated.showWeekNumbers).toBe(false);
-    expect(updated.theme).toBe("system");
-  });
-
   it("toggles showWeekNumbers optimistically", () => {
     const updated = applyOptimisticUpdate(settings, {
       showWeekNumbers: true,
@@ -283,20 +275,6 @@ describe("Setting changes — optimistic updates", () => {
     expect(updated.weekStartDay).toBe(1);
   });
 
-  it("changes workingHoursStart optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, {
-      workingHoursStart: 8,
-    });
-    expect(updated.workingHoursStart).toBe(8);
-  });
-
-  it("changes workingHoursEnd optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, {
-      workingHoursEnd: 18,
-    });
-    expect(updated.workingHoursEnd).toBe(18);
-  });
-
   it("changes defaultEventDuration optimistically", () => {
     const updated = applyOptimisticUpdate(settings, {
       defaultEventDuration: 30,
@@ -313,11 +291,9 @@ describe("Setting changes — optimistic updates", () => {
 
   it("applies multiple settings at once", () => {
     const updated = applyOptimisticUpdate(settings, {
-      compactView: true,
       showWeekNumbers: true,
       timeFormat: "24h",
     });
-    expect(updated.compactView).toBe(true);
     expect(updated.showWeekNumbers).toBe(true);
     expect(updated.timeFormat).toBe("24h");
     // Unchanged fields preserved
@@ -326,7 +302,7 @@ describe("Setting changes — optimistic updates", () => {
 
   it("preserves immutable fields (id, userId, timestamps)", () => {
     const updated = applyOptimisticUpdate(settings, {
-      compactView: true,
+      showWeekNumbers: true,
     });
     expect(updated.id).toBe(settings.id);
     expect(updated.userId).toBe(settings.userId);
@@ -341,25 +317,23 @@ describe("Optimistic update rollback on error", () => {
   it("restores previous settings on API failure", () => {
     const original = createDefaultSettings();
     const optimistic = applyOptimisticUpdate(original, {
-      compactView: true,
+      showWeekNumbers: true,
     });
 
     // Simulate API error → rollback
     const rolledBack = rollbackUpdate(optimistic, original);
-    expect(rolledBack.compactView).toBe(false);
+    expect(rolledBack.showWeekNumbers).toBe(false);
     expect(rolledBack).toEqual(original);
   });
 
   it("restores multiple changed fields on rollback", () => {
     const original = createDefaultSettings();
     const optimistic = applyOptimisticUpdate(original, {
-      compactView: true,
       showWeekNumbers: true,
       timeFormat: "24h",
     });
 
     const rolledBack = rollbackUpdate(optimistic, original);
-    expect(rolledBack.compactView).toBe(false);
     expect(rolledBack.showWeekNumbers).toBe(false);
     expect(rolledBack.timeFormat).toBe("12h");
   });
@@ -412,37 +386,37 @@ describe("Theme switching", () => {
 describe("Pending keys tracking", () => {
   it("adds keys from update to pending set", () => {
     const pending = new Set<string>();
-    const result = addPendingKeys(pending, { compactView: true });
-    expect(result.has("compactView")).toBe(true);
+    const result = addPendingKeys(pending, { showWeekNumbers: true });
+    expect(result.has("showWeekNumbers")).toBe(true);
   });
 
   it("adds multiple keys from a multi-field update", () => {
     const pending = new Set<string>();
     const result = addPendingKeys(pending, {
-      compactView: true,
       showWeekNumbers: true,
+      showDeclinedEvents: true,
     });
-    expect(result.has("compactView")).toBe(true);
     expect(result.has("showWeekNumbers")).toBe(true);
+    expect(result.has("showDeclinedEvents")).toBe(true);
   });
 
   it("preserves existing pending keys when adding new ones", () => {
     const pending = new Set(["theme"]);
-    const result = addPendingKeys(pending, { compactView: true });
+    const result = addPendingKeys(pending, { showWeekNumbers: true });
     expect(result.has("theme")).toBe(true);
-    expect(result.has("compactView")).toBe(true);
+    expect(result.has("showWeekNumbers")).toBe(true);
   });
 
   it("removes keys on settled", () => {
-    const pending = new Set(["compactView", "theme"]);
-    const result = removePendingKeys(pending, { compactView: true });
-    expect(result.has("compactView")).toBe(false);
+    const pending = new Set(["showWeekNumbers", "theme"]);
+    const result = removePendingKeys(pending, { showWeekNumbers: true });
+    expect(result.has("showWeekNumbers")).toBe(false);
     expect(result.has("theme")).toBe(true);
   });
 
   it("handles removing keys that are not in the set", () => {
     const pending = new Set(["theme"]);
-    const result = removePendingKeys(pending, { compactView: true });
+    const result = removePendingKeys(pending, { showWeekNumbers: true });
     expect(result.has("theme")).toBe(true);
     expect(result.size).toBe(1);
   });
@@ -543,12 +517,6 @@ describe("Default values for undefined settings", () => {
     expect(defaultView).toBe("month");
   });
 
-  it("defaults compactView to false", () => {
-    const settings = getSettings();
-    const compactView = settings?.compactView ?? false;
-    expect(compactView).toBe(false);
-  });
-
   it("defaults showWeekNumbers to false", () => {
     const settings = getSettings();
     const showWeekNumbers = settings?.showWeekNumbers ?? false;
@@ -571,18 +539,6 @@ describe("Default values for undefined settings", () => {
     const settings = getSettings();
     const weekStartDay = settings?.weekStartDay ?? 0;
     expect(weekStartDay).toBe(0);
-  });
-
-  it("defaults workingHoursStart to 9", () => {
-    const settings = getSettings();
-    const workingHoursStart = settings?.workingHoursStart ?? 9;
-    expect(workingHoursStart).toBe(9);
-  });
-
-  it("defaults workingHoursEnd to 17", () => {
-    const settings = getSettings();
-    const workingHoursEnd = settings?.workingHoursEnd ?? 17;
-    expect(workingHoursEnd).toBe(17);
   });
 
   it("defaults emailNotifications to true", () => {

@@ -1,9 +1,10 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { TabBar } from "../../src/components/TabBar";
 
 export default function TabsLayout() {
   return (
     <Tabs
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
       }}
@@ -12,27 +13,18 @@ export default function TabsLayout() {
         name="calendar"
         options={{
           title: "Calendar",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ color }}>📅</Text>
-          ),
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
           title: "Search",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ color }}>🔍</Text>
-          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ color }}>⚙️</Text>
-          ),
         }}
       />
     </Tabs>

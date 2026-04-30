@@ -77,27 +77,6 @@ export function WeekTimeline({
 
   return (
     <View style={styles.container}>
-      {/* Day header row */}
-      <View style={styles.headerRow}>
-        {/* Empty gutter space */}
-        <View style={styles.headerGutter} />
-        {weekDates.map((date, idx) => {
-          const isCurrentDay = isSameDay(date, today);
-          return (
-            <View key={idx} style={styles.headerCell}>
-              <Text
-                style={[
-                  styles.headerText,
-                  isCurrentDay && styles.headerTextToday,
-                ]}
-              >
-                {formatDayHeader(date)}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-
       {/* Scrollable time grid */}
       <ScrollView
         style={styles.scrollView}
@@ -201,19 +180,6 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    headerRow: {
-      flexDirection: "row" as const,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    headerGutter: {
-      width: TIME_GUTTER_WIDTH,
-    },
-    headerCell: {
-      flex: 1,
-      alignItems: "center" as const,
-      paddingVertical: theme.spacing["2"],
-    },
     scrollView: {
       flex: 1,
     },
@@ -275,18 +241,6 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    headerText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-    },
-    headerTextToday: {
-      color: theme.colors.primaryBase,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
     hourLabel: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,

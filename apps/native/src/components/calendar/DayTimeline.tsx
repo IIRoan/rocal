@@ -67,29 +67,12 @@ export function DayTimeline({
     [timeFormat],
   );
 
-  const headerLabel = format(currentDate, "EEEE, MMM d");
-
   // Current time indicator position
   const nowMinutes = today.getHours() * 60 + today.getMinutes();
   const nowTop = (nowMinutes / 60) * HOUR_HEIGHT;
 
   return (
     <View style={styles.container}>
-      {/* Day header */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerGutter} />
-        <View style={styles.headerCell}>
-          <Text
-            style={[
-              styles.headerText,
-              isCurrentDay && styles.headerTextToday,
-            ]}
-          >
-            {headerLabel}
-          </Text>
-        </View>
-      </View>
-
       {/* Scrollable time grid */}
       <ScrollView
         style={styles.scrollView}
@@ -116,7 +99,7 @@ export function DayTimeline({
                   style={styles.hourSlot}
                   onPress={() => onTimeSlotPress?.(currentDate, hour)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${headerLabel} ${formatHourLabel(hour, timeFormat)}`}
+                  accessibilityLabel={`${format(currentDate, "EEEE, MMM d")} ${formatHourLabel(hour, timeFormat)}`}
                 >
                   <View style={styles.hourDivider} />
                 </Pressable>
@@ -140,7 +123,7 @@ export function DayTimeline({
                     ]}
                     onPress={() => onEventPress?.(event)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${event.title}, ${headerLabel}`}
+                    accessibilityLabel={`${event.title}, ${format(currentDate, "EEEE, MMM d")}`}
                   >
                     <Text
                       style={[styles.eventTitle, { color: colors.fg }]}
@@ -185,19 +168,6 @@ function createStyles(theme: ThemeTokens) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-    },
-    headerRow: {
-      flexDirection: "row" as const,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    headerGutter: {
-      width: TIME_GUTTER_WIDTH,
-    },
-    headerCell: {
-      flex: 1,
-      alignItems: "center" as const,
-      paddingVertical: theme.spacing["2"],
     },
     scrollView: {
       flex: 1,
@@ -260,18 +230,6 @@ function createStyles(theme: ThemeTokens) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    headerText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
-    },
-    headerTextToday: {
-      color: theme.colors.primaryBase,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
     hourLabel: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,

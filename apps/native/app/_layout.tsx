@@ -5,6 +5,7 @@ import { QueryProvider } from "../src/providers/QueryProvider";
 import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
+import { SheetProvider } from "../src/providers/SheetProvider";
 import { calendarApiService } from "../src/lib/api";
 import { API_BASE_URL } from "../src/lib/constants";
 
@@ -66,7 +67,9 @@ export default function RootLayout() {
           <ThemeProvider>
             <E2eeProvider>
               <NavigationGuard>
-                <Slot />
+                <SheetProvider>
+                  <Slot />
+                </SheetProvider>
               </NavigationGuard>
             </E2eeProvider>
           </ThemeProvider>
