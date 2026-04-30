@@ -77,15 +77,36 @@ function NavigationResultButton({
 export function CommandPaletteMainSearchView({
   search,
 }: CommandPaletteMainSearchViewProps) {
+  const {
+    clearSearchQuery,
+    debouncedQuery,
+    isCommandMode,
+    isSearchOnly,
+    listRef,
+    matchingCommands,
+    searchEvents,
+    searchInputInteractionProps,
+    searchInputRef,
+    searchLoading,
+    searchQuery,
+    selectCommand,
+    selectedIndex,
+    selectNavigationItem,
+    selectSearchEvent,
+    showEventSearch,
+    totalSearchEvents,
+    visibleNavigationItems,
+  } = search;
+
   return (
     <div
       className="flex flex-col"
       style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
     >
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
-        {search.isCommandMode && !search.isSearchOnly ? (
+        {isCommandMode && !isSearchOnly ? (
           <span className="text-sm font-medium text-primary">Command</span>
-        ) : search.isSearchOnly ? (
+        ) : isSearchOnly ? (
           <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
             <Search className="h-3.5 w-3.5 text-primary" />
           </div>
@@ -93,28 +114,28 @@ export function CommandPaletteMainSearchView({
           <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         )}
         <Input
-          ref={search.searchInputRef}
+          ref={searchInputRef}
           type="text"
           placeholder={
-            search.isSearchOnly
+            isSearchOnly
               ? "Search events..."
-              : search.isCommandMode
+              : isCommandMode
                 ? "Type a command..."
                 : "Search or jump to..."
           }
-          value={search.searchQuery}
-          {...search.searchInputInteractionProps}
+          value={searchQuery}
+          {...searchInputInteractionProps}
           className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck="false"
         />
-        {search.searchQuery && (
+        {searchQuery && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={search.clearSearchQuery}
+            onClick={clearSearchQuery}
             className="p-1 h-auto"
           >
             <svg
@@ -127,71 +148,71 @@ export function CommandPaletteMainSearchView({
           </Button>
         )}
       </div>
-      <div ref={search.listRef} className="flex-1 overflow-y-auto py-2">
-        {search.isCommandMode ? (
-          search.matchingCommands.length === 0 ? (
+      <div ref={listRef} className="flex-1 overflow-y-auto py-2">
+        {isCommandMode ? (
+          matchingCommands.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">
               No command found.
             </div>
           ) : (
             <div className="px-2">
-              {search.matchingCommands.map((command, index) => (
+              {matchingCommands.map((command, index) => (
                 <NavigationResultButton
                   key={command.command}
                   resultIndex={index}
                   label={command.label}
                   description={command.description}
                   icon={command.icon}
-                  isSelected={index === search.selectedIndex}
-                  onClick={() => search.selectCommand(command)}
+                  isSelected={index === selectedIndex}
+                  onClick={() => selectCommand(command)}
                 />
               ))}
             </div>
           )
-        ) : search.isSearchOnly ? (
-          search.showEventSearch ? (
-            search.searchEvents.length > 0 || search.searchLoading ? (
+        ) : isSearchOnly ? (
+          showEventSearch ? (
+            searchEvents.length > 0 || searchLoading ? (
               <EventSearchResults
-                events={search.searchEvents}
-                isLoading={search.searchLoading}
-                onSelect={search.selectSearchEvent}
-                selectedIndex={search.selectedIndex}
+                events={searchEvents}
+                isLoading={searchLoading}
+                onSelect={selectSearchEvent}
+                selectedIndex={selectedIndex}
                 baseIndex={0}
               />
             ) : (
-              <SearchOnlyEmptyState debouncedQuery={search.debouncedQuery} />
+              <SearchOnlyEmptyState debouncedQuery={debouncedQuery} />
             )
           ) : (
             <SearchOnlyIntroState />
           )
         ) : (
           <>
-            {search.showEventSearch && (
+            {showEventSearch && (
               <EventSearchResults
-                events={search.searchEvents}
-                isLoading={search.searchLoading}
-                onSelect={search.selectSearchEvent}
-                selectedIndex={search.selectedIndex}
+                events={searchEvents}
+                isLoading={searchLoading}
+                onSelect={selectSearchEvent}
+                selectedIndex={selectedIndex}
                 baseIndex={0}
               />
             )}
-            {search.visibleNavigationItems.length === 0 &&
-            !search.showEventSearch &&
-            !search.debouncedQuery.trim() ? (
+            {visibleNavigationItems.length === 0 &&
+            !showEventSearch &&
+            !debouncedQuery.trim() ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 No results found.
               </div>
-            ) : search.visibleNavigationItems.length > 0 ? (
+            ) : visibleNavigationItems.length > 0 ? (
               <div className="px-2">
-                {search.showEventSearch && search.searchEvents.length > 0 && (
+                {showEventSearch && searchEvents.length > 0 && (
                   <div className="px-2 pt-1 pb-1">
                     <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">
                       Settings
                     </span>
                   </div>
                 )}
-                {search.visibleNavigationItems.map((item, index) => {
-                  const globalIndex = search.totalSearchEvents + index;
+                {visibleNavigationItems.map((item, index) => {
+                  const globalIndex = totalSearchEvents + index;
 
                   return (
                     <NavigationResultButton
@@ -200,17 +221,17 @@ export function CommandPaletteMainSearchView({
                       label={item.label}
                       description={item.description}
                       icon={item.icon}
-                      isSelected={globalIndex === search.selectedIndex}
-                      onClick={() => search.selectNavigationItem(item)}
+                      isSelected={globalIndex === selectedIndex}
+                      onClick={() => selectNavigationItem(item)}
                     />
                   );
                 })}
               </div>
-            ) : search.showEventSearch &&
-              search.searchEvents.length === 0 &&
-              !search.searchLoading ? (
+            ) : showEventSearch &&
+              searchEvents.length === 0 &&
+              !searchLoading ? (
               <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                No events found for &quot;{search.debouncedQuery}&quot;
+                No events found for &quot;{debouncedQuery}&quot;
               </div>
             ) : null}
           </>
