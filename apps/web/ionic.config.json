@@ -1,7 +1,0 @@
-{
-  "name": "solace-web",
-  "type": "custom",
-  "integrations": {
-    "capacitor": {}
-  }
-}

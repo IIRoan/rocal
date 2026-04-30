@@ -4,35 +4,19 @@ import {
   describe,
   expect,
   it,
-  jest,
 } from "@jest/globals";
 
-jest.mock("@capacitor/core", () => ({
-  Capacitor: {
-    isNativePlatform: jest.fn(),
-  },
-}));
-
-import { Capacitor } from "@capacitor/core";
 import {
   getApiBaseUrl,
   getAppBaseUrl,
   getAuthCallbackUrl,
-  getMobileAuthBridgeUrl,
-  getMobileAuthCallbackUrl,
   getSafeAuthCallbackUrl,
   resolveAuthRedirectTarget,
 } from "../../lib/api-url";
 
-const mockIsNativePlatform = Capacitor.isNativePlatform as jest.MockedFunction<
-  typeof Capacitor.isNativePlatform
->;
-
 const originalEnv = {
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL:
-    process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL,
 };
 
 type TestGlobal = typeof globalThis & {
@@ -44,10 +28,8 @@ const originalWindow = testGlobal.window;
 
 describe("api-url helpers", () => {
   beforeEach(() => {
-    mockIsNativePlatform.mockReturnValue(false);
     delete process.env.NEXT_PUBLIC_API_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
-    delete process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL;
     delete testGlobal.window;
   });
 
@@ -60,8 +42,6 @@ describe("api-url helpers", () => {
 
     process.env.NEXT_PUBLIC_API_URL = originalEnv.NEXT_PUBLIC_API_URL;
     process.env.NEXT_PUBLIC_APP_URL = originalEnv.NEXT_PUBLIC_APP_URL;
-    process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL =
-      originalEnv.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL;
   });
 
   it("prefers NEXT_PUBLIC_API_URL when provided", () => {
@@ -70,27 +50,14 @@ describe("api-url helpers", () => {
     expect(getApiBaseUrl()).toBe("https://api.solace.test");
   });
 
-  it("uses the native webview host for API requests on mobile", () => {
-    mockIsNativePlatform.mockReturnValue(true);
-    testGlobal.window = {
-      location: {
-        protocol: "https:",
-        hostname: "app.solace.test",
-      },
-    } as Window & typeof globalThis;
-
-    expect(getApiBaseUrl()).toBe("https://app.solace.test:4001");
+  it("falls back to localhost when no env is set", () => {
+    expect(getApiBaseUrl()).toBe("http://localhost:4001");
   });
 
-  it("uses the native webview origin as the app base url on mobile", () => {
-    mockIsNativePlatform.mockReturnValue(true);
-    testGlobal.window = {
-      location: {
-        origin: "capacitor://localhost",
-      },
-    } as Window & typeof globalThis;
+  it("uses NEXT_PUBLIC_APP_URL as the app base url", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
 
-    expect(getAppBaseUrl()).toBe("capacitor://localhost");
+    expect(getAppBaseUrl()).toBe("https://app.solace.test");
   });
 
   it("falls back to the configured app url for auth callbacks", () => {
@@ -98,30 +65,6 @@ describe("api-url helpers", () => {
 
     expect(getAuthCallbackUrl("/settings?tab=security")).toBe(
       "https://app.solace.test/settings?tab=security",
-    );
-  });
-
-  it("sanitizes non-relative next paths in mobile callback urls", () => {
-    expect(
-      getMobileAuthCallbackUrl("https://evil.test/phish", "access_denied", "ott-1"),
-    ).toBe(
-      "app.solace.onl://api/auth?next=%2Fdashboard&error=access_denied&ott=ott-1",
-    );
-  });
-
-  it("falls back to the default callback base when the configured one is invalid", () => {
-    process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL = "::not-a-url::";
-
-    expect(getMobileAuthCallbackUrl("/calendar")).toBe(
-      "app.solace.onl://api/auth?next=%2Fcalendar",
-    );
-  });
-
-  it("builds the mobile auth bridge url against the app origin", () => {
-    process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
-
-    expect(getMobileAuthBridgeUrl("/calendar", "expired_session")).toBe(
-      "https://app.solace.test/auth/mobile-complete?next=%2Fcalendar&error=expired_session",
     );
   });
 
