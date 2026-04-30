@@ -434,7 +434,7 @@ function createStyles(theme: ThemeTokens) {
     previewList: {
       gap: 2,
     },
-  } satisfies Record<string, ViewStyle>;
+  } satisfies Record<string, ViewStyle | TextStyle>;
 
   const text = {
     sectionLabel: {

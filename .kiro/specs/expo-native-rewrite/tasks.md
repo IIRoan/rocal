@@ -321,7 +321,7 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Test setting changes, optimistic updates, and theme switching
     - _Requirements: 12.1, 12.2, 12.5_
 
-- [ ] 15. Checkpoint — Core CRUD screens complete
+- [x] 15. Checkpoint — Core CRUD screens complete
   - Ensure all tests pass, run typecheck and lint
   - Verify event, calendar, category, and settings CRUD flows work end-to-end with the API
   - Ask the user if questions arise

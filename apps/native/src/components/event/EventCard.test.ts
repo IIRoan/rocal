@@ -4,7 +4,7 @@ import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
 function makeEvent(
-  overrides: Partial<DecoratedCalendarEvent> = {},
+  overrides: Record<string, unknown> = {},
 ): DecoratedCalendarEvent {
   return {
     id: "evt-1",
@@ -17,7 +17,7 @@ function makeEvent(
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  } as DecoratedCalendarEvent;
+  } as unknown as DecoratedCalendarEvent;
 }
 
 // ─── formatTimeRange ─────────────────────────────────────────────────────────
