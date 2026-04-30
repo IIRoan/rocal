@@ -339,8 +339,8 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - For any sequence of N input changes within 300ms, verify exactly one API call is triggered with the last input value
     - **Validates: Requirements 15.5**
 
-- [ ] 17. Implement gesture-based interactions
-  - [ ] 17.1 Implement `DraggableEvent` for drag-and-drop rescheduling
+- [-] 17. Implement gesture-based interactions
+  - [x] 17.1 Implement `DraggableEvent` for drag-and-drop rescheduling
     - Create `src/components/event/DraggableEvent.tsx` using `react-native-gesture-handler` for long-press drag
     - Support dragging to new time slots on day/week/three-day views
     - Support dragging to new day columns on week/three-day views
@@ -348,12 +348,12 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Provide haptic feedback via `expo-haptics` on drag start, hover, and drop
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
 
-  - [ ]* 17.2 Write property test for drag-drop duration preservation
+  - [ ] 17.2 Write property test for drag-drop duration preservation
     - **Property 14: Drag-drop event rescheduling preserves duration**
     - For any event with start/end and any valid drop target, verify the rescheduled event has the same duration and correct new start/end times
     - **Validates: Requirements 14.1, 14.2, 14.3**
 
-  - [ ] 17.3 Implement `SwipeableEventRow` for swipe-to-delete
+  - [x] 17.3 Implement `SwipeableEventRow` for swipe-to-delete
     - Create `src/components/event/SwipeableEventRow.tsx` using `react-native-gesture-handler`
     - Add confirmation step before deletion
     - Integrate into `AgendaList` component
@@ -369,7 +369,7 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Show guidance in settings when permission is denied
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7_
 
-  - [ ]* 18.2 Write property test for notification scheduling time
+  - [ ] 18.2 Write property test for notification scheduling time
     - **Property 9: Notification scheduling time**
     - For any event start time and reminder N minutes before, verify the computed notification time equals `event.start - N minutes`
     - **Validates: Requirements 10.3**

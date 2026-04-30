@@ -17,6 +17,7 @@ import {
   formatEventTime,
   type AgendaSection,
 } from "./agenda-utils";
+import { SwipeableEventRow } from "../event/SwipeableEventRow";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,8 @@ interface AgendaListProps {
   onRefresh?: () => void;
   /** Callback when an event is tapped */
   onEventPress?: (event: DecoratedCalendarEvent) => void;
+  /** Callback when an event is deleted via swipe-to-delete */
+  onEventDelete?: (eventId: string) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -41,6 +44,7 @@ export function AgendaList({
   refreshing = false,
   onRefresh,
   onEventPress,
+  onEventDelete,
 }: AgendaListProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -83,7 +87,7 @@ export function AgendaList({
         const accessibilityParts = [item.title, timeLabel];
         if (calendarName) accessibilityParts.push(calendarName);
 
-        return (
+        const rowContent = (
           <Pressable
             style={styles.eventRow}
             onPress={() => onEventPress?.(item)}
@@ -129,6 +133,20 @@ export function AgendaList({
             </View>
           </Pressable>
         );
+
+        if (onEventDelete) {
+          return (
+            <SwipeableEventRow
+              eventId={item.id}
+              eventTitle={item.title}
+              onDelete={onEventDelete}
+            >
+              {rowContent}
+            </SwipeableEventRow>
+          );
+        }
+
+        return rowContent;
       }}
     />
   );
