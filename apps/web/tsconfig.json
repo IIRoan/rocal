@@ -34,6 +34,12 @@
       ],
       "@workspace/calendar-ics/*": [
         "../../packages/calendar-ics/src/*"
+      ],
+      "@workspace/design-tokens": [
+        "../../packages/design-tokens/src/index.ts"
+      ],
+      "@workspace/design-tokens/*": [
+        "../../packages/design-tokens/src/*"
       ]
     },
     "plugins": [
