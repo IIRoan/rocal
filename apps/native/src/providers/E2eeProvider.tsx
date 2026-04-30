@@ -24,7 +24,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
-import { createNativeCryptoProvider } from "../lib/native-crypto-provider";
+import { createNativeCryptoProvider, installCryptoPolyfill } from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
 import { createLogger } from "@workspace/logger";
 
@@ -74,11 +74,18 @@ export function E2eeProvider({
   const moduleRef = useRef<E2eeModule | null>(null);
 
   // Lazily initialise the E2EE module (needs native crypto at runtime).
-  const getModule = useCallback((): E2eeModule => {
-    if (!moduleRef.current) {
-      const crypto = createNativeCryptoProvider();
-      moduleRef.current = createE2eeModule(crypto);
+  const getModule = useCallback(async (): Promise<E2eeModule | null> => {
+    if (moduleRef.current) return moduleRef.current;
+
+    // Ensure the polyfill is installed before checking for subtle crypto.
+    await installCryptoPolyfill();
+
+    const crypto = createNativeCryptoProvider();
+    if (!crypto) {
+      // SubtleCrypto not available (e.g. Expo Go) — E2EE disabled.
+      return null;
     }
+    moduleRef.current = createE2eeModule(crypto);
     return moduleRef.current;
   }, []);
 
@@ -87,7 +94,14 @@ export function E2eeProvider({
   const bootstrap = useCallback(
     async (userId: string, apiBaseUrl: string) => {
       try {
-        const e2ee = getModule();
+        const e2ee = await getModule();
+
+        if (!e2ee) {
+          log.warn("E2EE module not available — running in Expo Go without native crypto. " +
+            "E2EE is disabled for this session.");
+          setIsReady(true);
+          return;
+        }
 
         // 1. Fetch bootstrap data from the backend.
         const response = await fetch(`${apiBaseUrl}/e2ee/bootstrap`, {
@@ -125,6 +139,11 @@ export function E2eeProvider({
         if (existingDevice && privateKeyJwk) {
           // Device is already enrolled — unwrap the account & blind-index keys.
           const crypto = createNativeCryptoProvider();
+          if (!crypto) {
+            log.warn("Cannot unwrap keys — crypto not available");
+            setIsReady(true);
+            return;
+          }
           const privateKey = await crypto.subtle.importKey(
             "jwk",
             JSON.parse(privateKeyJwk),
@@ -189,6 +208,11 @@ export function E2eeProvider({
 
           // Export private key for secure storage.
           const crypto = createNativeCryptoProvider();
+          if (!crypto) {
+            log.warn("Cannot export keys — crypto not available");
+            setIsReady(true);
+            return;
+          }
           const exportedPrivateKey = await crypto.subtle.exportKey(
             "jwk",
             keyPair.privateKey,
@@ -251,7 +275,8 @@ export function E2eeProvider({
         if (!session) return request;
 
         try {
-          const e2ee = getModule();
+          const e2ee = await getModule();
+          if (!e2ee) return request;
           const payload = {
             title: (request as any).title,
             description: (request as any).description ?? null,
@@ -291,7 +316,8 @@ export function E2eeProvider({
         if (!session) return request;
 
         try {
-          const e2ee = getModule();
+          const e2ee = await getModule();
+          if (!e2ee) return request;
           const encrypted = await e2ee.encryptJsonPayload(
             session.accountKey,
             { name: (request as any).name },
@@ -325,7 +351,8 @@ export function E2eeProvider({
         if (!session) return request;
 
         try {
-          const e2ee = getModule();
+          const e2ee = await getModule();
+          if (!e2ee) return request;
           const encrypted = await e2ee.encryptJsonPayload(
             session.accountKey,
             { name: (request as any).name },
@@ -369,7 +396,8 @@ export function E2eeProvider({
         }
 
         try {
-          const e2ee = getModule();
+          const e2ee = await getModule();
+          if (!e2ee) return hydrateEncryptedEventWithoutSession(event);
           const payload = JSON.parse(event.encryptedContent);
           const decrypted = await e2ee.decryptJsonPayload<{
             title: string;
@@ -404,7 +432,8 @@ export function E2eeProvider({
         if (!session) return [];
 
         try {
-          const e2ee = getModule();
+          const e2ee = await getModule();
+          if (!e2ee) return [];
           return e2ee.createBlindIndexTokens(session.blindIndexKey, value);
         } catch {
           return [];

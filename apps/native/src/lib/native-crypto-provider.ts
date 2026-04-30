@@ -9,27 +9,71 @@
  * The SubtleCrypto operations are delegated to the global `crypto.subtle`
  * which is polyfilled by `react-native-quick-crypto` (or available natively
  * on Hermes with the New Architecture in SDK 55).
+ *
+ * `react-native-quick-crypto` depends on native modules (NitroModules) that
+ * are only available in a custom dev client / prebuild. When running in
+ * Expo Go the import will fail — we catch that and fall back to whatever
+ * `globalThis.crypto.subtle` provides (which may be `undefined`).
  */
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
+import { createLogger } from "@workspace/logger";
+
+const log = createLogger("native:crypto");
+
+let polyfillAttempted = false;
+
+/**
+ * Attempt to install the `react-native-quick-crypto` polyfill.
+ * This must be called (and awaited) before `createNativeCryptoProvider`.
+ *
+ * Safe to call multiple times — the import is only attempted once.
+ */
+export async function installCryptoPolyfill(): Promise<void> {
+  if (polyfillAttempted) return;
+  polyfillAttempted = true;
+
+  // If subtle is already available (e.g. Hermes New Architecture), skip.
+  if (globalThis.crypto?.subtle) {
+    log.info("crypto.subtle already available, skipping polyfill");
+    return;
+  }
+
+  try {
+    // Dynamic import so the native-module resolution error is catchable.
+    await import("react-native-quick-crypto");
+    log.info("react-native-quick-crypto polyfill installed");
+  } catch (error) {
+    log.warn(
+      "react-native-quick-crypto could not be loaded. This is expected when " +
+        "running in Expo Go, which does not include the required native modules " +
+        "(NitroModules). E2EE is disabled for this session. To enable E2EE, " +
+        "use a development build (`npx expo run:android` or EAS Build).",
+    );
+  }
+}
 
 /**
  * Build a CryptoProvider backed by native crypto primitives.
  *
+ * Call `installCryptoPolyfill()` before calling this function.
+ *
  * The `subtle` property delegates to the global `crypto.subtle` which is
  * expected to be available via Hermes (New Architecture) or a polyfill
  * from `react-native-quick-crypto`.
+ *
+ * Returns `null` if SubtleCrypto is not available (e.g. running in Expo Go
+ * without native modules).
  */
-export function createNativeCryptoProvider(): CryptoProvider {
-  // Hermes (New Architecture, SDK 55) exposes globalThis.crypto.subtle.
-  // react-native-quick-crypto also polyfills it.
+export function createNativeCryptoProvider(): CryptoProvider | null {
   const subtle = globalThis.crypto?.subtle;
 
   if (!subtle) {
-    throw new Error(
-      "SubtleCrypto is not available. Ensure react-native-quick-crypto " +
-        "is installed or that you are running on Hermes with New Architecture.",
+    log.warn(
+      "SubtleCrypto is not available — E2EE is disabled. This is expected " +
+        "when running in Expo Go. Use a development build to enable encryption.",
     );
+    return null;
   }
 
   return {
