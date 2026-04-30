@@ -67,7 +67,7 @@ export function E2eeProvider({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): React.ReactNode {
   const [isReady, setIsReady] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const sessionRef = useRef<E2eeSession | null>(null);
