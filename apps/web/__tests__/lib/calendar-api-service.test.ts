@@ -10,12 +10,12 @@ describe("CalendarApiService encryption wrappers", () => {
     delete: jest.Mock;
   };
   let mockE2ee: {
-    attachEventEncryptionShadow: jest.Mock;
-    attachCalendarEncryptionShadow: jest.Mock;
-    attachCategoryEncryptionShadow: jest.Mock;
-    hydrateEncryptedEvent: jest.Mock;
-    hydrateEncryptedEvents: jest.Mock;
-    createBlindIndexTokens: jest.Mock;
+    attachEventEncryptionShadow: jest.Mock<(req: any) => Promise<any>>;
+    attachCalendarEncryptionShadow: jest.Mock<(req: any) => Promise<any>>;
+    attachCategoryEncryptionShadow: jest.Mock<(req: any) => Promise<any>>;
+    hydrateEncryptedEvent: jest.Mock<(event: any) => Promise<any>>;
+    hydrateEncryptedEvents: jest.Mock<(events: any[]) => Promise<any[]>>;
+    createBlindIndexTokens: jest.Mock<(value: string) => Promise<string[]>>;
   };
   let service: CalendarApiService;
 

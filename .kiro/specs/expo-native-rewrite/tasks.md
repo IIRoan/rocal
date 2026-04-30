@@ -111,7 +111,7 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Replace all E2EE imports to use the shared package
     - _Requirements: 11.7_
 
-- [ ] 5. Checkpoint — Shared packages complete
+- [x] 5. Checkpoint — Shared packages complete
   - Ensure all tests pass (`bun run test`), run `bun run typecheck` and `bun run lint`
   - Verify `apps/web` still builds and functions correctly with the extracted shared packages
   - Ask the user if questions arise
