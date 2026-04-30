@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryProvider } from "../src/providers/QueryProvider";
 import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
@@ -59,16 +60,18 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <QueryProvider>
-      <AuthProvider>
-        <ThemeProvider>
-          <E2eeProvider>
-            <NavigationGuard>
-              <Slot />
-            </NavigationGuard>
-          </E2eeProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    </QueryProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <E2eeProvider>
+              <NavigationGuard>
+                <Slot />
+              </NavigationGuard>
+            </E2eeProvider>
+          </ThemeProvider>
+        </AuthProvider>
+      </QueryProvider>
+    </GestureHandlerRootView>
   );
 }

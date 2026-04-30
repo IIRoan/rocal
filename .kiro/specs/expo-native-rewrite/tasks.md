@@ -291,33 +291,33 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Test `EventForm` validation, `EventCard` rendering, and create/edit/delete flows
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 13. Implement calendar and category management screens
-  - [ ] 13.1 Implement calendar management screens
+- [x] 13. Implement calendar and category management screens
+  - [x] 13.1 Implement calendar management screens
     - Build `app/calendar-manage/index.tsx` displaying calendar list with name, color, and visibility toggle
     - Build `app/calendar-manage/create.tsx` with name and color selection form
     - Build `app/calendar-manage/edit/[id].tsx` with edit form and delete action (with move/delete events options)
     - Implement calendar sharing: enable, view, and disable ICS share links
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-  - [ ] 13.2 Implement category management screens
+  - [x] 13.2 Implement category management screens
     - Build `app/category-manage/index.tsx` displaying category list with name, color, and active status
     - Build `app/category-manage/create.tsx` with name and color selection form
     - Build `app/category-manage/edit/[id].tsx` with edit form and delete action
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-  - [ ] 13.3 Write unit tests for calendar and category management
+  - [x] 13.3 Write unit tests for calendar and category management
     - Test list rendering, form validation, and CRUD operations
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 14. Implement settings screen
-  - [ ] 14.1 Implement settings screen with all preference sections
+- [x] 14. Implement settings screen
+  - [x] 14.1 Implement settings screen with all preference sections
     - Build `app/(tabs)/settings/index.tsx` with sections: display preferences, time/timezone, working hours, notification preferences, default event settings, UI preferences
     - Implement theme selection (light, dark, system) wired to `ThemeProvider`
     - Implement optimistic updates: persist to Backend_API via `CalendarApiService` and update local UI immediately
     - Cache settings locally for offline access
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
 
-  - [ ] 14.2 Write unit tests for settings screen
+  - [x] 14.2 Write unit tests for settings screen
     - Test setting changes, optimistic updates, and theme switching
     - _Requirements: 12.1, 12.2, 12.5_
 

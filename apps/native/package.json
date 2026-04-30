@@ -25,6 +25,7 @@
     "better-auth": "^1.5.5",
     "date-fns": "^4.1.0",
     "expo": "~55.0.18",
+    "expo-clipboard": "~55.0.0",
     "expo-crypto": "~55.0.0",
     "expo-haptics": "~55.0.0",
     "expo-network": "~55.0.13",
