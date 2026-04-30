@@ -28,7 +28,12 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       router.replace("/(auth)/sign-in");
     } else if (isAuthenticated && inAuthGroup) {
       // Signed in — redirect to main tabs.
-      router.replace("/(tabs)/calendar");
+      // Use setTimeout to ensure the navigation state is settled before
+      // attempting the redirect (Expo Router needs a tick to process
+      // the auth state change).
+      setTimeout(() => {
+        router.replace("/(tabs)/calendar");
+      }, 0);
     }
   }, [isAuthenticated, isLoading, segments, router]);
 
