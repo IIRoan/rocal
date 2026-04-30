@@ -315,11 +315,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
           : "/dashboard";
-      const loginPath =
-        typeof window !== "undefined" &&
-        (window as any).Capacitor?.isNativePlatform?.()
-          ? "/mobile-login"
-          : "/login";
+      const loginPath = "/login";
       router.replace(
         `${loginPath}?next=${encodeURIComponent(currentPath)}`,
         undefined,

@@ -7,7 +7,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "bun run scripts/patch-ionic-css.ts",
     "install:all": "cd apps/backend && bun install && cd ../web && bun install && cd ../notifications && bun install",
     "build": "cd apps/backend && bun run build && cd ../web && bun run build && cd ../notifications && bun run build",
     "build:backend": "cd apps/backend && bun run build",
@@ -49,13 +48,7 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "2.1.10",
-    "@testing-library/react-native": "12.4.1",
     "babel-jest": "^30.3.0",
-    "jest-environment-jsdom": "30.3.0",
-    "jest-react-native": "^18.0.0",
-    "metro-react-native-babel-preset": "0.77.0",
-    "react-native-gesture-handler": "^2.30.0",
-    "react-native-safe-area-context": "5.7.0",
-    "react-native-web": "^0.21.2"
+    "jest-environment-jsdom": "30.3.0"
   }
 }
