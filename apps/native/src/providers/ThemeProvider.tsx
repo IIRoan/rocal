@@ -8,8 +8,8 @@ import React, {
 } from "react";
 import { useColorScheme } from "react-native";
 import {
-  lightTheme,
-  darkTheme,
+  nativeLightTheme,
+  nativeDarkTheme,
   type ThemeTokens,
 } from "@workspace/design-tokens";
 
@@ -93,7 +93,7 @@ function resolveTheme(
   const colorScheme =
     preference === "system" ? systemScheme : preference;
   return {
-    theme: colorScheme === "dark" ? darkTheme : lightTheme,
+    theme: colorScheme === "dark" ? nativeDarkTheme : nativeLightTheme,
     colorScheme,
   };
 }
