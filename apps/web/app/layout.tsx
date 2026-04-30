@@ -1,4 +1,3 @@
-import { MobilePage } from "@workspace/mobile-ui";
 import { Toaster } from "@workspace/ui/components/ui";
 import {
   GsapAnimationProvider,
@@ -87,7 +86,7 @@ export default function RootLayout({
                 <LoadingProvider>
                   <SettingsProvider>
                     <CalendarProvider>
-                      <MobilePage>{children}</MobilePage>
+                      {children}
                     </CalendarProvider>
                     <Toaster />
                   </SettingsProvider>

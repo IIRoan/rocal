@@ -554,29 +554,6 @@
     min-height: 100%;
   }
 
-  body.capacitor-app {
-    overscroll-behavior: none;
-  }
-
-  /* Ionic structure.css locks body scrolling; keep that only for native Capacitor */
-  body:not(.capacitor-app) {
-    position: static;
-    width: auto;
-    max-width: none;
-    height: auto;
-    max-height: none;
-    overflow-y: auto;
-    overflow-x: hidden;
-    transform: none;
-    touch-action: auto;
-    overscroll-behavior-y: auto;
-  }
-
-  ion-app {
-    background: transparent;
-    min-height: 100dvh;
-  }
-
   /* Form fields: clearer separation from cards/background */
   input,
   textarea,
