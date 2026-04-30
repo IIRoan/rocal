@@ -13,4 +13,6 @@ export const QUERY_KEYS = {
   eventDetail: (id: string) => ["event", id] as const,
   searchResults: (query: string) => ["search", query] as const,
   notifications: (eventId: string) => ["notifications", eventId] as const,
+  calendarShareLink: (calendarId: string) =>
+    ["calendarShareLink", calendarId] as const,
 } as const;
