@@ -215,40 +215,40 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Test form validation, error display, and navigation on success
     - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 10. Implement calendar view components
-  - [ ] 10.1 Implement `MonthGrid` component
+- [x] 10. Implement calendar view components
+  - [x] 10.1 Implement `MonthGrid` component
     - Create `src/components/calendar/MonthGrid.tsx` displaying a month grid with day cells and event dot indicators
     - Respect week start day from user settings
     - Style with `StyleSheet.create()` using theme tokens
     - _Requirements: 6.1, 6.8, 6.9_
 
-  - [ ] 10.2 Implement `WeekTimeline` component
+  - [x] 10.2 Implement `WeekTimeline` component
     - Create `src/components/calendar/WeekTimeline.tsx` displaying 7 columns with time slots and positioned event blocks
     - Render events from visible calendars with assigned colors
     - _Requirements: 6.2, 6.9_
 
-  - [ ] 10.3 Implement `DayTimeline` and `ThreeDayTimeline` components
+  - [x] 10.3 Implement `DayTimeline` and `ThreeDayTimeline` components
     - Create `src/components/calendar/DayTimeline.tsx` for single-day time grid
     - Create `src/components/calendar/ThreeDayTimeline.tsx` for 3-column time grid
     - Share common time grid rendering logic between day/week/three-day views
     - _Requirements: 6.3, 6.4_
 
-  - [ ] 10.4 Implement `AgendaList` component
+  - [x] 10.4 Implement `AgendaList` component
     - Create `src/components/calendar/AgendaList.tsx` using `FlatList` with section headers for chronological event list
     - Support pull-to-refresh to reload event data
     - _Requirements: 6.5, 14.6_
 
-  - [ ] 10.5 Implement `CalendarViewSwitcher` and `SkeletonLoader`
+  - [x] 10.5 Implement `CalendarViewSwitcher` and `SkeletonLoader`
     - Create `src/components/calendar/CalendarViewSwitcher.tsx` header control to switch between month/week/day/3day/agenda views
     - Create `src/components/calendar/SkeletonLoader.tsx` with placeholder UI matching each calendar view layout
     - _Requirements: 6.10_
 
-  - [ ] 10.6 Implement swipe navigation for calendar views
+  - [x] 10.6 Implement swipe navigation for calendar views
     - Add horizontal swipe gesture handling using `react-native-gesture-handler` to navigate between time periods
     - Integrate with `react-native-reanimated` for smooth 60fps transitions
     - _Requirements: 6.6, 6.7_
 
-  - [ ] 10.7 Wire calendar views into the calendar screen
+  - [x] 10.7 Wire calendar views into the calendar screen
     - Update `app/(tabs)/calendar/index.tsx` to render the active calendar view based on user settings
     - Fetch events via `CalendarApiService` using React Query with proper date range
     - Show `SkeletonLoader` while loading

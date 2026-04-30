@@ -58,7 +58,7 @@ export function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): React.ReactNode {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,7 +72,7 @@ export function AuthProvider({
         const result = await authClient.getSession();
         if (!cancelled && result?.data) {
           setUser(result.data.user as User);
-          setSession(result.data.session as Session);
+          setSession((result.data as any).session as Session);
         }
       } catch {
         // No valid session — stay unauthenticated.
@@ -115,7 +115,7 @@ export function AuthProvider({
 
       if (result.data) {
         setUser(result.data.user as User);
-        setSession(result.data.session as Session);
+        setSession((result.data as any).session as Session);
       }
     },
     [],
@@ -137,7 +137,7 @@ export function AuthProvider({
 
       if (result.data) {
         setUser(result.data.user as User);
-        setSession(result.data.session as Session);
+        setSession((result.data as any).session as Session);
       }
     },
     [],

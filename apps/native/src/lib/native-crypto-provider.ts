@@ -39,7 +39,7 @@ export function createNativeCryptoProvider(): CryptoProvider {
     },
     subtle: {
       generateKey: (algorithm: any, extractable: boolean, keyUsages: string[]) =>
-        subtle.generateKey(algorithm, extractable, keyUsages as KeyUsage[]),
+        subtle.generateKey(algorithm, extractable, keyUsages as KeyUsage[]) as unknown as Promise<CryptoKey>,
       importKey: (
         format: string,
         keyData: any,
@@ -55,7 +55,7 @@ export function createNativeCryptoProvider(): CryptoProvider {
           keyUsages as KeyUsage[],
         ),
       exportKey: (format: string, key: CryptoKey) =>
-        subtle.exportKey(format as any, key),
+        subtle.exportKey(format as any, key) as unknown as Promise<ArrayBuffer>,
       encrypt: (algorithm: any, key: CryptoKey, data: BufferSource) =>
         subtle.encrypt(algorithm, key, data),
       decrypt: (algorithm: any, key: CryptoKey, data: BufferSource) =>

@@ -106,7 +106,7 @@ export function ThemeProvider({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): React.ReactNode {
   const systemScheme = (useColorScheme() ?? "light") as "light" | "dark";
   const [preference, setPreference] = useState<ThemePreference>(
     cachedPreference ?? "system",
