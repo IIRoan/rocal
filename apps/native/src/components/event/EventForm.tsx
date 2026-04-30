@@ -681,7 +681,7 @@ function createStyles(theme: ThemeTokens) {
     submitButtonDisabled: {
       opacity: 0.6,
     },
-  } satisfies Record<string, ViewStyle>;
+  } satisfies Record<string, ViewStyle | TextStyle>;
 
   const text = {
     label: {
