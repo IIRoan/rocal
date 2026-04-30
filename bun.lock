@@ -106,6 +106,7 @@
         "@workspace/calendar-client": "workspace:*",
         "@workspace/calendar-core": "workspace:*",
         "@workspace/design-tokens": "workspace:*",
+        "@workspace/e2ee": "workspace:*",
         "@workspace/logger": "0.10.0",
         "@workspace/mobile-ui": "workspace:*",
         "better-auth": "^1.5.5",
@@ -156,6 +157,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@workspace/calendar-core": "workspace:*",
+        "@workspace/e2ee": "workspace:*",
         "@workspace/logger": "workspace:*",
       },
       "devDependencies": {
@@ -189,6 +191,18 @@
     "packages/design-tokens": {
       "name": "@workspace/design-tokens",
       "version": "0.1.0",
+      "devDependencies": {
+        "fast-check": "^4.7.0",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/e2ee": {
+      "name": "@workspace/e2ee",
+      "version": "0.1.0",
+      "dependencies": {
+        "@workspace/calendar-core": "workspace:*",
+        "@workspace/logger": "workspace:*",
+      },
       "devDependencies": {
         "fast-check": "^4.7.0",
         "typescript": "^5.9.3",
@@ -1359,6 +1373,8 @@
     "@workspace/calendar-ics": ["@workspace/calendar-ics@workspace:packages/calendar-ics"],
 
     "@workspace/design-tokens": ["@workspace/design-tokens@workspace:packages/design-tokens"],
+
+    "@workspace/e2ee": ["@workspace/e2ee@workspace:packages/e2ee"],
 
     "@workspace/eslint-config": ["@workspace/eslint-config@workspace:packages/eslint-config"],
 

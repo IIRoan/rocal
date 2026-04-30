@@ -83,30 +83,30 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Remove or deprecate the extracted source files in `apps/web/lib/`
     - _Requirements: 4.6, 4.7_
 
-- [ ] 4. Create `packages/e2ee` shared package
-  - [ ] 4.1 Scaffold `packages/e2ee` with `package.json`, `tsconfig.json`, and `src/` directory
+- [x] 4. Create `packages/e2ee` shared package
+  - [x] 4.1 Scaffold `packages/e2ee` with `package.json`, `tsconfig.json`, and `src/` directory
     - Define the `CryptoProvider` interface in `src/crypto-provider.ts` abstracting the SubtleCrypto API
     - Define the `E2eeProvider` interface in `src/provider.ts`
     - Extract E2EE logic from `apps/web/lib/e2ee-*.ts` into `src/index.ts` with `createE2eeModule(crypto: CryptoProvider)` factory
     - Create barrel export
     - _Requirements: 11.7, 11.1_
 
-  - [ ] 4.2 Write property test for E2EE encrypt-hydrate round-trip
+  - [x] 4.2 Write property test for E2EE encrypt-hydrate round-trip
     - **Property 10: E2EE encrypt-hydrate round-trip**
     - For any event with non-empty title, optional description, and optional location, verify encrypting then decrypting with the same session preserves original values
     - **Validates: Requirements 11.1, 11.2, 11.3**
 
-  - [ ] 4.3 Write property test for password envelope round-trip
+  - [x] 4.3 Write property test for password envelope round-trip
     - **Property 11: Password envelope round-trip**
     - For any non-empty password, account key, and blind index key, verify creating then unwrapping a password envelope recovers equivalent keys
     - **Validates: Requirements 11.5**
 
-  - [ ] 4.4 Write property test for encrypted event placeholder without session
+  - [x] 4.4 Write property test for encrypted event placeholder without session
     - **Property 12: Encrypted event placeholder without session**
     - For any event with `encryptionState === "encrypted"` and non-null `encryptedContent`, verify `hydrateEncryptedEvent` returns title "Encrypted event" and null description/location when no session is active
     - **Validates: Requirements 11.6**
 
-  - [ ] 4.5 Update `apps/web` to import from `@workspace/e2ee` instead of local E2EE files
+  - [x] 4.5 Update `apps/web` to import from `@workspace/e2ee` instead of local E2EE files
     - Provide web `CryptoProvider` wrapping `window.crypto`
     - Replace all E2EE imports to use the shared package
     - _Requirements: 11.7_

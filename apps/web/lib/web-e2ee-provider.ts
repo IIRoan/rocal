@@ -13,6 +13,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
+import { hydrateEncryptedEventWithoutSession, ENCRYPTED_EVENT_PLACEHOLDER_TITLE } from "@workspace/e2ee";
 import { waitForPendingE2eeBootstrap } from "./e2ee-bootstrap";
 import { createBlindIndexTokens, decryptJsonPayload } from "./e2ee-crypto";
 import {
@@ -21,8 +22,6 @@ import {
   attachEventEncryptionShadow,
 } from "./e2ee-payloads";
 import { getActiveE2eeSession } from "./e2ee-session";
-
-const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 
 async function getE2eeSession() {
   let session = getActiveE2eeSession();
@@ -70,13 +69,7 @@ export class WebE2eeProvider implements E2eeProvider {
 
     const session = await getE2eeSession();
     if (!session) {
-      return {
-        ...event,
-        title: event.title?.trim() || ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-        description: null,
-        location: null,
-        encryptionState: "encrypted",
-      };
+      return hydrateEncryptedEventWithoutSession(event);
     }
 
     try {
@@ -97,13 +90,7 @@ export class WebE2eeProvider implements E2eeProvider {
         location: decrypted.location ?? null,
       };
     } catch {
-      return {
-        ...event,
-        title: event.title?.trim() || ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
-        description: null,
-        location: null,
-        encryptionState: "encrypted",
-      };
+      return hydrateEncryptedEventWithoutSession(event);
     }
   }
 
