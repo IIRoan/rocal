@@ -363,7 +363,7 @@ export function useEventForm({
         setShowNotifications(false);
       }
     },
-    [queryClient],
+    [queryClient, setEventNotifications],
   );
 
   // Reset form to initial state
@@ -395,7 +395,7 @@ export function useEventForm({
     setEndTimeOpen(false);
     setTimeErrors({});
     setShowNotifications(false);
-  }, []);
+  }, [setEventNotifications]);
 
   // Handle start time change with validation
   const handleStartTimeChange = useCallback(

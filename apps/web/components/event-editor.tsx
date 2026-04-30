@@ -84,8 +84,10 @@ export function EventEditor({
   useEffect(() => {
     if (!open) {
       eventForm.resetForm();
-      setShowDescription(false);
-      setShowLocation(false);
+      requestAnimationFrame(() => {
+        setShowDescription(false);
+        setShowLocation(false);
+      });
     }
   }, [eventForm.resetForm, open]);
 
@@ -103,13 +105,15 @@ export function EventEditor({
       eventForm.setEventViewMode("edit");
     }
 
-    if (eventToEdit.description) {
-      setShowDescription(true);
-    }
+    requestAnimationFrame(() => {
+      if (eventToEdit.description) {
+        setShowDescription(true);
+      }
 
-    if (eventToEdit.location) {
-      setShowLocation(true);
-    }
+      if (eventToEdit.location) {
+        setShowLocation(true);
+      }
+    });
   }, [
     eventForm.loadEventData,
     eventForm.setEventViewMode,
@@ -200,7 +204,7 @@ export function EventEditor({
     } catch (error: any) {
       toast.error(error?.message || "Failed to download event as ICS file");
     }
-  }, [eventForm.selectedEvent?.id]);
+  }, [eventForm.selectedEvent]);
   const handleToggleLocation = useCallback(() => {
     setShowLocation((current) => !current);
   }, []);
