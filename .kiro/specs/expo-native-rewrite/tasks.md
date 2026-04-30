@@ -116,22 +116,25 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
   - Verify `apps/web` still builds and functions correctly with the extracted shared packages
   - Ask the user if questions arise
 
-- [ ] 6. Scaffold `apps/native` Expo project
-  - [ ] 6.1 Initialize the Expo project at `apps/native`
-    - Create `apps/native` using Expo SDK 53 with Expo Router, TypeScript template
+- [x] 6. Scaffold `apps/native` Expo project
+  - [x] 6.1 Initialize the Expo project at `apps/native`
+    - Create `apps/native` using Expo SDK 55 (React Native 0.83, React 19.2) with Expo Router v55, TypeScript
     - Configure `package.json` with workspace dependencies: `@workspace/design-tokens`, `@workspace/calendar-core`, `@workspace/calendar-client`, `@workspace/e2ee`, `@workspace/logger`
-    - Add dev dependencies: `jest`, `@testing-library/react-native`, `fast-check`
+    - Add dev dependencies: `jest@~29.7.0`, `@testing-library/react-native`, `fast-check`, `eslint-config-expo@~55.0.0`
     - Add scripts: `dev`, `build:ios`, `build:android`, `lint`, `typecheck`, `test`
+    - Note: SDK 55 dropped Legacy Architecture support; `newArchEnabled` config is removed
+    - Note: SDK 55 auto-configures Metro for monorepos — no manual `watchFolders`/`nodeModulesPaths`/`disableHierarchicalLookup` needed
+    - Note: `"main": "expo-router/entry"` in package.json (no separate index.js file)
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.7_
 
-  - [ ] 6.2 Configure monorepo integration
+  - [x] 6.2 Configure monorepo integration
     - Add `apps/native` to root `package.json` workspace resolution
     - Add `dev:native` script to root `package.json`
-    - Configure `metro.config.js` to resolve workspace packages from the monorepo root
+    - Configure `metro.config.js` — use minimal config with `getDefaultConfig(__dirname)` only (SDK 55 auto-detects monorepo)
     - Configure `tsconfig.json` with path aliases for workspace packages
     - _Requirements: 1.4, 1.6_
 
-  - [ ] 6.3 Set up the Expo Router file-based navigation structure
+  - [x] 6.3 Set up the Expo Router file-based navigation structure
     - Create `app/_layout.tsx` (root layout placeholder)
     - Create `app/(auth)/_layout.tsx`, `app/(auth)/sign-in.tsx`, `app/(auth)/sign-up.tsx`
     - Create `app/(tabs)/_layout.tsx` with bottom tab bar (Calendar, Search, Settings)
@@ -173,7 +176,7 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - **Validates: Requirements 5.4, 5.6**
 
   - [ ] 7.5 Implement native `CryptoProvider` and E2EE provider
-    - Create `src/providers/E2eeProvider.tsx` wrapping `@workspace/e2ee` with native `CryptoProvider` using `expo-crypto` and `react-native-quick-crypto`
+    - Create `src/providers/E2eeProvider.tsx` wrapping `@workspace/e2ee` with native `CryptoProvider` using `expo-crypto` (SDK 55 added AES-GCM support) and `react-native-quick-crypto`
     - Store device key pair in `expo-secure-store`
     - Implement E2EE bootstrap flow on authentication
     - _Requirements: 11.1, 11.4, 11.7_
@@ -430,6 +433,15 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
 
 ## Notes
 
+- The native app uses **Expo SDK 55** (React Native 0.83, React 19.2, Expo Router v55)
+- SDK 55 key differences from earlier SDKs:
+  - Legacy Architecture is removed; New Architecture is the only option
+  - Metro auto-configures for monorepos — no manual `watchFolders`/`nodeModulesPaths` needed
+  - All Expo SDK packages use the same major version as the SDK (e.g., `expo-crypto@~55.0.0`)
+  - `expo-router` follows SDK versioning (`~55.0.x` instead of `~5.0.x` or `~6.0.x`)
+  - `jest@~29.7.0` and `eslint-config-expo@~55.0.0` are the compatible versions
+  - `react-native-reanimated` v4 and `react-native-worklets` are required
+  - Entry point is `"main": "expo-router/entry"` in package.json (no separate index.js)
 - Tasks marked with `*` are optional and can be skipped for faster MVP
 - Each task references specific requirements for traceability
 - Checkpoints ensure incremental validation at key milestones
