@@ -49,6 +49,12 @@ const suites: TestSuite[] = [
     command: "bun",
     args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
   },
+  {
+    name: "native",
+    cwd: path.join(rootDir, "apps", "native"),
+    command: "bun",
+    args: useCoverage ? ["run", "test:coverage"] : ["run", "test"],
+  },
 ];
 
 function parseTestCounts(output: string): { passed: number; failed: number; total: number } {
