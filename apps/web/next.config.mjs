@@ -4,7 +4,7 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error"] } : false,
   },
-  transpilePackages: ['@workspace/mobile-ui', '@workspace/ui'],
+  transpilePackages: ['@workspace/mobile-ui', '@workspace/ui', '@workspace/design-tokens'],
   turbopack: {
     resolveAlias: {
       'react-native': 'react-native-web',
