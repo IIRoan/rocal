@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Solace",
+    "slug": "solace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "solace",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.solace.calendar"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.solace.calendar"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
