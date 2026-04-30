@@ -48,6 +48,12 @@ interface EventFormProps {
   onSubmit: (data: CreateEventRequest) => void;
   /** Callback when cancel is pressed */
   onCancel?: () => void;
+  /**
+   * When true, the form renders as a plain View instead of wrapping in its
+   * own ScrollView. Use this when the form is already inside a scrollable
+   * container (e.g. BottomSheet).
+   */
+  noScroll?: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -60,6 +66,7 @@ export function EventForm({
   isSubmitting = false,
   onSubmit,
   onCancel,
+  noScroll = false,
 }: EventFormProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -186,12 +193,8 @@ export function EventForm({
 
   const isEditMode = !!initialValues?.title;
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      keyboardShouldPersistTaps="handled"
-    >
+  const formContent = (
+    <>
       {/* Server errors */}
       {serverErrors && serverErrors.length > 0 && (
         <View style={styles.serverErrorContainer}>
@@ -556,6 +559,24 @@ export function EventForm({
           )}
         </Pressable>
       </View>
+    </>
+  );
+
+  if (noScroll) {
+    return (
+      <View style={[styles.container, styles.contentContainer]}>
+        {formContent}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
+    >
+      {formContent}
     </ScrollView>
   );
 }
