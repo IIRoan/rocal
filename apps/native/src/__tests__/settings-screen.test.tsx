@@ -532,68 +532,73 @@ describe("Loading and error state logic", () => {
 // ─── Tests: Default values when settings are undefined ───────────────────────
 
 describe("Default values for undefined settings", () => {
+  // Use a function to prevent TypeScript from narrowing the type to `undefined`
+  function getSettings(): Partial<UserSettings> | undefined {
+    return undefined;
+  }
+
   it("defaults defaultView to 'month'", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const defaultView = settings?.defaultView ?? "month";
     expect(defaultView).toBe("month");
   });
 
   it("defaults compactView to false", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const compactView = settings?.compactView ?? false;
     expect(compactView).toBe(false);
   });
 
   it("defaults showWeekNumbers to false", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const showWeekNumbers = settings?.showWeekNumbers ?? false;
     expect(showWeekNumbers).toBe(false);
   });
 
   it("defaults showDeclinedEvents to false", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const showDeclinedEvents = settings?.showDeclinedEvents ?? false;
     expect(showDeclinedEvents).toBe(false);
   });
 
   it("defaults timeFormat to '12h'", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const timeFormat = settings?.timeFormat ?? "12h";
     expect(timeFormat).toBe("12h");
   });
 
   it("defaults weekStartDay to 0", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const weekStartDay = settings?.weekStartDay ?? 0;
     expect(weekStartDay).toBe(0);
   });
 
   it("defaults workingHoursStart to 9", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const workingHoursStart = settings?.workingHoursStart ?? 9;
     expect(workingHoursStart).toBe(9);
   });
 
   it("defaults workingHoursEnd to 17", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const workingHoursEnd = settings?.workingHoursEnd ?? 17;
     expect(workingHoursEnd).toBe(17);
   });
 
   it("defaults emailNotifications to true", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const emailNotifications = settings?.emailNotifications ?? true;
     expect(emailNotifications).toBe(true);
   });
 
   it("defaults eventEncryptionMode to 'hybrid'", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const mode = settings?.eventEncryptionMode ?? "hybrid";
     expect(mode).toBe("hybrid");
   });
 
   it("defaults workingDays to Mon-Fri", () => {
-    const settings: Partial<UserSettings> | undefined = undefined;
+    const settings = getSettings();
     const workingDays = parseWorkingDays(settings?.workingDays ?? "1,2,3,4,5");
     expect(workingDays).toEqual(new Set([1, 2, 3, 4, 5]));
   });
