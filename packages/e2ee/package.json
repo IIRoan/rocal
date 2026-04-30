@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/calendar-client",
+  "name": "@workspace/e2ee",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@workspace/calendar-core": "workspace:*",
-    "@workspace/e2ee": "workspace:*",
     "@workspace/logger": "workspace:*"
   },
   "devDependencies": {
