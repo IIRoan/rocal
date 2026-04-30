@@ -148,8 +148,8 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Create `app/+not-found.tsx`
     - _Requirements: 17.1, 17.2, 17.4_
 
-- [ ] 7. Implement infrastructure providers
-  - [ ] 7.1 Implement `ThemeProvider` with design token integration
+- [x] 7. Implement infrastructure providers
+  - [x] 7.1 Implement `ThemeProvider` with design token integration
     - Create `src/providers/ThemeProvider.tsx` providing `ThemeContextValue` via React Context
     - Read theme preference from local cache, listen to `useColorScheme()` for system changes
     - Resolve to `lightTheme` or `darkTheme` from `@workspace/design-tokens`
@@ -161,7 +161,7 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - For any theme preference ("light", "dark", "system") and system color scheme, verify the ThemeProvider resolves to the correct theme object
     - **Validates: Requirements 12.2**
 
-  - [ ] 7.3 Implement `AuthProvider` with Better Auth and secure storage
+  - [x] 7.3 Implement `AuthProvider` with Better Auth and secure storage
     - Create `src/providers/AuthProvider.tsx` providing `AuthContextValue` via React Context
     - Configure Better Auth client with native API base URL
     - Persist session tokens in `expo-secure-store` (iOS Keychain / Android Keystore)
@@ -170,24 +170,24 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Export `useAuth()` hook
     - _Requirements: 5.1, 5.2, 5.3, 5.5, 5.6_
 
-  - [ ] 7.4 Write property test for auth session termination
+  - [x] 7.4 Write property test for auth session termination
     - **Property 4: Auth session termination**
     - For any authenticated state, verify that 401/403/session expiry clears the session token from secure storage and transitions to unauthenticated state
     - **Validates: Requirements 5.4, 5.6**
 
-  - [ ] 7.5 Implement native `CryptoProvider` and E2EE provider
+  - [x] 7.5 Implement native `CryptoProvider` and E2EE provider
     - Create `src/providers/E2eeProvider.tsx` wrapping `@workspace/e2ee` with native `CryptoProvider` using `expo-crypto` (SDK 55 added AES-GCM support) and `react-native-quick-crypto`
     - Store device key pair in `expo-secure-store`
     - Implement E2EE bootstrap flow on authentication
     - _Requirements: 11.1, 11.4, 11.7_
 
-  - [ ] 7.6 Set up React Query client and API service instances
+  - [x] 7.6 Set up React Query client and API service instances
     - Create `src/providers/QueryProvider.tsx` with `QueryClient` configuration
     - Create `src/lib/api.ts` instantiating `HttpClient` and `CalendarApiService` from `@workspace/calendar-client` with native base URL and auth headers
     - Define `QUERY_KEYS` constants for cache key management
     - _Requirements: 4.1, 4.6, 16.1_
 
-  - [ ] 7.7 Wire all providers into the root layout
+  - [x] 7.7 Wire all providers into the root layout
     - Update `app/_layout.tsx` to wrap the app with `QueryProvider`, `AuthProvider`, `ThemeProvider`, and `E2eeProvider`
     - Add navigation guard: redirect unauthenticated users to `(auth)` group, authenticated users to `(tabs)` group
     - _Requirements: 17.1, 5.4_
