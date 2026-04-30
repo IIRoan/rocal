@@ -255,6 +255,94 @@ export const darkTheme: ThemeTokens = {
   shadows,
 };
 
+// ─── OKLCH → Hex Conversion (for React Native) ──────────────────────────────
+
+/**
+ * Converts an OKLCH color string to a hex color string.
+ *
+ * React Native does not support oklch() — only hex, rgb(), rgba(), hsl(),
+ * hsla(), and named colors. This converter is used to produce native-
+ * compatible theme objects.
+ *
+ * Algorithm: oklch → OKLab → linear-sRGB → sRGB → hex
+ */
+function oklchToHex(oklchStr: string): string {
+  const match = oklchStr.match(
+    /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/,
+  );
+  if (!match) return oklchStr; // passthrough non-oklch values (e.g. rgba)
+
+  const L = parseFloat(match[1]);
+  const C = parseFloat(match[2]);
+  const H = parseFloat(match[3]);
+
+  // oklch → OKLab
+  const hRad = (H * Math.PI) / 180;
+  const a = C * Math.cos(hRad);
+  const b = C * Math.sin(hRad);
+
+  // OKLab → linear sRGB
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+
+  const l3 = l_ * l_ * l_;
+  const m3 = m_ * m_ * m_;
+  const s3 = s_ * s_ * s_;
+
+  const rLin = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+  const gLin = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+  const bLin = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
+
+  // linear sRGB → sRGB (gamma)
+  const toSrgb = (c: number) =>
+    c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+
+  const r = Math.round(Math.min(1, Math.max(0, toSrgb(rLin))) * 255);
+  const g = Math.round(Math.min(1, Math.max(0, toSrgb(gLin))) * 255);
+  const bVal = Math.round(Math.min(1, Math.max(0, toSrgb(bLin))) * 255);
+
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${bVal.toString(16).padStart(2, "0")}`;
+}
+
+/** Recursively convert all oklch color strings in an object to hex. */
+function convertColors<T>(obj: T): T {
+  if (typeof obj === "string") {
+    return oklchToHex(obj) as unknown as T;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(convertColors) as unknown as T;
+  }
+  if (obj !== null && typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = convertColors(value);
+    }
+    return result as T;
+  }
+  return obj;
+}
+
+/**
+ * Convert a ThemeTokens object so all oklch() color values become hex strings
+ * compatible with React Native's style system.
+ */
+export function toNativeTheme(tokens: ThemeTokens): ThemeTokens {
+  return {
+    ...tokens,
+    colors: convertColors(tokens.colors),
+    // shadows may contain rgba — convertColors handles passthrough
+    shadows: convertColors(tokens.shadows),
+  };
+}
+
+/**
+ * Pre-computed native-compatible themes with hex colors.
+ * Use these in React Native instead of `lightTheme`/`darkTheme` directly.
+ */
+export const nativeLightTheme: ThemeTokens = toNativeTheme(lightTheme);
+export const nativeDarkTheme: ThemeTokens = toNativeTheme(darkTheme);
+
 // ─── Tailwind Adapter ────────────────────────────────────────────────────────
 
 /**

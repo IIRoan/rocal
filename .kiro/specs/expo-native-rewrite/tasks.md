@@ -192,20 +192,20 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Add navigation guard: redirect unauthenticated users to `(auth)` group, authenticated users to `(tabs)` group
     - _Requirements: 17.1, 5.4_
 
-- [ ] 8. Checkpoint — Project scaffolding and providers complete
+- [x] 8. Checkpoint — Project scaffolding and providers complete
   - Ensure all tests pass, run typecheck and lint
   - Verify the app compiles and renders the tab navigation shell
   - Ask the user if questions arise
 
-- [ ] 9. Implement authentication screens
-  - [ ] 9.1 Implement sign-in screen
+- [x] 9. Implement authentication screens
+  - [x] 9.1 Implement sign-in screen
     - Build `app/(auth)/sign-in.tsx` with email/password form, validation, error display
     - Add passkey sign-in button using `useAuth().signInWithPasskey`
     - Show inline errors for invalid credentials and passkey failures
     - Style with `StyleSheet.create()` using `useTheme()` tokens
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [ ] 9.2 Implement sign-up screen
+  - [x] 9.2 Implement sign-up screen
     - Build `app/(auth)/sign-up.tsx` with name, email, password form
     - Add validation and inline error display
     - Navigate to calendar on successful sign-up
