@@ -259,35 +259,35 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
   - Verify all five calendar views render correctly with mock data
   - Ask the user if questions arise
 
-- [ ] 12. Implement event management screens
-  - [ ] 12.1 Implement `EventCard` component
+- [x] 12. Implement event management screens
+  - [x] 12.1 Implement `EventCard` component
     - Create `src/components/event/EventCard.tsx` for compact event display in timeline views
     - Display title, time, calendar color, and category indicator
     - _Requirements: 6.9, 7.2_
 
-  - [ ] 12.2 Implement `EventForm` component
+  - [x] 12.2 Implement `EventForm` component
     - Create `src/components/event/EventForm.tsx` with fields for title, date/time pickers, calendar selector, category selector, location, description, color picker, all-day toggle, recurrence picker, and reminders
     - Implement client-side validation using `validateEventData` from `@workspace/calendar-core`
     - Display inline validation errors and server-side error messages
     - _Requirements: 7.1, 7.3, 7.8_
 
-  - [ ] 12.3 Implement `RecurrencePicker` and `ColorPicker` components
+  - [x] 12.3 Implement `RecurrencePicker` and `ColorPicker` components
     - Create `src/components/event/RecurrencePicker.tsx` for recurrence rule builder (daily/weekly/monthly/yearly) with occurrence preview
     - Create `src/components/event/ColorPicker.tsx` for calendar color palette selector (12 colors from design tokens)
     - _Requirements: 7.7, 8.5_
 
-  - [ ] 12.4 Implement event detail screen
+  - [x] 12.4 Implement event detail screen
     - Build `app/event/[id].tsx` displaying full event details with edit and delete actions
     - Support recurring event scope options (this occurrence, this and future, all occurrences) for edit/delete
     - _Requirements: 7.2, 7.5, 7.6_
 
-  - [ ] 12.5 Implement event create and edit screens
+  - [x] 12.5 Implement event create and edit screens
     - Build `app/event/create.tsx` using `EventForm` with create API call via `CalendarApiService`
     - Build `app/event/edit/[id].tsx` using `EventForm` pre-populated with existing event data
     - Invalidate React Query cache on success and navigate back
     - _Requirements: 7.1, 7.4, 7.6_
 
-  - [ ] 12.6 Write unit tests for event management
+  - [x] 12.6 Write unit tests for event management
     - Test `EventForm` validation, `EventCard` rendering, and create/edit/delete flows
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
