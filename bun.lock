@@ -149,6 +149,18 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/calendar-core": {
+      "name": "@workspace/calendar-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@workspace/calendar-ics": "workspace:*",
+        "date-fns": "^4.1.0",
+      },
+      "devDependencies": {
+        "fast-check": "^4.7.0",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/calendar-ics": {
       "name": "@workspace/calendar-ics",
       "version": "0.1.0",
@@ -1325,6 +1337,8 @@
     "@unrs/resolver-binding-win32-ia32-msvc": ["@unrs/resolver-binding-win32-ia32-msvc@1.11.1", "", { "os": "win32", "cpu": "ia32" }, "sha512-DCEI6t5i1NmAZp6pFonpD5m7i6aFrpofcp4LA2i8IIq60Jyo28hamKBxNrZcyOwVOZkgsRp9O2sXWBWP8MnvIQ=="],
 
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.11.1", "", { "os": "win32", "cpu": "x64" }, "sha512-lrW200hZdbfRtztbygyaq/6jP6AKE8qQN2KvPcJ+x7wiD038YtnYtZ82IMNJ69GJibV7bwL3y9FgK+5w/pYt6g=="],
+
+    "@workspace/calendar-core": ["@workspace/calendar-core@workspace:packages/calendar-core"],
 
     "@workspace/calendar-ics": ["@workspace/calendar-ics@workspace:packages/calendar-ics"],
 

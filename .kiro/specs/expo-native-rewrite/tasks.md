@@ -24,8 +24,8 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Update imports to reference `@workspace/design-tokens`
     - _Requirements: 3.2, 3.4_
 
-- [ ] 2. Create `packages/calendar-core` shared package
-  - [ ] 2.1 Scaffold `packages/calendar-core` with `package.json`, `tsconfig.json`, and `src/` directory
+- [x] 2. Create `packages/calendar-core` shared package
+  - [x] 2.1 Scaffold `packages/calendar-core` with `package.json`, `tsconfig.json`, and `src/` directory
     - Extract TypeScript type definitions from `apps/web/lib/types/calendar.ts` into `src/types.ts`
     - Extract date utility functions from `apps/web/lib/calendar-view-model.ts` into `src/date-utils.ts` and `src/view-model.ts`
     - Extract validation logic into `src/validation.ts`
@@ -33,32 +33,32 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Create barrel export in `src/index.ts`
     - _Requirements: 4.3, 4.4, 4.5_
 
-  - [ ] 2.2 Write property test for calendar date range validity
+  - [x] 2.2 Write property test for calendar date range validity
     - **Property 3: Calendar date range validity**
     - For any valid base date, view type, and week start day, verify `getDefaultCalendarDateRange` returns `start <= end` with the base date within `[start, end]`
     - **Validates: Requirements 4.4**
 
-  - [ ] 2.3 Write property test for visible calendar event filtering
+  - [x] 2.3 Write property test for visible calendar event filtering
     - **Property 7: Visible calendar event filtering**
     - For any set of calendars with arbitrary visibility and any set of events, verify `transformCalendarEvents` returns only events whose `calendarId` belongs to a visible calendar
     - **Validates: Requirements 6.9**
 
-  - [ ] 2.4 Write property test for event validation correctness
+  - [x] 2.4 Write property test for event validation correctness
     - **Property 8: Event validation correctness**
     - For any event data, verify `validateEventData` returns errors when title is empty/whitespace, end <= start, title > 255 chars, or description > 1000 chars, and returns empty errors for valid data
     - **Validates: Requirements 7.3**
 
-  - [ ] 2.5 Write property test for calendar view navigation period
+  - [x] 2.5 Write property test for calendar view navigation period
     - **Property 5: Calendar view navigation period**
     - For any current date and view type, verify swiping forward/backward advances/subtracts exactly one period and the result is deterministic
     - **Validates: Requirements 6.6**
 
-  - [ ] 2.6 Write property test for week start day in calendar grid
+  - [x] 2.6 Write property test for week start day in calendar grid
     - **Property 6: Week start day in calendar grid**
     - For any week start day config (0 or 1) and target date, verify the first day of the generated week grid matches the configured start day and the grid contains exactly 7 consecutive days
     - **Validates: Requirements 6.8**
 
-  - [ ] 2.7 Update `apps/web` to import from `@workspace/calendar-core` instead of local files
+  - [x] 2.7 Update `apps/web` to import from `@workspace/calendar-core` instead of local files
     - Replace imports of types, date utils, view model, validation, and calendar helpers
     - Remove or deprecate the extracted source files in `apps/web/lib/`
     - _Requirements: 4.5, 4.7_
