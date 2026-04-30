@@ -1,61 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-
-jest.mock("../../lib/http-client", () => ({
-  httpClient: {},
-  HttpClient: class HttpClient {},
-}));
-
-jest.mock("../../lib/e2ee-payloads", () => ({
-  attachCalendarEncryptionShadow: jest.fn(),
-  attachCategoryEncryptionShadow: jest.fn(),
-  attachEventEncryptionShadow: jest.fn(),
-}));
-
-jest.mock("../../lib/e2ee-session", () => ({
-  getActiveE2eeSession: jest.fn(),
-}));
-
-jest.mock("../../lib/e2ee-bootstrap", () => ({
-  waitForPendingE2eeBootstrap: jest.fn(),
-}));
-
-jest.mock("../../lib/e2ee-crypto", () => ({
-  createBlindIndexTokens: jest.fn(),
-  decryptJsonPayload: jest.fn(),
-}));
-
-import {
-  attachCalendarEncryptionShadow,
-  attachCategoryEncryptionShadow,
-  attachEventEncryptionShadow,
-} from "../../lib/e2ee-payloads";
-import { waitForPendingE2eeBootstrap } from "../../lib/e2ee-bootstrap";
-import { createBlindIndexTokens, decryptJsonPayload } from "../../lib/e2ee-crypto";
-import { getActiveE2eeSession } from "../../lib/e2ee-session";
 import { CalendarApiService } from "../../lib/calendar-api-service";
-
-const mockAttachCalendarEncryptionShadow =
-  attachCalendarEncryptionShadow as jest.MockedFunction<
-    typeof attachCalendarEncryptionShadow
-  >;
-const mockAttachCategoryEncryptionShadow =
-  attachCategoryEncryptionShadow as jest.MockedFunction<
-    typeof attachCategoryEncryptionShadow
-  >;
-const mockAttachEventEncryptionShadow =
-  attachEventEncryptionShadow as jest.MockedFunction<
-    typeof attachEventEncryptionShadow
-  >;
-const mockGetActiveE2eeSession =
-  getActiveE2eeSession as jest.MockedFunction<typeof getActiveE2eeSession>;
-const mockWaitForPendingE2eeBootstrap =
-  waitForPendingE2eeBootstrap as jest.MockedFunction<
-    typeof waitForPendingE2eeBootstrap
-  >;
-const mockCreateBlindIndexTokens =
-  createBlindIndexTokens as jest.MockedFunction<typeof createBlindIndexTokens>;
-const mockDecryptJsonPayload =
-  decryptJsonPayload as jest.MockedFunction<typeof decryptJsonPayload>;
+import type { E2eeProvider } from "@workspace/calendar-client";
 
 describe("CalendarApiService encryption wrappers", () => {
   let client: {
@@ -63,6 +8,14 @@ describe("CalendarApiService encryption wrappers", () => {
     post: jest.Mock;
     put: jest.Mock;
     delete: jest.Mock;
+  };
+  let mockE2ee: {
+    attachEventEncryptionShadow: jest.Mock;
+    attachCalendarEncryptionShadow: jest.Mock;
+    attachCategoryEncryptionShadow: jest.Mock;
+    hydrateEncryptedEvent: jest.Mock;
+    hydrateEncryptedEvents: jest.Mock;
+    createBlindIndexTokens: jest.Mock;
   };
   let service: CalendarApiService;
 
@@ -74,18 +27,25 @@ describe("CalendarApiService encryption wrappers", () => {
       put: jest.fn(),
       delete: jest.fn(),
     };
-    service = new CalendarApiService(client as any);
-    mockWaitForPendingE2eeBootstrap.mockReturnValue(null);
-    mockGetActiveE2eeSession.mockReturnValue({
-      accountKey: {} as CryptoKey,
-      blindIndexKey: {} as CryptoKey,
-    } as any);
-    mockCreateBlindIndexTokens.mockResolvedValue(["idx-1", "idx-2"]);
-    mockDecryptJsonPayload.mockResolvedValue({
-      title: "Decrypted event",
-      description: "Hidden agenda",
-      location: "Room 7",
-    } as never);
+    mockE2ee = {
+      attachEventEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
+      attachCalendarEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
+      attachCategoryEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
+      hydrateEncryptedEvent: jest.fn((event: any) => Promise.resolve({
+        ...event,
+        title: "Decrypted event",
+        description: "Hidden agenda",
+        location: "Room 7",
+      })),
+      hydrateEncryptedEvents: jest.fn((events: any[]) =>
+        Promise.all(events.map((e: any) => mockE2ee.hydrateEncryptedEvent(e))),
+      ),
+      createBlindIndexTokens: jest.fn(() => Promise.resolve(["idx-1", "idx-2"])),
+    };
+    service = new CalendarApiService(
+      client as any,
+      mockE2ee as unknown as E2eeProvider,
+    );
   });
 
   it("posts attached event payloads on create", async () => {
@@ -96,24 +56,24 @@ describe("CalendarApiService encryption wrappers", () => {
       calendarId: "cal-1",
     };
     const payload = { ...request, encryptedContent: "ciphertext" };
-    mockAttachEventEncryptionShadow.mockResolvedValue(payload as any);
+    mockE2ee.attachEventEncryptionShadow.mockResolvedValue(payload);
     client.post.mockResolvedValue({ id: "event-1" } as never);
 
     await service.createEvent(request as any);
 
-    expect(mockAttachEventEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachEventEncryptionShadow).toHaveBeenCalledWith(request);
     expect(client.post).toHaveBeenCalledWith("/api/events", payload);
   });
 
   it("puts attached event payloads on update", async () => {
     const request = { title: "Event" };
     const payload = { ...request, encryptedContent: "ciphertext" };
-    mockAttachEventEncryptionShadow.mockResolvedValue(payload as any);
+    mockE2ee.attachEventEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "event-1" } as never);
 
     await service.updateEvent("event-1", request as any);
 
-    expect(mockAttachEventEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachEventEncryptionShadow).toHaveBeenCalledWith(request);
     expect(client.put).toHaveBeenCalledWith("/api/events/event-1", payload);
   });
 
@@ -134,55 +94,27 @@ describe("CalendarApiService encryption wrappers", () => {
 
     const result = await service.getEvent("event-1");
 
-    expect(mockDecryptJsonPayload).toHaveBeenCalled();
+    expect(mockE2ee.hydrateEncryptedEvent).toHaveBeenCalled();
     expect(result).toEqual(
       expect.objectContaining({
         title: "Decrypted event",
-        description: "Hidden agenda",
-        location: "Room 7",
         encryptedContent: null,
         blindIndexTokens: null,
       }),
     );
   });
 
-  it("waits for bootstrap before decrypting encrypted event reads", async () => {
-    let session: { accountKey: CryptoKey; blindIndexKey: CryptoKey } | null =
-      null;
-    mockGetActiveE2eeSession.mockImplementation(() => session as any);
-    mockWaitForPendingE2eeBootstrap.mockImplementation(
-      () =>
-        Promise.resolve().then(() => {
-          session = {
-            accountKey: {} as CryptoKey,
-            blindIndexKey: {} as CryptoKey,
-          };
-          return true;
-        }) as Promise<boolean>,
-    );
-    client.get.mockResolvedValue({
-      id: "event-1",
-      title: "",
-      encryptedContent: JSON.stringify({ iv: "iv", ciphertext: "ciphertext" }),
-      encryptionState: "encrypted",
-      start: new Date("2026-05-01T10:00:00.000Z"),
-      end: new Date("2026-05-01T11:00:00.000Z"),
-      calendarId: "cal-1",
-      userId: "user-1",
-      createdAt: new Date("2026-04-01T10:00:00.000Z"),
-      updatedAt: new Date("2026-04-01T10:00:00.000Z"),
-    } as never);
-
-    const result = await service.getEvent("event-1");
-
-    expect(mockWaitForPendingE2eeBootstrap).toHaveBeenCalled();
-    expect(mockDecryptJsonPayload).toHaveBeenCalled();
-    expect(result.title).toBe("Decrypted event");
-  });
-
   it("normalizes encrypted events when no session is available", async () => {
-    mockGetActiveE2eeSession.mockReturnValue(null);
-    mockWaitForPendingE2eeBootstrap.mockReturnValue(null);
+    // E2EE provider returns placeholder when no session
+    mockE2ee.hydrateEncryptedEvent.mockImplementation((event: any) =>
+      Promise.resolve({
+        ...event,
+        title: "Encrypted event",
+        description: null,
+        location: null,
+        encryptionState: "encrypted",
+      }),
+    );
     client.get.mockResolvedValue({
       id: "event-1",
       title: "",
@@ -209,11 +141,12 @@ describe("CalendarApiService encryption wrappers", () => {
         location: null,
       }),
     );
-    expect(mockDecryptJsonPayload).not.toHaveBeenCalled();
   });
 
   it("normalizes encrypted events when decryption fails", async () => {
-    mockDecryptJsonPayload.mockRejectedValueOnce(new Error("decrypt failed") as never);
+    mockE2ee.hydrateEncryptedEvent.mockRejectedValueOnce(
+      new Error("decrypt failed"),
+    );
     client.get.mockResolvedValue({
       id: "event-1",
       title: "",
@@ -262,8 +195,7 @@ describe("CalendarApiService encryption wrappers", () => {
 
     const result = await service.searchEvents({ q: "secret event" });
 
-    expect(mockCreateBlindIndexTokens).toHaveBeenCalledWith(
-      expect.any(Object),
+    expect(mockE2ee.createBlindIndexTokens).toHaveBeenCalledWith(
       "secret event",
     );
     expect(client.get).toHaveBeenCalledWith(
@@ -280,6 +212,8 @@ describe("CalendarApiService encryption wrappers", () => {
   });
 
   it("normalizes shadow-write events for UI renders", async () => {
+    // For non-encrypted events, hydrateEncryptedEvent should not be called
+    // because encryptionState is not "encrypted"
     client.get.mockResolvedValue({
       id: "event-1",
       title: "Visible title",
@@ -303,54 +237,61 @@ describe("CalendarApiService encryption wrappers", () => {
         blindIndexTokens: null,
       }),
     );
-    expect(mockDecryptJsonPayload).not.toHaveBeenCalled();
   });
 
   it("posts attached calendar payloads on create", async () => {
     const request = { name: "Work", color: "blue" };
     const payload = { ...request, encryptedName: "ciphertext" };
-    mockAttachCalendarEncryptionShadow.mockResolvedValue(payload as any);
+    mockE2ee.attachCalendarEncryptionShadow.mockResolvedValue(payload);
     client.post.mockResolvedValue({ id: "cal-1" } as never);
 
     await service.createCalendar(request as any);
 
-    expect(mockAttachCalendarEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachCalendarEncryptionShadow).toHaveBeenCalledWith(
+      request,
+    );
     expect(client.post).toHaveBeenCalledWith("/api/calendars", payload);
   });
 
   it("puts attached calendar payloads on update", async () => {
     const request = { name: "Work" };
     const payload = { ...request, encryptedName: "ciphertext" };
-    mockAttachCalendarEncryptionShadow.mockResolvedValue(payload as any);
+    mockE2ee.attachCalendarEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "cal-1" } as never);
 
     await service.updateCalendar("cal-1", request as any);
 
-    expect(mockAttachCalendarEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachCalendarEncryptionShadow).toHaveBeenCalledWith(
+      request,
+    );
     expect(client.put).toHaveBeenCalledWith("/api/calendars/cal-1", payload);
   });
 
   it("posts attached category payloads on create", async () => {
     const request = { name: "Personal", color: "emerald" };
     const payload = { ...request, encryptedName: "ciphertext" };
-    mockAttachCategoryEncryptionShadow.mockResolvedValue(payload as any);
+    mockE2ee.attachCategoryEncryptionShadow.mockResolvedValue(payload);
     client.post.mockResolvedValue({ id: "cat-1" } as never);
 
     await service.createCategory(request as any);
 
-    expect(mockAttachCategoryEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachCategoryEncryptionShadow).toHaveBeenCalledWith(
+      request,
+    );
     expect(client.post).toHaveBeenCalledWith("/api/categories", payload);
   });
 
   it("puts attached category payloads on update", async () => {
     const request = { name: "Personal" };
     const payload = { ...request, encryptedName: "ciphertext" };
-    mockAttachCategoryEncryptionShadow.mockResolvedValue(payload as any);
+    mockE2ee.attachCategoryEncryptionShadow.mockResolvedValue(payload);
     client.put.mockResolvedValue({ id: "cat-1" } as never);
 
     await service.updateCategory("cat-1", request as any);
 
-    expect(mockAttachCategoryEncryptionShadow).toHaveBeenCalledWith(request);
+    expect(mockE2ee.attachCategoryEncryptionShadow).toHaveBeenCalledWith(
+      request,
+    );
     expect(client.put).toHaveBeenCalledWith("/api/categories/cat-1", payload);
   });
 

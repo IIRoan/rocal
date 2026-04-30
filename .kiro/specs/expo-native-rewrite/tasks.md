@@ -63,8 +63,8 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Remove or deprecate the extracted source files in `apps/web/lib/`
     - _Requirements: 4.5, 4.7_
 
-- [ ] 3. Create `packages/calendar-client` shared package
-  - [ ] 3.1 Scaffold `packages/calendar-client` with `package.json`, `tsconfig.json`, and `src/` directory
+- [x] 3. Create `packages/calendar-client` shared package
+  - [x] 3.1 Scaffold `packages/calendar-client` with `package.json`, `tsconfig.json`, and `src/` directory
     - Extract `HttpClient` class from `apps/web/lib/http-client.ts` into `src/http-client.ts`
     - Make `HttpClient` accept `baseURL` via config and an optional `getHeaders` callback for platform-specific auth headers
     - Extract `CalendarApiService` from `apps/web/lib/calendar-api-service.ts` into `src/calendar-api-service.ts`
@@ -72,12 +72,12 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
     - Create barrel export in `src/index.ts`
     - _Requirements: 4.1, 4.2, 4.6_
 
-  - [ ] 3.2 Write property test for HTTP client retry behavior
+  - [x] 3.2 Write property test for HTTP client retry behavior
     - **Property 2: HTTP client retry behavior**
     - For any HTTP status code and retry config, verify retries on 5xx/408/429/network errors up to configured count, and no retries on 401/403/404
     - **Validates: Requirements 4.1**
 
-  - [ ] 3.3 Update `apps/web` to import from `@workspace/calendar-client` instead of local files
+  - [x] 3.3 Update `apps/web` to import from `@workspace/calendar-client` instead of local files
     - Replace imports of `HttpClient` and `CalendarApiService`
     - Provide web-specific `getHeaders` and `E2eeProvider` implementations at the app level
     - Remove or deprecate the extracted source files in `apps/web/lib/`
