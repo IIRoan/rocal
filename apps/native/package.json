@@ -12,13 +12,14 @@
     "build:preview:android": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios --profile production",
     "build:android": "eas build --platform android --profile production",
-    "update:main": "eas update --branch main",
-    "update:dev": "eas update --branch dev",
+    "update:master": "eas update --branch master",
+    "update:testing": "eas update --branch testing",
     "submit:ios": "eas submit --platform ios --profile production",
     "submit:android": "eas submit --platform android --profile production",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "jest -c jest.config.cjs"
+    "test": "jest -c jest.config.cjs",
+    "test:coverage": "jest -c jest.config.cjs --coverage"
   },
   "dependencies": {
     "@better-auth/expo": "^1.5.5",
