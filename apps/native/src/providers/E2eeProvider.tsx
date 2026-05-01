@@ -112,8 +112,8 @@ export function E2eeProvider({
 
         if (!e2ee) {
           log.warn(
-            "E2EE module not available — running in Expo Go without native crypto. " +
-              "E2EE is disabled for this session.",
+            "E2EE is unavailable in the current runtime. Encryption is disabled " +
+              "for this session.",
           );
           if (isCurrentBootstrap()) setIsReady(true);
           return;
