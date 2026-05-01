@@ -25,6 +25,8 @@ import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:event-service");
 
+const INITIALIZED_USER_CACHE_LIMIT = 5000;
+
 export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
 
@@ -201,6 +203,14 @@ export class EventService implements IEventService {
     if (!this.initializedUsers.has(userId)) {
       await ensureUserCalendars(userId);
       this.initializedUsers.add(userId);
+
+      if (this.initializedUsers.size > INITIALIZED_USER_CACHE_LIMIT) {
+        // Keep memory bounded in long-lived processes by evicting oldest inserted users.
+        const oldestUserId = this.initializedUsers.values().next().value;
+        if (oldestUserId) {
+          this.initializedUsers.delete(oldestUserId);
+        }
+      }
     }
 
     if (!start || !end) {
