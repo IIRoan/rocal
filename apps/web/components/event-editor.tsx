@@ -77,32 +77,60 @@ export function EventEditor({
     onEventSaved,
     onClose: handleClose,
   });
+  const {
+    eventAllDay,
+    eventCalendarId,
+    eventDescription,
+    eventEndDate,
+    eventEndTime,
+    eventLocation,
+    eventNotifications,
+    eventSaving,
+    eventStartDate,
+    eventStartTime,
+    eventTitle,
+    eventViewMode,
+    handleEventDelete: deleteEvent,
+    handleEventSave: saveEvent,
+    handleRecurringDeleteAll: deleteRecurringAll,
+    handleRecurringDeleteThis: deleteRecurringThis,
+    isRecurring,
+    loadEventData,
+    resetForm,
+    selectedEvent,
+    setEventViewMode,
+    setIsRecurring,
+    setShowNotifications,
+    setShowRecurringDeleteModal,
+    showNotifications,
+    showRecurringDeleteModal,
+  } = eventForm;
   const [showDescription, setShowDescription] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
   const lastPreviewPayloadRef = useRef<string>("");
 
   useEffect(() => {
     if (!open) {
-      eventForm.resetForm();
+      resetForm();
       requestAnimationFrame(() => {
         setShowDescription(false);
         setShowLocation(false);
       });
     }
-  }, [eventForm.resetForm, open]);
+  }, [open, resetForm]);
 
   useEffect(() => {
     if (!eventToEdit || !open) {
       return;
     }
 
-    eventForm.loadEventData(eventToEdit);
+    loadEventData(eventToEdit);
     if (
       eventToEdit.id &&
       initialEventViewMode === "edit" &&
       !eventToEdit.isSynced
     ) {
-      eventForm.setEventViewMode("edit");
+      setEventViewMode("edit");
     }
 
     requestAnimationFrame(() => {
@@ -115,11 +143,11 @@ export function EventEditor({
       }
     });
   }, [
-    eventForm.loadEventData,
-    eventForm.setEventViewMode,
     eventToEdit,
     initialEventViewMode,
+    loadEventData,
     open,
+    setEventViewMode,
   ]);
 
   useEffect(() => {
@@ -128,24 +156,22 @@ export function EventEditor({
       return;
     }
 
-    const [startHours, startMinutes] = eventForm.eventStartTime
-      .split(":")
-      .map(Number);
-    const [endHours, endMinutes] = eventForm.eventEndTime.split(":").map(Number);
-    const start = new Date(eventForm.eventStartDate);
-    const end = new Date(eventForm.eventEndDate);
+    const [startHours, startMinutes] = eventStartTime.split(":").map(Number);
+    const [endHours, endMinutes] = eventEndTime.split(":").map(Number);
+    const start = new Date(eventStartDate);
+    const end = new Date(eventEndDate);
 
     start.setHours(startHours || 0, startMinutes || 0, 0, 0);
     end.setHours(endHours || 0, endMinutes || 0, 0, 0);
 
     const payload = {
-      allDay: eventForm.eventAllDay,
-      calendarId: eventForm.eventCalendarId,
-      description: eventForm.eventDescription || "",
+      allDay: eventAllDay,
+      calendarId: eventCalendarId,
+      description: eventDescription || "",
       endIso: end.toISOString(),
-      location: eventForm.eventLocation || "",
+      location: eventLocation || "",
       startIso: start.toISOString(),
-      title: eventForm.eventTitle || "(No title)",
+      title: eventTitle || "(No title)",
     };
     const payloadKey = JSON.stringify(payload);
 
@@ -165,46 +191,46 @@ export function EventEditor({
     });
   }, [
     editorMode,
-    eventForm.eventAllDay,
-    eventForm.eventCalendarId,
-    eventForm.eventDescription,
-    eventForm.eventEndDate,
-    eventForm.eventEndTime,
-    eventForm.eventLocation,
-    eventForm.eventStartDate,
-    eventForm.eventStartTime,
-    eventForm.eventTitle,
+    eventAllDay,
+    eventCalendarId,
+    eventDescription,
+    eventEndDate,
+    eventEndTime,
+    eventLocation,
+    eventStartDate,
+    eventStartTime,
+    eventTitle,
     open,
     updatePreviewEvent,
   ]);
 
   const handleEventSave = useCallback(
-    () => eventForm.handleEventSave(calendarData),
-    [calendarData, eventForm],
+    () => saveEvent(calendarData),
+    [calendarData, saveEvent],
   );
   const handleEventDelete = useCallback(
-    () => eventForm.handleEventDelete(calendarData),
-    [calendarData, eventForm],
+    () => deleteEvent(calendarData),
+    [calendarData, deleteEvent],
   );
   const handleRecurringDeleteThis = useCallback(
-    () => eventForm.handleRecurringDeleteThis(calendarData),
-    [calendarData, eventForm],
+    () => deleteRecurringThis(calendarData),
+    [calendarData, deleteRecurringThis],
   );
   const handleRecurringDeleteAll = useCallback(
-    () => eventForm.handleRecurringDeleteAll(calendarData),
-    [calendarData, eventForm],
+    () => deleteRecurringAll(calendarData),
+    [calendarData, deleteRecurringAll],
   );
   const handleEventDownloadIcs = useCallback(async () => {
-    if (!eventForm.selectedEvent?.id) {
+    if (!selectedEvent?.id) {
       return;
     }
 
     try {
-      await calendarApiService.downloadEventICS(eventForm.selectedEvent.id);
+      await calendarApiService.downloadEventICS(selectedEvent.id);
     } catch (error: any) {
       toast.error(error?.message || "Failed to download event as ICS file");
     }
-  }, [eventForm.selectedEvent]);
+  }, [selectedEvent]);
   const handleToggleLocation = useCallback(() => {
     setShowLocation((current) => !current);
   }, []);
@@ -212,24 +238,22 @@ export function EventEditor({
     setShowDescription((current) => !current);
   }, []);
   const handleToggleRecurring = useCallback(() => {
-    eventForm.setIsRecurring(!eventForm.isRecurring);
-  }, [eventForm]);
+    setIsRecurring(!isRecurring);
+  }, [isRecurring, setIsRecurring]);
   const handleToggleNotifications = useCallback(() => {
-    eventForm.setShowNotifications(!eventForm.showNotifications);
-  }, [eventForm]);
+    setShowNotifications(!showNotifications);
+  }, [setShowNotifications, showNotifications]);
 
-  const isViewMode = eventForm.eventViewMode === "view";
+  const isViewMode = eventViewMode === "view";
   const isMobile = useIsMobile();
   const keyboardHeight = useKeyboardHeight();
   const selectedCalendar = useMemo(
-    () => calendars.find((calendar) => calendar.id === eventForm.eventCalendarId),
-    [calendars, eventForm.eventCalendarId],
+    () => calendars.find((calendar) => calendar.id === eventCalendarId),
+    [calendars, eventCalendarId],
   );
   const enabledNotificationCount = useMemo(
-    () =>
-      eventForm.eventNotifications.filter((notification) => notification.isEnabled)
-        .length,
-    [eventForm.eventNotifications],
+    () => eventNotifications.filter((notification) => notification.isEnabled).length,
+    [eventNotifications],
   );
   const hasActiveEncryptionSession = useMemo(
     () => getActiveE2eeSession() !== null,
@@ -250,26 +274,26 @@ export function EventEditor({
       selectedCalendar,
     ],
   );
-  const badgeItem = eventForm.selectedEvent?.id
-    ? eventForm.selectedEvent
+  const badgeItem = selectedEvent?.id
+    ? selectedEvent
     : previewBadgeItem;
-  const dialogTitle = !eventForm.selectedEvent?.id
+  const dialogTitle = !selectedEvent?.id
     ? "Create Event"
     : isViewMode
       ? "Event Details"
       : "Edit Event";
-  const recurringModal = eventForm.selectedEvent && (
+  const recurringModal = selectedEvent && (
     <RecurringDeleteModal
-      open={eventForm.showRecurringDeleteModal}
-      onOpenChange={eventForm.setShowRecurringDeleteModal}
-      eventTitle={eventForm.selectedEvent.title}
+      open={showRecurringDeleteModal}
+      onOpenChange={setShowRecurringDeleteModal}
+      eventTitle={selectedEvent.title}
       onDeleteThis={handleRecurringDeleteThis}
       onDeleteAll={handleRecurringDeleteAll}
-      loading={eventForm.eventSaving}
+      loading={eventSaving}
     />
   );
 
-  const standardLeadingSlot = eventForm.selectedEvent?.id ? (
+  const standardLeadingSlot = selectedEvent?.id ? (
     <button
       onClick={() => onOpenChange(false)}
       className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
@@ -293,7 +317,7 @@ export function EventEditor({
       <EventEditorDesktopHeader
         badgeItem={badgeItem}
         dialogTitle={dialogTitle}
-        isRecurring={eventForm.isRecurring}
+        isRecurring={isRecurring}
         isViewMode={isViewMode}
         leadingSlot={showBackButton ? embeddedLeadingSlot : standardLeadingSlot}
         onToggleDescription={handleToggleDescription}
@@ -302,7 +326,7 @@ export function EventEditor({
         onToggleRecurring={handleToggleRecurring}
         showDescription={showDescription}
         showLocation={showLocation}
-        showNotifications={eventForm.showNotifications}
+        showNotifications={showNotifications}
       />
       <EventEditorBody
         eventForm={eventForm}
