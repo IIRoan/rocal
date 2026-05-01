@@ -8,12 +8,15 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  Extrapolation,
+  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { isSameMonth, isSameDay, format } from "date-fns";
@@ -36,8 +39,19 @@ const WEEK_ROW_HEIGHT = 48;
 const HEADER_ROW_HEIGHT = 24;
 /** Height of the expand/collapse handle */
 const HANDLE_HEIGHT = 24;
-/** Duration of the swipe transition animation (ms) */
-const SWIPE_DURATION = 200;
+
+/** Distance (px) the finger must travel to commit to a month change. */
+const SWIPE_COMMIT_THRESHOLD = 50;
+/** Velocity (px/s) that also commits to a month change. */
+const VELOCITY_COMMIT = 600;
+/** Rubber-band factor for overscroll resistance. */
+const RUBBER_BAND_FACTOR = 0.35;
+/** Duration of the exit slide (ms). */
+const EXIT_DURATION = 160;
+/** Spring config for snap-back. */
+const SNAP_SPRING = { damping: 26, stiffness: 300, mass: 0.8 };
+/** Spring config for expand/collapse height animation. */
+const HEIGHT_SPRING = { damping: 22, stiffness: 260, mass: 0.7 };
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +72,16 @@ interface CompactMonthStripProps {
   onMonthChange: (direction: 1 | -1) => void;
   /** Callback to toggle expanded/collapsed state */
   onToggleExpand: () => void;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function rubberBand(offset: number, limit: number, factor: number): number {
+  "worklet";
+  if (Math.abs(offset) < limit) return offset;
+  const sign = offset < 0 ? -1 : 1;
+  const overshoot = Math.abs(offset) - limit;
+  return sign * (limit + overshoot * factor);
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -111,9 +135,9 @@ export function CompactMonthStrip({
   );
 
   useEffect(() => {
-    animatedHeight.value = withTiming(
+    animatedHeight.value = withSpring(
       expanded ? expandedHeight : collapsedHeight,
-      { duration: 250, easing: Easing.out(Easing.cubic) },
+      HEIGHT_SPRING,
     );
   }, [expanded, expandedHeight, collapsedHeight, animatedHeight]);
 
@@ -122,9 +146,10 @@ export function CompactMonthStrip({
     overflow: "hidden" as const,
   }));
 
-  // ─── Swipe gestures for month navigation + expand/collapse ────────────────
+  // ─── Horizontal pan gesture for month navigation ──────────────────────────
 
   const translateX = useSharedValue(0);
+  const gridOpacity = useSharedValue(1);
 
   const handleSwipeLeft = useCallback(() => {
     onMonthChange(1);
@@ -134,6 +159,64 @@ export function CompactMonthStrip({
     onMonthChange(-1);
   }, [onMonthChange]);
 
+  const resetPosition = useCallback(() => {
+    translateX.value = 0;
+    gridOpacity.value = 1;
+  }, [translateX, gridOpacity]);
+
+  const horizontalPan = Gesture.Pan()
+    .activeOffsetX([-12, 12])
+    .failOffsetY([-8, 8])
+    .onUpdate((e) => {
+      "worklet";
+      translateX.value = rubberBand(
+        e.translationX,
+        SWIPE_COMMIT_THRESHOLD * 2,
+        RUBBER_BAND_FACTOR,
+      );
+    })
+    .onEnd((e) => {
+      "worklet";
+      const committedLeft =
+        e.translationX < -SWIPE_COMMIT_THRESHOLD ||
+        e.velocityX < -VELOCITY_COMMIT;
+      const committedRight =
+        e.translationX > SWIPE_COMMIT_THRESHOLD ||
+        e.velocityX > VELOCITY_COMMIT;
+
+      if (committedLeft) {
+        translateX.value = withTiming(
+          -screenWidth * 0.25,
+          { duration: EXIT_DURATION, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            if (finished) {
+              runOnJS(handleSwipeLeft)();
+              runOnJS(resetPosition)();
+            }
+          },
+        );
+        gridOpacity.value = withTiming(0, { duration: EXIT_DURATION });
+      } else if (committedRight) {
+        translateX.value = withTiming(
+          screenWidth * 0.25,
+          { duration: EXIT_DURATION, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            if (finished) {
+              runOnJS(handleSwipeRight)();
+              runOnJS(resetPosition)();
+            }
+          },
+        );
+        gridOpacity.value = withTiming(0, { duration: EXIT_DURATION });
+      } else {
+        translateX.value = withSpring(0, SNAP_SPRING);
+      }
+    });
+
+  // ─── Vertical pan gesture for expand/collapse ─────────────────────────────
+
+  const VERTICAL_COMMIT = 30;
+
   const handleSwipeDown = useCallback(() => {
     if (!expanded) onToggleExpand();
   }, [expanded, onToggleExpand]);
@@ -142,61 +225,32 @@ export function CompactMonthStrip({
     if (expanded) onToggleExpand();
   }, [expanded, onToggleExpand]);
 
-  const resetPosition = useCallback(() => {
-    translateX.value = 0;
-  }, [translateX]);
-
-  const animateAndNavigate = useCallback(
-    (targetX: number, callback: () => void) => {
+  const verticalPan = Gesture.Pan()
+    .activeOffsetY([-10, 10])
+    .failOffsetX([-8, 8])
+    .onEnd((e) => {
       "worklet";
-      translateX.value = withTiming(
-        targetX,
-        { duration: SWIPE_DURATION, easing: Easing.out(Easing.cubic) },
-        (finished) => {
-          if (finished) {
-            runOnJS(callback)();
-            runOnJS(resetPosition)();
-          }
-        },
-      );
-    },
-    [translateX, resetPosition],
-  );
-
-  const leftFling = Gesture.Fling()
-    .direction(Directions.LEFT)
-    .onEnd(() => {
-      animateAndNavigate(-screenWidth, handleSwipeLeft);
+      if (e.translationY > VERTICAL_COMMIT || e.velocityY > 400) {
+        runOnJS(handleSwipeDown)();
+      } else if (e.translationY < -VERTICAL_COMMIT || e.velocityY < -400) {
+        runOnJS(handleSwipeUp)();
+      }
     });
 
-  const rightFling = Gesture.Fling()
-    .direction(Directions.RIGHT)
-    .onEnd(() => {
-      animateAndNavigate(screenWidth, handleSwipeRight);
-    });
+  const composedGesture = Gesture.Race(horizontalPan, verticalPan);
 
-  const downFling = Gesture.Fling()
-    .direction(Directions.DOWN)
-    .onEnd(() => {
-      runOnJS(handleSwipeDown)();
-    });
-
-  const upFling = Gesture.Fling()
-    .direction(Directions.UP)
-    .onEnd(() => {
-      runOnJS(handleSwipeUp)();
-    });
-
-  const composedGesture = Gesture.Race(
-    leftFling,
-    rightFling,
-    downFling,
-    upFling,
-  );
-
-  const gridAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  const gridAnimatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(
+      Math.abs(translateX.value),
+      [0, screenWidth * 0.25],
+      [1, 0.96],
+      Extrapolation.CLAMP,
+    );
+    return {
+      transform: [{ translateX: translateX.value }, { scale }],
+      opacity: gridOpacity.value,
+    };
+  });
 
   // ─── Render a single week row ────────────────────────────────────────────
 

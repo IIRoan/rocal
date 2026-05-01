@@ -26,6 +26,7 @@ import {
 } from "../../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
+import { ScreenHeader } from "../../../src/components/ScreenHeader";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -223,11 +224,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Settings
-        </Text>
-      </View>
+      <ScreenHeader title="Settings" />
 
       <ScrollView
         style={styles.scrollView}
