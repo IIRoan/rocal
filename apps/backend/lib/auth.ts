@@ -23,7 +23,6 @@ const trustedOrigins = Array.from(
     frontendOrigin,
     backendOrigin,
     process.env.NEXT_PUBLIC_APP_URL || "",
-    "capacitor://localhost",
     "http://localhost",
     "https://localhost",
     mobileAuthCallbackUrl,

@@ -42,7 +42,6 @@ const corsOrigins = Array.from(
   new Set([
     frontendUrl,
     process.env.NEXT_PUBLIC_APP_URL || "",
-    "capacitor://localhost",
     "http://localhost",
     "https://localhost",
     ...parseCsvEnv(process.env.TRUSTED_ORIGINS),

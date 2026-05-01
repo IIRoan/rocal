@@ -4,8 +4,8 @@ This repository is a monorepo for a calendar application (Solace), containing a 
 
 ## High-Level Architecture
 
-- **apps/web**: Next.js frontend built with React 19, Tailwind CSS v4, and `shadcn/ui`. Currently still contains Capacitor/Ionic dependencies for the legacy mobile build, but these are being replaced by `apps/native`. Uses `@workspace/calendar-client`, `@workspace/calendar-core`, `@workspace/design-tokens`, and `@workspace/e2ee` for shared logic.
-- **apps/native**: Expo React Native app (SDK 55, React Native 0.83, React 19) replacing the Capacitor/Ionic WebView mobile experience. Uses Expo Router for file-based navigation, `StyleSheet.create()` with a custom `ThemeProvider` for styling (no NativeWind/Tailwind), `react-native-gesture-handler` + `react-native-reanimated` for gestures, and `expo-secure-store` for auth token storage. Consumes the same shared packages as the web app.
+- **apps/web**: Next.js frontend built with React 19, Tailwind CSS v4, and `shadcn/ui`. Uses `@workspace/calendar-client`, `@workspace/calendar-core`, `@workspace/design-tokens`, and `@workspace/e2ee` for shared logic.
+- **apps/native**: Expo React Native app (SDK 55, React Native 0.83, React 19) replacing the previous mobile webview experience. Uses Expo Router for file-based navigation, `StyleSheet.create()` with a custom `ThemeProvider` for styling (no NativeWind/Tailwind), `react-native-gesture-handler` + `react-native-reanimated` for gestures, and `expo-secure-store` for auth token storage. Consumes the same shared packages as the web app.
 - **apps/backend**: API server built with Elysia.js running on Bun. Uses Prisma ORM with PostgreSQL and Better Auth for authentication (including passkey support). AI functionality utilizes `@openrouter/ai-sdk-provider`. The backend follows a service-layer architecture:
   - `routes/` — Thin HTTP adapters handling auth, request validation (TypeBox schemas), rate limiting, and response headers. Routes delegate all business logic to services.
   - `contracts/` — TypeScript interfaces and DTO types defining each service's operations. These are the source of truth for service signatures.
@@ -23,7 +23,7 @@ This repository is a monorepo for a calendar application (Solace), containing a 
 | `@workspace/e2ee` | End-to-end encryption abstraction (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with a `CryptoProvider` interface for platform-specific crypto backends. |
 | `@workspace/calendar-ics` | ICS export and recurrence logic. |
 | `@workspace/ui` | Shared React UI components (web-focused, shadcn/ui based). |
-| `@workspace/mobile-ui` | Legacy cross-platform components using `react-native-web` (being phased out with Capacitor removal). |
+| `@workspace/mobile-ui` | Legacy cross-platform components using `react-native-web`, retained only for migration reference. |
 | `@workspace/logger` | Shared logging utility. |
 | `@workspace/eslint-config` | Shared ESLint configuration. |
 | `@workspace/typescript-config` | Shared TypeScript configuration. |
@@ -53,7 +53,7 @@ Native app source code lives in `apps/native/src/` with `components/`, `provider
 
 The native app authenticates against the backend using Better Auth with session-based cookies. Auth tokens are stored in `expo-secure-store` (iOS Keychain / Android Keystore). The backend CORS and `TRUSTED_ORIGINS` must include the native app's origin.
 
-The legacy Capacitor/Ionic mobile build in `apps/web` (with `ios/` and `android/` directories) is being replaced by `apps/native` and will be removed once the native app reaches feature parity.
+The native mobile app replaces the previous web-based mobile approach and shares the same backend/auth setup as the web app.
 
 ## Common Development Commands
 
