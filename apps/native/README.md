@@ -6,8 +6,8 @@ This app is configured for Expo/EAS as the `solace-mobile` project.
 
 - Expo slug: `solace-mobile`
 - Deep-link scheme: `solace`
-- PR update channel: `dev`
-- Production update channel: `main`
+- PR update channel: `testing`
+- Production update channel: `master`
 - iOS bundle identifier: `com.solace.mobile`
 - Android application ID: `com.solace.mobile`
 
@@ -33,10 +33,10 @@ EXPO_PROJECT_ID=your-eas-project-id
    - Android: let Expo manage the keystore unless you already have one.
    - iOS: connect the Apple Developer account/team and let Expo manage certificates/profiles.
 8. Add `EXPO_PUBLIC_API_URL` in EAS environment variables if your build should target staging or production automatically.
-9. Create or confirm an EAS Update branch named `dev`.
-9. Create or confirm an EAS Update branch named `main`.
-10. Link the `dev` channel to the `dev` branch in Expo if it is not already linked.
-11. Link the `main` channel to the `main` branch in Expo if it is not already linked.
+9. Create or confirm an EAS Update branch named `testing`.
+10. Create or confirm an EAS Update branch named `master`.
+11. Link the `testing` channel to the `testing` branch in Expo if it is not already linked.
+12. Link the `master` channel to the `master` branch in Expo if it is not already linked.
 
 ## Backend auth setup
 
@@ -75,18 +75,18 @@ bun run start:go
 To publish an update manually to the branch used by the production channel:
 
 ```bash
-bun run update:main -- --message "main update"
+bun run update:master -- --message "master update"
 ```
 
-To publish an update manually to the PR/dev branch:
+To publish an update manually to the PR/testing branch:
 
 ```bash
-bun run update:dev -- --message "dev update"
+bun run update:testing -- --message "testing update"
 ```
 
 ## GitHub automation
 
-PRs targeting `main` can publish a `dev` EAS Update automatically, and pushes to `main` publish the `main` update automatically.
+Any PR can publish a `testing` EAS Update automatically, and pushes to `master` publish the `master` update automatically.
 
 Required GitHub secret:
 
