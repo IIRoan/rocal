@@ -8,6 +8,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import type { KeyboardEvent as RNKeyboardEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -33,8 +34,8 @@ const SCREEN_HEIGHT = Dimensions.get("window").height;
 const MAX_SHEET_RATIO = 0.92;
 
 /** How far (px) the user must drag down before we dismiss. */
-const DISMISS_VELOCITY = 500;
-const DISMISS_DISTANCE = 120;
+const DISMISS_VELOCITY = 400;
+const DISMISS_DISTANCE = 80;
 
 /** Spring that feels like vaul's snap animation. */
 const SPRING_CONFIG = { damping: 28, stiffness: 280, mass: 0.8 };
@@ -73,6 +74,45 @@ export function BottomSheet({
   const translateY = useSharedValue(maxHeight);
   const overlayOpacity = useSharedValue(0);
   const isOpen = useSharedValue(false);
+  const keyboardHeight = useSharedValue(0);
+
+  // ── Keyboard avoidance ───────────────────────────────────────────────────
+
+  // ── Keyboard avoidance ───────────────────────────────────────────────────
+  // Only listen while the sheet is visible so keyboard events from other
+  // screens (e.g. search on the calendar tab) don't shift a hidden sheet.
+
+  useEffect(() => {
+    if (!visible) {
+      // Reset immediately when the sheet is not visible
+      keyboardHeight.value = 0;
+      return;
+    }
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const onShow = (e: RNKeyboardEvent) => {
+      const kbHeight = e.endCoordinates.height;
+      const offset = Platform.OS === "ios" ? kbHeight - insets.bottom : kbHeight;
+      keyboardHeight.value = withSpring(Math.max(0, offset), SPRING_CONFIG);
+    };
+
+    const onHide = () => {
+      keyboardHeight.value = withSpring(0, SPRING_CONFIG);
+    };
+
+    const sub1 = Keyboard.addListener(showEvent, onShow);
+    const sub2 = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      sub1.remove();
+      sub2.remove();
+      keyboardHeight.value = 0;
+    };
+  }, [visible, keyboardHeight, insets.bottom]);
 
   // ── Open / close ─────────────────────────────────────────────────────────
 
@@ -84,6 +124,7 @@ export function BottomSheet({
 
   const close = useCallback(() => {
     Keyboard.dismiss();
+    keyboardHeight.value = 0;
     overlayOpacity.value = withTiming(0, { duration: 150 });
     translateY.value = withSpring(maxHeight, SPRING_CONFIG, (finished) => {
       if (finished) {
@@ -101,13 +142,40 @@ export function BottomSheet({
     }
   }, [visible, open, close, isOpen]);
 
-  // ── Pan gesture (handle area — always active) ────────────────────────────
+  // ── Handle pan gesture (drag the handle pill to dismiss) ─────────────────
 
   const handlePan = Gesture.Pan()
     .onUpdate((e) => {
+      "worklet";
       translateY.value = Math.max(0, e.translationY);
     })
     .onEnd((e) => {
+      "worklet";
+      if (
+        e.translationY > DISMISS_DISTANCE ||
+        e.velocityY > DISMISS_VELOCITY
+      ) {
+        runOnJS(close)();
+      } else {
+        translateY.value = withSpring(0, SPRING_CONFIG);
+      }
+    });
+
+  // ── Overlay pan gesture (swipe down on the backdrop to dismiss) ──────────
+  // This covers the entire screen area behind the sheet, so swiping down
+  // anywhere outside the sheet content will dismiss it.
+
+  const overlayPan = Gesture.Pan()
+    .activeOffsetY(8)
+    .failOffsetX([-15, 15])
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
       if (
         e.translationY > DISMISS_DISTANCE ||
         e.velocityY > DISMISS_VELOCITY
@@ -126,7 +194,9 @@ export function BottomSheet({
   }));
 
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [
+      { translateY: translateY.value - keyboardHeight.value },
+    ],
     maxHeight,
     paddingBottom: insets.bottom,
   }));
@@ -144,15 +214,17 @@ export function BottomSheet({
 
   return (
     <View style={styles.wrapper} pointerEvents={visible ? "auto" : "none"}>
-      {/* Overlay — matches shadcn: bg-black/50 */}
-      <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel="Close sheet"
-        />
-      </Animated.View>
+      {/* Overlay — tap or swipe down to dismiss */}
+      <GestureDetector gesture={overlayPan}>
+        <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel="Close sheet"
+          />
+        </Animated.View>
+      </GestureDetector>
 
       {/* Sheet container */}
       <Animated.View
@@ -160,7 +232,7 @@ export function BottomSheet({
         accessibilityRole="none"
         accessibilityLabel={title}
       >
-        {/* Handle — matches shadcn: mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted */}
+        {/* Handle — drag down to dismiss */}
         <GestureDetector gesture={handlePan}>
           <View style={styles.handleArea}>
             <Animated.View

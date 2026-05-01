@@ -7,7 +7,9 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useSidebar } from "../../providers/SidebarProvider";
 import {
   CALENDAR_VIEWS,
   type CalendarView,
@@ -56,6 +58,7 @@ export function CalendarViewSwitcher({
   onToggleMonthStrip,
 }: CalendarViewSwitcherProps) {
   const { theme } = useTheme();
+  const { toggle: toggleSidebar } = useSidebar();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const dateHeader = useMemo(
@@ -65,8 +68,17 @@ export function CalendarViewSwitcher({
 
   return (
     <View style={styles.container}>
-      {/* Navigation row: back, date header, today, forward */}
+      {/* Navigation row: menu, back, date header, today, forward */}
       <View style={styles.navRow}>
+        <Pressable
+          onPress={toggleSidebar}
+          style={styles.menuButton}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
+          <Feather name="menu" size={22} color={theme.colors.foreground} />
+        </Pressable>
+
         <Pressable
           onPress={onBackwardPress}
           style={styles.navButton}
@@ -158,6 +170,11 @@ function createStyles(theme: ThemeTokens) {
     navButton: {
       paddingHorizontal: theme.spacing["2"],
       paddingVertical: theme.spacing["1"],
+    },
+    menuButton: {
+      paddingHorizontal: theme.spacing["2"],
+      paddingVertical: theme.spacing["1"],
+      marginRight: theme.spacing["1"],
     },
     dateHeaderButton: {
       flex: 1,
