@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design describes the architecture for `apps/native`, a new Expo React Native application that replaces the existing Capacitor/Ionic WebView-based mobile experience. The native app communicates with the same Elysia.js backend API and replicates all calendar features with true native rendering performance.
+This design describes the architecture for `apps/native`, a new Expo React Native application that replaces the previous webview-based mobile experience. The native app communicates with the same Elysia.js backend API and replicates all calendar features with true native rendering performance.
 
 The core strategy is **extract-and-share**: platform-agnostic business logic currently embedded in `apps/web/lib/` is extracted into workspace packages (`packages/calendar-client`, `packages/calendar-core`, `packages/design-tokens`, `packages/e2ee`), then consumed by both the web and native apps. The native app builds its own UI layer using `StyleSheet.create()` with a custom `ThemeProvider` for design token access.
 
@@ -789,4 +789,4 @@ Integration tests (not property-based) cover:
 - UI rendering and layout (visual regression tests or manual QA)
 - Platform-specific integrations (secure storage, biometrics, haptics)
 - Backend API behavior (tested in `apps/backend` test suite)
-- Capacitor removal (one-time migration, verified by CI build)
+- Legacy mobile-webview removal (one-time migration, verified by CI build)

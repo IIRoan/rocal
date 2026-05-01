@@ -1,18 +1,6 @@
 @import "tw-animate-css";
 @import "tailwindcss";
 
-/* Ionic CSS - imported here so they participate in Tailwind's @layer system */
-@import "@ionic/react/css/core.css" layer(base);
-@import "@ionic/react/css/normalize.css" layer(base);
-@import "@ionic/react/css/structure.css" layer(base);
-@import "@ionic/react/css/typography.css" layer(base);
-@import "@ionic/react/css/padding.css" layer(utilities);
-@import "@ionic/react/css/float-elements.css" layer(utilities);
-@import "@ionic/react/css/text-alignment.css" layer(utilities);
-@import "@ionic/react/css/text-transformation.css" layer(utilities);
-@import "@ionic/react/css/flex-utils.css" layer(utilities);
-@import "@ionic/react/css/display.css" layer(utilities);
-
 @source "../**/*.{ts,tsx}";
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 

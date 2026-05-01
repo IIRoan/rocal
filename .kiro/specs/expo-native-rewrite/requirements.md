@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document defines the requirements for building a new native mobile application (`apps/native`) using Expo and React Native to replace the existing Capacitor/Ionic WebView-based mobile experience in the Solace calendar monorepo. The native app communicates with the same Elysia.js backend API and replicates all existing calendar features with true native performance. Styling uses React Native's built-in `StyleSheet.create()` API with a custom Theme_Provider (React Context) for design token access and light/dark mode support. Shared business logic (API client, hooks, types, date utilities) is extracted into workspace packages consumable by both the web and native apps. The existing Next.js web app remains unchanged.
+This document defines the requirements for building a new native mobile application (`apps/native`) using Expo and React Native to replace the previous webview-based mobile experience in the Solace calendar monorepo. The native app communicates with the same Elysia.js backend API and replicates all existing calendar features with true native performance. Styling uses React Native's built-in `StyleSheet.create()` API with a custom Theme_Provider (React Context) for design token access and light/dark mode support. Shared business logic (API client, hooks, types, date utilities) is extracted into workspace packages consumable by both the web and native apps. The existing Next.js web app remains unchanged.
 
 ## Glossary
 
@@ -248,15 +248,14 @@ This document defines the requirements for building a new native mobile applicat
 4. THE Native_App SHALL support stack-based navigation within each tab for drill-down screens (event detail, event editor, calendar management, category management, subscription management).
 5. THE Native_App SHALL support deep linking so that push notification taps and external links navigate to the correct screen.
 
-### Requirement 18: Capacitor/Ionic Removal
+### Requirement 18: Legacy Mobile Stack Removal
 
-**User Story:** As a developer, I want to remove the Capacitor/Ionic dependencies from the web app once the native app is ready, so that the codebase is clean and maintainable.
+**User Story:** As a developer, I want to remove the legacy mobile-webview dependencies from the web app once the native app is ready, so that the codebase is clean and maintainable.
 
 #### Acceptance Criteria
 
-1. WHEN the Native_App reaches feature parity with the existing mobile experience, THE Web_App SHALL remove all Capacitor dependencies (`@capacitor/core`, `@capacitor/app`, `@capacitor/browser`, `@capacitor/haptics`, `@capacitor/keyboard`, `@capacitor/status-bar`, `@capacitor/cli`, `@capacitor/ios`, `@capacitor/android`).
-2. WHEN the Native_App reaches feature parity, THE Web_App SHALL remove all Ionic dependencies (`@ionic/react`, `ionicons`, `ionic.config.json`).
-3. WHEN Capacitor is removed, THE Web_App SHALL remove the `capacitor.config.ts` file and the `ios/` and `android/` directories from `apps/web/`.
-4. WHEN Capacitor is removed, THE Web_App SHALL remove all mobile-specific scripts (`mobile:*`) from its `package.json`.
+1. WHEN the Native_App reaches feature parity with the existing mobile experience, THE Web_App SHALL remove all remaining legacy mobile-webview dependencies from web and shared packages.
+2. WHEN the Native_App reaches feature parity, THE Web_App SHALL remove obsolete mobile wrapper config files and generated native platform directories from `apps/web/`.
+3. WHEN the legacy stack is removed, THE Web_App SHALL remove all mobile-specific scripts (`mobile:*`) from its `package.json`.
 5. THE Web_App SHALL remove the `react-native-web` alias from `next.config.mjs` and the `@workspace/mobile-ui` dependency after the native app is live.
-6. THE Web_App SHALL remove the Capacitor-specific API URL resolution logic from `apps/web/lib/api-url.ts`.
+6. THE Web_App SHALL remove the legacy mobile-wrapper API URL resolution logic from `apps/web/lib/api-url.ts`.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plan implements the Expo React Native app (`apps/native`) to replace the Capacitor/Ionic WebView mobile experience. The approach is bottom-up: first extract shared packages from `apps/web/lib/`, then scaffold the Expo project, build infrastructure providers, implement screens and features, and finally wire everything together. Each task builds incrementally on previous work so there is no orphaned code.
+This plan implements the Expo React Native app (`apps/native`) to replace the previous webview-based mobile experience. The approach is bottom-up: first extract shared packages from `apps/web/lib/`, then scaffold the Expo project, build infrastructure providers, implement screens and features, and finally wire everything together. Each task builds incrementally on previous work so there is no orphaned code.
 
 ## Tasks
 
@@ -410,24 +410,23 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
   - Verify all screens, gestures, notifications, search, subscriptions, deep linking, and offline support work correctly
   - Ask the user if questions arise
 
-- [ ] 22. Configure backend CORS and remove Capacitor/Ionic
+- [ ] 22. Configure backend CORS and remove legacy mobile-webview dependencies
   - [ ] 22.1 Update backend CORS configuration for native app
     - Add native app origin to `TRUSTED_ORIGINS` in backend environment
     - Ensure cookie settings work with native app requests
     - _Requirements: 5.7_
 
-  - [ ] 22.2 Remove Capacitor and Ionic dependencies from `apps/web`
-    - Remove Capacitor packages: `@capacitor/core`, `@capacitor/app`, `@capacitor/browser`, `@capacitor/haptics`, `@capacitor/keyboard`, `@capacitor/status-bar`, `@capacitor/cli`, `@capacitor/ios`, `@capacitor/android`
-    - Remove Ionic packages: `@ionic/react`, `ionicons`, `ionic.config.json`
-    - Remove `capacitor.config.ts` and `ios/` and `android/` directories from `apps/web/`
+  - [ ] 22.2 Remove legacy mobile-webview dependencies from `apps/web`
+    - Remove remaining mobile-wrapper dependencies from `apps/web` and shared packages
+    - Remove obsolete mobile wrapper config files and native platform directories from `apps/web/`
     - Remove mobile-specific scripts (`mobile:*`) from `apps/web/package.json`
     - Remove `react-native-web` alias from `next.config.mjs` and `@workspace/mobile-ui` dependency
-    - Remove Capacitor-specific API URL resolution logic from `apps/web/lib/api-url.ts`
+    - Remove legacy mobile-wrapper API URL resolution logic from `apps/web/lib/api-url.ts`
     - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
 
 - [ ] 23. Final checkpoint — Full integration verification
   - Ensure all tests pass (`bun run test`), run `bun run typecheck` and `bun run lint`
-  - Verify `apps/web` still builds and functions correctly after Capacitor removal
+  - Verify `apps/web` still builds and functions correctly after legacy mobile-webview removal
   - Verify `apps/native` compiles for both iOS and Android
   - Ask the user if questions arise
 
@@ -448,4 +447,4 @@ This plan implements the Expo React Native app (`apps/native`) to replace the Ca
 - Property tests validate the 16 correctness properties defined in the design document
 - Shared package extraction (tasks 1–4) is done first so both web and native apps benefit immediately
 - The web app is updated alongside each extraction to ensure nothing breaks
-- Capacitor/Ionic removal (task 22.2) is last to ensure the native app has full feature parity first
+- Legacy mobile-webview removal (task 22.2) is last to ensure the native app has full feature parity first
