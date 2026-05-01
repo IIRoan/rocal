@@ -16,7 +16,10 @@ import { useSheet } from "../../../src/providers/SheetProvider";
 import { useCalendarView } from "../../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
-import { navigateCalendarDate } from "../../../src/components/calendar/navigation-utils";
+import {
+  getSurroundingCalendarDateRange,
+  navigateCalendarDate,
+} from "../../../src/components/calendar/navigation-utils";
 import { CalendarViewSwitcher } from "../../../src/components/calendar/CalendarViewSwitcher";
 import { CompactMonthStrip } from "../../../src/components/calendar/CompactMonthStrip";
 import { SkeletonLoader } from "../../../src/components/calendar/SkeletonLoader";
@@ -55,15 +58,28 @@ export default function CalendarScreen() {
   });
 
   // Fetch events for the detail view's date range
-  const detailDateRange = useMemo(
-    () =>
-      getDefaultCalendarDateRange({
-        baseDate: selectedDate,
+  const detailDateRange = useMemo(() => {
+    const weekStartDay = settings?.weekStartDay ?? 0;
+
+    if (
+      activeView === "day" ||
+      activeView === "3day" ||
+      activeView === "week"
+    ) {
+      return getSurroundingCalendarDateRange({
+        currentDate: selectedDate,
         view: activeView,
-        weekStartDay: settings?.weekStartDay,
-      }),
-    [selectedDate, activeView, settings?.weekStartDay],
-  );
+        weekStartDay,
+        pageRadius: 2,
+      });
+    }
+
+    return getDefaultCalendarDateRange({
+      baseDate: selectedDate,
+      view: activeView,
+      weekStartDay,
+    });
+  }, [selectedDate, activeView, settings?.weekStartDay]);
 
   // Also fetch events for the month strip (full month range for dots)
   const monthDateRange = useMemo(
@@ -88,6 +104,7 @@ export default function CalendarScreen() {
     queryFn: () =>
       calendarApiService.getEvents(detailDateRange.start, detailDateRange.end),
     enabled: !settingsLoading,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: monthEventsData } = useQuery({
@@ -165,7 +182,7 @@ export default function CalendarScreen() {
     calendarCount: calendarList.length,
     categoriesLoading: false,
     categoryCount: 0,
-    eventsLoading: detailEventsLoading,
+    eventsLoading: detailEventsLoading && detailEventsData == null,
     eventCount: decoratedDetailEvents.length,
   });
 
@@ -229,6 +246,24 @@ export default function CalendarScreen() {
     [openEventSheet],
   );
 
+  const handleDetailNavigate = useCallback(
+    (direction: 1 | -1) => {
+      setSelectedDate((prev) => {
+        const next = navigateCalendarDate(prev, activeView, direction);
+        setCurrentDate(next);
+        return next;
+      });
+    },
+    [activeView],
+  );
+
+  const handleDetailSwipeCommit = useCallback(
+    (direction: 1 | -1) => {
+      setCurrentDate(navigateCalendarDate(selectedDate, activeView, direction));
+    },
+    [activeView, selectedDate],
+  );
+
   const handleEventDelete = useCallback(
     (eventId: string) => {
       deleteEventMutation.mutate(eventId);
@@ -255,7 +290,7 @@ export default function CalendarScreen() {
       {/* Compact month strip with event dots */}
       <CompactMonthStrip
         currentDate={currentDate}
-        selectedDate={selectedDate}
+        selectedDate={currentDate}
         events={decoratedMonthEvents}
         weekStartDay={settings?.weekStartDay ?? 0}
         expanded={monthStripExpanded}
@@ -270,31 +305,30 @@ export default function CalendarScreen() {
       {/* Detail view below the strip */}
       {loadingState.isAllInitialLoading ? (
         <SkeletonLoader view={activeView} />
-      ) : (
+      ) : activeView === "agenda" ? (
         <SwipeableCalendarView
-          onSwipeLeft={() => {
-            setSelectedDate((prev) =>
-              navigateCalendarDate(prev, activeView, 1),
-            );
-            setCurrentDate((prev) =>
-              navigateCalendarDate(prev, activeView, 1),
-            );
-          }}
-          onSwipeRight={() => {
-            setSelectedDate((prev) =>
-              navigateCalendarDate(prev, activeView, -1),
-            );
-            setCurrentDate((prev) =>
-              navigateCalendarDate(prev, activeView, -1),
-            );
-          }}
+          onSwipeLeft={() => handleDetailNavigate(1)}
+          onSwipeRight={() => handleDetailNavigate(-1)}
         >
+          <AgendaList
+            events={decoratedDetailEvents}
+            timeFormat={settings?.timeFormat ?? "12h"}
+            refreshing={detailEventsLoading}
+            onRefresh={() => refetchDetailEvents()}
+            onEventPress={handleEventPress}
+            onEventDelete={handleEventDelete}
+          />
+        </SwipeableCalendarView>
+      ) : (
+        <>
           {activeView === "week" && (
             <WeekTimeline
               currentDate={selectedDate}
               events={decoratedDetailEvents}
               weekStartDay={settings?.weekStartDay ?? 0}
               timeFormat={settings?.timeFormat ?? "12h"}
+              onSwipeCommit={handleDetailSwipeCommit}
+              onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
             />
@@ -304,6 +338,8 @@ export default function CalendarScreen() {
               currentDate={selectedDate}
               events={decoratedDetailEvents}
               timeFormat={settings?.timeFormat ?? "12h"}
+              onSwipeCommit={handleDetailSwipeCommit}
+              onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
             />
@@ -313,21 +349,13 @@ export default function CalendarScreen() {
               currentDate={selectedDate}
               events={decoratedDetailEvents}
               timeFormat={settings?.timeFormat ?? "12h"}
+              onSwipeCommit={handleDetailSwipeCommit}
+              onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
             />
           )}
-          {activeView === "agenda" && (
-            <AgendaList
-              events={decoratedDetailEvents}
-              timeFormat={settings?.timeFormat ?? "12h"}
-              refreshing={detailEventsLoading}
-              onRefresh={() => refetchDetailEvents()}
-              onEventPress={handleEventPress}
-              onEventDelete={handleEventDelete}
-            />
-          )}
-        </SwipeableCalendarView>
+        </>
       )}
     </SafeAreaView>
   );

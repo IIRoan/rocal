@@ -1,10 +1,9 @@
+import { addMonths, addWeeks, addDays, isSameDay } from "date-fns";
 import {
-  addMonths,
-  addWeeks,
-  addDays,
-  isSameDay,
-} from "date-fns";
-import { navigateCalendarDate } from "./navigation-utils";
+  getCalendarPageDate,
+  getSurroundingCalendarDateRange,
+  navigateCalendarDate,
+} from "./navigation-utils";
 
 // ─── Month View ──────────────────────────────────────────────────────────────
 
@@ -98,5 +97,48 @@ describe("navigateCalendarDate", () => {
       const result = navigateCalendarDate(baseDate, "month", -1);
       expect(isSameDay(result, new Date(2024, 11, 15))).toBe(true);
     });
+  });
+});
+
+// ─── Page Offsets ──────────────────────────────────────────────────────────
+
+describe("getCalendarPageDate", () => {
+  const baseDate = new Date(2025, 0, 15);
+
+  it("advances multiple week pages at once", () => {
+    const result = getCalendarPageDate(baseDate, "week", 2);
+    expect(isSameDay(result, addWeeks(baseDate, 2))).toBe(true);
+  });
+
+  it("subtracts multiple 3-day pages at once", () => {
+    const result = getCalendarPageDate(baseDate, "3day", -2);
+    expect(isSameDay(result, addDays(baseDate, -6))).toBe(true);
+  });
+});
+
+// ─── Surrounding Fetch Range ────────────────────────────────────────────────
+
+describe("getSurroundingCalendarDateRange", () => {
+  it("covers the current day plus two surrounding day pages", () => {
+    const range = getSurroundingCalendarDateRange({
+      currentDate: new Date(2025, 0, 15, 12),
+      view: "day",
+      pageRadius: 2,
+    });
+
+    expect(isSameDay(range.start, new Date(2025, 0, 13))).toBe(true);
+    expect(isSameDay(range.end, new Date(2025, 0, 17))).toBe(true);
+  });
+
+  it("covers neighboring week pages using the configured week start", () => {
+    const range = getSurroundingCalendarDateRange({
+      currentDate: new Date(2025, 0, 15),
+      view: "week",
+      weekStartDay: 1,
+      pageRadius: 1,
+    });
+
+    expect(isSameDay(range.start, new Date(2025, 0, 6))).toBe(true);
+    expect(isSameDay(range.end, new Date(2025, 0, 26))).toBe(true);
   });
 });
