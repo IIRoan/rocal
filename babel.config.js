@@ -9,6 +9,12 @@ module.exports = function (api) {
         },
       },
     ],
+    isTest && [
+      '@babel/preset-react',
+      {
+        runtime: 'automatic',
+      },
+    ],
     '@babel/preset-typescript',
     isTest && 'babel-preset-jest',
   ].filter(Boolean);
