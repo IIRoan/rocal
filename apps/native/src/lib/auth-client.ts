@@ -2,7 +2,7 @@ import { createAuthClient } from "better-auth/react";
 import { expoClient } from "@better-auth/expo/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 import * as SecureStore from "expo-secure-store";
-import { API_BASE_URL } from "./constants";
+import { API_BASE_URL, APP_SCHEME, AUTH_STORAGE_PREFIX } from "./constants";
 
 /**
  * Better Auth client configured for the native app.
@@ -15,8 +15,8 @@ export const authClient = createAuthClient({
   basePath: "/api/auth",
   plugins: [
     expoClient({
-      scheme: "solace",
-      storagePrefix: "solace",
+      scheme: APP_SCHEME,
+      storagePrefix: AUTH_STORAGE_PREFIX,
       storage: SecureStore,
     }),
     passkeyClient(),

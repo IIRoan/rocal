@@ -1,3 +1,6 @@
+export const APP_SCHEME = "solace";
+export const AUTH_STORAGE_PREFIX = "solace";
+
 /**
  * Base URL for the Backend API.
  *

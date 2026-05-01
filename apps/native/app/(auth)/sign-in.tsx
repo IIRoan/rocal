@@ -12,10 +12,14 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "../../src/providers/AuthProvider";
+import {
+  AUTH_SIGN_UP_ROUTE,
+  CALENDAR_HOME_ROUTE,
+} from "../../src/lib/auth-routing";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -45,6 +49,7 @@ function validatePassword(password: string): string | null {
 
 export default function SignInScreen() {
   const { signIn, signInWithPasskey } = useAuth();
+  const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -90,7 +95,7 @@ export default function SignInScreen() {
     try {
       await signIn(email.trim(), password);
       log.ok("Sign-in successful");
-      // Navigation is handled by the root layout guard.
+      router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message = err?.message ?? "Sign-in failed. Please check your credentials.";
       log.error("Sign-in failed", err);
@@ -98,7 +103,7 @@ export default function SignInScreen() {
     } finally {
       setIsSigningIn(false);
     }
-  }, [email, password, signIn, clearErrors]);
+  }, [clearErrors, email, password, router, signIn]);
 
   const handlePasskeySignIn = useCallback(async () => {
     clearErrors();
@@ -107,6 +112,7 @@ export default function SignInScreen() {
     try {
       await signInWithPasskey();
       log.ok("Passkey sign-in successful");
+      router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message = err?.message ?? "Passkey sign-in failed. Please try again.";
       log.error("Passkey sign-in failed", err);
@@ -114,7 +120,7 @@ export default function SignInScreen() {
     } finally {
       setIsPasskeyLoading(false);
     }
-  }, [signInWithPasskey, clearErrors]);
+  }, [clearErrors, router, signInWithPasskey]);
 
   const isLoading = isSigningIn || isPasskeyLoading;
 
@@ -262,7 +268,7 @@ export default function SignInScreen() {
             {/* Footer link */}
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don't have an account? </Text>
-              <Link href="/(auth)/sign-up" asChild>
+              <Link href={AUTH_SIGN_UP_ROUTE} asChild>
                 <Pressable accessibilityRole="link">
                   <Text style={styles.footerLink}>Sign up</Text>
                 </Pressable>

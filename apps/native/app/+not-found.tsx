@@ -11,6 +11,12 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/providers/AuthProvider";
+import {
+  AUTH_SIGN_IN_ROUTE,
+  CALENDAR_HOME_ROUTE,
+  SEARCH_ROUTE,
+  SETTINGS_ROUTE,
+} from "../src/lib/auth-routing";
 import { useTheme } from "../src/providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
@@ -25,7 +31,7 @@ export default function NotFoundScreen() {
     setIsSigningOut(true);
     try {
       await signOut();
-      router.replace("/(auth)/sign-in");
+      router.replace(AUTH_SIGN_IN_ROUTE);
     } catch {
       // Best-effort — navigation guard will redirect anyway.
     } finally {
@@ -53,7 +59,7 @@ export default function NotFoundScreen() {
               styles.primaryButton,
               pressed && styles.primaryButtonPressed,
             ]}
-            onPress={() => router.replace("/(tabs)/calendar")}
+            onPress={() => router.replace(CALENDAR_HOME_ROUTE)}
             accessibilityRole="button"
             accessibilityLabel="Go to calendar"
           >
@@ -66,7 +72,7 @@ export default function NotFoundScreen() {
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
             ]}
-            onPress={() => router.replace("/(tabs)/settings")}
+            onPress={() => router.replace(SETTINGS_ROUTE)}
             accessibilityRole="button"
             accessibilityLabel="Go to settings"
           >
@@ -79,7 +85,7 @@ export default function NotFoundScreen() {
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
             ]}
-            onPress={() => router.replace("/(tabs)/search")}
+            onPress={() => router.replace(SEARCH_ROUTE)}
             accessibilityRole="button"
             accessibilityLabel="Go to search"
           >
