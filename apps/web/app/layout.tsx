@@ -12,10 +12,7 @@ import { LoggerBootstrap } from "@/components/logger-bootstrap";
 import { MobileRuntimeBridge } from "@/components/mobile-runtime-bridge";
 import { RouteTransitionProvider } from "@/components/route-transition-provider";
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import "./globals.css";
-
-const calendarBootstrapScript = `(function(){try{var root=document.documentElement;var params=new URLSearchParams(window.location.search);var rawDate=params.get("date");var match=rawDate&&/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(rawDate);var date=match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3]),12,0,0,0):new Date();if(Number.isNaN(date.getTime())){date=new Date()}var iso=date.toISOString();root.dataset.calendarBootstrapDate=iso;var parts={dayName:date.toLocaleDateString("en-US",{weekday:"long"}),dayNum:String(date.getDate()).padStart(2,"0"),monthName:date.toLocaleDateString("en-US",{month:"long"}),year:String(date.getFullYear())};var attempts=0;var applyParts=function(){var found=0;Object.entries(parts).forEach(function(entry){var key=entry[0];var value=entry[1];var nodes=document.querySelectorAll('[data-calendar-bootstrap="'+key+'"]').forEach(function(node){node.textContent=value;found+=1})});attempts+=1;if(found===0&&attempts<120){requestAnimationFrame(applyParts)}};applyParts()}catch(error){}})();`;
 
 export const metadata: Metadata = {
   title: "Solace",
@@ -67,11 +64,6 @@ export default function RootLayout({
       <body
         className={`${solaceSans.variable} ${solaceDisplay.variable} bg-background font-sans antialiased`}
       >
-        <Script
-          id="calendar-bootstrap-date"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{ __html: calendarBootstrapScript }}
-        />
         <GsapAnimationProvider />
         <RouteTransitionProvider>
           <MobileRuntimeBridge>
