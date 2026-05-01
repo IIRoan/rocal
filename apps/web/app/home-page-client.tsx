@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Capacitor } from "@capacitor/core";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
@@ -820,11 +819,10 @@ export function HomePageClient() {
 
   const handleLoginClick = () => {
     setIsExiting(true);
-    router.push(
-      Capacitor.isNativePlatform() ? "/mobile-login" : "/login",
-      undefined,
-      { messageContext: "AUTH_FLOW", minimumVisibleMs: 120 },
-    );
+    router.push("/login", undefined, {
+      messageContext: "AUTH_FLOW",
+      minimumVisibleMs: 120,
+    });
   };
 
   return (

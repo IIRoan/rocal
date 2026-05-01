@@ -47,11 +47,11 @@ export function CalendarDataProvider({ children }: CalendarDataProviderProps) {
  */
 export function CalendarDateSync() {
   const { currentDate } = useCalendarContext();
-  const calendarData = useSharedCalendarData();
+  const { setMonth } = useSharedCalendarData();
 
   useEffect(() => {
-    calendarData.setMonth(currentDate);
-  }, [currentDate, calendarData.setMonth]);
+    setMonth(currentDate);
+  }, [currentDate, setMonth]);
 
   return null;
 }
