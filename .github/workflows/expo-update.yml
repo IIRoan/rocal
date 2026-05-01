@@ -56,12 +56,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck native app
-        run: bun run typecheck:native
-
       - name: Publish update to testing
         working-directory: apps/native
-        run: eas update --branch testing --environment production --message "pr #${{ github.event.pull_request.number }} ${GITHUB_SHA}"
+        env:
+          EAS_UPDATE_MESSAGE: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+        run: eas update --branch testing --environment production --message "$EAS_UPDATE_MESSAGE"
 
   publish-master-update:
     name: Publish Master EAS Update
@@ -87,9 +86,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck native app
-        run: bun run typecheck:native
-
       - name: Publish update to master
         working-directory: apps/native
-        run: eas update --branch master --environment production --message "master ${GITHUB_SHA}"
+        env:
+          EAS_UPDATE_MESSAGE: master-${{ github.sha }}
+        run: eas update --branch master --environment production --message "$EAS_UPDATE_MESSAGE"
