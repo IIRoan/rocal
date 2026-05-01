@@ -17,11 +17,30 @@
  */
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
+import Constants from "expo-constants";
 import { createLogger } from "@workspace/logger";
 
 const log = createLogger("native:crypto");
 
 let polyfillAttempted = false;
+let expoGoWarningLogged = false;
+
+function isExpoGoRuntime(): boolean {
+  return (
+    Constants.executionEnvironment === "storeClient" ||
+    Constants.appOwnership === "expo"
+  );
+}
+
+function logExpoGoDisabledMessage() {
+  if (expoGoWarningLogged) return;
+  expoGoWarningLogged = true;
+  log.warn(
+    "Expo Go runtime detected. Native crypto is unavailable there, so E2EE " +
+      "is disabled for this session. Use a development build or production " +
+      "build to enable encryption on mobile.",
+  );
+}
 
 /**
  * Attempt to install the `react-native-quick-crypto` polyfill.
@@ -32,6 +51,11 @@ let polyfillAttempted = false;
 export async function installCryptoPolyfill(): Promise<void> {
   if (polyfillAttempted) return;
   polyfillAttempted = true;
+
+  if (isExpoGoRuntime()) {
+    logExpoGoDisabledMessage();
+    return;
+  }
 
   // If subtle is already available (e.g. Hermes New Architecture), skip.
   if (globalThis.crypto?.subtle) {
@@ -66,6 +90,11 @@ export async function installCryptoPolyfill(): Promise<void> {
  * without native modules).
  */
 export function createNativeCryptoProvider(): CryptoProvider | null {
+  if (isExpoGoRuntime()) {
+    logExpoGoDisabledMessage();
+    return null;
+  }
+
   const subtle = globalThis.crypto?.subtle;
 
   if (!subtle) {
