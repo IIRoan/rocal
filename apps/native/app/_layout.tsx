@@ -6,6 +6,8 @@ import { AuthProvider, useAuth } from "../src/providers/AuthProvider";
 import { ThemeProvider } from "../src/providers/ThemeProvider";
 import { E2eeProvider, useE2ee } from "../src/providers/E2eeProvider";
 import { SheetProvider } from "../src/providers/SheetProvider";
+import { SidebarProvider } from "../src/providers/SidebarProvider";
+import { AppSidebar } from "../src/components/AppSidebar";
 import { calendarApiService } from "../src/lib/api";
 import { API_BASE_URL } from "../src/lib/constants";
 
@@ -66,11 +68,14 @@ export default function RootLayout() {
         <AuthProvider>
           <ThemeProvider>
             <E2eeProvider>
-              <NavigationGuard>
-                <SheetProvider>
-                  <Slot />
-                </SheetProvider>
-              </NavigationGuard>
+              <SidebarProvider>
+                <NavigationGuard>
+                  <SheetProvider>
+                    <Slot />
+                    <AppSidebar />
+                  </SheetProvider>
+                </NavigationGuard>
+              </SidebarProvider>
             </E2eeProvider>
           </ThemeProvider>
         </AuthProvider>
