@@ -25,20 +25,23 @@ const log = createLogger("native:crypto");
 let polyfillAttempted = false;
 let expoGoWarningLogged = false;
 
-function isExpoGoRuntime(): boolean {
+function isExpoManagedRuntime(): boolean {
+  const appOwnership = Constants.appOwnership;
+
   return (
     Constants.executionEnvironment === "storeClient" ||
-    Constants.appOwnership === "expo"
+    appOwnership === "expo" ||
+    appOwnership === "guest"
   );
 }
 
-function logExpoGoDisabledMessage() {
+function logExpoManagedDisabledMessage() {
   if (expoGoWarningLogged) return;
   expoGoWarningLogged = true;
   log.warn(
-    "Expo Go runtime detected. Native crypto is unavailable there, so E2EE " +
-      "is disabled for this session. Use a development build or production " +
-      "build to enable encryption on mobile.",
+    "Expo-managed runtime detected. Native crypto is disabled there, so E2EE " +
+      "is unavailable for this session. Use a preview/production build to " +
+      "enable encryption on mobile.",
   );
 }
 
@@ -52,8 +55,8 @@ export async function installCryptoPolyfill(): Promise<void> {
   if (polyfillAttempted) return;
   polyfillAttempted = true;
 
-  if (isExpoGoRuntime()) {
-    logExpoGoDisabledMessage();
+  if (isExpoManagedRuntime()) {
+    logExpoManagedDisabledMessage();
     return;
   }
 
@@ -90,8 +93,8 @@ export async function installCryptoPolyfill(): Promise<void> {
  * without native modules).
  */
 export function createNativeCryptoProvider(): CryptoProvider | null {
-  if (isExpoGoRuntime()) {
-    logExpoGoDisabledMessage();
+  if (isExpoManagedRuntime()) {
+    logExpoManagedDisabledMessage();
     return null;
   }
 
