@@ -30,6 +30,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { useSwipePanelGesture } from "../lib/useSwipePanelGesture";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -62,6 +63,8 @@ export interface BottomSheetProps {
   children: React.ReactNode;
   /** Accessibility title for the sheet container. */
   title?: string;
+  /** Allow dragging the sheet body down to dismiss. */
+  swipeContentToDismiss?: boolean;
 }
 
 export interface BottomSheetHandle {
@@ -77,6 +80,7 @@ function BottomSheet({
   onCloseComplete,
   children,
   title,
+  swipeContentToDismiss = false,
 }: BottomSheetProps, ref) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -187,47 +191,47 @@ function BottomSheet({
 
   // ── Handle pan gesture (drag the handle pill to dismiss) ─────────────────
 
-  const handlePan = Gesture.Pan()
-    .onUpdate((e) => {
-      "worklet";
-      translateY.value = Math.max(0, e.translationY);
-    })
-    .onEnd((e) => {
-      "worklet";
-      if (
-        e.translationY > DISMISS_DISTANCE ||
-        e.velocityY > DISMISS_VELOCITY
-      ) {
-        runOnJS(requestClose)();
-      } else {
-        translateY.value = withSpring(0, SPRING_CONFIG);
-      }
-    });
+  const handlePan = useSwipePanelGesture(translateY, {
+    restValue: 0,
+    lowerBound: 0,
+    upperBound: maxHeight,
+    rubberBandBelow: 0,
+    rubberBandAbove: 0,
+    onCommitDown: requestClose,
+    commitDistance: DISMISS_DISTANCE,
+    commitVelocity: DISMISS_VELOCITY,
+    springConfig: SPRING_CONFIG,
+  });
 
   // ── Overlay pan gesture (swipe down on the backdrop to dismiss) ──────────
   // This covers the entire screen area behind the sheet, so swiping down
   // anywhere outside the sheet content will dismiss it.
 
-  const overlayPan = Gesture.Pan()
-    .activeOffsetY(8)
-    .failOffsetX([-15, 15])
-    .onUpdate((e) => {
-      "worklet";
-      if (e.translationY > 0) {
-        translateY.value = e.translationY;
-      }
-    })
-    .onEnd((e) => {
-      "worklet";
-      if (
-        e.translationY > DISMISS_DISTANCE ||
-        e.velocityY > DISMISS_VELOCITY
-      ) {
-        runOnJS(requestClose)();
-      } else {
-        translateY.value = withSpring(0, SPRING_CONFIG);
-      }
-    });
+  const overlayPan = useSwipePanelGesture(translateY, {
+    restValue: 0,
+    lowerBound: 0,
+    upperBound: maxHeight,
+    rubberBandBelow: 0,
+    rubberBandAbove: 0,
+    onCommitDown: requestClose,
+    commitDistance: DISMISS_DISTANCE,
+    commitVelocity: DISMISS_VELOCITY,
+    springConfig: SPRING_CONFIG,
+  }).activeOffsetY(8).failOffsetX([-15, 15]);
+
+  const contentPan = useSwipePanelGesture(translateY, {
+    restValue: 0,
+    lowerBound: 0,
+    upperBound: maxHeight,
+    rubberBandBelow: 0,
+    rubberBandAbove: 0,
+    onCommitDown: requestClose,
+    commitDistance: DISMISS_DISTANCE,
+    commitVelocity: DISMISS_VELOCITY,
+    springConfig: SPRING_CONFIG,
+  }).activeOffsetY(8).failOffsetX([-15, 15]).enabled(swipeContentToDismiss);
+
+  const contentGesture = Gesture.Simultaneous(contentPan, Gesture.Native());
 
   // ── Animated styles ──────────────────────────────────────────────────────
 
@@ -287,9 +291,9 @@ function BottomSheet({
         </GestureDetector>
 
         {/* Content — children manage their own scrolling */}
-        <View style={styles.contentWrapper}>
-          {children}
-        </View>
+        <GestureDetector gesture={contentGesture}>
+          <View style={styles.contentWrapper}>{children}</View>
+        </GestureDetector>
       </Animated.View>
     </View>
   );

@@ -19,6 +19,8 @@ export interface HttpClientConfig {
    * Useful for platform-specific auth headers (e.g. Bearer tokens on native).
    */
   getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
+  /** Optional callback invoked when the API returns 401 or 403. */
+  onAuthError?: (statusCode: 401 | 403) => void;
 }
 
 export interface RequestOptions extends RequestInit {
@@ -34,6 +36,7 @@ export class HttpClient {
   private credentials: RequestCredentials;
   private getHeaders?:
     | (() => Record<string, string> | Promise<Record<string, string>>);
+  private onAuthError?: (statusCode: 401 | 403) => void;
 
   constructor(config: HttpClientConfig) {
     this.baseURL = config.baseURL;
@@ -42,6 +45,7 @@ export class HttpClient {
     this.retryDelay = config.retryDelay ?? 1_000;
     this.credentials = config.credentials ?? "include";
     this.getHeaders = config.getHeaders;
+    this.onAuthError = config.onAuthError;
   }
 
   private async delay(ms: number): Promise<void> {
@@ -216,6 +220,7 @@ export class HttpClient {
 
         // Don't retry authentication errors
         if (error?.statusCode === 401 || error?.statusCode === 403) {
+          this.onAuthError?.(error.statusCode);
           throw error;
         }
 

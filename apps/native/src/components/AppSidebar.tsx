@@ -68,6 +68,7 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 const CALENDAR_VIEW_ITEMS: CalendarViewItem[] = [
+  { key: "month", label: VIEW_LABELS.month, icon: "grid" },
   { key: "week", label: VIEW_LABELS.week, icon: "columns" },
   { key: "3day", label: VIEW_LABELS["3day"], icon: "sidebar" },
   { key: "day", label: VIEW_LABELS.day, icon: "sun" },
