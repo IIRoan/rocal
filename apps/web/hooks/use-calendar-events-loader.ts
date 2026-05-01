@@ -246,7 +246,6 @@ export function useCalendarEventsLoader(
    * `onDateRangeChange` prop.  Month selection is driven exclusively
    * by CalendarDateSync → setMonth.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const setDateRange = useCallback((_dateRange: DateRange) => {}, []);
 
   const refetchEvents = useCallback(

@@ -1,0 +1,22 @@
+{
+  "name": "@workspace/calendar-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "jest -c jest.config.cjs",
+    "test:coverage": "jest -c jest.config.cjs --coverage --runInBand"
+  },
+  "dependencies": {
+    "@workspace/calendar-ics": "workspace:*",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "fast-check": "^4.7.0",
+    "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

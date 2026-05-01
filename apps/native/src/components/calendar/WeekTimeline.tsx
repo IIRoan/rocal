@@ -1,0 +1,56 @@
+import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
+import { TimelinePager } from "./TimelinePager";
+
+// ─── Props ───────────────────────────────────────────────────────────────────
+
+interface WeekTimelineProps {
+  /** The date representing the current week to display */
+  currentDate: Date;
+  /** Events to display as positioned blocks */
+  events: DecoratedCalendarEvent[];
+  /** Week start day: 0 = Sunday, 1 = Monday */
+  weekStartDay: number;
+  /** Time format: "12h" or "24h" */
+  timeFormat?: "12h" | "24h";
+  /** Callback when an event block is tapped */
+  onEventPress?: (event: DecoratedCalendarEvent) => void;
+  /** Callback when an empty time slot is tapped */
+  onTimeSlotPress?: (date: Date, hour: number) => void;
+  /** Callback when a swipe has committed and the header can preview the target week */
+  onSwipeCommit?: (direction: 1 | -1) => void;
+  /** Callback when the user swipes to the adjacent week */
+  onNavigate?: (direction: 1 | -1) => void;
+  /** Whether horizontal swipe gestures are enabled */
+  swipeEnabled?: boolean;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export function WeekTimeline({
+  currentDate,
+  events,
+  weekStartDay,
+  timeFormat = "12h",
+  onEventPress,
+  onTimeSlotPress,
+  onSwipeCommit,
+  onNavigate,
+  swipeEnabled = true,
+}: WeekTimelineProps) {
+  return (
+    <TimelinePager
+      currentDate={currentDate}
+      events={events}
+      view="week"
+      weekStartDay={weekStartDay}
+      timeFormat={timeFormat}
+      swipeEnabled={swipeEnabled}
+      onSwipeCommit={onSwipeCommit}
+      onNavigate={onNavigate}
+      onEventPress={onEventPress}
+      onTimeSlotPress={onTimeSlotPress}
+    />
+  );
+}
+
+export type { WeekTimelineProps };

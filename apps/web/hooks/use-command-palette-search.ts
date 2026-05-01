@@ -146,15 +146,18 @@ export function useCommandPaletteSearch({
   useEffect(() => {
     if (open && initialSearchQuery) {
       setSearchQuery(initialSearchQuery);
-      setDebouncedQuery(initialSearchQuery);
+      const timer = setTimeout(() => {
+        setDebouncedQuery(initialSearchQuery);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [open, initialSearchQuery, setSearchQuery]);
 
   useEffect(() => {
     if (open && currentView === "main") {
-      setSelectedIndex(0);
-
       const frameId = requestAnimationFrame(() => {
+        setSelectedIndex(0);
+
         if (searchInputRef.current) {
           searchInputRef.current.focus();
 
@@ -169,7 +172,10 @@ export function useCommandPaletteSearch({
   }, [open, currentView, initialSearchQuery]);
 
   useEffect(() => {
-    setSelectedIndex(0);
+    const frameId = requestAnimationFrame(() => {
+      setSelectedIndex(0);
+    });
+    return () => cancelAnimationFrame(frameId);
   }, [debouncedQuery, isCommandMode, commandQuery, isSearchOnly]);
 
   useEffect(() => {

@@ -13,6 +13,10 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
     "^@workspace/logger$": "<rootDir>/../../packages/logger/src/index.ts",
+    "^@workspace/calendar-core$": "<rootDir>/../../packages/calendar-core/src/index.ts",
+    "^@workspace/calendar-core/(.*)$": "<rootDir>/../../packages/calendar-core/src/$1",
+    "^@workspace/calendar-ics$": "<rootDir>/../../packages/calendar-ics/src/index.ts",
+    "^@workspace/calendar-ics/(.*)$": "<rootDir>/../../packages/calendar-ics/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 };
