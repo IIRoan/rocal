@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import {
   Alert,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -24,11 +25,13 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 /** Width of the delete action area revealed behind the row */
 const DELETE_ACTION_WIDTH = 80;
 
-/** Swipe threshold to trigger the delete action (percentage of action width) */
-const DELETE_THRESHOLD = 0.6;
+/** Swipe threshold to leave the action revealed (percentage of action width) */
+const DELETE_THRESHOLD = 0.45;
 
 /** Spring config for snap animations */
-const SPRING_CONFIG = { damping: 20, stiffness: 200 };
+const SPRING_CONFIG = { damping: 26, stiffness: 260, mass: 0.8 };
+
+const OVERSWIPE_RESISTANCE = 0.28;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +63,7 @@ export function SwipeableEventRow({
   // ── Shared values for gesture animation ──────────────────────────────────
 
   const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
   const hasReachedThreshold = useSharedValue(false);
 
   // ── Haptic feedback (runs on JS thread) ──────────────────────────────────
@@ -104,15 +108,22 @@ export function SwipeableEventRow({
     .activeOffsetX([-10, 10])
     .failOffsetY([-10, 10])
     .onStart(() => {
+      startX.value = translateX.value;
       hasReachedThreshold.value = false;
     })
     .onUpdate((e) => {
-      // Only allow swiping left (negative translationX), clamp to max
-      const clampedX = Math.min(0, Math.max(e.translationX, -DELETE_ACTION_WIDTH * 1.5));
-      translateX.value = clampedX;
+      "worklet";
+      const rawX = Math.min(0, startX.value + e.translationX);
+      const clampedX =
+        rawX < -DELETE_ACTION_WIDTH
+          ? -DELETE_ACTION_WIDTH +
+            (rawX + DELETE_ACTION_WIDTH) * OVERSWIPE_RESISTANCE
+          : rawX;
+      translateX.value = Math.max(clampedX, -DELETE_ACTION_WIDTH * 1.28);
 
       // Check if we've crossed the delete threshold
-      const thresholdReached = Math.abs(clampedX) >= DELETE_ACTION_WIDTH * DELETE_THRESHOLD;
+      const thresholdReached =
+        Math.abs(translateX.value) >= DELETE_ACTION_WIDTH * DELETE_THRESHOLD;
       if (thresholdReached && !hasReachedThreshold.value) {
         hasReachedThreshold.value = true;
         runOnJS(triggerThresholdHaptic)();
@@ -120,17 +131,15 @@ export function SwipeableEventRow({
         hasReachedThreshold.value = false;
       }
     })
-    .onEnd(() => {
+    .onEnd((e) => {
+      "worklet";
       const shouldTriggerDelete =
-        Math.abs(translateX.value) >= DELETE_ACTION_WIDTH * DELETE_THRESHOLD;
+        Math.abs(translateX.value) >= DELETE_ACTION_WIDTH * DELETE_THRESHOLD ||
+        e.velocityX < -900;
 
       if (shouldTriggerDelete) {
-        // Snap to reveal the full delete action, then show confirmation
-        translateX.value = withSpring(-DELETE_ACTION_WIDTH, SPRING_CONFIG, () => {
-          runOnJS(showDeleteConfirmation)();
-        });
+        translateX.value = withSpring(-DELETE_ACTION_WIDTH, SPRING_CONFIG);
       } else {
-        // Snap back to closed position
         translateX.value = withSpring(0, SPRING_CONFIG);
       }
     });
@@ -145,6 +154,17 @@ export function SwipeableEventRow({
     opacity: Math.min(1, Math.abs(translateX.value) / (DELETE_ACTION_WIDTH * 0.5)),
   }));
 
+  const deleteTextAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: Math.max(
+          0.86,
+          Math.min(1, Math.abs(translateX.value) / DELETE_ACTION_WIDTH),
+        ),
+      },
+    ],
+  }));
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -152,10 +172,17 @@ export function SwipeableEventRow({
       {/* Delete action revealed behind the row */}
       <Animated.View
         style={[styles.deleteAction, deleteActionAnimatedStyle]}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
       >
-        <Text style={styles.deleteText}>Delete</Text>
+        <Pressable
+          style={styles.deleteButton}
+          onPress={showDeleteConfirmation}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${eventTitle}`}
+        >
+          <Animated.Text style={[styles.deleteText, deleteTextAnimatedStyle]}>
+            Delete
+          </Animated.Text>
+        </Pressable>
       </Animated.View>
 
       {/* Swipeable row content */}
@@ -193,6 +220,12 @@ function createStyles(theme: ThemeTokens) {
       backgroundColor: theme.colors.destructive,
       justifyContent: "center" as const,
       alignItems: "center" as const,
+    },
+    deleteButton: {
+      flex: 1,
+      width: "100%",
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
     },
     rowContent: {
       backgroundColor: theme.colors.card,
