@@ -10,18 +10,26 @@ import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
 
 export const FORCE_LOADING_DESIGN_PREVIEW = false;
 
-function getBootstrapLoadingDate(): Date | null {
-  if (typeof document === "undefined") {
-    return null;
+function getLoadingDateParts(now: Date | null) {
+  if (!now) {
+    return {
+      dayName: "",
+      dayNum: "",
+      monthName: "",
+      year: "",
+    };
   }
 
-  const raw = document.documentElement.dataset.calendarBootstrapDate;
-  if (!raw) {
-    return null;
-  }
-
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return {
+    dayName: new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+    }).format(now),
+    dayNum: now.getDate().toString().padStart(2, "0"),
+    monthName: new Intl.DateTimeFormat(undefined, {
+      month: "long",
+    }).format(now),
+    year: now.getFullYear().toString(),
+  };
 }
 
 interface LogoSpinnerProps {
@@ -143,24 +151,30 @@ function LoadingBoard({
 }: LoadingBoardProps) {
   const sweepRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [now] = useState<Date | null>(() => {
-    const bootstrapDate = getBootstrapLoadingDate();
-    if (bootstrapDate) {
-      return bootstrapDate;
-    }
-
-    return typeof window === "undefined" ? null : new Date();
-  });
+  const [now, setNow] = useState<Date>(() => new Date());
   const { message: cyclingMessage, isTransitioning } = useCyclingMessage({
     context: messageContext,
     enabled: enableCycling && !message,
   });
 
   const displayText = message || cyclingMessage;
-  const dayName = now?.toLocaleDateString("en-US", { weekday: "long" }) || "";
-  const dayNum = now ? now.getDate().toString().padStart(2, "0") : "";
-  const monthName = now?.toLocaleDateString("en-US", { month: "long" }) || "";
-  const year = now?.getFullYear().toString() || "";
+  const { dayName, dayNum, monthName, year } = getLoadingDateParts(now);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setNow(new Date());
+
+    const intervalId = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     const sweepNode = sweepRef.current;
@@ -205,7 +219,6 @@ function LoadingBoard({
         </div>
         <span
           className="text-[9px] font-semibold uppercase tracking-[0.4em] text-muted-foreground/30"
-          data-calendar-bootstrap="dayName"
           suppressHydrationWarning
         >
           {dayName}
@@ -216,24 +229,21 @@ function LoadingBoard({
       <div className="relative select-none text-center leading-none">
         <span
           className="block font-bold text-foreground/[0.07]"
-          data-calendar-bootstrap="dayNum"
           suppressHydrationWarning
           style={{ fontSize: "clamp(140px, 38vw, 380px)", lineHeight: 1 }}
         >
           {dayNum}
         </span>
-        {/* Month + year overlay, centered on the number */}
+
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
           <span
             className="text-[clamp(22px,4vw,52px)] font-bold tracking-[-0.02em] text-foreground"
-            data-calendar-bootstrap="monthName"
             suppressHydrationWarning
           >
             {monthName}
           </span>
           <span
             className="text-base font-medium text-muted-foreground/50"
-            data-calendar-bootstrap="year"
             suppressHydrationWarning
           >
             {year}
