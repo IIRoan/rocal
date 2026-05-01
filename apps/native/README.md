@@ -6,6 +6,7 @@ This app is configured for Expo/EAS as the `solace-mobile` project.
 
 - Expo slug: `solace-mobile`
 - Deep-link scheme: `solace`
+- PR update channel: `dev`
 - Production update channel: `main`
 - iOS bundle identifier: `com.solace.mobile`
 - Android application ID: `com.solace.mobile`
@@ -32,8 +33,10 @@ EXPO_PROJECT_ID=your-eas-project-id
    - Android: let Expo manage the keystore unless you already have one.
    - iOS: connect the Apple Developer account/team and let Expo manage certificates/profiles.
 8. Add `EXPO_PUBLIC_API_URL` in EAS environment variables if your build should target staging or production automatically.
+9. Create or confirm an EAS Update branch named `dev`.
 9. Create or confirm an EAS Update branch named `main`.
-10. Link the `main` channel to the `main` branch in Expo if it is not already linked.
+10. Link the `dev` channel to the `dev` branch in Expo if it is not already linked.
+11. Link the `main` channel to the `main` branch in Expo if it is not already linked.
 
 ## Backend auth setup
 
@@ -75,9 +78,15 @@ To publish an update manually to the branch used by the production channel:
 bun run update:main -- --message "main update"
 ```
 
+To publish an update manually to the PR/dev branch:
+
+```bash
+bun run update:dev -- --message "dev update"
+```
+
 ## GitHub automation
 
-Pushes to `main` can publish an EAS Update automatically through GitHub Actions.
+PRs targeting `main` can publish a `dev` EAS Update automatically, and pushes to `main` publish the `main` update automatically.
 
 Required GitHub secret:
 
@@ -86,3 +95,5 @@ Required GitHub secret:
 Required Expo EAS environment values for the `production` environment:
 
 - `EXPO_PUBLIC_API_URL`
+
+Note: PR-triggered publishes are skipped for forked repositories because GitHub does not expose secrets to untrusted PRs.
