@@ -18,4 +18,4 @@ This component is a wrapper for the existing calendar component. It adds swipe g
 
 ## Usage
 
-These components are intended to be used in the `apps/web` application when it is running in a Capacitor container. They should not be used in the desktop web application.
+These components are legacy cross-platform building blocks retained for migration reference. They are not part of the current web or native runtime.

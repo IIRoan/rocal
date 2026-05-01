@@ -37,17 +37,3 @@ npm-debug.log*
 .DS_Store
 *.pem
 
-# Capacitor native projects: keep source projects committed, ignore generated/user-local artifacts.
-apps/web/android/.gradle/
-apps/web/android/local.properties
-apps/web/android/build/
-apps/web/android/app/build/
-apps/web/android/captures/
-apps/web/android/app/src/main/assets/public/
-apps/web/android/app/src/main/assets/capacitor.config.json
-apps/web/ios/App/build/
-apps/web/ios/App/App/public/
-apps/web/ios/App/App/capacitor.config.json
-apps/web/ios/App/Pods/
-apps/web/ios/App/App.xcworkspace/xcuserdata/
-apps/web/ios/App/App.xcodeproj/xcuserdata/
