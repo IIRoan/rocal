@@ -18,7 +18,8 @@
     "submit:android": "eas submit --platform android --profile production",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "jest -c jest.config.cjs"
+    "test": "jest -c jest.config.cjs",
+    "test:coverage": "jest -c jest.config.cjs --coverage"
   },
   "dependencies": {
     "@better-auth/expo": "^1.5.5",
