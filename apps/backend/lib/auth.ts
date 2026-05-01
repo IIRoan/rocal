@@ -3,10 +3,9 @@ import { expo } from "@better-auth/expo";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { oneTimeToken, openAPI } from "better-auth/plugins";
-import { PrismaClient } from "../generated/prisma";
+import { prisma } from "./prisma";
 import { env, parseCsvEnv, toOrigin } from "./env";
 
-const prisma = new PrismaClient();
 export const BETTER_AUTH_BASE_PATH = "/api/auth";
 
 const { backendUrl, frontendUrl, mobileAuthCallbackUrl, isProduction, cookieSameSite } = env;

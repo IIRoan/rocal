@@ -307,6 +307,14 @@ export const createAPI = (prefix = "") => {
 // Start the server when this file is run directly
 const port = env.port;
 const app = createAPI("/api");
+const calendarSyncService = CalendarSyncService.getInstance();
+
+const shutdown = () => {
+  calendarSyncService.stop();
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 // Handle OAuth errors at root (better-auth redirects here on error)
 app.get("/", ({ query, redirect }) => {

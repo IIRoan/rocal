@@ -7,7 +7,9 @@ const logger = createLogger("backend:calendar-sync");
 export class CalendarSyncService {
   private static instance: CalendarSyncService;
   private intervalId: NodeJS.Timeout | null = null;
+  private initialSyncTimeoutId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
+  private isSyncing: boolean = false;
 
   private constructor() {}
 
@@ -25,23 +27,33 @@ export class CalendarSyncService {
     this.isRunning = true;
 
     // Run initial sync after a short delay
-    setTimeout(() => {
+    this.initialSyncTimeoutId = setTimeout(() => {
       this.syncAllActiveSubscriptions().catch((error) => {
         logger.error("Initial sync failed:", error);
       });
     }, 5000);
+    this.initialSyncTimeoutId.unref?.();
 
     // Schedule regular syncing every 15 minutes
     this.intervalId = setInterval(
       async () => {
+        if (this.isSyncing) {
+          logger.warn("Skipping scheduled sync because a previous sync is still running");
+          return;
+        }
+
         try {
+          this.isSyncing = true;
           await this.syncAllActiveSubscriptions();
         } catch (error) {
           logger.error("Scheduled sync failed:", error);
+        } finally {
+          this.isSyncing = false;
         }
       },
       15 * 60 * 1000,
     ); // 15 minutes in milliseconds
+    this.intervalId.unref?.();
   }
 
   stop() {
@@ -49,11 +61,17 @@ export class CalendarSyncService {
       return;
     }
 
+    if (this.initialSyncTimeoutId) {
+      clearTimeout(this.initialSyncTimeoutId);
+      this.initialSyncTimeoutId = null;
+    }
+
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
 
+    this.isSyncing = false;
     this.isRunning = false;
   }
 
