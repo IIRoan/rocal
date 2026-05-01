@@ -16,6 +16,7 @@ import {
 } from "@workspace/calendar-client";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from "./constants";
+import { triggerSessionClear } from "../providers/AuthProvider";
 
 /**
  * The expo client plugin stores cookies in SecureStore under
@@ -28,7 +29,7 @@ import { API_BASE_URL } from "./constants";
  */
 const COOKIE_STORE_KEY = "solace_cookie";
 
-function getSessionCookie(): string {
+export function getSessionCookie(): string {
   const raw = SecureStore.getItem(COOKIE_STORE_KEY);
   if (!raw) return "";
 
@@ -49,17 +50,20 @@ function getSessionCookie(): string {
   }
 }
 
+export function getAuthHeaders(): Record<string, string> {
+  const cookie = getSessionCookie();
+  if (cookie) return { cookie };
+  return {};
+}
+
 export const httpClient = new HttpClient({
   baseURL: API_BASE_URL,
   timeout: 10_000,
   retries: 3,
   retryDelay: 1_000,
   credentials: "include",
-  getHeaders: (): Record<string, string> => {
-    const cookie = getSessionCookie();
-    if (cookie) return { cookie };
-    return {};
-  },
+  getHeaders: getAuthHeaders,
+  onAuthError: triggerSessionClear,
 });
 
 export const calendarApiService = new CalendarApiService(

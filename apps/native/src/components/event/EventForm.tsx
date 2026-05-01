@@ -1164,12 +1164,12 @@ function TogglePill({
         },
         active
           ? {
-              backgroundColor: theme.colors.primaryBase + "1A",
-              borderColor: theme.colors.primaryBase + "66",
+              backgroundColor: theme.colors.primaryBase + "14",
+              borderColor: theme.colors.primaryBase + "38",
             }
           : {
-              backgroundColor: theme.colors.card,
-              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.background,
+              borderColor: theme.colors.border + "80",
             },
       ]}
       onPress={onPress}
@@ -1351,10 +1351,13 @@ function CalendarGrid({
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
+  const softBorder = theme.colors.border + "80";
+  const mutedSurface = theme.colors.muted + "4D";
+
   const view = {
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "transparent",
     },
     scrollContent: {
       flexGrow: 1,
@@ -1365,6 +1368,8 @@ function createStyles(theme: ThemeTokens) {
     },
     errorContainer: {
       backgroundColor: theme.colors.destructive + "18",
+      borderWidth: 1,
+      borderColor: theme.colors.destructive + "33",
       borderRadius: theme.borderRadius.sm,
       padding: theme.spacing["3"],
       gap: theme.spacing["1"],
@@ -1375,11 +1380,12 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.lg.size,
       fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-      height: 44,
+      height: 48,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
+      borderColor: softBorder,
+      borderRadius: theme.borderRadius.md,
       paddingHorizontal: theme.spacing["3"],
+      backgroundColor: theme.colors.background,
     } as ViewStyle & TextStyle,
 
     inputError: {
@@ -1395,12 +1401,12 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      height: 36,
+      height: 40,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
+      borderColor: softBorder,
+      borderRadius: theme.borderRadius.md,
       paddingHorizontal: theme.spacing["3"],
-      backgroundColor: theme.colors.card,
+      backgroundColor: theme.colors.background,
     },
     selectContent: {
       flexDirection: "row" as const,
@@ -1414,9 +1420,9 @@ function createStyles(theme: ThemeTokens) {
     },
     dropdownList: {
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
-      backgroundColor: theme.colors.card,
+      borderColor: softBorder,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.background,
       overflow: "hidden" as const,
     },
     dropdownItem: {
@@ -1427,7 +1433,7 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: theme.spacing["2"],
     },
     dropdownItemActive: {
-      backgroundColor: theme.colors.muted,
+      backgroundColor: mutedSurface,
     },
 
     // Date & Time
@@ -1443,12 +1449,12 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      height: 36,
+      height: 40,
       paddingHorizontal: theme.spacing["3"],
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
-      backgroundColor: theme.colors.card,
+      borderColor: softBorder,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.background,
     },
     allDayRow: {
       flexDirection: "row" as const,
@@ -1472,17 +1478,17 @@ function createStyles(theme: ThemeTokens) {
       paddingTop: theme.spacing["3"],
       marginTop: theme.spacing["3"],
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border + "80",
+      borderTopColor: softBorder,
     },
     expandableInput: {
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.sm,
+      borderColor: softBorder,
+      borderRadius: theme.borderRadius.md,
       paddingHorizontal: theme.spacing["3"],
       paddingVertical: theme.spacing["2"],
       height: 44,
       color: theme.colors.foreground,
-      backgroundColor: theme.colors.card,
+      backgroundColor: theme.colors.background,
       fontSize: theme.typography.fontSize.sm.size,
     },
     textareaInput: {
@@ -1505,8 +1511,8 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: theme.spacing["1"],
       borderRadius: theme.borderRadius.full,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
+      borderColor: softBorder,
+      backgroundColor: theme.colors.background,
     },
     reminderChipActive: {
       borderColor: "transparent",
@@ -1520,8 +1526,8 @@ function createStyles(theme: ThemeTokens) {
       paddingTop: 12,
       paddingHorizontal: theme.spacing["4"],
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border + "80",
-      backgroundColor: theme.colors.muted + "4D",
+      borderTopColor: softBorder,
+      backgroundColor: mutedSurface,
     },
     footerSpacer: {
       flex: 1,
@@ -1534,7 +1540,7 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: 10,
       borderRadius: theme.borderRadius.md,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: softBorder,
       backgroundColor: theme.colors.background,
     },
     saveButton: {

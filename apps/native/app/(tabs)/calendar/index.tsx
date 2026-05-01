@@ -22,6 +22,7 @@ import {
 } from "../../../src/components/calendar/navigation-utils";
 import { CalendarViewSwitcher } from "../../../src/components/calendar/CalendarViewSwitcher";
 import { CompactMonthStrip } from "../../../src/components/calendar/CompactMonthStrip";
+import { MonthGrid } from "../../../src/components/calendar/MonthGrid";
 import { SkeletonLoader } from "../../../src/components/calendar/SkeletonLoader";
 import { SwipeableCalendarView } from "../../../src/components/calendar/SwipeableCalendarView";
 import { WeekTimeline } from "../../../src/components/calendar/WeekTimeline";
@@ -81,13 +82,14 @@ export default function CalendarScreen() {
     });
   }, [selectedDate, activeView, settings?.weekStartDay]);
 
-  // Also fetch events for the month strip (full month range for dots)
+  // Fetch the current/adjacent month windows so swipe pages already have dots.
   const monthDateRange = useMemo(
     () =>
-      getDefaultCalendarDateRange({
-        baseDate: currentDate,
+      getSurroundingCalendarDateRange({
+        currentDate,
         view: "month",
         weekStartDay: settings?.weekStartDay,
+        pageRadius: 1,
       }),
     [currentDate, settings?.weekStartDay],
   );
@@ -120,7 +122,7 @@ export default function CalendarScreen() {
   // ─── Sync default view from settings ───────────────────────────────────────
 
   useEffect(() => {
-    if (settings?.defaultView && settings.defaultView !== "month") {
+    if (settings?.defaultView) {
       setActiveView(settings.defaultView);
     }
   }, [settings?.defaultView, setActiveView]);
@@ -290,7 +292,7 @@ export default function CalendarScreen() {
       {/* Compact month strip with event dots */}
       <CompactMonthStrip
         currentDate={currentDate}
-        selectedDate={currentDate}
+        selectedDate={selectedDate}
         events={decoratedMonthEvents}
         weekStartDay={settings?.weekStartDay ?? 0}
         expanded={monthStripExpanded}
@@ -305,6 +307,14 @@ export default function CalendarScreen() {
       {/* Detail view below the strip */}
       {loadingState.isAllInitialLoading ? (
         <SkeletonLoader view={activeView} />
+      ) : activeView === "month" ? (
+        <MonthGrid
+          currentDate={currentDate}
+          selectedDate={selectedDate}
+          events={decoratedDetailEvents}
+          weekStartDay={settings?.weekStartDay ?? 0}
+          onDayPress={handleDayPress}
+        />
       ) : activeView === "agenda" ? (
         <SwipeableCalendarView
           onSwipeLeft={() => handleDetailNavigate(1)}
