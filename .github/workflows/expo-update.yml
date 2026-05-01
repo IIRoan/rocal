@@ -3,7 +3,7 @@ name: Expo Update
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - "apps/native/**"
       - "packages/**"
@@ -11,8 +11,6 @@ on:
       - "bun.lock"
       - "babel.config.js"
   pull_request:
-    branches:
-      - main
     types:
       - opened
       - synchronize
@@ -32,8 +30,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish-dev-update:
-    name: Publish Dev EAS Update
+  publish-testing-update:
+    name: Publish Testing EAS Update
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -61,12 +59,12 @@ jobs:
       - name: Typecheck native app
         run: bun run typecheck:native
 
-      - name: Publish update to dev
+      - name: Publish update to testing
         working-directory: apps/native
-        run: eas update --branch dev --environment production --message "pr #${{ github.event.pull_request.number }} ${GITHUB_SHA}"
+        run: eas update --branch testing --environment production --message "pr #${{ github.event.pull_request.number }} ${GITHUB_SHA}"
 
-  publish-main-update:
-    name: Publish Main EAS Update
+  publish-master-update:
+    name: Publish Master EAS Update
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -92,6 +90,6 @@ jobs:
       - name: Typecheck native app
         run: bun run typecheck:native
 
-      - name: Publish update to main
+      - name: Publish update to master
         working-directory: apps/native
-        run: eas update --branch main --environment production --message "main ${GITHUB_SHA}"
+        run: eas update --branch master --environment production --message "master ${GITHUB_SHA}"
