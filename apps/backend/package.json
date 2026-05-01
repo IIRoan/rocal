@@ -33,6 +33,7 @@
     "typescript-eslint": "^8.24.1"
   },
   "dependencies": {
+    "@better-auth/expo": "^1.5.5",
     "@workspace/calendar-ics": "workspace:*",
     "@workspace/logger": "0.10.0",
     "@better-auth/core": "^1.5.5",
