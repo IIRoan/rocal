@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { expo } from "@better-auth/expo";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { oneTimeToken, openAPI } from "better-auth/plugins";
@@ -65,6 +66,7 @@ export const auth = betterAuth({
     enabled: true,
   },
   plugins: [
+    expo(),
     openAPI({
       disableDefaultReference: true,
     }),
