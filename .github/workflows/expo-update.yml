@@ -10,17 +10,64 @@ on:
       - "package.json"
       - "bun.lock"
       - "babel.config.js"
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - "apps/native/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "babel.config.js"
 
 permissions:
   contents: read
 
 concurrency:
-  group: expo-update-main
+  group: expo-update-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  publish-update:
-    name: Publish EAS Update
+  publish-dev-update:
+    name: Publish Dev EAS Update
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck native app
+        run: bun run typecheck:native
+
+      - name: Publish update to dev
+        working-directory: apps/native
+        run: eas update --branch dev --environment production --message "pr #${{ github.event.pull_request.number }} ${GITHUB_SHA}"
+
+  publish-main-update:
+    name: Publish Main EAS Update
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
