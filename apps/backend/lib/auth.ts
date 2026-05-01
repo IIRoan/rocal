@@ -12,6 +12,15 @@ const { backendUrl, frontendUrl, mobileAuthCallbackUrl, isProduction, cookieSame
 
 const backendOrigin = toOrigin(backendUrl);
 const frontendOrigin = toOrigin(frontendUrl);
+const nativeTrustedOrigins = [
+  mobileAuthCallbackUrl,
+  "solace://",
+  "solace://api",
+  "solace://api/auth",
+  "app.solace.onl://",
+  "app.solace.onl://api",
+  "app.solace.onl://api/auth",
+];
 
 const skipStateCookieCheck =
   process.env.AUTH_SKIP_STATE_COOKIE_CHECK === "true" ||
@@ -25,10 +34,7 @@ const trustedOrigins = Array.from(
     process.env.NEXT_PUBLIC_APP_URL || "",
     "http://localhost",
     "https://localhost",
-    mobileAuthCallbackUrl,
-    "app.solace.onl://api",
-    "app.solace.onl://api/auth",
-    "app.solace.onl://",
+    ...nativeTrustedOrigins,
     ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
   ]),
 ).filter(Boolean);
