@@ -25,6 +25,7 @@ import {
   type ThemePreference,
 } from "../../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../../src/lib/api";
+import { SETTINGS_TIMEZONE_ROUTE } from "../../../src/lib/auth-routing";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
 
@@ -325,7 +326,7 @@ export default function SettingsScreen() {
             icon="globe"
             label="Timezone"
             value={settings?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
-            onPress={() => router.push("/(tabs)/settings/timezone")}
+            onPress={() => router.push(SETTINGS_TIMEZONE_ROUTE)}
             theme={theme}
           />
         </View>

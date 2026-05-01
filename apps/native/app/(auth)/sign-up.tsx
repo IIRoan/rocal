@@ -12,10 +12,14 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "../../src/providers/AuthProvider";
+import {
+  AUTH_SIGN_IN_ROUTE,
+  CALENDAR_HOME_ROUTE,
+} from "../../src/lib/auth-routing";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -52,6 +56,7 @@ function validatePassword(password: string): string | null {
 
 export default function SignUpScreen() {
   const { signUp } = useAuth();
+  const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -106,8 +111,7 @@ export default function SignUpScreen() {
     try {
       await signUp(name.trim(), email.trim(), password);
       log.ok("Sign-up successful");
-      // Navigation to calendar is handled by the root layout guard
-      // once the auth state transitions to authenticated.
+      router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message = err?.message ?? "Sign-up failed. Please try again.";
       log.error("Sign-up failed", err);
@@ -115,7 +119,7 @@ export default function SignUpScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [name, email, password, signUp, clearErrors]);
+  }, [clearErrors, email, name, password, router, signUp]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -260,7 +264,7 @@ export default function SignUpScreen() {
             {/* Footer link */}
             <View style={styles.footer}>
               <Text style={styles.footerText}>Already have an account? </Text>
-              <Link href="/(auth)/sign-in" asChild>
+              <Link href={AUTH_SIGN_IN_ROUTE} asChild>
                 <Pressable accessibilityRole="link">
                   <Text style={styles.footerLink}>Sign in</Text>
                 </Pressable>

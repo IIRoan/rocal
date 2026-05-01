@@ -10,6 +10,7 @@ import { SidebarProvider } from "../src/providers/SidebarProvider";
 import { CalendarViewProvider } from "../src/providers/CalendarViewProvider";
 import { AppSidebar } from "../src/components/AppSidebar";
 import { calendarApiService } from "../src/lib/api";
+import { getAuthRedirectPath } from "../src/lib/auth-routing";
 import { API_BASE_URL } from "../src/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -24,22 +25,22 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
   // Redirect based on auth state.
   useEffect(() => {
-    if (isLoading) return;
+    const redirectPath = getAuthRedirectPath({
+      isAuthenticated,
+      isLoading,
+      segments,
+    });
+    if (!redirectPath) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
+    // Expo Router can ignore redirects triggered during the same auth-state
+    // transition, so defer to the next tick.
+    const timeoutId = setTimeout(() => {
+      router.replace(redirectPath);
+    }, 0);
 
-    if (!isAuthenticated && !inAuthGroup) {
-      // Not signed in — redirect to sign-in.
-      router.replace("/(auth)/sign-in");
-    } else if (isAuthenticated && inAuthGroup) {
-      // Signed in — redirect to main tabs.
-      // Use setTimeout to ensure the navigation state is settled before
-      // attempting the redirect (Expo Router needs a tick to process
-      // the auth state change).
-      setTimeout(() => {
-        router.replace("/(tabs)/calendar");
-      }, 0);
-    }
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [isAuthenticated, isLoading, segments, router]);
 
   // Bootstrap E2EE after authentication.

@@ -24,6 +24,11 @@ import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
 import { useSidebar } from "../providers/SidebarProvider";
 import { useCalendarView, type DetailCalendarView } from "../providers/CalendarViewProvider";
+import {
+  CALENDAR_HOME_ROUTE,
+  SEARCH_ROUTE,
+  SETTINGS_ROUTE,
+} from "../lib/auth-routing";
 import { VIEW_LABELS } from "./calendar/view-switcher-utils";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -62,9 +67,19 @@ interface CalendarViewItem {
 }
 
 const MENU_ITEMS: MenuItem[] = [
-  { key: "calendar", label: "Calendar", icon: "calendar", route: "/(tabs)/calendar" },
-  { key: "search", label: "Search", icon: "search", route: "/(tabs)/search" },
-  { key: "settings", label: "Settings", icon: "settings", route: "/(tabs)/settings" },
+  {
+    key: "calendar",
+    label: "Calendar",
+    icon: "calendar",
+    route: CALENDAR_HOME_ROUTE,
+  },
+  { key: "search", label: "Search", icon: "search", route: SEARCH_ROUTE },
+  {
+    key: "settings",
+    label: "Settings",
+    icon: "settings",
+    route: SETTINGS_ROUTE,
+  },
 ];
 
 const CALENDAR_VIEW_ITEMS: CalendarViewItem[] = [

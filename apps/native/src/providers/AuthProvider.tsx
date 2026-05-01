@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { authClient } from "../lib/auth-client";
+import { waitForSessionCookie } from "../lib/session-cookie";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,6 +90,39 @@ export function AuthProvider({
 
   // ── Auth actions ─────────────────────────────────────────────────────
 
+  const applySessionData = useCallback(
+    (data: unknown) => {
+      const typedData = data as
+        | {
+            user?: User;
+            session?: Session;
+          }
+        | undefined;
+
+      if (!typedData?.user || !typedData.session) return false;
+      setUser(typedData.user);
+      setSession(typedData.session);
+      return true;
+    },
+    [setUser, setSession],
+  );
+
+  const finalizeAuthenticatedSession = useCallback(
+    async (data: unknown, errorPrefix: string) => {
+      const hasSessionCookie = await waitForSessionCookie();
+
+      if (hasSessionCookie && applySessionData(data)) return;
+
+      const sessionResult = await authClient.getSession();
+      if (applySessionData(sessionResult?.data)) return;
+
+      throw new Error(
+        `${errorPrefix} succeeded, but session setup did not complete. Please try again.`,
+      );
+    },
+    [applySessionData],
+  );
+
   const clearSession = useCallback(() => {
     setUser(null);
     setSession(null);
@@ -113,12 +147,9 @@ export function AuthProvider({
         );
       }
 
-      if (result.data) {
-        setUser(result.data.user as User);
-        setSession((result.data as any).session as Session);
-      }
+      await finalizeAuthenticatedSession(result.data, "Sign-in");
     },
-    [],
+    [finalizeAuthenticatedSession],
   );
 
   const signUp = useCallback(
@@ -135,12 +166,9 @@ export function AuthProvider({
         );
       }
 
-      if (result.data) {
-        setUser(result.data.user as User);
-        setSession((result.data as any).session as Session);
-      }
+      await finalizeAuthenticatedSession(result.data, "Sign-up");
     },
-    [],
+    [finalizeAuthenticatedSession],
   );
 
   const signOut = useCallback(async () => {
@@ -161,11 +189,8 @@ export function AuthProvider({
       );
     }
 
-    if (result.data) {
-      setUser(result.data.user as User);
-      setSession(result.data.session as Session);
-    }
-  }, []);
+    await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
+  }, [finalizeAuthenticatedSession]);
 
   // ── Context value ────────────────────────────────────────────────────
 
