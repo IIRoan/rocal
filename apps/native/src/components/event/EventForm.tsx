@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -10,11 +10,21 @@ import {
   Text,
   TextInput,
   View,
-  findNodeHandle,
+  useWindowDimensions,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -51,6 +61,11 @@ function generateTimeOptions(): Date[] {
 }
 
 const TIME_OPTIONS = generateTimeOptions();
+
+const PICKER_SPRING = { damping: 28, stiffness: 280, mass: 0.8 };
+const PICKER_CLOSE_DURATION = 180;
+const PICKER_DISMISS_DISTANCE = 64;
+const PICKER_DISMISS_VELOCITY = 650;
 
 function formatTime12(date: Date): string {
   let h = date.getHours();
@@ -89,6 +104,9 @@ export function EventForm({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
+  const titleInputRef = useRef<TextInput>(null);
+  const locationInputRef = useRef<TextInput>(null);
+  const descriptionInputRef = useRef<TextInput>(null);
 
   // ── Defaults ─────────────────────────────────────────────────────────────
 
@@ -167,20 +185,17 @@ export function EventForm({
   // ScrollView and scroll so it's visible near the top of the viewport.
 
   const handleInputFocus = useCallback(
-    (ref: View | TextInput | null) => {
+    (ref: TextInput | null) => {
       if (!ref || !scrollRef.current) return;
-      const nodeHandle = findNodeHandle(scrollRef.current);
-      if (!nodeHandle) return;
-      // measureLayout gives us the y-offset of the input inside the ScrollView
-      (ref as any).measureLayout(
-        nodeHandle,
+      const scrollNativeRef = scrollRef.current.getNativeScrollRef();
+      if (!scrollNativeRef) return;
+      ref.measureLayout(
+        scrollNativeRef,
         (_x: number, y: number) => {
           // Scroll so the input sits ~80px from the top
           scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
         },
-        () => {
-          // measureLayout failed — ignore
-        },
+        () => undefined,
       );
     },
     [],
@@ -323,6 +338,7 @@ export function EventForm({
 
               {/* ── Title ─────────────────────────────────────────── */}
               <TextInput
+                ref={titleInputRef}
                 style={[styles.titleInput, fieldErrors.title ? styles.inputError : null]}
                 value={title}
                 onChangeText={setTitle}
@@ -331,7 +347,7 @@ export function EventForm({
                 maxLength={255}
                 returnKeyType="done"
                 blurOnSubmit
-                onFocus={(e) => handleInputFocus(e.target as any)}
+                onFocus={() => handleInputFocus(titleInputRef.current)}
                 accessibilityLabel="Event title"
               />
               {renderFieldError("title")}
@@ -565,6 +581,7 @@ export function EventForm({
                 <View style={styles.expandableSection}>
                   {showLocation && (
                     <TextInput
+                      ref={locationInputRef}
                       style={[
                         styles.expandableInput,
                         fieldErrors.location ? styles.inputError : null,
@@ -576,7 +593,7 @@ export function EventForm({
                       maxLength={255}
                       returnKeyType="done"
                       blurOnSubmit
-                      onFocus={(e) => handleInputFocus(e.target as any)}
+                      onFocus={() => handleInputFocus(locationInputRef.current)}
                       accessibilityLabel="Event location"
                     />
                   )}
@@ -584,6 +601,7 @@ export function EventForm({
 
                   {showDescription && (
                     <TextInput
+                      ref={descriptionInputRef}
                       style={[
                         styles.expandableInput,
                         styles.textareaInput,
@@ -597,7 +615,7 @@ export function EventForm({
                       multiline
                       numberOfLines={3}
                       textAlignVertical="top"
-                      onFocus={(e) => handleInputFocus(e.target as any)}
+                      onFocus={() => handleInputFocus(descriptionInputRef.current)}
                       accessibilityLabel="Event description"
                     />
                   )}
@@ -825,70 +843,186 @@ function TimePickerModal({
   }, [targetOffset]);
 
   return (
-    <Modal
+    <PickerSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={titleText ?? "Select time"}
+      theme={theme}
+      bottomInset={bottomInset}
+      maxHeightRatio={0.56}
     >
-      <View style={modalStyles.overlay}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
+      <ScrollView
+        ref={timeScrollRef}
+        style={modalStyles.scrollArea}
+        contentContainerStyle={modalStyles.grid}
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={handleContentSizeChange}
+      >
+        {rows.map((row, ri) => (
+          <View key={ri} style={modalStyles.gridRow}>
+            {row.map((time) => {
+              const isSelected =
+                time.getHours() === selectedH &&
+                time.getMinutes() === selectedM;
+              const now = new Date();
+              const isCurrent =
+                time.getHours() === now.getHours() &&
+                time.getMinutes() === now.getMinutes();
+              return (
+                <Pressable
+                  key={`${time.getHours()}-${time.getMinutes()}`}
+                  style={[
+                    modalStyles.cell,
+                    isSelected && { backgroundColor: theme.colors.primaryBase },
+                    !isSelected && isCurrent && {
+                      backgroundColor: theme.colors.primaryBase + "33",
+                      borderWidth: 2,
+                      borderColor: theme.colors.primaryBase,
+                    },
+                  ]}
+                  onPress={() => onSelect(time)}
+                >
+                  <Text
+                    style={[
+                      modalStyles.cellText,
+                      isSelected && { color: theme.colors.primaryForeground },
+                      !isSelected && isCurrent && { color: theme.colors.primaryBase },
+                    ]}
+                  >
+                    {formatTime12(time)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+      </ScrollView>
+    </PickerSheet>
+  );
+}
 
-        <View style={[modalStyles.sheet, { paddingBottom: Math.max(24, bottomInset) }]}>
-          <View style={modalStyles.handle} />
-          <Text style={modalStyles.title}>{titleText ?? "Select time"}</Text>
+function PickerSheet({
+  visible,
+  onClose,
+  title,
+  theme,
+  bottomInset,
+  maxHeightRatio,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  theme: ThemeTokens;
+  bottomInset: number;
+  maxHeightRatio: number;
+  children: React.ReactNode;
+}) {
+  const { height } = useWindowDimensions();
+  const [mounted, setMounted] = useState(visible);
+  const styles = useMemo(() => createModalStyles(theme), [theme]);
+  const translateY = useSharedValue(height);
+  const overlayOpacity = useSharedValue(0);
 
-          <ScrollView
-            ref={timeScrollRef}
-            style={modalStyles.scrollArea}
-            contentContainerStyle={modalStyles.grid}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={handleContentSizeChange}
-          >
-            {rows.map((row, ri) => (
-              <View key={ri} style={modalStyles.gridRow}>
-                {row.map((time) => {
-                  const isSelected =
-                    time.getHours() === selectedH &&
-                    time.getMinutes() === selectedM;
-                  const now = new Date();
-                  const isCurrent =
-                    time.getHours() === now.getHours() &&
-                    time.getMinutes() === now.getMinutes();
-                  return (
-                    <Pressable
-                      key={`${time.getHours()}-${time.getMinutes()}`}
-                      style={[
-                        modalStyles.cell,
-                        isSelected && { backgroundColor: theme.colors.primaryBase },
-                        !isSelected && isCurrent && {
-                          backgroundColor: theme.colors.primaryBase + "33",
-                          borderWidth: 2,
-                          borderColor: theme.colors.primaryBase,
-                        },
-                      ]}
-                      onPress={() => onSelect(time)}
-                    >
-                      <Text
-                        style={[
-                          modalStyles.cellText,
-                          isSelected && { color: theme.colors.primaryForeground },
-                          !isSelected && isCurrent && { color: theme.colors.primaryBase },
-                        ]}
-                      >
-                        {formatTime12(time)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
-          </ScrollView>
+  const finishUnmount = useCallback(() => setMounted(false), []);
+  const requestClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
-          <Pressable style={modalStyles.cancelBtn} onPress={onClose}>
-            <Text style={modalStyles.cancelText}>Cancel</Text>
-          </Pressable>
-        </View>
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    translateY.value = visible
+      ? withSpring(0, PICKER_SPRING)
+      : withTiming(height, { duration: PICKER_CLOSE_DURATION }, (finished) => {
+          if (finished) runOnJS(finishUnmount)();
+        });
+    overlayOpacity.value = withTiming(visible ? 1 : 0, {
+      duration: PICKER_CLOSE_DURATION,
+    });
+  }, [visible, height, translateY, overlayOpacity, finishUnmount]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetY(8)
+    .failOffsetX([-20, 20])
+    .onUpdate((e) => {
+      "worklet";
+      if (e.translationY > 0) {
+        translateY.value = e.translationY;
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      if (
+        e.translationY > PICKER_DISMISS_DISTANCE ||
+        e.velocityY > PICKER_DISMISS_VELOCITY
+      ) {
+        runOnJS(requestClose)();
+      } else {
+        translateY.value = withSpring(0, PICKER_SPRING);
+      }
+    });
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  const sheetStyle = useAnimatedStyle(() => {
+    const handleOpacity = interpolate(
+      translateY.value,
+      [0, height * 0.25],
+      [1, 0.25],
+      Extrapolation.CLAMP,
+    );
+
+    return {
+      transform: [{ translateY: translateY.value }],
+      opacity: handleOpacity,
+    };
+  });
+
+  if (!mounted) return null;
+
+  return (
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      onRequestClose={requestClose}
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.42)" }, overlayStyle]}
+        />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={requestClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close picker"
+        />
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: height * maxHeightRatio,
+              paddingBottom: Math.max(16, bottomInset + 8),
+            },
+            sheetStyle,
+          ]}
+        >
+          <GestureDetector gesture={panGesture}>
+            <View style={styles.handleArea}>
+              <View style={styles.handle} />
+            </View>
+          </GestureDetector>
+          <Text style={styles.title}>{title}</Text>
+          {children}
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -899,30 +1033,31 @@ function createModalStyles(theme: ThemeTokens) {
   return StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "flex-end",
     },
     sheet: {
-      backgroundColor: theme.colors.card,
+      backgroundColor: theme.colors.card + "F2",
       borderTopLeftRadius: 16,
       borderTopRightRadius: 16,
-      paddingTop: 8,
-      maxHeight: "55%",
+      overflow: "hidden",
+    },
+    handleArea: {
+      alignItems: "center",
+      paddingTop: 12,
+      paddingBottom: 8,
     },
     handle: {
-      width: 36,
+      width: 42,
       height: 4,
       borderRadius: 2,
       backgroundColor: theme.colors.muted,
-      alignSelf: "center",
-      marginBottom: 12,
     },
     title: {
       fontSize: theme.typography.fontSize.base.size,
       fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       textAlign: "center",
-      marginBottom: 12,
+      marginBottom: 10,
       paddingHorizontal: 16,
     },
     scrollArea: {
@@ -930,12 +1065,16 @@ function createModalStyles(theme: ThemeTokens) {
     },
     grid: {
       paddingHorizontal: 12,
-      paddingBottom: 8,
+      paddingBottom: 16,
     },
     gridRow: {
       flexDirection: "row",
       gap: 8,
       marginBottom: 8,
+    },
+    calendarContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
     },
     cell: {
       flex: 1,
@@ -949,18 +1088,6 @@ function createModalStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    cancelBtn: {
-      alignItems: "center",
-      paddingVertical: 14,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border + "80",
-      marginTop: 4,
-    },
-    cancelText: {
-      fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.mutedForeground,
     },
   });
 }
@@ -988,31 +1115,23 @@ function DatePickerModal({
 }) {
   const dpStyles = useMemo(() => createModalStyles(theme), [theme]);
   return (
-    <Modal
+    <PickerSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={titleText ?? "Select date"}
+      theme={theme}
+      bottomInset={bottomInset}
+      maxHeightRatio={0.7}
     >
-      <View style={dpStyles.overlay}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={[dpStyles.sheet, { paddingBottom: Math.max(24, bottomInset), maxHeight: "70%" }]}>
-          <View style={dpStyles.handle} />
-          <Text style={dpStyles.title}>{titleText ?? "Select date"}</Text>
-          <View style={{ paddingHorizontal: 16 }}>
-            <CalendarGrid
-              selectedDate={selectedDate}
-              onSelect={onSelect}
-              minDate={minDate}
-              theme={theme}
-            />
-          </View>
-          <Pressable style={dpStyles.cancelBtn} onPress={onClose}>
-            <Text style={dpStyles.cancelText}>Cancel</Text>
-          </Pressable>
-        </View>
+      <View style={dpStyles.calendarContent}>
+        <CalendarGrid
+          selectedDate={selectedDate}
+          onSelect={onSelect}
+          minDate={minDate}
+          theme={theme}
+        />
       </View>
-    </Modal>
+    </PickerSheet>
   );
 }
 
