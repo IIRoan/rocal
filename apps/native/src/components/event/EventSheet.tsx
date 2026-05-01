@@ -4,7 +4,6 @@ import {
   Alert,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,6 +11,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { ScrollView } from "react-native-gesture-handler";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   CalendarEvent,
@@ -116,6 +116,9 @@ export function EventSheet({
   const [editOccurrenceDate, setEditOccurrenceDate] = useState<string | undefined>();
   const [scopeModalVisible, setScopeModalVisible] = useState(false);
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
+  const viewScrollAtTopRef = useRef(true);
+  const [canSwipeViewContentToDismiss, setCanSwipeViewContentToDismiss] =
+    useState(false);
 
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
@@ -140,7 +143,19 @@ export function EventSheet({
       setEditOccurrenceDate(mode.occurrenceDate);
     }
     setServerErrors([]);
+    viewScrollAtTopRef.current = true;
+    setCanSwipeViewContentToDismiss(mode?.type === "view");
   }, [mode]);
+
+  useEffect(() => {
+    if (viewMode !== "view") {
+      setCanSwipeViewContentToDismiss(false);
+      return;
+    }
+
+    viewScrollAtTopRef.current = true;
+    setCanSwipeViewContentToDismiss(true);
+  }, [viewMode]);
 
   const handleSheetDismissRequest = useCallback(() => {
     setServerErrors([]);
@@ -362,6 +377,7 @@ export function EventSheet({
         onDismiss={handleSheetDismissRequest}
         onCloseComplete={onCloseComplete}
         title={sheetTitle}
+        swipeContentToDismiss={canSwipeViewContentToDismiss}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -382,6 +398,16 @@ export function EventSheet({
               style={styles.viewScroll}
               contentContainerStyle={styles.viewBody}
               showsVerticalScrollIndicator={false}
+              bounces={false}
+              overScrollMode="never"
+              scrollEventThrottle={16}
+              onScroll={(event) => {
+                const nextAtTop = event.nativeEvent.contentOffset.y <= 0.5;
+                if (viewScrollAtTopRef.current !== nextAtTop) {
+                  viewScrollAtTopRef.current = nextAtTop;
+                  setCanSwipeViewContentToDismiss(nextAtTop);
+                }
+              }}
             >
               {/* Title */}
               <View style={styles.viewRow}>

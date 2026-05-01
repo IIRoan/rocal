@@ -18,7 +18,7 @@ import { API_BASE_URL } from "../src/lib/constants";
 
 function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const { bootstrap, provider } = useE2ee();
+  const { bootstrap, clearSession, provider } = useE2ee();
   const segments = useSegments();
   const router = useRouter();
 
@@ -44,16 +44,19 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 
   // Bootstrap E2EE after authentication.
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
-
     // Wire the E2EE provider into the API service.
     calendarApiService.setE2eeProvider(provider);
+
+    if (!isAuthenticated || !user) {
+      clearSession();
+      return;
+    }
 
     // Kick off E2EE bootstrap (non-blocking).
     bootstrap(user.id, API_BASE_URL).catch(() => {
       // Bootstrap failure is non-fatal — the app works without E2EE.
     });
-  }, [isAuthenticated, user, bootstrap, provider]);
+  }, [isAuthenticated, user, bootstrap, clearSession, provider]);
 
   return <>{children}</>;
 }

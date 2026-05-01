@@ -24,8 +24,12 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
-import { createNativeCryptoProvider, installCryptoPolyfill } from "../lib/native-crypto-provider";
+import {
+  createNativeCryptoProvider,
+  installCryptoPolyfill,
+} from "../lib/native-crypto-provider";
 import { SECURE_STORE_KEYS } from "../lib/constants";
+import { getAuthHeaders } from "../lib/api";
 import { createLogger } from "@workspace/logger";
 
 const log = createLogger("native:e2ee");
@@ -72,6 +76,7 @@ export function E2eeProvider({
   const [isEnabled, setIsEnabled] = useState(false);
   const sessionRef = useRef<E2eeSession | null>(null);
   const moduleRef = useRef<E2eeModule | null>(null);
+  const bootstrapGenerationRef = useRef(0);
 
   // Lazily initialise the E2EE module (needs native crypto at runtime).
   const getModule = useCallback(async (): Promise<E2eeModule | null> => {
@@ -93,24 +98,36 @@ export function E2eeProvider({
 
   const bootstrap = useCallback(
     async (userId: string, apiBaseUrl: string) => {
+      const generation = bootstrapGenerationRef.current + 1;
+      bootstrapGenerationRef.current = generation;
+      const isCurrentBootstrap = () =>
+        bootstrapGenerationRef.current === generation;
+
+      sessionRef.current = null;
+      setIsEnabled(false);
+      setIsReady(false);
+
       try {
         const e2ee = await getModule();
 
         if (!e2ee) {
-          log.warn("E2EE module not available — running in Expo Go without native crypto. " +
-            "E2EE is disabled for this session.");
-          setIsReady(true);
+          log.warn(
+            "E2EE module not available — running in Expo Go without native crypto. " +
+              "E2EE is disabled for this session.",
+          );
+          if (isCurrentBootstrap()) setIsReady(true);
           return;
         }
 
         // 1. Fetch bootstrap data from the backend.
         const response = await fetch(`${apiBaseUrl}/e2ee/bootstrap`, {
           credentials: "include",
+          headers: getAuthHeaders(),
         });
 
         if (!response.ok) {
           log.warn("E2EE bootstrap endpoint returned", response.status);
-          setIsReady(true);
+          if (isCurrentBootstrap()) setIsReady(true);
           return;
         }
 
@@ -118,10 +135,11 @@ export function E2eeProvider({
 
         if (!bootstrapData.enabled) {
           log.info("E2EE is not enabled for this user");
-          setIsReady(true);
+          if (isCurrentBootstrap()) setIsReady(true);
           return;
         }
 
+        if (!isCurrentBootstrap()) return;
         setIsEnabled(true);
 
         // 2. Check if this device already has a registered key pair.
@@ -141,7 +159,7 @@ export function E2eeProvider({
           const crypto = createNativeCryptoProvider();
           if (!crypto) {
             log.warn("Cannot unwrap keys — crypto not available");
-            setIsReady(true);
+            if (isCurrentBootstrap()) setIsReady(true);
             return;
           }
           const privateKey = await crypto.subtle.importKey(
@@ -161,6 +179,7 @@ export function E2eeProvider({
             privateKey,
           );
 
+          if (!isCurrentBootstrap()) return;
           sessionRef.current = {
             accountKey,
             blindIndexKey,
@@ -210,7 +229,7 @@ export function E2eeProvider({
           const crypto = createNativeCryptoProvider();
           if (!crypto) {
             log.warn("Cannot export keys — crypto not available");
-            setIsReady(true);
+            if (isCurrentBootstrap()) setIsReady(true);
             return;
           }
           const exportedPrivateKey = await crypto.subtle.exportKey(
@@ -219,10 +238,13 @@ export function E2eeProvider({
           );
 
           // Register device with backend.
-          await fetch(`${apiBaseUrl}/e2ee/device`, {
+          const deviceResponse = await fetch(`${apiBaseUrl}/e2ee/device`, {
             method: "PUT",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...getAuthHeaders(),
+            },
             body: JSON.stringify({
               deviceId,
               publicKey: publicKeyB64,
@@ -230,6 +252,13 @@ export function E2eeProvider({
               wrappedSearchKey,
             }),
           });
+
+          if (!deviceResponse.ok) {
+            log.warn("E2EE device registration returned", deviceResponse.status);
+            return;
+          }
+
+          if (!isCurrentBootstrap()) return;
 
           // Persist keys in secure storage.
           await SecureStore.setItemAsync(
@@ -244,11 +273,15 @@ export function E2eeProvider({
           sessionRef.current = { accountKey, blindIndexKey, deviceId };
         }
 
-        log.info("E2EE bootstrap complete for device", deviceId);
+        if (isCurrentBootstrap()) {
+          log.info("E2EE bootstrap complete for device", deviceId);
+        }
       } catch (error) {
-        log.error("E2EE bootstrap failed:", error);
+        if (isCurrentBootstrap()) {
+          log.error("E2EE bootstrap failed:", error);
+        }
       } finally {
-        setIsReady(true);
+        if (isCurrentBootstrap()) setIsReady(true);
       }
     },
     [getModule],
@@ -257,6 +290,7 @@ export function E2eeProvider({
   // ── Clear session ──────────────────────────────────────────────────────
 
   const clearSession = useCallback(() => {
+    bootstrapGenerationRef.current += 1;
     sessionRef.current = null;
     setIsEnabled(false);
     setIsReady(false);

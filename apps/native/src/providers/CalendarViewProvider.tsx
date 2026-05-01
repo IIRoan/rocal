@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import type { CalendarView } from "@workspace/calendar-core";
 
-export type DetailCalendarView = Exclude<CalendarView, "month">;
+export type DetailCalendarView = CalendarView;
 
 interface CalendarViewContextValue {
   activeView: DetailCalendarView;
