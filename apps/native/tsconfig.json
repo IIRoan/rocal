@@ -1,0 +1,68 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "DOM",
+      "ES2022"
+    ],
+    "types": [
+      "jest",
+      "@types/react"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@workspace/design-tokens": [
+        "../../packages/design-tokens/src/index.ts"
+      ],
+      "@workspace/design-tokens/*": [
+        "../../packages/design-tokens/src/*"
+      ],
+      "@workspace/calendar-core": [
+        "../../packages/calendar-core/src/index.ts"
+      ],
+      "@workspace/calendar-core/*": [
+        "../../packages/calendar-core/src/*"
+      ],
+      "@workspace/calendar-client": [
+        "../../packages/calendar-client/src/index.ts"
+      ],
+      "@workspace/calendar-client/*": [
+        "../../packages/calendar-client/src/*"
+      ],
+      "@workspace/e2ee": [
+        "../../packages/e2ee/src/index.ts"
+      ],
+      "@workspace/e2ee/*": [
+        "../../packages/e2ee/src/*"
+      ],
+      "@workspace/logger": [
+        "../../packages/logger/src/index.ts"
+      ],
+      "@workspace/logger/*": [
+        "../../packages/logger/src/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".expo"
+  ]
+}

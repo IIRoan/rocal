@@ -1,46 +1,9 @@
-import type { Calendar } from "./types/calendar";
-
-export type PartitionedCalendars = {
-  ownedCalendars: Calendar[];
-  publicCalendars: Calendar[];
-  subscribedCalendars: Calendar[];
-};
-
-export function partitionCalendarsByKind(
-  calendars: Calendar[],
-): PartitionedCalendars {
-  const ownedCalendars: Calendar[] = [];
-  const publicCalendars: Calendar[] = [];
-  const subscribedCalendars: Calendar[] = [];
-
-  for (const calendar of calendars) {
-    if (calendar.kind === "owned") {
-      ownedCalendars.push(calendar);
-      continue;
-    }
-
-    if (calendar.kind === "public_holiday") {
-      publicCalendars.push(calendar);
-      continue;
-    }
-
-    subscribedCalendars.push(calendar);
-  }
-
-  return {
-    ownedCalendars,
-    publicCalendars,
-    subscribedCalendars,
-  };
-}
-
-export function getErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-
-  return fallback;
-}
+/**
+ * @deprecated Import directly from "@workspace/calendar-core" instead.
+ * This file is a thin re-export for backwards compatibility.
+ */
+export {
+  partitionCalendarsByKind,
+  getErrorMessage,
+} from "@workspace/calendar-core";
+export type { PartitionedCalendars } from "@workspace/calendar-core";
