@@ -3,7 +3,6 @@ import { StyleSheet, View, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  type CalendarView,
   type DecoratedCalendarEvent,
   getDefaultCalendarDateRange,
   createCalendarMap,
@@ -14,6 +13,7 @@ import {
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { useSheet } from "../../../src/providers/SheetProvider";
+import { useCalendarView } from "../../../src/providers/CalendarViewProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { navigateCalendarDate } from "../../../src/components/calendar/navigation-utils";
@@ -28,19 +28,16 @@ import { AgendaList } from "../../../src/components/calendar/AgendaList";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** Detail views that appear below the month strip */
-type DetailView = Exclude<CalendarView, "month">;
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
   const { theme } = useTheme();
   const { openEventSheet } = useSheet();
+  const { activeView, setActiveView } = useCalendarView();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   // ─── State ───────────────────────────────────────────────────────────────────
 
-  const [activeView, setActiveView] = useState<DetailView>("day");
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [monthStripExpanded, setMonthStripExpanded] = useState(false);
@@ -107,9 +104,9 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     if (settings?.defaultView && settings.defaultView !== "month") {
-      setActiveView(settings.defaultView as DetailView);
+      setActiveView(settings.defaultView);
     }
-  }, [settings?.defaultView]);
+  }, [settings?.defaultView, setActiveView]);
 
   // ─── Event deletion (swipe-to-delete in agenda) ───────────────────────────
 
@@ -194,12 +191,6 @@ export default function CalendarScreen() {
     setSelectedDate(now);
   }, []);
 
-  const handleViewChange = useCallback((view: CalendarView) => {
-    if (view !== "month") {
-      setActiveView(view as DetailView);
-    }
-  }, []);
-
   // When a day is tapped in the month strip, select it and navigate
   const handleDayPress = useCallback((date: Date) => {
     setSelectedDate(date);
@@ -249,10 +240,9 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header: navigation arrows, date title, view switcher */}
+      {/* Header: menu, date title, mini-calendar toggle */}
       <CalendarViewSwitcher
         activeView={activeView}
-        onViewChange={handleViewChange}
         currentDate={currentDate}
         weekStartDay={settings?.weekStartDay ?? 0}
         onTodayPress={handleTodayPress}
