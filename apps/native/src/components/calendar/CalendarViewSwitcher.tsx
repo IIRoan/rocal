@@ -10,24 +10,15 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useSidebar } from "../../providers/SidebarProvider";
-import {
-  CALENDAR_VIEWS,
-  type CalendarView,
-} from "@workspace/calendar-core";
+import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { formatViewDateHeader, VIEW_LABELS } from "./view-switcher-utils";
-
-// ─── Detail view options (excludes "month" — the strip replaces it) ─────────
-
-const DETAIL_VIEWS: CalendarView[] = ["week", "3day", "day", "agenda"];
+import { formatViewDateHeader } from "./view-switcher-utils";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface CalendarViewSwitcherProps {
   /** The currently active view */
   activeView: CalendarView;
-  /** Callback when a view is selected */
-  onViewChange: (view: CalendarView) => void;
   /** The current date being displayed (for the header title) */
   currentDate: Date;
   /** Week start day for week view header formatting (default: 0 = Sunday) */
@@ -48,7 +39,6 @@ interface CalendarViewSwitcherProps {
 
 export function CalendarViewSwitcher({
   activeView,
-  onViewChange,
   currentDate,
   weekStartDay = 0,
   onTodayPress,
@@ -119,36 +109,6 @@ export function CalendarViewSwitcher({
         </Pressable>
       </View>
 
-      {/* View switcher row — detail views only (month is the strip) */}
-      <View style={styles.viewRow}>
-        {DETAIL_VIEWS.map((view) => {
-          const isActive = view === activeView;
-          return (
-            <Pressable
-              key={view}
-              onPress={() => onViewChange(view)}
-              style={[
-                styles.viewButton,
-                isActive ? styles.viewButtonActive : styles.viewButtonInactive,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Switch to ${VIEW_LABELS[view]} view`}
-              accessibilityState={{ selected: isActive }}
-            >
-              <Text
-                style={[
-                  styles.viewButtonText,
-                  isActive
-                    ? styles.viewButtonTextActive
-                    : styles.viewButtonTextInactive,
-                ]}
-              >
-                {VIEW_LABELS[view]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -165,7 +125,6 @@ function createStyles(theme: ThemeTokens) {
     navRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      marginBottom: theme.spacing["2"],
     },
     navButton: {
       paddingHorizontal: theme.spacing["2"],
@@ -192,23 +151,6 @@ function createStyles(theme: ThemeTokens) {
       borderColor: theme.colors.border,
       marginLeft: theme.spacing["2"],
     },
-    viewRow: {
-      flexDirection: "row" as const,
-      gap: theme.spacing["1"],
-    },
-    viewButton: {
-      flex: 1,
-      paddingVertical: theme.spacing["1"],
-      borderRadius: theme.borderRadius.sm,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
-    viewButtonActive: {
-      backgroundColor: theme.colors.primaryBase,
-    },
-    viewButtonInactive: {
-      backgroundColor: theme.colors.muted,
-    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -234,18 +176,6 @@ function createStyles(theme: ThemeTokens) {
       fontWeight: theme.typography.fontWeight
         .medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-    },
-    viewButtonText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-    },
-    viewButtonTextActive: {
-      color: theme.colors.primaryForeground,
-    },
-    viewButtonTextInactive: {
-      color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
 

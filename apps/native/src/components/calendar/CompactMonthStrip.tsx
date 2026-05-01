@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
   Easing,
   Extrapolation,
   interpolate,
@@ -51,7 +52,9 @@ const EXIT_DURATION = 160;
 /** Spring config for snap-back. */
 const SNAP_SPRING = { damping: 26, stiffness: 300, mass: 0.8 };
 /** Spring config for expand/collapse height animation. */
-const HEIGHT_SPRING = { damping: 22, stiffness: 260, mass: 0.7 };
+const HEIGHT_SPRING = { damping: 26, stiffness: 340, mass: 0.75 };
+const VERTICAL_COMMIT_DISTANCE = 22;
+const VERTICAL_VELOCITY_COMMIT = 360;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -135,6 +138,7 @@ export function CompactMonthStrip({
   );
 
   useEffect(() => {
+    cancelAnimation(animatedHeight);
     animatedHeight.value = withSpring(
       expanded ? expandedHeight : collapsedHeight,
       HEIGHT_SPRING,
@@ -215,8 +219,6 @@ export function CompactMonthStrip({
 
   // ─── Vertical pan gesture for expand/collapse ─────────────────────────────
 
-  const VERTICAL_COMMIT = 30;
-
   const handleSwipeDown = useCallback(() => {
     if (!expanded) onToggleExpand();
   }, [expanded, onToggleExpand]);
@@ -226,13 +228,23 @@ export function CompactMonthStrip({
   }, [expanded, onToggleExpand]);
 
   const verticalPan = Gesture.Pan()
-    .activeOffsetY([-10, 10])
-    .failOffsetX([-8, 8])
+    .activeOffsetY([-6, 6])
+    .failOffsetX([-10, 10])
+    .onBegin(() => {
+      "worklet";
+      cancelAnimation(animatedHeight);
+    })
     .onEnd((e) => {
       "worklet";
-      if (e.translationY > VERTICAL_COMMIT || e.velocityY > 400) {
+      if (
+        e.translationY > VERTICAL_COMMIT_DISTANCE ||
+        e.velocityY > VERTICAL_VELOCITY_COMMIT
+      ) {
         runOnJS(handleSwipeDown)();
-      } else if (e.translationY < -VERTICAL_COMMIT || e.velocityY < -400) {
+      } else if (
+        e.translationY < -VERTICAL_COMMIT_DISTANCE ||
+        e.velocityY < -VERTICAL_VELOCITY_COMMIT
+      ) {
         runOnJS(handleSwipeUp)();
       }
     });

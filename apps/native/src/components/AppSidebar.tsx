@@ -23,6 +23,8 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
 import { useSidebar } from "../providers/SidebarProvider";
+import { useCalendarView, type DetailCalendarView } from "../providers/CalendarViewProvider";
+import { VIEW_LABELS } from "./calendar/view-switcher-utils";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -53,10 +55,23 @@ interface MenuItem {
   route: string;
 }
 
+interface CalendarViewItem {
+  key: DetailCalendarView;
+  label: string;
+  icon: FeatherIcon;
+}
+
 const MENU_ITEMS: MenuItem[] = [
   { key: "calendar", label: "Calendar", icon: "calendar", route: "/(tabs)/calendar" },
   { key: "search", label: "Search", icon: "search", route: "/(tabs)/search" },
   { key: "settings", label: "Settings", icon: "settings", route: "/(tabs)/settings" },
+];
+
+const CALENDAR_VIEW_ITEMS: CalendarViewItem[] = [
+  { key: "week", label: VIEW_LABELS.week, icon: "columns" },
+  { key: "3day", label: VIEW_LABELS["3day"], icon: "sidebar" },
+  { key: "day", label: VIEW_LABELS.day, icon: "sun" },
+  { key: "agenda", label: VIEW_LABELS.agenda, icon: "list" },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -65,6 +80,7 @@ export function AppSidebar() {
   const { theme } = useTheme();
   const { user, signOut } = useAuth();
   const { isOpen, open, close } = useSidebar();
+  const { activeView, setActiveView } = useCalendarView();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const segments = useSegments();
@@ -159,6 +175,11 @@ export function AppSidebar() {
     await signOut();
   }, [close, signOut]);
 
+  const handleViewSelect = useCallback((view: DetailCalendarView) => {
+    setActiveView(view);
+    close();
+  }, [close, setActiveView]);
+
   const activeTab = useMemo(() => {
     const segmentArray = segments as string[];
     if (segmentArray.length >= 2 && segmentArray[0] === "(tabs)") {
@@ -234,8 +255,8 @@ export function AppSidebar() {
             <View style={styles.divider} />
 
             {/* Menu items */}
-            <View style={styles.menuSection}>
-              {MENU_ITEMS.map((item) => {
+             <View style={styles.menuSection}>
+               {MENU_ITEMS.map((item) => {
                 const isActive = activeTab === item.key;
                 return (
                   <Pressable
@@ -269,10 +290,56 @@ export function AppSidebar() {
                     </Text>
                   </Pressable>
                 );
-              })}
-            </View>
+               })}
+             </View>
 
-            {/* Spacer */}
+             {activeTab === "calendar" && (
+               <>
+                 <View style={styles.divider} />
+                 <View style={styles.sectionHeader}>
+                   <Text style={styles.sectionHeaderText}>Calendar view</Text>
+                 </View>
+                 <View style={styles.menuSection}>
+                   {CALENDAR_VIEW_ITEMS.map((item) => {
+                     const isActive = activeView === item.key;
+                     return (
+                       <Pressable
+                         key={item.key}
+                         onPress={() => handleViewSelect(item.key)}
+                         style={({ pressed }) => [
+                           styles.menuItem,
+                           isActive && styles.menuItemActive,
+                           pressed && styles.menuItemPressed,
+                         ]}
+                         accessibilityRole="button"
+                         accessibilityLabel={`Switch to ${item.label} view`}
+                         accessibilityState={{ selected: isActive }}
+                       >
+                         <Feather
+                           name={item.icon}
+                           size={20}
+                           color={
+                             isActive
+                               ? theme.colors.primaryBase
+                               : theme.colors.foreground
+                           }
+                         />
+                         <Text
+                           style={[
+                             styles.menuLabel,
+                             isActive && styles.menuLabelActive,
+                           ]}
+                         >
+                           {item.label}
+                         </Text>
+                       </Pressable>
+                     );
+                   })}
+                 </View>
+               </>
+             )}
+
+             {/* Spacer */}
             <View style={{ flex: 1 }} />
 
             {/* Logout */}
@@ -354,6 +421,10 @@ function createStyles(theme: ThemeTokens) {
     menuSection: {
       gap: theme.spacing["1"],
     },
+    sectionHeader: {
+      paddingHorizontal: theme.spacing["3"],
+      paddingBottom: theme.spacing["1"],
+    },
     menuItem: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -391,6 +462,15 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,
+    },
+    sectionHeaderText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.mutedForeground,
+      textTransform: "uppercase" as const,
+      letterSpacing: 0.6,
     },
     menuLabel: {
       fontSize: theme.typography.fontSize.base.size,
