@@ -35,7 +35,7 @@ export const env = {
   mobileAuthCallbackUrl:
     process.env.MOBILE_AUTH_CALLBACK_URL ||
     process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
-    "app.solace.onl://api/auth",
+    "solace://api/auth",
 } as const;
 
 /** Parse a comma-separated env var into a trimmed string array. */

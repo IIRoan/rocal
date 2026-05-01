@@ -1,20 +1,29 @@
 {
   "expo": {
     "name": "Solace",
-    "slug": "solace",
+    "slug": "solace-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "solace",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.solace.calendar"
+      "bundleIdentifier": "com.solace.mobile",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.solace.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      },
-      "package": "com.solace.calendar"
+      }
     },
     "plugins": [
       "expo-router",
@@ -23,6 +32,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1047b680-b99f-4671-9824-23b9a0487125"
+      }
+    },
+    "owner": "iiroan"
   }
 }
