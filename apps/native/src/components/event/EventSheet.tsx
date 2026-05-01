@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -22,7 +23,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
-import { BottomSheet } from "../BottomSheet";
+import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
 import { EventForm } from "./EventForm";
 import { toLocalISOString } from "./event-form-utils";
 import {
@@ -47,6 +48,7 @@ export interface EventSheetProps {
   visible: boolean;
   mode: EventSheetMode | null;
   onDismiss: () => void;
+  onCloseComplete?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -97,10 +99,16 @@ function IconBox({
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
+export function EventSheet({
+  visible,
+  mode,
+  onDismiss,
+  onCloseComplete,
+}: EventSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
+  const bottomSheetRef = useRef<BottomSheetHandle>(null);
 
   const [viewMode, setViewMode] = useState<"view" | "edit">("view");
   const [serverErrors, setServerErrors] = useState<string[]>([]);
@@ -117,11 +125,15 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
     : undefined;
 
   // Reset internal state when mode changes
-  useMemo(() => {
+  useEffect(() => {
     if (mode?.type === "create") {
       setViewMode("edit");
+      setEditScope(undefined);
+      setEditOccurrenceDate(undefined);
     } else if (mode?.type === "view") {
       setViewMode("view");
+      setEditScope(undefined);
+      setEditOccurrenceDate(undefined);
     } else if (mode?.type === "edit") {
       setViewMode("edit");
       setEditScope(mode.scope);
@@ -129,6 +141,20 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
     }
     setServerErrors([]);
   }, [mode]);
+
+  const handleSheetDismissRequest = useCallback(() => {
+    setServerErrors([]);
+    onDismiss();
+  }, [onDismiss]);
+
+  const dismissSheet = useCallback(() => {
+    setServerErrors([]);
+    if (bottomSheetRef.current) {
+      bottomSheetRef.current.dismiss();
+      return;
+    }
+    onDismiss();
+  }, [onDismiss]);
 
   // ─── Data fetching ─────────────────────────────────────────────────────
 
@@ -157,7 +183,7 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       setServerErrors([]);
-      onDismiss();
+      dismissSheet();
     },
     onError: (err: unknown) => {
       const message =
@@ -185,7 +211,7 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventDetail(eventId) });
       }
       setServerErrors([]);
-      onDismiss();
+      dismissSheet();
     },
     onError: (err: unknown) => {
       const message =
@@ -214,7 +240,7 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
       if (eventId) {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventDetail(eventId) });
       }
-      onDismiss();
+      dismissSheet();
     },
     onError: (err: unknown) => {
       const message =
@@ -241,15 +267,9 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
       setViewMode("view");
       setServerErrors([]);
     } else {
-      setServerErrors([]);
-      onDismiss();
+      dismissSheet();
     }
-  }, [viewMode, isViewOrEdit, event, onDismiss]);
-
-  const handleClose = useCallback(() => {
-    setServerErrors([]);
-    onDismiss();
-  }, [onDismiss]);
+  }, [viewMode, isViewOrEdit, event, dismissSheet]);
 
   const isRecurring = !!(event?.recurrence || event?.parentEventId);
 
@@ -336,7 +356,13 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
 
   return (
     <>
-      <BottomSheet visible={visible} onDismiss={handleClose} title={sheetTitle}>
+      <BottomSheet
+        ref={bottomSheetRef}
+        visible={visible}
+        onDismiss={handleSheetDismissRequest}
+        onCloseComplete={onCloseComplete}
+        title={sheetTitle}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={1}>
@@ -352,7 +378,11 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
         ) : viewMode === "view" && event ? (
           <>
             {/* ── View mode body ─────────────────────────────────── */}
-            <View style={styles.viewBody}>
+            <ScrollView
+              style={styles.viewScroll}
+              contentContainerStyle={styles.viewBody}
+              showsVerticalScrollIndicator={false}
+            >
               {/* Title */}
               <View style={styles.viewRow}>
                 <IconBox name="calendar" color={iconColor} />
@@ -446,7 +476,7 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
                   ))}
                 </View>
               )}
-            </View>
+            </ScrollView>
 
             {/* ── View mode footer ───────────────────────────────── */}
             <View style={styles.footer}>
@@ -471,7 +501,7 @@ export function EventSheet({ visible, mode, onDismiss }: EventSheetProps) {
 
               <Pressable
                 style={styles.footerBtnOutline}
-                onPress={handleClose}
+                onPress={dismissSheet}
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
@@ -561,6 +591,10 @@ function createStyles(theme: ThemeTokens) {
     viewBody: {
       paddingHorizontal: 16,
       paddingVertical: 6,
+      paddingBottom: 12,
+    },
+    viewScroll: {
+      flex: 1,
     },
     viewRow: {
       flexDirection: "row" as const,

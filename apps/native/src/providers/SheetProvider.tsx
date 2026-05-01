@@ -2,6 +2,8 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -24,6 +26,11 @@ const SheetContext = createContext<SheetContextValue | null>(null);
 export function SheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [mode, setMode] = useState<EventSheetMode | null>(null);
+  const visibleRef = useRef(visible);
+
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
 
   const openEventSheet = useCallback((m: EventSheetMode) => {
     setMode(m);
@@ -32,13 +39,23 @@ export function SheetProvider({ children }: { children: ReactNode }) {
 
   const closeEventSheet = useCallback(() => {
     setVisible(false);
-    setMode(null);
+  }, []);
+
+  const handleSheetCloseComplete = useCallback(() => {
+    if (!visibleRef.current) {
+      setMode(null);
+    }
   }, []);
 
   return (
     <SheetContext.Provider value={{ openEventSheet, closeEventSheet }}>
       {children}
-      <EventSheet visible={visible} mode={mode} onDismiss={closeEventSheet} />
+      <EventSheet
+        visible={visible}
+        mode={mode}
+        onDismiss={closeEventSheet}
+        onCloseComplete={handleSheetCloseComplete}
+      />
     </SheetContext.Provider>
   );
 }
