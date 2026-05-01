@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Solace",
-    "slug": "solace-mobile",
+    "slug": "solace",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "solace",
