@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import {
   Dimensions,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -23,7 +24,10 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
 import { useSidebar } from "../providers/SidebarProvider";
-import { useCalendarView, type DetailCalendarView } from "../providers/CalendarViewProvider";
+import {
+  useCalendarView,
+  type DetailCalendarView,
+} from "../providers/CalendarViewProvider";
 import {
   CALENDAR_HOME_ROUTE,
   SEARCH_ROUTE,
@@ -135,10 +139,7 @@ export function AppSidebar() {
       translateX.value = Math.min(0, Math.max(-SIDEBAR_WIDTH, next));
     })
     .onEnd((e) => {
-      if (
-        e.translationX > OPEN_THRESHOLD ||
-        e.velocityX > VELOCITY_THRESHOLD
-      ) {
+      if (e.translationX > OPEN_THRESHOLD || e.velocityX > VELOCITY_THRESHOLD) {
         translateX.value = withSpring(0, DRAWER_SPRING);
         runOnJS(open)();
       } else {
@@ -191,10 +192,13 @@ export function AppSidebar() {
     await signOut();
   }, [close, signOut]);
 
-  const handleViewSelect = useCallback((view: DetailCalendarView) => {
-    setActiveView(view);
-    close();
-  }, [close, setActiveView]);
+  const handleViewSelect = useCallback(
+    (view: DetailCalendarView) => {
+      setActiveView(view);
+      close();
+    },
+    [close, setActiveView],
+  );
 
   const activeTab = useMemo(() => {
     const segmentArray = segments as string[];
@@ -223,8 +227,17 @@ export function AppSidebar() {
 
       {/* Overlay + sidebar — interactive only when open */}
       <View
-        style={StyleSheet.absoluteFill}
-        pointerEvents={isOpen ? "auto" : "none"}
+        style={[
+          StyleSheet.absoluteFill,
+          Platform.OS === "web"
+            ? ({
+                pointerEvents: isOpen ? "auto" : "none",
+              } as unknown as ViewStyle)
+            : null,
+        ]}
+        pointerEvents={
+          Platform.OS === "web" ? undefined : isOpen ? "auto" : "none"
+        }
       >
         {/* Overlay: tap to close + swipe-to-close */}
         <GestureDetector gesture={closePanGesture}>
@@ -271,8 +284,8 @@ export function AppSidebar() {
             <View style={styles.divider} />
 
             {/* Menu items */}
-             <View style={styles.menuSection}>
-               {MENU_ITEMS.map((item) => {
+            <View style={styles.menuSection}>
+              {MENU_ITEMS.map((item) => {
                 const isActive = activeTab === item.key;
                 return (
                   <Pressable
@@ -306,56 +319,56 @@ export function AppSidebar() {
                     </Text>
                   </Pressable>
                 );
-               })}
-             </View>
+              })}
+            </View>
 
-             {activeTab === "calendar" && (
-               <>
-                 <View style={styles.divider} />
-                 <View style={styles.sectionHeader}>
-                   <Text style={styles.sectionHeaderText}>Calendar view</Text>
-                 </View>
-                 <View style={styles.menuSection}>
-                   {CALENDAR_VIEW_ITEMS.map((item) => {
-                     const isActive = activeView === item.key;
-                     return (
-                       <Pressable
-                         key={item.key}
-                         onPress={() => handleViewSelect(item.key)}
-                         style={({ pressed }) => [
-                           styles.menuItem,
-                           isActive && styles.menuItemActive,
-                           pressed && styles.menuItemPressed,
-                         ]}
-                         accessibilityRole="button"
-                         accessibilityLabel={`Switch to ${item.label} view`}
-                         accessibilityState={{ selected: isActive }}
-                       >
-                         <Feather
-                           name={item.icon}
-                           size={20}
-                           color={
-                             isActive
-                               ? theme.colors.primaryBase
-                               : theme.colors.foreground
-                           }
-                         />
-                         <Text
-                           style={[
-                             styles.menuLabel,
-                             isActive && styles.menuLabelActive,
-                           ]}
-                         >
-                           {item.label}
-                         </Text>
-                       </Pressable>
-                     );
-                   })}
-                 </View>
-               </>
-             )}
+            {activeTab === "calendar" && (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionHeaderText}>Calendar view</Text>
+                </View>
+                <View style={styles.menuSection}>
+                  {CALENDAR_VIEW_ITEMS.map((item) => {
+                    const isActive = activeView === item.key;
+                    return (
+                      <Pressable
+                        key={item.key}
+                        onPress={() => handleViewSelect(item.key)}
+                        style={({ pressed }) => [
+                          styles.menuItem,
+                          isActive && styles.menuItemActive,
+                          pressed && styles.menuItemPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Switch to ${item.label} view`}
+                        accessibilityState={{ selected: isActive }}
+                      >
+                        <Feather
+                          name={item.icon}
+                          size={20}
+                          color={
+                            isActive
+                              ? theme.colors.primaryBase
+                              : theme.colors.foreground
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.menuLabel,
+                            isActive && styles.menuLabelActive,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
-             {/* Spacer */}
+            {/* Spacer */}
             <View style={{ flex: 1 }} />
 
             {/* Logout */}
@@ -463,8 +476,7 @@ function createStyles(theme: ThemeTokens) {
   const text = {
     avatarText: {
       fontSize: theme.typography.fontSize.lg.size,
-      fontWeight: theme.typography.fontWeight
-        .bold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
     },
     userName: {
@@ -491,8 +503,7 @@ function createStyles(theme: ThemeTokens) {
     menuLabel: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     menuLabelActive: {
@@ -503,8 +514,7 @@ function createStyles(theme: ThemeTokens) {
     logoutLabel: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.destructive,
     },
   } satisfies Record<string, TextStyle>;

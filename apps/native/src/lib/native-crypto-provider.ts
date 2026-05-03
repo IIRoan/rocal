@@ -18,25 +18,33 @@
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { createLogger } from "@workspace/logger";
+import {
+  detectRuntime,
+  getRuntimeDisplayName,
+  supportsSubtleCrypto,
+} from "@workspace/runtime";
 
 const log = createLogger("native:crypto");
+const runtime = detectRuntime({
+  platformOs: Platform.OS,
+  expoExecutionEnvironment: Constants.executionEnvironment,
+  expoAppOwnership: Constants.appOwnership,
+});
 
 let polyfillAttempted = false;
 let expoGoWarningLogged = false;
 
 function isExpoGoRuntime(): boolean {
-  return (
-    Constants.executionEnvironment === "storeClient" ||
-    Constants.appOwnership === "expo"
-  );
+  return runtime.isExpoGo;
 }
 
 function logExpoGoDisabledMessage() {
   if (expoGoWarningLogged) return;
   expoGoWarningLogged = true;
   log.warn(
-    "Expo Go runtime detected. Native crypto is unavailable there, so E2EE " +
+    `${getRuntimeDisplayName(runtime)} detected. Native crypto is unavailable there, so E2EE ` +
       "is disabled for this session. Use a development build or production " +
       "build to enable encryption on mobile.",
   );
@@ -97,10 +105,10 @@ export function createNativeCryptoProvider(): CryptoProvider | null {
 
   const subtle = globalThis.crypto?.subtle;
 
-  if (!subtle) {
+  if (!supportsSubtleCrypto({ runtime, cryptoRef: globalThis.crypto })) {
     log.warn(
-      "SubtleCrypto is not available — E2EE is disabled. This is expected " +
-        "when running in Expo Go. Use a development build to enable encryption.",
+      `SubtleCrypto is not available in ${getRuntimeDisplayName(runtime)} — E2EE is disabled. ` +
+        "Use a development build to enable encryption.",
     );
     return null;
   }
@@ -111,8 +119,16 @@ export function createNativeCryptoProvider(): CryptoProvider | null {
       return ExpoCrypto.getRandomValues(buffer);
     },
     subtle: {
-      generateKey: (algorithm: any, extractable: boolean, keyUsages: string[]) =>
-        subtle.generateKey(algorithm, extractable, keyUsages as KeyUsage[]) as unknown as Promise<CryptoKey>,
+      generateKey: (
+        algorithm: any,
+        extractable: boolean,
+        keyUsages: string[],
+      ) =>
+        subtle.generateKey(
+          algorithm,
+          extractable,
+          keyUsages as KeyUsage[],
+        ) as unknown as Promise<CryptoKey>,
       importKey: (
         format: string,
         keyData: any,

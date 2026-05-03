@@ -39,6 +39,8 @@ module.exports = {
     "^@workspace/calendar-ics/(.*)$":
       "<rootDir>/../../packages/calendar-ics/src/$1.ts",
     "^@workspace/logger$": "<rootDir>/../../packages/logger/src/index.ts",
+    "^@workspace/runtime$": "<rootDir>/../../packages/runtime/src/index.ts",
+    "^@workspace/runtime/(.*)$": "<rootDir>/../../packages/runtime/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   setupFilesAfterEnv: ["<rootDir>/__tests__/setup.ts"],

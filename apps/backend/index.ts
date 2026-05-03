@@ -7,7 +7,7 @@ import {
   BETTER_AUTH_BASE_PATH,
   getAuthOpenApiDocumentation,
 } from "./lib/auth";
-import { env, parseCsvEnv } from "./lib/env";
+import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
 import { eventsRoutes } from "./routes/events";
 import { categoriesRoutes } from "./routes/categories";
@@ -31,22 +31,13 @@ import {
   apiSecuritySchemes,
   sessionCookieAuthSecurity,
 } from "./lib/openapi";
+import { corsOriginPolicy } from "./lib/origin-policy";
 
 installGlobalConsoleLogger("backend");
 
 const logger = createLogger("backend");
 
 const { frontendUrl } = env;
-
-const corsOrigins = Array.from(
-  new Set([
-    frontendUrl,
-    process.env.NEXT_PUBLIC_APP_URL || "",
-    "http://localhost",
-    "https://localhost",
-    ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
-  ]),
-).filter(Boolean);
 
 function normalizePath(path: string) {
   return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
@@ -122,7 +113,9 @@ const betterAuth = new Elysia({ name: "better-auth" })
 
 export const createAPI = (prefix = "") => {
   const app = new Elysia({ prefix, normalize: false });
-  const docsUiPath = normalizePath(`${prefix}${API_DOCS_UI_PATH}` || API_DOCS_UI_PATH);
+  const docsUiPath = normalizePath(
+    `${prefix}${API_DOCS_UI_PATH}` || API_DOCS_UI_PATH,
+  );
   const docsSpecPath = normalizePath(
     `${prefix}${API_DOCS_SPEC_PATH}` || API_DOCS_SPEC_PATH,
   );
@@ -202,7 +195,11 @@ export const createAPI = (prefix = "") => {
   return app
     .use(
       cors({
-        origin: corsOrigins,
+        origin: (request) =>
+          corsOriginPolicy.isOriginAllowed(
+            request.headers.get("origin"),
+            request,
+          ),
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [

@@ -1,20 +1,26 @@
 import { createE2eeModule, type CryptoProvider } from "@workspace/e2ee";
+import { detectRuntime, supportsSubtleCrypto } from "@workspace/runtime";
 
 // Re-export types from the shared package
-export type { EncryptedJsonPayload, EncryptedBinaryPayload, PasswordEnvelopePayload } from "@workspace/e2ee";
-export { PASSWORD_KDF_ALGORITHM, PASSWORD_WRAP_ALGORITHM, DEFAULT_PASSWORD_KDF_ITERATIONS } from "@workspace/e2ee";
+export type {
+  EncryptedJsonPayload,
+  EncryptedBinaryPayload,
+  PasswordEnvelopePayload,
+} from "@workspace/e2ee";
+export {
+  PASSWORD_KDF_ALGORITHM,
+  PASSWORD_WRAP_ALGORITHM,
+  DEFAULT_PASSWORD_KDF_ITERATIONS,
+} from "@workspace/e2ee";
 
 // Web-specific: check if Web Crypto API is available
 export function isWebCryptoAvailable(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.crypto !== "undefined" &&
-    typeof window.crypto.subtle !== "undefined"
-  );
+  return supportsSubtleCrypto({ runtime: detectRuntime() });
 }
 
 // Web CryptoProvider wrapping the global crypto object
-const webCrypto: CryptoProvider = globalThis.crypto as unknown as CryptoProvider;
+const webCrypto: CryptoProvider =
+  globalThis.crypto as unknown as CryptoProvider;
 
 // Create the E2EE module instance with web crypto
 const e2eeModule = createE2eeModule(webCrypto);

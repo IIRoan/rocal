@@ -1,6 +1,7 @@
 import React, { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import {
   LayoutChangeEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -266,8 +267,14 @@ export function TimelinePager({
 
           {isCurrentDay && (
             <View
-              style={[styles.nowIndicator, { top: nowTop }]}
-              pointerEvents="none"
+              style={[
+                styles.nowIndicator,
+                { top: nowTop },
+                Platform.OS === "web"
+                  ? ({ pointerEvents: "none" } as unknown as ViewStyle)
+                  : null,
+              ]}
+              pointerEvents={Platform.OS === "web" ? undefined : "none"}
             />
           )}
         </View>
