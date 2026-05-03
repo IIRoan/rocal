@@ -36,6 +36,7 @@
     "@better-auth/expo": "^1.5.5",
     "@workspace/calendar-ics": "workspace:*",
     "@workspace/logger": "0.10.0",
+    "@workspace/runtime": "workspace:*",
     "@better-auth/core": "^1.5.5",
     "@better-auth/passkey": "^1.5.5",
     "@better-auth/utils": "^0.3.1",

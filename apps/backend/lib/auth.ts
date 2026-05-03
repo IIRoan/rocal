@@ -4,40 +4,16 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { oneTimeToken, openAPI } from "better-auth/plugins";
 import { prisma } from "./prisma";
-import { env, parseCsvEnv, toOrigin } from "./env";
+import { env } from "./env";
+import { getAuthTrustedOrigins } from "./origin-policy";
 
 export const BETTER_AUTH_BASE_PATH = "/api/auth";
 
-const { backendUrl, frontendUrl, mobileAuthCallbackUrl, isProduction, cookieSameSite } = env;
-
-const backendOrigin = toOrigin(backendUrl);
-const frontendOrigin = toOrigin(frontendUrl);
-const nativeTrustedOrigins = [
-  mobileAuthCallbackUrl,
-  "solace://",
-  "solace://api",
-  "solace://api/auth",
-  "app.solace.onl://",
-  "app.solace.onl://api",
-  "app.solace.onl://api/auth",
-];
+const { backendUrl, frontendUrl, isProduction, cookieSameSite } = env;
 
 const skipStateCookieCheck =
   process.env.AUTH_SKIP_STATE_COOKIE_CHECK === "true" ||
   (!isProduction && process.env.AUTH_SKIP_STATE_COOKIE_CHECK !== "false");
-
-const trustedOrigins = Array.from(
-  new Set([
-    frontendUrl,
-    frontendOrigin,
-    backendOrigin,
-    process.env.NEXT_PUBLIC_APP_URL || "",
-    "http://localhost",
-    "https://localhost",
-    ...nativeTrustedOrigins,
-    ...parseCsvEnv(process.env.TRUSTED_ORIGINS),
-  ]),
-).filter(Boolean);
 
 const passkeyOrigin =
   process.env.PASSKEY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || frontendUrl;
@@ -100,7 +76,7 @@ export const auth = betterAuth({
       : {},
   baseURL: backendUrl,
   basePath: BETTER_AUTH_BASE_PATH,
-  trustedOrigins,
+  trustedOrigins: getAuthTrustedOrigins,
   session: {
     cookieCache: {
       enabled: true,

@@ -28,6 +28,7 @@ import {
   consumePendingAuthPassword,
 } from "./e2ee-password-cache";
 import type { E2eeBootstrapResponse, E2eeDeviceRecord } from "./types/calendar";
+import { detectRuntime, getRuntimeDisplayName } from "@workspace/runtime";
 
 const log = createLogger("e2ee-bootstrap");
 
@@ -51,12 +52,19 @@ function buildDeviceLabel(): string | undefined {
     return undefined;
   }
 
+  const runtime = detectRuntime();
   const browserNavigator = navigator as NavigatorWithUserAgentData;
   const platform =
     browserNavigator.userAgentData?.platform || navigator.platform || "Browser";
   const isMobile = /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const runtimeLabel = getRuntimeDisplayName(runtime);
+  const deviceLabel = isMobile ? "mobile" : "browser";
 
-  return isMobile ? `${platform} mobile` : `${platform} browser`;
+  if (runtime.kind === "browser") {
+    return isMobile ? `${platform} mobile` : `${platform} browser`;
+  }
+
+  return `${runtimeLabel} ${platform} ${deviceLabel}`;
 }
 
 function createAttempt(
@@ -175,7 +183,11 @@ async function provisionLocalDevice(
   accountKey: CryptoKey,
   blindIndexKey: CryptoKey,
 ): Promise<E2eeDeviceRecord> {
-  const localRecord = await createDeviceRecord(userId, accountKey, blindIndexKey);
+  const localRecord = await createDeviceRecord(
+    userId,
+    accountKey,
+    blindIndexKey,
+  );
   const remoteRecord = await uploadDevice(localRecord);
   await putStoredE2eeDevice(localRecord);
   return remoteRecord;
@@ -188,7 +200,11 @@ async function createInitialDevice(
 ): Promise<E2eeBootstrapAttempt> {
   const accountKey = await generateAccountKey();
   const blindIndexKey = await generateBlindIndexKey();
-  const remoteRecord = await provisionLocalDevice(userId, accountKey, blindIndexKey);
+  const remoteRecord = await provisionLocalDevice(
+    userId,
+    accountKey,
+    blindIndexKey,
+  );
 
   if (!isBootstrapCurrent(userId, generation)) {
     return createAttempt(false, bootstrap);
@@ -222,7 +238,9 @@ async function activateFromPasswordEnvelope(
 
   const localRecord = await getStoredE2eeDevice(userId);
   const matchingRemote = localRecord
-    ? bootstrap.devices.find((device) => device.deviceId === localRecord.deviceId)
+    ? bootstrap.devices.find(
+        (device) => device.deviceId === localRecord.deviceId,
+      )
     : undefined;
 
   const deviceId = matchingRemote
@@ -279,16 +297,10 @@ async function bootstrapUser(
       return createAttempt(false, remoteBootstrap);
     }
 
-    return activateFromRemote(
-      userId,
-      generation,
-      localRecord,
-      remoteRecord,
-      {
-        ...remoteBootstrap,
-        devices: [remoteRecord, ...remoteBootstrap.devices],
-      },
-    );
+    return activateFromRemote(userId, generation, localRecord, remoteRecord, {
+      ...remoteBootstrap,
+      devices: [remoteRecord, ...remoteBootstrap.devices],
+    });
   }
 
   if (remoteBootstrap.passwordEnvelope) {
@@ -381,7 +393,9 @@ export async function unlockE2eeWithPassword(
   }
 }
 
-export function ensureE2eeBootstrap(userId: string): Promise<E2eeBootstrapAttempt> {
+export function ensureE2eeBootstrap(
+  userId: string,
+): Promise<E2eeBootstrapAttempt> {
   if (!userId) {
     clearActiveE2eeSession();
     return Promise.resolve(createAttempt(false, null));

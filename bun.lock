@@ -34,6 +34,7 @@
         "@types/ical": "^0.8.3",
         "@workspace/calendar-ics": "workspace:*",
         "@workspace/logger": "0.10.0",
+        "@workspace/runtime": "workspace:*",
         "better-auth": "^1.5.5",
         "better-call": "^2.0.2",
         "date-fns": "^4.1.0",
@@ -74,6 +75,7 @@
         "@workspace/design-tokens": "workspace:*",
         "@workspace/e2ee": "workspace:*",
         "@workspace/logger": "workspace:*",
+        "@workspace/runtime": "workspace:*",
         "better-auth": "^1.5.5",
         "date-fns": "^4.1.0",
         "expo": "~55.0.18",
@@ -143,6 +145,7 @@
         "@workspace/design-tokens": "workspace:*",
         "@workspace/e2ee": "workspace:*",
         "@workspace/logger": "0.10.0",
+        "@workspace/runtime": "workspace:*",
         "better-auth": "^1.5.5",
         "better-call": "^2.0.2",
         "class-variance-authority": "^0.7.1",
@@ -274,6 +277,13 @@
         "@testing-library/react-native": "12.4.1",
         "jest": "29.7.0",
         "react-test-renderer": "18.2.0",
+      },
+    },
+    "packages/runtime": {
+      "name": "@workspace/runtime",
+      "version": "0.1.0",
+      "devDependencies": {
+        "typescript": "^5.9.3",
       },
     },
     "packages/typescript-config": {
@@ -1464,6 +1474,8 @@
     "@workspace/mobile-ui": ["@workspace/mobile-ui@workspace:packages/mobile-ui"],
 
     "@workspace/notifications": ["@workspace/notifications@workspace:apps/notifications"],
+
+    "@workspace/runtime": ["@workspace/runtime@workspace:packages/runtime"],
 
     "@workspace/typescript-config": ["@workspace/typescript-config@workspace:packages/typescript-config"],
 
