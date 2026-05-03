@@ -30,6 +30,7 @@
     "@workspace/calendar-core": "workspace:*",
     "@workspace/design-tokens": "workspace:*",
     "@workspace/e2ee": "workspace:*",
+    "@workspace/runtime": "workspace:*",
     "better-auth": "^1.5.5",
     "better-call": "^2.0.2",
     "class-variance-authority": "^0.7.1",
