@@ -1,4 +1,10 @@
-import React, { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   LayoutChangeEvent,
   Platform,
@@ -52,6 +58,8 @@ interface TimelinePagerProps {
   onNavigate?: (direction: 1 | -1) => void;
   onEventPress?: (event: DecoratedCalendarEvent) => void;
   onTimeSlotPress?: (date: Date, hour: number) => void;
+  /** Renders one header per timeline page so it can slide with the grid. */
+  renderHeaderPage?: (page: TimelinePage) => ReactNode;
 }
 
 interface TimelinePage {
@@ -101,6 +109,7 @@ export function TimelinePager({
   onNavigate,
   onEventPress,
   onTimeSlotPress,
+  renderHeaderPage,
 }: TimelinePagerProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -295,42 +304,68 @@ export function TimelinePager({
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.gridContainer}>
-          <View style={styles.timeGutter}>
-            {hourLabels.map((label, hour) => (
-              <View key={hour} style={styles.hourLabelContainer}>
-                <Text style={styles.hourLabel}>{label}</Text>
+      <GestureDetector gesture={panGesture}>
+        <View style={styles.pagerShell}>
+          {renderHeaderPage != null && (
+            <View style={styles.headerRow}>
+              <View style={styles.headerGutter} />
+              <View style={styles.headerViewport} onLayout={handleViewportLayout}>
+                <Animated.View
+                  style={[
+                    styles.pagesStrip,
+                    { width: pageWidth * PAGE_OFFSETS.length },
+                    animatedStripStyle,
+                  ]}
+                >
+                  {pages.map((page) => (
+                    <View
+                      key={`hdr-${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
+                      style={[styles.headerPage, { width: pageWidth }]}
+                    >
+                      {renderHeaderPage(page)}
+                    </View>
+                  ))}
+                </Animated.View>
               </View>
-            ))}
-          </View>
+            </View>
+          )}
 
-          <View style={styles.columnsViewport} onLayout={handleViewportLayout}>
-            <GestureDetector gesture={panGesture}>
-              <Animated.View
-                style={[
-                  styles.pagesStrip,
-                  { width: pageWidth * PAGE_OFFSETS.length },
-                  animatedStripStyle,
-                ]}
-              >
-                {pages.map((page) => (
-                  <View
-                    key={`${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
-                    style={[styles.page, { width: pageWidth }]}
-                  >
-                    {page.dates.map(renderDayColumn)}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.gridContainer}>
+              <View style={styles.timeGutter}>
+                {hourLabels.map((label, hour) => (
+                  <View key={hour} style={styles.hourLabelContainer}>
+                    <Text style={styles.hourLabel}>{label}</Text>
                   </View>
                 ))}
-              </Animated.View>
-            </GestureDetector>
-          </View>
+              </View>
+
+              <View style={styles.columnsViewport} onLayout={handleViewportLayout}>
+                <Animated.View
+                  style={[
+                    styles.pagesStrip,
+                    { width: pageWidth * PAGE_OFFSETS.length },
+                    animatedStripStyle,
+                  ]}
+                >
+                  {pages.map((page) => (
+                    <View
+                      key={`${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
+                      style={[styles.page, { width: pageWidth }]}
+                    >
+                      {page.dates.map(renderDayColumn)}
+                    </View>
+                  ))}
+                </Animated.View>
+              </View>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </GestureDetector>
     </View>
   );
 }
@@ -340,6 +375,20 @@ function createStyles(theme: ThemeTokens) {
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    pagerShell: {
+      flex: 1,
+    },
+    headerRow: {
+      flexDirection: "row" as const,
+      backgroundColor: theme.colors.background,
+    },
+    headerGutter: {
+      width: TIME_GUTTER_WIDTH,
+    },
+    headerViewport: {
+      flex: 1,
+      overflow: "hidden" as const,
     },
     scrollView: {
       flex: 1,
@@ -371,6 +420,9 @@ function createStyles(theme: ThemeTokens) {
     page: {
       flexDirection: "row" as const,
     },
+    headerPage: {
+      backgroundColor: theme.colors.background,
+    },
     dayColumn: {
       flex: 1,
       position: "relative" as const,
@@ -380,8 +432,7 @@ function createStyles(theme: ThemeTokens) {
     hourSlot: {
       height: HOUR_HEIGHT,
     },
-    hourDivider: {
-      position: "absolute" as const,
+    hourDivider: {      position: "absolute" as const,
       top: 0,
       left: 0,
       right: 0,
@@ -429,4 +480,4 @@ function createStyles(theme: ThemeTokens) {
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
 }
 
-export type { TimelinePagerProps };
+export type { TimelinePage, TimelinePagerProps };

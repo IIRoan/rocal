@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   View,
@@ -13,8 +14,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CreateEventRequest } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { useAuth } from "../../src/providers/AuthProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
+import {
+  buildOptimisticEvent,
+  generateOptimisticId,
+  optimisticallyInsertEvent,
+  rollbackFromSnapshot,
+  type CacheSnapshot,
+} from "../../src/lib/optimistic-events";
 import { EventForm } from "../../src/components/event/EventForm";
 import { toLocalISOString } from "../../src/components/event/event-form-utils";
 
@@ -25,6 +34,7 @@ export default function EventCreateScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // ─── Query params (optional pre-fill from tapping a time slot) ───────────
 
@@ -36,6 +46,9 @@ export default function EventCreateScreen() {
   // ─── Server errors ─────────────────────────────────────────────────────────
 
   const [serverErrors, setServerErrors] = useState<string[]>([]);
+
+  // Track snapshot for rollback; useRef so it survives re-renders
+  const snapshotRef = useRef<CacheSnapshot>([]);
 
   // ─── Fetch calendars and categories ────────────────────────────────────────
 
@@ -55,21 +68,31 @@ export default function EventCreateScreen() {
     queryFn: () => calendarApiService.getCategories(),
   });
 
-  // ─── Create mutation ───────────────────────────────────────────────────────
+  // ─── Create mutation (optimistic) ─────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: (data: CreateEventRequest) =>
       calendarApiService.createEvent(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onMutate: async (data: CreateEventRequest) => {
+      const tempId = generateOptimisticId();
+      const optimisticEvent = buildOptimisticEvent(data, user?.id ?? "", tempId);
+      snapshotRef.current = await optimisticallyInsertEvent(queryClient, optimisticEvent);
+      // Navigate back immediately so the user sees the event in the timeline
       router.back();
+      return { tempId };
+    },
+    onSuccess: () => {
+      // Replace optimistic data with real server data
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (err: unknown) => {
+      // Roll back the optimistic event
+      rollbackFromSnapshot(queryClient, snapshotRef.current);
       const message =
         err && typeof err === "object" && "message" in err
           ? (err as { message: string }).message
           : "Failed to create event";
-      setServerErrors([message]);
+      Alert.alert("Couldn't create event", message);
     },
   });
 

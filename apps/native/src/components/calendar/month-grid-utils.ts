@@ -102,3 +102,28 @@ export function resolveEventDotColor(
   }
   return eventColor;
 }
+
+// ─── CompactMonthStrip height helpers ────────────────────────────────────────
+
+/** Height of a single week row in the compact strip */
+export const COMPACT_STRIP_WEEK_ROW_HEIGHT = 48;
+/** Height of the day-of-week header row in the compact strip */
+export const COMPACT_STRIP_HEADER_ROW_HEIGHT = 24;
+
+/**
+ * Returns the collapsed content height for CompactMonthStrip.
+ * When `collapseToHandleOnly` is true (timeline views that already render
+ * a sticky day header), the content area collapses to 0.
+ */
+export function getCompactStripCollapsedHeight(
+  collapseToHandleOnly: boolean,
+): number {
+  return collapseToHandleOnly
+    ? 0
+    : COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT;
+}
+
+/** Returns the fully expanded content height for CompactMonthStrip. */
+export function getCompactStripExpandedHeight(): number {
+  return COMPACT_STRIP_HEADER_ROW_HEIGHT + COMPACT_STRIP_WEEK_ROW_HEIGHT * 6;
+}

@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,18 +16,26 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import type {
+  Calendar,
   CalendarView,
   UserSettings,
   UpdateSettingsRequest,
+  getErrorMessage as getErrorMessageType,
+} from "@workspace/calendar-core";
+import {
+  getErrorMessage,
+  partitionCalendarsByKind,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
   useTheme,
   type ThemePreference,
 } from "../../../src/providers/ThemeProvider";
+import { useAuth } from "../../../src/providers/AuthProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { SETTINGS_TIMEZONE_ROUTE } from "../../../src/lib/auth-routing";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
+import { getSettingsAccountActions } from "../../../src/lib/settings-screen-utils";
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,13 +44,21 @@ type FeatherIcon = React.ComponentProps<typeof Feather>["name"];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const THEME_OPTIONS: { label: string; value: ThemePreference; icon: FeatherIcon }[] = [
+const THEME_OPTIONS: {
+  label: string;
+  value: ThemePreference;
+  icon: FeatherIcon;
+}[] = [
   { label: "Light", value: "light", icon: "sun" },
   { label: "Dark", value: "dark", icon: "moon" },
   { label: "System", value: "system", icon: "monitor" },
 ];
 
-const VIEW_OPTIONS: { label: string; value: CalendarView; icon: FeatherIcon }[] = [
+const VIEW_OPTIONS: {
+  label: string;
+  value: CalendarView;
+  icon: FeatherIcon;
+}[] = [
   { label: "Month View", value: "month", icon: "grid" },
   { label: "Week View", value: "week", icon: "columns" },
   { label: "Day View", value: "day", icon: "square" },
@@ -59,15 +76,6 @@ const TIME_FORMAT_OPTIONS: { label: string; value: "12h" | "24h" }[] = [
   { label: "24 Hour (13:00)", value: "24h" },
 ];
 
-const DURATION_OPTIONS: { label: string; value: number }[] = [
-  { label: "15 minutes", value: 15 },
-  { label: "30 minutes", value: 30 },
-  { label: "45 minutes", value: 45 },
-  { label: "1 hour", value: 60 },
-  { label: "1.5 hours", value: 90 },
-  { label: "2 hours", value: 120 },
-];
-
 const WEEKDAY_OPTIONS: { label: string; value: number }[] = [
   { label: "Sunday", value: 0 },
   { label: "Monday", value: 1 },
@@ -78,22 +86,56 @@ const WEEKDAY_OPTIONS: { label: string; value: number }[] = [
   { label: "Saturday", value: 6 },
 ];
 
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Parse a comma-separated working days string (e.g. "1,2,3,4,5") into a Set. */
+function parseWorkingDayValue(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value >= 0 && value <= 6 ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 6
+      ? parsed
+      : null;
+  }
+
+  return null;
+}
+
+/** Parse persisted working days into a Set, supporting both JSON and legacy CSV. */
 function parseWorkingDays(workingDays: string): Set<number> {
-  if (!workingDays) return new Set([1, 2, 3, 4, 5]);
+  if (!workingDays) return new Set(DEFAULT_WORKING_DAYS);
+
+  try {
+    const parsed = JSON.parse(workingDays);
+    if (Array.isArray(parsed)) {
+      return new Set(
+        parsed.map(parseWorkingDayValue).filter((n): n is number => n !== null),
+      );
+    }
+  } catch {
+    // Fall through to legacy CSV parsing.
+  }
+
   return new Set(
     workingDays
       .split(",")
-      .map(Number)
-      .filter((n) => !Number.isNaN(n)),
+      .map(parseWorkingDayValue)
+      .filter((n): n is number => n !== null),
   );
 }
 
-/** Serialize a Set of day numbers back to a comma-separated string. */
+/** Serialize working days to the same JSON shape the web client uses. */
 function serializeWorkingDays(days: Set<number>): string {
-  return Array.from(days).sort((a, b) => a - b).join(",");
+  return JSON.stringify(Array.from(days).sort((a, b) => a - b));
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -103,6 +145,7 @@ export default function SettingsScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { user, signOut } = useAuth();
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
 
@@ -117,9 +160,40 @@ export default function SettingsScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: calendars = [] } = useQuery({
+    queryKey: QUERY_KEYS.calendars(),
+    queryFn: () => calendarApiService.getCalendars(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { ownedCalendars } = useMemo(
+    () => partitionCalendarsByKind(calendars),
+    [calendars],
+  );
+
+  const sortedOwnedCalendars = useMemo(
+    () =>
+      [...ownedCalendars].sort((left, right) => {
+        if (left.isDefault !== right.isDefault) {
+          return left.isDefault ? -1 : 1;
+        }
+
+        return left.name.localeCompare(right.name);
+      }),
+    [ownedCalendars],
+  );
+
   // ─── Optimistic update mutation ────────────────────────────────────────────
 
   const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
+  const [pendingDefaultCalendarId, setPendingDefaultCalendarId] = useState<
+    string | null
+  >(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const accountActions = useMemo(
+    () => getSettingsAccountActions({ canSignOut: Boolean(user) }),
+    [user],
+  );
 
   const updateSettingsMutation = useMutation({
     mutationFn: (update: UpdateSettingsRequest) =>
@@ -166,6 +240,67 @@ export default function SettingsScreen() {
     [updateSettingsMutation],
   );
 
+  const setDefaultCalendarMutation = useMutation({
+    mutationFn: (calendarId: string) =>
+      calendarApiService.updateCalendar(calendarId, { isDefault: true }),
+    onMutate: async (calendarId) => {
+      setPendingDefaultCalendarId(calendarId);
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.calendars() });
+
+      const previous = queryClient.getQueryData<Calendar[]>(
+        QUERY_KEYS.calendars(),
+      );
+
+      if (previous) {
+        queryClient.setQueryData<Calendar[]>(
+          QUERY_KEYS.calendars(),
+          previous.map((calendar) => ({
+            ...calendar,
+            isDefault: calendar.id === calendarId,
+          })),
+        );
+      }
+
+      return { previous };
+    },
+    onError: (error, _calendarId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(QUERY_KEYS.calendars(), context.previous);
+      }
+
+      Alert.alert(
+        "Unable to update default calendar",
+        getErrorMessage(error, "Failed to update default calendar"),
+      );
+    },
+    onSettled: () => {
+      setPendingDefaultCalendarId(null);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+    },
+  });
+
+  const resetSettingsMutation = useMutation({
+    mutationFn: () => calendarApiService.resetUserSettings(),
+    onSuccess: () => {
+      setThemePreference("system");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      Alert.alert(
+        "Settings reset",
+        "Your mobile preferences have been restored to the shared defaults.",
+      );
+    },
+    onError: (error) => {
+      Alert.alert(
+        "Unable to reset settings",
+        getErrorMessage(error, "Failed to reset settings"),
+      );
+    },
+  });
+
   // ─── Theme handler ────────────────────────────────────────────────────────
 
   const handleThemeChange = useCallback(
@@ -179,7 +314,7 @@ export default function SettingsScreen() {
   // ─── Working days handler ──────────────────────────────────────────────────
 
   const workingDaysSet = useMemo(
-    () => parseWorkingDays(settings?.workingDays ?? "1,2,3,4,5"),
+    () => parseWorkingDays(settings?.workingDays ?? "[1,2,3,4,5]"),
     [settings?.workingDays],
   );
 
@@ -194,6 +329,56 @@ export default function SettingsScreen() {
       updateSetting({ workingDays: serializeWorkingDays(next) });
     },
     [workingDaysSet, updateSetting],
+  );
+
+  const handleResetSettings = useCallback(() => {
+    Alert.alert(
+      "Reset settings?",
+      "This restores theme, calendar defaults, and notification preferences to their shared defaults.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => resetSettingsMutation.mutate(),
+        },
+      ],
+    );
+  }, [resetSettingsMutation]);
+
+  const handleSignOut = useCallback(() => {
+    Alert.alert("Sign out?", "End this session on this device.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: () => {
+          setIsSigningOut(true);
+          signOut()
+            .catch((error) => {
+              Alert.alert(
+                "Unable to sign out",
+                getErrorMessage(error, "Failed to sign out"),
+              );
+            })
+            .finally(() => {
+              setIsSigningOut(false);
+            });
+        },
+      },
+    ]);
+  }, [signOut]);
+
+  const handleAccountAction = useCallback(
+    (key: (typeof accountActions)[number]["key"]) => {
+      if (key === "reset-preferences") {
+        handleResetSettings();
+        return;
+      }
+
+      handleSignOut();
+    },
+    [handleResetSettings, handleSignOut],
   );
 
   // ─── Loading state ─────────────────────────────────────────────────────────
@@ -232,8 +417,8 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Theme ────────────────────────────────────────────────────── */}
-        <SectionLabel text="Theme" theme={theme} />
+        {/* ── Appearance ───────────────────────────────────────────────── */}
+        <SectionLabel text="Appearance" theme={theme} />
         <View style={styles.sectionItems}>
           {THEME_OPTIONS.map((opt) => (
             <SelectionRow
@@ -246,11 +431,6 @@ export default function SettingsScreen() {
               theme={theme}
             />
           ))}
-        </View>
-
-        {/* ── Default View ─────────────────────────────────────────────── */}
-        <SectionLabel text="Default View" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
           {VIEW_OPTIONS.map((opt) => (
             <SelectionRow
               key={opt.value}
@@ -264,31 +444,8 @@ export default function SettingsScreen() {
           ))}
         </View>
 
-        {/* ── Display ──────────────────────────────────────────────────── */}
-        <SectionLabel text="Display" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
-          <SettingToggleRow
-            icon="hash"
-            label="Week Numbers"
-            description="Show week numbers in calendar views"
-            value={settings?.showWeekNumbers ?? false}
-            onValueChange={(v) => updateSetting({ showWeekNumbers: v })}
-            isPending={pendingKeys.has("showWeekNumbers")}
-            theme={theme}
-          />
-          <SettingToggleRow
-            icon="eye-off"
-            label="Declined Events"
-            description="Show events you've declined"
-            value={settings?.showDeclinedEvents ?? false}
-            onValueChange={(v) => updateSetting({ showDeclinedEvents: v })}
-            isPending={pendingKeys.has("showDeclinedEvents")}
-            theme={theme}
-          />
-        </View>
-
-        {/* ── Time Format ──────────────────────────────────────────────── */}
-        <SectionLabel text="Time Format" theme={theme} isFirst={false} />
+        {/* ── Time & Region ────────────────────────────────────────────── */}
+        <SectionLabel text="Time & Region" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
           {TIME_FORMAT_OPTIONS.map((opt) => (
             <SelectionRow
@@ -301,39 +458,52 @@ export default function SettingsScreen() {
               theme={theme}
             />
           ))}
+          <NavigationRow
+            icon="globe"
+            label="Timezone"
+            value={
+              settings?.timezone ??
+              Intl.DateTimeFormat().resolvedOptions().timeZone
+            }
+            onPress={() => router.push(SETTINGS_TIMEZONE_ROUTE)}
+            theme={theme}
+          />
         </View>
 
-        {/* ── First Day of Week ────────────────────────────────────────── */}
-        <SectionLabel text="First Day of Week" theme={theme} isFirst={false} />
+        {/* ── Calendar Defaults ────────────────────────────────────────── */}
+        <SectionLabel text="Calendar Defaults" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
+          {sortedOwnedCalendars.length === 0 ? (
+            <HintRow
+              text="Create a calendar first to pick a default calendar for new events."
+              theme={theme}
+            />
+          ) : (
+            sortedOwnedCalendars.map((calendar) => (
+              <SelectionRow
+                key={calendar.id}
+                icon="star"
+                label={calendar.name}
+                description={calendar.isVisible ? "Visible" : "Hidden"}
+                isSelected={calendar.isDefault}
+                onPress={() => setDefaultCalendarMutation.mutate(calendar.id)}
+                isPending={pendingDefaultCalendarId === calendar.id}
+                theme={theme}
+              />
+            ))
+          )}
           {WEEK_START_OPTIONS.map((opt) => (
             <SelectionRow
               key={opt.value}
               icon="calendar"
               label={opt.label}
+              description="First day of week"
               isSelected={(settings?.weekStartDay ?? 0) === opt.value}
               onPress={() => updateSetting({ weekStartDay: opt.value })}
               isPending={pendingKeys.has("weekStartDay")}
               theme={theme}
             />
           ))}
-        </View>
-
-        {/* ── Timezone ─────────────────────────────────────────────────── */}
-        <SectionLabel text="Timezone" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
-          <NavigationRow
-            icon="globe"
-            label="Timezone"
-            value={settings?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
-            onPress={() => router.push(SETTINGS_TIMEZONE_ROUTE)}
-            theme={theme}
-          />
-        </View>
-
-        {/* ── Working Days ─────────────────────────────────────────────── */}
-        <SectionLabel text="Working Days" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
           {WEEKDAY_OPTIONS.map((day) => {
             const isActive = workingDaysSet.has(day.value);
             return (
@@ -341,6 +511,7 @@ export default function SettingsScreen() {
                 key={day.value}
                 icon="calendar"
                 label={day.label}
+                description="Working day"
                 isSelected={isActive}
                 onPress={() => handleToggleWorkingDay(day.value)}
                 isPending={false}
@@ -364,22 +535,6 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* ── Default Duration ─────────────────────────────────────────── */}
-        <SectionLabel text="Default Event Duration" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
-          {DURATION_OPTIONS.map((opt) => (
-            <SelectionRow
-              key={opt.value}
-              icon="clock"
-              label={opt.label}
-              isSelected={(settings?.defaultEventDuration ?? 60) === opt.value}
-              onPress={() => updateSetting({ defaultEventDuration: opt.value })}
-              isPending={pendingKeys.has("defaultEventDuration")}
-              theme={theme}
-            />
-          ))}
-        </View>
-
         {/* ── Security ─────────────────────────────────────────────────── */}
         <SectionLabel text="Security" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
@@ -397,10 +552,44 @@ export default function SettingsScreen() {
           {settings?.eventEncryptionMode === "full" && (
             <View style={styles.hintRow}>
               <Text style={styles.hintText}>
-                Reminder emails will only include timing details when full encryption is active.
+                Reminder emails will only include timing details when full
+                encryption is active.
               </Text>
             </View>
           )}
+        </View>
+
+        {/* ── Management ───────────────────────────────────────────────── */}
+        <SectionLabel text="Management" theme={theme} isFirst={false} />
+        <View style={styles.sectionItems}>
+          <NavigationRow
+            icon="tag"
+            label="Categories"
+            value="Manage event categories"
+            onPress={() => router.push("/category-manage")}
+            theme={theme}
+          />
+        </View>
+
+        {/* ── Account ──────────────────────────────────────────────────── */}
+        <SectionLabel text="Account" theme={theme} isFirst={false} />
+        <View style={styles.sectionItems}>
+          {accountActions.map((action) => (
+            <ActionRow
+              key={action.key}
+              icon={action.icon}
+              label={action.label}
+              description={action.description}
+              onPress={() => handleAccountAction(action.key)}
+              theme={theme}
+              destructive={action.destructive}
+              isPending={
+                action.key === "reset-preferences"
+                  ? resetSettingsMutation.isPending
+                  : isSigningOut
+              }
+            />
+          ))}
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -440,7 +629,8 @@ function SectionLabel({
         style={{
           fontSize: theme.typography.fontSize.xs.size,
           lineHeight: theme.typography.fontSize.xs.lineHeight,
-          fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+          fontWeight: theme.typography.fontWeight
+            .medium as TextStyle["fontWeight"],
           color: theme.colors.mutedForeground,
         }}
         accessibilityRole="header"
@@ -455,6 +645,7 @@ function SectionLabel({
 function SelectionRow({
   icon,
   label,
+  description,
   isSelected,
   onPress,
   isPending,
@@ -462,6 +653,7 @@ function SelectionRow({
 }: {
   icon: FeatherIcon;
   label: string;
+  description?: string;
   isSelected: boolean;
   onPress: () => void;
   isPending: boolean;
@@ -486,11 +678,7 @@ function SelectionRow({
       accessibilityState={{ selected: isSelected }}
       accessibilityLabel={label}
     >
-      <Feather
-        name={icon}
-        size={16}
-        color={theme.colors.mutedForeground}
-      />
+      <Feather name={icon} size={16} color={theme.colors.mutedForeground} />
       <Text
         style={{
           flex: 1,
@@ -501,16 +689,45 @@ function SelectionRow({
       >
         {label}
       </Text>
+      {description ? (
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.xs.size,
+            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            color: theme.colors.mutedForeground,
+          }}
+          numberOfLines={1}
+        >
+          {description}
+        </Text>
+      ) : null}
       {isPending ? (
         <ActivityIndicator size="small" />
       ) : isSelected ? (
-        <Feather
-          name="check"
-          size={16}
-          color={theme.colors.primaryBase}
-        />
+        <Feather name="check" size={16} color={theme.colors.primaryBase} />
       ) : null}
     </Pressable>
+  );
+}
+
+function HintRow({ text, theme }: { text: string; theme: ThemeTokens }) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: theme.spacing["3"],
+        paddingVertical: theme.spacing["2"],
+      }}
+    >
+      <Text
+        style={{
+          fontSize: theme.typography.fontSize.xs.size,
+          lineHeight: theme.typography.fontSize.xs.lineHeight,
+          color: theme.colors.mutedForeground,
+        }}
+      >
+        {text}
+      </Text>
+    </View>
   );
 }
 
@@ -653,6 +870,79 @@ function SettingToggleRow({
           }}
           thumbColor="#ffffff"
           style={{ transform: [{ scale: 0.85 }] }}
+        />
+      )}
+    </Pressable>
+  );
+}
+
+function ActionRow({
+  icon,
+  label,
+  description,
+  onPress,
+  theme,
+  destructive = false,
+  isPending = false,
+}: {
+  icon: FeatherIcon;
+  label: string;
+  description: string;
+  onPress: () => void;
+  theme: ThemeTokens;
+  destructive?: boolean;
+  isPending?: boolean;
+}) {
+  const foregroundColor = destructive
+    ? theme.colors.destructive
+    : theme.colors.foreground;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row" as const,
+          alignItems: "center" as const,
+          gap: theme.spacing["3"],
+          paddingHorizontal: theme.spacing["3"],
+          paddingVertical: theme.spacing["2"],
+          borderRadius: theme.borderRadius.md,
+          marginHorizontal: theme.spacing["1"],
+        },
+        pressed && { backgroundColor: theme.colors.accent },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Feather name={icon} size={16} color={foregroundColor} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.sm.size,
+            lineHeight: theme.typography.fontSize.sm.lineHeight,
+            color: foregroundColor,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.xs.size,
+            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            color: theme.colors.mutedForeground,
+          }}
+        >
+          {description}
+        </Text>
+      </View>
+      {isPending ? (
+        <ActivityIndicator size="small" color={foregroundColor} />
+      ) : (
+        <Feather
+          name="chevron-right"
+          size={14}
+          color={theme.colors.mutedForeground}
         />
       )}
     </Pressable>

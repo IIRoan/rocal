@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
-import { TimelinePager } from "./TimelinePager";
+import { TimelinePager, type TimelinePage } from "./TimelinePager";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ interface DayTimelineProps {
   onNavigate?: (direction: 1 | -1) => void;
   /** Whether horizontal swipe gestures are enabled */
   swipeEnabled?: boolean;
+  /** Renders one header per timeline page so it moves with the grid. */
+  renderHeaderPage?: (page: TimelinePage) => ReactNode;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -33,6 +36,7 @@ export function DayTimeline({
   onSwipeCommit,
   onNavigate,
   swipeEnabled = true,
+  renderHeaderPage,
 }: DayTimelineProps) {
   return (
     <TimelinePager
@@ -45,6 +49,7 @@ export function DayTimeline({
       onNavigate={onNavigate}
       onEventPress={onEventPress}
       onTimeSlotPress={onTimeSlotPress}
+      renderHeaderPage={renderHeaderPage}
     />
   );
 }

@@ -69,6 +69,10 @@ interface CompactMonthStripProps {
   currentDate: Date;
   /** The currently selected date */
   selectedDate?: Date;
+  /** Dates currently visible in the timeline that should be highlighted. */
+  highlightedDates?: Date[];
+  /** Optional custom 7-day collapsed row for integrated timeline headers. */
+  collapsedRowDates?: Date[];
   /** Events for dot indicators */
   events: DecoratedCalendarEvent[];
   /** Week start day: 0 = Sunday, 1 = Monday */
@@ -78,9 +82,18 @@ interface CompactMonthStripProps {
   /** Callback when a day is tapped */
   onDayPress: (date: Date) => void;
   /** Callback when the month changes (swipe left/right on the strip) */
-  onMonthChange: (direction: 1 | -1) => void;
+  onMonthChange?: (direction: 1 | -1) => void;
   /** Callback to toggle expanded/collapsed state */
   onToggleExpand: () => void;
+  /** Whether the strip owns horizontal month paging. */
+  swipeEnabled?: boolean;
+  /** Whether the selected date should be visually highlighted. */
+  showSelectedDateHighlight?: boolean;
+  /**
+   * When true the strip collapses to just the drag handle — no day-label
+   * header or week row is shown.
+   */
+  collapseToHandleOnly?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -96,10 +109,17 @@ function rubberBand(offset: number, limit: number, factor: number): number {
 function getMonthRowTarget(
   monthDate: Date,
   selectedDate: Date | undefined,
+  highlightedDates: Date[] | undefined,
   today: Date,
 ): Date {
   if (selectedDate != null && isSameMonth(selectedDate, monthDate)) {
     return selectedDate;
+  }
+  const highlightedDate = highlightedDates?.find((date) =>
+    isSameMonth(date, monthDate),
+  );
+  if (highlightedDate != null) {
+    return highlightedDate;
   }
   if (isSameMonth(today, monthDate)) {
     return today;
@@ -111,9 +131,15 @@ function getActiveRowIndexForMonth(
   monthDate: Date,
   gridDates: Date[],
   selectedDate: Date | undefined,
+  highlightedDates: Date[] | undefined,
   today: Date,
 ): number {
-  const target = getMonthRowTarget(monthDate, selectedDate, today);
+  const target = getMonthRowTarget(
+    monthDate,
+    selectedDate,
+    highlightedDates,
+    today,
+  );
 
   for (let row = 0; row < 6; row++) {
     const rowDates = gridDates.slice(row * 7, row * 7 + 7);
@@ -129,6 +155,8 @@ interface MonthPageProps {
   monthDate: Date;
   gridDates: Date[];
   selectedDate?: Date;
+  highlightedDates?: Date[];
+  collapsedRowDates?: Date[];
   today: Date;
   eventsByDay: Map<string, DecoratedCalendarEvent[]>;
   theme: ThemeTokens;
@@ -138,12 +166,15 @@ interface MonthPageProps {
   collapsedContentHeight: number;
   expandedContentHeight: number;
   onDayPress: (date: Date) => void;
+  showSelectedDateHighlight: boolean;
 }
 
 function MonthPage({
   monthDate,
   gridDates,
   selectedDate,
+  highlightedDates,
+  collapsedRowDates,
   today,
   eventsByDay,
   theme,
@@ -153,11 +184,18 @@ function MonthPage({
   collapsedContentHeight,
   expandedContentHeight,
   onDayPress,
+  showSelectedDateHighlight,
 }: MonthPageProps) {
   const activeRowIndex = useMemo(
     () =>
-      getActiveRowIndexForMonth(monthDate, gridDates, selectedDate, today),
-    [gridDates, monthDate, selectedDate, today],
+      getActiveRowIndexForMonth(
+        monthDate,
+        gridDates,
+        selectedDate,
+        highlightedDates,
+        today,
+      ),
+    [gridDates, highlightedDates, monthDate, selectedDate, today],
   );
   const collapsedGridTranslateY = -activeRowIndex * WEEK_ROW_HEIGHT;
 
@@ -186,18 +224,21 @@ function MonthPage({
     showExpandedRows,
   ]);
 
-  const renderWeekRow = useCallback(
-    (rowIndex: number) => {
-      const rowDates = gridDates.slice(rowIndex * 7, rowIndex * 7 + 7);
+  const renderDatesRow = useCallback(
+    (rowDates: Date[], key: string | number) => {
 
       return (
-        <View key={rowIndex} style={styles.weekRow}>
+        <View key={key} style={styles.weekRow}>
           {rowDates.map((date) => {
             const dateKey = format(date, "yyyy-MM-dd");
             const isCurrentMonth = isSameMonth(date, monthDate);
             const isToday = isSameDay(date, today);
             const isSelected =
               selectedDate != null && isSameDay(date, selectedDate);
+            const isHighlighted =
+              highlightedDates?.some((highlightedDate) =>
+                isSameDay(date, highlightedDate),
+              ) ?? false;
             const dayEvents = eventsByDay.get(dateKey) ?? [];
 
             return (
@@ -213,7 +254,10 @@ function MonthPage({
                   style={[
                     styles.dayNumberContainer,
                     isToday && styles.todayHighlight,
-                    isSelected && !isToday && styles.selectedHighlight,
+                    !isToday &&
+                      ((showSelectedDateHighlight && isSelected) ||
+                        isHighlighted) &&
+                      styles.selectedHighlight,
                   ]}
                 >
                   <Text
@@ -221,45 +265,63 @@ function MonthPage({
                       styles.dayNumber,
                       !isCurrentMonth && styles.outsideMonthText,
                       isToday && styles.todayText,
-                      isSelected && !isToday && styles.selectedText,
+                      !isToday &&
+                        ((showSelectedDateHighlight && isSelected) ||
+                          isHighlighted) &&
+                        styles.selectedText,
                     ]}
                   >
                     {format(date, "d")}
                   </Text>
                 </View>
 
-                {dayEvents.length > 0 && (
-                  <View style={styles.dotsRow}>
-                    {dayEvents.slice(0, MAX_DOTS).map((event, idx) => (
-                      <View
-                        key={event.id ?? idx}
-                        style={[
-                          styles.dot,
-                          {
-                            backgroundColor: resolveEventDotColor(
-                              event.color,
-                              theme,
-                            ),
-                          },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                )}
+                <View style={styles.dotsRow}>
+                  {dayEvents.slice(0, MAX_DOTS).map((event, idx) => (
+                    <View
+                      key={event.id ?? idx}
+                      style={[
+                        styles.dot,
+                        {
+                          backgroundColor: resolveEventDotColor(
+                            event.color,
+                            theme,
+                          ),
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
               </Pressable>
             );
           })}
         </View>
       );
     },
-    [eventsByDay, gridDates, monthDate, onDayPress, selectedDate, styles, theme, today],
+    [
+      eventsByDay,
+      highlightedDates,
+      monthDate,
+      onDayPress,
+      selectedDate,
+      showSelectedDateHighlight,
+      styles,
+      theme,
+      today,
+    ],
   );
 
   return (
     <Animated.View style={[styles.monthPageContent, pageAnimatedStyle]}>
       {showExpandedRows
-        ? Array.from({ length: 6 }, (_, index) => renderWeekRow(index))
-        : renderWeekRow(activeRowIndex)}
+        ? Array.from({ length: 6 }, (_, index) =>
+            renderDatesRow(gridDates.slice(index * 7, index * 7 + 7), index),
+          )
+        : collapsedRowDates != null
+          ? renderDatesRow(collapsedRowDates, "collapsed-custom")
+          : renderDatesRow(
+              gridDates.slice(activeRowIndex * 7, activeRowIndex * 7 + 7),
+              activeRowIndex,
+            )}
     </Animated.View>
   );
 }
@@ -269,12 +331,17 @@ function MonthPage({
 export function CompactMonthStrip({
   currentDate,
   selectedDate,
+  highlightedDates,
+  collapsedRowDates,
   events,
   weekStartDay,
   expanded,
   onDayPress,
   onMonthChange,
   onToggleExpand,
+  swipeEnabled = true,
+  showSelectedDateHighlight = true,
+  collapseToHandleOnly = false,
 }: CompactMonthStripProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -286,22 +353,36 @@ export function CompactMonthStrip({
   );
   const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
   const pages = useMemo(
-    () =>
-      [-1, 0, 1].map((offset) => {
+    () => {
+      if (!swipeEnabled) {
+        return [
+          {
+            key: `0-${format(currentDate, "yyyy-MM")}`,
+            monthDate: currentDate,
+            gridDates: generateGridDates(currentDate, weekStartDay),
+          },
+        ];
+      }
+
+      return [-1, 0, 1].map((offset) => {
         const monthDate = addMonths(currentDate, offset);
         return {
           key: `${offset}-${format(monthDate, "yyyy-MM")}`,
           monthDate,
           gridDates: generateGridDates(monthDate, weekStartDay),
         };
-      }),
-    [currentDate, weekStartDay],
+      });
+    },
+    [currentDate, swipeEnabled, weekStartDay],
   );
 
   // ─── Animated height for expand/collapse ─────────────────────────────────
 
-  // Content area height excludes the handle — handle lives outside the clip region.
-  const collapsedContentHeight = HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT;
+  // When collapseToHandleOnly is true the content area is 0 when collapsed —
+  // the parent timeline header already renders the day columns.
+  const collapsedContentHeight = collapseToHandleOnly
+    ? 0
+    : HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT;
   const expandedContentHeight = HEADER_ROW_HEIGHT + WEEK_ROW_HEIGHT * 6;
   const animatedContentHeight = useSharedValue(
     expanded ? expandedContentHeight : collapsedContentHeight,
@@ -342,15 +423,15 @@ export function CompactMonthStrip({
   const translateX = useSharedValue(-1);
 
   useLayoutEffect(() => {
-    translateX.value = -pageWidth;
-  }, [currentDate, pageWidth, translateX]);
+    translateX.value = swipeEnabled ? -pageWidth : 0;
+  }, [currentDate, pageWidth, swipeEnabled, translateX]);
 
   const handleNavigateLeft = useCallback(() => {
-    onMonthChange(1);
+    onMonthChange?.(1);
   }, [onMonthChange]);
 
   const handleNavigateRight = useCallback(() => {
-    onMonthChange(-1);
+    onMonthChange?.(-1);
   }, [onMonthChange]);
 
   const handleGridLayout = useCallback((event: LayoutChangeEvent) => {
@@ -361,7 +442,7 @@ export function CompactMonthStrip({
   }, []);
 
   const horizontalPan = Gesture.Pan()
-    .enabled(pageWidth > 1)
+    .enabled(swipeEnabled && onMonthChange != null && pageWidth > 1)
     .activeOffsetX([-12, 12])
     .failOffsetY([-8, 8])
     .onBegin(() => {
@@ -429,7 +510,9 @@ export function CompactMonthStrip({
     .activeOffsetY([-6, 6])
     .failOffsetX([-18, 18]);
 
-  const composedGesture = Gesture.Race(horizontalPan, verticalPan);
+  const composedGesture = swipeEnabled
+    ? Gesture.Race(horizontalPan, verticalPan)
+    : verticalPan;
 
   const stripAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -450,36 +533,61 @@ export function CompactMonthStrip({
           ))}
         </View>
 
-        {/* Swipeable grid area */}
+        {/* Grid area */}
         <GestureDetector gesture={composedGesture}>
-          <View style={styles.gridViewport} onLayout={handleGridLayout}>
-            <Animated.View
-              style={[
-                styles.pagesStrip,
-                { width: pageWidth * pages.length },
-                stripAnimatedStyle,
-              ]}
-            >
-              {pages.map((page) => (
-                <View key={page.key} style={[styles.page, { width: pageWidth }]}>
-                  <MonthPage
-                    monthDate={page.monthDate}
-                    gridDates={page.gridDates}
-                    selectedDate={selectedDate}
-                    today={today}
-                    eventsByDay={eventsByDay}
-                    theme={theme}
-                    styles={styles}
-                    showExpandedRows={showExpandedRows}
-                    animatedContentHeight={animatedContentHeight}
-                    collapsedContentHeight={collapsedContentHeight}
-                    expandedContentHeight={expandedContentHeight}
-                    onDayPress={onDayPress}
-                  />
-                </View>
-              ))}
-            </Animated.View>
-          </View>
+          {swipeEnabled ? (
+            <View style={styles.gridViewport} onLayout={handleGridLayout}>
+              <Animated.View
+                style={[
+                  styles.pagesStrip,
+                  { width: pageWidth * pages.length },
+                  stripAnimatedStyle,
+                ]}
+              >
+                {pages.map((page) => (
+                  <View key={page.key} style={[styles.page, { width: pageWidth }]}>
+                    <MonthPage
+                      monthDate={page.monthDate}
+                      gridDates={page.gridDates}
+                      selectedDate={selectedDate}
+                      highlightedDates={highlightedDates}
+                      collapsedRowDates={collapsedRowDates}
+                      today={today}
+                      eventsByDay={eventsByDay}
+                      theme={theme}
+                      styles={styles}
+                      showExpandedRows={showExpandedRows}
+                      animatedContentHeight={animatedContentHeight}
+                      collapsedContentHeight={collapsedContentHeight}
+                      expandedContentHeight={expandedContentHeight}
+                      onDayPress={onDayPress}
+                      showSelectedDateHighlight={showSelectedDateHighlight}
+                    />
+                  </View>
+                ))}
+              </Animated.View>
+            </View>
+          ) : (
+            <View style={styles.gridViewport}>
+              <MonthPage
+                monthDate={pages[0].monthDate}
+                gridDates={pages[0].gridDates}
+                selectedDate={selectedDate}
+                highlightedDates={highlightedDates}
+                collapsedRowDates={collapsedRowDates}
+                today={today}
+                eventsByDay={eventsByDay}
+                theme={theme}
+                styles={styles}
+                showExpandedRows={showExpandedRows}
+                animatedContentHeight={animatedContentHeight}
+                collapsedContentHeight={collapsedContentHeight}
+                expandedContentHeight={expandedContentHeight}
+                onDayPress={onDayPress}
+                showSelectedDateHighlight={showSelectedDateHighlight}
+              />
+            </View>
+          )}
         </GestureDetector>
       </Animated.View>
 
@@ -509,6 +617,8 @@ function createStyles(theme: ThemeTokens) {
       backgroundColor: theme.colors.background,
       paddingHorizontal: theme.spacing["2"],
       zIndex: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
     },
     headerRow: {
       flexDirection: "row" as const,
