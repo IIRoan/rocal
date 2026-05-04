@@ -1,7 +1,9 @@
 import {
+  eventOverlapsDate,
   getWeekDates,
   getThreeDayDates,
   getThreeDayStripDates,
+  getAllDayEventsForDate,
   calculateEventPosition,
   formatHourLabel,
   resolveEventBlockColor,
@@ -9,6 +11,7 @@ import {
   getEventsForDate,
   formatDayHeader,
   isToday,
+  isAllDayOrMultiDayEvent,
   HOUR_HEIGHT,
 } from "./timeline-utils";
 import { getDay, isSameDay, addDays } from "date-fns";
@@ -378,5 +381,86 @@ describe("getThreeDayStripDates", () => {
     expect(isSameDay(dates[3], new Date(2025, 1, 1))).toBe(true);
     expect(isSameDay(dates[4], new Date(2025, 1, 2))).toBe(true);
     expect(isSameDay(dates[6], new Date(2025, 1, 4))).toBe(true);
+  });
+});
+
+describe("isAllDayOrMultiDayEvent", () => {
+  it("returns true for explicitly all-day events", () => {
+    const event = {
+      ...makeEvent("all-day", new Date(2025, 0, 10, 0), new Date(2025, 0, 10, 23, 59)),
+      allDay: true,
+    } as DecoratedCalendarEvent;
+
+    expect(isAllDayOrMultiDayEvent(event)).toBe(true);
+  });
+
+  it("returns true for multi-day events", () => {
+    const event = makeEvent(
+      "multi",
+      new Date(2025, 0, 10, 23, 0),
+      new Date(2025, 0, 11, 1, 0),
+    );
+
+    expect(isAllDayOrMultiDayEvent(event)).toBe(true);
+  });
+
+  it("returns false for single-day timed events", () => {
+    const event = makeEvent(
+      "timed",
+      new Date(2025, 0, 10, 9, 0),
+      new Date(2025, 0, 10, 10, 0),
+    );
+
+    expect(isAllDayOrMultiDayEvent(event)).toBe(false);
+  });
+});
+
+describe("eventOverlapsDate", () => {
+  it("matches all-day events on the same date", () => {
+    const event = {
+      ...makeEvent("all-day", new Date(2025, 0, 10, 0), new Date(2025, 0, 11, 0)),
+      allDay: true,
+    } as DecoratedCalendarEvent;
+
+    expect(eventOverlapsDate(event, new Date(2025, 0, 10))).toBe(true);
+  });
+
+  it("matches multi-day events on every visible day", () => {
+    const event = makeEvent(
+      "multi",
+      new Date(2025, 0, 10, 23, 0),
+      new Date(2025, 0, 12, 1, 0),
+    );
+
+    expect(eventOverlapsDate(event, new Date(2025, 0, 10))).toBe(true);
+    expect(eventOverlapsDate(event, new Date(2025, 0, 11))).toBe(true);
+    expect(eventOverlapsDate(event, new Date(2025, 0, 12))).toBe(true);
+  });
+});
+
+describe("getAllDayEventsForDate", () => {
+  it("returns only all-day and multi-day events for the target date", () => {
+    const allDayEvent = {
+      ...makeEvent("all-day", new Date(2025, 0, 10, 0), new Date(2025, 0, 11, 0)),
+      allDay: true,
+    } as DecoratedCalendarEvent;
+    const multiDayEvent = makeEvent(
+      "multi",
+      new Date(2025, 0, 10, 22, 0),
+      new Date(2025, 0, 11, 2, 0),
+    );
+    const timedEvent = makeEvent(
+      "timed",
+      new Date(2025, 0, 10, 9, 0),
+      new Date(2025, 0, 10, 10, 0),
+    );
+
+    expect(
+      getAllDayEventsForDate(new Date(2025, 0, 10), [
+        timedEvent,
+        multiDayEvent,
+        allDayEvent,
+      ]).map((event) => event.id),
+    ).toEqual(["all-day", "multi"]);
   });
 });
