@@ -17,6 +17,8 @@ Create `apps/native/.env` or `apps/native/.env.local` with:
 
 ```env
 EXPO_PUBLIC_API_URL=https://api.example.com
+EXPO_PUBLIC_APP_URL=https://app.example.com
+PASSKEY_ORIGIN=https://app.example.com
 EXPO_OWNER=your-expo-account-or-org
 EXPO_PROJECT_ID=your-eas-project-id
 ```
@@ -33,10 +35,11 @@ EXPO_PROJECT_ID=your-eas-project-id
    - Android: let Expo manage the keystore unless you already have one.
    - iOS: connect the Apple Developer account/team and let Expo manage certificates/profiles.
 8. Add `EXPO_PUBLIC_API_URL` in EAS environment variables if your build should target staging or production automatically.
-9. Create or confirm an EAS Update branch named `testing`.
-10. Create or confirm an EAS Update branch named `master`.
-11. Link the `testing` channel to the `testing` branch in Expo if it is not already linked.
-12. Link the `master` channel to the `master` branch in Expo if it is not already linked.
+9. If you want native passkeys, also add `PASSKEY_ORIGIN` (or reuse `NEXT_PUBLIC_APP_URL`) with the HTTPS app origin that Better Auth uses for passkeys.
+10. Create or confirm an EAS Update branch named `testing`.
+11. Create or confirm an EAS Update branch named `master`.
+12. Link the `testing` channel to the `testing` branch in Expo if it is not already linked.
+13. Link the `master` channel to the `master` branch in Expo if it is not already linked.
 
 ## Backend auth setup
 
@@ -45,9 +48,35 @@ Standalone native auth should use:
 ```env
 MOBILE_AUTH_CALLBACK_URL=solace://api/auth
 AUTH_COOKIE_SAME_SITE=none
+PASSKEY_ORIGIN=https://app.example.com
 ```
 
 Production backend values should also use HTTPS for `BACKEND_URL` and `FRONTEND_URL`.
+
+For GitHub OAuth, the GitHub app's **Authorization callback URL** must match:
+
+```env
+${BACKEND_URL}/api/auth/callback/github
+```
+
+For local LAN development with your current IP, that means:
+
+```env
+http://192.168.88.246:4001/api/auth/callback/github
+```
+
+## Native passkeys
+
+- Native now uses a browser-based Better Auth passkey bridge across Expo Go and normal native runtimes, so the same passkey actions work without native-only modules.
+- `app.config.ts` automatically adds the iOS `associatedDomains` entry when `PASSKEY_ORIGIN`, `NEXT_PUBLIC_APP_URL`, or `EXPO_PUBLIC_APP_URL` points at a non-local HTTPS origin.
+- iOS still needs `https://<domain>/.well-known/apple-app-site-association`.
+- Android still needs `https://<domain>/.well-known/assetlinks.json` with `delegate_permission/common.get_login_creds`.
+- Expo Go does not expose the native passkey module, so `EXPO_PUBLIC_APP_URL` should point at a reachable web deployment for the browser bridge.
+
+## Expo Go E2EE
+
+- Expo Go now uses a JavaScript crypto fallback for E2EE when native SubtleCrypto is unavailable.
+- Encryption still works, but first-time device bootstrap can be slower than in a development or production build with native crypto support.
 
 ## Build commands
 
@@ -95,5 +124,6 @@ Required GitHub secret:
 Required Expo EAS environment values for the `production` environment:
 
 - `EXPO_PUBLIC_API_URL`
+- `PASSKEY_ORIGIN` when native passkeys are enabled
 
 Note: PR-triggered publishes are skipped for forked repositories because GitHub does not expose secrets to untrusted PRs.

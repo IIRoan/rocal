@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,9 +13,11 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
+import type { Passkey as AuthPasskey } from "@better-auth/passkey/client";
 import type {
   Calendar,
   CalendarView,
@@ -31,9 +34,18 @@ import {
   useTheme,
   type ThemePreference,
 } from "../../../src/providers/ThemeProvider";
+import { authClient } from "../../../src/lib/auth-client";
 import { useAuth } from "../../../src/providers/AuthProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { SETTINGS_TIMEZONE_ROUTE } from "../../../src/lib/auth-routing";
+import {
+  formatStoredPasskeyDescription,
+} from "../../../src/lib/passkey-auth";
+import { getAuthCapabilities } from "../../../src/lib/auth-capabilities";
+import {
+  isPasskeyBridgeOriginSecure,
+  resolvePasskeyBridgeBaseUrl,
+} from "../../../src/lib/passkey-browser-bridge";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { getSettingsAccountActions } from "../../../src/lib/settings-screen-utils";
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
@@ -145,7 +157,28 @@ export default function SettingsScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, registerPasskey, deletePasskey } = useAuth();
+  const passkeysQuery = authClient.useListPasskeys();
+  const authCapabilities = useMemo(
+    () => {
+      const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
+
+      return getAuthCapabilities({
+        platformOs: Platform.OS,
+        expoExecutionEnvironment: Constants.executionEnvironment,
+        expoAppOwnership: Constants.appOwnership,
+        hasPublicKeyCredential:
+          typeof globalThis.PublicKeyCredential === "function",
+        hasSecurePasskeyBridgeOrigin:
+          isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
+      });
+    },
+    [],
+  );
+  const isPasskeySupported = authCapabilities.supportsPasskeys;
+  const passkeySupportMessage =
+    authCapabilities.passkeyMessage ??
+    "Passkeys are unavailable in the current runtime.";
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
 
@@ -190,9 +223,17 @@ export default function SettingsScreen() {
     string | null
   >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isRegisteringPasskey, setIsRegisteringPasskey] = useState(false);
+  const [pendingPasskeyDeletionId, setPendingPasskeyDeletionId] = useState<
+    string | null
+  >(null);
   const accountActions = useMemo(
     () => getSettingsAccountActions({ canSignOut: Boolean(user) }),
     [user],
+  );
+  const storedPasskeys = useMemo(
+    () => (Array.isArray(passkeysQuery.data) ? passkeysQuery.data : []),
+    [passkeysQuery.data],
   );
 
   const updateSettingsMutation = useMutation({
@@ -381,6 +422,58 @@ export default function SettingsScreen() {
     [handleResetSettings, handleSignOut],
   );
 
+  const handleRegisterPasskey = useCallback(async () => {
+    setIsRegisteringPasskey(true);
+    try {
+      await registerPasskey();
+      await passkeysQuery.refetch();
+      Alert.alert(
+        "Passkey added",
+        "You can now sign in faster on supported devices.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Unable to add passkey",
+        getErrorMessage(error, "Failed to add passkey"),
+      );
+    } finally {
+      setIsRegisteringPasskey(false);
+    }
+  }, [passkeysQuery, registerPasskey]);
+
+  const handleDeletePasskey = useCallback(
+    (passkey: AuthPasskey) => {
+      const passkeyLabel = passkey.name || "this passkey";
+
+      Alert.alert(
+        "Delete passkey?",
+        `Remove ${passkeyLabel} from your account?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              setPendingPasskeyDeletionId(passkey.id);
+              deletePasskey(passkey.id)
+                .then(() => passkeysQuery.refetch())
+                .catch((error) => {
+                  Alert.alert(
+                    "Unable to delete passkey",
+                    getErrorMessage(error, "Failed to delete passkey"),
+                  );
+                })
+                .finally(() => {
+                  setPendingPasskeyDeletionId(null);
+                });
+            },
+          },
+        ],
+      );
+    },
+    [deletePasskey, passkeysQuery],
+  );
+
   // ─── Loading state ─────────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -556,6 +649,47 @@ export default function SettingsScreen() {
                 encryption is active.
               </Text>
             </View>
+          )}
+          {isPasskeySupported ? (
+            <>
+              <ActionRow
+                icon="key"
+                label="Add Passkey"
+                description={
+                  storedPasskeys.length > 0
+                    ? `${storedPasskeys.length} saved on your account`
+                    : "Use this device for faster, passwordless sign-in."
+                }
+                onPress={handleRegisterPasskey}
+                theme={theme}
+                isPending={isRegisteringPasskey}
+              />
+              {storedPasskeys.length > 0 ? (
+                storedPasskeys.map((passkey) => (
+                  <PasskeyRow
+                    key={passkey.id}
+                    passkey={passkey}
+                    onDelete={() => handleDeletePasskey(passkey)}
+                    theme={theme}
+                    isPending={pendingPasskeyDeletionId === passkey.id}
+                  />
+                ))
+              ) : (
+                <HintRow
+                  text="No passkeys saved yet. Add one to sign in with Face ID, Touch ID, or your device credential manager."
+                  theme={theme}
+                />
+              )}
+            </>
+          ) : (
+            <HintRow
+              text={
+                Platform.OS === "web" || Constants.appOwnership === "expo"
+                  ? passkeySupportMessage
+                  : `${passkeySupportMessage} Native passkeys also need the passkey domain, apple-app-site-association, and assetlinks setup to match your build.`
+              }
+              theme={theme}
+            />
           )}
         </View>
 
@@ -946,6 +1080,77 @@ function ActionRow({
         />
       )}
     </Pressable>
+  );
+}
+
+function PasskeyRow({
+  passkey,
+  onDelete,
+  theme,
+  isPending,
+}: {
+  passkey: AuthPasskey;
+  onDelete: () => void;
+  theme: ThemeTokens;
+  isPending: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: theme.spacing["3"],
+        paddingHorizontal: theme.spacing["3"],
+        paddingVertical: theme.spacing["2"],
+        borderRadius: theme.borderRadius.md,
+        marginHorizontal: theme.spacing["1"],
+      }}
+    >
+      <Feather name="key" size={16} color={theme.colors.mutedForeground} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.sm.size,
+            lineHeight: theme.typography.fontSize.sm.lineHeight,
+            color: theme.colors.foreground,
+          }}
+          numberOfLines={1}
+        >
+          {passkey.name || "Unnamed Passkey"}
+        </Text>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.xs.size,
+            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            color: theme.colors.mutedForeground,
+          }}
+          numberOfLines={2}
+        >
+          {formatStoredPasskeyDescription(passkey)}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onDelete}
+        style={({ pressed }) => [
+          {
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            alignItems: "center" as const,
+            justifyContent: "center" as const,
+          },
+          pressed && { backgroundColor: theme.colors.accent },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete ${passkey.name || "passkey"}`}
+      >
+        {isPending ? (
+          <ActivityIndicator size="small" color={theme.colors.destructive} />
+        ) : (
+          <Feather name="trash-2" size={16} color={theme.colors.destructive} />
+        )}
+      </Pressable>
+    </View>
   );
 }
 

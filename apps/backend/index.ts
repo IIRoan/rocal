@@ -6,6 +6,7 @@ import {
   auth,
   BETTER_AUTH_BASE_PATH,
   getAuthOpenApiDocumentation,
+  githubOAuthCallbackUrl,
 } from "./lib/auth";
 import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
@@ -37,7 +38,7 @@ installGlobalConsoleLogger("backend");
 
 const logger = createLogger("backend");
 
-const { frontendUrl } = env;
+const { backendUrl, frontendUrl } = env;
 
 function normalizePath(path: string) {
   return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
@@ -325,10 +326,12 @@ app.get("/", ({ query, redirect }) => {
 });
 
 app.listen(port, () => {
-  logger.ok(`Server is running on http://localhost:${port}`);
-  logger.info(`API documentation: http://localhost:${port}/api/docs`);
+  logger.ok(`Server is running on ${backendUrl}`);
+  logger.info(`API documentation: ${backendUrl}/api/docs`);
   logger.info("Auth runtime config", {
+    backendUrl,
     frontendUrl,
+    githubOAuthCallbackUrl,
     authRedirectUrl: process.env.AUTH_REDIRECT_URL || null,
     mobileAuthCallbackUrl: process.env.MOBILE_AUTH_CALLBACK_URL || null,
     cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",

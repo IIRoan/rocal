@@ -12,14 +12,21 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
 import { useAuth } from "../../src/providers/AuthProvider";
 import {
+  isPasskeyBridgeOriginSecure,
+  resolvePasskeyBridgeBaseUrl,
+} from "../../src/lib/passkey-browser-bridge";
+import {
   AUTH_SIGN_UP_ROUTE,
   CALENDAR_HOME_ROUTE,
 } from "../../src/lib/auth-routing";
+import { getAuthCapabilities } from "../../src/lib/auth-capabilities";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -48,10 +55,27 @@ function validatePassword(password: string): string | null {
 // ---------------------------------------------------------------------------
 
 export default function SignInScreen() {
-  const { signIn, signInWithPasskey } = useAuth();
+  const { signIn, signInWithGitHub, signInWithPasskey } = useAuth();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const authCapabilities = useMemo(
+    () => {
+      const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
+
+      return getAuthCapabilities({
+        platformOs: Platform.OS,
+        expoExecutionEnvironment: Constants.executionEnvironment,
+        expoAppOwnership: Constants.appOwnership,
+        hasPublicKeyCredential:
+          typeof globalThis.PublicKeyCredential === "function",
+        hasSecurePasskeyBridgeOrigin:
+          isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
+      });
+    },
+    [],
+  );
+  const showPasskeyButton = authCapabilities.supportsPasskeys;
 
   // Form state
   const [email, setEmail] = useState("");
@@ -64,6 +88,7 @@ export default function SignInScreen() {
 
   // Loading state
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
 
   // Refs for focus management
@@ -122,7 +147,24 @@ export default function SignInScreen() {
     }
   }, [clearErrors, router, signInWithPasskey]);
 
-  const isLoading = isSigningIn || isPasskeyLoading;
+  const handleGitHubSignIn = useCallback(async () => {
+    clearErrors();
+    log.info("Attempting GitHub sign-in");
+    setIsGitHubLoading(true);
+    try {
+      await signInWithGitHub();
+      log.ok("GitHub sign-in successful");
+      router.replace(CALENDAR_HOME_ROUTE);
+    } catch (err: any) {
+      const message = err?.message ?? "GitHub sign-in failed. Please try again.";
+      log.error("GitHub sign-in failed", err);
+      setServerError(message);
+    } finally {
+      setIsGitHubLoading(false);
+    }
+  }, [clearErrors, router, signInWithGitHub]);
+
+  const isLoading = isSigningIn || isGitHubLoading || isPasskeyLoading;
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -239,31 +281,65 @@ export default function SignInScreen() {
             {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <Text style={styles.dividerText}>or continue with</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Passkey button */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.secondaryButtonPressed,
-                isLoading && styles.buttonDisabled,
-              ]}
-              onPress={handlePasskeySignIn}
-              disabled={isLoading}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in with passkey"
-              accessibilityState={{ disabled: isLoading }}
-            >
-              {isPasskeyLoading ? (
-                <ActivityIndicator color={theme.colors.foreground} />
-              ) : (
-                <Text style={styles.secondaryButtonText}>
-                  Sign in with Passkey
-                </Text>
-              )}
-            </Pressable>
+            <View style={styles.socialButtonsRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.socialButton,
+                  pressed && styles.secondaryButtonPressed,
+                  isLoading && styles.buttonDisabled,
+                ]}
+                onPress={handleGitHubSignIn}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with GitHub"
+                accessibilityState={{ disabled: isLoading }}
+              >
+                {isGitHubLoading ? (
+                  <ActivityIndicator color={theme.colors.foreground} />
+                ) : (
+                  <>
+                    <Feather
+                      name="github"
+                      size={16}
+                      color={theme.colors.foreground}
+                    />
+                    <Text style={styles.secondaryButtonText}>GitHub</Text>
+                  </>
+                )}
+              </Pressable>
+
+              {showPasskeyButton ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.socialButton,
+                    pressed && styles.secondaryButtonPressed,
+                    isLoading && styles.buttonDisabled,
+                  ]}
+                  onPress={handlePasskeySignIn}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with passkey"
+                  accessibilityState={{ disabled: isLoading }}
+                >
+                  {isPasskeyLoading ? (
+                    <ActivityIndicator color={theme.colors.foreground} />
+                  ) : (
+                    <>
+                      <Feather
+                        name="key"
+                        size={16}
+                        color={theme.colors.foreground}
+                      />
+                      <Text style={styles.secondaryButtonText}>Passkey</Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
 
             {/* Footer link */}
             <View style={styles.footer}>
@@ -355,6 +431,23 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: theme.spacing["3"],
       alignItems: "center" as const,
       justifyContent: "center" as const,
+      minHeight: 48,
+      backgroundColor: theme.colors.background,
+    },
+    socialButtonsRow: {
+      flexDirection: "row" as const,
+      gap: theme.spacing["3"],
+    },
+    socialButton: {
+      flex: 1,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: theme.spacing["2"],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      paddingVertical: theme.spacing["3"],
       minHeight: 48,
       backgroundColor: theme.colors.background,
     },

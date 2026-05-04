@@ -15,7 +15,6 @@ import Animated, {
   interpolate,
   runOnJS,
   type SharedValue,
-  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -390,28 +389,13 @@ export function CompactMonthStrip({
   const [showExpandedRows, setShowExpandedRows] = useState(expanded);
 
   useEffect(() => {
+    setShowExpandedRows(expanded);
     cancelAnimation(animatedContentHeight);
     animatedContentHeight.value = withSpring(
       expanded ? expandedContentHeight : collapsedContentHeight,
       HEIGHT_SPRING,
     );
   }, [expanded, expandedContentHeight, collapsedContentHeight, animatedContentHeight]);
-
-  useEffect(() => {
-    if (expanded) {
-      setShowExpandedRows(true);
-    }
-  }, [expanded]);
-
-  useAnimatedReaction(
-    () => expanded || animatedContentHeight.value > collapsedContentHeight + 0.5,
-    (next, previous) => {
-      if (next !== previous) {
-        runOnJS(setShowExpandedRows)(next);
-      }
-    },
-    [animatedContentHeight, collapsedContentHeight, expanded],
-  );
 
   const contentAreaAnimatedStyle = useAnimatedStyle(() => ({
     height: animatedContentHeight.value,
