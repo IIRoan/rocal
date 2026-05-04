@@ -616,12 +616,6 @@ function createStyles(theme: ThemeTokens) {
       paddingHorizontal: 14,
       height: 44,
     },
-    viewTriggerLabel: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: "500" as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
     viewDropdown: {
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
@@ -635,15 +629,6 @@ function createStyles(theme: ThemeTokens) {
     },
     viewOptionRowActive: {
       backgroundColor: theme.colors.primaryBase + "12",
-    },
-    viewOptionLabel: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    },
-    viewOptionLabelActive: {
-      color: theme.colors.primaryBase,
-      fontWeight: "600" as TextStyle["fontWeight"],
     },
     // ── Calendars section ────────────────────────────────────
     calendarsSectionHeader: {
@@ -740,6 +725,21 @@ function createStyles(theme: ThemeTokens) {
       letterSpacing: 0.7,
       color: theme.colors.mutedForeground,
       opacity: 0.7,
+    },
+    viewTriggerLabel: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: "500" as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    },
+    viewOptionLabel: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.foreground,
+    },
+    viewOptionLabelActive: {
+      color: theme.colors.primaryBase,
+      fontWeight: "600" as TextStyle["fontWeight"],
     },
     calendarRowLabel: {
       flex: 1,

@@ -6,7 +6,21 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
+import { CALENDAR_HOME_ROUTE } from "../lib/auth-routing";
+import { getAuthCapabilities } from "../lib/auth-capabilities";
+import {
+  deleteStoredPasskey,
+  getDefaultPasskeyName,
+} from "../lib/passkey-auth";
+import {
+  isPasskeyBridgeOriginSecure,
+  registerBrowserPasskey,
+  resolvePasskeyBridgeBaseUrl,
+  signInWithBrowserPasskey,
+} from "../lib/passkey-browser-bridge";
 import { waitForSessionCookie } from "../lib/session-cookie";
 
 // ---------------------------------------------------------------------------
@@ -39,10 +53,16 @@ export interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   /** Create a new account. */
   signUp: (name: string, email: string, password: string) => Promise<void>;
+  /** Sign in with GitHub OAuth. */
+  signInWithGitHub: (options?: { requestSignUp?: boolean }) => Promise<void>;
   /** Sign out and clear the session. */
   signOut: () => Promise<void>;
   /** Authenticate using platform biometrics (passkey). */
   signInWithPasskey: () => Promise<void>;
+  /** Register a passkey for the current account. */
+  registerPasskey: () => Promise<void>;
+  /** Delete a passkey from the current account. */
+  deletePasskey: (id: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +83,22 @@ export function AuthProvider({
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const authCapabilities = useMemo(
+    () => {
+      const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
+
+      return getAuthCapabilities({
+        platformOs: Platform.OS,
+        expoExecutionEnvironment: Constants.executionEnvironment,
+        expoAppOwnership: Constants.appOwnership,
+        hasPublicKeyCredential:
+          typeof globalThis.PublicKeyCredential === "function",
+        hasSecurePasskeyBridgeOrigin:
+          isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
+      });
+    },
+    [],
+  );
 
   // ── Session hydration ────────────────────────────────────────────────
   useEffect(() => {
@@ -171,6 +207,25 @@ export function AuthProvider({
     [finalizeAuthenticatedSession],
   );
 
+  const signInWithGitHub = useCallback(
+    async (options?: { requestSignUp?: boolean }) => {
+      const result = await authClient.signIn.social({
+        provider: "github",
+        callbackURL: CALENDAR_HOME_ROUTE,
+        ...(options?.requestSignUp ? { requestSignUp: true } : {}),
+      });
+
+      if (result.error) {
+        throw new Error(
+          result.error.message ?? "GitHub sign-in failed. Please try again.",
+        );
+      }
+
+      await finalizeAuthenticatedSession(result.data, "GitHub sign-in");
+    },
+    [finalizeAuthenticatedSession],
+  );
+
   const signOut = useCallback(async () => {
     try {
       await authClient.signOut();
@@ -181,16 +236,78 @@ export function AuthProvider({
   }, [clearSession]);
 
   const signInWithPasskey = useCallback(async () => {
-    const result = await (authClient as any).signIn.passkey();
-
-    if (result.error) {
+    if (!authCapabilities.supportsPasskeys) {
       throw new Error(
-        result.error.message ?? "Passkey sign-in failed. Please try again.",
+        authCapabilities.passkeyMessage ??
+          "Passkey sign-in failed. Please try again.",
       );
     }
 
-    await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
-  }, [finalizeAuthenticatedSession]);
+    if (authCapabilities.passkeyMode === "web") {
+      const result = await authClient.signIn.passkey();
+
+      if (result.error) {
+        throw new Error(
+          typeof result.error.message === "string"
+            ? result.error.message
+            : "Passkey sign-in failed. Please try again.",
+        );
+      }
+
+      await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
+      return;
+    }
+
+    if (authCapabilities.passkeyMode === "browser-bridge") {
+      const result = await signInWithBrowserPasskey(authClient);
+
+      await finalizeAuthenticatedSession(result, "Passkey sign-in");
+      return;
+    }
+
+    throw new Error("Passkey sign-in failed. Please try again.");
+  }, [authCapabilities, finalizeAuthenticatedSession]);
+
+  const registerPasskey = useCallback(async () => {
+    if (!authCapabilities.supportsPasskeys) {
+      throw new Error(
+        authCapabilities.passkeyMessage ??
+          "Unable to finish passkey setup.",
+      );
+    }
+
+    if (authCapabilities.passkeyMode === "web") {
+      const result = await authClient.passkey.addPasskey({
+        name: getDefaultPasskeyName(Platform.OS),
+        authenticatorAttachment: "platform",
+      });
+
+      if (result.error) {
+        throw new Error(
+          typeof result.error.message === "string"
+            ? result.error.message
+            : "Unable to finish passkey setup.",
+        );
+      }
+
+      return;
+    }
+
+    if (authCapabilities.passkeyMode === "browser-bridge") {
+      await registerBrowserPasskey(
+        authClient,
+        getDefaultPasskeyName(Platform.OS),
+      );
+      return;
+    }
+
+    throw new Error("Unable to finish passkey setup.");
+  }, [authCapabilities]);
+
+
+  const deletePasskey = useCallback(async (id: string) => {
+    await deleteStoredPasskey(authClient, id);
+  }, []);
 
   // ── Context value ────────────────────────────────────────────────────
 
@@ -202,10 +319,24 @@ export function AuthProvider({
       isAuthenticated: !!user && !!session,
       signIn,
       signUp,
+      signInWithGitHub,
       signOut,
       signInWithPasskey,
+      registerPasskey,
+      deletePasskey,
     }),
-    [user, session, isLoading, signIn, signUp, signOut, signInWithPasskey],
+    [
+      user,
+      session,
+      isLoading,
+      signIn,
+      signUp,
+      signInWithGitHub,
+      signOut,
+      signInWithPasskey,
+      registerPasskey,
+      deletePasskey,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -50,6 +50,17 @@ describe("api-url helpers", () => {
     expect(getApiBaseUrl()).toBe("https://api.solace.test");
   });
 
+  it("remaps a localhost API url to the current browser host on LAN", () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:4001";
+    testGlobal.window = {
+      location: {
+        origin: "http://192.168.88.246:4000",
+      },
+    } as Window & typeof globalThis;
+
+    expect(getApiBaseUrl()).toBe("http://192.168.88.246:4001");
+  });
+
   it("falls back to localhost when no env is set", () => {
     expect(getApiBaseUrl()).toBe("http://localhost:4001");
   });
@@ -58,6 +69,17 @@ describe("api-url helpers", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
 
     expect(getAppBaseUrl()).toBe("https://app.solace.test");
+  });
+
+  it("remaps a localhost app url to the current browser host on LAN", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "http://localhost:4000";
+    testGlobal.window = {
+      location: {
+        origin: "http://192.168.88.246:4000",
+      },
+    } as Window & typeof globalThis;
+
+    expect(getAppBaseUrl()).toBe("http://192.168.88.246:4000");
   });
 
   it("falls back to the configured app url for auth callbacks", () => {
