@@ -159,3 +159,12 @@ export function isToday(date: Date): boolean {
 export function getThreeDayDates(currentDate: Date): Date[] {
   return [addDays(currentDate, -1), currentDate, addDays(currentDate, 1)];
 }
+
+/**
+ * Returns a 7-day strip window with the visible 3-day range centered inside
+ * the compact row. The selected/current day stays in the middle slot.
+ */
+export function getThreeDayStripDates(currentDate: Date): Date[] {
+  const rowStart = addDays(currentDate, -3);
+  return Array.from({ length: 7 }, (_, index) => addDays(rowStart, index));
+}

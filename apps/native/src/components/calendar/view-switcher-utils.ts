@@ -2,10 +2,10 @@ import {
   format,
   startOfWeek,
   endOfWeek,
-  addDays,
   isSameMonth,
 } from "date-fns";
 import type { CalendarView } from "@workspace/calendar-core";
+import { getThreeDayDates } from "./timeline-utils";
 
 // ─── View Labels ─────────────────────────────────────────────────────────────
 
@@ -56,8 +56,7 @@ export function formatViewDateHeader(
       return format(currentDate, "MMM d, yyyy");
 
     case "3day": {
-      const rangeStart = currentDate;
-      const rangeEnd = addDays(currentDate, 2);
+      const [rangeStart, , rangeEnd] = getThreeDayDates(currentDate);
 
       if (isSameMonth(rangeStart, rangeEnd)) {
         return `${format(rangeStart, "MMM d")} – ${format(rangeEnd, "d")}`;

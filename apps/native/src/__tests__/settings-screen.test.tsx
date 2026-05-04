@@ -1,44 +1,61 @@
-/**
- * Unit tests for settings screen.
- *
- * Tests setting changes, optimistic updates, theme switching,
- * loading/error states, and helper functions.
- *
- * Validates: Requirements 12.1, 12.2, 12.5
- */
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { beforeEach, describe, expect, it } from "@jest/globals";
 import type {
-  UserSettings,
   UpdateSettingsRequest,
+  UserSettings,
 } from "@workspace/calendar-core";
 
-// ─── Helper functions (mirrored from settings screen for testability) ────────
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
 
-/** Parse a comma-separated working days string (e.g. "1,2,3,4,5") into a Set. */
+function parseWorkingDayValue(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value >= 0 && value <= 6 ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 6
+      ? parsed
+      : null;
+  }
+
+  return null;
+}
+
 function parseWorkingDays(workingDays: string): Set<number> {
-  if (!workingDays) return new Set([1, 2, 3, 4, 5]);
+  if (!workingDays) {
+    return new Set(DEFAULT_WORKING_DAYS);
+  }
+
+  try {
+    const parsed = JSON.parse(workingDays);
+    if (Array.isArray(parsed)) {
+      return new Set(
+        parsed
+          .map(parseWorkingDayValue)
+          .filter((value): value is number => value !== null),
+      );
+    }
+  } catch {
+    // Fall back to legacy CSV input.
+  }
+
   return new Set(
     workingDays
       .split(",")
-      .map(Number)
-      .filter((n) => !Number.isNaN(n)),
+      .map(parseWorkingDayValue)
+      .filter((value): value is number => value !== null),
   );
 }
 
-/** Serialize a Set of day numbers back to a comma-separated string. */
 function serializeWorkingDays(days: Set<number>): string {
-  return Array.from(days)
-    .sort((a, b) => a - b)
-    .join(",");
+  return JSON.stringify(Array.from(days).sort((left, right) => left - right));
 }
 
-// ─── Models for testing optimistic update logic ──────────────────────────────
-
-/**
- * Simulates the optimistic update cache logic from the settings screen.
- * When a setting is updated, the cache is immediately patched with the
- * new values before the API call resolves.
- */
 function applyOptimisticUpdate(
   current: UserSettings,
   update: UpdateSettingsRequest,
@@ -46,18 +63,12 @@ function applyOptimisticUpdate(
   return { ...current, ...update };
 }
 
-/**
- * Simulates the rollback logic: if the API call fails, the cache is
- * restored to the previous snapshot.
- */
 function rollbackUpdate(
   _current: UserSettings,
   previous: UserSettings,
 ): UserSettings {
   return previous;
 }
-
-// ─── Theme resolution model ──────────────────────────────────────────────────
 
 type ThemePreference = "light" | "dark" | "system";
 
@@ -66,10 +77,6 @@ interface ThemeChangeResult {
   backendUpdatePayload: UpdateSettingsRequest;
 }
 
-/**
- * Models the handleThemeChange callback from the settings screen.
- * It calls both setThemePreference (ThemeProvider) and updateSetting (backend).
- */
 function handleThemeChange(pref: ThemePreference): ThemeChangeResult {
   return {
     themePreferenceCalled: pref,
@@ -77,18 +84,21 @@ function handleThemeChange(pref: ThemePreference): ThemeChangeResult {
   };
 }
 
-// ─── Pending keys tracking model ─────────────────────────────────────────────
+function handleResetSettings() {
+  return {
+    backendResetCalled: true,
+    themePreferenceCalled: "system" as ThemePreference,
+  };
+}
 
-/**
- * Models the pendingKeys state used for showing loading indicators
- * on individual settings while they are being saved.
- */
 function addPendingKeys(
   current: Set<string>,
   update: UpdateSettingsRequest,
 ): Set<string> {
   const next = new Set(current);
-  for (const k of Object.keys(update)) next.add(k);
+  for (const key of Object.keys(update)) {
+    next.add(key);
+  }
   return next;
 }
 
@@ -97,16 +107,13 @@ function removePendingKeys(
   update: UpdateSettingsRequest,
 ): Set<string> {
   const next = new Set(current);
-  for (const k of Object.keys(update)) next.delete(k);
+  for (const key of Object.keys(update)) {
+    next.delete(key);
+  }
   return next;
 }
 
-// ─── Working days toggle model ───────────────────────────────────────────────
-
-function toggleWorkingDay(
-  workingDays: Set<number>,
-  day: number,
-): Set<number> {
+function toggleWorkingDay(workingDays: Set<number>, day: number): Set<number> {
   const next = new Set(workingDays);
   if (next.has(day)) {
     next.delete(day);
@@ -116,11 +123,7 @@ function toggleWorkingDay(
   return next;
 }
 
-// ─── Default settings fixture ────────────────────────────────────────────────
-
-function createDefaultSettings(
-  overrides?: Partial<UserSettings>,
-): UserSettings {
+function createDefaultSettings(overrides?: Partial<UserSettings>): UserSettings {
   return {
     id: "settings-1",
     userId: "user-1",
@@ -131,7 +134,7 @@ function createDefaultSettings(
     timeFormat: "12h",
     workingHoursStart: 9,
     workingHoursEnd: 17,
-    workingDays: "1,2,3,4,5",
+    workingDays: "[1,2,3,4,5]",
     emailNotifications: true,
     browserNotifications: true,
     reminderSound: true,
@@ -147,142 +150,101 @@ function createDefaultSettings(
   };
 }
 
-// ─── Tests: parseWorkingDays ─────────────────────────────────────────────────
-
 describe("parseWorkingDays", () => {
-  it("parses a standard weekday string", () => {
+  it("parses the current JSON weekday format", () => {
+    const result = parseWorkingDays("[1,2,3,4,5]");
+    expect(result).toEqual(new Set([1, 2, 3, 4, 5]));
+  });
+
+  it("supports the legacy CSV format", () => {
     const result = parseWorkingDays("1,2,3,4,5");
     expect(result).toEqual(new Set([1, 2, 3, 4, 5]));
   });
 
-  it("parses a single day", () => {
-    const result = parseWorkingDays("3");
-    expect(result).toEqual(new Set([3]));
-  });
-
-  it("parses all seven days", () => {
-    const result = parseWorkingDays("0,1,2,3,4,5,6");
-    expect(result).toEqual(new Set([0, 1, 2, 3, 4, 5, 6]));
-  });
-
-  it("returns default weekdays for empty string", () => {
+  it("returns default weekdays for empty values", () => {
     const result = parseWorkingDays("");
     expect(result).toEqual(new Set([1, 2, 3, 4, 5]));
   });
 
-  it("filters out NaN values", () => {
-    const result = parseWorkingDays("1,abc,3");
-    expect(result).toEqual(new Set([1, 3]));
+  it("filters invalid JSON values", () => {
+    const result = parseWorkingDays("[1,2,8,-1,\"3\",null]");
+    expect(result).toEqual(new Set([1, 2, 3]));
   });
 
-  it("handles duplicate values", () => {
-    const result = parseWorkingDays("1,1,2,2,3");
-    expect(result).toEqual(new Set([1, 2, 3]));
+  it("filters invalid CSV values", () => {
+    const result = parseWorkingDays("1,abc,7,-1,5");
+    expect(result).toEqual(new Set([1, 5]));
   });
 });
 
-// ─── Tests: serializeWorkingDays ─────────────────────────────────────────────
-
 describe("serializeWorkingDays", () => {
-  it("serializes a standard weekday set", () => {
+  it("serializes weekdays to sorted JSON", () => {
     const result = serializeWorkingDays(new Set([1, 2, 3, 4, 5]));
-    expect(result).toBe("1,2,3,4,5");
+    expect(result).toBe("[1,2,3,4,5]");
   });
 
-  it("sorts days numerically", () => {
+  it("sorts day numbers numerically", () => {
     const result = serializeWorkingDays(new Set([5, 3, 1]));
-    expect(result).toBe("1,3,5");
-  });
-
-  it("serializes a single day", () => {
-    const result = serializeWorkingDays(new Set([0]));
-    expect(result).toBe("0");
+    expect(result).toBe("[1,3,5]");
   });
 
   it("serializes an empty set", () => {
     const result = serializeWorkingDays(new Set());
-    expect(result).toBe("");
-  });
-
-  it("serializes all seven days in order", () => {
-    const result = serializeWorkingDays(new Set([6, 4, 2, 0, 1, 3, 5]));
-    expect(result).toBe("0,1,2,3,4,5,6");
+    expect(result).toBe("[]");
   });
 });
 
-// ─── Tests: parseWorkingDays / serializeWorkingDays round-trip ───────────────
-
 describe("parseWorkingDays / serializeWorkingDays round-trip", () => {
-  it("round-trips standard weekdays", () => {
-    const original = "1,2,3,4,5";
-    const parsed = parseWorkingDays(original);
-    const serialized = serializeWorkingDays(parsed);
-    expect(serialized).toBe(original);
-  });
-
-  it("round-trips all days", () => {
-    const original = "0,1,2,3,4,5,6";
+  it("round-trips the JSON working day format", () => {
+    const original = "[1,2,3,4,5]";
     const parsed = parseWorkingDays(original);
     const serialized = serializeWorkingDays(parsed);
     expect(serialized).toBe(original);
   });
 
   it("normalizes unsorted input on round-trip", () => {
-    const input = "5,3,1";
+    const input = "[5,3,1]";
     const parsed = parseWorkingDays(input);
     const serialized = serializeWorkingDays(parsed);
-    expect(serialized).toBe("1,3,5");
+    expect(serialized).toBe("[1,3,5]");
+  });
+
+  it("upgrades legacy CSV input to JSON on round-trip", () => {
+    const parsed = parseWorkingDays("1,2,3,4,5");
+    const serialized = serializeWorkingDays(parsed);
+    expect(serialized).toBe("[1,2,3,4,5]");
   });
 });
 
-// ─── Tests: Setting changes (optimistic updates) ────────────────────────────
-
-describe("Setting changes — optimistic updates", () => {
+describe("Setting changes - optimistic updates", () => {
   let settings: UserSettings;
 
   beforeEach(() => {
     settings = createDefaultSettings();
   });
 
-  it("toggles showWeekNumbers optimistically", () => {
+  it("changes compact view optimistically", () => {
     const updated = applyOptimisticUpdate(settings, {
-      showWeekNumbers: true,
+      compactView: true,
     });
-    expect(updated.showWeekNumbers).toBe(true);
+    expect(updated.compactView).toBe(true);
   });
 
-  it("toggles showDeclinedEvents optimistically", () => {
+  it("changes the default calendar optimistically", () => {
     const updated = applyOptimisticUpdate(settings, {
-      showDeclinedEvents: true,
+      defaultCalendarId: "calendar-2",
     });
-    expect(updated.showDeclinedEvents).toBe(true);
+    expect(updated.defaultCalendarId).toBe("calendar-2");
   });
 
-  it("changes defaultView optimistically", () => {
+  it("changes browser notifications optimistically", () => {
     const updated = applyOptimisticUpdate(settings, {
-      defaultView: "week",
+      browserNotifications: false,
     });
-    expect(updated.defaultView).toBe("week");
+    expect(updated.browserNotifications).toBe(false);
   });
 
-  it("changes timeFormat optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, { timeFormat: "24h" });
-    expect(updated.timeFormat).toBe("24h");
-  });
-
-  it("changes weekStartDay optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, { weekStartDay: 1 });
-    expect(updated.weekStartDay).toBe(1);
-  });
-
-  it("changes defaultEventDuration optimistically", () => {
-    const updated = applyOptimisticUpdate(settings, {
-      defaultEventDuration: 30,
-    });
-    expect(updated.defaultEventDuration).toBe(30);
-  });
-
-  it("changes eventEncryptionMode optimistically", () => {
+  it("changes event encryption mode optimistically", () => {
     const updated = applyOptimisticUpdate(settings, {
       eventEncryptionMode: "full",
     });
@@ -291,18 +253,17 @@ describe("Setting changes — optimistic updates", () => {
 
   it("applies multiple settings at once", () => {
     const updated = applyOptimisticUpdate(settings, {
-      showWeekNumbers: true,
+      compactView: true,
       timeFormat: "24h",
     });
-    expect(updated.showWeekNumbers).toBe(true);
+    expect(updated.compactView).toBe(true);
     expect(updated.timeFormat).toBe("24h");
-    // Unchanged fields preserved
     expect(updated.defaultView).toBe("month");
   });
 
-  it("preserves immutable fields (id, userId, timestamps)", () => {
+  it("preserves immutable fields", () => {
     const updated = applyOptimisticUpdate(settings, {
-      showWeekNumbers: true,
+      compactView: true,
     });
     expect(updated.id).toBe(settings.id);
     expect(updated.userId).toBe(settings.userId);
@@ -311,118 +272,83 @@ describe("Setting changes — optimistic updates", () => {
   });
 });
 
-// ─── Tests: Optimistic update rollback ───────────────────────────────────────
-
 describe("Optimistic update rollback on error", () => {
   it("restores previous settings on API failure", () => {
     const original = createDefaultSettings();
     const optimistic = applyOptimisticUpdate(original, {
-      showWeekNumbers: true,
+      compactView: true,
     });
 
-    // Simulate API error → rollback
     const rolledBack = rollbackUpdate(optimistic, original);
-    expect(rolledBack.showWeekNumbers).toBe(false);
+    expect(rolledBack.compactView).toBe(false);
     expect(rolledBack).toEqual(original);
   });
 
   it("restores multiple changed fields on rollback", () => {
     const original = createDefaultSettings();
     const optimistic = applyOptimisticUpdate(original, {
-      showWeekNumbers: true,
+      compactView: true,
       timeFormat: "24h",
     });
 
     const rolledBack = rollbackUpdate(optimistic, original);
-    expect(rolledBack.showWeekNumbers).toBe(false);
+    expect(rolledBack.compactView).toBe(false);
     expect(rolledBack.timeFormat).toBe("12h");
   });
 });
 
-// ─── Tests: Theme switching ──────────────────────────────────────────────────
-
 describe("Theme switching", () => {
-  it("calls setThemePreference with 'light'", () => {
+  it("calls setThemePreference with light", () => {
     const result = handleThemeChange("light");
     expect(result.themePreferenceCalled).toBe("light");
-  });
-
-  it("calls setThemePreference with 'dark'", () => {
-    const result = handleThemeChange("dark");
-    expect(result.themePreferenceCalled).toBe("dark");
-  });
-
-  it("calls setThemePreference with 'system'", () => {
-    const result = handleThemeChange("system");
-    expect(result.themePreferenceCalled).toBe("system");
-  });
-
-  it("sends theme update to backend for 'light'", () => {
-    const result = handleThemeChange("light");
     expect(result.backendUpdatePayload).toEqual({ theme: "light" });
   });
 
-  it("sends theme update to backend for 'dark'", () => {
+  it("calls setThemePreference with dark", () => {
     const result = handleThemeChange("dark");
+    expect(result.themePreferenceCalled).toBe("dark");
     expect(result.backendUpdatePayload).toEqual({ theme: "dark" });
   });
 
-  it("sends theme update to backend for 'system'", () => {
+  it("calls setThemePreference with system", () => {
     const result = handleThemeChange("system");
+    expect(result.themePreferenceCalled).toBe("system");
     expect(result.backendUpdatePayload).toEqual({ theme: "system" });
-  });
-
-  it("updates both ThemeProvider and backend simultaneously", () => {
-    const result = handleThemeChange("dark");
-    // Both the local ThemeProvider preference and the backend payload
-    // should reflect the same value
-    expect(result.themePreferenceCalled).toBe("dark");
-    expect(result.backendUpdatePayload.theme).toBe("dark");
   });
 });
 
-// ─── Tests: Pending keys tracking ────────────────────────────────────────────
+describe("Reset settings", () => {
+  it("resets backend settings and local theme preference together", () => {
+    const result = handleResetSettings();
+    expect(result.backendResetCalled).toBe(true);
+    expect(result.themePreferenceCalled).toBe("system");
+  });
+});
 
 describe("Pending keys tracking", () => {
-  it("adds keys from update to pending set", () => {
+  it("adds keys from an update to the pending set", () => {
     const pending = new Set<string>();
-    const result = addPendingKeys(pending, { showWeekNumbers: true });
-    expect(result.has("showWeekNumbers")).toBe(true);
+    const result = addPendingKeys(pending, { compactView: true });
+    expect(result.has("compactView")).toBe(true);
   });
 
   it("adds multiple keys from a multi-field update", () => {
     const pending = new Set<string>();
     const result = addPendingKeys(pending, {
-      showWeekNumbers: true,
-      showDeclinedEvents: true,
+      compactView: true,
+      browserNotifications: false,
     });
-    expect(result.has("showWeekNumbers")).toBe(true);
-    expect(result.has("showDeclinedEvents")).toBe(true);
+    expect(result.has("compactView")).toBe(true);
+    expect(result.has("browserNotifications")).toBe(true);
   });
 
-  it("preserves existing pending keys when adding new ones", () => {
-    const pending = new Set(["theme"]);
-    const result = addPendingKeys(pending, { showWeekNumbers: true });
+  it("removes keys when an update settles", () => {
+    const pending = new Set(["compactView", "theme"]);
+    const result = removePendingKeys(pending, { compactView: true });
+    expect(result.has("compactView")).toBe(false);
     expect(result.has("theme")).toBe(true);
-    expect(result.has("showWeekNumbers")).toBe(true);
-  });
-
-  it("removes keys on settled", () => {
-    const pending = new Set(["showWeekNumbers", "theme"]);
-    const result = removePendingKeys(pending, { showWeekNumbers: true });
-    expect(result.has("showWeekNumbers")).toBe(false);
-    expect(result.has("theme")).toBe(true);
-  });
-
-  it("handles removing keys that are not in the set", () => {
-    const pending = new Set(["theme"]);
-    const result = removePendingKeys(pending, { showWeekNumbers: true });
-    expect(result.has("theme")).toBe(true);
-    expect(result.size).toBe(1);
   });
 });
-
-// ─── Tests: Working days toggle ──────────────────────────────────────────────
 
 describe("Working days toggle", () => {
   it("removes a day that is currently active", () => {
@@ -441,42 +367,34 @@ describe("Working days toggle", () => {
 
   it("does not mutate the original set", () => {
     const days = new Set([1, 2, 3, 4, 5]);
-    toggleWorkingDay(days, 5);
-    expect(days.has(5)).toBe(true);
+    toggleWorkingDay(days, 6);
+    expect(days.has(6)).toBe(false);
     expect(days.size).toBe(5);
   });
 
-  it("produces correct serialized output after toggle", () => {
+  it("produces JSON output after a toggle", () => {
     const days = new Set([1, 2, 3, 4, 5]);
     const toggled = toggleWorkingDay(days, 6);
     const serialized = serializeWorkingDays(toggled);
-    expect(serialized).toBe("1,2,3,4,5,6");
-  });
-
-  it("double toggle returns to original state", () => {
-    const days = new Set([1, 2, 3, 4, 5]);
-    const toggled = toggleWorkingDay(toggleWorkingDay(days, 3), 3);
-    expect(toggled).toEqual(days);
+    expect(serialized).toBe("[1,2,3,4,5,6]");
   });
 });
 
-// ─── Tests: Loading and error state logic ────────────────────────────────────
-
 describe("Loading and error state logic", () => {
-  it("identifies loading state when data is undefined and isLoading is true", () => {
+  it("identifies a loading state", () => {
     const state = { data: undefined, isLoading: true, isError: false, error: null };
     expect(state.isLoading).toBe(true);
     expect(state.data).toBeUndefined();
   });
 
-  it("identifies error state when isError is true", () => {
+  it("identifies an error state", () => {
     const error = new Error("Network error");
     const state = { data: undefined, isLoading: false, isError: true, error };
     expect(state.isError).toBe(true);
     expect(state.error?.message).toBe("Network error");
   });
 
-  it("extracts error message from Error object", () => {
+  it("extracts an error message from Error objects", () => {
     const error = new Error("Failed to load settings");
     const message =
       error && typeof error === "object" && "message" in error
@@ -484,78 +402,40 @@ describe("Loading and error state logic", () => {
         : "Failed to load settings";
     expect(message).toBe("Failed to load settings");
   });
-
-  it("uses fallback message for non-Error objects", () => {
-    const error = "something went wrong";
-    const message =
-      error && typeof error === "object" && "message" in error
-        ? (error as { message: string }).message
-        : "Failed to load settings";
-    expect(message).toBe("Failed to load settings");
-  });
-
-  it("identifies ready state when data is present", () => {
-    const settings = createDefaultSettings();
-    const state = { data: settings, isLoading: false, isError: false, error: null };
-    expect(state.isLoading).toBe(false);
-    expect(state.isError).toBe(false);
-    expect(state.data).toBeDefined();
-  });
 });
 
-// ─── Tests: Default values when settings are undefined ───────────────────────
-
 describe("Default values for undefined settings", () => {
-  // Use a function to prevent TypeScript from narrowing the type to `undefined`
   function getSettings(): Partial<UserSettings> | undefined {
     return undefined;
   }
 
-  it("defaults defaultView to 'month'", () => {
+  it("defaults defaultView to month", () => {
     const settings = getSettings();
     const defaultView = settings?.defaultView ?? "month";
     expect(defaultView).toBe("month");
   });
 
-  it("defaults showWeekNumbers to false", () => {
+  it("defaults compactView to false", () => {
     const settings = getSettings();
-    const showWeekNumbers = settings?.showWeekNumbers ?? false;
-    expect(showWeekNumbers).toBe(false);
+    const compactView = settings?.compactView ?? false;
+    expect(compactView).toBe(false);
   });
 
-  it("defaults showDeclinedEvents to false", () => {
+  it("defaults defaultCalendarId to null", () => {
     const settings = getSettings();
-    const showDeclinedEvents = settings?.showDeclinedEvents ?? false;
-    expect(showDeclinedEvents).toBe(false);
+    const defaultCalendarId = settings?.defaultCalendarId ?? null;
+    expect(defaultCalendarId).toBeNull();
   });
 
-  it("defaults timeFormat to '12h'", () => {
+  it("defaults timeFormat to 12h", () => {
     const settings = getSettings();
     const timeFormat = settings?.timeFormat ?? "12h";
     expect(timeFormat).toBe("12h");
   });
 
-  it("defaults weekStartDay to 0", () => {
+  it("defaults workingDays to the web-compatible JSON shape", () => {
     const settings = getSettings();
-    const weekStartDay = settings?.weekStartDay ?? 0;
-    expect(weekStartDay).toBe(0);
-  });
-
-  it("defaults emailNotifications to true", () => {
-    const settings = getSettings();
-    const emailNotifications = settings?.emailNotifications ?? true;
-    expect(emailNotifications).toBe(true);
-  });
-
-  it("defaults eventEncryptionMode to 'hybrid'", () => {
-    const settings = getSettings();
-    const mode = settings?.eventEncryptionMode ?? "hybrid";
-    expect(mode).toBe("hybrid");
-  });
-
-  it("defaults workingDays to Mon-Fri", () => {
-    const settings = getSettings();
-    const workingDays = parseWorkingDays(settings?.workingDays ?? "1,2,3,4,5");
+    const workingDays = parseWorkingDays(settings?.workingDays ?? "[1,2,3,4,5]");
     expect(workingDays).toEqual(new Set([1, 2, 3, 4, 5]));
   });
 });

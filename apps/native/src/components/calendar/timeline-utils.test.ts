@@ -1,6 +1,7 @@
 import {
   getWeekDates,
   getThreeDayDates,
+  getThreeDayStripDates,
   calculateEventPosition,
   formatHourLabel,
   resolveEventBlockColor,
@@ -337,15 +338,15 @@ describe("getThreeDayDates", () => {
   it("handles month boundaries correctly", () => {
     const center = new Date(2025, 1, 1); // Feb 1
     const dates = getThreeDayDates(center);
-    expect(isSameDay(dates[0], new Date(2025, 0, 31))).toBe(true); // Jan 31
-    expect(isSameDay(dates[1], new Date(2025, 1, 1))).toBe(true);  // Feb 1
-    expect(isSameDay(dates[2], new Date(2025, 1, 2))).toBe(true);  // Feb 2
+    expect(isSameDay(dates[0], new Date(2025, 0, 31))).toBe(true);
+    expect(isSameDay(dates[1], new Date(2025, 1, 1))).toBe(true);
+    expect(isSameDay(dates[2], new Date(2025, 1, 2))).toBe(true);
   });
 
   it("handles year boundaries correctly", () => {
     const center = new Date(2025, 0, 1); // Jan 1
     const dates = getThreeDayDates(center);
-    expect(isSameDay(dates[0], new Date(2024, 11, 31))).toBe(true); // Dec 31
+    expect(isSameDay(dates[0], new Date(2024, 11, 31))).toBe(true);
     expect(isSameDay(dates[1], new Date(2025, 0, 1))).toBe(true);
     expect(isSameDay(dates[2], new Date(2025, 0, 2))).toBe(true);
   });
@@ -357,5 +358,25 @@ describe("getThreeDayDates", () => {
       expect(diff).toBeGreaterThanOrEqual(22 * 60 * 60 * 1000);
       expect(diff).toBeLessThanOrEqual(26 * 60 * 60 * 1000);
     }
+  });
+});
+
+describe("getThreeDayStripDates", () => {
+  it("centers the visible 3-day range inside the 7-day strip", () => {
+    const dates = getThreeDayStripDates(new Date(2025, 0, 12)); // Sunday
+    expect(isSameDay(dates[0], new Date(2025, 0, 9))).toBe(true);
+    expect(isSameDay(dates[2], new Date(2025, 0, 11))).toBe(true);
+    expect(isSameDay(dates[3], new Date(2025, 0, 12))).toBe(true);
+    expect(isSameDay(dates[4], new Date(2025, 0, 13))).toBe(true);
+    expect(isSameDay(dates[6], new Date(2025, 0, 15))).toBe(true);
+  });
+
+  it("covers the centered 3-day range even across month boundaries", () => {
+    const dates = getThreeDayStripDates(new Date(2025, 1, 1)); // Feb 1
+    expect(isSameDay(dates[0], new Date(2025, 0, 29))).toBe(true);
+    expect(isSameDay(dates[2], new Date(2025, 0, 31))).toBe(true);
+    expect(isSameDay(dates[3], new Date(2025, 1, 1))).toBe(true);
+    expect(isSameDay(dates[4], new Date(2025, 1, 2))).toBe(true);
+    expect(isSameDay(dates[6], new Date(2025, 1, 4))).toBe(true);
   });
 });

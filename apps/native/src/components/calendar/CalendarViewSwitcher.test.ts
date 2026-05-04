@@ -53,16 +53,16 @@ describe("formatViewDateHeader", () => {
   it("shows compact range for 3-day view within same month", () => {
     const date = new Date(2025, 0, 14); // Jan 14
     const result = formatViewDateHeader("3day", date);
-    // Jan 14 – 16
-    expect(result).toBe("Jan 14 – 16");
+    // Jan 13 – 15
+    expect(result).toBe("Jan 13 – 15");
   });
 
   // 3-Day view — cross-month
   it("shows full month names for 3-day view crossing months", () => {
     const date = new Date(2024, 11, 31); // Dec 31
     const result = formatViewDateHeader("3day", date);
-    // Dec 31 – Jan 2
-    expect(result).toBe("Dec 31 – Jan 2");
+    // Dec 30 – Jan 1
+    expect(result).toBe("Dec 30 – Jan 1");
   });
 
   // Default weekStartDay
