@@ -1,8 +1,10 @@
 import {
+  addHours,
   startOfWeek,
   addDays,
   format,
   isSameDay,
+  startOfDay,
 } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
@@ -167,4 +169,47 @@ export function getThreeDayDates(currentDate: Date): Date[] {
 export function getThreeDayStripDates(currentDate: Date): Date[] {
   const rowStart = addDays(currentDate, -3);
   return Array.from({ length: 7 }, (_, index) => addDays(rowStart, index));
+}
+
+export function isAllDayOrMultiDayEvent(event: DecoratedCalendarEvent): boolean {
+  const eventStart = new Date(event.start);
+  const eventEnd = new Date(event.end);
+
+  return Boolean(event.allDay) || !isSameDay(eventStart, eventEnd);
+}
+
+export function eventOverlapsDate(
+  event: DecoratedCalendarEvent,
+  date: Date,
+): boolean {
+  const dayStart = startOfDay(date);
+  const dayEnd = addHours(dayStart, 24);
+  const eventStart = new Date(event.start);
+  const eventEnd = new Date(event.end);
+
+  return eventStart < dayEnd && eventEnd > dayStart;
+}
+
+export function getAllDayEventsForDate(
+  date: Date,
+  events: DecoratedCalendarEvent[],
+): DecoratedCalendarEvent[] {
+  return events
+    .filter((event) => isAllDayOrMultiDayEvent(event))
+    .filter((event) => eventOverlapsDate(event, date))
+    .sort((left, right) => {
+      const leftStart = new Date(left.start).getTime();
+      const rightStart = new Date(right.start).getTime();
+
+      if (leftStart !== rightStart) {
+        return leftStart - rightStart;
+      }
+
+      const leftDuration =
+        new Date(left.end).getTime() - new Date(left.start).getTime();
+      const rightDuration =
+        new Date(right.end).getTime() - new Date(right.start).getTime();
+
+      return rightDuration - leftDuration;
+    });
 }

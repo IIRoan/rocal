@@ -1,7 +1,9 @@
 import React, {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -38,10 +40,12 @@ import {
   calculateEventPosition,
   formatDayHeader,
   formatHourLabel,
+  getAllDayEventsForDate,
   getEventsForDate,
   getThreeDayDates,
   getWeekDates,
   groupEventsByDate,
+  isAllDayOrMultiDayEvent,
   resolveEventBlockColor,
 } from "./timeline-utils";
 
@@ -76,6 +80,8 @@ const PAGE_TIMING = {
   duration: 210,
   easing: Easing.out(Easing.cubic),
 };
+const INITIAL_TIMELINE_HOUR = 9;
+const ALL_DAY_PILL_HEIGHT = 24;
 
 function clampDrag(offset: number, pageWidth: number): number {
   "worklet";
@@ -112,10 +118,13 @@ export function TimelinePager({
   renderHeaderPage,
 }: TimelinePagerProps) {
   const { theme } = useTheme();
+  const isWeekView = view === "week";
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { width: windowWidth } = useWindowDimensions();
   const fallbackPageWidth = Math.max(1, windowWidth - TIME_GUTTER_WIDTH);
   const [pageWidth, setPageWidth] = useState(fallbackPageWidth);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hasInitialScrollRef = useRef(false);
   const translateX = useSharedValue(-fallbackPageWidth);
   const currentDateKey = currentDate.getTime();
 
@@ -148,6 +157,51 @@ export function TimelinePager({
       }),
     [currentDate, view, weekStartDay],
   );
+
+  const allDayEventsByPage = useMemo(
+    () =>
+      pages.map((page) =>
+        page.dates.map((date) => getAllDayEventsForDate(date, events)),
+      ),
+    [events, pages],
+  );
+  const hasAllDayEvents = useMemo(
+    () =>
+      allDayEventsByPage.some((page) =>
+        page.some((dateEvents) => dateEvents.length > 0),
+      ),
+    [allDayEventsByPage],
+  );
+  const allDayMinHeight = useMemo(() => {
+    const maxRows = Math.max(
+      1,
+      ...allDayEventsByPage.flatMap((page) =>
+        page.map((dateEvents) => dateEvents.length),
+      ),
+    );
+
+    return maxRows * ALL_DAY_PILL_HEIGHT;
+  }, [allDayEventsByPage]);
+
+  useEffect(() => {
+    hasInitialScrollRef.current = false;
+  }, [currentDateKey, pageWidth, view, weekStartDay]);
+
+  useEffect(() => {
+    if (pageWidth <= 1 || hasInitialScrollRef.current) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({
+        y: INITIAL_TIMELINE_HOUR * HOUR_HEIGHT,
+        animated: false,
+      });
+      hasInitialScrollRef.current = true;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [currentDateKey, pageWidth, view, weekStartDay]);
 
   const handleViewportLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -215,7 +269,9 @@ export function TimelinePager({
 
   const renderDayColumn = useCallback(
     (date: Date) => {
-      const dayEvents = getEventsForDate(date, eventsByDate);
+      const dayEvents = getEventsForDate(date, eventsByDate).filter(
+        (event) => !isAllDayOrMultiDayEvent(event),
+      );
       const isCurrentDay = isSameDay(date, today);
       const dayLabel =
         view === "day" ? format(date, "EEEE, MMM d") : formatDayHeader(date);
@@ -243,6 +299,7 @@ export function TimelinePager({
                 key={event.id}
                 style={[
                   styles.eventBlock,
+                  isWeekView ? styles.eventBlockWeek : null,
                   {
                     top: position.top,
                     height: position.height,
@@ -254,12 +311,16 @@ export function TimelinePager({
                 accessibilityLabel={`${event.title}, ${dayLabel}`}
               >
                 <Text
-                  style={[styles.eventTitle, { color: colors.fg }]}
-                  numberOfLines={1}
+                  style={[
+                    styles.eventTitle,
+                    isWeekView ? styles.eventTitleWeek : null,
+                    { color: colors.fg },
+                  ]}
+                  numberOfLines={isWeekView ? 2 : 1}
                 >
                   {event.title}
                 </Text>
-                {position.height >= HOUR_HEIGHT / 2 && (
+                {!isWeekView && position.height >= HOUR_HEIGHT / 2 && (
                   <Text
                     style={[styles.eventTime, { color: colors.fg }]}
                     numberOfLines={1}
@@ -294,10 +355,79 @@ export function TimelinePager({
       nowTop,
       onEventPress,
       onTimeSlotPress,
+      isWeekView,
       styles,
       theme,
       timeFormat,
       today,
+      view,
+    ],
+  );
+
+  const renderAllDayPage = useCallback(
+    (page: TimelinePage, pageIndex: number) => (
+      <View
+        key={`all-day-${page.offset}-${format(page.baseDate, "yyyy-MM-dd")}`}
+        style={[styles.allDayPage, { width: pageWidth }]}
+      >
+        {page.dates.map((date, dateIndex) => {
+          const dateEvents = allDayEventsByPage[pageIndex]?.[dateIndex] ?? [];
+
+          return (
+            <View
+              key={`all-day-column-${format(date, "yyyy-MM-dd")}`}
+              style={styles.allDayColumn}
+            >
+              <View style={[styles.allDayColumnStack, { minHeight: allDayMinHeight }]}>
+                {dateEvents.map((event) => {
+                  const colors = resolveEventBlockColor(event.color, theme);
+                  const dayLabel =
+                    view === "day"
+                      ? format(date, "EEEE, MMM d")
+                      : formatDayHeader(date);
+
+                  return (
+                    <Pressable
+                      key={`${event.id}-${format(date, "yyyy-MM-dd")}`}
+                      style={[
+                        styles.allDayPill,
+                        isWeekView ? styles.allDayPillWeek : null,
+                        {
+                          backgroundColor: colors.bg,
+                          borderColor: colors.bg,
+                        },
+                      ]}
+                      onPress={() => onEventPress?.(event)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${event.title}, all-day on ${dayLabel}`}
+                    >
+                      <Text
+                        style={[
+                          styles.allDayPillText,
+                          isWeekView ? styles.allDayPillTextWeek : null,
+                          { color: colors.fg },
+                        ]}
+                        numberOfLines={isWeekView ? 2 : 1}
+                      >
+                        {event.title}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    ),
+    [
+      allDayEventsByPage,
+      allDayMinHeight,
+      onEventPress,
+      pageWidth,
+      isWeekView,
+      styles,
+      theme,
       view,
     ],
   );
@@ -330,7 +460,27 @@ export function TimelinePager({
             </View>
           )}
 
+          {hasAllDayEvents && (
+            <View style={styles.allDayRow}>
+              <View style={styles.allDayGutter}>
+                <Text style={styles.allDayLabel}>All-day</Text>
+              </View>
+              <View style={styles.allDayViewport}>
+                <Animated.View
+                  style={[
+                    styles.pagesStrip,
+                    { width: pageWidth * PAGE_OFFSETS.length },
+                    animatedStripStyle,
+                  ]}
+                >
+                  {pages.map(renderAllDayPage)}
+                </Animated.View>
+              </View>
+            </View>
+          )}
+
           <ScrollView
+            ref={scrollViewRef}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -390,6 +540,23 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       overflow: "hidden" as const,
     },
+    allDayRow: {
+      flexDirection: "row" as const,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+    },
+    allDayGutter: {
+      width: TIME_GUTTER_WIDTH,
+      paddingTop: theme.spacing["1"],
+      paddingRight: theme.spacing["1"],
+      alignItems: "flex-end" as const,
+    },
+    allDayViewport: {
+      flex: 1,
+      overflow: "hidden" as const,
+    },
     scrollView: {
       flex: 1,
     },
@@ -423,6 +590,35 @@ function createStyles(theme: ThemeTokens) {
     headerPage: {
       backgroundColor: theme.colors.background,
     },
+    allDayPage: {
+      flexDirection: "row" as const,
+      paddingVertical: theme.spacing["1"],
+      backgroundColor: theme.colors.background,
+    },
+    allDayColumn: {
+      flex: 1,
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderLeftColor: theme.colors.border,
+      paddingHorizontal: theme.spacing["1"],
+    },
+    allDayColumnStack: {
+      gap: theme.spacing["1"],
+    },
+    allDayPill: {
+      minHeight: ALL_DAY_PILL_HEIGHT - 2,
+      borderRadius: theme.borderRadius.sm,
+      borderWidth: 1,
+      justifyContent: "center" as const,
+      paddingHorizontal: theme.spacing["2"],
+      paddingVertical: 3,
+      overflow: "hidden" as const,
+    },
+    allDayPillWeek: {
+      minHeight: ALL_DAY_PILL_HEIGHT + 8,
+      justifyContent: "flex-start" as const,
+      paddingHorizontal: theme.spacing["1"],
+      paddingVertical: 4,
+    },
     dayColumn: {
       flex: 1,
       position: "relative" as const,
@@ -449,6 +645,11 @@ function createStyles(theme: ThemeTokens) {
       overflow: "hidden" as const,
       zIndex: 2,
     },
+    eventBlockWeek: {
+      paddingHorizontal: 1,
+      paddingTop: 2,
+      paddingBottom: 2,
+    },
     nowIndicator: {
       position: "absolute" as const,
       left: 0,
@@ -465,10 +666,26 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
     },
+    allDayLabel: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    allDayPillText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    allDayPillTextWeek: {
+      lineHeight: 11,
+    },
     eventTitle: {
       fontSize: 10,
       lineHeight: 12,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    eventTitleWeek: {
+      lineHeight: 11,
     },
     eventTime: {
       fontSize: 9,
