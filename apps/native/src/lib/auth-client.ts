@@ -8,7 +8,8 @@ import { API_BASE_URL, APP_SCHEME, AUTH_STORAGE_PREFIX } from "./constants";
  * Better Auth client configured for the native app.
  *
  * Uses `@better-auth/expo/client` for secure cookie storage via
- * `expo-secure-store` and deep-link callback handling.
+ * `expo-secure-store` and deep-link callback handling, while the passkey
+ * plugin keeps the web passkey hooks available for Expo web.
  */
 export const authClient = createAuthClient({
   baseURL: API_BASE_URL,

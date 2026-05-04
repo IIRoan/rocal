@@ -1,19 +1,13 @@
 /**
- * Native CryptoProvider implementation.
+ * Mobile CryptoProvider implementation.
  *
- * Wraps `expo-crypto` (SDK 55 added AES-GCM support) and
- * `react-native-quick-crypto` to satisfy the platform-agnostic
- * CryptoProvider interface from `@workspace/e2ee`.
+ * Wraps Expo/runtime crypto when available and otherwise falls back to a
+ * pure JavaScript provider so Expo Go never depends on native-only crypto
+ * modules.
  *
- * `expo-crypto` provides `getRandomValues` and `randomUUID`.
- * The SubtleCrypto operations are delegated to the global `crypto.subtle`
- * which is polyfilled by `react-native-quick-crypto` (or available natively
- * on Hermes with the New Architecture in SDK 55).
- *
- * `react-native-quick-crypto` depends on native modules (NitroModules) that
- * are only available in a custom dev client / prebuild. When running in
- * Expo Go the import will fail — we catch that and fall back to whatever
- * `globalThis.crypto.subtle` provides (which may be `undefined`).
+ * `expo-crypto` provides `getRandomValues` and `randomUUID`. If the runtime
+ * also exposes `crypto.subtle`, we use it. Otherwise we fall back to the JS
+ * provider from `node-forge`.
  */
 import type { CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
@@ -25,6 +19,7 @@ import {
   getRuntimeDisplayName,
   supportsSubtleCrypto,
 } from "@workspace/runtime";
+import { createJsCryptoProvider } from "./js-crypto-provider";
 
 const log = createLogger("native:crypto");
 const runtime = detectRuntime({
@@ -33,54 +28,24 @@ const runtime = detectRuntime({
   expoAppOwnership: Constants.appOwnership,
 });
 
-let polyfillAttempted = false;
-let expoGoWarningLogged = false;
+let jsFallbackLogged = false;
 
 function isExpoGoRuntime(): boolean {
   return runtime.isExpoGo;
 }
 
-function logExpoGoDisabledMessage() {
-  if (expoGoWarningLogged) return;
-  expoGoWarningLogged = true;
+function logJsFallbackMessage(message: string) {
+  if (jsFallbackLogged) return;
+  jsFallbackLogged = true;
   log.warn(
-    `${getRuntimeDisplayName(runtime)} detected. Native crypto is unavailable there, so E2EE ` +
-      "is disabled for this session. Use a development build or production " +
-      "build to enable encryption on mobile.",
+    `${message} Crypto operations stay available, but first-time key setup can be slower.`,
   );
 }
 
-/**
- * Attempt to install the `react-native-quick-crypto` polyfill.
- * This must be called (and awaited) before `createNativeCryptoProvider`.
- *
- * Safe to call multiple times — the import is only attempted once.
- */
 export async function installCryptoPolyfill(): Promise<void> {
-  if (polyfillAttempted) return;
-  polyfillAttempted = true;
-
-  if (isExpoGoRuntime()) {
-    logExpoGoDisabledMessage();
-    return;
-  }
-
-  // If subtle is already available (e.g. Hermes New Architecture), skip.
-  if (globalThis.crypto?.subtle) {
-    log.info("crypto.subtle already available, skipping polyfill");
-    return;
-  }
-
-  try {
-    // Dynamic import so the native-module resolution error is catchable.
-    await import("react-native-quick-crypto");
-    log.info("react-native-quick-crypto polyfill installed");
-  } catch (error) {
-    log.warn(
-      "react-native-quick-crypto could not be loaded. This is expected when " +
-        "running in Expo Go, which does not include the required native modules " +
-        "(NitroModules). E2EE is disabled for this session. To enable E2EE, " +
-        "use a development build (`npx expo run:android` or EAS Build).",
+  if (isExpoGoRuntime() || !globalThis.crypto?.subtle) {
+    logJsFallbackMessage(
+      `${getRuntimeDisplayName(runtime)} is using the JavaScript crypto fallback for E2EE.`,
     );
   }
 }
@@ -88,29 +53,27 @@ export async function installCryptoPolyfill(): Promise<void> {
 /**
  * Build a CryptoProvider backed by native crypto primitives.
  *
- * Call `installCryptoPolyfill()` before calling this function.
+ * Call `installCryptoPolyfill()` before calling this function if you want the
+ * runtime/fallback log to happen during bootstrap.
  *
- * The `subtle` property delegates to the global `crypto.subtle` which is
- * expected to be available via Hermes (New Architecture) or a polyfill
- * from `react-native-quick-crypto`.
- *
- * Returns `null` if SubtleCrypto is not available (e.g. running in Expo Go
- * without native modules).
+ * Falls back to a pure JavaScript provider when native SubtleCrypto is not
+ * available.
  */
-export function createNativeCryptoProvider(): CryptoProvider | null {
+export function createNativeCryptoProvider(): CryptoProvider {
   if (isExpoGoRuntime()) {
-    logExpoGoDisabledMessage();
-    return null;
+    logJsFallbackMessage(
+      `${getRuntimeDisplayName(runtime)} detected. Using the JavaScript crypto fallback for E2EE.`,
+    );
+    return createJsCryptoProvider();
   }
 
   const subtle = globalThis.crypto?.subtle;
 
   if (!supportsSubtleCrypto({ runtime, cryptoRef: globalThis.crypto })) {
-    log.warn(
-      `SubtleCrypto is not available in ${getRuntimeDisplayName(runtime)} — E2EE is disabled. ` +
-        "Use a development build to enable encryption.",
+    logJsFallbackMessage(
+      `SubtleCrypto is not available in ${getRuntimeDisplayName(runtime)}. Using the JavaScript crypto fallback for E2EE.`,
     );
-    return null;
+    return createJsCryptoProvider();
   }
 
   return {

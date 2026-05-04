@@ -12,6 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
@@ -55,7 +56,7 @@ function validatePassword(password: string): string | null {
 // ---------------------------------------------------------------------------
 
 export default function SignUpScreen() {
-  const { signUp } = useAuth();
+  const { signUp, signInWithGitHub } = useAuth();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -73,6 +74,7 @@ export default function SignUpScreen() {
 
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
 
   // Refs for focus management
   const emailRef = useRef<TextInput>(null);
@@ -120,6 +122,23 @@ export default function SignUpScreen() {
       setIsSubmitting(false);
     }
   }, [clearErrors, email, name, password, router, signUp]);
+
+  const handleGitHubSignUp = useCallback(async () => {
+    clearErrors();
+    log.info("Attempting GitHub sign-up");
+    setIsGitHubLoading(true);
+    try {
+      await signInWithGitHub({ requestSignUp: true });
+      log.ok("GitHub sign-up successful");
+      router.replace(CALENDAR_HOME_ROUTE);
+    } catch (err: any) {
+      const message = err?.message ?? "GitHub sign-up failed. Please try again.";
+      log.error("GitHub sign-up failed", err);
+      setServerError(message);
+    } finally {
+      setIsGitHubLoading(false);
+    }
+  }, [clearErrors, router, signInWithGitHub]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -246,18 +265,50 @@ export default function SignUpScreen() {
               style={({ pressed }) => [
                 styles.primaryButton,
                 pressed && styles.primaryButtonPressed,
-                isSubmitting && styles.buttonDisabled,
+                (isSubmitting || isGitHubLoading) && styles.buttonDisabled,
               ]}
               onPress={handleSignUp}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isGitHubLoading}
               accessibilityRole="button"
               accessibilityLabel="Create account"
-              accessibilityState={{ disabled: isSubmitting }}
+              accessibilityState={{ disabled: isSubmitting || isGitHubLoading }}
             >
               {isSubmitting ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
                 <Text style={styles.primaryButtonText}>Create account</Text>
+              )}
+            </Pressable>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && styles.secondaryButtonPressed,
+                (isSubmitting || isGitHubLoading) && styles.buttonDisabled,
+              ]}
+              onPress={handleGitHubSignUp}
+              disabled={isSubmitting || isGitHubLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with GitHub"
+              accessibilityState={{ disabled: isSubmitting || isGitHubLoading }}
+            >
+              {isGitHubLoading ? (
+                <ActivityIndicator color={theme.colors.foreground} />
+              ) : (
+                <>
+                  <Feather
+                    name="github"
+                    size={16}
+                    color={theme.colors.foreground}
+                  />
+                  <Text style={styles.secondaryButtonText}>GitHub</Text>
+                </>
               )}
             </Pressable>
 
@@ -337,6 +388,31 @@ function createStyles(theme: ThemeTokens) {
     buttonDisabled: {
       opacity: 0.6,
     },
+    divider: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      marginVertical: theme.spacing["5"],
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.colors.border,
+    },
+    secondaryButton: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: theme.spacing["2"],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      paddingVertical: theme.spacing["3"],
+      minHeight: 48,
+      backgroundColor: theme.colors.background,
+    },
+    secondaryButtonPressed: {
+      backgroundColor: theme.colors.accent,
+    },
     footer: {
       flexDirection: "row" as const,
       justifyContent: "center" as const,
@@ -399,6 +475,17 @@ function createStyles(theme: ThemeTokens) {
       lineHeight: theme.typography.fontSize.base.lineHeight,
       fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
+    },
+    dividerText: {
+      marginHorizontal: theme.spacing["3"],
+      fontSize: theme.typography.fontSize.sm.size,
+      color: theme.colors.mutedForeground,
+    },
+    secondaryButtonText: {
+      fontSize: theme.typography.fontSize.base.size,
+      lineHeight: theme.typography.fontSize.base.lineHeight,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
     },
     footerText: {
       fontSize: theme.typography.fontSize.sm.size,

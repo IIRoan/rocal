@@ -11,6 +11,9 @@ export const AUTH_STORAGE_PREFIX = "solace";
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4001";
 
+export const APP_BASE_URL =
+  process.env.EXPO_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? null;
+
 /**
  * Secure-store keys used throughout the app.
  */

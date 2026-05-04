@@ -6,6 +6,7 @@ import { oneTimeToken, openAPI } from "better-auth/plugins";
 import { prisma } from "./prisma";
 import { env } from "./env";
 import { getAuthTrustedOrigins } from "./origin-policy";
+import { getOAuthProviderCallbackUrl } from "./oauth-urls";
 
 export const BETTER_AUTH_BASE_PATH = "/api/auth";
 
@@ -20,8 +21,15 @@ const passkeyOrigin =
 
 const socialRedirectUrl =
   process.env.AUTH_REDIRECT_URL ||
+  env.mobileAuthCallbackUrl ||
   process.env.NEXT_PUBLIC_APP_URL ||
   frontendUrl;
+
+export const githubOAuthCallbackUrl = getOAuthProviderCallbackUrl(
+  backendUrl,
+  BETTER_AUTH_BASE_PATH,
+  "github",
+);
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {

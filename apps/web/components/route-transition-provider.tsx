@@ -43,6 +43,7 @@ const DEFAULT_MESSAGE_CONTEXT: RouteLoadingMessageContext = "PAGE_LOAD";
 const DEFAULT_MINIMUM_VISIBLE_MS = 140;
 const ROUTE_OVERLAY_FADE_MS = 180;
 const OVERLAY_EXIT_MS = ROUTE_OVERLAY_FADE_MS;
+const PASSKEY_BRIDGE_ROUTE = "/passkey/native";
 
 const RouteTransitionContext = createContext<
   RouteTransitionContextValue | undefined
@@ -67,6 +68,10 @@ function RouteTransitionRouteTracker({
   return null;
 }
 
+function isPasskeyBridgeRoute(routeKey: string | null) {
+  return routeKey === PASSKEY_BRIDGE_ROUTE || routeKey?.startsWith(`${PASSKEY_BRIDGE_ROUTE}?`);
+}
+
 export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   const [routeKey, setRouteKey] = useState<string | null>(null);
   const currentRouteKeyRef = useRef<string | null>(null);
@@ -88,6 +93,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
       currentRouteKey === nextRouteKey ? currentRouteKey : nextRouteKey,
     );
   }, []);
+  const isPasskeyBridge = isPasskeyBridgeRoute(routeKey);
 
   const clearTimers = useCallback(() => {
     if (hideTimerRef.current !== null) {
@@ -222,6 +228,10 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   }, [finishRouteTransition, overlayState.mounted, routeKey]);
 
   useEffect(() => {
+    if (isPasskeyBridge) {
+      return;
+    }
+
     const handleDocumentClick = (event: MouseEvent) => {
       if (
         event.defaultPrevented ||
@@ -337,7 +347,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
         <RouteTransitionRouteTracker onRouteKeyChange={handleRouteKeyChange} />
       </Suspense>
       {children}
-      {overlayState.mounted ? (
+      {overlayState.mounted && !isPasskeyBridge ? (
         <PageLoadingOverlay
           isLoading={overlayState.active}
           messageContext={overlayState.messageContext}

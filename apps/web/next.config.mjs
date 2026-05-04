@@ -1,10 +1,16 @@
+import { getAllowedNextDevOrigins } from "@workspace/runtime/next-dev";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  output: "export",
+  allowedDevOrigins: getAllowedNextDevOrigins(),
   compiler: {
-    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error"] } : false,
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error"] }
+        : false,
   },
-  transpilePackages: ['@workspace/ui', '@workspace/design-tokens'],
-}
+  transpilePackages: ["@workspace/ui", "@workspace/design-tokens"],
+};
 
-export default nextConfig
+export default nextConfig;

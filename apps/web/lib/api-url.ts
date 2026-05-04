@@ -1,4 +1,46 @@
 const AUTH_REDIRECT_FALLBACK_PATH = "/dashboard";
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+function isLoopbackHost(hostname?: string | null) {
+  return Boolean(hostname && LOOPBACK_HOSTS.has(hostname.toLowerCase()));
+}
+
+function getBrowserOriginUrl() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return new URL(window.location.origin);
+  } catch {
+    return null;
+  }
+}
+
+function remapLoopbackUrlForBrowser(urlString: string): string {
+  const browserOrigin = getBrowserOriginUrl();
+
+  if (!browserOrigin) {
+    return urlString;
+  }
+
+  try {
+    const configuredUrl = new URL(urlString);
+
+    if (
+      isLoopbackHost(configuredUrl.hostname) &&
+      !isLoopbackHost(browserOrigin.hostname)
+    ) {
+      configuredUrl.protocol = browserOrigin.protocol;
+      configuredUrl.hostname = browserOrigin.hostname;
+      return configuredUrl.toString().replace(/\/$/, "");
+    }
+
+    return urlString;
+  } catch {
+    return urlString;
+  }
+}
 
 /**
  * Resolve the API base URL.
@@ -6,7 +48,20 @@ const AUTH_REDIRECT_FALLBACK_PATH = "/dashboard";
  * Priority: NEXT_PUBLIC_API_URL env var → env fallback.
  */
 export const getApiBaseUrl = () => {
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (configuredUrl) {
+    return remapLoopbackUrlForBrowser(configuredUrl);
+  }
+
+  const browserOrigin = getBrowserOriginUrl();
+  if (browserOrigin && !isLoopbackHost(browserOrigin.hostname)) {
+    const apiUrl = new URL(browserOrigin.origin);
+    apiUrl.port = "4001";
+    return apiUrl.toString().replace(/\/$/, "");
+  }
+
+  return "http://localhost:4001";
 };
 
 /**
@@ -15,8 +70,12 @@ export const getApiBaseUrl = () => {
  * Priority: NEXT_PUBLIC_APP_URL → browser origin → env fallback.
  */
 export const getAppBaseUrl = () => {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (configuredUrl) {
+    return remapLoopbackUrlForBrowser(configuredUrl);
+  }
+
   return (
-    process.env.NEXT_PUBLIC_APP_URL ||
     (typeof window !== "undefined" ? window.location.origin : null) ||
     "http://localhost:4000"
   );

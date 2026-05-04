@@ -114,7 +114,7 @@ export function buildSidebarCalendarSections(
 export interface SidebarViewOption {
   view: CalendarView;
   label: string;
-  icon: string;
+  icon: "square" | "columns" | "grid" | "calendar" | "list";
 }
 
 export const SIDEBAR_VIEW_OPTIONS: SidebarViewOption[] = [
