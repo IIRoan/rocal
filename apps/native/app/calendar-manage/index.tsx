@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
+  Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
   type TextStyle,
@@ -13,11 +13,28 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Calendar } from "@workspace/calendar-core";
+import { Feather } from "@expo/vector-icons";
+import type { Calendar, CalendarSubscription } from "@workspace/calendar-core";
+import {
+  getErrorMessage,
+  partitionCalendarsByKind,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
+import { StackScreenHeader } from "../../src/components/StackScreenHeader";
+import {
+  formatLastSync,
+  getSubscriptionType,
+  resolveCalendarSwatchColor,
+  sortSubscriptions,
+} from "../../src/lib/subscription-utils";
+
+type ReadOnlyCalendarEntry = {
+  subscription: CalendarSubscription;
+  calendar: Calendar | undefined;
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -39,18 +56,56 @@ export default function CalendarManageScreen() {
     queryFn: () => calendarApiService.getCalendars(),
   });
 
+  const { data: subscriptions = [], isLoading: subscriptionsLoading } =
+    useQuery({
+      queryKey: QUERY_KEYS.subscriptions(),
+      queryFn: () => calendarApiService.getSubscriptions(),
+    });
+
+  const { ownedCalendars } = useMemo(
+    () => partitionCalendarsByKind(calendars ?? []),
+    [calendars],
+  );
+
+  const sortedOwnedCalendars = useMemo(
+    () =>
+      [...ownedCalendars].sort((left, right) => {
+        if (left.isDefault !== right.isDefault) {
+          return left.isDefault ? -1 : 1;
+        }
+
+        return left.name.localeCompare(right.name);
+      }),
+    [ownedCalendars],
+  );
+
+  const calendarById = useMemo(
+    () => new Map((calendars ?? []).map((calendar) => [calendar.id, calendar])),
+    [calendars],
+  );
+
+  const readOnlyCalendars = useMemo(
+    () =>
+      sortSubscriptions(subscriptions).map((subscription) => ({
+        subscription,
+        calendar: calendarById.get(subscription.calendar.id),
+      })),
+    [calendarById, subscriptions],
+  );
+
   // ─── Visibility toggle mutation ────────────────────────────────────────────
 
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [pendingDefaultCalendarId, setPendingDefaultCalendarId] = useState<
+    string | null
+  >(null);
+  const [pendingSyncSubscriptionId, setPendingSyncSubscriptionId] = useState<
+    string | null
+  >(null);
 
   const toggleVisibilityMutation = useMutation({
-    mutationFn: ({
-      id,
-      isVisible,
-    }: {
-      id: string;
-      isVisible: boolean;
-    }) => calendarApiService.updateCalendar(id, { isVisible }),
+    mutationFn: ({ id, isVisible }: { id: string; isVisible: boolean }) =>
+      calendarApiService.updateCalendar(id, { isVisible }),
     onMutate: ({ id }) => {
       setTogglingIds((prev) => new Set(prev).add(id));
     },
@@ -58,12 +113,71 @@ export default function CalendarManageScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
+    onError: (mutationError) => {
+      Alert.alert(
+        "Unable to update visibility",
+        getErrorMessage(mutationError, "Failed to update calendar visibility"),
+      );
+    },
     onSettled: (_data, _error, { id }) => {
       setTogglingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
+    },
+  });
+
+  const setDefaultCalendarMutation = useMutation({
+    mutationFn: (calendarId: string) =>
+      calendarApiService.updateCalendar(calendarId, { isDefault: true }),
+    onMutate: (calendarId) => {
+      setPendingDefaultCalendarId(calendarId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+    },
+    onError: (mutationError) => {
+      Alert.alert(
+        "Unable to update default calendar",
+        getErrorMessage(mutationError, "Failed to update default calendar"),
+      );
+    },
+    onSettled: () => {
+      setPendingDefaultCalendarId(null);
+    },
+  });
+
+  const syncSubscriptionMutation = useMutation({
+    mutationFn: (subscriptionId: string) =>
+      calendarApiService.syncSubscription(subscriptionId),
+    onMutate: (subscriptionId) => {
+      setPendingSyncSubscriptionId(subscriptionId);
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+
+      if (result.status === "error") {
+        Alert.alert(
+          "Sync finished with issues",
+          result.message ??
+            result.errors?.join("\n") ??
+            "The calendar feed returned an error.",
+        );
+      }
+    },
+    onError: (mutationError) => {
+      Alert.alert(
+        "Unable to sync calendar",
+        getErrorMessage(mutationError, "Failed to sync calendar"),
+      );
+    },
+    onSettled: () => {
+      setPendingSyncSubscriptionId(null);
     },
   });
 
@@ -86,60 +200,40 @@ export default function CalendarManageScreen() {
     [router],
   );
 
+  const handleReadOnlyPress = useCallback(
+    (subscription: CalendarSubscription) => {
+      router.push(`/subscription/edit/${subscription.id}`);
+    },
+    [router],
+  );
+
   const handleCreate = useCallback(() => {
     router.push("/calendar-manage/create");
   }, [router]);
 
-  // ─── Render item ───────────────────────────────────────────────────────────
+  const handleOpenSubscriptions = useCallback(() => {
+    router.push("/subscription");
+  }, [router]);
 
-  const renderCalendarItem = useCallback(
-    ({ item }: { item: Calendar }) => {
-      const calendarColor =
-        theme.colors.calendar[
-          item.color as keyof typeof theme.colors.calendar
-        ]?.bg ?? theme.colors.primaryBase;
-      const isToggling = togglingIds.has(item.id);
+  const handleAddOrImport = useCallback(() => {
+    router.push("/subscription/create");
+  }, [router]);
 
-      return (
-        <Pressable
-          style={styles.calendarRow}
-          onPress={() => handleCalendarPress(item)}
-          accessibilityRole="button"
-          accessibilityLabel={`Edit calendar ${item.name}`}
-        >
-          <View
-            style={[styles.colorDot, { backgroundColor: calendarColor }]}
-          />
-          <View style={styles.calendarInfo}>
-            <Text style={styles.calendarName} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {item.isDefault ? (
-              <Text style={styles.defaultBadge}>Default</Text>
-            ) : null}
-          </View>
-          <Switch
-            value={item.isVisible}
-            onValueChange={() => handleToggleVisibility(item)}
-            disabled={isToggling}
-            trackColor={{
-              false: theme.colors.muted,
-              true: theme.colors.primaryBase,
-            }}
-            thumbColor={theme.colors.background}
-            accessibilityLabel={`Toggle visibility for ${item.name}`}
-          />
-        </Pressable>
-      );
+  const handleSetDefault = useCallback(
+    (calendarId: string) => {
+      setDefaultCalendarMutation.mutate(calendarId);
     },
-    [
-      theme,
-      styles,
-      togglingIds,
-      handleCalendarPress,
-      handleToggleVisibility,
-    ],
+    [setDefaultCalendarMutation],
   );
+
+  const handleSyncSubscription = useCallback(
+    (subscriptionId: string) => {
+      syncSubscriptionMutation.mutate(subscriptionId);
+    },
+    [syncSubscriptionMutation],
+  );
+
+  // ─── Render item ───────────────────────────────────────────────────────────
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
@@ -178,34 +272,365 @@ export default function CalendarManageScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Manage Calendars
-        </Text>
-        <Pressable
-          style={styles.createButton}
-          onPress={handleCreate}
-          accessibilityRole="button"
-          accessibilityLabel="Create new calendar"
-        >
-          <Text style={styles.createButtonText}>+ New</Text>
-        </Pressable>
-      </View>
-      <FlatList
-        data={calendars ?? []}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCalendarItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No calendars yet</Text>
-            <Text style={styles.emptySubtext}>
-              Tap "+ New" to create your first calendar
-            </Text>
-          </View>
+      <StackScreenHeader
+        title="Calendar Management"
+        rightAction={
+          <Pressable
+            style={styles.headerAction}
+            onPress={handleCreate}
+            accessibilityRole="button"
+            accessibilityLabel="Create new calendar"
+          >
+            <Feather name="plus" size={18} color={theme.colors.primaryBase} />
+          </Pressable>
         }
       />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>
+            Manage every calendar in one place
+          </Text>
+          <Text style={styles.heroText}>
+            Owned calendars can be edited, shared, and set as default. Read-only
+            calendars stay synced from feeds and holiday catalogs.
+          </Text>
+          <View style={styles.heroActions}>
+            <Pressable style={styles.primaryButton} onPress={handleCreate}>
+              <Text style={styles.primaryButtonText}>New Calendar</Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={handleAddOrImport}
+            >
+              <Text style={styles.secondaryButtonText}>Add or Import</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <SectionHeader
+          title="Owned Calendars"
+          count={sortedOwnedCalendars.length}
+          theme={theme}
+        />
+        {sortedOwnedCalendars.length === 0 ? (
+          <EmptyCard
+            icon="calendar"
+            title="No owned calendars yet"
+            text="Create a calendar to organize events, share it, and choose a default."
+            theme={theme}
+          />
+        ) : (
+          sortedOwnedCalendars.map((calendar) => (
+            <OwnedCalendarRow
+              key={calendar.id}
+              calendar={calendar}
+              onOpen={() => handleCalendarPress(calendar)}
+              onToggleVisibility={() => handleToggleVisibility(calendar)}
+              onSetDefault={() => handleSetDefault(calendar.id)}
+              visibilityPending={togglingIds.has(calendar.id)}
+              defaultPending={pendingDefaultCalendarId === calendar.id}
+              theme={theme}
+            />
+          ))
+        )}
+
+        <SectionHeader
+          title="Read-only Calendars"
+          count={readOnlyCalendars.length}
+          actionLabel="Manage"
+          onAction={handleOpenSubscriptions}
+          theme={theme}
+        />
+        {subscriptionsLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={theme.colors.primaryBase} />
+            <Text style={styles.loadingInlineText}>Loading subscriptions…</Text>
+          </View>
+        ) : readOnlyCalendars.length === 0 ? (
+          <EmptyCard
+            icon="rss"
+            title="No read-only calendars yet"
+            text="Add an external feed, import a local .ics file, or browse holiday calendars."
+            theme={theme}
+          />
+        ) : (
+          readOnlyCalendars.map((entry) => (
+            <ReadOnlyCalendarRow
+              key={entry.subscription.id}
+              entry={entry}
+              onOpen={() => handleReadOnlyPress(entry.subscription)}
+              onToggleVisibility={() =>
+                entry.calendar
+                  ? handleToggleVisibility(entry.calendar)
+                  : undefined
+              }
+              onSync={
+                getSubscriptionType(entry.subscription) === "external"
+                  ? () => handleSyncSubscription(entry.subscription.id)
+                  : undefined
+              }
+              visibilityPending={togglingIds.has(
+                entry.subscription.calendar.id,
+              )}
+              syncPending={pendingSyncSubscriptionId === entry.subscription.id}
+              theme={theme}
+            />
+          ))
+        )}
+      </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function SectionHeader({
+  title,
+  count,
+  actionLabel,
+  onAction,
+  theme,
+}: {
+  title: string;
+  count: number;
+  actionLabel?: string;
+  onAction?: () => void;
+  theme: ThemeTokens;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionTitleWrap}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionCount}>{count}</Text>
+      </View>
+      {actionLabel && onAction ? (
+        <Pressable onPress={onAction}>
+          <Text style={styles.sectionAction}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function EmptyCard({
+  icon,
+  title,
+  text,
+  theme,
+}: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  title: string;
+  text: string;
+  theme: ThemeTokens;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  return (
+    <View style={styles.emptyCard}>
+      <Feather name={icon} size={18} color={theme.colors.mutedForeground} />
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyText}>{text}</Text>
+    </View>
+  );
+}
+
+function OwnedCalendarRow({
+  calendar,
+  onOpen,
+  onToggleVisibility,
+  onSetDefault,
+  visibilityPending,
+  defaultPending,
+  theme,
+}: {
+  calendar: Calendar;
+  onOpen: () => void;
+  onToggleVisibility: () => void;
+  onSetDefault: () => void;
+  visibilityPending: boolean;
+  defaultPending: boolean;
+  theme: ThemeTokens;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const meta = [calendar.isDefault ? "Default" : "Owned"];
+
+  if (calendar.forceFullEncryption) {
+    meta.push("Encrypted");
+  }
+  if (!calendar.isVisible) {
+    meta.push("Hidden");
+  }
+
+  return (
+    <View style={styles.rowCard}>
+      <Pressable style={styles.rowInfoButton} onPress={onOpen}>
+        <View
+          style={[
+            styles.colorSwatch,
+            {
+              backgroundColor: resolveCalendarSwatchColor(
+                calendar.color,
+                theme,
+              ),
+            },
+          ]}
+        />
+        <View style={styles.rowCopy}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {calendar.name}
+          </Text>
+          <Text style={styles.rowMeta}>{meta.join(" · ")}</Text>
+        </View>
+      </Pressable>
+
+      <View style={styles.rowActions}>
+        {!calendar.isDefault ? (
+          <RoundIconButton
+            icon="star"
+            onPress={onSetDefault}
+            pending={defaultPending}
+            accessibilityLabel="Set as default calendar"
+            theme={theme}
+          />
+        ) : null}
+        <RoundIconButton
+          icon={calendar.isVisible ? "eye" : "eye-off"}
+          onPress={onToggleVisibility}
+          pending={visibilityPending}
+          accessibilityLabel={
+            calendar.isVisible ? "Hide calendar" : "Show calendar"
+          }
+          theme={theme}
+        />
+        <RoundIconButton
+          icon="chevron-right"
+          onPress={onOpen}
+          accessibilityLabel="Open calendar details"
+          pending={false}
+          theme={theme}
+        />
+      </View>
+    </View>
+  );
+}
+
+function ReadOnlyCalendarRow({
+  entry,
+  onOpen,
+  onToggleVisibility,
+  onSync,
+  visibilityPending,
+  syncPending,
+  theme,
+}: {
+  entry: ReadOnlyCalendarEntry;
+  onOpen: () => void;
+  onToggleVisibility: () => void;
+  onSync?: () => void;
+  visibilityPending: boolean;
+  syncPending: boolean;
+  theme: ThemeTokens;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const type = getSubscriptionType(entry.subscription);
+  const meta = [type === "holiday" ? "Holiday calendar" : "External feed"];
+
+  if (entry.calendar && !entry.calendar.isVisible) {
+    meta.push("Hidden");
+  }
+  if (type === "external") {
+    meta.push(
+      `Last synced ${formatLastSync(entry.subscription.lastSyncAt).toLowerCase()}`,
+    );
+  }
+
+  return (
+    <View style={styles.rowCard}>
+      <Pressable style={styles.rowInfoButton} onPress={onOpen}>
+        <View
+          style={[
+            styles.colorSwatch,
+            {
+              backgroundColor: resolveCalendarSwatchColor(
+                entry.subscription.calendar.color,
+                theme,
+              ),
+            },
+          ]}
+        />
+        <View style={styles.rowCopy}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {entry.subscription.calendar.name}
+          </Text>
+          <Text style={styles.rowMeta}>{meta.join(" · ")}</Text>
+        </View>
+      </Pressable>
+
+      <View style={styles.rowActions}>
+        <RoundIconButton
+          icon={entry.calendar?.isVisible === false ? "eye-off" : "eye"}
+          onPress={onToggleVisibility}
+          pending={visibilityPending}
+          accessibilityLabel={
+            entry.calendar?.isVisible === false
+              ? "Show calendar"
+              : "Hide calendar"
+          }
+          theme={theme}
+        />
+        {onSync ? (
+          <RoundIconButton
+            icon="refresh-cw"
+            onPress={onSync}
+            pending={syncPending}
+            accessibilityLabel="Sync now"
+            theme={theme}
+          />
+        ) : null}
+        <RoundIconButton
+          icon="chevron-right"
+          onPress={onOpen}
+          accessibilityLabel="Open read-only calendar details"
+          pending={false}
+          theme={theme}
+        />
+      </View>
+    </View>
+  );
+}
+
+function RoundIconButton({
+  icon,
+  onPress,
+  accessibilityLabel,
+  pending,
+  theme,
+}: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  onPress: () => void;
+  accessibilityLabel: string;
+  pending: boolean;
+  theme: ThemeTokens;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  return (
+    <Pressable
+      style={styles.iconButton}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {pending ? (
+        <ActivityIndicator size="small" color={theme.colors.primaryBase} />
+      ) : (
+        <Feather name={icon} size={15} color={theme.colors.mutedForeground} />
+      )}
+    </Pressable>
   );
 }
 
@@ -224,50 +649,125 @@ function createStyles(theme: ThemeTokens) {
       backgroundColor: theme.colors.background,
       padding: theme.spacing["4"],
     },
-    header: {
-      flexDirection: "row" as const,
-      justifyContent: "space-between" as const,
+    backButton: {
+      minHeight: 44,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primaryBase,
       alignItems: "center" as const,
+      justifyContent: "center" as const,
       paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["3"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      marginTop: theme.spacing["3"],
     },
-    listContent: {
-      paddingVertical: theme.spacing["2"],
-    },
-    calendarRow: {
-      flexDirection: "row" as const,
+    headerAction: {
+      width: 38,
+      height: 38,
       alignItems: "center" as const,
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["3"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      justifyContent: "center" as const,
     },
-    colorDot: {
-      width: 14,
-      height: 14,
-      borderRadius: theme.borderRadius.full,
-      marginRight: theme.spacing["3"],
-    },
-    calendarInfo: {
+    scrollView: {
       flex: 1,
+    },
+    scrollContent: {
+      padding: theme.spacing["4"],
+      paddingBottom: theme.spacing["8"],
+      gap: theme.spacing["3"],
+    },
+    heroCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing["4"],
+      gap: theme.spacing["3"],
+    },
+    heroActions: {
+      flexDirection: "row" as const,
+      gap: theme.spacing["3"],
+    },
+    primaryButton: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primaryBase,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    secondaryButton: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.muted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    sectionHeader: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingTop: theme.spacing["1"],
+    },
+    sectionTitleWrap: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: theme.spacing["2"],
     },
-    createButton: {
-      backgroundColor: theme.colors.primaryBase,
-      paddingVertical: theme.spacing["1"],
-      paddingHorizontal: theme.spacing["3"],
-      borderRadius: theme.borderRadius.md,
+    emptyCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing["4"],
+      gap: theme.spacing["2"],
     },
-    backButton: {
-      marginTop: theme.spacing["4"],
-      paddingVertical: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["4"],
+    rowCard: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["3"],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+    },
+    rowInfoButton: {
+      flex: 1,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["3"],
+    },
+    colorSwatch: {
+      width: 14,
+      height: 14,
+      borderRadius: theme.borderRadius.full,
+      flexShrink: 0,
+    },
+    rowCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    rowActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["1"],
+    },
+    iconButton: {
+      width: 34,
+      height: 34,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.muted,
-      borderRadius: theme.borderRadius.md,
+    },
+    loadingRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["2"],
     },
     emptyContainer: {
       flex: 1,
@@ -285,25 +785,75 @@ function createStyles(theme: ThemeTokens) {
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
-    createButtonText: {
+    heroTitle: {
+      fontSize: theme.typography.fontSize.lg.size,
+      lineHeight: theme.typography.fontSize.lg.lineHeight,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    },
+    heroText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.primaryForeground,
+      color: theme.colors.mutedForeground,
     },
-    calendarName: {
+    primaryButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.primaryForeground,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+    },
+    secondaryButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    sectionTitle: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
       color: theme.colors.foreground,
-      flexShrink: 1,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
-    defaultBadge: {
+    sectionCount: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+    },
+    sectionAction: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.primaryBase,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    rowTitle: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    rowMeta: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    loadingInlineText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    emptyTitle: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    emptyText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
     },
     loadingText: {
       fontSize: theme.typography.fontSize.sm.size,
@@ -320,20 +870,9 @@ function createStyles(theme: ThemeTokens) {
     backButtonText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    emptyText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
+      color: theme.colors.primaryForeground,
       fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-    },
-    emptySubtext: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["1"],
+        .semibold as TextStyle["fontWeight"],
     },
   } satisfies Record<string, TextStyle>;
 

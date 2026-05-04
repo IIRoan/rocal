@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -19,6 +20,7 @@ import { useTheme } from "../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../src/lib/api";
 import { QUERY_KEYS } from "../../src/lib/query-keys";
 import { ColorPicker } from "../../src/components/event/ColorPicker";
+import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -32,6 +34,7 @@ export default function CalendarCreateScreen() {
 
   const [name, setName] = useState("");
   const [color, setColor] = useState<EventColor>("blue");
+  const [isDefault, setIsDefault] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [serverErrors, setServerErrors] = useState<string[]>([]);
 
@@ -77,8 +80,9 @@ export default function CalendarCreateScreen() {
     createMutation.mutate({
       name: name.trim(),
       color,
+      isDefault,
     });
-  }, [name, color, validate, createMutation]);
+  }, [name, color, isDefault, validate, createMutation]);
 
   const handleCancel = useCallback(() => {
     router.back();
@@ -90,16 +94,20 @@ export default function CalendarCreateScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Create Calendar
-        </Text>
-      </View>
+      <StackScreenHeader title="Create Calendar" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>Create an editable calendar</Text>
+          <Text style={styles.heroText}>
+            Owned calendars can be edited, shared, and set as the default for new
+            events.
+          </Text>
+        </View>
+
         {/* Name field */}
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Name</Text>
@@ -121,6 +129,24 @@ export default function CalendarCreateScreen() {
             selectedColor={color}
             onColorSelect={setColor}
             label="Color"
+          />
+        </View>
+
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleCopy}>
+            <Text style={styles.fieldLabel}>Default Calendar</Text>
+            <Text style={styles.helperText}>
+              New events will use this calendar automatically.
+            </Text>
+          </View>
+          <Switch
+            value={isDefault}
+            onValueChange={setIsDefault}
+            trackColor={{
+              false: theme.colors.input,
+              true: theme.colors.primaryBase,
+            }}
+            thumbColor={theme.colors.background}
           />
         </View>
 
@@ -194,6 +220,15 @@ function createStyles(theme: ThemeTokens) {
     fieldGroup: {
       marginBottom: theme.spacing["4"],
     },
+    heroCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing["4"],
+      marginBottom: theme.spacing["4"],
+      gap: theme.spacing["1"],
+    },
     textInput: {
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -204,6 +239,16 @@ function createStyles(theme: ThemeTokens) {
     },
     errorContainer: {
       marginBottom: theme.spacing["4"],
+    },
+    toggleRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      gap: theme.spacing["3"],
+      marginBottom: theme.spacing["4"],
+    },
+    toggleCopy: {
+      flex: 1,
     },
     actionRow: {
       flexDirection: "row" as const,
@@ -237,6 +282,18 @@ function createStyles(theme: ThemeTokens) {
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
+    heroTitle: {
+      fontSize: theme.typography.fontSize.lg.size,
+      lineHeight: theme.typography.fontSize.lg.lineHeight,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    },
+    heroText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
     fieldLabel: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
@@ -249,6 +306,12 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
       color: theme.colors.foreground,
+    },
+    helperText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+      marginTop: theme.spacing["1"],
     },
     errorText: {
       fontSize: theme.typography.fontSize.sm.size,

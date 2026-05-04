@@ -1,8 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,24 +14,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type {
-  Calendar,
-  EventColor,
-  UpdateCalendarRequest,
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
+import {
+  getErrorMessage,
+  type EventColor,
+  type UpdateCalendarRequest,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
+import { StackScreenHeader } from "../../../src/components/StackScreenHeader";
+import { ColorPicker } from "../../../src/components/event/ColorPicker";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
-import { ColorPicker } from "../../../src/components/event/ColorPicker";
-import * as Clipboard from "expo-clipboard";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { resolveCalendarSwatchColor } from "../../../src/lib/calendar-color-utils";
 
 type DeleteAction = "delete_events" | "move_events";
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function CalendarEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,82 +38,81 @@ export default function CalendarEditScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // ─── Form state ────────────────────────────────────────────────────────────
-
   const [name, setName] = useState("");
   const [color, setColor] = useState<EventColor>("blue");
   const [isVisible, setIsVisible] = useState(true);
-  const [formInitialized, setFormInitialized] = useState(false);
+  const [isDefault, setIsDefault] = useState(false);
+  const [forceFullEncryption, setForceFullEncryption] = useState(false);
+  const [selectedMoveTargetId, setSelectedMoveTargetId] = useState("");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [serverErrors, setServerErrors] = useState<string[]>([]);
+  const [formReady, setFormReady] = useState(false);
 
-  // ─── Delete modal state ────────────────────────────────────────────────────
-
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [targetCalendarId, setTargetCalendarId] = useState<string | null>(null);
-
-  // ─── Share link state ──────────────────────────────────────────────────────
-
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  // ─── Data fetching ─────────────────────────────────────────────────────────
-
-  const {
-    data: calendar,
-    isLoading: calendarLoading,
-  } = useQuery({
+  const { data: calendar, isLoading: calendarLoading } = useQuery({
     queryKey: [...QUERY_KEYS.calendars(), id],
     queryFn: async () => {
       const calendars = await calendarApiService.getCalendars();
-      return calendars.find((c) => c.id === id) ?? null;
+      return calendars.find((entry) => entry.id === id) ?? null;
     },
     enabled: !!id,
   });
 
-  // Initialize form when calendar data loads
-  if (calendar && !formInitialized) {
-    setName(calendar.name);
-    setColor(calendar.color as EventColor);
-    setIsVisible(calendar.isVisible);
-    setFormInitialized(true);
-  }
-
-  // Fetch all calendars for move-events target selection
-  const { data: allCalendars } = useQuery({
+  const { data: allCalendars = [] } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
   });
 
-  // Fetch share link status
-  const {
-    data: shareLink,
-    isLoading: shareLinkLoading,
-  } = useQuery({
+  const { data: shareLink, isLoading: shareLinkLoading } = useQuery({
     queryKey: QUERY_KEYS.calendarShareLink(id ?? ""),
     queryFn: () => calendarApiService.getCalendarShareLink(id!),
     enabled: !!id,
   });
 
-  // ─── Update mutation ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!calendar || formReady) {
+      return;
+    }
+
+    setName(calendar.name);
+    setColor(calendar.color);
+    setIsVisible(calendar.isVisible);
+    setIsDefault(calendar.isDefault);
+    setForceFullEncryption(calendar.forceFullEncryption === true);
+    setFormReady(true);
+  }, [calendar, formReady]);
+
+  const otherOwnedCalendars = useMemo(
+    () =>
+      allCalendars.filter((entry) => entry.id !== id && entry.kind === "owned"),
+    [allCalendars, id],
+  );
+
+  useEffect(() => {
+    if (selectedMoveTargetId || otherOwnedCalendars.length === 0) {
+      return;
+    }
+
+    setSelectedMoveTargetId(otherOwnedCalendars[0].id);
+  }, [otherOwnedCalendars, selectedMoveTargetId]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateCalendarRequest) =>
-      calendarApiService.updateCalendar(id!, data),
+    mutationFn: (request: UpdateCalendarRequest) =>
+      calendarApiService.updateCalendar(id!, request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.calendarShareLink(id!),
+      });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       router.back();
     },
-    onError: (err: unknown) => {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to update calendar";
-      setServerErrors([message]);
+    onError: (error) => {
+      Alert.alert(
+        "Unable to save calendar",
+        getErrorMessage(error, "Failed to update calendar"),
+      );
     },
   });
-
-  // ─── Delete mutation ───────────────────────────────────────────────────────
 
   const deleteMutation = useMutation({
     mutationFn: ({
@@ -125,41 +121,37 @@ export default function CalendarEditScreen() {
     }: {
       action: DeleteAction;
       moveTargetId?: string;
-    }) =>
-      calendarApiService.deleteCalendarAdvanced(
-        id!,
-        action,
-        moveTargetId,
-      ),
+    }) => calendarApiService.deleteCalendarAdvanced(id!, action, moveTargetId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
       router.back();
     },
-    onError: (err: unknown) => {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to delete calendar";
-      setServerErrors([message]);
+    onError: (error) => {
+      Alert.alert(
+        "Unable to delete calendar",
+        getErrorMessage(error, "Failed to delete calendar"),
+      );
     },
   });
 
-  // ─── Share link mutations ──────────────────────────────────────────────────
-
   const enableShareMutation = useMutation({
-    mutationFn: () => calendarApiService.enableCalendarShareLink(id!),
+    mutationFn: (regenerate: boolean) =>
+      calendarApiService.enableCalendarShareLink(
+        id!,
+        regenerate ? { regenerate: true } : undefined,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
     },
-    onError: (err: unknown) => {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to enable share link";
-      setServerErrors([message]);
+    onError: (error) => {
+      Alert.alert(
+        "Unable to update share link",
+        getErrorMessage(error, "Failed to enable calendar sharing"),
+      );
     },
   });
 
@@ -169,142 +161,105 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
-      setLinkCopied(false);
     },
-    onError: (err: unknown) => {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to disable share link";
-      setServerErrors([message]);
+    onError: (error) => {
+      Alert.alert(
+        "Unable to disable share link",
+        getErrorMessage(error, "Failed to disable calendar sharing"),
+      );
     },
   });
 
-  // ─── Validation ────────────────────────────────────────────────────────────
+  const validate = useCallback(() => {
+    const nextErrors: string[] = [];
 
-  const validate = useCallback((): boolean => {
-    const errors: string[] = [];
     if (!name.trim()) {
-      errors.push("Calendar name is required");
+      nextErrors.push("Calendar name is required");
     }
     if (name.trim().length > 100) {
-      errors.push("Calendar name must be 100 characters or less");
+      nextErrors.push("Calendar name must be 100 characters or less");
     }
-    setValidationErrors(errors);
-    return errors.length === 0;
+
+    setValidationErrors(nextErrors);
+    return nextErrors.length === 0;
   }, [name]);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
-
-  const handleSubmit = useCallback(() => {
-    setServerErrors([]);
-    if (!validate()) return;
+  const handleSave = useCallback(() => {
+    if (!validate()) {
+      return;
+    }
 
     updateMutation.mutate({
       name: name.trim(),
       color,
       isVisible,
+      isDefault,
+      forceFullEncryption,
     });
-  }, [name, color, isVisible, validate, updateMutation]);
+  }, [
+    color,
+    forceFullEncryption,
+    isDefault,
+    isVisible,
+    name,
+    updateMutation,
+    validate,
+  ]);
 
-  const handleCancel = useCallback(() => {
-    router.back();
-  }, [router]);
+  const confirmDelete = useCallback(
+    (action: DeleteAction) => {
+      if (calendar?.isDefault) {
+        Alert.alert(
+          "Cannot delete default calendar",
+          "Make another calendar default before deleting this one.",
+        );
+        return;
+      }
 
-  const handleDeletePress = useCallback(() => {
-    if (calendar?.isDefault) {
-      Alert.alert(
-        "Cannot delete",
-        "The default calendar cannot be deleted.",
-        [{ text: "OK" }],
-      );
-      return;
-    }
-    setDeleteModalVisible(true);
-  }, [calendar]);
+      if (action === "move_events" && !selectedMoveTargetId) {
+        Alert.alert(
+          "Choose a destination",
+          "Select another owned calendar to receive this calendar's events.",
+        );
+        return;
+      }
 
-  const handleDeleteWithEvents = useCallback(() => {
-    setDeleteModalVisible(false);
-    Alert.alert(
-      "Delete calendar and events?",
-      "All events in this calendar will be permanently deleted.",
-      [
+      const message =
+        action === "delete_events"
+          ? "All events in this calendar will be permanently deleted."
+          : "Events will be moved to the selected calendar before this calendar is deleted.";
+
+      Alert.alert("Delete calendar?", message, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
           onPress: () =>
-            deleteMutation.mutate({ action: "delete_events" }),
+            deleteMutation.mutate({
+              action,
+              moveTargetId:
+                action === "move_events" ? selectedMoveTargetId : undefined,
+            }),
         },
-      ],
-    );
-  }, [deleteMutation]);
-
-  const handleMoveEvents = useCallback(
-    (moveToId: string) => {
-      setDeleteModalVisible(false);
-      setTargetCalendarId(null);
-      Alert.alert(
-        "Delete calendar?",
-        "Events will be moved to the selected calendar.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () =>
-              deleteMutation.mutate({
-                action: "move_events",
-                moveTargetId: moveToId,
-              }),
-          },
-        ],
-      );
+      ]);
     },
-    [deleteMutation],
+    [calendar?.isDefault, deleteMutation, selectedMoveTargetId],
   );
 
   const handleCopyShareLink = useCallback(async () => {
-    if (shareLink?.shareUrl) {
-      await Clipboard.setStringAsync(shareLink.shareUrl);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
+    if (!shareLink?.shareUrl) {
+      return;
     }
-  }, [shareLink]);
 
-  const handleEnableShare = useCallback(() => {
-    enableShareMutation.mutate();
-  }, [enableShareMutation]);
-
-  const handleDisableShare = useCallback(() => {
-    Alert.alert(
-      "Disable sharing?",
-      "The share link will stop working. You can re-enable it later.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Disable",
-          style: "destructive",
-          onPress: () => disableShareMutation.mutate(),
-        },
-      ],
-    );
-  }, [disableShareMutation]);
-
-  // ─── Other calendars for move target ───────────────────────────────────────
-
-  const otherCalendars = useMemo(
-    () => (allCalendars ?? []).filter((c) => c.id !== id),
-    [allCalendars, id],
-  );
-
-  // ─── Loading state ─────────────────────────────────────────────────────────
+    await Clipboard.setStringAsync(shareLink.shareUrl);
+    Alert.alert("Copied", "The share link is now on your clipboard.");
+  }, [shareLink?.shareUrl]);
 
   if (calendarLoading) {
     return (
       <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading…</Text>
+        <Text style={styles.loadingText}>Loading calendar…</Text>
       </SafeAreaView>
     );
   }
@@ -312,278 +267,281 @@ export default function CalendarEditScreen() {
   if (!calendar) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Calendar not found</Text>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Text style={styles.backButtonText}>Go back</Text>
-        </Pressable>
+        <Text style={styles.errorText}>Calendar not found.</Text>
       </SafeAreaView>
     );
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  const allErrors = [...validationErrors, ...serverErrors];
-  const isShareEnabled = shareLink?.enabled ?? false;
-  const isShareLoading =
+  const shareBusy =
     shareLinkLoading ||
     enableShareMutation.isPending ||
     disableShareMutation.isPending;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Edit Calendar
-        </Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StackScreenHeader title="Edit Calendar" />
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Name field */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Name</Text>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>{calendar.name}</Text>
+          <Text style={styles.heroText}>
+            Update visibility, sharing, and encryption settings for this owned
+            calendar.
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Calendar</Text>
+
+          <FieldLabel text="Name" theme={theme} />
           <TextInput
-            style={[styles.textInput, styles.textInputText]}
+            style={styles.input}
             value={name}
             onChangeText={setName}
             placeholder="Calendar name"
             placeholderTextColor={theme.colors.mutedForeground}
             maxLength={100}
-            accessibilityLabel="Calendar name"
           />
-        </View>
 
-        {/* Color picker */}
-        <View style={styles.fieldGroup}>
-          <ColorPicker
-            selectedColor={color}
-            onColorSelect={setColor}
-            label="Color"
-          />
-        </View>
+          <FieldLabel text="Color" theme={theme} />
+          <ColorPicker selectedColor={color} onColorSelect={setColor} />
 
-        {/* Visibility toggle */}
-        <View style={styles.toggleRow}>
-          <Text style={styles.fieldLabel}>Visible</Text>
-          <Switch
-            value={isVisible}
-            onValueChange={setIsVisible}
-            trackColor={{
-              false: theme.colors.muted,
-              true: theme.colors.primaryBase,
-            }}
-            thumbColor={theme.colors.background}
-            accessibilityLabel="Calendar visibility"
-          />
-        </View>
-
-        {/* Sharing section */}
-        <View style={styles.sectionDivider} />
-        <View style={styles.fieldGroup}>
-          <Text style={styles.sectionTitle}>Sharing</Text>
-          {isShareLoading ? (
-            <ActivityIndicator
-              size="small"
-              color={theme.colors.primaryBase}
-              style={styles.shareLoading}
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <Text style={styles.toggleTitle}>Visible</Text>
+              <Text style={styles.toggleText}>
+                Hide this calendar without deleting its events.
+              </Text>
+            </View>
+            <Switch
+              value={isVisible}
+              onValueChange={setIsVisible}
+              trackColor={{
+                false: theme.colors.input,
+                true: theme.colors.primaryBase,
+              }}
+              thumbColor={theme.colors.background}
             />
-          ) : isShareEnabled ? (
-            <View style={styles.shareContainer}>
-              {shareLink?.shareUrl ? (
-                <View style={styles.shareLinkRow}>
-                  <Text
-                    style={styles.shareLinkText}
-                    numberOfLines={1}
-                    ellipsizeMode="middle"
-                  >
+          </View>
+
+          <View style={styles.inlineActionRow}>
+            <View style={styles.inlineActionCopy}>
+              <Text style={styles.toggleTitle}>Default Calendar</Text>
+              <Text style={styles.toggleText}>
+                New events open in your default calendar first.
+              </Text>
+            </View>
+            {isDefault ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>Default</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={styles.inlineButton}
+                onPress={() => setIsDefault(true)}
+              >
+                <Text style={styles.inlineButtonText}>Set Default</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <Text style={styles.toggleTitle}>Full Calendar Encryption</Text>
+              <Text style={styles.toggleText}>
+                Drop plaintext shadows for encrypted events in this calendar.
+              </Text>
+            </View>
+            <Switch
+              value={forceFullEncryption}
+              onValueChange={setForceFullEncryption}
+              trackColor={{
+                false: theme.colors.input,
+                true: theme.colors.primaryBase,
+              }}
+              thumbColor={theme.colors.background}
+            />
+          </View>
+
+          {forceFullEncryption ? (
+            <Text style={styles.helperText}>
+              Existing fully encrypted events may need to be reopened and saved
+              before ICS sharing can be enabled again.
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Sharing</Text>
+          <Text style={styles.helperText}>
+            Share links publish an ICS feed for this owned calendar. If you
+            recently enabled full encryption, reopen and resave encrypted events
+            before sharing.
+          </Text>
+
+          {shareBusy ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primaryBase}
+              />
+              <Text style={styles.helperText}>Updating share link…</Text>
+            </View>
+          ) : shareLink?.enabled ? (
+            <>
+              {shareLink.shareUrl ? (
+                <View style={styles.sourceRow}>
+                  <Text style={styles.sourceText} numberOfLines={2}>
                     {shareLink.shareUrl}
                   </Text>
-                  <Pressable
-                    style={styles.copyButton}
-                    onPress={handleCopyShareLink}
-                    accessibilityRole="button"
-                    accessibilityLabel="Copy share link"
-                  >
-                    <Text style={styles.copyButtonText}>
-                      {linkCopied ? "Copied!" : "Copy"}
-                    </Text>
-                  </Pressable>
                 </View>
               ) : null}
-              <Pressable
-                style={styles.disableShareButton}
-                onPress={handleDisableShare}
-                accessibilityRole="button"
-                accessibilityLabel="Disable sharing"
-              >
-                <Text style={styles.disableShareButtonText}>
-                  Disable Sharing
-                </Text>
-              </Pressable>
-            </View>
+
+              <View style={styles.buttonCluster}>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={handleCopyShareLink}
+                >
+                  <Text style={styles.secondaryButtonText}>Copy Link</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => enableShareMutation.mutate(true)}
+                >
+                  <Text style={styles.secondaryButtonText}>Regenerate</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.destructiveOutlineButton}
+                  onPress={() => disableShareMutation.mutate()}
+                >
+                  <Text style={styles.destructiveOutlineButtonText}>
+                    Disable
+                  </Text>
+                </Pressable>
+              </View>
+            </>
           ) : (
             <Pressable
-              style={styles.enableShareButton}
-              onPress={handleEnableShare}
-              accessibilityRole="button"
-              accessibilityLabel="Enable ICS share link"
+              style={styles.primaryButtonWide}
+              onPress={() => enableShareMutation.mutate(false)}
             >
-              <Text style={styles.enableShareButtonText}>
-                Enable ICS Share Link
-              </Text>
+              <Text style={styles.primaryButtonText}>Enable Share Link</Text>
             </Pressable>
           )}
         </View>
 
-        {/* Errors */}
-        {allErrors.length > 0 ? (
-          <View style={styles.errorContainer}>
-            {allErrors.map((err, i) => (
-              <Text key={i} style={styles.errorText}>
-                {err}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Delete Calendar</Text>
+          {calendar.isDefault ? (
+            <Text style={styles.helperText}>
+              Make another calendar default before deleting this one.
+            </Text>
+          ) : (
+            <Text style={styles.helperText}>
+              Delete this calendar and either remove its events or move them
+              into another owned calendar first.
+            </Text>
+          )}
+
+          {otherOwnedCalendars.length > 0 ? (
+            <>
+              <FieldLabel text="Move Events To" theme={theme} />
+              <View style={styles.selectionList}>
+                {otherOwnedCalendars.map((entry) => {
+                  const selected = entry.id === selectedMoveTargetId;
+                  return (
+                    <Pressable
+                      key={entry.id}
+                      style={styles.selectionRow}
+                      onPress={() => setSelectedMoveTargetId(entry.id)}
+                    >
+                      <View
+                        style={[
+                          styles.selectionSwatch,
+                          {
+                            backgroundColor: resolveCalendarSwatchColor(
+                              entry.color,
+                              theme,
+                            ),
+                          },
+                        ]}
+                      />
+                      <View style={styles.selectionCopy}>
+                        <Text style={styles.selectionTitle}>{entry.name}</Text>
+                        <Text style={styles.selectionMeta}>
+                          {entry.isDefault
+                            ? "Default calendar"
+                            : "Owned calendar"}
+                        </Text>
+                      </View>
+                      {selected ? (
+                        <Text style={styles.badgeText}>Selected</Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+
+          <View style={styles.buttonCluster}>
+            <Pressable
+              style={styles.destructiveOutlineButton}
+              onPress={() => confirmDelete("delete_events")}
+              disabled={deleteMutation.isPending || calendar.isDefault}
+            >
+              <Text style={styles.destructiveOutlineButtonText}>
+                Delete Events
+              </Text>
+            </Pressable>
+            {otherOwnedCalendars.length > 0 ? (
+              <Pressable
+                style={styles.destructiveOutlineButton}
+                onPress={() => confirmDelete("move_events")}
+                disabled={deleteMutation.isPending || calendar.isDefault}
+              >
+                <Text style={styles.destructiveOutlineButtonText}>
+                  Move & Delete
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
+        {validationErrors.length > 0 ? (
+          <View style={styles.errorCard}>
+            {validationErrors.map((entry) => (
+              <Text key={entry} style={styles.errorText}>
+                {entry}
               </Text>
             ))}
           </View>
         ) : null}
 
-        {/* Action buttons */}
-        <View style={styles.actionRow}>
-          <Pressable
-            style={styles.cancelButton}
-            onPress={handleCancel}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel"
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.submitButton,
-              updateMutation.isPending && styles.submitButtonDisabled,
-            ]}
-            onPress={handleSubmit}
-            disabled={updateMutation.isPending}
-            accessibilityRole="button"
-            accessibilityLabel="Save calendar"
-          >
-            {updateMutation.isPending ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryForeground}
-              />
-            ) : (
-              <Text style={styles.submitButtonText}>Save</Text>
-            )}
-          </Pressable>
-        </View>
-
-        {/* Delete button */}
-        <Pressable
-          style={styles.deleteButton}
-          onPress={handleDeletePress}
-          disabled={deleteMutation.isPending}
-          accessibilityRole="button"
-          accessibilityLabel="Delete calendar"
-        >
-          {deleteMutation.isPending ? (
+        <Pressable style={styles.primaryButtonWide} onPress={handleSave}>
+          {updateMutation.isPending ? (
             <ActivityIndicator
               size="small"
-              color={theme.colors.destructiveForeground}
+              color={theme.colors.primaryForeground}
             />
           ) : (
-            <Text style={styles.deleteButtonText}>Delete Calendar</Text>
+            <Text style={styles.primaryButtonText}>Save Changes</Text>
           )}
         </Pressable>
       </ScrollView>
-
-      {/* Delete options modal */}
-      <Modal
-        visible={deleteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteModalVisible(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setDeleteModalVisible(false)}
-        >
-          <View
-            style={styles.modalContent}
-            onStartShouldSetResponder={() => true}
-          >
-            <Text style={styles.modalTitle}>Delete Calendar</Text>
-            <Text style={styles.modalDescription}>
-              What would you like to do with the events in this calendar?
-            </Text>
-
-            {/* Delete all events option */}
-            <Pressable
-              style={styles.modalOption}
-              onPress={handleDeleteWithEvents}
-              accessibilityRole="button"
-              accessibilityLabel="Delete all events"
-            >
-              <Text style={styles.modalOptionTextDestructive}>
-                Delete all events
-              </Text>
-            </Pressable>
-
-            {/* Move events option */}
-            {otherCalendars.length > 0 ? (
-              <>
-                <Text style={styles.moveEventsLabel}>
-                  Move events to another calendar:
-                </Text>
-                {otherCalendars.map((cal) => {
-                  const calColor =
-                    theme.colors.calendar[
-                      cal.color as keyof typeof theme.colors.calendar
-                    ]?.bg ?? theme.colors.primaryBase;
-                  return (
-                    <Pressable
-                      key={cal.id}
-                      style={styles.moveTargetRow}
-                      onPress={() => handleMoveEvents(cal.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Move events to ${cal.name}`}
-                    >
-                      <View
-                        style={[
-                          styles.moveTargetDot,
-                          { backgroundColor: calColor },
-                        ]}
-                      />
-                      <Text style={styles.moveTargetText}>{cal.name}</Text>
-                    </Pressable>
-                  );
-                })}
-              </>
-            ) : null}
-
-            {/* Cancel */}
-            <Pressable
-              style={styles.modalCancelOption}
-              onPress={() => setDeleteModalVisible(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel"
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+function FieldLabel({ text, theme }: { text: string; theme: ThemeTokens }) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  return <Text style={styles.fieldLabel}>{text}</Text>;
+}
 
 function createStyles(theme: ThemeTokens) {
   const view = {
@@ -597,12 +555,7 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       backgroundColor: theme.colors.background,
       padding: theme.spacing["4"],
-    },
-    header: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["3"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      gap: theme.spacing["2"],
     },
     scrollView: {
       flex: 1,
@@ -610,276 +563,249 @@ function createStyles(theme: ThemeTokens) {
     scrollContent: {
       padding: theme.spacing["4"],
       paddingBottom: theme.spacing["8"],
+      gap: theme.spacing["3"],
     },
-    fieldGroup: {
-      marginBottom: theme.spacing["4"],
+    heroCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing["4"],
+      gap: theme.spacing["1"],
     },
-    textInput: {
+    card: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing["4"],
+      gap: theme.spacing["2"],
+    },
+    input: {
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.background,
       paddingHorizontal: theme.spacing["3"],
-      paddingVertical: theme.spacing["2"],
-      backgroundColor: theme.colors.card,
+      paddingVertical: theme.spacing["3"],
+      color: theme.colors.foreground,
     },
     toggleRow: {
       flexDirection: "row" as const,
-      justifyContent: "space-between" as const,
       alignItems: "center" as const,
-      marginBottom: theme.spacing["4"],
+      justifyContent: "space-between" as const,
+      gap: theme.spacing["3"],
+      marginTop: theme.spacing["1"],
     },
-    sectionDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border,
-      marginVertical: theme.spacing["2"],
-    },
-    shareContainer: {
-      gap: theme.spacing["2"],
-    },
-    shareLinkRow: {
+    inlineActionRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: theme.spacing["2"],
-      backgroundColor: theme.colors.muted,
-      borderRadius: theme.borderRadius.md,
-      padding: theme.spacing["2"],
+      justifyContent: "space-between" as const,
+      gap: theme.spacing["3"],
+      marginTop: theme.spacing["1"],
     },
-    shareLoading: {
-      marginTop: theme.spacing["2"],
+    inlineActionCopy: {
+      flex: 1,
     },
-    copyButton: {
-      backgroundColor: theme.colors.primaryBase,
+    toggleCopy: {
+      flex: 1,
+    },
+    badge: {
+      paddingHorizontal: theme.spacing["3"],
       paddingVertical: theme.spacing["1"],
-      paddingHorizontal: theme.spacing["2"],
-      borderRadius: theme.borderRadius.sm,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.primaryBase + "14",
     },
-    enableShareButton: {
-      backgroundColor: theme.colors.card,
+    inlineButton: {
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["2"],
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.muted,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      paddingVertical: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
+    },
+    sourceRow: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       borderRadius: theme.borderRadius.md,
-      alignItems: "center" as const,
+      backgroundColor: theme.colors.background,
+      padding: theme.spacing["3"],
     },
-    disableShareButton: {
-      backgroundColor: theme.colors.muted,
-      paddingVertical: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["3"],
-      borderRadius: theme.borderRadius.md,
-      alignItems: "center" as const,
-    },
-    errorContainer: {
-      marginBottom: theme.spacing["4"],
-    },
-    actionRow: {
+    buttonCluster: {
       flexDirection: "row" as const,
-      gap: theme.spacing["3"],
-      marginTop: theme.spacing["2"],
+      flexWrap: "wrap" as const,
+      gap: theme.spacing["2"],
     },
-    cancelButton: {
-      flex: 1,
-      backgroundColor: theme.colors.muted,
-      paddingVertical: theme.spacing["3"],
-      borderRadius: theme.borderRadius.md,
-      alignItems: "center" as const,
-    },
-    submitButton: {
-      flex: 1,
-      backgroundColor: theme.colors.primaryBase,
-      paddingVertical: theme.spacing["3"],
-      borderRadius: theme.borderRadius.md,
-      alignItems: "center" as const,
-    },
-    submitButtonDisabled: {
-      opacity: 0.6,
-    },
-    deleteButton: {
-      backgroundColor: theme.colors.destructive,
-      paddingVertical: theme.spacing["3"],
-      borderRadius: theme.borderRadius.md,
-      alignItems: "center" as const,
-      marginTop: theme.spacing["4"],
-    },
-    backButton: {
-      marginTop: theme.spacing["4"],
-      paddingVertical: theme.spacing["2"],
+    secondaryButton: {
       paddingHorizontal: theme.spacing["4"],
-      backgroundColor: theme.colors.muted,
+      paddingVertical: theme.spacing["2"],
       borderRadius: theme.borderRadius.md,
-    },
-    // Modal
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
-      justifyContent: "center" as const,
+      backgroundColor: theme.colors.muted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      minWidth: 110,
       alignItems: "center" as const,
+      justifyContent: "center" as const,
     },
-    modalContent: {
-      width: "85%" as unknown as number,
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.lg,
-      padding: theme.spacing["4"],
-      maxHeight: "70%" as unknown as number,
+    destructiveOutlineButton: {
+      paddingHorizontal: theme.spacing["4"],
+      paddingVertical: theme.spacing["2"],
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.destructive + "10",
+      borderWidth: 1,
+      borderColor: theme.colors.destructive + "26",
+      minWidth: 110,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
     },
-    modalOption: {
-      paddingVertical: theme.spacing["3"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+    primaryButtonWide: {
+      minHeight: 48,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primaryBase,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      paddingHorizontal: theme.spacing["4"],
     },
-    moveTargetRow: {
+    loadingRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      paddingVertical: theme.spacing["2"],
-      paddingHorizontal: theme.spacing["2"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      gap: theme.spacing["2"],
     },
-    moveTargetDot: {
-      width: 10,
-      height: 10,
-      borderRadius: theme.borderRadius.full,
-      marginRight: theme.spacing["2"],
+    selectionList: {
+      gap: theme.spacing["2"],
     },
-    modalCancelOption: {
-      paddingVertical: theme.spacing["3"],
+    selectionRow: {
+      flexDirection: "row" as const,
       alignItems: "center" as const,
-      marginTop: theme.spacing["2"],
+      gap: theme.spacing["3"],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.background,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
     },
-  } satisfies Record<string, ViewStyle>;
+    selectionSwatch: {
+      width: 14,
+      height: 14,
+      borderRadius: theme.borderRadius.full,
+      flexShrink: 0,
+    },
+    selectionCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    errorCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.destructive + "26",
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.destructive + "0D",
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+      gap: theme.spacing["1"],
+    },
+  } satisfies Record<string, ViewStyle | TextStyle>;
 
   const text = {
-    headerTitle: {
-      fontSize: theme.typography.fontSize["xl"].size,
-      lineHeight: theme.typography.fontSize["xl"].lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    fieldLabel: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-      marginBottom: theme.spacing["1"],
-    },
-    textInputText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
-    },
-    sectionTitle: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-      marginBottom: theme.spacing["2"],
-    },
-    shareLinkText: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    copyButtonText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.primaryForeground,
-    },
-    enableShareButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    disableShareButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.destructive,
-    },
-    loadingText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-      marginTop: theme.spacing["2"],
-    },
-    errorText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.destructive,
-      marginBottom: 2,
-    },
-    cancelButtonText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    submitButtonText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.primaryForeground,
-    },
-    deleteButtonText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
-      color: theme.colors.destructiveForeground,
-    },
-    backButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-    },
-    modalTitle: {
+    heroTitle: {
       fontSize: theme.typography.fontSize.lg.size,
       lineHeight: theme.typography.fontSize.lg.lineHeight,
       fontWeight: theme.typography.fontWeight
         .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-      marginBottom: theme.spacing["2"],
     },
-    modalDescription: {
+    heroText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,
-      marginBottom: theme.spacing["3"],
     },
-    modalOptionTextDestructive: {
+    cardTitle: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.destructive,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
     },
-    moveEventsLabel: {
+    fieldLabel: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      marginTop: theme.spacing["1"],
+    },
+    toggleTitle: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-      marginTop: theme.spacing["3"],
-      marginBottom: theme.spacing["1"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
-    moveTargetText: {
+    toggleText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+      marginTop: theme.spacing["1"],
+    },
+    helperText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    badgeText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.primaryBase,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    inlineButtonText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.foreground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    sourceText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+    },
+    secondaryButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    destructiveOutlineButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.destructive,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    primaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
-    },
-    modalCancelText: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
+      color: theme.colors.primaryForeground,
       fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+        .semibold as TextStyle["fontWeight"],
+    },
+    selectionTitle: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    selectionMeta: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    errorText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.destructive,
+    },
+    loadingText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;

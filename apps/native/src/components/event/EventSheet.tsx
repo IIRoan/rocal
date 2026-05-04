@@ -21,8 +21,17 @@ import type {
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
+import { useAuth } from "../../providers/AuthProvider";
 import { calendarApiService } from "../../lib/api";
 import { QUERY_KEYS } from "../../lib/query-keys";
+import {
+  buildOptimisticEvent,
+  generateOptimisticId,
+  optimisticallyInsertEvent,
+  optimisticallyRemoveEvent,
+  rollbackFromSnapshot,
+  type CacheSnapshot,
+} from "../../lib/optimistic-events";
 import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
 import { EventForm } from "./EventForm";
 import { toLocalISOString } from "./event-form-utils";
@@ -108,7 +117,10 @@ export function EventSheet({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
+  const createSnapshotRef = useRef<CacheSnapshot>([]);
+  const deleteSnapshotRef = useRef<CacheSnapshot>([]);
 
   const [viewMode, setViewMode] = useState<"view" | "edit">("view");
   const [serverErrors, setServerErrors] = useState<string[]>([]);
@@ -195,17 +207,24 @@ export function EventSheet({
 
   const createMutation = useMutation({
     mutationFn: (data: CreateEventRequest) => calendarApiService.createEvent(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
+    onMutate: async (data: CreateEventRequest) => {
+      const tempId = generateOptimisticId();
+      const optimisticEvent = buildOptimisticEvent(data, user?.id ?? "", tempId);
+      createSnapshotRef.current = await optimisticallyInsertEvent(queryClient, optimisticEvent);
       setServerErrors([]);
       dismissSheet();
+      return { tempId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
     onError: (err: unknown) => {
+      rollbackFromSnapshot(queryClient, createSnapshotRef.current);
       const message =
         err && typeof err === "object" && "message" in err
           ? (err as { message: string }).message
           : "Failed to create event";
-      setServerErrors([message]);
+      Alert.alert("Couldn't create event", message);
     },
   });
 
@@ -250,19 +269,25 @@ export function EventSheet({
       }
       return calendarApiService.deleteEvent(eventId!);
     },
+    onMutate: async () => {
+      if (eventId) {
+        deleteSnapshotRef.current = await optimisticallyRemoveEvent(queryClient, eventId);
+        dismissSheet();
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventDetail(eventId) });
       }
-      dismissSheet();
     },
     onError: (err: unknown) => {
+      rollbackFromSnapshot(queryClient, deleteSnapshotRef.current);
       const message =
         err && typeof err === "object" && "message" in err
           ? (err as { message: string }).message
           : "Failed to delete event";
-      setServerErrors([message]);
+      Alert.alert("Couldn't delete event", message);
     },
   });
 

@@ -20,6 +20,7 @@ import {
   getSurroundingCalendarDateRange,
   navigateCalendarDate,
 } from "../../../src/components/calendar/navigation-utils";
+import { getThreeDayStripDates } from "../../../src/components/calendar/timeline-utils";
 import { CalendarViewSwitcher } from "../../../src/components/calendar/CalendarViewSwitcher";
 import { CompactMonthStrip } from "../../../src/components/calendar/CompactMonthStrip";
 import { MonthGrid } from "../../../src/components/calendar/MonthGrid";
@@ -29,6 +30,7 @@ import { WeekTimeline } from "../../../src/components/calendar/WeekTimeline";
 import { DayTimeline } from "../../../src/components/calendar/DayTimeline";
 import { ThreeDayTimeline } from "../../../src/components/calendar/ThreeDayTimeline";
 import { AgendaList } from "../../../src/components/calendar/AgendaList";
+import type { TimelinePage } from "../../../src/components/calendar/TimelinePager";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -275,6 +277,57 @@ export default function CalendarScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  const isTimelineView =
+    activeView === "week" || activeView === "3day" || activeView === "day";
+
+  const standaloneCompactStrip = (
+    <CompactMonthStrip
+      currentDate={currentDate}
+      selectedDate={selectedDate}
+      events={decoratedMonthEvents}
+      weekStartDay={settings?.weekStartDay ?? 0}
+      expanded={monthStripExpanded}
+      onDayPress={handleDayPress}
+      onMonthChange={handleMonthChange}
+      onToggleExpand={handleToggleMonthStrip}
+      collapseToHandleOnly={activeView === "day"}
+    />
+  );
+
+  const renderTimelineHeaderPage = useCallback(
+    (page: TimelinePage) => (
+      <CompactMonthStrip
+        currentDate={page.baseDate}
+        selectedDate={page.baseDate}
+        highlightedDates={
+          activeView === "day" || activeView === "3day" ? page.dates : undefined
+        }
+        collapsedRowDates={
+          activeView === "3day"
+            ? getThreeDayStripDates(page.baseDate)
+            : activeView === "week"
+              ? page.dates
+              : undefined
+        }
+        events={decoratedMonthEvents}
+        weekStartDay={settings?.weekStartDay ?? 0}
+        expanded={monthStripExpanded}
+        onDayPress={handleDayPress}
+        onToggleExpand={handleToggleMonthStrip}
+        swipeEnabled={false}
+        showSelectedDateHighlight={activeView !== "week"}
+      />
+    ),
+    [
+      activeView,
+      decoratedMonthEvents,
+      handleDayPress,
+      handleToggleMonthStrip,
+      monthStripExpanded,
+      settings?.weekStartDay,
+    ],
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header: menu, date title, mini-calendar toggle */}
@@ -289,22 +342,15 @@ export default function CalendarScreen() {
         onToggleMonthStrip={handleToggleMonthStrip}
       />
 
-      {/* Compact month strip with event dots */}
-      <CompactMonthStrip
-        currentDate={currentDate}
-        selectedDate={selectedDate}
-        events={decoratedMonthEvents}
-        weekStartDay={settings?.weekStartDay ?? 0}
-        expanded={monthStripExpanded}
-        onDayPress={handleDayPress}
-        onMonthChange={handleMonthChange}
-        onToggleExpand={handleToggleMonthStrip}
-      />
+      {/* For non-timeline views, show strip + separator above the content */}
+      {!isTimelineView && (
+        <>
+          {standaloneCompactStrip}
+          <View style={styles.separator} />
+        </>
+      )}
 
-      {/* Separator */}
-      <View style={styles.separator} />
-
-      {/* Detail view below the strip */}
+      {/* Detail view */}
       {loadingState.isAllInitialLoading ? (
         <SkeletonLoader view={activeView} />
       ) : activeView === "month" ? (
@@ -341,6 +387,7 @@ export default function CalendarScreen() {
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
+              renderHeaderPage={renderTimelineHeaderPage}
             />
           )}
           {activeView === "day" && (
@@ -352,6 +399,7 @@ export default function CalendarScreen() {
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
+              renderHeaderPage={renderTimelineHeaderPage}
             />
           )}
           {activeView === "3day" && (
@@ -363,6 +411,7 @@ export default function CalendarScreen() {
               onNavigate={handleDetailNavigate}
               onEventPress={handleEventPress}
               onTimeSlotPress={handleTimeSlotPress}
+              renderHeaderPage={renderTimelineHeaderPage}
             />
           )}
         </>
