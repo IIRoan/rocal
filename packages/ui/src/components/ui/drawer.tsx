@@ -4,6 +4,7 @@ import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@workspace/ui/lib/utils";
+import { useDrawerViewport } from "../../hooks/use-drawer-viewport";
 
 function Drawer({
   ...props
@@ -46,11 +47,27 @@ function DrawerOverlay({
   );
 }
 
+type DrawerContentProps = React.ComponentProps<typeof DrawerPrimitive.Content> & {
+  responsive?: boolean;
+  responsiveHeight?: string;
+  keyboardAware?: boolean;
+};
+
 function DrawerContent({
   className,
   children,
+  responsive = false,
+  responsiveHeight = "92dvh",
+  keyboardAware = true,
+  style,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Content>) {
+}: DrawerContentProps) {
+  const { viewportStyle } = useDrawerViewport({
+    enabled: responsive,
+    keyboardAware,
+    responsiveHeight,
+  });
+
   return (
     <DrawerPortal data-slot="drawer-portal">
       <DrawerOverlay />
@@ -58,13 +75,21 @@ function DrawerContent({
         forceMount
         data-slot="drawer-content"
         className={cn(
-          "group/drawer-content bg-background fixed z-50 flex h-auto flex-col",
+          "group/drawer-content bg-background fixed z-50 flex h-auto min-h-0 flex-col",
           "data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-lg data-[vaul-drawer-direction=top]:border-b",
           "data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:rounded-t-lg data-[vaul-drawer-direction=bottom]:border-t",
           "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=right]:sm:max-w-sm",
           "data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=left]:sm:max-w-sm",
           className,
         )}
+        style={
+          responsive
+            ? {
+                ...viewportStyle,
+                ...(style as React.CSSProperties | undefined),
+              }
+            : style
+        }
         {...props}
       >
         <div className="bg-muted mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
@@ -123,6 +148,55 @@ function DrawerDescription({
   );
 }
 
+interface DrawerShellProps extends React.ComponentProps<"div"> {
+  header?: React.ReactNode;
+  footer?: React.ReactNode;
+  headerClassName?: string;
+  bodyClassName?: string;
+  footerClassName?: string;
+}
+
+function DrawerShell({
+  header,
+  footer,
+  children,
+  className,
+  headerClassName,
+  bodyClassName,
+  footerClassName,
+  ...props
+}: DrawerShellProps) {
+  return (
+    <div
+      data-slot="drawer-shell"
+      className={cn(
+        "grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto]",
+        className,
+      )}
+      {...props}
+    >
+      <div
+        data-slot="drawer-shell-header"
+        className={cn("min-h-0", headerClassName)}
+      >
+        {header}
+      </div>
+      <div
+        data-slot="drawer-shell-body"
+        className={cn("flex min-h-0 flex-col overflow-hidden", bodyClassName)}
+      >
+        {children}
+      </div>
+      <div
+        data-slot="drawer-shell-footer"
+        className={cn("min-h-0", footerClassName)}
+      >
+        {footer}
+      </div>
+    </div>
+  );
+}
+
 export {
   Drawer,
   DrawerPortal,
@@ -134,4 +208,5 @@ export {
   DrawerFooter,
   DrawerTitle,
   DrawerDescription,
+  DrawerShell,
 };

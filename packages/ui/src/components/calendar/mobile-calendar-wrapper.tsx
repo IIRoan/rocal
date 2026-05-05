@@ -309,7 +309,11 @@ export function MobileCalendarWrapper({
         onOpenChange={setIsQuickNavOpen}
         direction="bottom"
       >
-        <DrawerContent className="w-full p-0 sm:max-w-none max-h-[85dvh] overflow-hidden safe-area-inset-bottom">
+        <DrawerContent
+          responsive
+          responsiveHeight="85dvh"
+          className="w-full p-0 sm:max-w-none overflow-hidden safe-area-inset-bottom"
+        >
           <VisuallyHidden>
             <DrawerTitle>Quick Date Navigation</DrawerTitle>
             <DrawerDescription>

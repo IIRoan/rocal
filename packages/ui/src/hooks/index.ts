@@ -6,6 +6,7 @@ export { useCyclingMessage } from "./use-cycling-message";
 export { useHorizontalSwipeGesture } from "./use-horizontal-swipe-gesture";
 export { useMiniCalendarMonthData } from "./use-mini-calendar-month-data";
 export { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
+export { useDrawerViewport } from "./use-drawer-viewport";
 export {
   useKeyboardShortcuts,
   useDropdownShortcuts,

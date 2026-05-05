@@ -158,7 +158,7 @@ export function EventEditorBody({
   );
   const bodyClass = desktop
     ? "px-3 py-2 space-y-3 flex-1 overflow-y-auto min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
-    : "p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar";
+    : "p-4 space-y-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar";
 
   return (
     <div className={bodyClass}>
@@ -374,7 +374,11 @@ export function EventEditorBody({
                           </span>
                         </Button>
                       </DrawerTrigger>
-                      <DrawerContent className="pb-safe">
+                      <DrawerContent
+                        responsive
+                        responsiveHeight="80dvh"
+                        className="pb-safe"
+                      >
                         <DrawerTitle className="sr-only">Select start date</DrawerTitle>
                         <div className="flex justify-center p-4 pb-8">
                           <CalendarUI
@@ -455,7 +459,11 @@ export function EventEditorBody({
                           </span>
                         </Button>
                       </DrawerTrigger>
-                      <DrawerContent className="pb-safe">
+                      <DrawerContent
+                        responsive
+                        responsiveHeight="80dvh"
+                        className="pb-safe"
+                      >
                         <DrawerTitle className="sr-only">Select end date</DrawerTitle>
                         <div className="flex justify-center p-4 pb-8">
                           <CalendarUI

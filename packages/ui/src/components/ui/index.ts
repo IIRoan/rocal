@@ -129,6 +129,7 @@ export {
   DrawerHeader,
   DrawerOverlay,
   DrawerPortal,
+  DrawerShell,
   DrawerTitle,
   DrawerTrigger,
 } from "./drawer";

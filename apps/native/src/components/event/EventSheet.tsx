@@ -33,7 +33,7 @@ import {
   type CacheSnapshot,
 } from "../../lib/optimistic-events";
 import { BottomSheet, type BottomSheetHandle } from "../BottomSheet";
-import { EventForm } from "./EventForm";
+import { EventForm, type EventFormHandle } from "./EventForm";
 import { toLocalISOString } from "./event-form-utils";
 import {
   formatEventDate,
@@ -94,12 +94,23 @@ const SCOPE_OPTIONS: {
 function IconBox({
   name,
   color,
+  bg = "transparent",
 }: {
   name: React.ComponentProps<typeof Feather>["name"];
   color: string;
+  bg?: string;
 }) {
   return (
-    <View style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
+    <View
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 9,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: bg,
+      }}
+    >
       <Feather name={name} size={16} color={color} />
     </View>
   );
@@ -118,6 +129,7 @@ export function EventSheet({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const bottomSheetRef = useRef<BottomSheetHandle>(null);
+  const formRef = useRef<EventFormHandle>(null);
   const createSnapshotRef = useRef<CacheSnapshot>([]);
   const deleteSnapshotRef = useRef<CacheSnapshot>([]);
 
@@ -304,6 +316,10 @@ export function EventSheet({
     }
   }, [viewMode, isViewOrEdit, event, dismissSheet]);
 
+  const handleFormSubmitPress = useCallback(() => {
+    formRef.current?.submit();
+  }, []);
+
   const isRecurring = !!(event?.recurrence || event?.parentEventId);
 
   const handleEditPress = useCallback(() => {
@@ -373,7 +389,9 @@ export function EventSheet({
   const isLoading = calendarsLoading || (isViewOrEdit && eventLoading);
   const isPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const sheetTitle = isCreate ? "Create Event" : viewMode === "view" ? "Event Details" : "Edit Event";
+  const isEditing = viewMode === "edit";
   const iconColor = theme.colors.mutedForeground;
+  const iconBg = theme.colors.mutedForeground + "18";
 
   const calendarInfo = useMemo(() => {
     if (!event || !calendars) return null;
@@ -394,9 +412,72 @@ export function EventSheet({
       >
         {/* Header */}
         <View style={styles.header}>
+          {isEditing ? (
+            <Pressable
+              style={styles.headerTextButton}
+              onPress={handleCancel}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel editing event"
+            >
+              <Text style={styles.headerTextButtonLabel}>Cancel</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={styles.headerIconButton}
+              onPress={dismissSheet}
+              accessibilityRole="button"
+              accessibilityLabel="Close event drawer"
+            >
+              <Feather name="x" size={18} color={theme.colors.mutedForeground} />
+            </Pressable>
+          )}
+
           <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={1}>
             {sheetTitle}
           </Text>
+
+          {isEditing ? (
+            <Pressable
+              style={[
+                styles.headerPillAction,
+                { backgroundColor: theme.colors.primaryBase },
+                isPending && styles.headerActionDisabled,
+              ]}
+              onPress={handleFormSubmitPress}
+              disabled={isPending}
+              accessibilityRole="button"
+              accessibilityLabel={isCreate ? "Create event" : "Save event"}
+            >
+              {isPending ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.primaryForeground}
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.headerPillActionText,
+                    { color: theme.colors.primaryForeground },
+                  ]}
+                >
+                  {isCreate ? "Create" : "Save"}
+                </Text>
+              )}
+            </Pressable>
+          ) : event?.id ? (
+            <Pressable
+              style={styles.headerTextButton}
+              onPress={handleEditPress}
+              accessibilityRole="button"
+              accessibilityLabel="Edit event"
+            >
+              <Text style={[styles.headerTextButtonLabel, { color: theme.colors.primaryBase }]}>
+                Edit
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={styles.headerTextButton} />
+          )}
         </View>
 
         {isLoading ? (
@@ -414,85 +495,106 @@ export function EventSheet({
               bounces={false}
               overScrollMode="never"
               scrollEventThrottle={16}
-              onScroll={(event) => {
-                const nextAtTop = event.nativeEvent.contentOffset.y <= 0.5;
+              onScroll={(e) => {
+                const nextAtTop = e.nativeEvent.contentOffset.y <= 0.5;
                 if (viewScrollAtTopRef.current !== nextAtTop) {
                   viewScrollAtTopRef.current = nextAtTop;
                   setCanSwipeViewContentToDismiss(nextAtTop);
                 }
               }}
             >
-              {/* Title */}
-              <View style={styles.viewRow}>
-                <IconBox name="calendar" color={iconColor} />
-                <Text style={styles.viewTitle} numberOfLines={2}>
-                  {event.title || "Untitled Event"}
-                </Text>
-              </View>
+              {/* Event title */}
+              <Text style={styles.viewEventTitle} numberOfLines={2}>
+                {event.title || "Untitled Event"}
+              </Text>
 
-              <View style={styles.viewDivider} />
-
-              {/* Date & time */}
-              <View style={styles.viewRow}>
-                <IconBox name="clock" color={iconColor} />
-                <View style={styles.viewRowContent}>
-                  <Text style={styles.viewText}>{formatEventDate(event)}</Text>
-                  <Text style={styles.viewSubtext}>{formatEventTime(event)}</Text>
-                </View>
-              </View>
-
-              {/* Calendar */}
-              {calendarInfo && (
-                <View style={styles.viewRow}>
-                  <View style={styles.iconBoxWrapper}>
-                    <View
-                      style={[
-                        styles.calendarDot,
-                        {
-                          backgroundColor:
-                            theme.colors.calendar[
-                              calendarInfo.color as keyof typeof theme.colors.calendar
-                            ]?.bg ?? calendarInfo.color,
-                        },
-                      ]}
-                    />
+              {/* Primary section: date/time + calendar + reminder + recurrence */}
+              <View style={styles.sectionCard}>
+                <View style={styles.sectionRow}>
+                  <IconBox name="clock" color={iconColor} bg={iconBg} />
+                  <View style={styles.viewRowContent}>
+                    <Text style={styles.viewText}>{formatEventDate(event)}</Text>
+                    <Text style={styles.viewSubtext}>{formatEventTime(event)}</Text>
                   </View>
-                  <Text style={styles.viewText}>{calendarInfo.name}</Text>
                 </View>
-              )}
 
-              {/* Reminder */}
-              {event.reminder != null && event.reminder >= 0 ? (
-                <View style={styles.viewRow}>
-                  <IconBox name="bell" color={iconColor} />
-                  <Text style={styles.viewText}>{formatReminderLabel(event.reminder)}</Text>
-                </View>
-              ) : null}
+                {calendarInfo && (
+                  <>
+                    <View style={styles.sectionDivider} />
+                    <View style={styles.sectionRow}>
+                      <View style={styles.iconBoxWrapper}>
+                        <View
+                          style={[
+                            styles.calendarDot,
+                            {
+                              backgroundColor:
+                                theme.colors.calendar[
+                                  calendarInfo.color as keyof typeof theme.colors.calendar
+                                ]?.bg ?? calendarInfo.color,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.viewText}>{calendarInfo.name}</Text>
+                    </View>
+                  </>
+                )}
+
+                {event.reminder != null && event.reminder >= 0 ? (
+                  <>
+                    <View style={styles.sectionDivider} />
+                    <View style={styles.sectionRow}>
+                      <IconBox name="bell" color={iconColor} bg={iconBg} />
+                      <Text style={styles.viewText}>{formatReminderLabel(event.reminder)}</Text>
+                    </View>
+                  </>
+                ) : null}
+
+                {event.recurrence ? (
+                  <>
+                    <View style={styles.sectionDivider} />
+                    <View style={styles.sectionRow}>
+                      <IconBox name="repeat" color={iconColor} bg={iconBg} />
+                      <Text style={styles.viewText}>{event.recurrence}</Text>
+                    </View>
+                  </>
+                ) : null}
+              </View>
 
               {/* Location */}
               {event.location ? (
-                <View style={styles.viewRow}>
-                  <IconBox name="map-pin" color={iconColor} />
-                  <Text style={styles.viewText}>{event.location}</Text>
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionRow}>
+                    <IconBox name="map-pin" color={iconColor} bg={iconBg} />
+                    <Text style={styles.viewText}>{event.location}</Text>
+                  </View>
                 </View>
               ) : null}
 
               {/* Description */}
               {event.description ? (
-                <View style={[styles.viewRow, { alignItems: "flex-start" }]}>
-                  <View style={{ marginTop: 2 }}>
-                    <IconBox name="file-text" color={iconColor} />
+                <View style={styles.sectionCard}>
+                  <View style={[styles.sectionRow, { alignItems: "flex-start" }]}>
+                    <View style={{ marginTop: 2 }}>
+                      <IconBox name="file-text" color={iconColor} bg={iconBg} />
+                    </View>
+                    <Text style={styles.viewDescription}>{event.description}</Text>
                   </View>
-                  <Text style={styles.viewDescription}>{event.description}</Text>
                 </View>
               ) : null}
 
-              {/* Recurrence */}
-              {event.recurrence ? (
-                <View style={styles.viewRow}>
-                  <IconBox name="repeat" color={iconColor} />
-                  <Text style={styles.viewText}>{event.recurrence}</Text>
-                </View>
+              {/* Delete */}
+              {event.id ? (
+                <Pressable
+                  style={styles.deleteRow}
+                  onPress={handleDeletePress}
+                  disabled={isPending}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete event"
+                >
+                  <Feather name="trash-2" size={16} color={theme.colors.destructive} />
+                  <Text style={styles.deleteText}>Delete event</Text>
+                </Pressable>
               ) : null}
 
               {/* Errors */}
@@ -504,62 +606,22 @@ export function EventSheet({
                 </View>
               )}
             </ScrollView>
-
-            {/* ── View mode footer ───────────────────────────────── */}
-            <View style={styles.footer}>
-              <Pressable
-                style={styles.footerBtnOutlineDestructive}
-                onPress={handleDeletePress}
-                disabled={isPending}
-                accessibilityRole="button"
-                accessibilityLabel="Delete event"
-              >
-                {deleteMutation.isPending ? (
-                  <ActivityIndicator size="small" color={theme.colors.destructive} />
-                ) : (
-                  <>
-                    <Feather name="trash-2" size={14} color={theme.colors.destructive} />
-                    <Text style={styles.footerTextDestructive}>Delete</Text>
-                  </>
-                )}
-              </Pressable>
-
-              <View style={styles.footerSpacer} />
-
-              <Pressable
-                style={styles.footerBtnOutline}
-                onPress={dismissSheet}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-              >
-                <Text style={styles.footerText}>Close</Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.footerBtnPrimary, { backgroundColor: theme.colors.primaryBase }]}
-                onPress={handleEditPress}
-                accessibilityRole="button"
-                accessibilityLabel="Edit event"
-              >
-                <Feather name="edit-3" size={14} color={theme.colors.primaryForeground} />
-                <Text style={[styles.footerTextPrimary, { color: theme.colors.primaryForeground }]}>
-                  Edit
-                </Text>
-              </Pressable>
-            </View>
           </>
         ) : (
           /* ── Edit / Create mode ──────────────────────────────── */
-          <EventForm
-            key={isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`}
-            calendars={calendars ?? []}
-            serverErrors={serverErrors}
-            isSubmitting={isPending}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            initialValues={initialValues}
-            noScroll
-          />
+          <View style={styles.editBody}>
+            <EventForm
+              ref={formRef}
+              key={isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`}
+              calendars={calendars ?? []}
+              serverErrors={serverErrors}
+              isSubmitting={isPending}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+              initialValues={initialValues}
+              actionsPlacement="external"
+            />
+          </View>
         )}
       </BottomSheet>
 
@@ -607,43 +669,81 @@ export function EventSheet({
 function createStyles(theme: ThemeTokens) {
   const view = {
     header: {
-      paddingHorizontal: 20,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      paddingHorizontal: 16,
       paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.colors.border + "66",
+    },
+    headerIconButton: {
+      width: 36,
+      height: 36,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: 18,
+    },
+    headerTextButton: {
+      minWidth: 64,
+      height: 36,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      paddingHorizontal: 4,
+    },
+    headerPillAction: {
+      minWidth: 64,
+      height: 32,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      borderRadius: 9999,
+      paddingHorizontal: 14,
+    },
+    headerActionDisabled: {
+      opacity: 0.6,
     },
 
     // ── View body ──────────────────────────────────────────────────────
     viewBody: {
       paddingHorizontal: 16,
-      paddingVertical: 6,
-      paddingBottom: 12,
+      paddingTop: 12,
+      paddingBottom: 20,
     },
     viewScroll: {
       flex: 1,
     },
-    viewRow: {
+    editBody: {
+      flex: 1,
+      minHeight: 0,
+    },
+    // Card section
+    sectionCard: {
+      backgroundColor: theme.colors.muted + "28",
+      borderRadius: theme.borderRadius.lg,
+      marginBottom: 8,
+      overflow: "hidden" as const,
+    },
+    sectionRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 12,
-      paddingHorizontal: 8,
-      paddingVertical: 8,
-      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    sectionDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.colors.border + "60",
+      marginLeft: 14 + 32 + 12,
     },
     viewRowContent: {
       flex: 1,
     },
-    viewDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border + "80",
-      marginHorizontal: 16,
-      marginVertical: 2,
-    },
     iconBoxWrapper: {
-      width: 24,
-      height: 24,
+      width: 32,
+      height: 32,
+      borderRadius: 9,
       alignItems: "center" as const,
       justifyContent: "center" as const,
+      backgroundColor: theme.colors.mutedForeground + "18",
     },
     calendarDot: {
       width: 12,
@@ -658,55 +758,17 @@ function createStyles(theme: ThemeTokens) {
       padding: 12,
       marginTop: 8,
     },
-
-    // ── Footer ─────────────────────────────────────────────────────────
-    footer: {
+    deleteRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border + "80",
-      backgroundColor: theme.colors.muted + "4D",
-    },
-    footerSpacer: { flex: 1 },
-    footerBtnOutline: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
       paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
-    },
-    footerBtnOutlineDestructive: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: theme.colors.destructive + "4D",
-      backgroundColor: theme.colors.background,
-    },
-    footerBtnPrimary: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: theme.borderRadius.md,
-    },
-
-    // ── Loading ────────────────────────────────────────────────────────
-    loadingContainer: {
-      paddingVertical: 40,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
+      paddingVertical: 13,
+      marginTop: 4,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.destructive + "10",
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.destructive + "28",
     },
 
     // ── Scope modal ────────────────────────────────────────────────────
@@ -732,19 +794,40 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       marginTop: 8,
     },
+
+    // ── Loading ────────────────────────────────────────────────────────
+    loadingContainer: {
+      paddingVertical: 40,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
     headerTitle: {
+      flex: 1,
       fontSize: theme.typography.fontSize.base.size,
       fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+      textAlign: "center" as const,
+      marginHorizontal: 8,
     },
-    viewTitle: {
-      flex: 1,
+    headerTextButtonLabel: {
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
+    },
+    headerPillActionText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+    },
+    viewEventTitle: {
+      fontSize: theme.typography.fontSize.xl.size,
+      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+      marginBottom: 10,
+      paddingHorizontal: 4,
+      lineHeight: theme.typography.fontSize.xl.lineHeight,
     },
     viewText: {
       flex: 1,
@@ -762,19 +845,11 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
     },
-    footerText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    footerTextDestructive: {
+    deleteText: {
+      flex: 1,
       fontSize: theme.typography.fontSize.sm.size,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.destructive,
-    },
-    footerTextPrimary: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     loadingText: {
       fontSize: theme.typography.fontSize.sm.size,

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -83,20 +91,28 @@ interface EventFormProps {
   isSubmitting?: boolean;
   onSubmit: (data: CreateEventRequest) => void;
   onCancel?: () => void;
-  noScroll?: boolean;
+  actionsPlacement?: "footer" | "external";
+}
+
+export interface EventFormHandle {
+  submit: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function EventForm({
-  initialValues,
-  calendars,
-  serverErrors,
-  isSubmitting = false,
-  onSubmit,
-  onCancel,
-  noScroll = false,
-}: EventFormProps) {
+export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
+  function EventForm(
+    {
+      initialValues,
+      calendars,
+      serverErrors,
+      isSubmitting = false,
+      onSubmit,
+      onCancel,
+      actionsPlacement = "footer",
+    }: EventFormProps,
+    ref,
+  ) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -291,6 +307,8 @@ export function EventForm({
     color, recurrence, reminder, onSubmit,
   ]);
 
+  useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
+
   const renderFieldError = (field: string) => {
     const error = fieldErrors[field];
     if (!error) return null;
@@ -306,11 +324,13 @@ export function EventForm({
       <View style={styles.container}>
         <ScrollView
           ref={scrollRef}
-          style={{ flex: 1 }}
+          style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
+          bounces={false}
+          overScrollMode="never"
         >
           <View style={styles.formInner}>
               {/* Server errors */}
@@ -539,35 +559,39 @@ export function EventForm({
               {/* ── Options toggle pills ──────────────────────────── */}
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Options</Text>
-                <View style={styles.toggleRow}>
-                  <TogglePill
-                    icon="map-pin"
-                    label="Location"
-                    active={showLocation}
-                    onPress={() => { Keyboard.dismiss(); setShowLocation((v) => !v); }}
-                    theme={theme}
-                  />
-                  <TogglePill
-                    icon="file-text"
-                    label="Description"
-                    active={showDescription}
-                    onPress={() => { Keyboard.dismiss(); setShowDescription((v) => !v); }}
-                    theme={theme}
-                  />
-                  <TogglePill
-                    icon="rotate-ccw"
-                    label="Repeat"
-                    active={showRecurring}
-                    onPress={() => { Keyboard.dismiss(); setShowRecurring((v) => !v); }}
-                    theme={theme}
-                  />
-                  <TogglePill
-                    icon="bell"
-                    label="Reminder"
-                    active={showReminder}
-                    onPress={() => { Keyboard.dismiss(); setShowReminder((v) => !v); }}
-                    theme={theme}
-                  />
+                <View style={styles.toggleGrid}>
+                  <View style={styles.toggleRow}>
+                    <TogglePill
+                      icon="map-pin"
+                      label="Location"
+                      active={showLocation}
+                      onPress={() => { Keyboard.dismiss(); setShowLocation((v) => !v); }}
+                      theme={theme}
+                    />
+                    <TogglePill
+                      icon="file-text"
+                      label="Description"
+                      active={showDescription}
+                      onPress={() => { Keyboard.dismiss(); setShowDescription((v) => !v); }}
+                      theme={theme}
+                    />
+                  </View>
+                  <View style={styles.toggleRow}>
+                    <TogglePill
+                      icon="rotate-ccw"
+                      label="Repeat"
+                      active={showRecurring}
+                      onPress={() => { Keyboard.dismiss(); setShowRecurring((v) => !v); }}
+                      theme={theme}
+                    />
+                    <TogglePill
+                      icon="bell"
+                      label="Reminder"
+                      active={showReminder}
+                      onPress={() => { Keyboard.dismiss(); setShowReminder((v) => !v); }}
+                      theme={theme}
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -674,59 +698,60 @@ export function EventForm({
             </View>
         </ScrollView>
 
-        {/* ── Sticky footer ─────────────────────────────────────── */}
-        <View
-          style={[
-            styles.footer,
-            { paddingBottom: Math.max(12, insets.bottom) },
-          ]}
-        >
-          {onCancel && (
-            <Pressable
-              style={styles.cancelButton}
-              onPress={onCancel}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel"
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </Pressable>
-          )}
-          <View style={styles.footerSpacer} />
-          <Pressable
+        {actionsPlacement === "footer" ? (
+          <View
             style={[
-              styles.saveButton,
-              { backgroundColor: theme.colors.primaryBase },
-              isSubmitting && styles.saveButtonDisabled,
+              styles.footer,
+              { paddingBottom: Math.max(12, insets.bottom) },
             ]}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-            accessibilityRole="button"
-            accessibilityLabel={isEditMode ? "Save event" : "Create event"}
           >
-            {isSubmitting ? (
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primaryForeground}
-              />
-            ) : (
-              <>
-                <Feather
-                  name="save"
-                  size={14}
+            {onCancel && (
+              <Pressable
+                style={styles.cancelButton}
+                onPress={onCancel}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+            )}
+            <View style={styles.footerSpacer} />
+            <Pressable
+              style={[
+                styles.saveButton,
+                { backgroundColor: theme.colors.primaryBase },
+                isSubmitting && styles.saveButtonDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+              accessibilityRole="button"
+              accessibilityLabel={isEditMode ? "Save event" : "Create event"}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator
+                  size="small"
                   color={theme.colors.primaryForeground}
                 />
-                <Text
-                  style={[
-                    styles.saveButtonText,
-                    { color: theme.colors.primaryForeground },
-                  ]}
-                >
-                  {isEditMode ? "Save" : "Create"}
-                </Text>
-              </>
-            )}
-          </Pressable>
-        </View>
+              ) : (
+                <>
+                  <Feather
+                    name="save"
+                    size={14}
+                    color={theme.colors.primaryForeground}
+                  />
+                  <Text
+                    style={[
+                      styles.saveButtonText,
+                      { color: theme.colors.primaryForeground },
+                    ]}
+                  >
+                    {isEditMode ? "Save" : "Create"}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       {/* ── Modals (outside main layout) ──────────────────────── */}
@@ -769,7 +794,8 @@ export function EventForm({
       />
     </>
   );
-}
+  },
+);
 
 
 // ─── Time Picker Modal ───────────────────────────────────────────────────────
@@ -1149,22 +1175,20 @@ function TogglePill({
     <Pressable
       style={[
         {
+          flex: 1,
           flexDirection: "row" as const,
           alignItems: "center" as const,
-          gap: 6,
+          gap: 8,
           paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderRadius: theme.borderRadius.full,
-          borderWidth: 1,
+          paddingVertical: 11,
+          borderRadius: theme.borderRadius.lg,
         },
         active
           ? {
-              backgroundColor: theme.colors.primaryBase + "14",
-              borderColor: theme.colors.primaryBase + "38",
+              backgroundColor: theme.colors.primaryBase + "18",
             }
           : {
-              backgroundColor: theme.colors.background,
-              borderColor: theme.colors.border + "80",
+              backgroundColor: theme.colors.muted + "30",
             },
       ]}
       onPress={onPress}
@@ -1172,13 +1196,27 @@ function TogglePill({
       accessibilityLabel={`${label}${active ? ", active" : ""}`}
       accessibilityState={{ selected: active }}
     >
-      <Feather
-        name={icon}
-        size={14}
-        color={active ? theme.colors.primaryBase : theme.colors.mutedForeground}
-      />
+      <View
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 8,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: active
+            ? theme.colors.primaryBase + "22"
+            : theme.colors.mutedForeground + "16",
+        }}
+      >
+        <Feather
+          name={icon}
+          size={14}
+          color={active ? theme.colors.primaryBase : theme.colors.mutedForeground}
+        />
+      </View>
       <Text
         style={{
+          flex: 1,
           fontSize: theme.typography.fontSize.sm.size,
           fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
           color: active ? theme.colors.primaryBase : theme.colors.foreground,
@@ -1186,6 +1224,20 @@ function TogglePill({
       >
         {label}
       </Text>
+      {active ? (
+        <View
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: theme.colors.primaryBase,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Feather name="check" size={10} color={theme.colors.primaryForeground} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -1352,10 +1404,16 @@ function createStyles(theme: ThemeTokens) {
   const view = {
     container: {
       flex: 1,
+      minHeight: 0,
       backgroundColor: "transparent",
+    },
+    scrollView: {
+      flex: 1,
+      minHeight: 0,
     },
     scrollContent: {
       flexGrow: 1,
+      paddingBottom: theme.spacing["4"],
     },
     formInner: {
       padding: theme.spacing["4"],
@@ -1460,10 +1518,11 @@ function createStyles(theme: ThemeTokens) {
     },
 
     // Toggle pills
+    toggleGrid: {
+      gap: theme.spacing["2"],
+    },
     toggleRow: {
       flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      alignItems: "center" as const,
       gap: theme.spacing["2"],
     },
 
@@ -1515,6 +1574,7 @@ function createStyles(theme: ThemeTokens) {
 
     // Footer
     footer: {
+      flexShrink: 0,
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 12,

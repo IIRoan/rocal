@@ -17,6 +17,7 @@ import {
 import {
   Drawer,
   DrawerContent,
+  DrawerShell,
   DrawerTitle,
 } from "@workspace/ui/components/ui/drawer";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
@@ -36,7 +37,6 @@ import { EventEditorBody } from "./event-editor/event-editor-body";
 import { EventEditorFooter } from "./event-editor/event-editor-footer";
 import { EventEditorDesktopHeader } from "./event-editor/event-editor-header";
 import { EventEditorPopover } from "./event-editor/event-editor-popover";
-import { useKeyboardHeight } from "./event-editor/use-keyboard-height";
 import type { EventEditorMode } from "./command-palette-context";
 
 interface EventEditorProps {
@@ -246,7 +246,6 @@ export function EventEditor({
 
   const isViewMode = eventViewMode === "view";
   const isMobile = useIsMobile();
-  const keyboardHeight = useKeyboardHeight();
   const selectedCalendar = useMemo(
     () => calendars.find((calendar) => calendar.id === eventCalendarId),
     [calendars, eventCalendarId],
@@ -361,45 +360,54 @@ export function EventEditor({
           modal={true}
         >
           <DrawerContent
+            responsive
+            responsiveHeight="92dvh"
             className="rounded-t-2xl bg-card/95 backdrop-blur-xl border-none flex flex-col gap-0 overflow-hidden pb-0 transition-[max-height,bottom] duration-200 ease-out"
-            style={{
-              maxHeight:
-                keyboardHeight > 0
-                  ? `calc(100dvh - ${keyboardHeight}px)`
-                  : "92dvh",
-              bottom: keyboardHeight,
-            }}
           >
             <DrawerTitle className="sr-only">{dialogTitle}</DrawerTitle>
-            <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
-              <h2 className="inline-flex items-center h-5 text-base font-semibold leading-none">
-                {dialogTitle}
-              </h2>
-              <EncryptionStatusBadge
-                item={badgeItem}
-                className="ml-1"
-                hidePlaintext={false}
-                iconSize="sm"
-              />
-            </div>
-            <EventEditorBody
-              eventForm={eventForm}
-              isViewMode={isViewMode}
-              showLocation={showLocation}
-              showDescription={showDescription}
-              setShowLocation={setShowLocation}
-              setShowDescription={setShowDescription}
-              localSettings={localSettings}
-              calendars={calendars}
-            />
-            <EventEditorFooter
-              isViewMode={isViewMode}
-              eventForm={eventForm}
-              onBack={onBack}
-              handleEventSave={handleEventSave}
-              handleEventDelete={handleEventDelete}
-              handleEventDownloadIcs={handleEventDownloadIcs}
-            />
+            <DrawerShell
+              data-testid="mobile-event-editor-shell"
+              header={
+                <div className="px-5 py-3 border-b border-border/40 flex flex-row items-center shrink-0">
+                  <h2 className="inline-flex items-center h-5 text-base font-semibold leading-none">
+                    {dialogTitle}
+                  </h2>
+                  <EncryptionStatusBadge
+                    item={badgeItem}
+                    className="ml-1"
+                    hidePlaintext={false}
+                    iconSize="sm"
+                  />
+                </div>
+              }
+              footer={
+                <EventEditorFooter
+                  isViewMode={isViewMode}
+                  eventForm={eventForm}
+                  onBack={onBack}
+                  handleEventSave={handleEventSave}
+                  handleEventDelete={handleEventDelete}
+                  handleEventDownloadIcs={handleEventDownloadIcs}
+                />
+              }
+              bodyClassName="min-h-0"
+            >
+              <div
+                data-testid="mobile-event-editor-main"
+                className="flex min-h-0 flex-col overflow-hidden"
+              >
+                <EventEditorBody
+                  eventForm={eventForm}
+                  isViewMode={isViewMode}
+                  showLocation={showLocation}
+                  showDescription={showDescription}
+                  setShowLocation={setShowLocation}
+                  setShowDescription={setShowDescription}
+                  localSettings={localSettings}
+                  calendars={calendars}
+                />
+              </div>
+            </DrawerShell>
           </DrawerContent>
         </Drawer>
         {recurringModal}
