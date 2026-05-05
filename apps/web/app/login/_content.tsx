@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { signIn, signUp, authClient, useSession } from "@/lib/auth-client";
+import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
 import { useSearchParams } from "next/navigation";
@@ -20,25 +20,116 @@ import {
   clearPendingAuthPassword,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
+import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
 const log = createLogger("login");
 
+type AuthMode = "sign-in" | "sign-up" | "forgot-password";
+
+// ─── AnimatedCollapse ─────────────────────────────────────────────────────────
+
+function AnimatedCollapse({
+  isOpen,
+  children,
+}: {
+  isOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tweenRef = useRef<gsap.core.Tween | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (isOpen) setShouldRender(true);
+  }, [isOpen]);
+
+  useGSAP(
+    () => {
+      const el = containerRef.current;
+      if (!el) return;
+      tweenRef.current?.kill();
+
+      if (prefersReducedMotion) {
+        if (isOpen) {
+          gsap.set(el, { autoAlpha: 1, height: "auto", overflow: "visible" });
+        } else {
+          gsap.set(el, { autoAlpha: 0, height: 0, overflow: "hidden" });
+          setShouldRender(false);
+        }
+        return;
+      }
+
+      if (isOpen) {
+        const targetHeight = el.scrollHeight;
+        tweenRef.current = gsap.fromTo(
+          el,
+          { height: 0, autoAlpha: 0, y: -6, overflow: "hidden" },
+          {
+            height: targetHeight,
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.22,
+            ease: "power2.out",
+            overwrite: true,
+            onComplete: () =>
+              gsap.set(el, {
+                height: "auto",
+                overflow: "visible",
+                clearProps: "y",
+              }),
+          },
+        );
+      } else {
+        tweenRef.current = gsap.to(el, {
+          height: 0,
+          autoAlpha: 0,
+          y: -4,
+          overflow: "hidden",
+          duration: 0.16,
+          ease: "power2.in",
+          overwrite: true,
+          onComplete: () => setShouldRender(false),
+        });
+      }
+    },
+    { dependencies: [isOpen, shouldRender] },
+  );
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ height: 0, overflow: "hidden", opacity: 0 }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── LoginForm ────────────────────────────────────────────────────────────────
+
 export function LoginForm() {
-  const [isExiting, setIsExiting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isPasskeySupported, setIsPasskeySupported] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [overlayFading, setOverlayFading] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const titleRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const { data: session, isPending } = useSession();
   const router = useSmoothRouter();
@@ -47,15 +138,33 @@ export function LoginForm() {
   const nextPath = searchParams.get("next");
   const callbackUrl =
     searchParams.get("callbackURL") || searchParams.get("callbackUrl");
+  const resetSucceeded = searchParams.get("reset") === "success";
+
+  const isSignUp = authMode === "sign-up";
+  const isForgotPassword = authMode === "forgot-password";
 
   const getRedirectTarget = useCallback(
     () => resolveAuthRedirectTarget(nextPath, callbackUrl),
     [nextPath, callbackUrl],
   );
 
+  const switchMode = useCallback((mode: AuthMode) => {
+    setAuthMode(mode);
+    setError(null);
+    setNotice(null);
+    setShowPassword(false);
+
+    if (mode !== "sign-up") {
+      setName("");
+    }
+
+    if (mode === "forgot-password") {
+      setPassword("");
+    }
+  }, []);
+
   const redirectAfterAuth = useCallback(() => {
     const target = getRedirectTarget();
-    setIsExiting(true);
     if (target.external) {
       router.startRouteTransition({
         messageContext: "AUTH_FLOW",
@@ -98,7 +207,6 @@ export function LoginForm() {
     }
   }, [session, isPending, handleSessionRedirect]);
 
-  // Fade out the loading overlay when session check is done with no session
   useEffect(() => {
     if (!isPending && !isCheckingSession && !session?.user) {
       setOverlayFading(true);
@@ -113,26 +221,41 @@ export function LoginForm() {
     }
   }, []);
 
+  // Animate the title in when auth mode switches
+  useGSAP(
+    () => {
+      const el = titleRef.current;
+      if (!el || prefersReducedMotion) return;
+      gsap.fromTo(
+        el,
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" },
+      );
+    },
+    { dependencies: [authMode] },
+  );
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setEmailLoading(true);
       setError(null);
+      setNotice(null);
 
       if (isSignUp) {
         if (!name.trim()) {
           setError("Please enter your name.");
-          setEmailLoading(false);
           return;
         }
+
         const result = await signUp.email({
           email,
           password,
           name,
         });
+
         if (result?.error) {
           setError(result.error.message || "Sign up failed. Please try again.");
-          setEmailLoading(false);
           return;
         }
       } else {
@@ -140,9 +263,9 @@ export function LoginForm() {
           email,
           password,
         });
+
         if (result?.error) {
           setError(result.error.message || "Invalid email or password.");
-          setEmailLoading(false);
           return;
         }
       }
@@ -161,10 +284,48 @@ export function LoginForm() {
     }
   };
 
+  const handleForgotPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setEmailLoading(true);
+    setError(null);
+    setNotice(null);
+
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      setEmailLoading(false);
+      return;
+    }
+
+    try {
+      const redirectTo = new URL("/reset-password", getAppBaseUrl()).toString();
+      const result = await authClient.requestPasswordReset({
+        email: email.trim(),
+        redirectTo,
+      });
+
+      if (result?.error) {
+        setError(
+          result.error.message || "Unable to send a password reset link.",
+        );
+        return;
+      }
+
+      setNotice(
+        "If an account exists for that email, we sent a password reset link.",
+      );
+    } catch (err: any) {
+      log.error("Password reset request failed:", err);
+      setError(err.message || "Unable to send a password reset link.");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   const handlePasskeyLogin = async () => {
     try {
       setPasskeyLoading(true);
       setError(null);
+      setNotice(null);
       clearPendingAuthPassword();
 
       const result = await authClient.signIn.passkey({
@@ -193,8 +354,9 @@ export function LoginForm() {
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+      setNotice(null);
       clearPendingAuthPassword();
-      // Store current theme so it can be synced after OAuth redirect
       if (currentTheme) {
         localStorage.setItem("pending-theme-sync", currentTheme);
       }
@@ -214,16 +376,37 @@ export function LoginForm() {
     }
   };
 
+  const title = isForgotPassword
+    ? "Reset your password"
+    : isSignUp
+      ? "Create an account"
+      : "Welcome back";
+
+  const subtitle = isForgotPassword
+    ? "Enter your email and we’ll send you a reset link"
+    : isSignUp
+      ? "Sign up and get started with Solace"
+      : "Sign in to continue to Solace";
+
+  const primaryButtonLabel = isForgotPassword
+    ? "Send reset link"
+    : isSignUp
+      ? "Create account"
+      : "Sign in";
+
+  const primaryLoadingLabel = isForgotPassword
+    ? "Sending link…"
+    : isSignUp
+      ? "Creating account…"
+      : "Signing in…";
+
   return (
     <>
-      <section className="min-h-[100dvh] flex">
-        {/* Left side - Form */}
+      <section className="flex min-h-[100dvh]">
         <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
-          {/* Subtle gradient background */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-secondary/30 via-background to-background" />
 
           <div className="relative z-10 mx-auto w-full max-w-md">
-            {/* Logo + Theme toggle */}
             <div className="mb-10 flex items-center justify-between">
               <Logo
                 width={44}
@@ -234,33 +417,48 @@ export function LoginForm() {
               <ThemeToggle />
             </div>
 
-            {/* Heading */}
             <div className="mb-8">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {isSignUp ? "Create an account" : "Welcome back"}
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {isSignUp
-                  ? "Sign up and get started with Solace"
-                  : "Sign in to continue to Solace"}
-              </p>
+              <div ref={titleRef}>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  {title}
+                </h1>
+                <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
+              </div>
             </div>
 
             <div>
-              {/* Error message */}
-              {error && (
+              {resetSucceeded && !isForgotPassword ? (
+                <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+                  <p className="text-sm text-foreground">
+                    Your password has been updated. Sign in with your new
+                    password.
+                  </p>
+                </div>
+              ) : null}
+
+              {notice ? (
+                <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+                  <p className="text-sm text-foreground">{notice}</p>
+                </div>
+              ) : null}
+
+              {error ? (
                 <div
-                  className="mb-5 rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+                  className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
                   role="alert"
                 >
                   <p className="text-sm text-destructive">{error}</p>
                 </div>
-              )}
+              ) : null}
 
-              {/* Email/Password form */}
-              <form onSubmit={handleEmailAuth} className="space-y-5">
-                {isSignUp && (
-                  <div className="space-y-2">
+              <form
+                onSubmit={
+                  isForgotPassword ? handleForgotPassword : handleEmailAuth
+                }
+                className="space-y-5"
+              >
+                <AnimatedCollapse isOpen={isSignUp}>
+                  <div className="space-y-2 pb-0.5">
                     <Label htmlFor="name" className="text-sm font-medium">
                       Full name
                     </Label>
@@ -277,7 +475,7 @@ export function LoginForm() {
                       className="h-11 rounded-lg"
                     />
                   </div>
-                )}
+                </AnimatedCollapse>
 
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium">
@@ -297,46 +495,59 @@ export function LoginForm() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete={
-                        isSignUp ? "new-password" : "current-password"
-                      }
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={emailLoading}
-                      className="h-11 rounded-lg pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
+                <AnimatedCollapse isOpen={!isForgotPassword}>
+                  <div className="space-y-2 pb-0.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="password" className="text-sm font-medium">
+                        Password
+                      </Label>
+                      {!isSignUp ? (
+                        <button
+                          type="button"
+                          onClick={() => switchMode("forgot-password")}
+                          className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                        >
+                          Forgot password?
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete={
+                          isSignUp ? "new-password" : "current-password"
+                        }
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required={!isForgotPassword}
+                        disabled={emailLoading}
+                        className="h-11 rounded-lg pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </AnimatedCollapse>
 
                 <Button
                   type="submit"
                   disabled={emailLoading}
-                  className="w-full h-11 rounded-lg font-medium mt-2"
+                  className="mt-2 h-11 w-full rounded-lg font-medium"
                   aria-busy={emailLoading}
                 >
                   {emailLoading ? (
@@ -345,109 +556,119 @@ export function LoginForm() {
                         className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
                         aria-hidden="true"
                       />
-                      <span>
-                        {isSignUp ? "Creating account…" : "Signing in…"}
-                      </span>
+                      <span>{primaryLoadingLabel}</span>
                     </>
                   ) : (
                     <>
-                      <span>{isSignUp ? "Create account" : "Sign in"}</span>
+                      <span>{primaryButtonLabel}</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
                 </Button>
               </form>
 
-              {/* Divider */}
-              <div className="flex items-center gap-3 my-6">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground font-medium">
-                  or continue with
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
+              <AnimatedCollapse isOpen={!isForgotPassword}>
+                <div className="pb-0.5">
+                  <div className="my-6 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      or continue with
+                    </span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
 
-              {/* Social login buttons */}
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleGitHubLogin}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="flex-1 h-11 rounded-lg"
-                  aria-busy={isLoading}
-                >
-                  {isLoading ? (
-                    <div
-                      className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                      style={{ borderTopColor: "currentColor", opacity: 1 }}
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <>
-                      <Github className="h-4 w-4" />
-                      <span>GitHub</span>
-                    </>
-                  )}
-                </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleGitHubLogin}
+                      disabled={isLoading}
+                      variant="outline"
+                      className="h-11 flex-1 rounded-lg"
+                      aria-busy={isLoading}
+                    >
+                      {isLoading ? (
+                        <div
+                          className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                          style={{ borderTopColor: "currentColor", opacity: 1 }}
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <>
+                          <Github className="h-4 w-4" />
+                          <span>GitHub</span>
+                        </>
+                      )}
+                    </Button>
 
-                {isPasskeySupported && (
-                  <Button
-                    onClick={handlePasskeyLogin}
-                    disabled={passkeyLoading}
-                    variant="outline"
-                    className="flex-1 h-11 rounded-lg"
-                    aria-busy={passkeyLoading}
+                    {isPasskeySupported ? (
+                      <Button
+                        onClick={handlePasskeyLogin}
+                        disabled={passkeyLoading}
+                        variant="outline"
+                        className="h-11 flex-1 rounded-lg"
+                        aria-busy={passkeyLoading}
+                      >
+                        {passkeyLoading ? (
+                          <div
+                            className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                            style={{
+                              borderTopColor: "currentColor",
+                              opacity: 1,
+                            }}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <>
+                            <Key className="h-4 w-4" />
+                            <span>Passkey</span>
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </AnimatedCollapse>
+
+              {isForgotPassword ? (
+                <p className="mt-6 text-center text-sm text-muted-foreground">
+                  Remembered your password?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("sign-in")}
+                    className="font-medium text-primary transition-colors hover:text-primary/80"
                   >
-                    {passkeyLoading ? (
-                      <div
-                        className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                        style={{ borderTopColor: "currentColor", opacity: 1 }}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <>
-                        <Key className="h-4 w-4" />
-                        <span>Passkey</span>
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+                    Back to sign in
+                  </button>
+                </p>
+              ) : (
+                <p className="mt-6 text-center text-sm text-muted-foreground">
+                  {isSignUp
+                    ? "Already have an account?"
+                    : "Don't have an account?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode(isSignUp ? "sign-in" : "sign-up")}
+                    className="font-medium text-primary transition-colors hover:text-primary/80 underline-offset-4 hover:underline"
+                  >
+                    {isSignUp ? "Sign in" : "Sign up"}
+                  </button>
+                </p>
+              )}
 
-              {/* Toggle sign in / sign up */}
-              <p className="mt-6 text-center text-sm text-muted-foreground">
-                {isSignUp
-                  ? "Already have an account?"
-                  : "Don't have an account?"}{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSignUp(!isSignUp);
-                    setError(null);
-                  }}
-                  className="font-medium text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
+              <p className="mt-6 text-center text-xs text-muted-foreground">
+                Before continuing, please read our{" "}
+                <Link
+                  href="/privacy"
+                  className="font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  {isSignUp ? "Sign in" : "Sign up"}
-                </button>
+                  privacy commitments
+                </Link>
               </p>
             </div>
-
-            {/* Footer links */}
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Before continuing, please read our{" "}
-              <Link
-                href="/privacy"
-                className="font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                privacy commitments
-              </Link>
-            </p>
           </div>
         </div>
 
-        {/* Right side - Wallpaper (hidden on mobile) */}
-        <div className="hidden lg:block lg:w-1/2 relative">
-          <div className="absolute inset-4 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="relative hidden lg:block lg:w-1/2">
+          <div className="absolute inset-4 overflow-hidden rounded-2xl shadow-2xl">
             <Image
               src="/wallpaper.jpg"
               alt="Solace — collaborate better"
@@ -456,19 +677,18 @@ export function LoginForm() {
               loading="eager"
               unoptimized
             />
-            {/* Overlay gradient */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
           </div>
         </div>
       </section>
 
-      {overlayVisible && (
+      {overlayVisible ? (
         <PageLoadingOverlay
           isLoading={!overlayFading}
           messageContext="AUTH_FLOW"
           fadeDurationMs={300}
         />
-      )}
+      ) : null}
     </>
   );
 }

@@ -13,7 +13,6 @@ import { createRoot, type Root } from "react-dom/client";
 
 jest.mock("lucide-react", () => {
   const Icon = () => null;
-
   return {
     RotateCcw: Icon,
     Check: Icon,
@@ -21,6 +20,10 @@ jest.mock("lucide-react", () => {
     ArrowLeft: Icon,
     AlertTriangle: Icon,
     Trash2: Icon,
+    Lock: Icon,
+    Loader2: Icon,
+    ImageIcon: Icon,
+    Pencil: Icon,
   };
 });
 
@@ -47,8 +50,11 @@ describe("AccountSettings", () => {
     container.remove();
   });
 
-  it("renders a delete-account confirmation flow", async () => {
+  it("renders account info and delete-account confirmation flow", async () => {
     const handleDeleteAccount = jest.fn();
+    const handleChangePassword = jest.fn<() => Promise<void>>(
+      async () => undefined,
+    );
 
     await act(async () => {
       root.render(
@@ -58,15 +64,24 @@ describe("AccountSettings", () => {
           handleReset={() => {}}
           deletingAccount={false}
           handleDeleteAccount={handleDeleteAccount}
+          accountName="Roan"
+          accountEmail="roan@example.com"
+          accountImage={null}
+          sessionLoading={false}
+          changingPassword={false}
+          handleChangePassword={handleChangePassword}
         />,
       );
-
       await Promise.resolve();
     });
 
-    const openDeleteButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Delete Account"),
-    );
+    expect(container.textContent).toContain("Roan");
+    expect(container.textContent).toContain("roan@example.com");
+    expect(container.textContent).toContain("Change Password");
+
+    const openDeleteButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((el) => el.textContent?.includes("Delete Account"));
     expect(openDeleteButton).toBeDefined();
 
     await act(async () => {
@@ -76,14 +91,37 @@ describe("AccountSettings", () => {
 
     const confirmDeleteButton = Array.from(
       container.querySelectorAll("button"),
-    ).find((element) => element.textContent?.includes("Yes, Delete My Account"));
-
+    ).find((el) => el.textContent?.includes("Delete my account"));
     expect(confirmDeleteButton).toBeDefined();
+
     await act(async () => {
       confirmDeleteButton?.click();
       await Promise.resolve();
     });
 
     expect(handleDeleteAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows loading skeleton while session is loading", async () => {
+    await act(async () => {
+      root.render(
+        <AccountSettings
+          goBack={() => {}}
+          saving={false}
+          handleReset={() => {}}
+          deletingAccount={false}
+          handleDeleteAccount={() => {}}
+          accountName={null}
+          accountEmail={null}
+          sessionLoading={true}
+          changingPassword={false}
+          handleChangePassword={async () => {}}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    // Should not show "Email unavailable" while loading
+    expect(container.textContent).not.toContain("Email unavailable");
   });
 });

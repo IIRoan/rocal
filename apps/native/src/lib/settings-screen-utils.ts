@@ -1,15 +1,33 @@
 export type SettingsAccountActionKey =
+  | "change-password"
+  | "change-profile-picture"
   | "reset-preferences"
   | "sign-out"
   | "delete-account";
 
 export interface SettingsAccountAction {
   key: SettingsAccountActionKey;
-  icon: "rotate-ccw" | "log-out" | "trash-2";
+  icon: "lock" | "image" | "rotate-ccw" | "log-out" | "trash-2";
   label: string;
   description: string;
   destructive: boolean;
 }
+
+const CHANGE_PASSWORD_ACTION: SettingsAccountAction = {
+  key: "change-password",
+  icon: "lock",
+  label: "Change Password",
+  description: "Update the password used for email sign-in.",
+  destructive: false,
+};
+
+const CHANGE_PROFILE_PICTURE_ACTION: SettingsAccountAction = {
+  key: "change-profile-picture",
+  icon: "image",
+  label: "Profile Picture",
+  description: "Set a URL for your profile picture.",
+  destructive: false,
+};
 
 const RESET_PREFERENCES_ACTION: SettingsAccountAction = {
   key: "reset-preferences",
@@ -41,6 +59,12 @@ export function getSettingsAccountActions({
   canSignOut: boolean;
 }): SettingsAccountAction[] {
   return canSignOut
-    ? [RESET_PREFERENCES_ACTION, SIGN_OUT_ACTION, DELETE_ACCOUNT_ACTION]
+    ? [
+        CHANGE_PASSWORD_ACTION,
+        CHANGE_PROFILE_PICTURE_ACTION,
+        RESET_PREFERENCES_ACTION,
+        SIGN_OUT_ACTION,
+        DELETE_ACCOUNT_ACTION,
+      ]
     : [RESET_PREFERENCES_ACTION];
 }

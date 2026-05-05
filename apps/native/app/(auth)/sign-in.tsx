@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,6 +18,8 @@ import Constants from "expo-constants";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
+import { authClient } from "../../src/lib/auth-client";
+import { APP_BASE_URL } from "../../src/lib/constants";
 import { useAuth } from "../../src/providers/AuthProvider";
 import {
   isPasskeyBridgeOriginSecure,
@@ -33,10 +36,6 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 
 const log = createLogger("auth:sign-in");
 
-// ---------------------------------------------------------------------------
-// Validation helpers
-// ---------------------------------------------------------------------------
-
 function validateEmail(value: string): string | null {
   if (!value.trim()) return "Email is required";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
@@ -50,9 +49,17 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function resolvePasswordResetRedirectUrl(): string | null {
+  if (!APP_BASE_URL) {
+    return null;
+  }
+
+  try {
+    return new URL("/reset-password", APP_BASE_URL).toString();
+  } catch {
+    return `${APP_BASE_URL.replace(/\/+$/, "")}/reset-password`;
+  }
+}
 
 export default function SignInScreen() {
   const { signIn, signInWithGitHub, signInWithPasskey } = useAuth();
@@ -77,24 +84,20 @@ export default function SignInScreen() {
   );
   const showPasskeyButton = authCapabilities.supportsPasskeys;
 
-  // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  // Validation state
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isResetMode, setIsResetMode] = useState(false);
 
-  // Loading state
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+  const [isRequestingPasswordReset, setIsRequestingPasswordReset] =
+    useState(false);
 
-  // Refs for focus management
   const passwordRef = useRef<TextInput>(null);
-
-  // ── Handlers ───────────────────────────────────────────────────────
 
   const clearErrors = useCallback(() => {
     setEmailError(null);
@@ -111,7 +114,10 @@ export default function SignInScreen() {
     if (eErr) setEmailError(eErr);
     if (pErr) setPasswordError(pErr);
     if (eErr || pErr) {
-      log.warn("Sign-in validation failed", { emailError: eErr, passwordError: pErr });
+      log.warn("Sign-in validation failed", {
+        emailError: eErr,
+        passwordError: pErr,
+      });
       return;
     }
 
@@ -122,13 +128,61 @@ export default function SignInScreen() {
       log.ok("Sign-in successful");
       router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
-      const message = err?.message ?? "Sign-in failed. Please check your credentials.";
+      const message =
+        err?.message ?? "Sign-in failed. Please check your credentials.";
       log.error("Sign-in failed", err);
       setServerError(message);
     } finally {
       setIsSigningIn(false);
     }
   }, [clearErrors, email, password, router, signIn]);
+
+  const handleRequestPasswordReset = useCallback(async () => {
+    clearErrors();
+
+    const eErr = validateEmail(email);
+    if (eErr) {
+      setEmailError(eErr);
+      return;
+    }
+
+    const redirectTo = resolvePasswordResetRedirectUrl();
+    if (!redirectTo) {
+      setServerError(
+        "Password reset is unavailable because the public app URL is not configured.",
+      );
+      return;
+    }
+
+    log.info("Requesting password reset", { email: email.trim() });
+    setIsRequestingPasswordReset(true);
+
+    try {
+      const result = await authClient.requestPasswordReset({
+        email: email.trim(),
+        redirectTo,
+      });
+
+      if (result?.error) {
+        throw new Error(
+          result.error.message ?? "Unable to send a password reset link.",
+        );
+      }
+
+      Alert.alert(
+        "Check your email",
+        "If an account exists for that email, we sent a password reset link.",
+      );
+      setIsResetMode(false);
+    } catch (err: any) {
+      const message =
+        err?.message ?? "Unable to send a password reset link right now.";
+      log.error("Password reset request failed", err);
+      setServerError(message);
+    } finally {
+      setIsRequestingPasswordReset(false);
+    }
+  }, [clearErrors, email]);
 
   const handlePasskeySignIn = useCallback(async () => {
     clearErrors();
@@ -164,9 +218,28 @@ export default function SignInScreen() {
     }
   }, [clearErrors, router, signInWithGitHub]);
 
-  const isLoading = isSigningIn || isGitHubLoading || isPasskeyLoading;
+  const switchMode = useCallback(
+    (nextMode: boolean) => {
+      setIsResetMode(nextMode);
+      clearErrors();
 
-  // ── Render ─────────────────────────────────────────────────────────
+      if (nextMode) {
+        setPassword("");
+      }
+    },
+    [clearErrors],
+  );
+
+  const isLoading =
+    isSigningIn ||
+    isGitHubLoading ||
+    isPasskeyLoading ||
+    isRequestingPasswordReset;
+
+  const title = isResetMode ? "Reset your password" : "Welcome back";
+  const subtitle = isResetMode
+    ? "Enter your email and we’ll send you a reset link"
+    : "Sign in to your account to continue";
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -174,7 +247,6 @@ export default function SignInScreen() {
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Theme toggle — top right */}
         <View style={styles.topBar}>
           <ThemeToggle />
         </View>
@@ -184,23 +256,18 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
               <Text style={styles.appName}>Solace</Text>
-              <Text style={styles.title}>Welcome back</Text>
-              <Text style={styles.subtitle}>
-                Sign in to your account to continue
-              </Text>
+              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
 
-            {/* Server error */}
-            {serverError && (
+            {serverError ? (
               <View style={styles.serverErrorContainer}>
                 <Text style={styles.serverErrorText}>{serverError}</Text>
               </View>
-            )}
+            ) : null}
 
-            {/* Email field */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Email</Text>
               <TextInput
@@ -218,137 +285,177 @@ export default function SignInScreen() {
                 inputMode="email"
                 keyboardType="email-address"
                 textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
+                returnKeyType={isResetMode ? "done" : "next"}
+                onSubmitEditing={() => {
+                  if (isResetMode) {
+                    void handleRequestPasswordReset();
+                  } else {
+                    passwordRef.current?.focus();
+                  }
+                }}
                 editable={!isLoading}
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email address"
               />
-              {emailError && (
-                <Text style={styles.fieldError}>{emailError}</Text>
-              )}
+              {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
             </View>
 
-            {/* Password field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                ref={passwordRef}
-                style={[styles.input, passwordError && styles.inputError]}
-                placeholder="Enter your password"
-                placeholderTextColor={theme.colors.mutedForeground}
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (passwordError) setPasswordError(null);
-                }}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="password"
-                autoCorrect={false}
-                textContentType="password"
-                returnKeyType="done"
-                onSubmitEditing={handleSignIn}
-                editable={!isLoading}
-                accessibilityLabel="Password"
-                accessibilityHint="Enter your password"
-              />
-              {passwordError && (
-                <Text style={styles.fieldError}>{passwordError}</Text>
-              )}
-            </View>
+            {!isResetMode ? (
+              <View style={styles.fieldContainer}>
+                <View style={styles.inlineLabelRow}>
+                  <Text style={styles.label}>Password</Text>
+                  <Pressable
+                    onPress={() => switchMode(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Forgot password"
+                  >
+                    <Text style={styles.inlineLink}>Forgot password?</Text>
+                  </Pressable>
+                </View>
+                <TextInput
+                  ref={passwordRef}
+                  style={[styles.input, passwordError && styles.inputError]}
+                  placeholder="Enter your password"
+                  placeholderTextColor={theme.colors.mutedForeground}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (passwordError) setPasswordError(null);
+                  }}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoComplete="password"
+                  autoCorrect={false}
+                  textContentType="password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSignIn}
+                  editable={!isLoading}
+                  accessibilityLabel="Password"
+                  accessibilityHint="Enter your password"
+                />
+                {passwordError ? (
+                  <Text style={styles.fieldError}>{passwordError}</Text>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.helperCard}>
+                <Text style={styles.helperText}>
+                  We&apos;ll email you a secure link to choose a new password on
+                  the web.
+                </Text>
+              </View>
+            )}
 
-            {/* Sign in button */}
             <Pressable
               style={({ pressed }) => [
                 styles.primaryButton,
                 pressed && styles.primaryButtonPressed,
                 isLoading && styles.buttonDisabled,
               ]}
-              onPress={handleSignIn}
+              onPress={
+                isResetMode ? handleRequestPasswordReset : handleSignIn
+              }
               disabled={isLoading}
               accessibilityRole="button"
-              accessibilityLabel="Sign in"
+              accessibilityLabel={isResetMode ? "Send reset link" : "Sign in"}
               accessibilityState={{ disabled: isLoading }}
             >
-              {isSigningIn ? (
+              {isSigningIn || isRequestingPasswordReset ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
-                <Text style={styles.primaryButtonText}>Sign in</Text>
+                <Text style={styles.primaryButtonText}>
+                  {isResetMode ? "Send reset link" : "Sign in"}
+                </Text>
               )}
             </Pressable>
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
+            {!isResetMode ? (
+              <>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or continue with</Text>
+                  <View style={styles.dividerLine} />
+                </View>
 
-            <View style={styles.socialButtonsRow}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.socialButton,
-                  pressed && styles.secondaryButtonPressed,
-                  isLoading && styles.buttonDisabled,
-                ]}
-                onPress={handleGitHubSignIn}
-                disabled={isLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Continue with GitHub"
-                accessibilityState={{ disabled: isLoading }}
-              >
-                {isGitHubLoading ? (
-                  <ActivityIndicator color={theme.colors.foreground} />
-                ) : (
-                  <>
-                    <Feather
-                      name="github"
-                      size={16}
-                      color={theme.colors.foreground}
-                    />
-                    <Text style={styles.secondaryButtonText}>GitHub</Text>
-                  </>
-                )}
-              </Pressable>
+                <View style={styles.socialButtonsRow}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.socialButton,
+                      pressed && styles.secondaryButtonPressed,
+                      isLoading && styles.buttonDisabled,
+                    ]}
+                    onPress={handleGitHubSignIn}
+                    disabled={isLoading}
+                    accessibilityRole="button"
+                    accessibilityLabel="Continue with GitHub"
+                    accessibilityState={{ disabled: isLoading }}
+                  >
+                    {isGitHubLoading ? (
+                      <ActivityIndicator color={theme.colors.foreground} />
+                    ) : (
+                      <>
+                        <Feather
+                          name="github"
+                          size={16}
+                          color={theme.colors.foreground}
+                        />
+                        <Text style={styles.secondaryButtonText}>GitHub</Text>
+                      </>
+                    )}
+                  </Pressable>
 
-              {showPasskeyButton ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.socialButton,
-                    pressed && styles.secondaryButtonPressed,
-                    isLoading && styles.buttonDisabled,
-                  ]}
-                  onPress={handlePasskeySignIn}
-                  disabled={isLoading}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue with passkey"
-                  accessibilityState={{ disabled: isLoading }}
-                >
-                  {isPasskeyLoading ? (
-                    <ActivityIndicator color={theme.colors.foreground} />
-                  ) : (
-                    <>
-                      <Feather
-                        name="key"
-                        size={16}
-                        color={theme.colors.foreground}
-                      />
-                      <Text style={styles.secondaryButtonText}>Passkey</Text>
-                    </>
-                  )}
-                </Pressable>
-              ) : null}
-            </View>
+                  {showPasskeyButton ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.socialButton,
+                        pressed && styles.secondaryButtonPressed,
+                        isLoading && styles.buttonDisabled,
+                      ]}
+                      onPress={handlePasskeySignIn}
+                      disabled={isLoading}
+                      accessibilityRole="button"
+                      accessibilityLabel="Continue with passkey"
+                      accessibilityState={{ disabled: isLoading }}
+                    >
+                      {isPasskeyLoading ? (
+                        <ActivityIndicator color={theme.colors.foreground} />
+                      ) : (
+                        <>
+                          <Feather
+                            name="key"
+                            size={16}
+                            color={theme.colors.foreground}
+                          />
+                          <Text style={styles.secondaryButtonText}>Passkey</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
+              </>
+            ) : null}
 
-            {/* Footer link */}
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
-              <Link href={AUTH_SIGN_UP_ROUTE} asChild>
-                <Pressable accessibilityRole="link">
-                  <Text style={styles.footerLink}>Sign up</Text>
-                </Pressable>
-              </Link>
+              {isResetMode ? (
+                <>
+                  <Text style={styles.footerText}>Remembered it? </Text>
+                  <Pressable
+                    onPress={() => switchMode(false)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.footerLink}>Back to sign in</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.footerText}>Don&apos;t have an account? </Text>
+                  <Link href={AUTH_SIGN_UP_ROUTE} asChild>
+                    <Pressable accessibilityRole="link">
+                      <Text style={styles.footerLink}>Sign up</Text>
+                    </Pressable>
+                  </Link>
+                </>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -356,10 +463,6 @@ export default function SignInScreen() {
     </SafeAreaView>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
 
 function createStyles(theme: ThemeTokens) {
   const view = {
@@ -399,6 +502,21 @@ function createStyles(theme: ThemeTokens) {
     fieldContainer: {
       marginBottom: theme.spacing["4"],
     },
+    inlineLabelRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      marginBottom: theme.spacing["1"],
+    },
+    helperCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.muted + "20",
+      borderRadius: theme.borderRadius.lg,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+      marginBottom: theme.spacing["4"],
+    },
     inputError: {
       borderColor: theme.colors.destructive,
     },
@@ -423,16 +541,6 @@ function createStyles(theme: ThemeTokens) {
       flex: 1,
       height: 1,
       backgroundColor: theme.colors.border,
-    },
-    secondaryButton: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      paddingVertical: theme.spacing["3"],
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      minHeight: 48,
-      backgroundColor: theme.colors.background,
     },
     socialButtonsRow: {
       flexDirection: "row" as const,
@@ -462,6 +570,7 @@ function createStyles(theme: ThemeTokens) {
       justifyContent: "center" as const,
       alignItems: "center" as const,
       marginTop: theme.spacing["6"],
+      flexWrap: "wrap" as const,
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -476,7 +585,8 @@ function createStyles(theme: ThemeTokens) {
     title: {
       fontSize: theme.typography.fontSize["2xl"].size,
       lineHeight: theme.typography.fontSize["2xl"].lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight:
+        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: theme.spacing["1"],
     },
@@ -498,6 +608,18 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
       marginBottom: theme.spacing["1"],
     },
+    inlineLink: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      fontWeight:
+        theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.primaryBase,
+    },
+    helperText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
     input: {
       borderWidth: 1,
       borderColor: theme.colors.input,
@@ -517,7 +639,8 @@ function createStyles(theme: ThemeTokens) {
     primaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight:
+        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
     },
     dividerText: {
@@ -528,7 +651,8 @@ function createStyles(theme: ThemeTokens) {
     secondaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      fontWeight:
+        theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     footerText: {
@@ -539,7 +663,8 @@ function createStyles(theme: ThemeTokens) {
     footerLink: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight:
+        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryBase,
     },
   } satisfies Record<string, TextStyle>;
