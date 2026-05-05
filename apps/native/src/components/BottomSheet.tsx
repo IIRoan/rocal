@@ -40,12 +40,15 @@ import { useSwipePanelGesture } from "../lib/useSwipePanelGesture";
  */
 const MAX_SHEET_RATIO = 0.92;
 
-/** How far (px) the user must drag down before we dismiss. */
-const DISMISS_VELOCITY = 400;
-const DISMISS_DISTANCE = 80;
+/** Velocity (px/s) at which a flick commits the dismiss — Spotify-style medium flick. */
+const DISMISS_VELOCITY = 300;
+/** Drag distance (px) required to commit without a flick. */
+const DISMISS_DISTANCE = 60;
 
-/** Spring that feels like vaul's snap animation. */
+/** Spring for open / snap-back (feels like vaul). */
 const SPRING_CONFIG = { damping: 28, stiffness: 280, mass: 0.8 };
+/** Snappier spring for the exit so the sheet leaves quickly after a commit. */
+const SPRING_CLOSE = { damping: 24, stiffness: 320, mass: 0.7 };
 
 /** Overlay fade duration (ms). */
 const OVERLAY_DURATION = 200;
@@ -161,7 +164,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         Keyboard.dismiss();
         keyboardHeight.value = 0;
         overlayOpacity.value = withTiming(0, { duration: 150 });
-        translateY.value = withSpring(maxHeight, SPRING_CONFIG, (finished) => {
+        translateY.value = withSpring(maxHeight, SPRING_CLOSE, (finished) => {
           if (finished) {
             isOpen.value = false;
             runOnJS(handleCloseComplete)();
@@ -202,13 +205,15 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       restValue: 0,
       lowerBound: 0,
       upperBound: maxHeight,
-      rubberBandBelow: 0,
+      rubberBandBelow: 0.4, // subtle bounce when pulled upward past open
       rubberBandAbove: 0,
       onCommitDown: requestClose,
       commitDistance: DISMISS_DISTANCE,
       commitVelocity: DISMISS_VELOCITY,
-      springConfig: SPRING_CONFIG,
-    });
+      springConfig: SPRING_CLOSE,
+    })
+      .activeOffsetY([-5, 5])
+      .failOffsetX([-20, 20]);
 
     // ── Overlay pan gesture (swipe down on the backdrop to dismiss) ──────────
     // This covers the entire screen area behind the sheet, so swiping down
@@ -223,10 +228,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       onCommitDown: requestClose,
       commitDistance: DISMISS_DISTANCE,
       commitVelocity: DISMISS_VELOCITY,
-      springConfig: SPRING_CONFIG,
+      springConfig: SPRING_CLOSE,
     })
-      .activeOffsetY(8)
-      .failOffsetX([-15, 15]);
+      .activeOffsetY(5)
+      .failOffsetX([-20, 20]);
 
     const contentPan = useSwipePanelGesture(translateY, {
       restValue: 0,
@@ -237,31 +242,54 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       onCommitDown: requestClose,
       commitDistance: DISMISS_DISTANCE,
       commitVelocity: DISMISS_VELOCITY,
-      springConfig: SPRING_CONFIG,
+      springConfig: SPRING_CLOSE,
     })
-      .activeOffsetY(8)
-      .failOffsetX([-15, 15])
+      .activeOffsetY(5)
+      .failOffsetX([-20, 20])
       .enabled(swipeContentToDismiss);
 
     const contentGesture = Gesture.Simultaneous(contentPan, Gesture.Native());
 
     // ── Animated styles ──────────────────────────────────────────────────────
 
-    const overlayAnimatedStyle = useAnimatedStyle(() => ({
-      opacity: overlayOpacity.value,
-    }));
+    // Overlay dims progressively as the sheet is dragged down — gives the
+    // user clear visual feedback that the dismiss is in-progress.
+    const overlayAnimatedStyle = useAnimatedStyle(() => {
+      const dragFade = interpolate(
+        translateY.value,
+        [0, maxHeight * 0.5],
+        [1, 0.3],
+        Extrapolation.CLAMP,
+      );
+      return { opacity: overlayOpacity.value * dragFade };
+    });
 
-    const sheetAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ translateY: translateY.value - keyboardHeight.value }],
-      maxHeight,
-      paddingBottom: insets.bottom,
-    }));
+    // Sheet scales down slightly and corners round more as it's dragged —
+    // matches the Spotify / Apple Music sheet-dismiss feel.
+    const sheetAnimatedStyle = useAnimatedStyle(() => {
+      const progress = translateY.value / maxHeight;
+      const scale = interpolate(progress, [0, 0.6], [1, 0.96], Extrapolation.CLAMP);
+      const radius = interpolate(progress, [0, 0.15], [16, 26], Extrapolation.CLAMP);
+      return {
+        transform: [
+          { translateY: translateY.value - keyboardHeight.value },
+          { scale },
+        ],
+        borderTopLeftRadius: radius,
+        borderTopRightRadius: radius,
+        // Explicit height (not just maxHeight) so flex:1 children have a
+        // definite boundary — required for ScrollViews inside the sheet to
+        // calculate overflow and allow scrolling.
+        height: maxHeight,
+        paddingBottom: insets.bottom,
+      };
+    });
 
     const handleIndicatorOpacity = useAnimatedStyle(() => ({
       opacity: interpolate(
         translateY.value,
-        [0, maxHeight * 0.3],
-        [1, 0.3],
+        [0, maxHeight * 0.5],
+        [1, 0.4],
         Extrapolation.CLAMP,
       ),
     }));
@@ -350,9 +378,8 @@ function createStyles(theme: ThemeTokens) {
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: theme.colors.card + "F2",
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
+      backgroundColor: theme.colors.card,
+      // Border-radius is animated in sheetAnimatedStyle
       ...(Platform.OS === "ios"
         ? {
             shadowColor: "#000",
@@ -365,21 +392,25 @@ function createStyles(theme: ThemeTokens) {
     },
 
     handleArea: {
-      paddingTop: 12,
-      paddingBottom: 8,
+      paddingTop: 14,
+      paddingBottom: 12,
       alignItems: "center" as const,
       justifyContent: "center" as const,
+      // Extend the hit area slightly without growing visually
+      marginHorizontal: -16,
+      paddingHorizontal: 16,
     },
 
     handlePill: {
-      width: 42,
-      height: 4,
+      width: 48,
+      height: 5,
       borderRadius: 9999,
       backgroundColor: theme.colors.muted,
     },
 
     contentWrapper: {
       flex: 1,
+      minHeight: 0,
     },
   } satisfies Record<string, ViewStyle>;
 

@@ -693,7 +693,11 @@ export function CommandPalette({
     <>
       {isMobile ? (
         <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
-          <DrawerContent className="bg-popover border-border/50 flex flex-col max-h-[90svh] overflow-hidden p-0">
+          <DrawerContent
+            responsive
+            responsiveHeight="90svh"
+            className="bg-popover border-border/50 flex flex-col overflow-hidden p-0"
+          >
             <VisuallyHidden>
               <DrawerTitle>{getDialogTitle()}</DrawerTitle>
             </VisuallyHidden>
