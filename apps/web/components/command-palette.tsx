@@ -40,13 +40,18 @@ import {
   DialogContent,
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+} from "@workspace/ui/components/ui/drawer";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import {
   Settings,
   Loader2,
   ArrowLeft,
 } from "lucide-react";
-import { useNumberedShortcuts } from "@workspace/ui/hooks";
+import { useNumberedShortcuts, useIsMobile } from "@workspace/ui/hooks";
 
 const log = createLogger("command-palette");
 
@@ -88,6 +93,8 @@ export function CommandPalette({
   const { data: session, isPending: sessionLoading } = useSession();
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
+
+  const isMobile = useIsMobile();
 
   // Navigation history stack — goForward pushes, goBack pops
   const buildInitialHistory = (view: PaletteView): PaletteView[] => {
@@ -652,42 +659,62 @@ export function CommandPalette({
   };
 
   // Single Dialog for ALL views (except event-editor which has its own Dialog/Drawer/Popover)
+  // On mobile: bottom Drawer; on desktop: spotlight Dialog
+  const paletteContent = (
+    <>
+      <TransitionContainer viewKey={currentView}>
+        {renderContent()}
+      </TransitionContainer>
+      {currentView !== "events" && !isMobile && (
+        <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
+          <span>
+            Type{" "}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+              &gt;
+            </kbd>{" "}
+            for commands
+          </span>
+          <span className="hidden sm:flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+              ↑↓
+            </kbd>{" "}
+            to navigate
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+              ↵
+            </kbd>{" "}
+            to select
+          </span>
+        </div>
+      )}
+    </>
+  );
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        variant="spotlight"
-        showClose={false}
-        aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
-      >
-        <VisuallyHidden>
-          <DialogTitle>{getDialogTitle()}</DialogTitle>
-        </VisuallyHidden>
-        <TransitionContainer viewKey={currentView}>
-          {renderContent()}
-        </TransitionContainer>
-        {currentView !== "events" && (
-          <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
-            <span>
-              Type{" "}
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                &gt;
-              </kbd>{" "}
-              for commands
-            </span>
-            <span className="hidden sm:flex items-center gap-2">
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                ↑↓
-              </kbd>{" "}
-              to navigate
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-                ↵
-              </kbd>{" "}
-              to select
-            </span>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+    <>
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
+          <DrawerContent className="bg-popover border-border/50 flex flex-col max-h-[90svh] overflow-hidden p-0">
+            <VisuallyHidden>
+              <DrawerTitle>{getDialogTitle()}</DrawerTitle>
+            </VisuallyHidden>
+            {paletteContent}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent
+            variant="spotlight"
+            showClose={false}
+            aria-describedby={undefined}
+            className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
+          >
+            <VisuallyHidden>
+              <DialogTitle>{getDialogTitle()}</DialogTitle>
+            </VisuallyHidden>
+            {paletteContent}
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }

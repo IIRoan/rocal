@@ -75,7 +75,6 @@ function eventToInitialValues(
     location: event.location ?? undefined,
     color: event.color ?? undefined,
     calendarId: event.calendarId,
-    categoryId: event.categoryId ?? undefined,
     reminder: event.reminder ?? undefined,
     recurrence: event.recurrence ?? undefined,
   };
@@ -194,12 +193,6 @@ export function EventSheet({
   const { data: calendars, isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
-    enabled: visible,
-  });
-
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: QUERY_KEYS.categories(),
-    queryFn: () => calendarApiService.getCategories(),
     enabled: visible,
   });
 
@@ -377,7 +370,7 @@ export function EventSheet({
 
   // ─── Derived ───────────────────────────────────────────────────────────
 
-  const isLoading = calendarsLoading || categoriesLoading || (isViewOrEdit && eventLoading);
+  const isLoading = calendarsLoading || (isViewOrEdit && eventLoading);
   const isPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const sheetTitle = isCreate ? "Create Event" : viewMode === "view" ? "Event Details" : "Edit Event";
   const iconColor = theme.colors.mutedForeground;
@@ -386,11 +379,6 @@ export function EventSheet({
     if (!event || !calendars) return null;
     return calendars.find((c) => c.id === event.calendarId) ?? null;
   }, [event, calendars]);
-
-  const categoryInfo = useMemo(() => {
-    if (!event || !categories) return null;
-    return categories.find((c) => c.id === event.categoryId) ?? null;
-  }, [event, categories]);
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -470,18 +458,6 @@ export function EventSheet({
                     />
                   </View>
                   <Text style={styles.viewText}>{calendarInfo.name}</Text>
-                </View>
-              )}
-
-              {/* Category */}
-              {categoryInfo && (
-                <View style={styles.viewRow}>
-                  <View style={styles.iconBoxWrapper}>
-                    <View
-                      style={[styles.calendarDot, { backgroundColor: categoryInfo.color }]}
-                    />
-                  </View>
-                  <Text style={styles.viewText}>{categoryInfo.name}</Text>
                 </View>
               )}
 
@@ -577,7 +553,6 @@ export function EventSheet({
           <EventForm
             key={isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`}
             calendars={calendars ?? []}
-            categories={categories ?? []}
             serverErrors={serverErrors}
             isSubmitting={isPending}
             onSubmit={handleSubmit}

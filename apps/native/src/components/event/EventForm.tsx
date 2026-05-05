@@ -32,7 +32,6 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import type {
   Calendar,
   CreateEventRequest,
-  EventCategory,
   EventColor,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
@@ -80,7 +79,6 @@ function formatTime12(date: Date): string {
 interface EventFormProps {
   initialValues?: Partial<CreateEventRequest>;
   calendars: Calendar[];
-  categories: EventCategory[];
   serverErrors?: string[];
   isSubmitting?: boolean;
   onSubmit: (data: CreateEventRequest) => void;
@@ -93,7 +91,6 @@ interface EventFormProps {
 export function EventForm({
   initialValues,
   calendars,
-  categories,
   serverErrors,
   isSubmitting = false,
   onSubmit,
@@ -129,9 +126,6 @@ export function EventForm({
   );
   const [calendarId, setCalendarId] = useState(
     initialValues?.calendarId ?? defaultCalendarId,
-  );
-  const [categoryId, setCategoryId] = useState(
-    initialValues?.categoryId ?? "",
   );
   const [location, setLocation] = useState(initialValues?.location ?? "");
   const [description, setDescription] = useState(
@@ -272,7 +266,7 @@ export function EventForm({
       location,
       description,
       color,
-      categoryId: categoryId || undefined,
+      categoryId: undefined,
       recurrence,
       reminder,
     });
@@ -294,7 +288,7 @@ export function EventForm({
     onSubmit(data);
   }, [
     title, start, end, calendarId, allDay, location, description,
-    color, categoryId, recurrence, reminder, onSubmit,
+    color, recurrence, reminder, onSubmit,
   ]);
 
   const renderFieldError = (field: string) => {
@@ -312,6 +306,7 @@ export function EventForm({
       <View style={styles.container}>
         <ScrollView
           ref={scrollRef}
+          style={{ flex: 1 }}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"

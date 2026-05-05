@@ -49,6 +49,7 @@ import {
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
 import { getSettingsAccountActions } from "../../../src/lib/settings-screen-utils";
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
+import { BottomSheet } from "../../../src/components/BottomSheet";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,15 @@ function serializeWorkingDays(days: Set<number>): string {
   return JSON.stringify(Array.from(days).sort((a, b) => a - b));
 }
 
+/** Format a set of working days to a short readable label. */
+function formatWorkingDaysLabel(daysSet: Set<number>): string {
+  const count = daysSet.size;
+  if (count === 0) return "None";
+  if (count === 7) return "Every day";
+  if (count === 5 && !daysSet.has(0) && !daysSet.has(6)) return "Mon – Fri";
+  return `${count} day${count !== 1 ? "s" : ""}`;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
@@ -245,6 +255,21 @@ export default function SettingsScreen() {
     () => (Array.isArray(passkeysQuery.data) ? passkeysQuery.data : []),
     [passkeysQuery.data],
   );
+
+  // ─── Picker sheet state ──────────────────────────────────────────────────────
+  type PickerKey =
+    | "theme"
+    | "defaultView"
+    | "timeFormat"
+    | "weekStart"
+    | "defaultCalendar"
+    | "workingDays";
+  const [activePicker, setActivePicker] = useState<PickerKey | null>(null);
+  const [lastPicker, setLastPicker] = useState<PickerKey | null>(null);
+  const openPicker = useCallback((key: PickerKey) => {
+    setLastPicker(key);
+    setActivePicker(key);
+  }, []);
 
   const updateSettingsMutation = useMutation({
     mutationFn: (update: UpdateSettingsRequest) =>
@@ -381,6 +406,25 @@ export default function SettingsScreen() {
     },
     [workingDaysSet, updateSetting],
   );
+
+  // ─── Picker display labels ───────────────────────────────────────────────────
+  const themeLabel =
+    THEME_OPTIONS.find((o) => o.value === themePreference)?.label ?? "System";
+  const viewLabel =
+    VIEW_OPTIONS.find((o) => o.value === (settings?.defaultView ?? "month"))
+      ?.label ?? "Month View";
+  const timeFormatLabel =
+    TIME_FORMAT_OPTIONS.find(
+      (o) => o.value === (settings?.timeFormat ?? "12h"),
+    )?.label ?? "12h";
+  const weekStartLabel =
+    WEEK_START_OPTIONS.find((o) => o.value === (settings?.weekStartDay ?? 0))
+      ?.label ?? "Sunday";
+  const defaultCalendarLabel =
+    sortedOwnedCalendars.find((c) => c.isDefault)?.name ??
+    sortedOwnedCalendars[0]?.name ??
+    "Not set";
+  const workingDaysLabel = formatWorkingDaysLabel(workingDaysSet);
 
   const handleResetSettings = useCallback(() => {
     Alert.alert(
@@ -669,44 +713,35 @@ export default function SettingsScreen() {
         {/* ── Appearance ───────────────────────────────────────────────── */}
         <SectionLabel text="Appearance" theme={theme} />
         <View style={styles.sectionItems}>
-          {THEME_OPTIONS.map((opt) => (
-            <SelectionRow
-              key={opt.value}
-              icon={opt.icon}
-              label={opt.label}
-              isSelected={themePreference === opt.value}
-              onPress={() => handleThemeChange(opt.value)}
-              isPending={pendingKeys.has("theme")}
-              theme={theme}
-            />
-          ))}
-          {VIEW_OPTIONS.map((opt) => (
-            <SelectionRow
-              key={opt.value}
-              icon={opt.icon}
-              label={opt.label}
-              isSelected={(settings?.defaultView ?? "month") === opt.value}
-              onPress={() => updateSetting({ defaultView: opt.value })}
-              isPending={pendingKeys.has("defaultView")}
-              theme={theme}
-            />
-          ))}
+          <PickerRow
+            icon="sun"
+            label="Theme"
+            value={themeLabel}
+            onPress={() => openPicker("theme")}
+            theme={theme}
+            isPending={pendingKeys.has("theme")}
+          />
+          <PickerRow
+            icon="grid"
+            label="Default View"
+            value={viewLabel}
+            onPress={() => openPicker("defaultView")}
+            theme={theme}
+            isPending={pendingKeys.has("defaultView")}
+          />
         </View>
 
         {/* ── Time & Region ────────────────────────────────────────────── */}
         <SectionLabel text="Time & Region" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
-          {TIME_FORMAT_OPTIONS.map((opt) => (
-            <SelectionRow
-              key={opt.value}
-              icon="clock"
-              label={opt.label}
-              isSelected={(settings?.timeFormat ?? "12h") === opt.value}
-              onPress={() => updateSetting({ timeFormat: opt.value })}
-              isPending={pendingKeys.has("timeFormat")}
-              theme={theme}
-            />
-          ))}
+          <PickerRow
+            icon="clock"
+            label="Time Format"
+            value={timeFormatLabel}
+            onPress={() => openPicker("timeFormat")}
+            theme={theme}
+            isPending={pendingKeys.has("timeFormat")}
+          />
           <NavigationRow
             icon="globe"
             label="Timezone"
@@ -722,52 +757,29 @@ export default function SettingsScreen() {
         {/* ── Calendar Defaults ────────────────────────────────────────── */}
         <SectionLabel text="Calendar Defaults" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
-          {sortedOwnedCalendars.length === 0 ? (
-            <HintRow
-              text="Create a calendar first to pick a default calendar for new events."
-              theme={theme}
-            />
-          ) : (
-            sortedOwnedCalendars.map((calendar) => (
-              <SelectionRow
-                key={calendar.id}
-                icon="star"
-                label={calendar.name}
-                description={calendar.isVisible ? "Visible" : "Hidden"}
-                isSelected={calendar.isDefault}
-                onPress={() => setDefaultCalendarMutation.mutate(calendar.id)}
-                isPending={pendingDefaultCalendarId === calendar.id}
-                theme={theme}
-              />
-            ))
-          )}
-          {WEEK_START_OPTIONS.map((opt) => (
-            <SelectionRow
-              key={opt.value}
-              icon="calendar"
-              label={opt.label}
-              description="First day of week"
-              isSelected={(settings?.weekStartDay ?? 0) === opt.value}
-              onPress={() => updateSetting({ weekStartDay: opt.value })}
-              isPending={pendingKeys.has("weekStartDay")}
-              theme={theme}
-            />
-          ))}
-          {WEEKDAY_OPTIONS.map((day) => {
-            const isActive = workingDaysSet.has(day.value);
-            return (
-              <SelectionRow
-                key={day.value}
-                icon="calendar"
-                label={day.label}
-                description="Working day"
-                isSelected={isActive}
-                onPress={() => handleToggleWorkingDay(day.value)}
-                isPending={false}
-                theme={theme}
-              />
-            );
-          })}
+          <PickerRow
+            icon="star"
+            label="Default Calendar"
+            value={defaultCalendarLabel}
+            onPress={() => openPicker("defaultCalendar")}
+            theme={theme}
+            isPending={Boolean(pendingDefaultCalendarId)}
+          />
+          <PickerRow
+            icon="calendar"
+            label="Week Starts On"
+            value={weekStartLabel}
+            onPress={() => openPicker("weekStart")}
+            theme={theme}
+            isPending={pendingKeys.has("weekStartDay")}
+          />
+          <PickerRow
+            icon="briefcase"
+            label="Working Days"
+            value={workingDaysLabel}
+            onPress={() => openPicker("workingDays")}
+            theme={theme}
+          />
         </View>
 
         {/* ── Notifications ────────────────────────────────────────────── */}
@@ -849,18 +861,6 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {/* ── Management ───────────────────────────────────────────────── */}
-        <SectionLabel text="Management" theme={theme} isFirst={false} />
-        <View style={styles.sectionItems}>
-          <NavigationRow
-            icon="tag"
-            label="Categories"
-            value="Manage event categories"
-            onPress={() => router.push("/category-manage")}
-            theme={theme}
-          />
-        </View>
-
         {/* ── Account ──────────────────────────────────────────────────── */}
         <SectionLabel text="Account" theme={theme} isFirst={false} />
         <View style={styles.sectionItems}>
@@ -892,41 +892,182 @@ export default function SettingsScreen() {
               }
             />
           ))}
-          {showProfilePictureForm ? (
-            <ProfilePictureCard
-              value={profilePictureUrlInput}
-              onChange={setProfilePictureUrlInput}
-              onSubmit={handleSubmitProfilePicture}
-              onCancel={() => {
-                setShowProfilePictureForm(false);
-                setProfilePictureUrlInput("");
-              }}
-              isPending={isUpdatingProfilePicture}
-              theme={theme}
-            />
-          ) : null}
-          {showChangePasswordForm ? (
-            <PasswordChangeCard
-              currentPassword={currentPasswordInput}
-              newPassword={newPasswordInput}
-              confirmPassword={confirmPasswordInput}
-              onCurrentPasswordChange={setCurrentPasswordInput}
-              onNewPasswordChange={setNewPasswordInput}
-              onConfirmPasswordChange={setConfirmPasswordInput}
-              onSubmit={handleSubmitPasswordChange}
-              onCancel={() => {
-                setShowChangePasswordForm(false);
-                resetChangePasswordForm();
-              }}
-              error={passwordChangeError}
-              isPending={isChangingPassword}
-              theme={theme}
-            />
-          ) : null}
         </View>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Picker bottom sheet */}
+      <BottomSheet
+        visible={activePicker !== null}
+        onDismiss={() => setActivePicker(null)}
+        title={
+          lastPicker === "theme"
+            ? "Theme"
+            : lastPicker === "defaultView"
+              ? "Default View"
+              : lastPicker === "timeFormat"
+                ? "Time Format"
+                : lastPicker === "weekStart"
+                  ? "Week Starts On"
+                  : lastPicker === "defaultCalendar"
+                    ? "Default Calendar"
+                    : lastPicker === "workingDays"
+                      ? "Working Days"
+                      : ""
+        }
+      >
+        <View style={{ paddingVertical: 8 }}>
+          {lastPicker === "theme" &&
+            THEME_OPTIONS.map((opt) => (
+              <SheetPickerOption
+                key={opt.value}
+                icon={opt.icon}
+                label={opt.label}
+                isSelected={themePreference === opt.value}
+                onPress={() => {
+                  handleThemeChange(opt.value);
+                  setActivePicker(null);
+                }}
+                theme={theme}
+              />
+            ))}
+          {lastPicker === "defaultView" &&
+            VIEW_OPTIONS.map((opt) => (
+              <SheetPickerOption
+                key={opt.value}
+                icon={opt.icon}
+                label={opt.label}
+                isSelected={(settings?.defaultView ?? "month") === opt.value}
+                onPress={() => {
+                  updateSetting({ defaultView: opt.value });
+                  setActivePicker(null);
+                }}
+                theme={theme}
+              />
+            ))}
+          {lastPicker === "timeFormat" &&
+            TIME_FORMAT_OPTIONS.map((opt) => (
+              <SheetPickerOption
+                key={opt.value}
+                label={opt.label}
+                isSelected={(settings?.timeFormat ?? "12h") === opt.value}
+                onPress={() => {
+                  updateSetting({ timeFormat: opt.value });
+                  setActivePicker(null);
+                }}
+                theme={theme}
+              />
+            ))}
+          {lastPicker === "weekStart" &&
+            WEEK_START_OPTIONS.map((opt) => (
+              <SheetPickerOption
+                key={opt.value}
+                label={opt.label}
+                isSelected={(settings?.weekStartDay ?? 0) === opt.value}
+                onPress={() => {
+                  updateSetting({ weekStartDay: opt.value });
+                  setActivePicker(null);
+                }}
+                theme={theme}
+              />
+            ))}
+          {lastPicker === "defaultCalendar" &&
+            (sortedOwnedCalendars.length === 0 ? (
+              <View
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: theme.spacing["3"],
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: theme.typography.fontSize.sm.size,
+                    color: theme.colors.mutedForeground,
+                  }}
+                >
+                  No calendars yet. Create one first.
+                </Text>
+              </View>
+            ) : (
+              sortedOwnedCalendars.map((calendar) => (
+                <SheetPickerOption
+                  key={calendar.id}
+                  label={calendar.name}
+                  isSelected={calendar.isDefault}
+                  onPress={() => {
+                    setDefaultCalendarMutation.mutate(calendar.id);
+                    setActivePicker(null);
+                  }}
+                  theme={theme}
+                />
+              ))
+            ))}
+          {lastPicker === "workingDays" &&
+            WEEKDAY_OPTIONS.map((day) => {
+              const isActive = workingDaysSet.has(day.value);
+              return (
+                <SheetPickerOption
+                  key={day.value}
+                  label={day.label}
+                  isSelected={isActive}
+                  onPress={() => handleToggleWorkingDay(day.value)}
+                  theme={theme}
+                  multiSelect
+                />
+              );
+            })}
+        </View>
+      </BottomSheet>
+
+      {/* Profile picture bottom sheet */}
+      <BottomSheet
+        visible={showProfilePictureForm}
+        onDismiss={() => {
+          setShowProfilePictureForm(false);
+          setProfilePictureUrlInput("");
+        }}
+        title="Change Profile Picture"
+      >
+        <ProfilePictureCard
+          value={profilePictureUrlInput}
+          onChange={setProfilePictureUrlInput}
+          onSubmit={handleSubmitProfilePicture}
+          onCancel={() => {
+            setShowProfilePictureForm(false);
+            setProfilePictureUrlInput("");
+          }}
+          isPending={isUpdatingProfilePicture}
+          theme={theme}
+        />
+      </BottomSheet>
+
+      {/* Change password bottom sheet */}
+      <BottomSheet
+        visible={showChangePasswordForm}
+        onDismiss={() => {
+          setShowChangePasswordForm(false);
+          resetChangePasswordForm();
+        }}
+        title="Change Password"
+      >
+        <PasswordChangeCard
+          currentPassword={currentPasswordInput}
+          newPassword={newPasswordInput}
+          confirmPassword={confirmPasswordInput}
+          onCurrentPasswordChange={setCurrentPasswordInput}
+          onNewPasswordChange={setNewPasswordInput}
+          onConfirmPasswordChange={setConfirmPasswordInput}
+          onSubmit={handleSubmitPasswordChange}
+          onCancel={() => {
+            setShowChangePasswordForm(false);
+            resetChangePasswordForm();
+          }}
+          error={passwordChangeError}
+          isPending={isChangingPassword}
+          theme={theme}
+        />
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -1001,7 +1142,7 @@ function SelectionRow({
           alignItems: "center" as const,
           gap: theme.spacing["3"],
           paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["2"],
+          paddingVertical: theme.spacing["3"],
           borderRadius: theme.borderRadius.md,
           marginHorizontal: theme.spacing["1"],
         },
@@ -1061,6 +1202,141 @@ function HintRow({ text, theme }: { text: string; theme: ThemeTokens }) {
         {text}
       </Text>
     </View>
+  );
+}
+
+/** A pressable row that opens a picker sheet, with icon, label, current value, and chevron. */
+function PickerRow({
+  icon,
+  label,
+  value,
+  onPress,
+  theme,
+  isPending,
+}: {
+  icon: FeatherIcon;
+  label: string;
+  value: string;
+  onPress: () => void;
+  theme: ThemeTokens;
+  isPending?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row" as const,
+          alignItems: "center" as const,
+          gap: theme.spacing["3"],
+          paddingHorizontal: theme.spacing["3"],
+          paddingVertical: theme.spacing["3"],
+          minHeight: 48,
+          borderRadius: theme.borderRadius.md,
+          marginHorizontal: theme.spacing["1"],
+        },
+        pressed && { backgroundColor: theme.colors.accent },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+    >
+      <Feather name={icon} size={16} color={theme.colors.mutedForeground} />
+      <Text
+        style={{
+          flex: 1,
+          fontSize: theme.typography.fontSize.sm.size,
+          lineHeight: theme.typography.fontSize.sm.lineHeight,
+          color: theme.colors.foreground,
+        }}
+      >
+        {label}
+      </Text>
+      {isPending ? (
+        <ActivityIndicator size="small" />
+      ) : (
+        <>
+          <Text
+            style={{
+              fontSize: theme.typography.fontSize.sm.size,
+              lineHeight: theme.typography.fontSize.sm.lineHeight,
+              color: theme.colors.mutedForeground,
+            }}
+            numberOfLines={1}
+          >
+            {value}
+          </Text>
+          <Feather
+            name="chevron-right"
+            size={14}
+            color={theme.colors.mutedForeground}
+            style={{ opacity: 0.4 }}
+          />
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+/** A single-select (or multi-select) option row inside a picker BottomSheet. */
+function SheetPickerOption({
+  icon,
+  label,
+  isSelected,
+  onPress,
+  theme,
+  multiSelect = false,
+}: {
+  icon?: FeatherIcon;
+  label: string;
+  isSelected: boolean;
+  onPress: () => void;
+  theme: ThemeTokens;
+  multiSelect?: boolean;
+}) {
+  const activeColor = theme.colors.primaryBase;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row" as const,
+          alignItems: "center" as const,
+          gap: theme.spacing["4"],
+          paddingHorizontal: 20,
+          minHeight: 52,
+          paddingVertical: theme.spacing["3"],
+          backgroundColor: isSelected
+            ? activeColor + "14"
+            : ("transparent" as const),
+        },
+        pressed && { opacity: 0.7 },
+      ]}
+      accessibilityRole={multiSelect ? "switch" : "menuitem"}
+      accessibilityState={multiSelect ? { checked: isSelected } : { selected: isSelected }}
+      accessibilityLabel={label}
+    >
+      {icon ? (
+        <Feather
+          name={icon}
+          size={18}
+          color={isSelected ? activeColor : theme.colors.mutedForeground}
+        />
+      ) : null}
+      <Text
+        style={{
+          flex: 1,
+          fontSize: theme.typography.fontSize.base.size,
+          lineHeight: theme.typography.fontSize.base.lineHeight,
+          color: isSelected ? activeColor : theme.colors.foreground,
+          fontWeight: (isSelected ? "600" : "400") as TextStyle["fontWeight"],
+        }}
+      >
+        {label}
+      </Text>
+      {isSelected && (
+        <Feather name="check" size={16} color={activeColor} />
+      )}
+    </Pressable>
   );
 }
 
@@ -1188,35 +1464,31 @@ function PasswordChangeCard({
   theme: ThemeTokens;
 }) {
   return (
-    <View
-      style={{
-        marginHorizontal: theme.spacing["1"],
-        marginTop: theme.spacing["1"],
-        borderRadius: theme.borderRadius.lg,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.background,
-        padding: theme.spacing["3"],
-        gap: theme.spacing["3"],
+    <ScrollView
+      contentContainerStyle={{
+        padding: theme.spacing["4"],
+        gap: theme.spacing["4"],
       }}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <View>
+      {/* Header */}
+      <View style={{ gap: theme.spacing["1"] }}>
         <Text
           style={{
-            fontSize: theme.typography.fontSize.sm.size,
-            lineHeight: theme.typography.fontSize.sm.lineHeight,
+            fontSize: theme.typography.fontSize.base.size,
+            lineHeight: theme.typography.fontSize.base.lineHeight,
             color: theme.colors.foreground,
             fontWeight: theme.typography.fontWeight
-              .medium as TextStyle["fontWeight"],
+              .semibold as TextStyle["fontWeight"],
           }}
         >
           Change Password
         </Text>
         <Text
           style={{
-            marginTop: theme.spacing["1"],
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            fontSize: theme.typography.fontSize.sm.size,
+            lineHeight: theme.typography.fontSize.sm.lineHeight,
             color: theme.colors.mutedForeground,
           }}
         >
@@ -1232,13 +1504,13 @@ function PasswordChangeCard({
             borderColor: theme.colors.destructive + "40",
             backgroundColor: theme.colors.destructive + "18",
             paddingHorizontal: theme.spacing["3"],
-            paddingVertical: theme.spacing["2"],
+            paddingVertical: theme.spacing["2.5"] ?? 10,
           }}
         >
           <Text
             style={{
-              fontSize: theme.typography.fontSize.xs.size,
-              lineHeight: theme.typography.fontSize.xs.lineHeight,
+              fontSize: theme.typography.fontSize.sm.size,
+              lineHeight: theme.typography.fontSize.sm.lineHeight,
               color: theme.colors.destructive,
             }}
           >
@@ -1247,37 +1519,38 @@ function PasswordChangeCard({
         </View>
       ) : null}
 
-      <PasswordField
-        label="Current password"
-        value={currentPassword}
-        onChangeText={onCurrentPasswordChange}
-        autoComplete="password"
-        theme={theme}
-      />
-      <PasswordField
-        label="New password"
-        value={newPassword}
-        onChangeText={onNewPasswordChange}
-        autoComplete="new-password"
-        theme={theme}
-      />
-      <PasswordField
-        label="Confirm new password"
-        value={confirmPassword}
-        onChangeText={onConfirmPasswordChange}
-        autoComplete="new-password"
-        theme={theme}
-      />
+      <View style={{ gap: theme.spacing["3"] }}>
+        <PasswordField
+          label="Current password"
+          value={currentPassword}
+          onChangeText={onCurrentPasswordChange}
+          autoComplete="password"
+          theme={theme}
+        />
+        <PasswordField
+          label="New password"
+          value={newPassword}
+          onChangeText={onNewPasswordChange}
+          autoComplete="new-password"
+          theme={theme}
+        />
+        <PasswordField
+          label="Confirm new password"
+          value={confirmPassword}
+          onChangeText={onConfirmPasswordChange}
+          autoComplete="new-password"
+          theme={theme}
+        />
+      </View>
 
-      <View style={{ flexDirection: "row", gap: theme.spacing["2"] }}>
+      <View style={{ gap: theme.spacing["2"] }}>
         <Pressable
           onPress={onSubmit}
           disabled={isPending}
           style={({ pressed }) => [
             {
-              flex: 1,
-              minHeight: 44,
-              borderRadius: theme.borderRadius.md,
+              minHeight: 48,
+              borderRadius: theme.borderRadius.lg,
               backgroundColor: theme.colors.primaryBase,
               alignItems: "center",
               justifyContent: "center",
@@ -1310,8 +1583,7 @@ function PasswordChangeCard({
           style={({ pressed }) => [
             {
               minHeight: 44,
-              paddingHorizontal: theme.spacing["4"],
-              borderRadius: theme.borderRadius.md,
+              borderRadius: theme.borderRadius.lg,
               borderWidth: StyleSheet.hairlineWidth,
               borderColor: theme.colors.border,
               alignItems: "center",
@@ -1328,15 +1600,13 @@ function PasswordChangeCard({
               fontSize: theme.typography.fontSize.sm.size,
               lineHeight: theme.typography.fontSize.sm.lineHeight,
               color: theme.colors.foreground,
-              fontWeight: theme.typography.fontWeight
-                .medium as TextStyle["fontWeight"],
             }}
           >
             Cancel
           </Text>
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -1358,68 +1628,94 @@ function ProfilePictureCard({
   return (
     <View
       style={{
-        marginHorizontal: theme.spacing["1"],
-        marginTop: theme.spacing["1"],
-        borderRadius: theme.borderRadius.lg,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.background,
-        padding: theme.spacing["3"],
-        gap: theme.spacing["3"],
+        padding: theme.spacing["4"],
+        gap: theme.spacing["4"],
       }}
     >
-      <Text
-        style={{
-          fontSize: theme.typography.fontSize.xs.size,
-          lineHeight: theme.typography.fontSize.xs.lineHeight,
-          color: theme.colors.mutedForeground,
-        }}
-      >
-        Paste the URL of the image you want to use as your profile picture.
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder="https://example.com/photo.png"
-        placeholderTextColor={theme.colors.mutedForeground}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        editable={!isPending}
-        style={{
-          height: 40,
-          borderRadius: theme.borderRadius.md,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.muted + "30",
-          paddingHorizontal: theme.spacing["3"],
-          fontSize: theme.typography.fontSize.sm.size,
-          color: theme.colors.foreground,
-        }}
-      />
-      <View style={{ flexDirection: "row", gap: theme.spacing["2"] }}>
+      {/* Header */}
+      <View style={{ gap: theme.spacing["1"] }}>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.base.size,
+            lineHeight: theme.typography.fontSize.base.lineHeight,
+            color: theme.colors.foreground,
+            fontWeight: theme.typography.fontWeight
+              .semibold as TextStyle["fontWeight"],
+          }}
+        >
+          Change Profile Picture
+        </Text>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.sm.size,
+            lineHeight: theme.typography.fontSize.sm.lineHeight,
+            color: theme.colors.mutedForeground,
+          }}
+        >
+          Paste the URL of the image you want to use.
+        </Text>
+      </View>
+
+      <View style={{ gap: theme.spacing["1.5"] ?? 6 }}>
+        <Text
+          style={{
+            fontSize: theme.typography.fontSize.xs.size,
+            lineHeight: theme.typography.fontSize.xs.lineHeight,
+            color: theme.colors.mutedForeground,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+          }}
+        >
+          Image URL
+        </Text>
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder="https://example.com/photo.png"
+          placeholderTextColor={theme.colors.mutedForeground}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          editable={!isPending}
+          style={{
+            height: 44,
+            borderRadius: theme.borderRadius.lg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.muted + "50",
+            paddingHorizontal: theme.spacing["3"],
+            fontSize: theme.typography.fontSize.sm.size,
+            color: theme.colors.foreground,
+          }}
+        />
+      </View>
+
+      <View style={{ gap: theme.spacing["2"] }}>
         <Pressable
           onPress={onSubmit}
           disabled={isPending}
-          style={({ pressed }) => ({
-            flex: 1,
-            height: 40,
-            borderRadius: theme.borderRadius.md,
-            backgroundColor: theme.colors.primaryBase,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: pressed || isPending ? 0.7 : 1,
-          })}
+          style={({ pressed }) => [
+            {
+              minHeight: 48,
+              borderRadius: theme.borderRadius.lg,
+              backgroundColor: theme.colors.primaryBase,
+              alignItems: "center",
+              justifyContent: "center",
+            },
+            (pressed || isPending) && { opacity: 0.7 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Save profile picture"
         >
           {isPending ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={theme.colors.primaryForeground} />
           ) : (
             <Text
               style={{
                 fontSize: theme.typography.fontSize.sm.size,
-                color: "#fff",
+                color: theme.colors.primaryForeground,
                 fontWeight: theme.typography.fontWeight
-                  .medium as TextStyle["fontWeight"],
+                  .semibold as TextStyle["fontWeight"],
               }}
             >
               Save
@@ -1429,16 +1725,20 @@ function ProfilePictureCard({
         <Pressable
           onPress={onCancel}
           disabled={isPending}
-          style={({ pressed }) => ({
-            flex: 1,
-            height: 40,
-            borderRadius: theme.borderRadius.md,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.border,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: pressed || isPending ? 0.7 : 1,
-          })}
+          style={({ pressed }) => [
+            {
+              minHeight: 44,
+              borderRadius: theme.borderRadius.lg,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: theme.colors.border,
+              alignItems: "center",
+              justifyContent: "center",
+            },
+            pressed && { backgroundColor: theme.colors.accent },
+            isPending && { opacity: 0.6 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel"
         >
           <Text
             style={{
@@ -1529,7 +1829,7 @@ function NavigationRow({
           alignItems: "center" as const,
           gap: theme.spacing["3"],
           paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["2"],
+          paddingVertical: theme.spacing["3"],
           borderRadius: theme.borderRadius.md,
           marginHorizontal: theme.spacing["1"],
         },
@@ -1597,7 +1897,7 @@ function SettingToggleRow({
           alignItems: "center" as const,
           gap: theme.spacing["3"],
           paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["2"],
+          paddingVertical: theme.spacing["3"],
           borderRadius: theme.borderRadius.md,
           marginHorizontal: theme.spacing["1"],
         },
@@ -1681,7 +1981,7 @@ function ActionRow({
           alignItems: "center" as const,
           gap: theme.spacing["3"],
           paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["2"],
+          paddingVertical: theme.spacing["3"],
           borderRadius: theme.borderRadius.md,
           marginHorizontal: theme.spacing["1"],
         },

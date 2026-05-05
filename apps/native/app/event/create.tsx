@@ -50,7 +50,7 @@ export default function EventCreateScreen() {
   // Track snapshot for rollback; useRef so it survives re-renders
   const snapshotRef = useRef<CacheSnapshot>([]);
 
-  // ─── Fetch calendars and categories ────────────────────────────────────────
+  // ─── Fetch calendars ───────────────────────────────────────────────────────
 
   const {
     data: calendars,
@@ -58,14 +58,6 @@ export default function EventCreateScreen() {
   } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
-  });
-
-  const {
-    data: categories,
-    isLoading: categoriesLoading,
-  } = useQuery({
-    queryKey: QUERY_KEYS.categories(),
-    queryFn: () => calendarApiService.getCategories(),
   });
 
   // ─── Create mutation (optimistic) ─────────────────────────────────────────
@@ -135,7 +127,7 @@ export default function EventCreateScreen() {
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
-  if (calendarsLoading || categoriesLoading) {
+  if (calendarsLoading) {
     return (
       <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primaryBase} />
@@ -155,7 +147,6 @@ export default function EventCreateScreen() {
       </View>
       <EventForm
         calendars={calendars ?? []}
-        categories={categories ?? []}
         serverErrors={serverErrors}
         isSubmitting={createMutation.isPending}
         onSubmit={handleSubmit}

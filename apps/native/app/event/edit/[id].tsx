@@ -41,7 +41,6 @@ function eventToInitialValues(
     location: event.location ?? undefined,
     color: event.color ?? undefined,
     calendarId: event.calendarId,
-    categoryId: event.categoryId ?? undefined,
     reminder: event.reminder ?? undefined,
     recurrence: event.recurrence ?? undefined,
   };
@@ -78,7 +77,7 @@ export default function EventEditScreen() {
     enabled: !!id,
   });
 
-  // ─── Fetch calendars and categories ────────────────────────────────────────
+  // ─── Fetch calendars ───────────────────────────────────────────────────────
 
   const {
     data: calendars,
@@ -86,14 +85,6 @@ export default function EventEditScreen() {
   } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
-  });
-
-  const {
-    data: categories,
-    isLoading: categoriesLoading,
-  } = useQuery({
-    queryKey: QUERY_KEYS.categories(),
-    queryFn: () => calendarApiService.getCategories(),
   });
 
   // ─── Update mutation ───────────────────────────────────────────────────────
@@ -149,7 +140,7 @@ export default function EventEditScreen() {
 
   // ─── Loading state ─────────────────────────────────────────────────────────
 
-  if (eventLoading || calendarsLoading || categoriesLoading) {
+  if (eventLoading || calendarsLoading) {
     return (
       <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primaryBase} />
@@ -169,7 +160,6 @@ export default function EventEditScreen() {
       </View>
       <EventForm
         calendars={calendars ?? []}
-        categories={categories ?? []}
         serverErrors={serverErrors}
         isSubmitting={updateMutation.isPending}
         onSubmit={handleSubmit}

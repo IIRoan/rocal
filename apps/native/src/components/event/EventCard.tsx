@@ -36,7 +36,6 @@ export function EventCard({
 
   const colors = resolveEventBlockColor(event.color, theme);
   const timeLabel = formatTimeRange(event, timeFormat);
-  const categoryColor = event.category?.color;
 
   const accessibilityParts = [event.title, timeLabel];
   if (event.calendar?.name) accessibilityParts.push(event.calendar.name);
@@ -63,15 +62,6 @@ export function EventCard({
           <Text style={styles.time} numberOfLines={1}>
             {timeLabel}
           </Text>
-
-          {categoryColor ? (
-            <View
-              style={[
-                styles.categoryDot,
-                { backgroundColor: categoryColor },
-              ]}
-            />
-          ) : null}
         </View>
       </View>
     </Pressable>
@@ -102,12 +92,6 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       marginTop: 1,
-    },
-    categoryDot: {
-      width: 6,
-      height: 6,
-      borderRadius: theme.borderRadius.full,
-      marginLeft: theme.spacing["1"],
     },
   } satisfies Record<string, ViewStyle>;
 
