@@ -223,6 +223,7 @@ export default function SettingsScreen() {
     string | null
   >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isRegisteringPasskey, setIsRegisteringPasskey] = useState(false);
   const [pendingPasskeyDeletionId, setPendingPasskeyDeletionId] = useState<
     string | null
@@ -410,6 +411,38 @@ export default function SettingsScreen() {
     ]);
   }, [signOut]);
 
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      "Delete account?",
+      "This permanently deletes your account, calendars, events, categories, subscriptions, passkeys, and settings. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            setIsDeletingAccount(true);
+            calendarApiService
+              .deleteAccount()
+              .then(async () => {
+                queryClient.clear();
+                await signOut();
+              })
+              .catch((error) => {
+                Alert.alert(
+                  "Unable to delete account",
+                  getErrorMessage(error, "Failed to delete account"),
+                );
+              })
+              .finally(() => {
+                setIsDeletingAccount(false);
+              });
+          },
+        },
+      ],
+    );
+  }, [queryClient, signOut]);
+
   const handleAccountAction = useCallback(
     (key: (typeof accountActions)[number]["key"]) => {
       if (key === "reset-preferences") {
@@ -417,9 +450,14 @@ export default function SettingsScreen() {
         return;
       }
 
+      if (key === "delete-account") {
+        handleDeleteAccount();
+        return;
+      }
+
       handleSignOut();
     },
-    [handleResetSettings, handleSignOut],
+    [handleDeleteAccount, handleResetSettings, handleSignOut],
   );
 
   const handleRegisterPasskey = useCallback(async () => {
@@ -720,7 +758,9 @@ export default function SettingsScreen() {
               isPending={
                 action.key === "reset-preferences"
                   ? resetSettingsMutation.isPending
-                  : isSigningOut
+                  : action.key === "delete-account"
+                    ? isDeletingAccount
+                    : isSigningOut
               }
             />
           ))}

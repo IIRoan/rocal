@@ -183,9 +183,9 @@ export const NAVIGATION_ITEMS = [
     id: "account",
     label: "Account",
     icon: User,
-    description: "Account information",
+    description: "Reset preferences or delete your account",
     targetView: "account",
-    keywords: ["account", "reset", "settings"],
+    keywords: ["account", "reset", "settings", "delete account"],
     parent: null,
   },
   {
