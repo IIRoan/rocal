@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { format } from "date-fns";
 import { createLogger } from "@workspace/logger";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -31,6 +32,8 @@ import {
 import { CommandPaletteMainSearchView } from "./command-palette/main-search-view";
 import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 import { parseWorkingDays } from "@/lib/calendar-view-model";
+import { calendarApiService } from "@/lib/calendar-api-service";
+import { signOut } from "@/lib/auth-client";
 
 import {
   Dialog,
@@ -81,6 +84,7 @@ export function CommandPalette({
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
+  const queryClient = useQueryClient();
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
 
@@ -151,6 +155,7 @@ export function CommandPalette({
 
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (settings) setLocalSettings(settings);
@@ -226,6 +231,25 @@ export function CommandPalette({
       setSaving(false);
     }
   };
+
+  const handleDeleteAccount = useCallback(async () => {
+    setDeletingAccount(true);
+    try {
+      await calendarApiService.deleteAccount();
+      queryClient.clear();
+      try {
+        await signOut();
+      } catch {
+        // The session may already be invalid after the account is removed.
+      }
+      onOpenChange(false);
+      window.location.href = "/";
+    } catch (err) {
+      log.error("Failed to delete account:", err);
+    } finally {
+      setDeletingAccount(false);
+    }
+  }, [onOpenChange, queryClient]);
 
   // Command mode handling - hooks must be at component level
   // Execute a command action
@@ -458,6 +482,8 @@ export function CommandPalette({
           goBack={goBack}
           saving={saving}
           handleReset={handleReset}
+          deletingAccount={deletingAccount}
+          handleDeleteAccount={handleDeleteAccount}
         />
       );
     }
