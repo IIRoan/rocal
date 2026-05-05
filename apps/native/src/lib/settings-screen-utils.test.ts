@@ -17,6 +17,13 @@ describe("Settings screen account actions", () => {
         description: "End this session on this device.",
         destructive: true,
       },
+      {
+        key: "delete-account",
+        icon: "trash-2",
+        label: "Delete Account",
+        description: "Permanently delete your account and all calendar data.",
+        destructive: true,
+      },
     ]);
   });
 
@@ -33,7 +40,7 @@ describe("Settings screen account actions", () => {
       getSettingsAccountActions({ canSignOut: true }).map(
         (action) => action.key,
       ),
-    ).toEqual(["reset-preferences", "sign-out"]);
+    ).toEqual(["reset-preferences", "sign-out", "delete-account"]);
   });
 
   it("marks account actions as destructive for native row styling", () => {

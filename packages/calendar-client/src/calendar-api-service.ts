@@ -47,6 +47,12 @@ import type {
 
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 
+export type DeleteAccountResponse = {
+  success: boolean;
+  message: string;
+  deletedUserId: string;
+};
+
 export class CalendarApiService {
   private client: HttpClient;
   private e2ee: E2eeProvider;
@@ -430,6 +436,14 @@ export class CalendarApiService {
       }>("/api/settings");
     } catch (error) {
       throw this.transformError(error, "Failed to reset user settings");
+    }
+  }
+
+  async deleteAccount(): Promise<DeleteAccountResponse> {
+    try {
+      return await this.client.delete<DeleteAccountResponse>("/api/account");
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete account");
     }
   }
 
