@@ -23,6 +23,29 @@ EXPO_OWNER=your-expo-account-or-org
 EXPO_PROJECT_ID=your-eas-project-id
 ```
 
+For local native development, `bun run dev` now forces the app through
+`https://cloudflared.roan.dev` by:
+
+- exporting `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_URL`, and `PASSKEY_ORIGIN`
+  to the Cloudflare URL for the Expo process
+- auto-starting `cloudflared tunnel run rocal` using `~/.cloudflared/config.yml`
+  by default
+
+Optional overrides:
+
+```env
+CLOUDFLARED_PUBLIC_URL=https://cloudflared.roan.dev
+CLOUDFLARED_TUNNEL_NAME=rocal
+# CLOUDFLARED_CONFIG=/absolute/path/to/config.yml
+# CLOUDFLARED_TUNNEL_TOKEN=your-cloudflare-tunnel-token
+```
+
+If you need the old direct Expo behavior without the tunnel wrapper, use:
+
+```bash
+bun run dev:expo
+```
+
 ## Expo.dev setup
 
 1. Sign in to `https://expo.dev`.
