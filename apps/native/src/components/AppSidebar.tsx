@@ -15,12 +15,10 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
@@ -39,9 +37,8 @@ import {
   buildSidebarCalendarSections,
   getViewLabel,
   SIDEBAR_VIEW_OPTIONS,
-  SIDEBAR_DROPDOWN_OPTION_HEIGHT,
-  SIDEBAR_DROPDOWN_TOTAL_HEIGHT,
 } from "./app-sidebar-utils";
+import { BottomSheet } from "./BottomSheet";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -70,10 +67,8 @@ export function AppSidebar() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
     useState<string | null>(null);
-  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
-
-  // Animated height for the view dropdown
-  const dropdownHeight = useSharedValue(0);
+  const [viewSheetOpen, setViewSheetOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const isOnCalendar = pathname.includes("/calendar") || pathname === "/";
 
@@ -137,23 +132,6 @@ export function AppSidebar() {
     const progress = (translateX.value + SIDEBAR_WIDTH) / SIDEBAR_WIDTH;
     return { opacity: progress * 0.5 };
   });
-
-  const animatedDropdownStyle = useAnimatedStyle(() => ({
-    height: dropdownHeight.value,
-    overflow: "hidden",
-  }));
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        rotate: `${interpolate(
-          dropdownHeight.value,
-          [0, SIDEBAR_DROPDOWN_TOTAL_HEIGHT],
-          [0, 180],
-        )}deg`,
-      },
-    ],
-  }));
 
   // Active view label
   const activeViewLabel = getViewLabel(activeView);
@@ -222,27 +200,17 @@ export function AppSidebar() {
     [toggleCalendarVisibilityMutation],
   );
 
-  const handleToggleViewDropdown = useCallback(() => {
-    const next = !viewDropdownOpen;
-    setViewDropdownOpen(next);
-    dropdownHeight.value = withSpring(
-      next ? SIDEBAR_DROPDOWN_TOTAL_HEIGHT : 0,
-      { damping: 22, stiffness: 280, mass: 0.7 },
-    );
-  }, [viewDropdownOpen, dropdownHeight]);
-
   const handleSelectView = useCallback(
     (view: CalendarView) => {
       setActiveView(view);
-      setViewDropdownOpen(false);
-      dropdownHeight.value = withTiming(0, { duration: 160 });
+      setViewSheetOpen(false);
       // Navigate to calendar if not already there
       if (!pathname.includes("/calendar") && pathname !== "/") {
         setTimeout(() => router.push("/(tabs)/calendar" as any), 60);
       }
       close();
     },
-    [setActiveView, dropdownHeight, pathname, router, close],
+    [setActiveView, pathname, router, close],
   );
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -318,11 +286,19 @@ export function AppSidebar() {
                   accessibilityRole="button"
                   accessibilityLabel="Account settings"
                 >
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
-                      {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
-                    </Text>
-                  </View>
+                  {user?.image && !avatarError ? (
+                    <Image
+                      source={{ uri: user.image }}
+                      style={styles.avatar}
+                      onError={() => setAvatarError(true)}
+                    />
+                  ) : (
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>
+                        {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
+                      </Text>
+                    </View>
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -350,10 +326,10 @@ export function AppSidebar() {
               {/* View switcher section */}
               <View style={styles.viewSection}>
                 <Pressable
-                  onPress={handleToggleViewDropdown}
+                  onPress={() => setViewSheetOpen(true)}
                   style={({ pressed }) => [styles.viewTriggerRow, pressed && styles.pressed]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Switch view. Current: ${activeViewLabel}`}
+                  accessibilityLabel={`Calendar view: ${activeViewLabel}. Tap to change`}
                 >
                   <Feather
                     name="eye"
@@ -362,49 +338,8 @@ export function AppSidebar() {
                     style={{ opacity: 0.7 }}
                   />
                   <Text style={styles.viewTriggerLabel}>{activeViewLabel}</Text>
-                  <Animated.View style={chevronStyle}>
-                    <Feather name="chevron-down" size={14} color={theme.colors.mutedForeground} style={{ opacity: 0.7 }} />
-                  </Animated.View>
+                  <Feather name="chevron-down" size={14} color={theme.colors.mutedForeground} style={{ opacity: 0.5 }} />
                 </Pressable>
-
-                {/* Dropdown options */}
-                <Animated.View style={[styles.viewDropdown, animatedDropdownStyle]}>
-                  {SIDEBAR_VIEW_OPTIONS.map((opt) => {
-                    const isActive = activeView === opt.view;
-                    return (
-                      <Pressable
-                        key={opt.view}
-                        onPress={() => handleSelectView(opt.view)}
-                        style={({ pressed }) => [
-                          styles.viewOptionRow,
-                          isActive && styles.viewOptionRowActive,
-                          pressed && styles.pressed,
-                        ]}
-                        accessibilityRole="menuitem"
-                        accessibilityLabel={opt.label}
-                        accessibilityState={{ selected: isActive }}
-                      >
-                        <Feather
-                          name={opt.icon}
-                          size={15}
-                          color={isActive ? theme.colors.primaryBase : theme.colors.mutedForeground}
-                          style={{ opacity: isActive ? 1 : 0.6 }}
-                        />
-                        <Text
-                          style={[
-                            styles.viewOptionLabel,
-                            isActive && styles.viewOptionLabelActive,
-                          ]}
-                        >
-                          {opt.label}
-                        </Text>
-                        {isActive && (
-                          <Feather name="check" size={14} color={theme.colors.primaryBase} />
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </Animated.View>
               </View>
 
               {/* Calendars section */}
@@ -506,6 +441,50 @@ export function AppSidebar() {
           </Animated.View>
         </GestureDetector>
       </View>
+
+      {/* View selector sheet */}
+      <BottomSheet
+        visible={viewSheetOpen}
+        onDismiss={() => setViewSheetOpen(false)}
+        title="Calendar View"
+      >
+        <View style={styles.viewSheetContent}>
+          {SIDEBAR_VIEW_OPTIONS.map((opt) => {
+            const isActive = activeView === opt.view;
+            return (
+              <Pressable
+                key={opt.view}
+                onPress={() => handleSelectView(opt.view)}
+                style={({ pressed }) => [
+                  styles.viewSheetOption,
+                  isActive && styles.viewSheetOptionActive,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="menuitem"
+                accessibilityLabel={opt.label}
+                accessibilityState={{ selected: isActive }}
+              >
+                <Feather
+                  name={opt.icon}
+                  size={18}
+                  color={isActive ? theme.colors.primaryBase : theme.colors.mutedForeground}
+                />
+                <Text
+                  style={[
+                    styles.viewSheetLabel,
+                    isActive && styles.viewSheetLabelActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+                {isActive && (
+                  <Feather name="check" size={16} color={theme.colors.primaryBase} />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </>
   );
 }
@@ -607,7 +586,6 @@ function createStyles(theme: ThemeTokens) {
       borderRadius: theme.borderRadius.lg,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      overflow: "hidden" as const,
     },
     viewTriggerRow: {
       flexDirection: "row" as const,
@@ -624,11 +602,25 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 10,
-      height: SIDEBAR_DROPDOWN_OPTION_HEIGHT,
+      height: 44,
       paddingHorizontal: 14,
     },
     viewOptionRowActive: {
       backgroundColor: theme.colors.primaryBase + "12",
+    },
+    viewSheetContent: {
+      paddingVertical: 8,
+      paddingHorizontal: 0,
+    },
+    viewSheetOption: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 14,
+      paddingHorizontal: 20,
+      height: 52,
+    },
+    viewSheetOptionActive: {
+      backgroundColor: theme.colors.primaryBase + "10",
     },
     // ── Calendars section ────────────────────────────────────
     calendarsSectionHeader: {
@@ -738,6 +730,15 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
     },
     viewOptionLabelActive: {
+      color: theme.colors.primaryBase,
+      fontWeight: "600" as TextStyle["fontWeight"],
+    },
+    viewSheetLabel: {
+      flex: 1,
+      fontSize: theme.typography.fontSize.base.size,
+      color: theme.colors.foreground,
+    },
+    viewSheetLabelActive: {
       color: theme.colors.primaryBase,
       fontWeight: "600" as TextStyle["fontWeight"],
     },

@@ -58,12 +58,12 @@ function NavigationResultButton({
       data-index={resultIndex}
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
+      className={`flex items-center gap-3 px-2 py-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${
         isSelected ? "bg-accent/50" : "hover:bg-accent/50"
       }`}
     >
-      <div className="flex items-center justify-center w-6 h-6 shrink-0">
-        <Icon className="h-4 w-4 text-muted-foreground" />
+      <div className="flex items-center justify-center w-8 h-8 sm:w-6 sm:h-6 shrink-0">
+        <Icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
       <span className="text-sm flex-1 truncate">{label}</span>
       <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
@@ -101,9 +101,9 @@ export function CommandPaletteMainSearchView({
   return (
     <div
       className="flex flex-col"
-      style={{ minHeight: "420px", maxHeight: "calc(100dvh - 200px)" }}
+      style={{ minHeight: "clamp(280px, 50svh, 420px)", maxHeight: "calc(100dvh - 200px)" }}
     >
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+      <div className="flex items-center gap-2 px-3 py-3 sm:py-2 border-b border-border/50">
         {isCommandMode && !isSearchOnly ? (
           <span className="text-sm font-medium text-primary">Command</span>
         ) : isSearchOnly ? (

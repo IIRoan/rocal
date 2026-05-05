@@ -81,7 +81,6 @@ export function AgendaList({
       renderItem={({ item }) => {
         const colors = resolveEventBlockColor(item.color, theme);
         const calendarName = item.calendar?.name;
-        const categoryColor = item.category?.color;
         const timeLabel = formatEventTime(item, timeFormat);
 
         const accessibilityParts = [item.title, timeLabel];
@@ -108,26 +107,9 @@ export function AgendaList({
               </Text>
               {calendarName ? (
                 <View style={styles.metaRow}>
-                  {categoryColor ? (
-                    <View
-                      style={[
-                        styles.categoryDot,
-                        { backgroundColor: categoryColor },
-                      ]}
-                    />
-                  ) : null}
                   <Text style={styles.calendarName} numberOfLines={1}>
                     {calendarName}
                   </Text>
-                </View>
-              ) : categoryColor ? (
-                <View style={styles.metaRow}>
-                  <View
-                    style={[
-                      styles.categoryDot,
-                      { backgroundColor: categoryColor },
-                    ]}
-                  />
                 </View>
               ) : null}
             </View>
@@ -189,12 +171,6 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       marginTop: 2,
-    },
-    categoryDot: {
-      width: 8,
-      height: 8,
-      borderRadius: theme.borderRadius.full,
-      marginRight: theme.spacing["1"],
     },
   } satisfies Record<string, ViewStyle>;
 
