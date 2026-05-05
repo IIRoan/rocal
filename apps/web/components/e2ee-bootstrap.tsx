@@ -23,6 +23,7 @@ import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-res
 import {
   clearPendingAuthPassword,
   consumePendingAuthPassword,
+  peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import { signOut } from "@/lib/auth-client";
 
@@ -60,6 +61,9 @@ export function E2eeBootstrap() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Track whether the current session started with email/password login so
+  // we can show the right messaging in the encryption gate dialogs.
+  const [isEmailPasswordUser, setIsEmailPasswordUser] = useState(false);
 
   const rerunBootstrap = useCallback(() => {
     setReloadKey((current) => current + 1);
@@ -79,6 +83,7 @@ export function E2eeBootstrap() {
       setPassword("");
       setConfirmPassword("");
       setError(null);
+      setIsEmailPasswordUser(false);
 
       if (previousUserId) {
         clearCalendarQueries(queryClient);
@@ -94,6 +99,12 @@ export function E2eeBootstrap() {
     }
 
     previousUserIdRef.current = userId;
+
+    // Peek (without consuming) to know whether this was an email/password login.
+    // bootstrapUser in e2ee-bootstrap.ts may consume it during auto-unlock, so
+    // we capture the information here before the bootstrap runs.
+    const hadPendingPassword = !!peekPendingAuthPassword();
+    setIsEmailPasswordUser(hadPendingPassword);
 
     let isCancelled = false;
     setError(null);
@@ -243,7 +254,11 @@ export function E2eeBootstrap() {
       const unlocked = await unlockE2eeWithPassword(userId, password);
 
       if (!unlocked) {
-        setError("That password did not unlock your encrypted data.");
+        setError(
+          isEmailPasswordUser
+            ? "That password didn't match. If you recently changed your Solace password, use your previous password here."
+            : "That password did not unlock your encrypted data.",
+        );
         return;
       }
 
@@ -259,7 +274,7 @@ export function E2eeBootstrap() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [password, queryClient, userId]);
+  }, [isEmailPasswordUser, password, queryClient, userId]);
 
   const handleSignOut = useCallback(async () => {
     setIsSubmitting(true);
@@ -290,10 +305,14 @@ export function E2eeBootstrap() {
       : "Protect your encryption keys";
 
   const description = isUnlock
-    ? "Enter the password that wraps your end-to-end encryption keys on this device."
+    ? isEmailPasswordUser
+      ? "Enter your Solace login password to unlock your encrypted data on this device. If you recently changed your password, use your previous one."
+      : "Enter your encryption password to unlock your data on this device."
     : isLegacy
       ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and set an encryption password once."
-      : "Choose a password that wraps your encryption keys so you can unlock them on other devices after sign-in.";
+      : isEmailPasswordUser
+        ? "Your Solace login password is used to protect your encryption keys. Please re-enter it below to complete setup."
+        : "Choose a password to protect your end-to-end encryption keys. You'll need this to access your encrypted data from other devices.";
 
   const Icon = isUnlock ? KeyRound : Shield;
 
@@ -316,6 +335,14 @@ export function E2eeBootstrap() {
       : isLegacy
         ? "Retry"
         : "Save password";
+
+  const passwordLabel = isUnlock
+    ? isEmailPasswordUser
+      ? "Solace login password"
+      : "Encryption password"
+    : isEmailPasswordUser
+      ? "Your Solace password"
+      : "Encryption password";
 
   return (
     <Dialog open onOpenChange={() => undefined}>
@@ -358,7 +385,7 @@ export function E2eeBootstrap() {
                     htmlFor="e2ee-password"
                     className="text-xs font-medium text-muted-foreground"
                   >
-                    Encryption password
+                    {passwordLabel}
                   </Label>
                   <Input
                     id="e2ee-password"

@@ -33,7 +33,7 @@ import { CommandPaletteMainSearchView } from "./command-palette/main-search-view
 import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 import { parseWorkingDays } from "@/lib/calendar-view-model";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import { signOut } from "@/lib/auth-client";
+import { authClient, signOut, useSession } from "@/lib/auth-client";
 
 import {
   Dialog,
@@ -85,6 +85,7 @@ export function CommandPalette({
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
   const queryClient = useQueryClient();
+  const { data: session, isPending: sessionLoading } = useSession();
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
 
@@ -156,6 +157,8 @@ export function CommandPalette({
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
 
   useEffect(() => {
     if (settings) setLocalSettings(settings);
@@ -250,6 +253,59 @@ export function CommandPalette({
       setDeletingAccount(false);
     }
   }, [onOpenChange, queryClient]);
+
+  const handleChangePassword = useCallback(
+    async ({
+      currentPassword,
+      newPassword,
+    }: {
+      currentPassword: string;
+      newPassword: string;
+    }) => {
+      setChangingPassword(true);
+
+      try {
+        const result = await authClient.changePassword({
+          currentPassword,
+          newPassword,
+        });
+
+        if (result?.error) {
+          throw new Error(
+            result.error.message || "Unable to update your password.",
+          );
+        }
+      } catch (error) {
+        log.error("Failed to change password:", error);
+        throw error;
+      } finally {
+        setChangingPassword(false);
+      }
+    },
+    [],
+  );
+
+  const handleUpdateProfile = useCallback(
+    async ({ imageUrl }: { name?: string; imageUrl?: string }) => {
+      setUpdatingProfile(true);
+      try {
+        const result = await authClient.updateUser({
+          image: imageUrl ?? null,
+        });
+        if (result?.error) {
+          throw new Error(
+            result.error.message || "Unable to update your profile.",
+          );
+        }
+      } catch (error) {
+        log.error("Failed to update profile:", error);
+        throw error;
+      } finally {
+        setUpdatingProfile(false);
+      }
+    },
+    [],
+  );
 
   // Command mode handling - hooks must be at component level
   // Execute a command action
@@ -484,6 +540,14 @@ export function CommandPalette({
           handleReset={handleReset}
           deletingAccount={deletingAccount}
           handleDeleteAccount={handleDeleteAccount}
+          accountName={session?.user?.name}
+          accountEmail={session?.user?.email}
+          accountImage={session?.user?.image}
+          sessionLoading={sessionLoading}
+          changingPassword={changingPassword}
+          handleChangePassword={handleChangePassword}
+          updatingProfile={updatingProfile}
+          handleUpdateProfile={handleUpdateProfile}
         />
       );
     }

@@ -25,6 +25,14 @@ export function consumePendingAuthPassword(): string | null {
   return password;
 }
 
+export function peekPendingAuthPassword(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return sessionStorage.getItem(PENDING_AUTH_PASSWORD_KEY);
+}
+
 export function clearPendingAuthPassword(): void {
   if (typeof window === "undefined") {
     return;
