@@ -24,6 +24,7 @@ import { cn } from "../../lib/utils";
 import {
   Drawer,
   DrawerContent,
+  DrawerShell,
   DrawerTitle,
 } from "../ui/drawer";
 import { resolveInlineColorValue } from "./utils";
@@ -425,49 +426,55 @@ export function MobileThreeDayView({
 
       {/* Event selection drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerContent>
+        <DrawerContent responsive responsiveHeight="70dvh" className="overflow-hidden">
           <DrawerTitle className="sr-only">Select Event</DrawerTitle>
-          <div className="px-5 py-3 border-b border-border/40">
-            <span className="text-base font-semibold">Select Event</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {drawerEvents[0] && format(new Date(drawerEvents[0].start), "EEEE, MMMM d")}
-            </p>
-          </div>
-          <div className="px-2 py-2 pb-6">
-            {drawerEvents.map((event) => {
-              const eventStart = new Date(event.start);
-              const eventEnd = new Date(event.end);
-              return (
-                <button
-                  key={event.id}
-                  className="w-full text-left flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
-                  onClick={() => {
-                    onEventSelect(event);
-                    setDrawerOpen(false);
-                    setDrawerEvents([]);
-                  }}
-                >
-                  <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: resolveInlineColorValue(event.color || "blue") }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">
-                      {event.title || "Untitled Event"}
+          <DrawerShell
+            header={
+              <div className="px-5 py-3 border-b border-border/40">
+                <span className="text-base font-semibold">Select Event</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {drawerEvents[0] &&
+                    format(new Date(drawerEvents[0].start), "EEEE, MMMM d")}
+                </p>
+              </div>
+            }
+          >
+            <div className="overflow-y-auto px-2 py-2 pb-6">
+              {drawerEvents.map((event) => {
+                const eventStart = new Date(event.start);
+                const eventEnd = new Date(event.end);
+                return (
+                  <button
+                    key={event.id}
+                    className="w-full text-left flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={() => {
+                      onEventSelect(event);
+                      setDrawerOpen(false);
+                      setDrawerEvents([]);
+                    }}
+                  >
+                    <div className="flex items-center justify-center w-6 h-6 shrink-0">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: resolveInlineColorValue(event.color || "blue") }}
+                      />
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {event.allDay
-                        ? "All day"
-                        : `${format(eventStart, "h:mm a")} - ${format(eventEnd, "h:mm a")}`}
-                      {event.location && ` · ${event.location}`}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {event.title || "Untitled Event"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {event.allDay
+                          ? "All day"
+                          : `${format(eventStart, "h:mm a")} - ${format(eventEnd, "h:mm a")}`}
+                        {event.location && ` · ${event.location}`}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
+          </DrawerShell>
         </DrawerContent>
       </Drawer>
     </div>
