@@ -4,10 +4,11 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import { format } from "date-fns";
 import { createLogger } from "@workspace/logger";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/hooks/use-settings";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarContext } from "@workspace/ui/components/calendar";
@@ -34,6 +35,11 @@ import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 import { parseWorkingDays } from "@/lib/calendar-view-model";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { authClient, signOut, useSession } from "@/lib/auth-client";
+import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
+import {
+  extractLinkedAuthAccounts,
+  summarizeLinkedAuthAccounts,
+} from "@workspace/calendar-core";
 
 import {
   Dialog,
@@ -91,6 +97,19 @@ export function CommandPalette({
   const { settings, loading, updateSettings, resetSettings } = useSettings();
   const queryClient = useQueryClient();
   const { data: session, isPending: sessionLoading } = useSession();
+  const accountsQuery = useQuery({
+    queryKey: ["auth", "accounts", session?.user?.id ?? null],
+    queryFn: async () => {
+      if (typeof authClient.listAccounts !== "function") {
+        return [];
+      }
+
+      return extractLinkedAuthAccounts(await authClient.listAccounts());
+    },
+    enabled:
+      Boolean(session?.user?.id) && typeof authClient.listAccounts === "function",
+    staleTime: 5 * 60 * 1000,
+  });
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
 
@@ -165,7 +184,15 @@ export function CommandPalette({
   const [saving, setSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [resettingEncryptionPassword, setResettingEncryptionPassword] =
+    useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const linkedAccounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
+  const { hasOAuthAccount, hasPasswordAccount } = useMemo(
+    () => summarizeLinkedAuthAccounts(linkedAccounts),
+    [linkedAccounts],
+  );
 
   useEffect(() => {
     if (settings) setLocalSettings(settings);
@@ -290,6 +317,59 @@ export function CommandPalette({
       }
     },
     [],
+  );
+
+  const handleSetPassword = useCallback(
+    async ({ newPassword }: { newPassword: string }) => {
+      setSettingPassword(true);
+
+      try {
+        const result = await authClient.setPassword({
+          newPassword,
+        });
+
+        if (result?.error) {
+          throw new Error(result.error.message || "Unable to set your password.");
+        }
+
+        await accountsQuery?.refetch?.();
+      } catch (error) {
+        log.error("Failed to set password:", error);
+        throw error;
+      } finally {
+        setSettingPassword(false);
+      }
+    },
+    [accountsQuery],
+  );
+
+  const handleResetEncryptionPassword = useCallback(
+    async ({ newPassword }: { newPassword: string }) => {
+      if (!session?.user?.id) {
+        throw new Error("Your session is unavailable. Please try again.");
+      }
+
+      setResettingEncryptionPassword(true);
+
+      try {
+        const stored = await resetEncryptionPasswordForActiveSession(
+          session.user.id,
+          newPassword,
+        );
+
+        if (!stored) {
+          throw new Error(
+            "Unlock your encrypted data on this device first, then try again.",
+          );
+        }
+      } catch (error) {
+        log.error("Failed to reset encryption password:", error);
+        throw error;
+      } finally {
+        setResettingEncryptionPassword(false);
+      }
+    },
+    [session?.user?.id],
   );
 
   const handleUpdateProfile = useCallback(
@@ -552,7 +632,13 @@ export function CommandPalette({
           accountImage={session?.user?.image}
           sessionLoading={sessionLoading}
           changingPassword={changingPassword}
+          settingPassword={settingPassword}
+          resettingEncryptionPassword={resettingEncryptionPassword}
+          hasPasswordAccount={hasPasswordAccount}
+          hasOAuthAccount={hasOAuthAccount}
           handleChangePassword={handleChangePassword}
+          handleSetPassword={handleSetPassword}
+          handleResetEncryptionPassword={handleResetEncryptionPassword}
           updatingProfile={updatingProfile}
           handleUpdateProfile={handleUpdateProfile}
         />

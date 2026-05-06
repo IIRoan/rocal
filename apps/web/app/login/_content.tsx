@@ -305,17 +305,21 @@ export function LoginForm() {
 
       if (result?.error) {
         setError(
-          result.error.message || "Unable to send a password reset link.",
+          result.error.message ||
+            "Unable to send a password reset link for your email sign-in password.",
         );
         return;
       }
 
       setNotice(
-        "If an account exists for that email, we sent a password reset link.",
+        "If an account exists for that email, we sent a password reset link for your email sign-in password.",
       );
     } catch (err: any) {
       log.error("Password reset request failed:", err);
-      setError(err.message || "Unable to send a password reset link.");
+      setError(
+        err.message ||
+          "Unable to send a password reset link for your email sign-in password.",
+      );
     } finally {
       setEmailLoading(false);
     }
@@ -377,15 +381,15 @@ export function LoginForm() {
   };
 
   const title = isForgotPassword
-    ? "Reset your password"
+    ? "Reset your email sign-in password"
     : isSignUp
       ? "Create an account"
       : "Welcome back";
 
   const subtitle = isForgotPassword
-    ? "Enter your email and we’ll send you a reset link"
+    ? "Enter your email and we’ll send a reset link for your email sign-in password."
     : isSignUp
-      ? "Sign up and get started with Solace"
+      ? "Sign up and get started with Solace. If you sign in with email, this password also protects your encrypted data."
       : "Sign in to continue to Solace";
 
   const primaryButtonLabel = isForgotPassword
@@ -430,8 +434,9 @@ export function LoginForm() {
               {resetSucceeded && !isForgotPassword ? (
                 <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
                   <p className="text-sm text-foreground">
-                    Your password has been updated. Sign in with your new
-                    password.
+                    Your email sign-in password has been updated. The next time
+                    you sign in with email, Solace will also use it to protect
+                    your encryption keys.
                   </p>
                 </div>
               ) : null}
