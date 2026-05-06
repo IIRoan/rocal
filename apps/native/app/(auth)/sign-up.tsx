@@ -163,7 +163,8 @@ export default function SignUpScreen() {
               <Text style={styles.appName}>Solace</Text>
               <Text style={styles.title}>Create your account</Text>
               <Text style={styles.subtitle}>
-                Get started with your personal calendar
+                Get started with your personal calendar. If you sign in with
+                email, this password also protects your encrypted data.
               </Text>
             </View>
 
