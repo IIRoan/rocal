@@ -11,7 +11,11 @@ export type DetailCalendarView = CalendarView;
 
 interface CalendarViewContextValue {
   activeView: DetailCalendarView;
+  currentDate: Date;
+  selectedDate: Date;
   setActiveView: (view: DetailCalendarView) => void;
+  setCurrentDate: (date: React.SetStateAction<Date>) => void;
+  setSelectedDate: (date: React.SetStateAction<Date>) => void;
 }
 
 const CalendarViewContext = createContext<CalendarViewContextValue | null>(null);
@@ -22,14 +26,38 @@ export function CalendarViewProvider({
   children: React.ReactNode;
 }) {
   const [activeView, setActiveViewState] = useState<DetailCalendarView>("day");
+  const [currentDate, setCurrentDateState] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDateState] = useState<Date>(() => new Date());
 
   const setActiveView = useCallback((view: DetailCalendarView) => {
     setActiveViewState(view);
   }, []);
 
+  const setCurrentDate = useCallback((date: React.SetStateAction<Date>) => {
+    setCurrentDateState(date);
+  }, []);
+
+  const setSelectedDate = useCallback((date: React.SetStateAction<Date>) => {
+    setSelectedDateState(date);
+  }, []);
+
   const value = useMemo<CalendarViewContextValue>(
-    () => ({ activeView, setActiveView }),
-    [activeView, setActiveView],
+    () => ({
+      activeView,
+      currentDate,
+      selectedDate,
+      setActiveView,
+      setCurrentDate,
+      setSelectedDate,
+    }),
+    [
+      activeView,
+      currentDate,
+      selectedDate,
+      setActiveView,
+      setCurrentDate,
+      setSelectedDate,
+    ],
   );
 
   return (
