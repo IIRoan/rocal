@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  addMonths,
-  endOfMonth,
-  startOfMonth,
-  subMonths,
-} from "date-fns";
+  buildPaddedCalendarMonthRanges,
+  getCalendarMonthKey,
+  getPaddedCalendarMonthRange,
+} from "@workspace/calendar-core";
 import { calendarApiService } from "../lib/calendar-api-service";
 import { CalendarEvent, ApiError } from "../lib/types/calendar";
 
@@ -39,9 +38,6 @@ interface UseCalendarEventsLoaderOptions {
 /** Days of padding before the 1st and after the last day of the month. */
 const MONTH_PADDING_DAYS = 7;
 
-/** Number of adjacent months to prefetch (±1 and ±2). */
-const PREFETCH_OFFSETS = [-1, 1, -2, 2];
-
 /** Default stale time for event queries (15 minutes). */
 const DEFAULT_STALE_TIME = 15 * 60 * 1000;
 
@@ -50,25 +46,12 @@ const GC_TIME = 30 * 60 * 1000;
 
 /** Padded fetch range for the calendar month containing `date`. */
 function monthFetchRange(date: Date): DateRange {
-  const first = startOfMonth(date);
-  const last = endOfMonth(date);
-
-  const start = new Date(first);
-  start.setDate(start.getDate() - MONTH_PADDING_DAYS);
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(last);
-  end.setDate(end.getDate() + MONTH_PADDING_DAYS);
-  end.setHours(23, 59, 59, 999);
-
-  return { start, end };
+  return getPaddedCalendarMonthRange(date, MONTH_PADDING_DAYS);
 }
 
 /** Stable string key for a calendar month: `"YYYY-MM"`. */
 export function monthKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
+  return getCalendarMonthKey(date);
 }
 
 /**
@@ -103,9 +86,10 @@ export function buildViewPrefetchRanges(
   center: Date,
   _view: string,
 ): DateRange[] {
-  return PREFETCH_OFFSETS.map((offset) => {
-    const shift = offset < 0 ? subMonths : addMonths;
-    return monthFetchRange(shift(center, Math.abs(offset)));
+  return buildPaddedCalendarMonthRanges(center, {
+    includeCurrent: false,
+    adjacentMonthDepth: 2,
+    paddingDays: MONTH_PADDING_DAYS,
   });
 }
 
@@ -199,11 +183,11 @@ export function useCalendarEventsLoader(
     const center = new Date(year, month - 1, 15);
 
     const runPrefetch = () => {
-      for (const offset of PREFETCH_OFFSETS) {
-        const shift = offset < 0 ? subMonths : addMonths;
-        const target = shift(center, Math.abs(offset));
-        const key = monthKey(target);
-        const range = monthFetchRange(target);
+      for (const range of buildViewPrefetchRanges(center, "month")) {
+        const midpoint = new Date(
+          (range.start.getTime() + range.end.getTime()) / 2,
+        );
+        const key = monthKey(midpoint);
 
         queryClient.prefetchQuery({
           queryKey: getMonthQueryKey(key),
