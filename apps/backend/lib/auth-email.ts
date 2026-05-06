@@ -131,6 +131,9 @@ export function buildPasswordResetEmail({
       We received a request to reset your Solace password.
       Click the button below to choose a new one &mdash; this link expires in&nbsp;<strong>1&nbsp;hour</strong>.
     </p>
+    <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
+      If you sign in with email and password, Solace also uses that password to protect your encryption keys after you sign in. GitHub and passkey sign-in keep using a separate encryption password.
+    </p>
     <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
       <tbody>
         <tr>
@@ -156,6 +159,9 @@ export function buildPasswordResetEmail({
       `Hi ${name},`,
       "",
       "We received a request to reset your Solace password.",
+      "If you sign in with email and password, Solace also uses that password to protect your encryption keys after you sign in.",
+      "GitHub and passkey sign-in keep using a separate encryption password.",
+      "",
       "Use the link below to choose a new password:",
       resetUrl,
       "",
@@ -198,6 +204,9 @@ export function buildPasswordUpdatedEmail({
       This is a confirmation that your Solace password was successfully <strong>${escapeHtml(actionText)}</strong>.
       If you made this change, no further action is needed &mdash; you&rsquo;re all set.
     </p>
+    <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
+      After you sign in with email and password, Solace will also use this password to protect your encryption keys. GitHub and passkey sign-in keep using a separate encryption password.
+    </p>
     <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
       <tbody>
         <tr>
@@ -221,6 +230,8 @@ export function buildPasswordUpdatedEmail({
       "",
       `This is a confirmation that your Solace password was ${actionText}.`,
       "If you made this change, no further action is needed.",
+      "After you sign in with email and password, Solace will also use this password to protect your encryption keys.",
+      "GitHub and passkey sign-in keep using a separate encryption password.",
       `If you did not make this change, reset your password immediately: ${signInUrl}`,
     ].join("\n"),
     html: buildEmailHtml({

@@ -104,10 +104,15 @@ export default function ResetPasswordPage() {
 
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Choose a new password
+            Choose a new email sign-in password
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Reset the password you use to sign in to Solace.
+            Reset the password you use to sign in to Solace with email.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            If you sign in with email and password, Solace also uses this
+            password to protect your encryption keys after you sign in. GitHub
+            and passkey sign-in keep using a separate encryption password.
           </p>
         </div>
 
@@ -128,7 +133,7 @@ export default function ResetPasswordPage() {
 
             <div className="space-y-2">
               <Label htmlFor="newPassword" className="text-sm font-medium">
-                New password
+                New email sign-in password
               </Label>
               <Input
                 id="newPassword"

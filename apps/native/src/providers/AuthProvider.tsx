@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Constants from "expo-constants";
@@ -40,6 +41,8 @@ interface Session {
   expiresAt: Date;
 }
 
+export type AuthMethod = "email-password" | "github" | "passkey" | "unknown";
+
 export interface AuthContextValue {
   /** The currently authenticated user, or null. */
   user: User | null;
@@ -49,6 +52,8 @@ export interface AuthContextValue {
   isLoading: boolean;
   /** Convenience flag — true when user and session are present. */
   isAuthenticated: boolean;
+  /** The auth method used for the current session when known. */
+  lastAuthMethod: AuthMethod;
   /** Sign in with email and password. */
   signIn: (email: string, password: string) => Promise<void>;
   /** Create a new account. */
@@ -63,6 +68,10 @@ export interface AuthContextValue {
   registerPasskey: () => Promise<void>;
   /** Delete a passkey from the current account. */
   deletePasskey: (id: string) => Promise<void>;
+  /** Retrieve and clear the pending email/password sign-in password. */
+  consumePendingAuthPassword: () => string | null;
+  /** Clear any pending email/password sign-in password. */
+  clearPendingAuthPassword: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +92,8 @@ export function AuthProvider({
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod>("unknown");
+  const pendingAuthPasswordRef = useRef<string | null>(null);
   const authCapabilities = useMemo(
     () => {
       const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
@@ -143,6 +154,31 @@ export function AuthProvider({
     [setUser, setSession],
   );
 
+  const clearPendingAuthPassword = useCallback(() => {
+    pendingAuthPasswordRef.current = null;
+  }, []);
+
+  const consumePendingAuthPassword = useCallback(() => {
+    const pendingPassword = pendingAuthPasswordRef.current;
+    pendingAuthPasswordRef.current = null;
+    return pendingPassword;
+  }, []);
+
+  const resetAuthMethodHints = useCallback(() => {
+    pendingAuthPasswordRef.current = null;
+    setLastAuthMethod("unknown");
+  }, []);
+
+  const setEmailPasswordAuthHints = useCallback((password: string) => {
+    pendingAuthPasswordRef.current = password;
+    setLastAuthMethod("email-password");
+  }, []);
+
+  const setProviderAuthHints = useCallback((method: "github" | "passkey") => {
+    pendingAuthPasswordRef.current = null;
+    setLastAuthMethod(method);
+  }, []);
+
   const finalizeAuthenticatedSession = useCallback(
     async (data: unknown, errorPrefix: string) => {
       const hasSessionCookie = await waitForSessionCookie();
@@ -162,7 +198,8 @@ export function AuthProvider({
   const clearSession = useCallback(() => {
     setUser(null);
     setSession(null);
-  }, []);
+    resetAuthMethodHints();
+  }, [resetAuthMethodHints]);
 
   // Register the clear-session callback so the HTTP layer can terminate
   // sessions on 401/403 without a React hook.
@@ -183,9 +220,16 @@ export function AuthProvider({
         );
       }
 
-      await finalizeAuthenticatedSession(result.data, "Sign-in");
+      setEmailPasswordAuthHints(password);
+
+      try {
+        await finalizeAuthenticatedSession(result.data, "Sign-in");
+      } catch (error) {
+        resetAuthMethodHints();
+        throw error;
+      }
     },
-    [finalizeAuthenticatedSession],
+    [finalizeAuthenticatedSession, resetAuthMethodHints, setEmailPasswordAuthHints],
   );
 
   const signUp = useCallback(
@@ -202,13 +246,21 @@ export function AuthProvider({
         );
       }
 
-      await finalizeAuthenticatedSession(result.data, "Sign-up");
+      setEmailPasswordAuthHints(password);
+
+      try {
+        await finalizeAuthenticatedSession(result.data, "Sign-up");
+      } catch (error) {
+        resetAuthMethodHints();
+        throw error;
+      }
     },
-    [finalizeAuthenticatedSession],
+    [finalizeAuthenticatedSession, resetAuthMethodHints, setEmailPasswordAuthHints],
   );
 
   const signInWithGitHub = useCallback(
     async (options?: { requestSignUp?: boolean }) => {
+      setProviderAuthHints("github");
       const result = await authClient.signIn.social({
         provider: "github",
         callbackURL: CALENDAR_HOME_ROUTE,
@@ -221,9 +273,14 @@ export function AuthProvider({
         );
       }
 
-      await finalizeAuthenticatedSession(result.data, "GitHub sign-in");
+      try {
+        await finalizeAuthenticatedSession(result.data, "GitHub sign-in");
+      } catch (error) {
+        resetAuthMethodHints();
+        throw error;
+      }
     },
-    [finalizeAuthenticatedSession],
+    [finalizeAuthenticatedSession, resetAuthMethodHints, setProviderAuthHints],
   );
 
   const signOut = useCallback(async () => {
@@ -243,8 +300,9 @@ export function AuthProvider({
       );
     }
 
-    if (authCapabilities.passkeyMode === "web") {
-      const result = await authClient.signIn.passkey();
+      if (authCapabilities.passkeyMode === "web") {
+        setProviderAuthHints("passkey");
+        const result = await authClient.signIn.passkey();
 
       if (result.error) {
         throw new Error(
@@ -254,19 +312,30 @@ export function AuthProvider({
         );
       }
 
-      await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
-      return;
-    }
+        try {
+          await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
+        } catch (error) {
+          resetAuthMethodHints();
+          throw error;
+        }
+        return;
+      }
 
-    if (authCapabilities.passkeyMode === "browser-bridge") {
-      const result = await signInWithBrowserPasskey(authClient);
+      if (authCapabilities.passkeyMode === "browser-bridge") {
+        setProviderAuthHints("passkey");
+        const result = await signInWithBrowserPasskey(authClient);
 
-      await finalizeAuthenticatedSession(result, "Passkey sign-in");
-      return;
-    }
+        try {
+          await finalizeAuthenticatedSession(result, "Passkey sign-in");
+        } catch (error) {
+          resetAuthMethodHints();
+          throw error;
+        }
+        return;
+      }
 
     throw new Error("Passkey sign-in failed. Please try again.");
-  }, [authCapabilities, finalizeAuthenticatedSession]);
+  }, [authCapabilities, finalizeAuthenticatedSession, resetAuthMethodHints, setProviderAuthHints]);
 
   const registerPasskey = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {
@@ -317,6 +386,7 @@ export function AuthProvider({
       session,
       isLoading,
       isAuthenticated: !!user && !!session,
+      lastAuthMethod,
       signIn,
       signUp,
       signInWithGitHub,
@@ -324,11 +394,14 @@ export function AuthProvider({
       signInWithPasskey,
       registerPasskey,
       deletePasskey,
+      consumePendingAuthPassword,
+      clearPendingAuthPassword,
     }),
     [
       user,
       session,
       isLoading,
+      lastAuthMethod,
       signIn,
       signUp,
       signInWithGitHub,
@@ -336,6 +409,8 @@ export function AuthProvider({
       signInWithPasskey,
       registerPasskey,
       deletePasskey,
+      consumePendingAuthPassword,
+      clearPendingAuthPassword,
     ],
   );
 

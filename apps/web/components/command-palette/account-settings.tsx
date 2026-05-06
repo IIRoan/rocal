@@ -21,6 +21,10 @@ interface ChangePasswordValues {
   newPassword: string;
 }
 
+interface PasswordOnlyValues {
+  newPassword: string;
+}
+
 interface UpdateProfileValues {
   name?: string;
   imageUrl?: string;
@@ -36,8 +40,16 @@ interface AccountSettingsProps {
   accountEmail?: string | null;
   accountImage?: string | null;
   sessionLoading?: boolean;
+  hasPasswordAccount?: boolean;
+  hasOAuthAccount?: boolean;
   changingPassword: boolean;
+  settingPassword?: boolean;
+  resettingEncryptionPassword?: boolean;
   handleChangePassword: (values: ChangePasswordValues) => Promise<void>;
+  handleSetPassword?: (values: PasswordOnlyValues) => Promise<void>;
+  handleResetEncryptionPassword?: (
+    values: PasswordOnlyValues,
+  ) => Promise<void>;
   updatingProfile?: boolean;
   handleUpdateProfile?: (values: UpdateProfileValues) => Promise<void>;
 }
@@ -265,14 +277,22 @@ export function AccountSettings({
   accountEmail,
   accountImage,
   sessionLoading = false,
+  hasPasswordAccount = true,
+  hasOAuthAccount = false,
   changingPassword,
+  settingPassword = false,
+  resettingEncryptionPassword = false,
   handleChangePassword,
+  handleSetPassword,
+  handleResetEncryptionPassword,
   updatingProfile = false,
   handleUpdateProfile,
 }: AccountSettingsProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [activeSecurityForm, setActiveSecurityForm] = useState<
+    "change-password" | "set-password" | "reset-encryption" | null
+  >(null);
   const [showAvatarForm, setShowAvatarForm] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -284,12 +304,24 @@ export function AccountSettings({
   const [profileMessage, setProfileMessage] = useState<SectionMessage>(null);
 
   const isBusy =
-    saving || deletingAccount || changingPassword || updatingProfile;
+    saving ||
+    deletingAccount ||
+    changingPassword ||
+    settingPassword ||
+    resettingEncryptionPassword ||
+    updatingProfile;
+  const hasOAuthOnlyAccess = hasOAuthAccount && !hasPasswordAccount;
+  const isChangePasswordForm = activeSecurityForm === "change-password";
+  const isSetPasswordForm = activeSecurityForm === "set-password";
+  const isResetEncryptionForm = activeSecurityForm === "reset-encryption";
+  const isAnySecurityFormOpen = activeSecurityForm !== null;
+  const securityFormBusy =
+    changingPassword || settingPassword || resettingEncryptionPassword;
 
   const displayName = accountName?.trim() || null;
   const displayEmail = accountEmail?.trim() || null;
 
-  const resetPasswordForm = () => {
+  const resetSecurityForm = () => {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -301,7 +333,16 @@ export function AccountSettings({
     event.preventDefault();
     setPasswordMessage(null);
 
-    if (!currentPassword.trim() || !newPassword.trim()) {
+    if (!newPassword.trim()) {
+      setPasswordMessage({
+        kind: "error",
+        text: isChangePasswordForm
+          ? "Enter your current password and a new password."
+          : "Enter a new password and confirm it.",
+      });
+      return;
+    }
+    if (isChangePasswordForm && !currentPassword.trim()) {
       setPasswordMessage({
         kind: "error",
         text: "Enter your current password and a new password.",
@@ -316,13 +357,34 @@ export function AccountSettings({
       return;
     }
     try {
-      await handleChangePassword({ currentPassword, newPassword });
-      resetPasswordForm();
-      setShowPasswordForm(false);
-      setPasswordMessage({
-        kind: "success",
-        text: "Your password has been updated.",
-      });
+      if (isChangePasswordForm) {
+        await handleChangePassword({ currentPassword, newPassword });
+        setPasswordMessage({
+          kind: "success",
+          text: "Your email sign-in password has been updated. After email sign-in, Solace will also use it to protect your encryption keys.",
+        });
+      } else if (isSetPasswordForm) {
+        if (!handleSetPassword) {
+          throw new Error("Password setup is unavailable.");
+        }
+        await handleSetPassword({ newPassword });
+        setPasswordMessage({
+          kind: "success",
+          text: "An email sign-in password has been added to your account. OAuth and passkey sign-in still use your separate encryption password unless you reset it below.",
+        });
+      } else {
+        if (!handleResetEncryptionPassword) {
+          throw new Error("Encryption password reset is unavailable.");
+        }
+        await handleResetEncryptionPassword({ newPassword });
+        setPasswordMessage({
+          kind: "success",
+          text: "Your encryption password has been reset for OAuth and passkey sign-in. This keeps your encrypted data intact and only replaces the password used to unlock your encryption keys on new devices.",
+        });
+      }
+
+      resetSecurityForm();
+      setActiveSecurityForm(null);
     } catch (error) {
       setPasswordMessage({ kind: "error", text: getErrorMessage(error) });
     }
@@ -470,92 +532,176 @@ export function AccountSettings({
         </div>
 
         {/* Password message (shown after form closes) */}
-        {passwordMessage && !showPasswordForm ? (
+        {passwordMessage && !isAnySecurityFormOpen ? (
           <div className="mx-3 mb-1">
             <InlineMessage msg={passwordMessage} />
           </div>
         ) : null}
 
         <div className="px-2 pb-1">
-          {/* Change password row — always rendered, hidden by AnimatedCollapse */}
-          <button
-            type="button"
-            onClick={() => {
-              setShowPasswordForm(true);
-              setPasswordMessage(null);
-            }}
-            disabled={isBusy || showPasswordForm}
-            className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ display: showPasswordForm ? "none" : undefined }}
-          >
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-              <Lock className="h-4 w-4 text-muted-foreground" />
+          {hasOAuthAccount ? (
+            <div className="mx-1 mb-2 rounded-lg border border-border/50 bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground">
+              OAuth and passkey sign-in use a separate encryption password.
+              {hasOAuthOnlyAccess
+                ? " Setting an email password adds email sign-in to this account."
+                : " Your email sign-in password stays separate from that encryption password."}{" "}
+              Resetting the encryption password only replaces the password wrapper
+              around your existing encryption keys; it does not change your OAuth
+              sign-in method.
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm">Change Password</div>
-              <div className="text-xs text-muted-foreground">
-                Update the password for email sign-in.
-              </div>
-            </div>
-          </button>
+          ) : null}
 
-          {/* Password form — animated expand */}
-          <AnimatedCollapse isOpen={showPasswordForm}>
+          {hasPasswordAccount ? (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSecurityForm("change-password");
+                setPasswordMessage(null);
+              }}
+              disabled={isBusy || isAnySecurityFormOpen}
+              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
+            >
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm">Change Password</div>
+                <div className="text-xs text-muted-foreground">
+                  Update your email sign-in password. Solace also uses it for
+                  encryption after email sign-in.
+                </div>
+              </div>
+            </button>
+          ) : null}
+
+          {hasOAuthOnlyAccess ? (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSecurityForm("set-password");
+                setPasswordMessage(null);
+              }}
+              disabled={isBusy || isAnySecurityFormOpen}
+              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
+            >
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm">Set Email Password</div>
+                <div className="text-xs text-muted-foreground">
+                  Add an email sign-in password to this account. This does not
+                  change the separate encryption password used by OAuth or
+                  passkey sign-in.
+                </div>
+              </div>
+            </button>
+          ) : null}
+
+          {hasOAuthAccount ? (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSecurityForm("reset-encryption");
+                setPasswordMessage(null);
+              }}
+              disabled={isBusy || isAnySecurityFormOpen}
+              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
+            >
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <RotateCcw className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm">Reset Encryption Password</div>
+                <div className="text-xs text-muted-foreground">
+                  Choose a new encryption password for OAuth or passkey sign-in.
+                  This keeps your encrypted data intact and only replaces the
+                  password used to unlock your keys on new devices.
+                </div>
+              </div>
+            </button>
+          ) : null}
+
+          <AnimatedCollapse isOpen={isAnySecurityFormOpen}>
             <form
               className="mx-1 my-1 rounded-lg border border-border/50 bg-muted/20 p-4 space-y-3"
               onSubmit={handlePasswordSubmit}
             >
               <InlineMessage msg={passwordMessage} />
 
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {isChangePasswordForm
+                  ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
+                  : isSetPasswordForm
+                    ? "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing the separate encryption password used by OAuth or passkey sign-in."
+                    : "Choose a new encryption password for OAuth or passkey sign-in. This only replaces the password wrapper around your existing encryption keys and does not change your OAuth sign-in method."}
+              </p>
+
+              {isChangePasswordForm ? (
+                <FieldInput
+                  label="Current password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={setCurrentPassword}
+                  autoComplete="current-password"
+                  disabled={securityFormBusy}
+                  autoFocus
+                />
+              ) : null}
               <FieldInput
-                label="Current password"
-                type="password"
-                value={currentPassword}
-                onChange={setCurrentPassword}
-                autoComplete="current-password"
-                disabled={changingPassword}
-                autoFocus
-              />
-              <FieldInput
-                label="New password"
+                label={
+                  isResetEncryptionForm ? "New encryption password" : "New password"
+                }
                 type="password"
                 value={newPassword}
                 onChange={setNewPassword}
                 autoComplete="new-password"
-                disabled={changingPassword}
+                disabled={securityFormBusy}
+                autoFocus={!isChangePasswordForm}
               />
               <FieldInput
-                label="Confirm new password"
+                label={
+                  isResetEncryptionForm
+                    ? "Confirm new encryption password"
+                    : "Confirm new password"
+                }
                 type="password"
                 value={confirmPassword}
                 onChange={setConfirmPassword}
                 autoComplete="new-password"
-                disabled={changingPassword}
+                disabled={securityFormBusy}
               />
 
               <div className="flex gap-2 pt-1">
                 <button
                   type="submit"
-                  disabled={changingPassword}
+                  disabled={securityFormBusy}
                   className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {changingPassword ? (
+                  {securityFormBusy ? (
                     <>
                       <Loader2 className="h-3 w-3 animate-spin" />
-                      Updating…
+                      Saving…
                     </>
                   ) : (
-                    "Update Password"
+                    isChangePasswordForm
+                      ? "Update Password"
+                      : isSetPasswordForm
+                        ? "Set Password"
+                        : "Reset Encryption Password"
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setShowPasswordForm(false);
-                    resetPasswordForm();
+                    setActiveSecurityForm(null);
+                    resetSecurityForm();
                     setPasswordMessage(null);
                   }}
-                  disabled={changingPassword}
+                  disabled={securityFormBusy}
                   className="inline-flex h-8 items-center rounded-md border border-border bg-background px-4 text-xs font-medium text-foreground transition-colors hover:bg-accent/40 disabled:opacity-60"
                 >
                   Cancel

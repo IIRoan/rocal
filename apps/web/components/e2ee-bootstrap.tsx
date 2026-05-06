@@ -243,7 +243,11 @@ export function E2eeBootstrap() {
     }
 
     if (!password) {
-      setError("Enter your encryption password.");
+      setError(
+        isEmailPasswordUser
+          ? "Enter your email sign-in password."
+          : "Enter your encryption password.",
+      );
       return;
     }
 
@@ -254,11 +258,11 @@ export function E2eeBootstrap() {
       const unlocked = await unlockE2eeWithPassword(userId, password);
 
       if (!unlocked) {
-        setError(
-          isEmailPasswordUser
-            ? "That password didn't match. If you recently changed your Solace password, use your previous password here."
-            : "That password did not unlock your encrypted data.",
-        );
+          setError(
+            isEmailPasswordUser
+              ? "That password didn't match. If you recently changed your email sign-in password, use your previous one here."
+              : "That password did not unlock your encrypted data.",
+          );
         return;
       }
 
@@ -306,13 +310,13 @@ export function E2eeBootstrap() {
 
   const description = isUnlock
     ? isEmailPasswordUser
-      ? "Enter your Solace login password to unlock your encrypted data on this device. If you recently changed your password, use your previous one."
-      : "Enter your encryption password to unlock your data on this device."
+      ? "Solace normally reuses your email sign-in password to unlock encrypted data on this device. If that did not finish automatically, enter the same password here. If you recently changed it, use your previous password."
+      : "Enter your encryption password to unlock encrypted data on this device. GitHub and passkey sign-in keep this password separate."
     : isLegacy
-      ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and set an encryption password once."
+      ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and save an encryption password once."
       : isEmailPasswordUser
-        ? "Your Solace login password is used to protect your encryption keys. Please re-enter it below to complete setup."
-        : "Choose a password to protect your end-to-end encryption keys. You'll need this to access your encrypted data from other devices.";
+        ? "Solace normally reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish."
+        : "Choose an encryption password to protect your end-to-end encryption keys. You'll need it when you sign in with GitHub or a passkey on a new device.";
 
   const Icon = isUnlock ? KeyRound : Shield;
 
@@ -338,10 +342,10 @@ export function E2eeBootstrap() {
 
   const passwordLabel = isUnlock
     ? isEmailPasswordUser
-      ? "Solace login password"
+      ? "Email sign-in password"
       : "Encryption password"
     : isEmailPasswordUser
-      ? "Your Solace password"
+      ? "Email sign-in password"
       : "Encryption password";
 
   return (

@@ -23,6 +23,9 @@ describe("auth-email", () => {
 
     expect(message.subject).toBe("Reset your Solace password");
     expect(message.text).toContain("https://solace.test/reset?token=abc");
+    expect(message.text).toContain(
+      "GitHub and passkey sign-in keep using a separate encryption password.",
+    );
     expect(message.html).toContain("Hi &lt;Roan&gt;");
     expect(message.html).toContain("Reset password");
   });
@@ -36,7 +39,24 @@ describe("auth-email", () => {
 
     expect(message.subject).toBe("Your Solace password was updated");
     expect(message.text).toContain("was reset");
+    expect(message.text).toContain(
+      "Solace will also use this password to protect your encryption keys.",
+    );
     expect(message.html).toContain("Open Solace");
+  });
+
+  it("builds a password changed email for the changed action branch", () => {
+    const message = buildPasswordUpdatedEmail({
+      name: "Roan",
+      action: "changed",
+      signInUrl: "https://solace.test/login",
+    });
+
+    expect(message.text).toContain("was changed");
+    expect(message.html).toContain("password was changed");
+    expect(message.html).toContain(
+      "GitHub and passkey sign-in keep using a separate encryption password.",
+    );
   });
 
   it("extracts the password change recipient from a Better Auth response", () => {

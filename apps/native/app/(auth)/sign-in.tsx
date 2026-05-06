@@ -171,7 +171,7 @@ export default function SignInScreen() {
 
       Alert.alert(
         "Check your email",
-        "If an account exists for that email, we sent a password reset link.",
+        "If an account exists for that email, we sent a password reset link for your email sign-in password.",
       );
       setIsResetMode(false);
     } catch (err: any) {
@@ -236,9 +236,11 @@ export default function SignInScreen() {
     isPasskeyLoading ||
     isRequestingPasswordReset;
 
-  const title = isResetMode ? "Reset your password" : "Welcome back";
+  const title = isResetMode
+    ? "Reset your email sign-in password"
+    : "Welcome back";
   const subtitle = isResetMode
-    ? "Enter your email and we’ll send you a reset link"
+    ? "Enter your email and we’ll send a web link to reset your email sign-in password."
     : "Sign in to your account to continue";
 
   return (
@@ -340,8 +342,11 @@ export default function SignInScreen() {
             ) : (
               <View style={styles.helperCard}>
                 <Text style={styles.helperText}>
-                  We&apos;ll email you a secure link to choose a new password on
-                  the web.
+                  We&apos;ll email you a secure link to reset your email sign-in
+                  password on the web. If you sign in with email, Solace also
+                  uses that password to protect your encryption keys after you
+                  sign in. GitHub and passkey sign-in keep using a separate
+                  encryption password.
                 </Text>
               </View>
             )}

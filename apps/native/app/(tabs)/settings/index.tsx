@@ -26,10 +26,13 @@ import type {
   UserSettings,
   UpdateSettingsRequest,
   getErrorMessage as getErrorMessageType,
+  LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
 import {
+  extractLinkedAuthAccounts,
   getErrorMessage,
   partitionCalendarsByKind,
+  summarizeLinkedAuthAccounts,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import {
@@ -38,6 +41,7 @@ import {
 } from "../../../src/providers/ThemeProvider";
 import { authClient } from "../../../src/lib/auth-client";
 import { useAuth } from "../../../src/providers/AuthProvider";
+import { useE2ee } from "../../../src/providers/E2eeProvider";
 import { calendarApiService } from "../../../src/lib/api";
 import { SETTINGS_TIMEZONE_ROUTE } from "../../../src/lib/auth-routing";
 import { formatStoredPasskeyDescription } from "../../../src/lib/passkey-auth";
@@ -168,7 +172,20 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { user, signOut, registerPasskey, deletePasskey } = useAuth();
+  const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
+  const accountsQuery = useQuery({
+    queryKey: ["auth", "accounts", user?.id ?? null],
+    queryFn: async (): Promise<LinkedAuthAccountLike[]> => {
+      if (typeof authClient.listAccounts !== "function") {
+        return [];
+      }
+
+      return extractLinkedAuthAccounts(await authClient.listAccounts());
+    },
+    enabled: Boolean(user?.id) && typeof authClient.listAccounts === "function",
+    staleTime: 5 * 60 * 1000,
+  });
   const authCapabilities = useMemo(() => {
     const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
 
@@ -240,16 +257,34 @@ export default function SettingsScreen() {
   const [pendingPasskeyDeletionId, setPendingPasskeyDeletionId] = useState<
     string | null
   >(null);
-  const [showChangePasswordForm, setShowChangePasswordForm] = useState(false);
+  const [activePasswordSheet, setActivePasswordSheet] = useState<
+    "change-password" | "set-password" | "reset-encryption-password" | null
+  >(null);
   const [currentPasswordInput, setCurrentPasswordInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
   const [passwordChangeError, setPasswordChangeError] = useState<string | null>(
     null,
   );
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [isResettingEncryptionPassword, setIsResettingEncryptionPassword] =
+    useState(false);
+  const linkedAccounts = useMemo(
+    () => accountsQuery.data ?? ([] as LinkedAuthAccountLike[]),
+    [accountsQuery.data],
+  );
+  const { hasPasswordAccount, hasOAuthAccount } = useMemo(
+    () => summarizeLinkedAuthAccounts(linkedAccounts),
+    [linkedAccounts],
+  );
   const accountActions = useMemo(
-    () => getSettingsAccountActions({ canSignOut: Boolean(user) }),
-    [user],
+    () =>
+      getSettingsAccountActions({
+        canSignOut: Boolean(user),
+        hasPasswordAccount,
+        hasOAuthAccount,
+      }),
+    [hasOAuthAccount, hasPasswordAccount, user],
   );
   const storedPasskeys = useMemo(
     () => (Array.isArray(passkeysQuery.data) ? passkeysQuery.data : []),
@@ -506,7 +541,19 @@ export default function SettingsScreen() {
   const handleSubmitPasswordChange = useCallback(async () => {
     setPasswordChangeError(null);
 
-    if (!currentPasswordInput.trim() || !newPasswordInput.trim()) {
+    if (!newPasswordInput.trim()) {
+      setPasswordChangeError(
+        activePasswordSheet === "change-password"
+          ? "Enter your current password and a new password."
+          : "Enter a new password and confirm it.",
+      );
+      return;
+    }
+
+    if (
+      activePasswordSheet === "change-password" &&
+      !currentPasswordInput.trim()
+    ) {
       setPasswordChangeError("Enter your current password and a new password.");
       return;
     }
@@ -516,37 +563,77 @@ export default function SettingsScreen() {
       return;
     }
 
-    setIsChangingPassword(true);
-
     try {
-      const result = await authClient.changePassword({
-        currentPassword: currentPasswordInput,
-        newPassword: newPasswordInput,
-      });
+      if (activePasswordSheet === "change-password") {
+        setIsChangingPassword(true);
+        const result = await authClient.changePassword({
+          currentPassword: currentPasswordInput,
+          newPassword: newPasswordInput,
+        });
 
-      if (result?.error) {
-        throw new Error(
-          result.error.message ?? "Unable to update your password.",
+        if (result?.error) {
+          throw new Error(
+            result.error.message ?? "Unable to update your password.",
+          );
+        }
+
+        Alert.alert(
+          "Password updated",
+          "Use your new password the next time you sign in with email. After email sign-in, Solace also uses it to protect your encryption keys.",
+        );
+      } else if (activePasswordSheet === "set-password") {
+        setIsSettingPassword(true);
+        const result = await (authClient as typeof authClient & {
+          setPassword: (input: { newPassword: string }) => Promise<{
+            error?: { message?: string };
+          } | void>;
+        }).setPassword({
+          newPassword: newPasswordInput,
+        });
+
+        if (result?.error) {
+          throw new Error(result.error.message ?? "Unable to set your password.");
+        }
+
+        await accountsQuery?.refetch?.();
+        Alert.alert(
+          "Email password added",
+          "You can now sign in with email and password. OAuth and passkey sign-in still use your separate encryption password unless you reset it below.",
+        );
+      } else {
+        setIsResettingEncryptionPassword(true);
+        const stored = await resetEncryptionPassword(newPasswordInput);
+
+        if (!stored) {
+          throw new Error(
+            "Unlock your encrypted data on this device first, then try again.",
+          );
+        }
+
+        Alert.alert(
+          "Encryption password reset",
+          "OAuth and passkey sign-in will now use your new encryption password on new devices. This keeps your encrypted data intact and only replaces the password wrapper around your keys.",
         );
       }
 
       resetChangePasswordForm();
-      setShowChangePasswordForm(false);
-      Alert.alert(
-        "Password updated",
-        "Use your new password the next time you sign in with email.",
-      );
+      setActivePasswordSheet(null);
     } catch (error) {
       setPasswordChangeError(
         getErrorMessage(error, "Failed to update your password"),
       );
     } finally {
       setIsChangingPassword(false);
+      setIsSettingPassword(false);
+      setIsResettingEncryptionPassword(false);
     }
   }, [
+    accountsQuery,
+    activePasswordSheet,
     confirmPasswordInput,
     currentPasswordInput,
     newPasswordInput,
+    resetEncryptionPassword,
     resetChangePasswordForm,
   ]);
 
@@ -579,12 +666,38 @@ export default function SettingsScreen() {
   const handleAccountAction = useCallback(
     (key: (typeof accountActions)[number]["key"]) => {
       if (key === "change-password") {
-        setShowChangePasswordForm((current) => {
-          const next = !current;
+        setPasswordChangeError(null);
+        setActivePasswordSheet((current) => {
+          const next = current === "change-password" ? null : "change-password";
           if (!next) {
             resetChangePasswordForm();
-          } else {
-            setPasswordChangeError(null);
+          }
+          return next;
+        });
+        return;
+      }
+
+      if (key === "set-password") {
+        setPasswordChangeError(null);
+        setActivePasswordSheet((current) => {
+          const next = current === "set-password" ? null : "set-password";
+          if (!next) {
+            resetChangePasswordForm();
+          }
+          return next;
+        });
+        return;
+      }
+
+      if (key === "reset-encryption-password") {
+        setPasswordChangeError(null);
+        setActivePasswordSheet((current) => {
+          const next =
+            current === "reset-encryption-password"
+              ? null
+              : "reset-encryption-password";
+          if (!next) {
+            resetChangePasswordForm();
           }
           return next;
         });
@@ -870,6 +983,16 @@ export default function SettingsScreen() {
             imageUrl={user?.image}
             theme={theme}
           />
+          {hasOAuthAccount ? (
+            <HintRow
+              text={
+                hasPasswordAccount
+                  ? "OAuth and passkey sign-in still use a separate encryption password. Resetting that encryption password only replaces the password wrapper around your existing keys and does not change your OAuth login method."
+                  : "OAuth and passkey sign-in use a separate encryption password. Setting an email password adds email sign-in to this account, while resetting the encryption password only replaces the password wrapper around your existing keys."
+              }
+              theme={theme}
+            />
+          ) : null}
           {accountActions.map((action) => (
             <ActionRow
               key={action.key}
@@ -882,6 +1005,10 @@ export default function SettingsScreen() {
               isPending={
                 action.key === "change-password"
                   ? isChangingPassword
+                  : action.key === "set-password"
+                    ? isSettingPassword
+                    : action.key === "reset-encryption-password"
+                      ? isResettingEncryptionPassword
                   : action.key === "change-profile-picture"
                     ? isUpdatingProfilePicture
                     : action.key === "reset-preferences"
@@ -1044,14 +1171,21 @@ export default function SettingsScreen() {
 
       {/* Change password bottom sheet */}
       <BottomSheet
-        visible={showChangePasswordForm}
+        visible={activePasswordSheet !== null}
         onDismiss={() => {
-          setShowChangePasswordForm(false);
+          setActivePasswordSheet(null);
           resetChangePasswordForm();
         }}
-        title="Change Password"
+        title={
+          activePasswordSheet === "change-password"
+            ? "Change Password"
+            : activePasswordSheet === "set-password"
+              ? "Set Email Password"
+              : "Reset Encryption Password"
+        }
       >
         <PasswordChangeCard
+          mode={activePasswordSheet ?? "change-password"}
           currentPassword={currentPasswordInput}
           newPassword={newPasswordInput}
           confirmPassword={confirmPasswordInput}
@@ -1060,11 +1194,13 @@ export default function SettingsScreen() {
           onConfirmPasswordChange={setConfirmPasswordInput}
           onSubmit={handleSubmitPasswordChange}
           onCancel={() => {
-            setShowChangePasswordForm(false);
+            setActivePasswordSheet(null);
             resetChangePasswordForm();
           }}
           error={passwordChangeError}
-          isPending={isChangingPassword}
+          isPending={
+            isChangingPassword || isSettingPassword || isResettingEncryptionPassword
+          }
           theme={theme}
         />
       </BottomSheet>
@@ -1439,6 +1575,7 @@ function AccountInfoCard({
 }
 
 function PasswordChangeCard({
+  mode,
   currentPassword,
   newPassword,
   confirmPassword,
@@ -1451,6 +1588,7 @@ function PasswordChangeCard({
   isPending,
   theme,
 }: {
+  mode: "change-password" | "set-password" | "reset-encryption-password";
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -1463,6 +1601,9 @@ function PasswordChangeCard({
   isPending: boolean;
   theme: ThemeTokens;
 }) {
+  const isChangePassword = mode === "change-password";
+  const isResetEncryptionPassword = mode === "reset-encryption-password";
+
   return (
     <ScrollView
       contentContainerStyle={{
@@ -1483,7 +1624,11 @@ function PasswordChangeCard({
               .semibold as TextStyle["fontWeight"],
           }}
         >
-          Change Password
+          {isChangePassword
+            ? "Change Password"
+            : isResetEncryptionPassword
+              ? "Reset Encryption Password"
+              : "Set Email Password"}
         </Text>
         <Text
           style={{
@@ -1492,7 +1637,11 @@ function PasswordChangeCard({
             color: theme.colors.mutedForeground,
           }}
         >
-          Update the password used for email sign-in.
+          {isChangePassword
+            ? "Update your email sign-in password. After email sign-in, Solace also uses it to protect your encryption keys."
+            : isResetEncryptionPassword
+              ? "Choose a new encryption password for OAuth or passkey sign-in. This only replaces the password wrapper around your existing encryption keys and does not change your OAuth login method."
+              : "Add an email sign-in password to this account. This gives you an email/password sign-in option without changing the separate encryption password used by OAuth or passkey sign-in."}
         </Text>
       </View>
 
@@ -1520,22 +1669,30 @@ function PasswordChangeCard({
       ) : null}
 
       <View style={{ gap: theme.spacing["3"] }}>
+        {isChangePassword ? (
+          <PasswordField
+            label="Current password"
+            value={currentPassword}
+            onChangeText={onCurrentPasswordChange}
+            autoComplete="password"
+            theme={theme}
+          />
+        ) : null}
         <PasswordField
-          label="Current password"
-          value={currentPassword}
-          onChangeText={onCurrentPasswordChange}
-          autoComplete="password"
-          theme={theme}
-        />
-        <PasswordField
-          label="New password"
+          label={
+            isResetEncryptionPassword ? "New encryption password" : "New password"
+          }
           value={newPassword}
           onChangeText={onNewPasswordChange}
           autoComplete="new-password"
           theme={theme}
         />
         <PasswordField
-          label="Confirm new password"
+          label={
+            isResetEncryptionPassword
+              ? "Confirm new encryption password"
+              : "Confirm new password"
+          }
           value={confirmPassword}
           onChangeText={onConfirmPasswordChange}
           autoComplete="new-password"
@@ -1559,7 +1716,13 @@ function PasswordChangeCard({
             isPending && { opacity: 0.6 },
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Update password"
+          accessibilityLabel={
+            isChangePassword
+              ? "Update password"
+              : isResetEncryptionPassword
+                ? "Reset encryption password"
+                : "Set email password"
+          }
         >
           {isPending ? (
             <ActivityIndicator color={theme.colors.primaryForeground} />
@@ -1573,7 +1736,11 @@ function PasswordChangeCard({
                   .semibold as TextStyle["fontWeight"],
               }}
             >
-              Update Password
+              {isChangePassword
+                ? "Update Password"
+                : isResetEncryptionPassword
+                  ? "Reset Encryption Password"
+                  : "Set Password"}
             </Text>
           )}
         </Pressable>
@@ -1593,7 +1760,7 @@ function PasswordChangeCard({
             isPending && { opacity: 0.6 },
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Cancel password change"
+          accessibilityLabel="Cancel password update"
         >
           <Text
             style={{

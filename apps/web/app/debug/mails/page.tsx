@@ -90,6 +90,9 @@ function buildPasswordResetHtml(): string {
       We received a request to reset your Solace password.
       Click the button below to choose a new one &mdash; this link expires in&nbsp;<strong>1&nbsp;hour</strong>.
     </p>
+    <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
+      If you sign in with email and password, Solace also uses that password to protect your encryption keys after you sign in. GitHub and passkey sign-in keep using a separate encryption password.
+    </p>
     <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
       <tbody><tr><td align="center" valign="middle">
         <a class="email-btn" href="${safeResetUrl}" style='display:inline-block;background:#fff;color:#000;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;font-weight:500;line-height:100%;margin:0;text-decoration:none;padding:12px 20px;border:1px solid rgba(0,0,0,0.12);border-bottom:2px solid rgba(0,0,0,0.12);border-radius:12px'>Reset password</a>
@@ -124,6 +127,9 @@ function buildPasswordUpdatedHtml(action: "changed" | "reset"): string {
     <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
       This is a confirmation that your Solace password was successfully <strong>${escapeHtml(actionText)}</strong>.
       If you made this change, no further action is needed &mdash; you&rsquo;re all set.
+    </p>
+    <p class="email-body" style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
+      After you sign in with email and password, Solace will also use this password to protect your encryption keys. GitHub and passkey sign-in keep using a separate encryption password.
     </p>
     <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
       <tbody><tr><td align="center" valign="middle">

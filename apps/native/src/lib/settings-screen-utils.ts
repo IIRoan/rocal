@@ -1,5 +1,7 @@
 export type SettingsAccountActionKey =
   | "change-password"
+  | "set-password"
+  | "reset-encryption-password"
   | "change-profile-picture"
   | "reset-preferences"
   | "sign-out"
@@ -17,7 +19,26 @@ const CHANGE_PASSWORD_ACTION: SettingsAccountAction = {
   key: "change-password",
   icon: "lock",
   label: "Change Password",
-  description: "Update the password used for email sign-in.",
+  description:
+    "Update your email sign-in password. Solace also uses it for encryption after email sign-in.",
+  destructive: false,
+};
+
+const SET_PASSWORD_ACTION: SettingsAccountAction = {
+  key: "set-password",
+  icon: "lock",
+  label: "Set Email Password",
+  description:
+    "Add an email sign-in password. This does not change the separate encryption password used by OAuth or passkey sign-in.",
+  destructive: false,
+};
+
+const RESET_ENCRYPTION_PASSWORD_ACTION: SettingsAccountAction = {
+  key: "reset-encryption-password",
+  icon: "rotate-ccw",
+  label: "Reset Encryption Password",
+  description:
+    "Choose a new encryption password for OAuth or passkey sign-in without changing your OAuth login method.",
   destructive: false,
 };
 
@@ -55,12 +76,28 @@ const DELETE_ACCOUNT_ACTION: SettingsAccountAction = {
 
 export function getSettingsAccountActions({
   canSignOut,
+  hasPasswordAccount,
+  hasOAuthAccount,
 }: {
   canSignOut: boolean;
+  hasPasswordAccount: boolean;
+  hasOAuthAccount: boolean;
 }): SettingsAccountAction[] {
+  const authActions: SettingsAccountAction[] = [];
+
+  if (hasPasswordAccount) {
+    authActions.push(CHANGE_PASSWORD_ACTION);
+  } else if (hasOAuthAccount) {
+    authActions.push(SET_PASSWORD_ACTION);
+  }
+
+  if (hasOAuthAccount) {
+    authActions.push(RESET_ENCRYPTION_PASSWORD_ACTION);
+  }
+
   return canSignOut
     ? [
-        CHANGE_PASSWORD_ACTION,
+        ...authActions,
         CHANGE_PROFILE_PICTURE_ACTION,
         RESET_PREFERENCES_ACTION,
         SIGN_OUT_ACTION,
