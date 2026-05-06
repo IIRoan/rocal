@@ -39,13 +39,18 @@ import type { TimelinePage } from "../../../src/components/calendar/TimelinePage
 export default function CalendarScreen() {
   const { theme } = useTheme();
   const { openEventSheet } = useSheet();
-  const { activeView, setActiveView } = useCalendarView();
+  const {
+    activeView,
+    currentDate,
+    selectedDate,
+    setActiveView,
+    setCurrentDate,
+    setSelectedDate,
+  } = useCalendarView();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   // ─── State ───────────────────────────────────────────────────────────────────
 
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [monthStripExpanded, setMonthStripExpanded] = useState(false);
 
   // ─── Data fetching ─────────────────────────────────────────────────────────

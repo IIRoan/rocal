@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
-  addMonths,
   eachDayOfInterval,
   endOfDay,
   format,
@@ -11,6 +10,10 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import {
+  buildPaddedCalendarMonthRanges,
+  getCalendarMonthKey,
+} from "@workspace/calendar-core";
 import type { CalendarEvent } from "../components/calendar/types";
 import {
   buildMiniCalendarDayEventsMap,
@@ -61,22 +64,16 @@ export function useMiniCalendarMonthData({
   useEffect(() => {
     if (!prefetchRange) return;
 
-    const gridKey = `${grid.start.toISOString()}-${grid.end.toISOString()}`;
-    if (lastFetchedKeyRef.current === gridKey) return;
-    lastFetchedKeyRef.current = gridKey;
-
-    const gridRange = { start: grid.start, end: grid.end };
+    const monthKey = getCalendarMonthKey(calendarMonth);
+    if (lastFetchedKeyRef.current === monthKey) return;
+    lastFetchedKeyRef.current = monthKey;
 
     const run = () => {
-      prefetchRange(gridRange);
-      prefetchRange({
-        start: addMonths(grid.start, -1),
-        end: addMonths(grid.end, -1),
-      });
-      prefetchRange({
-        start: addMonths(grid.start, 1),
-        end: addMonths(grid.end, 1),
-      });
+      for (const range of buildPaddedCalendarMonthRanges(calendarMonth, {
+        adjacentMonthDepth: 2,
+      })) {
+        prefetchRange(range);
+      }
     };
 
     const timeoutId = window.setTimeout(() => {
@@ -88,7 +85,7 @@ export function useMiniCalendarMonthData({
     }, rangeChangeDebounceMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [grid, prefetchRange, rangeChangeDebounceMs]);
+  }, [calendarMonth, prefetchRange, rangeChangeDebounceMs]);
 
   // Periodically check for new cached data to pick up prefetch results
   const [cacheBuster, setCacheBuster] = useState(0);

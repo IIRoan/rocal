@@ -21,26 +21,26 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter, usePathname } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Calendar, CalendarView } from "@workspace/calendar-core";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import type { Calendar } from "@workspace/calendar-core";
 import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../providers/ThemeProvider";
 import { useAuth } from "../providers/AuthProvider";
-import { useSidebar } from "../providers/SidebarProvider";
 import { useCalendarView } from "../providers/CalendarViewProvider";
+import { useSidebar } from "../providers/SidebarProvider";
 import { calendarApiService } from "../lib/api";
 import { QUERY_KEYS } from "../lib/query-keys";
-import {
-  buildSidebarCalendarSections,
-  getViewLabel,
-  SIDEBAR_VIEW_OPTIONS,
-} from "./app-sidebar-utils";
-import { BottomSheet } from "./BottomSheet";
+import { buildSidebarCalendarSections } from "./app-sidebar-utils";
+import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
 const EDGE_SWIPE_WIDTH = 24;
@@ -49,28 +49,21 @@ const CLOSE_THRESHOLD = 35;
 const VELOCITY_THRESHOLD = 400;
 const DRAWER_SPRING = { damping: 24, stiffness: 280, mass: 0.8 };
 
-// ─── Logo ─────────────────────────────────────────────────────────────────────
-
 const logoSource = require("../assets/logo.png");
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export function AppSidebar() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
+  const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
   const { isOpen, open, close } = useSidebar();
-  const { activeView, setActiveView } = useCalendarView();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const pathname = usePathname();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
     useState<string | null>(null);
-  const [viewSheetOpen, setViewSheetOpen] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
-
-  const isOnCalendar = pathname.includes("/calendar") || pathname === "/";
 
   const { data: calendars = [], isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
@@ -86,7 +79,7 @@ export function AppSidebar() {
   );
 
   const calendarById = useMemo(
-    () => new Map(calendars.map((c) => [c.id, c])),
+    () => new Map(calendars.map((calendar) => [calendar.id, calendar])),
     [calendars],
   );
 
@@ -116,8 +109,6 @@ export function AppSidebar() {
     },
   });
 
-  // ── Shared animation value ─────────────────────────────────────────────
-
   const translateX = useSharedValue(-SIDEBAR_WIDTH);
 
   React.useEffect(() => {
@@ -133,20 +124,18 @@ export function AppSidebar() {
     return { opacity: progress * 0.5 };
   });
 
-  // Active view label
-  const activeViewLabel = getViewLabel(activeView);
-
-  // ── Swipe-to-open gesture ─────────────────────────────────────────────
-
   const edgePanGesture = Gesture.Pan()
     .activeOffsetX(10)
     .failOffsetX(-5)
-    .onUpdate((e) => {
-      const next = -SIDEBAR_WIDTH + e.translationX;
+    .onUpdate((event) => {
+      const next = -SIDEBAR_WIDTH + event.translationX;
       translateX.value = Math.min(0, Math.max(-SIDEBAR_WIDTH, next));
     })
-    .onEnd((e) => {
-      if (e.translationX > OPEN_THRESHOLD || e.velocityX > VELOCITY_THRESHOLD) {
+    .onEnd((event) => {
+      if (
+        event.translationX > OPEN_THRESHOLD ||
+        event.velocityX > VELOCITY_THRESHOLD
+      ) {
         translateX.value = withSpring(0, DRAWER_SPRING);
         runOnJS(open)();
       } else {
@@ -155,21 +144,19 @@ export function AppSidebar() {
       }
     });
 
-  // ── Swipe-to-close gesture ────────────────────────────────────────────
-
   const closePanGesture = Gesture.Pan()
     .activeOffsetX([-6, 20])
     .failOffsetY([-15, 15])
-    .onUpdate((e) => {
+    .onUpdate((event) => {
       "worklet";
-      const clamped = Math.min(5, Math.max(e.translationX, -SIDEBAR_WIDTH));
+      const clamped = Math.min(5, Math.max(event.translationX, -SIDEBAR_WIDTH));
       translateX.value = clamped;
     })
-    .onEnd((e) => {
+    .onEnd((event) => {
       "worklet";
       if (
-        e.translationX < -CLOSE_THRESHOLD ||
-        e.velocityX < -VELOCITY_THRESHOLD
+        event.translationX < -CLOSE_THRESHOLD ||
+        event.velocityX < -VELOCITY_THRESHOLD
       ) {
         translateX.value = withSpring(-SIDEBAR_WIDTH, DRAWER_SPRING);
         runOnJS(close)();
@@ -177,8 +164,6 @@ export function AppSidebar() {
         translateX.value = withSpring(0, DRAWER_SPRING);
       }
     });
-
-  // ── Navigation ────────────────────────────────────────────────────────
 
   const handleNavigate = useCallback(
     (route: string) => {
@@ -200,24 +185,27 @@ export function AppSidebar() {
     [toggleCalendarVisibilityMutation],
   );
 
-  const handleSelectView = useCallback(
-    (view: CalendarView) => {
-      setActiveView(view);
-      setViewSheetOpen(false);
-      // Navigate to calendar if not already there
-      if (!pathname.includes("/calendar") && pathname !== "/") {
-        setTimeout(() => router.push("/(tabs)/calendar" as any), 60);
-      }
+  const handleSelectCalendarDate = useCallback(
+    (date: Date) => {
+      setCurrentDate(date);
+      setSelectedDate(date);
       close();
-    },
-    [setActiveView, pathname, router, close],
-  );
 
-  // ── Render ────────────────────────────────────────────────────────────
+      if (
+        pathname.includes("/calendar") ||
+        pathname === "/" ||
+        pathname === "/(tabs)/calendar"
+      ) {
+        return;
+      }
+
+      setTimeout(() => router.replace("/(tabs)/calendar" as any), 80);
+    },
+    [close, pathname, router, setCurrentDate, setSelectedDate],
+  );
 
   return (
     <>
-      {/* Invisible left-edge swipe zone — always present for swipe-to-open */}
       {!isOpen && (
         <GestureDetector gesture={edgePanGesture}>
           <Animated.View
@@ -229,7 +217,6 @@ export function AppSidebar() {
         </GestureDetector>
       )}
 
-      {/* Overlay + sidebar — interactive only when open */}
       <View
         style={[
           StyleSheet.absoluteFill,
@@ -243,7 +230,6 @@ export function AppSidebar() {
           Platform.OS === "web" ? undefined : isOpen ? "auto" : "none"
         }
       >
-        {/* Scrim */}
         <GestureDetector gesture={closePanGesture}>
           <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
             <Pressable
@@ -255,109 +241,139 @@ export function AppSidebar() {
           </Animated.View>
         </GestureDetector>
 
-        {/* Sidebar panel */}
         <GestureDetector gesture={closePanGesture}>
           <Animated.View
             style={[styles.sidebar, sidebarAnimatedStyle, { width: SIDEBAR_WIDTH }]}
           >
-            {/* ── Header: logo + search + avatar ──────────────────── */}
-            <View
-              style={[
-                styles.header,
-                { paddingTop: insets.top + 20 },
-              ]}
-            >
-              <View style={styles.headerLeft}>
-                <Image source={logoSource} style={styles.logoImage} />
-                <Text style={styles.appName}>solace</Text>
-              </View>
-              <View style={styles.headerRight}>
-                <Pressable
-                  onPress={() => handleNavigate("/(tabs)/search")}
-                  style={styles.headerIconBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="Search"
-                >
-                  <Feather name="search" size={18} color={theme.colors.mutedForeground} />
-                </Pressable>
-                <Pressable
-                  onPress={() => handleNavigate("/(tabs)/settings")}
-                  style={styles.avatarButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Account settings"
-                >
-                  {user?.image && !avatarError ? (
-                    <Image
-                      source={{ uri: user.image }}
-                      style={styles.avatar}
-                      onError={() => setAvatarError(true)}
+            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+              <View style={styles.headerRow}>
+                <View style={styles.headerBrand}>
+                  <Image source={logoSource} style={styles.logoImage} />
+                  <Text style={styles.appName}>solace</Text>
+                </View>
+                <View style={styles.headerActions}>
+                  <Pressable
+                    onPress={() => handleNavigate("/(tabs)/search")}
+                    style={({ pressed }) => [
+                      styles.headerIconButton,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Search"
+                  >
+                    <Feather
+                      name="search"
+                      size={18}
+                      color={theme.colors.mutedForeground}
                     />
-                  ) : (
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleNavigate("/(tabs)/settings")}
+                    style={({ pressed }) => [
+                      styles.avatarButton,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Account settings"
+                  >
+                    {user?.image && !avatarError ? (
+                      <Image
+                        source={{ uri: user.image }}
+                        style={styles.avatar}
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      <View style={styles.avatarFallback}>
+                        <Text style={styles.avatarText}>
+                          {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                </View>
               </View>
             </View>
 
-            {/* ── Scrollable content ───────────────────────────────── */}
             <ScrollView
               style={styles.sidebarScroll}
               contentContainerStyle={styles.sidebarScrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* New Event CTA */}
-              <Pressable
-                onPress={() => handleNavigate("/event/create")}
-                style={({ pressed }) => [
-                  styles.newEventButton,
-                  pressed && styles.pressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Create new event"
-              >
-                <Feather name="plus" size={17} color={theme.colors.foreground} style={{ opacity: 0.8 }} />
-                <Text style={styles.newEventText}>New event</Text>
-              </Pressable>
-
-              {/* View switcher section */}
-              <View style={styles.viewSection}>
-                <Pressable
-                  onPress={() => setViewSheetOpen(true)}
-                  style={({ pressed }) => [styles.viewTriggerRow, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Calendar view: ${activeViewLabel}. Tap to change`}
-                >
-                  <Feather
-                    name="eye"
-                    size={15}
-                    color={theme.colors.mutedForeground}
-                    style={{ opacity: 0.7 }}
-                  />
-                  <Text style={styles.viewTriggerLabel}>{activeViewLabel}</Text>
-                  <Feather name="chevron-down" size={14} color={theme.colors.mutedForeground} style={{ opacity: 0.5 }} />
-                </Pressable>
-              </View>
-
-              {/* Calendars section */}
-              <View>
-                {/* Section header */}
-                <View style={styles.calendarsSectionHeader}>
-                  <Text style={styles.calendarsSectionLabel}>Calendars</Text>
+              <View style={styles.sectionBlock}>
+                <View style={styles.primaryActionRow}>
                   <Pressable
-                    onPress={() => handleNavigate("/calendar-manage")}
-                    style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressed]}
+                    onPress={() => handleNavigate("/event/create")}
+                    style={({ pressed }) => [
+                      styles.newEventButton,
+                      pressed && styles.newEventButtonPressed,
+                    ]}
                     accessibilityRole="button"
-                    accessibilityLabel="Manage calendars"
+                    accessibilityLabel="Create new event"
                   >
-                    <Feather name="settings" size={14} color={theme.colors.mutedForeground} style={{ opacity: 0.5 }} />
+                    <Feather
+                      name="plus"
+                      size={16}
+                      color={theme.colors.primaryForeground}
+                    />
+                    <Text style={styles.newEventText}>New event</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => handleSelectCalendarDate(new Date())}
+                    style={({ pressed }) => [
+                      styles.todayButton,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Go to today"
+                  >
+                    <Text style={styles.todayButtonText}>Today</Text>
                   </Pressable>
                 </View>
+              </View>
 
-                {/* Calendar rows */}
+              <View style={styles.sectionBlock}>
+                <SidebarMiniCalendar
+                  weekStartDay={1}
+                  selectedDate={selectedDate}
+                  drawerCloseGesture={closePanGesture}
+                  onDayPress={handleSelectCalendarDate}
+                />
+              </View>
+
+              <View>
+                <View style={styles.calendarsSectionHeader}>
+                  <Text style={styles.sectionLabel}>Calendars</Text>
+                  <View style={styles.calendarsSectionActions}>
+                    <Pressable
+                      onPress={() => handleNavigate("/calendar-manage/create")}
+                      style={({ pressed }) => [
+                        styles.sectionActionButton,
+                        pressed && styles.pressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Create calendar"
+                    >
+                      <Feather name="plus" size={14} color={theme.colors.mutedForeground} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleNavigate("/calendar-manage")}
+                      style={({ pressed }) => [
+                        styles.sectionActionButton,
+                        pressed && styles.pressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Manage calendars"
+                    >
+                      <Feather
+                        name="settings"
+                        size={13}
+                        color={theme.colors.mutedForeground}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+
                 {calendarsLoading ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator size="small" color={theme.colors.primaryBase} />
@@ -373,12 +389,14 @@ export function AppSidebar() {
                       {section.rows.map((row) => {
                         const calendar = calendarById.get(row.id);
                         const isPending = pendingVisibilityCalendarId === row.id;
+
                         return (
                           <Pressable
                             key={row.id}
                             onPress={() => calendar && handleToggleCalendarVisibility(calendar)}
                             style={({ pressed }) => [
                               styles.calendarRow,
+                              !row.isVisible && styles.calendarRowHidden,
                               pressed && styles.pressed,
                             ]}
                             accessibilityRole="button"
@@ -386,15 +404,16 @@ export function AppSidebar() {
                             accessibilityState={{ checked: row.isVisible }}
                           >
                             {isPending ? (
-                              <ActivityIndicator size="small" color={theme.colors.primaryBase} style={styles.calendarDotPlaceholder} />
+                              <ActivityIndicator
+                                size="small"
+                                color={theme.colors.primaryBase}
+                                style={styles.calendarDotPlaceholder}
+                              />
                             ) : (
                               <View
                                 style={[
                                   styles.calendarDot,
-                                  {
-                                    backgroundColor: row.swatchColor,
-                                    opacity: row.isVisible ? 1 : 0.35,
-                                  },
+                                  { backgroundColor: row.swatchColor },
                                 ]}
                               />
                             )}
@@ -415,83 +434,19 @@ export function AppSidebar() {
                 )}
               </View>
             </ScrollView>
-
-            {/* ── Footer ──────────────────────────────────────────── */}
-            <View style={[styles.footerContainer, { paddingBottom: insets.bottom + 12 }]}>
-              {!isOnCalendar && (
-                <Pressable
-                  onPress={() => handleNavigate("/(tabs)/calendar")}
-                  style={({ pressed }) => [styles.backToCalendarButton, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Go to Calendar"
-                >
-                  <Feather name="chevron-left" size={16} color={theme.colors.primaryBase} />
-                  <Text style={styles.backToCalendarText}>Back to Calendar</Text>
-                </Pressable>
-              )}
-              <Pressable
-                onPress={close}
-                style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel="Close sidebar"
-              >
-                <Text style={styles.closeButtonText}>Close</Text>
-              </Pressable>
-            </View>
           </Animated.View>
         </GestureDetector>
       </View>
-
-      {/* View selector sheet */}
-      <BottomSheet
-        visible={viewSheetOpen}
-        onDismiss={() => setViewSheetOpen(false)}
-        title="Calendar View"
-      >
-        <View style={styles.viewSheetContent}>
-          {SIDEBAR_VIEW_OPTIONS.map((opt) => {
-            const isActive = activeView === opt.view;
-            return (
-              <Pressable
-                key={opt.view}
-                onPress={() => handleSelectView(opt.view)}
-                style={({ pressed }) => [
-                  styles.viewSheetOption,
-                  isActive && styles.viewSheetOptionActive,
-                  pressed && styles.pressed,
-                ]}
-                accessibilityRole="menuitem"
-                accessibilityLabel={opt.label}
-                accessibilityState={{ selected: isActive }}
-              >
-                <Feather
-                  name={opt.icon}
-                  size={18}
-                  color={isActive ? theme.colors.primaryBase : theme.colors.mutedForeground}
-                />
-                <Text
-                  style={[
-                    styles.viewSheetLabel,
-                    isActive && styles.viewSheetLabelActive,
-                  ]}
-                >
-                  {opt.label}
-                </Text>
-                {isActive && (
-                  <Feather name="check" size={16} color={theme.colors.primaryBase} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      </BottomSheet>
     </>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 function createStyles(theme: ThemeTokens) {
+  const borderSubtle = theme.colors.border + "66";
+  const borderMedium = theme.colors.border + "99";
+  const primaryTint = theme.colors.primaryBase + "1A";
+
+
   const view = {
     edgeZone: {
       position: "absolute" as const,
@@ -511,21 +466,22 @@ function createStyles(theme: ThemeTokens) {
       left: 0,
       bottom: 0,
       backgroundColor: theme.colors.card,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: theme.colors.border,
+      borderRightWidth: 1,
+      borderRightColor: borderSubtle,
       zIndex: 10,
     },
-    // ── Header ──────────────────────────────────────────────
     header: {
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: borderSubtle,
+    },
+    headerRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      paddingHorizontal: 20,
-      paddingBottom: 14,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
     },
-    headerLeft: {
+    headerBrand: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 10,
@@ -535,99 +491,90 @@ function createStyles(theme: ThemeTokens) {
       height: 28,
       borderRadius: 7,
     },
-    headerRight: {
+    headerActions: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 2,
     },
-    headerIconBtn: {
+    headerIconButton: {
       width: 36,
       height: 36,
+      borderRadius: theme.borderRadius.xl,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      borderRadius: theme.borderRadius.xl,
     },
     avatarButton: {
       borderRadius: 16,
+      marginLeft: 2,
     },
     avatar: {
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: theme.colors.primaryBase,
+    },
+    avatarFallback: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: primaryTint,
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
-    // ── Scroll ──────────────────────────────────────────────
     sidebarScroll: {
       flex: 1,
     },
     sidebarScrollContent: {
       paddingHorizontal: 20,
       paddingTop: 16,
-      paddingBottom: 16,
-      gap: 24,
+      paddingBottom: 24,
     },
-    // ── New event button ─────────────────────────────────────
+    sectionBlock: {
+      marginBottom: 20,
+    },
+    primaryActionRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 10,
+    },
     newEventButton: {
       flexDirection: "row" as const,
+      flex: 1,
       alignItems: "center" as const,
       justifyContent: "center" as const,
       gap: 8,
       height: 44,
+      borderRadius: 9999,
+      backgroundColor: theme.colors.primaryBase,
+    },
+    newEventButtonPressed: {
+      opacity: 0.85,
+    },
+    todayButton: {
+      height: 44,
+      paddingHorizontal: 16,
       borderRadius: theme.borderRadius.xl,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: "transparent" as const,
-    },
-    // ── View switcher ────────────────────────────────────────
-    viewSection: {
-      marginTop: 4,
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-    },
-    viewTriggerRow: {
-      flexDirection: "row" as const,
+      borderColor: borderMedium,
       alignItems: "center" as const,
-      gap: 10,
-      paddingHorizontal: 14,
-      height: 44,
+      justifyContent: "center" as const,
     },
-    viewDropdown: {
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-    },
-    viewOptionRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 10,
-      height: 44,
-      paddingHorizontal: 14,
-    },
-    viewOptionRowActive: {
-      backgroundColor: theme.colors.primaryBase + "12",
-    },
-    viewSheetContent: {
-      paddingVertical: 8,
-      paddingHorizontal: 0,
-    },
-    viewSheetOption: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 14,
-      paddingHorizontal: 20,
-      height: 52,
-    },
-    viewSheetOptionActive: {
-      backgroundColor: theme.colors.primaryBase + "10",
-    },
-    // ── Calendars section ────────────────────────────────────
     calendarsSectionHeader: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      marginBottom: 8,
+      marginBottom: 6,
+    },
+    calendarsSectionActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 2,
+    },
+    sectionActionButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 9999,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
     },
     loadingRow: {
       alignItems: "center" as const,
@@ -640,9 +587,12 @@ function createStyles(theme: ThemeTokens) {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 12,
-      paddingVertical: 9,
-      paddingHorizontal: 10,
-      borderRadius: theme.borderRadius.lg,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: theme.borderRadius.xl,
+    },
+    calendarRowHidden: {
+      opacity: 0.5,
     },
     calendarDot: {
       width: 10,
@@ -653,32 +603,6 @@ function createStyles(theme: ThemeTokens) {
     calendarDotPlaceholder: {
       width: 10,
       height: 10,
-    },
-    // ── Footer ──────────────────────────────────────────────
-    footerContainer: {
-      paddingHorizontal: 20,
-      paddingTop: 12,
-      gap: 8,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-    },
-    backToCalendarButton: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      gap: 6,
-      height: 44,
-      borderRadius: theme.borderRadius.xl,
-      borderWidth: 1,
-      borderColor: theme.colors.primaryBase,
-    },
-    closeButton: {
-      width: "100%" as const,
-      height: 44,
-      borderRadius: theme.borderRadius.xl,
-      backgroundColor: theme.colors.muted,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
     },
   } satisfies Record<string, ViewStyle>;
 
@@ -692,15 +616,19 @@ function createStyles(theme: ThemeTokens) {
     avatarText: {
       fontSize: theme.typography.fontSize.xs.size,
       fontWeight: "600" as TextStyle["fontWeight"],
-      color: theme.colors.primaryForeground,
+      color: theme.colors.primaryBase,
     },
     newEventText: {
       fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: "600" as TextStyle["fontWeight"],
+      color: theme.colors.primaryForeground,
+    },
+    todayButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
       fontWeight: "500" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
-      opacity: 0.8,
     },
-    calendarsSectionLabel: {
+    sectionLabel: {
       fontSize: 11,
       fontWeight: "600" as TextStyle["fontWeight"],
       color: theme.colors.mutedForeground,
@@ -709,62 +637,26 @@ function createStyles(theme: ThemeTokens) {
     },
     sectionSeparator: {
       paddingHorizontal: 12,
-      paddingTop: 12,
-      paddingBottom: 4,
-      fontSize: 11,
+      paddingTop: 10,
+      paddingBottom: 2,
+      fontSize: 10,
       fontWeight: "600" as TextStyle["fontWeight"],
       textTransform: "uppercase" as const,
       letterSpacing: 0.7,
       color: theme.colors.mutedForeground,
-      opacity: 0.7,
-    },
-    viewTriggerLabel: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: "500" as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    viewOptionLabel: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
-      color: theme.colors.foreground,
-    },
-    viewOptionLabelActive: {
-      color: theme.colors.primaryBase,
-      fontWeight: "600" as TextStyle["fontWeight"],
-    },
-    viewSheetLabel: {
-      flex: 1,
-      fontSize: theme.typography.fontSize.base.size,
-      color: theme.colors.foreground,
-    },
-    viewSheetLabelActive: {
-      color: theme.colors.primaryBase,
-      fontWeight: "600" as TextStyle["fontWeight"],
     },
     calendarRowLabel: {
       flex: 1,
-      fontSize: theme.typography.fontSize.sm.size,
+      fontSize: 14,
       fontWeight: "500" as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     calendarRowLabelHidden: {
       color: theme.colors.mutedForeground,
-      opacity: 0.55,
     },
     emptyText: {
       fontSize: theme.typography.fontSize.xs.size,
       color: theme.colors.mutedForeground,
-    },
-    closeButtonText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: "500" as TextStyle["fontWeight"],
-      color: theme.colors.foreground,
-    },
-    backToCalendarText: {
-      fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: "500" as TextStyle["fontWeight"],
-      color: theme.colors.primaryBase,
     },
   } satisfies Record<string, TextStyle>;
 
