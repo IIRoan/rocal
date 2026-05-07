@@ -356,6 +356,40 @@ exports.Prisma.UserEncryptionPasswordScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.MailDirectoryEntryScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  email: 'email',
+  localPart: 'localPart',
+  domain: 'domain',
+  displayName: 'displayName',
+  stalwartAccountId: 'stalwartAccountId',
+  stalwartDomainId: 'stalwartDomainId',
+  stalwartPublicKeyId: 'stalwartPublicKeyId',
+  publicKeyArmored: 'publicKeyArmored',
+  publicKeyFingerprint: 'publicKeyFingerprint',
+  keyAlgorithm: 'keyAlgorithm',
+  source: 'source',
+  trust: 'trust',
+  keyCreatedAt: 'keyCreatedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.MailVaultBackupScalarFieldEnum = {
+  id: 'id',
+  directoryEntryId: 'directoryEntryId',
+  vaultVersion: 'vaultVersion',
+  encryptedVaultB64: 'encryptedVaultB64',
+  kdf: 'kdf',
+  kdfSaltB64: 'kdfSaltB64',
+  kdfMemoryKiB: 'kdfMemoryKiB',
+  kdfIterations: 'kdfIterations',
+  kdfParallelism: 'kdfParallelism',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.CalendarSubscriptionScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -420,6 +454,8 @@ exports.Prisma.ModelName = {
   Passkey: 'Passkey',
   UserEncryptionDevice: 'UserEncryptionDevice',
   UserEncryptionPassword: 'UserEncryptionPassword',
+  MailDirectoryEntry: 'MailDirectoryEntry',
+  MailVaultBackup: 'MailVaultBackup',
   CalendarSubscription: 'CalendarSubscription',
   CalendarSyncLog: 'CalendarSyncLog'
 };

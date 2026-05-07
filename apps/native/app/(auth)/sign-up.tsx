@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -21,11 +21,13 @@ import {
   AUTH_SIGN_IN_ROUTE,
   CALENDAR_HOME_ROUTE,
 } from "../../src/lib/auth-routing";
+import { accountApiService } from "../../src/lib/api";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 const log = createLogger("auth:sign-up");
+const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -37,10 +39,10 @@ function validateName(name: string): string | null {
   return null;
 }
 
-function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Email is required";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    return "Please enter a valid email address";
+function validateDesiredEmail(email: string): string | null {
+  if (!email.trim()) return "Solace email is required";
+  if (!/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(email.trim().toLowerCase())) {
+    return "Use lowercase letters, numbers, dots, underscores, or hyphens";
   }
   return null;
 }
@@ -63,8 +65,9 @@ export default function SignUpScreen() {
 
   // Form state
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [desiredEmail, setDesiredEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
 
   // Validation state
   const [nameError, setNameError] = useState<string | null>(null);
@@ -89,11 +92,33 @@ export default function SignUpScreen() {
     setServerError(null);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void accountApiService
+      .getSignupConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setSignupDomain(config.defaultEmailDomain);
+        }
+      })
+      .catch((error) => {
+        log.error("Failed to load signup config", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSignUp = useCallback(async () => {
     clearErrors();
 
+    const trimmedName = name.trim();
+    const normalizedDesiredEmail = desiredEmail.trim().toLowerCase();
+
     const nErr = validateName(name);
-    const eErr = validateEmail(email);
+    const eErr = validateDesiredEmail(desiredEmail);
     const pErr = validatePassword(password);
 
     if (nErr) setNameError(nErr);
@@ -108,10 +133,22 @@ export default function SignUpScreen() {
       return;
     }
 
-    log.info("Attempting sign-up", { email: email.trim(), name: name.trim() });
+    log.info("Attempting sign-up", {
+      desiredEmail: normalizedDesiredEmail,
+      name: trimmedName,
+    });
     setIsSubmitting(true);
     try {
-      await signUp(name.trim(), email.trim(), password);
+      const availability = await accountApiService.checkEmailAvailability(
+        normalizedDesiredEmail,
+      );
+
+      if (!availability.available) {
+        setEmailError(availability.message);
+        return;
+      }
+
+      await signUp(trimmedName, availability.normalizedEmail, password);
       log.ok("Sign-up successful");
       router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
@@ -121,7 +158,7 @@ export default function SignUpScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [clearErrors, email, name, password, router, signUp]);
+  }, [clearErrors, desiredEmail, name, password, router, signUp]);
 
   const handleGitHubSignUp = useCallback(async () => {
     clearErrors();
@@ -163,8 +200,9 @@ export default function SignUpScreen() {
               <Text style={styles.appName}>Solace</Text>
               <Text style={styles.title}>Create your account</Text>
               <Text style={styles.subtitle}>
-                Get started with your personal calendar. If you sign in with
-                email, this password also protects your encrypted data.
+                Choose your @{signupDomain} Solace email and password. Your
+                Solace email becomes your account address, and this password
+                also protects your encrypted data.
               </Text>
             </View>
 
@@ -202,31 +240,30 @@ export default function SignUpScreen() {
               )}
             </View>
 
-            {/* Email field */}
+            {/* Solace email field */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                ref={emailRef}
-                style={[styles.input, emailError && styles.inputError]}
-                placeholder="you@example.com"
-                placeholderTextColor={theme.colors.mutedForeground}
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (emailError) setEmailError(null);
-                }}
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                inputMode="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                editable={!isSubmitting}
-                accessibilityLabel="Email address"
-                accessibilityHint="Enter your email address"
-              />
+              <Text style={styles.label}>Solace email</Text>
+              <View style={[styles.inputWithSuffix, emailError && styles.inputError]}>
+                <TextInput
+                  ref={emailRef}
+                  style={styles.inputInner}
+                  placeholder="your-name"
+                  placeholderTextColor={theme.colors.mutedForeground}
+                  value={desiredEmail}
+                  onChangeText={(text) => {
+                    setDesiredEmail(text);
+                    if (emailError) setEmailError(null);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  editable={!isSubmitting}
+                  accessibilityLabel="Solace email"
+                  accessibilityHint={`Choose the name before @${signupDomain}`}
+                />
+                <Text style={styles.inputSuffix}>@{signupDomain}</Text>
+              </View>
               {emailError && (
                 <Text style={styles.fieldError}>{emailError}</Text>
               )}
@@ -371,6 +408,15 @@ function createStyles(theme: ThemeTokens) {
     fieldContainer: {
       marginBottom: theme.spacing["4"],
     },
+    inputWithSuffix: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      borderWidth: 1,
+      borderColor: theme.colors.input,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.background,
+      overflow: "hidden" as const,
+    },
     inputError: {
       borderColor: theme.colors.destructive,
     },
@@ -463,6 +509,24 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: theme.spacing["3"],
       fontSize: theme.typography.fontSize.base.size,
       color: theme.colors.foreground,
+      backgroundColor: theme.colors.background,
+    },
+    inputInner: {
+      flex: 1,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+      fontSize: theme.typography.fontSize.base.size,
+      color: theme.colors.foreground,
+      backgroundColor: theme.colors.background,
+    },
+    inputSuffix: {
+      borderLeftWidth: 1,
+      borderLeftColor: theme.colors.input,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
       backgroundColor: theme.colors.background,
     },
     fieldError: {

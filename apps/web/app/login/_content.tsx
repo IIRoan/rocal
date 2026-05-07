@@ -16,14 +16,17 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { accountApiService } from "@/lib/account-api-service";
+import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import {
-  clearPendingAuthPassword,
+  clearAuthPasswords,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
 const log = createLogger("login");
+const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
 
 type AuthMode = "sign-in" | "sign-up" | "forgot-password";
 
@@ -126,7 +129,9 @@ export function LoginForm() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [desiredEmail, setDesiredEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
 
   const titleRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -221,6 +226,25 @@ export function LoginForm() {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void accountApiService
+      .getSignupConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setSignupDomain(config.defaultEmailDomain);
+        }
+      })
+      .catch((error) => {
+        log.error("Failed to load signup config:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Animate the title in when auth mode switches
   useGSAP(
     () => {
@@ -237,30 +261,72 @@ export function LoginForm() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedDesiredEmail = desiredEmail.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
     try {
       setEmailLoading(true);
       setError(null);
       setNotice(null);
 
       if (isSignUp) {
-        if (!name.trim()) {
+        if (!trimmedName) {
           setError("Please enter your name.");
           return;
         }
 
+        if (!normalizedDesiredEmail) {
+          setError(`Please choose your @${signupDomain} email.`);
+          return;
+        }
+
+        const availability = await accountApiService.checkEmailAvailability(
+          normalizedDesiredEmail,
+        );
+
+        if (!availability.available) {
+          setError(availability.message);
+          return;
+        }
+
         const result = await signUp.email({
-          email,
+          email: availability.normalizedEmail,
           password,
-          name,
+          name: trimmedName,
         });
 
         if (result?.error) {
           setError(result.error.message || "Sign up failed. Please try again.");
           return;
         }
+
+        storePendingAuthPassword(password);
+
+        setEmail(availability.normalizedEmail);
+
+        try {
+          await bootstrapMailboxForAccount({
+            email: availability.normalizedEmail,
+            password,
+            displayName: trimmedName,
+          });
+        } catch (mailboxError) {
+          log.error("Automatic mailbox bootstrap failed:", mailboxError);
+        }
       } else {
+        if (!normalizedEmail) {
+          setError("Please enter your account email address.");
+          return;
+        }
+
         const result = await signIn.email({
-          email,
+          email: normalizedEmail,
           password,
         });
 
@@ -268,9 +334,9 @@ export function LoginForm() {
           setError(result.error.message || "Invalid email or password.");
           return;
         }
-      }
 
-      storePendingAuthPassword(password);
+        storePendingAuthPassword(password);
+      }
 
       await syncThemeAfterAuth();
       setTimeout(() => {
@@ -278,8 +344,9 @@ export function LoginForm() {
       }, 100);
     } catch (err: any) {
       log.error("Email auth failed:", err);
-      clearPendingAuthPassword();
+      clearAuthPasswords();
       setError(err.message || "Authentication failed. Please try again.");
+    } finally {
       setEmailLoading(false);
     }
   };
@@ -330,7 +397,7 @@ export function LoginForm() {
       setPasskeyLoading(true);
       setError(null);
       setNotice(null);
-      clearPendingAuthPassword();
+      clearAuthPasswords();
 
       const result = await authClient.signIn.passkey({
         autoFocus: true,
@@ -360,7 +427,7 @@ export function LoginForm() {
       setIsLoading(true);
       setError(null);
       setNotice(null);
-      clearPendingAuthPassword();
+      clearAuthPasswords();
       if (currentTheme) {
         localStorage.setItem("pending-theme-sync", currentTheme);
       }
@@ -387,9 +454,9 @@ export function LoginForm() {
       : "Welcome back";
 
   const subtitle = isForgotPassword
-    ? "Enter your email and we’ll send a reset link for your email sign-in password."
+    ? "Enter your Solace account email and we’ll send a reset link for your email sign-in password."
     : isSignUp
-      ? "Sign up and get started with Solace. If you sign in with email, this password also protects your encrypted data."
+      ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password also protects your encrypted data.`
       : "Sign in to continue to Solace";
 
   const primaryButtonLabel = isForgotPassword
@@ -482,23 +549,55 @@ export function LoginForm() {
                   </div>
                 </AnimatedCollapse>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={emailLoading}
-                    className="h-11 rounded-lg"
-                  />
-                </div>
+                <AnimatedCollapse isOpen={isSignUp}>
+                  <div className="space-y-2 pb-0.5">
+                    <Label htmlFor="desired-email" className="text-sm font-medium">
+                      Solace email
+                    </Label>
+                    <div className="flex h-11 overflow-hidden rounded-lg border border-input bg-background">
+                      <Input
+                        id="desired-email"
+                        name="desired-email"
+                        type="text"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        placeholder="your-name"
+                        value={desiredEmail}
+                        onChange={(e) => setDesiredEmail(e.target.value)}
+                        required={isSignUp}
+                        disabled={emailLoading}
+                        className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                      <span className="flex items-center border-l border-input px-3 text-sm text-muted-foreground">
+                        @{signupDomain}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This becomes your Solace account email and mailbox address.
+                    </p>
+                  </div>
+                </AnimatedCollapse>
+
+                <AnimatedCollapse isOpen={!isSignUp}>
+                  <div className="space-y-2 pb-0.5">
+                    <Label htmlFor="email" className="text-sm font-medium">
+                      Account email
+                    </Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder={`you@${signupDomain}`}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required={!isSignUp}
+                      disabled={emailLoading}
+                      className="h-11 rounded-lg"
+                    />
+                  </div>
+                </AnimatedCollapse>
 
                 <AnimatedCollapse isOpen={!isForgotPassword}>
                   <div className="space-y-2 pb-0.5">
