@@ -36,6 +36,15 @@ export const env = {
     process.env.MOBILE_AUTH_CALLBACK_URL ||
     process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
     "solace://api/auth",
+
+  /** Base URL for direct Stalwart HTTP/JMAP access. */
+  stalwartBaseUrl: process.env.STALWART_BASE_URL || "http://localhost:8080",
+
+  /** Default email domain used by the mail demo when provisioning new mailboxes. */
+  stalwartDefaultDomain: process.env.STALWART_DEFAULT_DOMAIN || "solace.onl",
+
+  /** Admin token used for Stalwart provisioning via JMAP registry methods. */
+  stalwartAdminToken: process.env.STALWART_ADMIN_TOKEN || "",
 } as const;
 
 /** Parse a comma-separated env var into a trimmed string array. */

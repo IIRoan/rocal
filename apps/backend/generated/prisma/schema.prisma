@@ -34,6 +34,7 @@ model User {
   participations     EventParticipant[]
   settings           UserSettings?
   subscriptions      CalendarSubscription[]
+  mailDirectoryEntry MailDirectoryEntry?
   encryptionDevices  UserEncryptionDevice[]
   encryptionPassword UserEncryptionPassword?
 
@@ -350,6 +351,48 @@ model UserEncryptionPassword {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("user_encryption_password")
+}
+
+model MailDirectoryEntry {
+  id                   String           @id @default(cuid())
+  userId               String?          @unique @map("user_id")
+  user                 User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email                String           @unique
+  localPart            String           @map("local_part")
+  domain               String
+  displayName          String?          @map("display_name")
+  stalwartAccountId    String           @unique @map("stalwart_account_id")
+  stalwartDomainId     String           @map("stalwart_domain_id")
+  stalwartPublicKeyId  String?          @map("stalwart_public_key_id")
+  publicKeyArmored     String           @map("public_key_armored")
+  publicKeyFingerprint String           @map("public_key_fingerprint")
+  keyAlgorithm         String           @default("openpgp") @map("key_algorithm")
+  source               String           @default("internal")
+  trust                String           @default("verified")
+  keyCreatedAt         DateTime?        @map("key_created_at")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  vaultBackup          MailVaultBackup?
+
+  @@index([domain, localPart])
+  @@map("mail_directory_entry")
+}
+
+model MailVaultBackup {
+  id                String             @id @default(cuid())
+  directoryEntryId  String             @unique @map("directory_entry_id")
+  directoryEntry    MailDirectoryEntry @relation(fields: [directoryEntryId], references: [id], onDelete: Cascade)
+  vaultVersion      Int                @map("vault_version")
+  encryptedVaultB64 String             @map("encrypted_vault_b64")
+  kdf               String
+  kdfSaltB64        String             @map("kdf_salt_b64")
+  kdfMemoryKiB      Int                @map("kdf_memory_kib")
+  kdfIterations     Int                @map("kdf_iterations")
+  kdfParallelism    Int                @map("kdf_parallelism")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  @@map("mail_vault_backup")
 }
 
 // Calendar Subscription Models

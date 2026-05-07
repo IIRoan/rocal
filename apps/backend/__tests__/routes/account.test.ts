@@ -7,6 +7,9 @@ jest.mock("../../lib/prisma", () => ({
       findUnique: jest.fn(async (): Promise<any> => ({ id: "user-1" })),
       delete: jest.fn(async (): Promise<any> => ({ id: "user-1" })),
     },
+    mailDirectoryEntry: {
+      findUnique: jest.fn(async (): Promise<any> => null),
+    },
     calendarSharing: {
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
@@ -40,6 +43,7 @@ jest.mock("../../lib/auth-guard", () => {
 import { ensureAuthenticatedUser } from "../../lib/auth-utils";
 import { errorHandler } from "../../lib/errors";
 import { prisma } from "../../lib/prisma";
+import { accountPublicRoutes } from "../../routes/account-public";
 import { accountRoutes } from "../../routes/account";
 
 const mockEnsureAuthenticatedUser =
@@ -48,6 +52,9 @@ const mockPrisma = prisma as unknown as {
   user: {
     findUnique: jest.Mock<() => Promise<any>>;
     delete: jest.Mock<() => Promise<any>>;
+  };
+  mailDirectoryEntry: {
+    findUnique: jest.Mock<() => Promise<any>>;
   };
   calendarSharing: {
     deleteMany: jest.Mock<() => Promise<any>>;
@@ -61,6 +68,7 @@ const mockPrisma = prisma as unknown as {
 function createApp() {
   return new Elysia({ normalize: false })
     .use(errorHandler)
+    .use(accountPublicRoutes)
     .use(accountRoutes);
 }
 
@@ -69,6 +77,39 @@ async function readJson(response: Response) {
 }
 
 describe("accountRoutes", () => {
+  it("returns the public signup config", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/account/signup-config"),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(readJson(response)).resolves.toEqual({
+      defaultEmailDomain: "solace.onl",
+    });
+  });
+
+  it("checks public sign-up email availability", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce(null);
+
+    const response = await createApp().handle(
+      new Request(
+        "http://localhost/account/email-availability?email=Roan",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(readJson(response)).resolves.toEqual({
+      email: "Roan",
+      localPart: "roan",
+      domain: "solace.onl",
+      normalizedEmail: "roan@solace.onl",
+      available: true,
+      code: "available",
+      message: "That email address is available.",
+    });
+  });
+
   it("deletes the authenticated account", async () => {
     mockEnsureAuthenticatedUser.mockResolvedValue({ id: "user-1" });
 

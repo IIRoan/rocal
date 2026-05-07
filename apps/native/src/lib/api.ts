@@ -10,6 +10,7 @@
  * (via `setE2eeProvider`).
  */
 import {
+  AccountApiService,
   HttpClient,
   CalendarApiService,
   NoopE2eeProvider,
@@ -38,3 +39,5 @@ export const calendarApiService = new CalendarApiService(
   httpClient,
   new NoopE2eeProvider(),
 );
+
+export const accountApiService = new AccountApiService(httpClient);
