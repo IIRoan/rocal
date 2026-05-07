@@ -94,6 +94,16 @@ export type UserEncryptionDevice = $Result.DefaultSelection<Prisma.$UserEncrypti
  */
 export type UserEncryptionPassword = $Result.DefaultSelection<Prisma.$UserEncryptionPasswordPayload>
 /**
+ * Model MailDirectoryEntry
+ * 
+ */
+export type MailDirectoryEntry = $Result.DefaultSelection<Prisma.$MailDirectoryEntryPayload>
+/**
+ * Model MailVaultBackup
+ * 
+ */
+export type MailVaultBackup = $Result.DefaultSelection<Prisma.$MailVaultBackupPayload>
+/**
  * Model CalendarSubscription
  * 
  */
@@ -381,6 +391,26 @@ export class PrismaClient<
     * ```
     */
   get userEncryptionPassword(): Prisma.UserEncryptionPasswordDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.mailDirectoryEntry`: Exposes CRUD operations for the **MailDirectoryEntry** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more MailDirectoryEntries
+    * const mailDirectoryEntries = await prisma.mailDirectoryEntry.findMany()
+    * ```
+    */
+  get mailDirectoryEntry(): Prisma.MailDirectoryEntryDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.mailVaultBackup`: Exposes CRUD operations for the **MailVaultBackup** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more MailVaultBackups
+    * const mailVaultBackups = await prisma.mailVaultBackup.findMany()
+    * ```
+    */
+  get mailVaultBackup(): Prisma.MailVaultBackupDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.calendarSubscription`: Exposes CRUD operations for the **CalendarSubscription** model.
@@ -858,6 +888,8 @@ export namespace Prisma {
     Passkey: 'Passkey',
     UserEncryptionDevice: 'UserEncryptionDevice',
     UserEncryptionPassword: 'UserEncryptionPassword',
+    MailDirectoryEntry: 'MailDirectoryEntry',
+    MailVaultBackup: 'MailVaultBackup',
     CalendarSubscription: 'CalendarSubscription',
     CalendarSyncLog: 'CalendarSyncLog'
   };
@@ -878,7 +910,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "session" | "account" | "verification" | "calendar" | "eventCategory" | "calendarEvent" | "eventParticipant" | "userSettings" | "calendarSharing" | "recurrenceException" | "eventNotification" | "notificationLog" | "passkey" | "userEncryptionDevice" | "userEncryptionPassword" | "calendarSubscription" | "calendarSyncLog"
+      modelProps: "user" | "session" | "account" | "verification" | "calendar" | "eventCategory" | "calendarEvent" | "eventParticipant" | "userSettings" | "calendarSharing" | "recurrenceException" | "eventNotification" | "notificationLog" | "passkey" | "userEncryptionDevice" | "userEncryptionPassword" | "mailDirectoryEntry" | "mailVaultBackup" | "calendarSubscription" | "calendarSyncLog"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2066,6 +2098,154 @@ export namespace Prisma {
           }
         }
       }
+      MailDirectoryEntry: {
+        payload: Prisma.$MailDirectoryEntryPayload<ExtArgs>
+        fields: Prisma.MailDirectoryEntryFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.MailDirectoryEntryFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.MailDirectoryEntryFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>
+          }
+          findFirst: {
+            args: Prisma.MailDirectoryEntryFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.MailDirectoryEntryFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>
+          }
+          findMany: {
+            args: Prisma.MailDirectoryEntryFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>[]
+          }
+          create: {
+            args: Prisma.MailDirectoryEntryCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>
+          }
+          createMany: {
+            args: Prisma.MailDirectoryEntryCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.MailDirectoryEntryCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>[]
+          }
+          delete: {
+            args: Prisma.MailDirectoryEntryDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>
+          }
+          update: {
+            args: Prisma.MailDirectoryEntryUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>
+          }
+          deleteMany: {
+            args: Prisma.MailDirectoryEntryDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.MailDirectoryEntryUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.MailDirectoryEntryUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>[]
+          }
+          upsert: {
+            args: Prisma.MailDirectoryEntryUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailDirectoryEntryPayload>
+          }
+          aggregate: {
+            args: Prisma.MailDirectoryEntryAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateMailDirectoryEntry>
+          }
+          groupBy: {
+            args: Prisma.MailDirectoryEntryGroupByArgs<ExtArgs>
+            result: $Utils.Optional<MailDirectoryEntryGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.MailDirectoryEntryCountArgs<ExtArgs>
+            result: $Utils.Optional<MailDirectoryEntryCountAggregateOutputType> | number
+          }
+        }
+      }
+      MailVaultBackup: {
+        payload: Prisma.$MailVaultBackupPayload<ExtArgs>
+        fields: Prisma.MailVaultBackupFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.MailVaultBackupFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.MailVaultBackupFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>
+          }
+          findFirst: {
+            args: Prisma.MailVaultBackupFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.MailVaultBackupFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>
+          }
+          findMany: {
+            args: Prisma.MailVaultBackupFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>[]
+          }
+          create: {
+            args: Prisma.MailVaultBackupCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>
+          }
+          createMany: {
+            args: Prisma.MailVaultBackupCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.MailVaultBackupCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>[]
+          }
+          delete: {
+            args: Prisma.MailVaultBackupDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>
+          }
+          update: {
+            args: Prisma.MailVaultBackupUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>
+          }
+          deleteMany: {
+            args: Prisma.MailVaultBackupDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.MailVaultBackupUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.MailVaultBackupUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>[]
+          }
+          upsert: {
+            args: Prisma.MailVaultBackupUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailVaultBackupPayload>
+          }
+          aggregate: {
+            args: Prisma.MailVaultBackupAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateMailVaultBackup>
+          }
+          groupBy: {
+            args: Prisma.MailVaultBackupGroupByArgs<ExtArgs>
+            result: $Utils.Optional<MailVaultBackupGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.MailVaultBackupCountArgs<ExtArgs>
+            result: $Utils.Optional<MailVaultBackupCountAggregateOutputType> | number
+          }
+        }
+      }
       CalendarSubscription: {
         payload: Prisma.$CalendarSubscriptionPayload<ExtArgs>
         fields: Prisma.CalendarSubscriptionFieldRefs
@@ -2326,6 +2506,8 @@ export namespace Prisma {
     passkey?: PasskeyOmit
     userEncryptionDevice?: UserEncryptionDeviceOmit
     userEncryptionPassword?: UserEncryptionPasswordOmit
+    mailDirectoryEntry?: MailDirectoryEntryOmit
+    mailVaultBackup?: MailVaultBackupOmit
     calendarSubscription?: CalendarSubscriptionOmit
     calendarSyncLog?: CalendarSyncLogOmit
   }
@@ -2858,6 +3040,7 @@ export namespace Prisma {
     participations?: boolean | User$participationsArgs<ExtArgs>
     settings?: boolean | User$settingsArgs<ExtArgs>
     subscriptions?: boolean | User$subscriptionsArgs<ExtArgs>
+    mailDirectoryEntry?: boolean | User$mailDirectoryEntryArgs<ExtArgs>
     encryptionDevices?: boolean | User$encryptionDevicesArgs<ExtArgs>
     encryptionPassword?: boolean | User$encryptionPasswordArgs<ExtArgs>
     passkeys?: boolean | User$passkeysArgs<ExtArgs>
@@ -2904,6 +3087,7 @@ export namespace Prisma {
     participations?: boolean | User$participationsArgs<ExtArgs>
     settings?: boolean | User$settingsArgs<ExtArgs>
     subscriptions?: boolean | User$subscriptionsArgs<ExtArgs>
+    mailDirectoryEntry?: boolean | User$mailDirectoryEntryArgs<ExtArgs>
     encryptionDevices?: boolean | User$encryptionDevicesArgs<ExtArgs>
     encryptionPassword?: boolean | User$encryptionPasswordArgs<ExtArgs>
     passkeys?: boolean | User$passkeysArgs<ExtArgs>
@@ -2923,6 +3107,7 @@ export namespace Prisma {
       participations: Prisma.$EventParticipantPayload<ExtArgs>[]
       settings: Prisma.$UserSettingsPayload<ExtArgs> | null
       subscriptions: Prisma.$CalendarSubscriptionPayload<ExtArgs>[]
+      mailDirectoryEntry: Prisma.$MailDirectoryEntryPayload<ExtArgs> | null
       encryptionDevices: Prisma.$UserEncryptionDevicePayload<ExtArgs>[]
       encryptionPassword: Prisma.$UserEncryptionPasswordPayload<ExtArgs> | null
       passkeys: Prisma.$PasskeyPayload<ExtArgs>[]
@@ -3337,6 +3522,7 @@ export namespace Prisma {
     participations<T extends User$participationsArgs<ExtArgs> = {}>(args?: Subset<T, User$participationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EventParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     settings<T extends User$settingsArgs<ExtArgs> = {}>(args?: Subset<T, User$settingsArgs<ExtArgs>>): Prisma__UserSettingsClient<$Result.GetResult<Prisma.$UserSettingsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     subscriptions<T extends User$subscriptionsArgs<ExtArgs> = {}>(args?: Subset<T, User$subscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSubscriptionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    mailDirectoryEntry<T extends User$mailDirectoryEntryArgs<ExtArgs> = {}>(args?: Subset<T, User$mailDirectoryEntryArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     encryptionDevices<T extends User$encryptionDevicesArgs<ExtArgs> = {}>(args?: Subset<T, User$encryptionDevicesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserEncryptionDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     encryptionPassword<T extends User$encryptionPasswordArgs<ExtArgs> = {}>(args?: Subset<T, User$encryptionPasswordArgs<ExtArgs>>): Prisma__UserEncryptionPasswordClient<$Result.GetResult<Prisma.$UserEncryptionPasswordPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     passkeys<T extends User$passkeysArgs<ExtArgs> = {}>(args?: Subset<T, User$passkeysArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PasskeyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -3948,6 +4134,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CalendarSubscriptionScalarFieldEnum | CalendarSubscriptionScalarFieldEnum[]
+  }
+
+  /**
+   * User.mailDirectoryEntry
+   */
+  export type User$mailDirectoryEntryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    where?: MailDirectoryEntryWhereInput
   }
 
   /**
@@ -21740,6 +21945,2444 @@ export namespace Prisma {
 
 
   /**
+   * Model MailDirectoryEntry
+   */
+
+  export type AggregateMailDirectoryEntry = {
+    _count: MailDirectoryEntryCountAggregateOutputType | null
+    _min: MailDirectoryEntryMinAggregateOutputType | null
+    _max: MailDirectoryEntryMaxAggregateOutputType | null
+  }
+
+  export type MailDirectoryEntryMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    email: string | null
+    localPart: string | null
+    domain: string | null
+    displayName: string | null
+    stalwartAccountId: string | null
+    stalwartDomainId: string | null
+    stalwartPublicKeyId: string | null
+    publicKeyArmored: string | null
+    publicKeyFingerprint: string | null
+    keyAlgorithm: string | null
+    source: string | null
+    trust: string | null
+    keyCreatedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MailDirectoryEntryMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    email: string | null
+    localPart: string | null
+    domain: string | null
+    displayName: string | null
+    stalwartAccountId: string | null
+    stalwartDomainId: string | null
+    stalwartPublicKeyId: string | null
+    publicKeyArmored: string | null
+    publicKeyFingerprint: string | null
+    keyAlgorithm: string | null
+    source: string | null
+    trust: string | null
+    keyCreatedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MailDirectoryEntryCountAggregateOutputType = {
+    id: number
+    userId: number
+    email: number
+    localPart: number
+    domain: number
+    displayName: number
+    stalwartAccountId: number
+    stalwartDomainId: number
+    stalwartPublicKeyId: number
+    publicKeyArmored: number
+    publicKeyFingerprint: number
+    keyAlgorithm: number
+    source: number
+    trust: number
+    keyCreatedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type MailDirectoryEntryMinAggregateInputType = {
+    id?: true
+    userId?: true
+    email?: true
+    localPart?: true
+    domain?: true
+    displayName?: true
+    stalwartAccountId?: true
+    stalwartDomainId?: true
+    stalwartPublicKeyId?: true
+    publicKeyArmored?: true
+    publicKeyFingerprint?: true
+    keyAlgorithm?: true
+    source?: true
+    trust?: true
+    keyCreatedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MailDirectoryEntryMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    email?: true
+    localPart?: true
+    domain?: true
+    displayName?: true
+    stalwartAccountId?: true
+    stalwartDomainId?: true
+    stalwartPublicKeyId?: true
+    publicKeyArmored?: true
+    publicKeyFingerprint?: true
+    keyAlgorithm?: true
+    source?: true
+    trust?: true
+    keyCreatedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MailDirectoryEntryCountAggregateInputType = {
+    id?: true
+    userId?: true
+    email?: true
+    localPart?: true
+    domain?: true
+    displayName?: true
+    stalwartAccountId?: true
+    stalwartDomainId?: true
+    stalwartPublicKeyId?: true
+    publicKeyArmored?: true
+    publicKeyFingerprint?: true
+    keyAlgorithm?: true
+    source?: true
+    trust?: true
+    keyCreatedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type MailDirectoryEntryAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MailDirectoryEntry to aggregate.
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailDirectoryEntries to fetch.
+     */
+    orderBy?: MailDirectoryEntryOrderByWithRelationInput | MailDirectoryEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: MailDirectoryEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailDirectoryEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailDirectoryEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned MailDirectoryEntries
+    **/
+    _count?: true | MailDirectoryEntryCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: MailDirectoryEntryMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: MailDirectoryEntryMaxAggregateInputType
+  }
+
+  export type GetMailDirectoryEntryAggregateType<T extends MailDirectoryEntryAggregateArgs> = {
+        [P in keyof T & keyof AggregateMailDirectoryEntry]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateMailDirectoryEntry[P]>
+      : GetScalarType<T[P], AggregateMailDirectoryEntry[P]>
+  }
+
+
+
+
+  export type MailDirectoryEntryGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: MailDirectoryEntryWhereInput
+    orderBy?: MailDirectoryEntryOrderByWithAggregationInput | MailDirectoryEntryOrderByWithAggregationInput[]
+    by: MailDirectoryEntryScalarFieldEnum[] | MailDirectoryEntryScalarFieldEnum
+    having?: MailDirectoryEntryScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: MailDirectoryEntryCountAggregateInputType | true
+    _min?: MailDirectoryEntryMinAggregateInputType
+    _max?: MailDirectoryEntryMaxAggregateInputType
+  }
+
+  export type MailDirectoryEntryGroupByOutputType = {
+    id: string
+    userId: string | null
+    email: string
+    localPart: string
+    domain: string
+    displayName: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm: string
+    source: string
+    trust: string
+    keyCreatedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: MailDirectoryEntryCountAggregateOutputType | null
+    _min: MailDirectoryEntryMinAggregateOutputType | null
+    _max: MailDirectoryEntryMaxAggregateOutputType | null
+  }
+
+  type GetMailDirectoryEntryGroupByPayload<T extends MailDirectoryEntryGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<MailDirectoryEntryGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof MailDirectoryEntryGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], MailDirectoryEntryGroupByOutputType[P]>
+            : GetScalarType<T[P], MailDirectoryEntryGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type MailDirectoryEntrySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    email?: boolean
+    localPart?: boolean
+    domain?: boolean
+    displayName?: boolean
+    stalwartAccountId?: boolean
+    stalwartDomainId?: boolean
+    stalwartPublicKeyId?: boolean
+    publicKeyArmored?: boolean
+    publicKeyFingerprint?: boolean
+    keyAlgorithm?: boolean
+    source?: boolean
+    trust?: boolean
+    keyCreatedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
+    vaultBackup?: boolean | MailDirectoryEntry$vaultBackupArgs<ExtArgs>
+  }, ExtArgs["result"]["mailDirectoryEntry"]>
+
+  export type MailDirectoryEntrySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    email?: boolean
+    localPart?: boolean
+    domain?: boolean
+    displayName?: boolean
+    stalwartAccountId?: boolean
+    stalwartDomainId?: boolean
+    stalwartPublicKeyId?: boolean
+    publicKeyArmored?: boolean
+    publicKeyFingerprint?: boolean
+    keyAlgorithm?: boolean
+    source?: boolean
+    trust?: boolean
+    keyCreatedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
+  }, ExtArgs["result"]["mailDirectoryEntry"]>
+
+  export type MailDirectoryEntrySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    email?: boolean
+    localPart?: boolean
+    domain?: boolean
+    displayName?: boolean
+    stalwartAccountId?: boolean
+    stalwartDomainId?: boolean
+    stalwartPublicKeyId?: boolean
+    publicKeyArmored?: boolean
+    publicKeyFingerprint?: boolean
+    keyAlgorithm?: boolean
+    source?: boolean
+    trust?: boolean
+    keyCreatedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
+  }, ExtArgs["result"]["mailDirectoryEntry"]>
+
+  export type MailDirectoryEntrySelectScalar = {
+    id?: boolean
+    userId?: boolean
+    email?: boolean
+    localPart?: boolean
+    domain?: boolean
+    displayName?: boolean
+    stalwartAccountId?: boolean
+    stalwartDomainId?: boolean
+    stalwartPublicKeyId?: boolean
+    publicKeyArmored?: boolean
+    publicKeyFingerprint?: boolean
+    keyAlgorithm?: boolean
+    source?: boolean
+    trust?: boolean
+    keyCreatedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type MailDirectoryEntryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "email" | "localPart" | "domain" | "displayName" | "stalwartAccountId" | "stalwartDomainId" | "stalwartPublicKeyId" | "publicKeyArmored" | "publicKeyFingerprint" | "keyAlgorithm" | "source" | "trust" | "keyCreatedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["mailDirectoryEntry"]>
+  export type MailDirectoryEntryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
+    vaultBackup?: boolean | MailDirectoryEntry$vaultBackupArgs<ExtArgs>
+  }
+  export type MailDirectoryEntryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
+  }
+  export type MailDirectoryEntryIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
+  }
+
+  export type $MailDirectoryEntryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "MailDirectoryEntry"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs> | null
+      vaultBackup: Prisma.$MailVaultBackupPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string | null
+      email: string
+      localPart: string
+      domain: string
+      displayName: string | null
+      stalwartAccountId: string
+      stalwartDomainId: string
+      stalwartPublicKeyId: string | null
+      publicKeyArmored: string
+      publicKeyFingerprint: string
+      keyAlgorithm: string
+      source: string
+      trust: string
+      keyCreatedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["mailDirectoryEntry"]>
+    composites: {}
+  }
+
+  type MailDirectoryEntryGetPayload<S extends boolean | null | undefined | MailDirectoryEntryDefaultArgs> = $Result.GetResult<Prisma.$MailDirectoryEntryPayload, S>
+
+  type MailDirectoryEntryCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<MailDirectoryEntryFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: MailDirectoryEntryCountAggregateInputType | true
+    }
+
+  export interface MailDirectoryEntryDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['MailDirectoryEntry'], meta: { name: 'MailDirectoryEntry' } }
+    /**
+     * Find zero or one MailDirectoryEntry that matches the filter.
+     * @param {MailDirectoryEntryFindUniqueArgs} args - Arguments to find a MailDirectoryEntry
+     * @example
+     * // Get one MailDirectoryEntry
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends MailDirectoryEntryFindUniqueArgs>(args: SelectSubset<T, MailDirectoryEntryFindUniqueArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one MailDirectoryEntry that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {MailDirectoryEntryFindUniqueOrThrowArgs} args - Arguments to find a MailDirectoryEntry
+     * @example
+     * // Get one MailDirectoryEntry
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends MailDirectoryEntryFindUniqueOrThrowArgs>(args: SelectSubset<T, MailDirectoryEntryFindUniqueOrThrowArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MailDirectoryEntry that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryFindFirstArgs} args - Arguments to find a MailDirectoryEntry
+     * @example
+     * // Get one MailDirectoryEntry
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends MailDirectoryEntryFindFirstArgs>(args?: SelectSubset<T, MailDirectoryEntryFindFirstArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MailDirectoryEntry that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryFindFirstOrThrowArgs} args - Arguments to find a MailDirectoryEntry
+     * @example
+     * // Get one MailDirectoryEntry
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends MailDirectoryEntryFindFirstOrThrowArgs>(args?: SelectSubset<T, MailDirectoryEntryFindFirstOrThrowArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more MailDirectoryEntries that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all MailDirectoryEntries
+     * const mailDirectoryEntries = await prisma.mailDirectoryEntry.findMany()
+     * 
+     * // Get first 10 MailDirectoryEntries
+     * const mailDirectoryEntries = await prisma.mailDirectoryEntry.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const mailDirectoryEntryWithIdOnly = await prisma.mailDirectoryEntry.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends MailDirectoryEntryFindManyArgs>(args?: SelectSubset<T, MailDirectoryEntryFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a MailDirectoryEntry.
+     * @param {MailDirectoryEntryCreateArgs} args - Arguments to create a MailDirectoryEntry.
+     * @example
+     * // Create one MailDirectoryEntry
+     * const MailDirectoryEntry = await prisma.mailDirectoryEntry.create({
+     *   data: {
+     *     // ... data to create a MailDirectoryEntry
+     *   }
+     * })
+     * 
+     */
+    create<T extends MailDirectoryEntryCreateArgs>(args: SelectSubset<T, MailDirectoryEntryCreateArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many MailDirectoryEntries.
+     * @param {MailDirectoryEntryCreateManyArgs} args - Arguments to create many MailDirectoryEntries.
+     * @example
+     * // Create many MailDirectoryEntries
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends MailDirectoryEntryCreateManyArgs>(args?: SelectSubset<T, MailDirectoryEntryCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many MailDirectoryEntries and returns the data saved in the database.
+     * @param {MailDirectoryEntryCreateManyAndReturnArgs} args - Arguments to create many MailDirectoryEntries.
+     * @example
+     * // Create many MailDirectoryEntries
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many MailDirectoryEntries and only return the `id`
+     * const mailDirectoryEntryWithIdOnly = await prisma.mailDirectoryEntry.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends MailDirectoryEntryCreateManyAndReturnArgs>(args?: SelectSubset<T, MailDirectoryEntryCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a MailDirectoryEntry.
+     * @param {MailDirectoryEntryDeleteArgs} args - Arguments to delete one MailDirectoryEntry.
+     * @example
+     * // Delete one MailDirectoryEntry
+     * const MailDirectoryEntry = await prisma.mailDirectoryEntry.delete({
+     *   where: {
+     *     // ... filter to delete one MailDirectoryEntry
+     *   }
+     * })
+     * 
+     */
+    delete<T extends MailDirectoryEntryDeleteArgs>(args: SelectSubset<T, MailDirectoryEntryDeleteArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one MailDirectoryEntry.
+     * @param {MailDirectoryEntryUpdateArgs} args - Arguments to update one MailDirectoryEntry.
+     * @example
+     * // Update one MailDirectoryEntry
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends MailDirectoryEntryUpdateArgs>(args: SelectSubset<T, MailDirectoryEntryUpdateArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more MailDirectoryEntries.
+     * @param {MailDirectoryEntryDeleteManyArgs} args - Arguments to filter MailDirectoryEntries to delete.
+     * @example
+     * // Delete a few MailDirectoryEntries
+     * const { count } = await prisma.mailDirectoryEntry.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends MailDirectoryEntryDeleteManyArgs>(args?: SelectSubset<T, MailDirectoryEntryDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MailDirectoryEntries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many MailDirectoryEntries
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends MailDirectoryEntryUpdateManyArgs>(args: SelectSubset<T, MailDirectoryEntryUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MailDirectoryEntries and returns the data updated in the database.
+     * @param {MailDirectoryEntryUpdateManyAndReturnArgs} args - Arguments to update many MailDirectoryEntries.
+     * @example
+     * // Update many MailDirectoryEntries
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more MailDirectoryEntries and only return the `id`
+     * const mailDirectoryEntryWithIdOnly = await prisma.mailDirectoryEntry.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends MailDirectoryEntryUpdateManyAndReturnArgs>(args: SelectSubset<T, MailDirectoryEntryUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one MailDirectoryEntry.
+     * @param {MailDirectoryEntryUpsertArgs} args - Arguments to update or create a MailDirectoryEntry.
+     * @example
+     * // Update or create a MailDirectoryEntry
+     * const mailDirectoryEntry = await prisma.mailDirectoryEntry.upsert({
+     *   create: {
+     *     // ... data to create a MailDirectoryEntry
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the MailDirectoryEntry we want to update
+     *   }
+     * })
+     */
+    upsert<T extends MailDirectoryEntryUpsertArgs>(args: SelectSubset<T, MailDirectoryEntryUpsertArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of MailDirectoryEntries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryCountArgs} args - Arguments to filter MailDirectoryEntries to count.
+     * @example
+     * // Count the number of MailDirectoryEntries
+     * const count = await prisma.mailDirectoryEntry.count({
+     *   where: {
+     *     // ... the filter for the MailDirectoryEntries we want to count
+     *   }
+     * })
+    **/
+    count<T extends MailDirectoryEntryCountArgs>(
+      args?: Subset<T, MailDirectoryEntryCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], MailDirectoryEntryCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a MailDirectoryEntry.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends MailDirectoryEntryAggregateArgs>(args: Subset<T, MailDirectoryEntryAggregateArgs>): Prisma.PrismaPromise<GetMailDirectoryEntryAggregateType<T>>
+
+    /**
+     * Group by MailDirectoryEntry.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailDirectoryEntryGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends MailDirectoryEntryGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: MailDirectoryEntryGroupByArgs['orderBy'] }
+        : { orderBy?: MailDirectoryEntryGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, MailDirectoryEntryGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetMailDirectoryEntryGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the MailDirectoryEntry model
+   */
+  readonly fields: MailDirectoryEntryFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for MailDirectoryEntry.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__MailDirectoryEntryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends MailDirectoryEntry$userArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntry$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    vaultBackup<T extends MailDirectoryEntry$vaultBackupArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntry$vaultBackupArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the MailDirectoryEntry model
+   */
+  interface MailDirectoryEntryFieldRefs {
+    readonly id: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly userId: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly email: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly localPart: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly domain: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly displayName: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly stalwartAccountId: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly stalwartDomainId: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly stalwartPublicKeyId: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly publicKeyArmored: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly publicKeyFingerprint: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly keyAlgorithm: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly source: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly trust: FieldRef<"MailDirectoryEntry", 'String'>
+    readonly keyCreatedAt: FieldRef<"MailDirectoryEntry", 'DateTime'>
+    readonly createdAt: FieldRef<"MailDirectoryEntry", 'DateTime'>
+    readonly updatedAt: FieldRef<"MailDirectoryEntry", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * MailDirectoryEntry findUnique
+   */
+  export type MailDirectoryEntryFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * Filter, which MailDirectoryEntry to fetch.
+     */
+    where: MailDirectoryEntryWhereUniqueInput
+  }
+
+  /**
+   * MailDirectoryEntry findUniqueOrThrow
+   */
+  export type MailDirectoryEntryFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * Filter, which MailDirectoryEntry to fetch.
+     */
+    where: MailDirectoryEntryWhereUniqueInput
+  }
+
+  /**
+   * MailDirectoryEntry findFirst
+   */
+  export type MailDirectoryEntryFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * Filter, which MailDirectoryEntry to fetch.
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailDirectoryEntries to fetch.
+     */
+    orderBy?: MailDirectoryEntryOrderByWithRelationInput | MailDirectoryEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MailDirectoryEntries.
+     */
+    cursor?: MailDirectoryEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailDirectoryEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailDirectoryEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MailDirectoryEntries.
+     */
+    distinct?: MailDirectoryEntryScalarFieldEnum | MailDirectoryEntryScalarFieldEnum[]
+  }
+
+  /**
+   * MailDirectoryEntry findFirstOrThrow
+   */
+  export type MailDirectoryEntryFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * Filter, which MailDirectoryEntry to fetch.
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailDirectoryEntries to fetch.
+     */
+    orderBy?: MailDirectoryEntryOrderByWithRelationInput | MailDirectoryEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MailDirectoryEntries.
+     */
+    cursor?: MailDirectoryEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailDirectoryEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailDirectoryEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MailDirectoryEntries.
+     */
+    distinct?: MailDirectoryEntryScalarFieldEnum | MailDirectoryEntryScalarFieldEnum[]
+  }
+
+  /**
+   * MailDirectoryEntry findMany
+   */
+  export type MailDirectoryEntryFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * Filter, which MailDirectoryEntries to fetch.
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailDirectoryEntries to fetch.
+     */
+    orderBy?: MailDirectoryEntryOrderByWithRelationInput | MailDirectoryEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing MailDirectoryEntries.
+     */
+    cursor?: MailDirectoryEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailDirectoryEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailDirectoryEntries.
+     */
+    skip?: number
+    distinct?: MailDirectoryEntryScalarFieldEnum | MailDirectoryEntryScalarFieldEnum[]
+  }
+
+  /**
+   * MailDirectoryEntry create
+   */
+  export type MailDirectoryEntryCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * The data needed to create a MailDirectoryEntry.
+     */
+    data: XOR<MailDirectoryEntryCreateInput, MailDirectoryEntryUncheckedCreateInput>
+  }
+
+  /**
+   * MailDirectoryEntry createMany
+   */
+  export type MailDirectoryEntryCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many MailDirectoryEntries.
+     */
+    data: MailDirectoryEntryCreateManyInput | MailDirectoryEntryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * MailDirectoryEntry createManyAndReturn
+   */
+  export type MailDirectoryEntryCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * The data used to create many MailDirectoryEntries.
+     */
+    data: MailDirectoryEntryCreateManyInput | MailDirectoryEntryCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MailDirectoryEntry update
+   */
+  export type MailDirectoryEntryUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * The data needed to update a MailDirectoryEntry.
+     */
+    data: XOR<MailDirectoryEntryUpdateInput, MailDirectoryEntryUncheckedUpdateInput>
+    /**
+     * Choose, which MailDirectoryEntry to update.
+     */
+    where: MailDirectoryEntryWhereUniqueInput
+  }
+
+  /**
+   * MailDirectoryEntry updateMany
+   */
+  export type MailDirectoryEntryUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update MailDirectoryEntries.
+     */
+    data: XOR<MailDirectoryEntryUpdateManyMutationInput, MailDirectoryEntryUncheckedUpdateManyInput>
+    /**
+     * Filter which MailDirectoryEntries to update
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * Limit how many MailDirectoryEntries to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * MailDirectoryEntry updateManyAndReturn
+   */
+  export type MailDirectoryEntryUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * The data used to update MailDirectoryEntries.
+     */
+    data: XOR<MailDirectoryEntryUpdateManyMutationInput, MailDirectoryEntryUncheckedUpdateManyInput>
+    /**
+     * Filter which MailDirectoryEntries to update
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * Limit how many MailDirectoryEntries to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MailDirectoryEntry upsert
+   */
+  export type MailDirectoryEntryUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * The filter to search for the MailDirectoryEntry to update in case it exists.
+     */
+    where: MailDirectoryEntryWhereUniqueInput
+    /**
+     * In case the MailDirectoryEntry found by the `where` argument doesn't exist, create a new MailDirectoryEntry with this data.
+     */
+    create: XOR<MailDirectoryEntryCreateInput, MailDirectoryEntryUncheckedCreateInput>
+    /**
+     * In case the MailDirectoryEntry was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<MailDirectoryEntryUpdateInput, MailDirectoryEntryUncheckedUpdateInput>
+  }
+
+  /**
+   * MailDirectoryEntry delete
+   */
+  export type MailDirectoryEntryDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+    /**
+     * Filter which MailDirectoryEntry to delete.
+     */
+    where: MailDirectoryEntryWhereUniqueInput
+  }
+
+  /**
+   * MailDirectoryEntry deleteMany
+   */
+  export type MailDirectoryEntryDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MailDirectoryEntries to delete
+     */
+    where?: MailDirectoryEntryWhereInput
+    /**
+     * Limit how many MailDirectoryEntries to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * MailDirectoryEntry.user
+   */
+  export type MailDirectoryEntry$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * MailDirectoryEntry.vaultBackup
+   */
+  export type MailDirectoryEntry$vaultBackupArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    where?: MailVaultBackupWhereInput
+  }
+
+  /**
+   * MailDirectoryEntry without action
+   */
+  export type MailDirectoryEntryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailDirectoryEntry
+     */
+    select?: MailDirectoryEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailDirectoryEntry
+     */
+    omit?: MailDirectoryEntryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailDirectoryEntryInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model MailVaultBackup
+   */
+
+  export type AggregateMailVaultBackup = {
+    _count: MailVaultBackupCountAggregateOutputType | null
+    _avg: MailVaultBackupAvgAggregateOutputType | null
+    _sum: MailVaultBackupSumAggregateOutputType | null
+    _min: MailVaultBackupMinAggregateOutputType | null
+    _max: MailVaultBackupMaxAggregateOutputType | null
+  }
+
+  export type MailVaultBackupAvgAggregateOutputType = {
+    vaultVersion: number | null
+    kdfMemoryKiB: number | null
+    kdfIterations: number | null
+    kdfParallelism: number | null
+  }
+
+  export type MailVaultBackupSumAggregateOutputType = {
+    vaultVersion: number | null
+    kdfMemoryKiB: number | null
+    kdfIterations: number | null
+    kdfParallelism: number | null
+  }
+
+  export type MailVaultBackupMinAggregateOutputType = {
+    id: string | null
+    directoryEntryId: string | null
+    vaultVersion: number | null
+    encryptedVaultB64: string | null
+    kdf: string | null
+    kdfSaltB64: string | null
+    kdfMemoryKiB: number | null
+    kdfIterations: number | null
+    kdfParallelism: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MailVaultBackupMaxAggregateOutputType = {
+    id: string | null
+    directoryEntryId: string | null
+    vaultVersion: number | null
+    encryptedVaultB64: string | null
+    kdf: string | null
+    kdfSaltB64: string | null
+    kdfMemoryKiB: number | null
+    kdfIterations: number | null
+    kdfParallelism: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MailVaultBackupCountAggregateOutputType = {
+    id: number
+    directoryEntryId: number
+    vaultVersion: number
+    encryptedVaultB64: number
+    kdf: number
+    kdfSaltB64: number
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type MailVaultBackupAvgAggregateInputType = {
+    vaultVersion?: true
+    kdfMemoryKiB?: true
+    kdfIterations?: true
+    kdfParallelism?: true
+  }
+
+  export type MailVaultBackupSumAggregateInputType = {
+    vaultVersion?: true
+    kdfMemoryKiB?: true
+    kdfIterations?: true
+    kdfParallelism?: true
+  }
+
+  export type MailVaultBackupMinAggregateInputType = {
+    id?: true
+    directoryEntryId?: true
+    vaultVersion?: true
+    encryptedVaultB64?: true
+    kdf?: true
+    kdfSaltB64?: true
+    kdfMemoryKiB?: true
+    kdfIterations?: true
+    kdfParallelism?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MailVaultBackupMaxAggregateInputType = {
+    id?: true
+    directoryEntryId?: true
+    vaultVersion?: true
+    encryptedVaultB64?: true
+    kdf?: true
+    kdfSaltB64?: true
+    kdfMemoryKiB?: true
+    kdfIterations?: true
+    kdfParallelism?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MailVaultBackupCountAggregateInputType = {
+    id?: true
+    directoryEntryId?: true
+    vaultVersion?: true
+    encryptedVaultB64?: true
+    kdf?: true
+    kdfSaltB64?: true
+    kdfMemoryKiB?: true
+    kdfIterations?: true
+    kdfParallelism?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type MailVaultBackupAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MailVaultBackup to aggregate.
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailVaultBackups to fetch.
+     */
+    orderBy?: MailVaultBackupOrderByWithRelationInput | MailVaultBackupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: MailVaultBackupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailVaultBackups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailVaultBackups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned MailVaultBackups
+    **/
+    _count?: true | MailVaultBackupCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: MailVaultBackupAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: MailVaultBackupSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: MailVaultBackupMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: MailVaultBackupMaxAggregateInputType
+  }
+
+  export type GetMailVaultBackupAggregateType<T extends MailVaultBackupAggregateArgs> = {
+        [P in keyof T & keyof AggregateMailVaultBackup]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateMailVaultBackup[P]>
+      : GetScalarType<T[P], AggregateMailVaultBackup[P]>
+  }
+
+
+
+
+  export type MailVaultBackupGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: MailVaultBackupWhereInput
+    orderBy?: MailVaultBackupOrderByWithAggregationInput | MailVaultBackupOrderByWithAggregationInput[]
+    by: MailVaultBackupScalarFieldEnum[] | MailVaultBackupScalarFieldEnum
+    having?: MailVaultBackupScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: MailVaultBackupCountAggregateInputType | true
+    _avg?: MailVaultBackupAvgAggregateInputType
+    _sum?: MailVaultBackupSumAggregateInputType
+    _min?: MailVaultBackupMinAggregateInputType
+    _max?: MailVaultBackupMaxAggregateInputType
+  }
+
+  export type MailVaultBackupGroupByOutputType = {
+    id: string
+    directoryEntryId: string
+    vaultVersion: number
+    encryptedVaultB64: string
+    kdf: string
+    kdfSaltB64: string
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt: Date
+    updatedAt: Date
+    _count: MailVaultBackupCountAggregateOutputType | null
+    _avg: MailVaultBackupAvgAggregateOutputType | null
+    _sum: MailVaultBackupSumAggregateOutputType | null
+    _min: MailVaultBackupMinAggregateOutputType | null
+    _max: MailVaultBackupMaxAggregateOutputType | null
+  }
+
+  type GetMailVaultBackupGroupByPayload<T extends MailVaultBackupGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<MailVaultBackupGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof MailVaultBackupGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], MailVaultBackupGroupByOutputType[P]>
+            : GetScalarType<T[P], MailVaultBackupGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type MailVaultBackupSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    directoryEntryId?: boolean
+    vaultVersion?: boolean
+    encryptedVaultB64?: boolean
+    kdf?: boolean
+    kdfSaltB64?: boolean
+    kdfMemoryKiB?: boolean
+    kdfIterations?: boolean
+    kdfParallelism?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mailVaultBackup"]>
+
+  export type MailVaultBackupSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    directoryEntryId?: boolean
+    vaultVersion?: boolean
+    encryptedVaultB64?: boolean
+    kdf?: boolean
+    kdfSaltB64?: boolean
+    kdfMemoryKiB?: boolean
+    kdfIterations?: boolean
+    kdfParallelism?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mailVaultBackup"]>
+
+  export type MailVaultBackupSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    directoryEntryId?: boolean
+    vaultVersion?: boolean
+    encryptedVaultB64?: boolean
+    kdf?: boolean
+    kdfSaltB64?: boolean
+    kdfMemoryKiB?: boolean
+    kdfIterations?: boolean
+    kdfParallelism?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mailVaultBackup"]>
+
+  export type MailVaultBackupSelectScalar = {
+    id?: boolean
+    directoryEntryId?: boolean
+    vaultVersion?: boolean
+    encryptedVaultB64?: boolean
+    kdf?: boolean
+    kdfSaltB64?: boolean
+    kdfMemoryKiB?: boolean
+    kdfIterations?: boolean
+    kdfParallelism?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type MailVaultBackupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "directoryEntryId" | "vaultVersion" | "encryptedVaultB64" | "kdf" | "kdfSaltB64" | "kdfMemoryKiB" | "kdfIterations" | "kdfParallelism" | "createdAt" | "updatedAt", ExtArgs["result"]["mailVaultBackup"]>
+  export type MailVaultBackupInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }
+  export type MailVaultBackupIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }
+  export type MailVaultBackupIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }
+
+  export type $MailVaultBackupPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "MailVaultBackup"
+    objects: {
+      directoryEntry: Prisma.$MailDirectoryEntryPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      directoryEntryId: string
+      vaultVersion: number
+      encryptedVaultB64: string
+      kdf: string
+      kdfSaltB64: string
+      kdfMemoryKiB: number
+      kdfIterations: number
+      kdfParallelism: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["mailVaultBackup"]>
+    composites: {}
+  }
+
+  type MailVaultBackupGetPayload<S extends boolean | null | undefined | MailVaultBackupDefaultArgs> = $Result.GetResult<Prisma.$MailVaultBackupPayload, S>
+
+  type MailVaultBackupCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<MailVaultBackupFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: MailVaultBackupCountAggregateInputType | true
+    }
+
+  export interface MailVaultBackupDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['MailVaultBackup'], meta: { name: 'MailVaultBackup' } }
+    /**
+     * Find zero or one MailVaultBackup that matches the filter.
+     * @param {MailVaultBackupFindUniqueArgs} args - Arguments to find a MailVaultBackup
+     * @example
+     * // Get one MailVaultBackup
+     * const mailVaultBackup = await prisma.mailVaultBackup.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends MailVaultBackupFindUniqueArgs>(args: SelectSubset<T, MailVaultBackupFindUniqueArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one MailVaultBackup that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {MailVaultBackupFindUniqueOrThrowArgs} args - Arguments to find a MailVaultBackup
+     * @example
+     * // Get one MailVaultBackup
+     * const mailVaultBackup = await prisma.mailVaultBackup.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends MailVaultBackupFindUniqueOrThrowArgs>(args: SelectSubset<T, MailVaultBackupFindUniqueOrThrowArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MailVaultBackup that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupFindFirstArgs} args - Arguments to find a MailVaultBackup
+     * @example
+     * // Get one MailVaultBackup
+     * const mailVaultBackup = await prisma.mailVaultBackup.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends MailVaultBackupFindFirstArgs>(args?: SelectSubset<T, MailVaultBackupFindFirstArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MailVaultBackup that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupFindFirstOrThrowArgs} args - Arguments to find a MailVaultBackup
+     * @example
+     * // Get one MailVaultBackup
+     * const mailVaultBackup = await prisma.mailVaultBackup.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends MailVaultBackupFindFirstOrThrowArgs>(args?: SelectSubset<T, MailVaultBackupFindFirstOrThrowArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more MailVaultBackups that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all MailVaultBackups
+     * const mailVaultBackups = await prisma.mailVaultBackup.findMany()
+     * 
+     * // Get first 10 MailVaultBackups
+     * const mailVaultBackups = await prisma.mailVaultBackup.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const mailVaultBackupWithIdOnly = await prisma.mailVaultBackup.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends MailVaultBackupFindManyArgs>(args?: SelectSubset<T, MailVaultBackupFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a MailVaultBackup.
+     * @param {MailVaultBackupCreateArgs} args - Arguments to create a MailVaultBackup.
+     * @example
+     * // Create one MailVaultBackup
+     * const MailVaultBackup = await prisma.mailVaultBackup.create({
+     *   data: {
+     *     // ... data to create a MailVaultBackup
+     *   }
+     * })
+     * 
+     */
+    create<T extends MailVaultBackupCreateArgs>(args: SelectSubset<T, MailVaultBackupCreateArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many MailVaultBackups.
+     * @param {MailVaultBackupCreateManyArgs} args - Arguments to create many MailVaultBackups.
+     * @example
+     * // Create many MailVaultBackups
+     * const mailVaultBackup = await prisma.mailVaultBackup.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends MailVaultBackupCreateManyArgs>(args?: SelectSubset<T, MailVaultBackupCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many MailVaultBackups and returns the data saved in the database.
+     * @param {MailVaultBackupCreateManyAndReturnArgs} args - Arguments to create many MailVaultBackups.
+     * @example
+     * // Create many MailVaultBackups
+     * const mailVaultBackup = await prisma.mailVaultBackup.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many MailVaultBackups and only return the `id`
+     * const mailVaultBackupWithIdOnly = await prisma.mailVaultBackup.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends MailVaultBackupCreateManyAndReturnArgs>(args?: SelectSubset<T, MailVaultBackupCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a MailVaultBackup.
+     * @param {MailVaultBackupDeleteArgs} args - Arguments to delete one MailVaultBackup.
+     * @example
+     * // Delete one MailVaultBackup
+     * const MailVaultBackup = await prisma.mailVaultBackup.delete({
+     *   where: {
+     *     // ... filter to delete one MailVaultBackup
+     *   }
+     * })
+     * 
+     */
+    delete<T extends MailVaultBackupDeleteArgs>(args: SelectSubset<T, MailVaultBackupDeleteArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one MailVaultBackup.
+     * @param {MailVaultBackupUpdateArgs} args - Arguments to update one MailVaultBackup.
+     * @example
+     * // Update one MailVaultBackup
+     * const mailVaultBackup = await prisma.mailVaultBackup.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends MailVaultBackupUpdateArgs>(args: SelectSubset<T, MailVaultBackupUpdateArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more MailVaultBackups.
+     * @param {MailVaultBackupDeleteManyArgs} args - Arguments to filter MailVaultBackups to delete.
+     * @example
+     * // Delete a few MailVaultBackups
+     * const { count } = await prisma.mailVaultBackup.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends MailVaultBackupDeleteManyArgs>(args?: SelectSubset<T, MailVaultBackupDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MailVaultBackups.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many MailVaultBackups
+     * const mailVaultBackup = await prisma.mailVaultBackup.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends MailVaultBackupUpdateManyArgs>(args: SelectSubset<T, MailVaultBackupUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MailVaultBackups and returns the data updated in the database.
+     * @param {MailVaultBackupUpdateManyAndReturnArgs} args - Arguments to update many MailVaultBackups.
+     * @example
+     * // Update many MailVaultBackups
+     * const mailVaultBackup = await prisma.mailVaultBackup.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more MailVaultBackups and only return the `id`
+     * const mailVaultBackupWithIdOnly = await prisma.mailVaultBackup.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends MailVaultBackupUpdateManyAndReturnArgs>(args: SelectSubset<T, MailVaultBackupUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one MailVaultBackup.
+     * @param {MailVaultBackupUpsertArgs} args - Arguments to update or create a MailVaultBackup.
+     * @example
+     * // Update or create a MailVaultBackup
+     * const mailVaultBackup = await prisma.mailVaultBackup.upsert({
+     *   create: {
+     *     // ... data to create a MailVaultBackup
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the MailVaultBackup we want to update
+     *   }
+     * })
+     */
+    upsert<T extends MailVaultBackupUpsertArgs>(args: SelectSubset<T, MailVaultBackupUpsertArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of MailVaultBackups.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupCountArgs} args - Arguments to filter MailVaultBackups to count.
+     * @example
+     * // Count the number of MailVaultBackups
+     * const count = await prisma.mailVaultBackup.count({
+     *   where: {
+     *     // ... the filter for the MailVaultBackups we want to count
+     *   }
+     * })
+    **/
+    count<T extends MailVaultBackupCountArgs>(
+      args?: Subset<T, MailVaultBackupCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], MailVaultBackupCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a MailVaultBackup.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends MailVaultBackupAggregateArgs>(args: Subset<T, MailVaultBackupAggregateArgs>): Prisma.PrismaPromise<GetMailVaultBackupAggregateType<T>>
+
+    /**
+     * Group by MailVaultBackup.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailVaultBackupGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends MailVaultBackupGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: MailVaultBackupGroupByArgs['orderBy'] }
+        : { orderBy?: MailVaultBackupGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, MailVaultBackupGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetMailVaultBackupGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the MailVaultBackup model
+   */
+  readonly fields: MailVaultBackupFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for MailVaultBackup.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__MailVaultBackupClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    directoryEntry<T extends MailDirectoryEntryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntryDefaultArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the MailVaultBackup model
+   */
+  interface MailVaultBackupFieldRefs {
+    readonly id: FieldRef<"MailVaultBackup", 'String'>
+    readonly directoryEntryId: FieldRef<"MailVaultBackup", 'String'>
+    readonly vaultVersion: FieldRef<"MailVaultBackup", 'Int'>
+    readonly encryptedVaultB64: FieldRef<"MailVaultBackup", 'String'>
+    readonly kdf: FieldRef<"MailVaultBackup", 'String'>
+    readonly kdfSaltB64: FieldRef<"MailVaultBackup", 'String'>
+    readonly kdfMemoryKiB: FieldRef<"MailVaultBackup", 'Int'>
+    readonly kdfIterations: FieldRef<"MailVaultBackup", 'Int'>
+    readonly kdfParallelism: FieldRef<"MailVaultBackup", 'Int'>
+    readonly createdAt: FieldRef<"MailVaultBackup", 'DateTime'>
+    readonly updatedAt: FieldRef<"MailVaultBackup", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * MailVaultBackup findUnique
+   */
+  export type MailVaultBackupFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * Filter, which MailVaultBackup to fetch.
+     */
+    where: MailVaultBackupWhereUniqueInput
+  }
+
+  /**
+   * MailVaultBackup findUniqueOrThrow
+   */
+  export type MailVaultBackupFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * Filter, which MailVaultBackup to fetch.
+     */
+    where: MailVaultBackupWhereUniqueInput
+  }
+
+  /**
+   * MailVaultBackup findFirst
+   */
+  export type MailVaultBackupFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * Filter, which MailVaultBackup to fetch.
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailVaultBackups to fetch.
+     */
+    orderBy?: MailVaultBackupOrderByWithRelationInput | MailVaultBackupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MailVaultBackups.
+     */
+    cursor?: MailVaultBackupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailVaultBackups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailVaultBackups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MailVaultBackups.
+     */
+    distinct?: MailVaultBackupScalarFieldEnum | MailVaultBackupScalarFieldEnum[]
+  }
+
+  /**
+   * MailVaultBackup findFirstOrThrow
+   */
+  export type MailVaultBackupFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * Filter, which MailVaultBackup to fetch.
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailVaultBackups to fetch.
+     */
+    orderBy?: MailVaultBackupOrderByWithRelationInput | MailVaultBackupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MailVaultBackups.
+     */
+    cursor?: MailVaultBackupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailVaultBackups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailVaultBackups.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MailVaultBackups.
+     */
+    distinct?: MailVaultBackupScalarFieldEnum | MailVaultBackupScalarFieldEnum[]
+  }
+
+  /**
+   * MailVaultBackup findMany
+   */
+  export type MailVaultBackupFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * Filter, which MailVaultBackups to fetch.
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailVaultBackups to fetch.
+     */
+    orderBy?: MailVaultBackupOrderByWithRelationInput | MailVaultBackupOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing MailVaultBackups.
+     */
+    cursor?: MailVaultBackupWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailVaultBackups from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailVaultBackups.
+     */
+    skip?: number
+    distinct?: MailVaultBackupScalarFieldEnum | MailVaultBackupScalarFieldEnum[]
+  }
+
+  /**
+   * MailVaultBackup create
+   */
+  export type MailVaultBackupCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * The data needed to create a MailVaultBackup.
+     */
+    data: XOR<MailVaultBackupCreateInput, MailVaultBackupUncheckedCreateInput>
+  }
+
+  /**
+   * MailVaultBackup createMany
+   */
+  export type MailVaultBackupCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many MailVaultBackups.
+     */
+    data: MailVaultBackupCreateManyInput | MailVaultBackupCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * MailVaultBackup createManyAndReturn
+   */
+  export type MailVaultBackupCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * The data used to create many MailVaultBackups.
+     */
+    data: MailVaultBackupCreateManyInput | MailVaultBackupCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MailVaultBackup update
+   */
+  export type MailVaultBackupUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * The data needed to update a MailVaultBackup.
+     */
+    data: XOR<MailVaultBackupUpdateInput, MailVaultBackupUncheckedUpdateInput>
+    /**
+     * Choose, which MailVaultBackup to update.
+     */
+    where: MailVaultBackupWhereUniqueInput
+  }
+
+  /**
+   * MailVaultBackup updateMany
+   */
+  export type MailVaultBackupUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update MailVaultBackups.
+     */
+    data: XOR<MailVaultBackupUpdateManyMutationInput, MailVaultBackupUncheckedUpdateManyInput>
+    /**
+     * Filter which MailVaultBackups to update
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * Limit how many MailVaultBackups to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * MailVaultBackup updateManyAndReturn
+   */
+  export type MailVaultBackupUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * The data used to update MailVaultBackups.
+     */
+    data: XOR<MailVaultBackupUpdateManyMutationInput, MailVaultBackupUncheckedUpdateManyInput>
+    /**
+     * Filter which MailVaultBackups to update
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * Limit how many MailVaultBackups to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MailVaultBackup upsert
+   */
+  export type MailVaultBackupUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * The filter to search for the MailVaultBackup to update in case it exists.
+     */
+    where: MailVaultBackupWhereUniqueInput
+    /**
+     * In case the MailVaultBackup found by the `where` argument doesn't exist, create a new MailVaultBackup with this data.
+     */
+    create: XOR<MailVaultBackupCreateInput, MailVaultBackupUncheckedCreateInput>
+    /**
+     * In case the MailVaultBackup was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<MailVaultBackupUpdateInput, MailVaultBackupUncheckedUpdateInput>
+  }
+
+  /**
+   * MailVaultBackup delete
+   */
+  export type MailVaultBackupDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+    /**
+     * Filter which MailVaultBackup to delete.
+     */
+    where: MailVaultBackupWhereUniqueInput
+  }
+
+  /**
+   * MailVaultBackup deleteMany
+   */
+  export type MailVaultBackupDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MailVaultBackups to delete
+     */
+    where?: MailVaultBackupWhereInput
+    /**
+     * Limit how many MailVaultBackups to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * MailVaultBackup without action
+   */
+  export type MailVaultBackupDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailVaultBackup
+     */
+    select?: MailVaultBackupSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailVaultBackup
+     */
+    omit?: MailVaultBackupOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailVaultBackupInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model CalendarSubscription
    */
 
@@ -24469,6 +27112,46 @@ export namespace Prisma {
   export type UserEncryptionPasswordScalarFieldEnum = (typeof UserEncryptionPasswordScalarFieldEnum)[keyof typeof UserEncryptionPasswordScalarFieldEnum]
 
 
+  export const MailDirectoryEntryScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    email: 'email',
+    localPart: 'localPart',
+    domain: 'domain',
+    displayName: 'displayName',
+    stalwartAccountId: 'stalwartAccountId',
+    stalwartDomainId: 'stalwartDomainId',
+    stalwartPublicKeyId: 'stalwartPublicKeyId',
+    publicKeyArmored: 'publicKeyArmored',
+    publicKeyFingerprint: 'publicKeyFingerprint',
+    keyAlgorithm: 'keyAlgorithm',
+    source: 'source',
+    trust: 'trust',
+    keyCreatedAt: 'keyCreatedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type MailDirectoryEntryScalarFieldEnum = (typeof MailDirectoryEntryScalarFieldEnum)[keyof typeof MailDirectoryEntryScalarFieldEnum]
+
+
+  export const MailVaultBackupScalarFieldEnum: {
+    id: 'id',
+    directoryEntryId: 'directoryEntryId',
+    vaultVersion: 'vaultVersion',
+    encryptedVaultB64: 'encryptedVaultB64',
+    kdf: 'kdf',
+    kdfSaltB64: 'kdfSaltB64',
+    kdfMemoryKiB: 'kdfMemoryKiB',
+    kdfIterations: 'kdfIterations',
+    kdfParallelism: 'kdfParallelism',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type MailVaultBackupScalarFieldEnum = (typeof MailVaultBackupScalarFieldEnum)[keyof typeof MailVaultBackupScalarFieldEnum]
+
+
   export const CalendarSubscriptionScalarFieldEnum: {
     id: 'id',
     name: 'name',
@@ -24620,6 +27303,7 @@ export namespace Prisma {
     participations?: EventParticipantListRelationFilter
     settings?: XOR<UserSettingsNullableScalarRelationFilter, UserSettingsWhereInput> | null
     subscriptions?: CalendarSubscriptionListRelationFilter
+    mailDirectoryEntry?: XOR<MailDirectoryEntryNullableScalarRelationFilter, MailDirectoryEntryWhereInput> | null
     encryptionDevices?: UserEncryptionDeviceListRelationFilter
     encryptionPassword?: XOR<UserEncryptionPasswordNullableScalarRelationFilter, UserEncryptionPasswordWhereInput> | null
     passkeys?: PasskeyListRelationFilter
@@ -24641,6 +27325,7 @@ export namespace Prisma {
     participations?: EventParticipantOrderByRelationAggregateInput
     settings?: UserSettingsOrderByWithRelationInput
     subscriptions?: CalendarSubscriptionOrderByRelationAggregateInput
+    mailDirectoryEntry?: MailDirectoryEntryOrderByWithRelationInput
     encryptionDevices?: UserEncryptionDeviceOrderByRelationAggregateInput
     encryptionPassword?: UserEncryptionPasswordOrderByWithRelationInput
     passkeys?: PasskeyOrderByRelationAggregateInput
@@ -24665,6 +27350,7 @@ export namespace Prisma {
     participations?: EventParticipantListRelationFilter
     settings?: XOR<UserSettingsNullableScalarRelationFilter, UserSettingsWhereInput> | null
     subscriptions?: CalendarSubscriptionListRelationFilter
+    mailDirectoryEntry?: XOR<MailDirectoryEntryNullableScalarRelationFilter, MailDirectoryEntryWhereInput> | null
     encryptionDevices?: UserEncryptionDeviceListRelationFilter
     encryptionPassword?: XOR<UserEncryptionPasswordNullableScalarRelationFilter, UserEncryptionPasswordWhereInput> | null
     passkeys?: PasskeyListRelationFilter
@@ -26095,6 +28781,211 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"UserEncryptionPassword"> | Date | string
   }
 
+  export type MailDirectoryEntryWhereInput = {
+    AND?: MailDirectoryEntryWhereInput | MailDirectoryEntryWhereInput[]
+    OR?: MailDirectoryEntryWhereInput[]
+    NOT?: MailDirectoryEntryWhereInput | MailDirectoryEntryWhereInput[]
+    id?: StringFilter<"MailDirectoryEntry"> | string
+    userId?: StringNullableFilter<"MailDirectoryEntry"> | string | null
+    email?: StringFilter<"MailDirectoryEntry"> | string
+    localPart?: StringFilter<"MailDirectoryEntry"> | string
+    domain?: StringFilter<"MailDirectoryEntry"> | string
+    displayName?: StringNullableFilter<"MailDirectoryEntry"> | string | null
+    stalwartAccountId?: StringFilter<"MailDirectoryEntry"> | string
+    stalwartDomainId?: StringFilter<"MailDirectoryEntry"> | string
+    stalwartPublicKeyId?: StringNullableFilter<"MailDirectoryEntry"> | string | null
+    publicKeyArmored?: StringFilter<"MailDirectoryEntry"> | string
+    publicKeyFingerprint?: StringFilter<"MailDirectoryEntry"> | string
+    keyAlgorithm?: StringFilter<"MailDirectoryEntry"> | string
+    source?: StringFilter<"MailDirectoryEntry"> | string
+    trust?: StringFilter<"MailDirectoryEntry"> | string
+    keyCreatedAt?: DateTimeNullableFilter<"MailDirectoryEntry"> | Date | string | null
+    createdAt?: DateTimeFilter<"MailDirectoryEntry"> | Date | string
+    updatedAt?: DateTimeFilter<"MailDirectoryEntry"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    vaultBackup?: XOR<MailVaultBackupNullableScalarRelationFilter, MailVaultBackupWhereInput> | null
+  }
+
+  export type MailDirectoryEntryOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    email?: SortOrder
+    localPart?: SortOrder
+    domain?: SortOrder
+    displayName?: SortOrderInput | SortOrder
+    stalwartAccountId?: SortOrder
+    stalwartDomainId?: SortOrder
+    stalwartPublicKeyId?: SortOrderInput | SortOrder
+    publicKeyArmored?: SortOrder
+    publicKeyFingerprint?: SortOrder
+    keyAlgorithm?: SortOrder
+    source?: SortOrder
+    trust?: SortOrder
+    keyCreatedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+    vaultBackup?: MailVaultBackupOrderByWithRelationInput
+  }
+
+  export type MailDirectoryEntryWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId?: string
+    email?: string
+    stalwartAccountId?: string
+    AND?: MailDirectoryEntryWhereInput | MailDirectoryEntryWhereInput[]
+    OR?: MailDirectoryEntryWhereInput[]
+    NOT?: MailDirectoryEntryWhereInput | MailDirectoryEntryWhereInput[]
+    localPart?: StringFilter<"MailDirectoryEntry"> | string
+    domain?: StringFilter<"MailDirectoryEntry"> | string
+    displayName?: StringNullableFilter<"MailDirectoryEntry"> | string | null
+    stalwartDomainId?: StringFilter<"MailDirectoryEntry"> | string
+    stalwartPublicKeyId?: StringNullableFilter<"MailDirectoryEntry"> | string | null
+    publicKeyArmored?: StringFilter<"MailDirectoryEntry"> | string
+    publicKeyFingerprint?: StringFilter<"MailDirectoryEntry"> | string
+    keyAlgorithm?: StringFilter<"MailDirectoryEntry"> | string
+    source?: StringFilter<"MailDirectoryEntry"> | string
+    trust?: StringFilter<"MailDirectoryEntry"> | string
+    keyCreatedAt?: DateTimeNullableFilter<"MailDirectoryEntry"> | Date | string | null
+    createdAt?: DateTimeFilter<"MailDirectoryEntry"> | Date | string
+    updatedAt?: DateTimeFilter<"MailDirectoryEntry"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    vaultBackup?: XOR<MailVaultBackupNullableScalarRelationFilter, MailVaultBackupWhereInput> | null
+  }, "id" | "userId" | "email" | "stalwartAccountId">
+
+  export type MailDirectoryEntryOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    email?: SortOrder
+    localPart?: SortOrder
+    domain?: SortOrder
+    displayName?: SortOrderInput | SortOrder
+    stalwartAccountId?: SortOrder
+    stalwartDomainId?: SortOrder
+    stalwartPublicKeyId?: SortOrderInput | SortOrder
+    publicKeyArmored?: SortOrder
+    publicKeyFingerprint?: SortOrder
+    keyAlgorithm?: SortOrder
+    source?: SortOrder
+    trust?: SortOrder
+    keyCreatedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: MailDirectoryEntryCountOrderByAggregateInput
+    _max?: MailDirectoryEntryMaxOrderByAggregateInput
+    _min?: MailDirectoryEntryMinOrderByAggregateInput
+  }
+
+  export type MailDirectoryEntryScalarWhereWithAggregatesInput = {
+    AND?: MailDirectoryEntryScalarWhereWithAggregatesInput | MailDirectoryEntryScalarWhereWithAggregatesInput[]
+    OR?: MailDirectoryEntryScalarWhereWithAggregatesInput[]
+    NOT?: MailDirectoryEntryScalarWhereWithAggregatesInput | MailDirectoryEntryScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    userId?: StringNullableWithAggregatesFilter<"MailDirectoryEntry"> | string | null
+    email?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    localPart?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    domain?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    displayName?: StringNullableWithAggregatesFilter<"MailDirectoryEntry"> | string | null
+    stalwartAccountId?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    stalwartDomainId?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    stalwartPublicKeyId?: StringNullableWithAggregatesFilter<"MailDirectoryEntry"> | string | null
+    publicKeyArmored?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    publicKeyFingerprint?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    keyAlgorithm?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    source?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    trust?: StringWithAggregatesFilter<"MailDirectoryEntry"> | string
+    keyCreatedAt?: DateTimeNullableWithAggregatesFilter<"MailDirectoryEntry"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"MailDirectoryEntry"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"MailDirectoryEntry"> | Date | string
+  }
+
+  export type MailVaultBackupWhereInput = {
+    AND?: MailVaultBackupWhereInput | MailVaultBackupWhereInput[]
+    OR?: MailVaultBackupWhereInput[]
+    NOT?: MailVaultBackupWhereInput | MailVaultBackupWhereInput[]
+    id?: StringFilter<"MailVaultBackup"> | string
+    directoryEntryId?: StringFilter<"MailVaultBackup"> | string
+    vaultVersion?: IntFilter<"MailVaultBackup"> | number
+    encryptedVaultB64?: StringFilter<"MailVaultBackup"> | string
+    kdf?: StringFilter<"MailVaultBackup"> | string
+    kdfSaltB64?: StringFilter<"MailVaultBackup"> | string
+    kdfMemoryKiB?: IntFilter<"MailVaultBackup"> | number
+    kdfIterations?: IntFilter<"MailVaultBackup"> | number
+    kdfParallelism?: IntFilter<"MailVaultBackup"> | number
+    createdAt?: DateTimeFilter<"MailVaultBackup"> | Date | string
+    updatedAt?: DateTimeFilter<"MailVaultBackup"> | Date | string
+    directoryEntry?: XOR<MailDirectoryEntryScalarRelationFilter, MailDirectoryEntryWhereInput>
+  }
+
+  export type MailVaultBackupOrderByWithRelationInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    vaultVersion?: SortOrder
+    encryptedVaultB64?: SortOrder
+    kdf?: SortOrder
+    kdfSaltB64?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    directoryEntry?: MailDirectoryEntryOrderByWithRelationInput
+  }
+
+  export type MailVaultBackupWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    directoryEntryId?: string
+    AND?: MailVaultBackupWhereInput | MailVaultBackupWhereInput[]
+    OR?: MailVaultBackupWhereInput[]
+    NOT?: MailVaultBackupWhereInput | MailVaultBackupWhereInput[]
+    vaultVersion?: IntFilter<"MailVaultBackup"> | number
+    encryptedVaultB64?: StringFilter<"MailVaultBackup"> | string
+    kdf?: StringFilter<"MailVaultBackup"> | string
+    kdfSaltB64?: StringFilter<"MailVaultBackup"> | string
+    kdfMemoryKiB?: IntFilter<"MailVaultBackup"> | number
+    kdfIterations?: IntFilter<"MailVaultBackup"> | number
+    kdfParallelism?: IntFilter<"MailVaultBackup"> | number
+    createdAt?: DateTimeFilter<"MailVaultBackup"> | Date | string
+    updatedAt?: DateTimeFilter<"MailVaultBackup"> | Date | string
+    directoryEntry?: XOR<MailDirectoryEntryScalarRelationFilter, MailDirectoryEntryWhereInput>
+  }, "id" | "directoryEntryId">
+
+  export type MailVaultBackupOrderByWithAggregationInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    vaultVersion?: SortOrder
+    encryptedVaultB64?: SortOrder
+    kdf?: SortOrder
+    kdfSaltB64?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: MailVaultBackupCountOrderByAggregateInput
+    _avg?: MailVaultBackupAvgOrderByAggregateInput
+    _max?: MailVaultBackupMaxOrderByAggregateInput
+    _min?: MailVaultBackupMinOrderByAggregateInput
+    _sum?: MailVaultBackupSumOrderByAggregateInput
+  }
+
+  export type MailVaultBackupScalarWhereWithAggregatesInput = {
+    AND?: MailVaultBackupScalarWhereWithAggregatesInput | MailVaultBackupScalarWhereWithAggregatesInput[]
+    OR?: MailVaultBackupScalarWhereWithAggregatesInput[]
+    NOT?: MailVaultBackupScalarWhereWithAggregatesInput | MailVaultBackupScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"MailVaultBackup"> | string
+    directoryEntryId?: StringWithAggregatesFilter<"MailVaultBackup"> | string
+    vaultVersion?: IntWithAggregatesFilter<"MailVaultBackup"> | number
+    encryptedVaultB64?: StringWithAggregatesFilter<"MailVaultBackup"> | string
+    kdf?: StringWithAggregatesFilter<"MailVaultBackup"> | string
+    kdfSaltB64?: StringWithAggregatesFilter<"MailVaultBackup"> | string
+    kdfMemoryKiB?: IntWithAggregatesFilter<"MailVaultBackup"> | number
+    kdfIterations?: IntWithAggregatesFilter<"MailVaultBackup"> | number
+    kdfParallelism?: IntWithAggregatesFilter<"MailVaultBackup"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"MailVaultBackup"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"MailVaultBackup"> | Date | string
+  }
+
   export type CalendarSubscriptionWhereInput = {
     AND?: CalendarSubscriptionWhereInput | CalendarSubscriptionWhereInput[]
     OR?: CalendarSubscriptionWhereInput[]
@@ -26307,6 +29198,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -26328,6 +29220,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -26349,6 +29242,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -26370,6 +29264,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -27992,6 +30887,246 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type MailDirectoryEntryCreateInput = {
+    id?: string
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutMailDirectoryEntryInput
+    vaultBackup?: MailVaultBackupCreateNestedOneWithoutDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryUncheckedCreateInput = {
+    id?: string
+    userId?: string | null
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    vaultBackup?: MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutMailDirectoryEntryNestedInput
+    vaultBackup?: MailVaultBackupUpdateOneWithoutDirectoryEntryNestedInput
+  }
+
+  export type MailDirectoryEntryUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    vaultBackup?: MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput
+  }
+
+  export type MailDirectoryEntryCreateManyInput = {
+    id?: string
+    userId?: string | null
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailDirectoryEntryUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailDirectoryEntryUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailVaultBackupCreateInput = {
+    id?: string
+    vaultVersion: number
+    encryptedVaultB64: string
+    kdf: string
+    kdfSaltB64: string
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    directoryEntry: MailDirectoryEntryCreateNestedOneWithoutVaultBackupInput
+  }
+
+  export type MailVaultBackupUncheckedCreateInput = {
+    id?: string
+    directoryEntryId: string
+    vaultVersion: number
+    encryptedVaultB64: string
+    kdf: string
+    kdfSaltB64: string
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailVaultBackupUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    vaultVersion?: IntFieldUpdateOperationsInput | number
+    encryptedVaultB64?: StringFieldUpdateOperationsInput | string
+    kdf?: StringFieldUpdateOperationsInput | string
+    kdfSaltB64?: StringFieldUpdateOperationsInput | string
+    kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    directoryEntry?: MailDirectoryEntryUpdateOneRequiredWithoutVaultBackupNestedInput
+  }
+
+  export type MailVaultBackupUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    directoryEntryId?: StringFieldUpdateOperationsInput | string
+    vaultVersion?: IntFieldUpdateOperationsInput | number
+    encryptedVaultB64?: StringFieldUpdateOperationsInput | string
+    kdf?: StringFieldUpdateOperationsInput | string
+    kdfSaltB64?: StringFieldUpdateOperationsInput | string
+    kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailVaultBackupCreateManyInput = {
+    id?: string
+    directoryEntryId: string
+    vaultVersion: number
+    encryptedVaultB64: string
+    kdf: string
+    kdfSaltB64: string
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailVaultBackupUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    vaultVersion?: IntFieldUpdateOperationsInput | number
+    encryptedVaultB64?: StringFieldUpdateOperationsInput | string
+    kdf?: StringFieldUpdateOperationsInput | string
+    kdfSaltB64?: StringFieldUpdateOperationsInput | string
+    kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailVaultBackupUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    directoryEntryId?: StringFieldUpdateOperationsInput | string
+    vaultVersion?: IntFieldUpdateOperationsInput | number
+    encryptedVaultB64?: StringFieldUpdateOperationsInput | string
+    kdf?: StringFieldUpdateOperationsInput | string
+    kdfSaltB64?: StringFieldUpdateOperationsInput | string
+    kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CalendarSubscriptionCreateInput = {
     id?: string
     name: string
@@ -28301,6 +31436,11 @@ export namespace Prisma {
     every?: CalendarSubscriptionWhereInput
     some?: CalendarSubscriptionWhereInput
     none?: CalendarSubscriptionWhereInput
+  }
+
+  export type MailDirectoryEntryNullableScalarRelationFilter = {
+    is?: MailDirectoryEntryWhereInput | null
+    isNot?: MailDirectoryEntryWhereInput | null
   }
 
   export type UserEncryptionDeviceListRelationFilter = {
@@ -29377,6 +32517,137 @@ export namespace Prisma {
     keyVersion?: SortOrder
   }
 
+  export type UserNullableScalarRelationFilter = {
+    is?: UserWhereInput | null
+    isNot?: UserWhereInput | null
+  }
+
+  export type MailVaultBackupNullableScalarRelationFilter = {
+    is?: MailVaultBackupWhereInput | null
+    isNot?: MailVaultBackupWhereInput | null
+  }
+
+  export type MailDirectoryEntryCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    email?: SortOrder
+    localPart?: SortOrder
+    domain?: SortOrder
+    displayName?: SortOrder
+    stalwartAccountId?: SortOrder
+    stalwartDomainId?: SortOrder
+    stalwartPublicKeyId?: SortOrder
+    publicKeyArmored?: SortOrder
+    publicKeyFingerprint?: SortOrder
+    keyAlgorithm?: SortOrder
+    source?: SortOrder
+    trust?: SortOrder
+    keyCreatedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailDirectoryEntryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    email?: SortOrder
+    localPart?: SortOrder
+    domain?: SortOrder
+    displayName?: SortOrder
+    stalwartAccountId?: SortOrder
+    stalwartDomainId?: SortOrder
+    stalwartPublicKeyId?: SortOrder
+    publicKeyArmored?: SortOrder
+    publicKeyFingerprint?: SortOrder
+    keyAlgorithm?: SortOrder
+    source?: SortOrder
+    trust?: SortOrder
+    keyCreatedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailDirectoryEntryMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    email?: SortOrder
+    localPart?: SortOrder
+    domain?: SortOrder
+    displayName?: SortOrder
+    stalwartAccountId?: SortOrder
+    stalwartDomainId?: SortOrder
+    stalwartPublicKeyId?: SortOrder
+    publicKeyArmored?: SortOrder
+    publicKeyFingerprint?: SortOrder
+    keyAlgorithm?: SortOrder
+    source?: SortOrder
+    trust?: SortOrder
+    keyCreatedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailDirectoryEntryScalarRelationFilter = {
+    is?: MailDirectoryEntryWhereInput
+    isNot?: MailDirectoryEntryWhereInput
+  }
+
+  export type MailVaultBackupCountOrderByAggregateInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    vaultVersion?: SortOrder
+    encryptedVaultB64?: SortOrder
+    kdf?: SortOrder
+    kdfSaltB64?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailVaultBackupAvgOrderByAggregateInput = {
+    vaultVersion?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+  }
+
+  export type MailVaultBackupMaxOrderByAggregateInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    vaultVersion?: SortOrder
+    encryptedVaultB64?: SortOrder
+    kdf?: SortOrder
+    kdfSaltB64?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailVaultBackupMinOrderByAggregateInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    vaultVersion?: SortOrder
+    encryptedVaultB64?: SortOrder
+    kdf?: SortOrder
+    kdfSaltB64?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailVaultBackupSumOrderByAggregateInput = {
+    vaultVersion?: SortOrder
+    kdfMemoryKiB?: SortOrder
+    kdfIterations?: SortOrder
+    kdfParallelism?: SortOrder
+  }
+
   export type CalendarSyncLogListRelationFilter = {
     every?: CalendarSyncLogWhereInput
     some?: CalendarSyncLogWhereInput
@@ -29569,6 +32840,12 @@ export namespace Prisma {
     connect?: CalendarSubscriptionWhereUniqueInput | CalendarSubscriptionWhereUniqueInput[]
   }
 
+  export type MailDirectoryEntryCreateNestedOneWithoutUserInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutUserInput, MailDirectoryEntryUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutUserInput
+    connect?: MailDirectoryEntryWhereUniqueInput
+  }
+
   export type UserEncryptionDeviceCreateNestedManyWithoutUserInput = {
     create?: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput> | UserEncryptionDeviceCreateWithoutUserInput[] | UserEncryptionDeviceUncheckedCreateWithoutUserInput[]
     connectOrCreate?: UserEncryptionDeviceCreateOrConnectWithoutUserInput | UserEncryptionDeviceCreateOrConnectWithoutUserInput[]
@@ -29642,6 +32919,12 @@ export namespace Prisma {
     connectOrCreate?: CalendarSubscriptionCreateOrConnectWithoutUserInput | CalendarSubscriptionCreateOrConnectWithoutUserInput[]
     createMany?: CalendarSubscriptionCreateManyUserInputEnvelope
     connect?: CalendarSubscriptionWhereUniqueInput | CalendarSubscriptionWhereUniqueInput[]
+  }
+
+  export type MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutUserInput, MailDirectoryEntryUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutUserInput
+    connect?: MailDirectoryEntryWhereUniqueInput
   }
 
   export type UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput = {
@@ -29788,6 +33071,16 @@ export namespace Prisma {
     deleteMany?: CalendarSubscriptionScalarWhereInput | CalendarSubscriptionScalarWhereInput[]
   }
 
+  export type MailDirectoryEntryUpdateOneWithoutUserNestedInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutUserInput, MailDirectoryEntryUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutUserInput
+    upsert?: MailDirectoryEntryUpsertWithoutUserInput
+    disconnect?: MailDirectoryEntryWhereInput | boolean
+    delete?: MailDirectoryEntryWhereInput | boolean
+    connect?: MailDirectoryEntryWhereUniqueInput
+    update?: XOR<XOR<MailDirectoryEntryUpdateToOneWithWhereWithoutUserInput, MailDirectoryEntryUpdateWithoutUserInput>, MailDirectoryEntryUncheckedUpdateWithoutUserInput>
+  }
+
   export type UserEncryptionDeviceUpdateManyWithoutUserNestedInput = {
     create?: XOR<UserEncryptionDeviceCreateWithoutUserInput, UserEncryptionDeviceUncheckedCreateWithoutUserInput> | UserEncryptionDeviceCreateWithoutUserInput[] | UserEncryptionDeviceUncheckedCreateWithoutUserInput[]
     connectOrCreate?: UserEncryptionDeviceCreateOrConnectWithoutUserInput | UserEncryptionDeviceCreateOrConnectWithoutUserInput[]
@@ -29932,6 +33225,16 @@ export namespace Prisma {
     update?: CalendarSubscriptionUpdateWithWhereUniqueWithoutUserInput | CalendarSubscriptionUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: CalendarSubscriptionUpdateManyWithWhereWithoutUserInput | CalendarSubscriptionUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: CalendarSubscriptionScalarWhereInput | CalendarSubscriptionScalarWhereInput[]
+  }
+
+  export type MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutUserInput, MailDirectoryEntryUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutUserInput
+    upsert?: MailDirectoryEntryUpsertWithoutUserInput
+    disconnect?: MailDirectoryEntryWhereInput | boolean
+    delete?: MailDirectoryEntryWhereInput | boolean
+    connect?: MailDirectoryEntryWhereUniqueInput
+    update?: XOR<XOR<MailDirectoryEntryUpdateToOneWithWhereWithoutUserInput, MailDirectoryEntryUpdateWithoutUserInput>, MailDirectoryEntryUncheckedUpdateWithoutUserInput>
   }
 
   export type UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput = {
@@ -30512,6 +33815,68 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutEncryptionPasswordInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutEncryptionPasswordInput, UserUpdateWithoutEncryptionPasswordInput>, UserUncheckedUpdateWithoutEncryptionPasswordInput>
+  }
+
+  export type UserCreateNestedOneWithoutMailDirectoryEntryInput = {
+    create?: XOR<UserCreateWithoutMailDirectoryEntryInput, UserUncheckedCreateWithoutMailDirectoryEntryInput>
+    connectOrCreate?: UserCreateOrConnectWithoutMailDirectoryEntryInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type MailVaultBackupCreateNestedOneWithoutDirectoryEntryInput = {
+    create?: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput
+    connect?: MailVaultBackupWhereUniqueInput
+  }
+
+  export type MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput = {
+    create?: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput
+    connect?: MailVaultBackupWhereUniqueInput
+  }
+
+  export type UserUpdateOneWithoutMailDirectoryEntryNestedInput = {
+    create?: XOR<UserCreateWithoutMailDirectoryEntryInput, UserUncheckedCreateWithoutMailDirectoryEntryInput>
+    connectOrCreate?: UserCreateOrConnectWithoutMailDirectoryEntryInput
+    upsert?: UserUpsertWithoutMailDirectoryEntryInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutMailDirectoryEntryInput, UserUpdateWithoutMailDirectoryEntryInput>, UserUncheckedUpdateWithoutMailDirectoryEntryInput>
+  }
+
+  export type MailVaultBackupUpdateOneWithoutDirectoryEntryNestedInput = {
+    create?: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput
+    upsert?: MailVaultBackupUpsertWithoutDirectoryEntryInput
+    disconnect?: MailVaultBackupWhereInput | boolean
+    delete?: MailVaultBackupWhereInput | boolean
+    connect?: MailVaultBackupWhereUniqueInput
+    update?: XOR<XOR<MailVaultBackupUpdateToOneWithWhereWithoutDirectoryEntryInput, MailVaultBackupUpdateWithoutDirectoryEntryInput>, MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput>
+  }
+
+  export type MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput = {
+    create?: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput
+    upsert?: MailVaultBackupUpsertWithoutDirectoryEntryInput
+    disconnect?: MailVaultBackupWhereInput | boolean
+    delete?: MailVaultBackupWhereInput | boolean
+    connect?: MailVaultBackupWhereUniqueInput
+    update?: XOR<XOR<MailVaultBackupUpdateToOneWithWhereWithoutDirectoryEntryInput, MailVaultBackupUpdateWithoutDirectoryEntryInput>, MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput>
+  }
+
+  export type MailDirectoryEntryCreateNestedOneWithoutVaultBackupInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutVaultBackupInput, MailDirectoryEntryUncheckedCreateWithoutVaultBackupInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutVaultBackupInput
+    connect?: MailDirectoryEntryWhereUniqueInput
+  }
+
+  export type MailDirectoryEntryUpdateOneRequiredWithoutVaultBackupNestedInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutVaultBackupInput, MailDirectoryEntryUncheckedCreateWithoutVaultBackupInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutVaultBackupInput
+    upsert?: MailDirectoryEntryUpsertWithoutVaultBackupInput
+    connect?: MailDirectoryEntryWhereUniqueInput
+    update?: XOR<XOR<MailDirectoryEntryUpdateToOneWithWhereWithoutVaultBackupInput, MailDirectoryEntryUpdateWithoutVaultBackupInput>, MailDirectoryEntryUncheckedUpdateWithoutVaultBackupInput>
   }
 
   export type UserCreateNestedOneWithoutSubscriptionsInput = {
@@ -31160,6 +34525,51 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type MailDirectoryEntryCreateWithoutUserInput = {
+    id?: string
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    vaultBackup?: MailVaultBackupCreateNestedOneWithoutDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryUncheckedCreateWithoutUserInput = {
+    id?: string
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    vaultBackup?: MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryCreateOrConnectWithoutUserInput = {
+    where: MailDirectoryEntryWhereUniqueInput
+    create: XOR<MailDirectoryEntryCreateWithoutUserInput, MailDirectoryEntryUncheckedCreateWithoutUserInput>
+  }
+
   export type UserEncryptionDeviceCreateWithoutUserInput = {
     id?: string
     deviceId: string
@@ -31577,6 +34987,57 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"CalendarSubscription"> | Date | string
   }
 
+  export type MailDirectoryEntryUpsertWithoutUserInput = {
+    update: XOR<MailDirectoryEntryUpdateWithoutUserInput, MailDirectoryEntryUncheckedUpdateWithoutUserInput>
+    create: XOR<MailDirectoryEntryCreateWithoutUserInput, MailDirectoryEntryUncheckedCreateWithoutUserInput>
+    where?: MailDirectoryEntryWhereInput
+  }
+
+  export type MailDirectoryEntryUpdateToOneWithWhereWithoutUserInput = {
+    where?: MailDirectoryEntryWhereInput
+    data: XOR<MailDirectoryEntryUpdateWithoutUserInput, MailDirectoryEntryUncheckedUpdateWithoutUserInput>
+  }
+
+  export type MailDirectoryEntryUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    vaultBackup?: MailVaultBackupUpdateOneWithoutDirectoryEntryNestedInput
+  }
+
+  export type MailDirectoryEntryUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    vaultBackup?: MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput
+  }
+
   export type UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput = {
     where: UserEncryptionDeviceWhereUniqueInput
     update: XOR<UserEncryptionDeviceUpdateWithoutUserInput, UserEncryptionDeviceUncheckedUpdateWithoutUserInput>
@@ -31697,6 +35158,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -31717,6 +35179,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -31753,6 +35216,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -31773,6 +35237,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -31793,6 +35258,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -31813,6 +35279,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -31849,6 +35316,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -31869,6 +35337,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -31889,6 +35358,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -31909,6 +35379,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -32091,6 +35562,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -32111,6 +35583,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -32193,6 +35666,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -32213,6 +35687,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -32321,6 +35796,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -32341,6 +35817,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -32377,6 +35854,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -32397,6 +35875,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -32609,6 +36088,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -32629,6 +36109,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -32890,6 +36371,7 @@ export namespace Prisma {
     calendars?: CalendarCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -32910,6 +36392,7 @@ export namespace Prisma {
     calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -33019,6 +36502,7 @@ export namespace Prisma {
     calendars?: CalendarUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -33039,6 +36523,7 @@ export namespace Prisma {
     calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -33059,6 +36544,7 @@ export namespace Prisma {
     calendars?: CalendarCreateNestedManyWithoutUserInput
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -33079,6 +36565,7 @@ export namespace Prisma {
     calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -33115,6 +36602,7 @@ export namespace Prisma {
     calendars?: CalendarUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -33135,6 +36623,7 @@ export namespace Prisma {
     calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
@@ -33544,6 +37033,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
   }
@@ -33564,6 +37054,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
   }
@@ -33600,6 +37091,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
   }
@@ -33620,6 +37112,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
   }
@@ -33640,6 +37133,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
@@ -33660,6 +37154,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
@@ -33696,6 +37191,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
@@ -33716,6 +37212,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
   }
@@ -33736,6 +37233,7 @@ export namespace Prisma {
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
   }
@@ -33756,6 +37254,7 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
     subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
   }
@@ -33792,6 +37291,7 @@ export namespace Prisma {
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
   }
@@ -33812,8 +37312,273 @@ export namespace Prisma {
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
     subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutMailDirectoryEntryInput = {
+    id?: string
+    name: string
+    email: string
+    emailVerified?: boolean
+    image?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    events?: CalendarEventCreateNestedManyWithoutUserInput
+    categories?: EventCategoryCreateNestedManyWithoutUserInput
+    calendars?: CalendarCreateNestedManyWithoutUserInput
+    participations?: EventParticipantCreateNestedManyWithoutUserInput
+    settings?: UserSettingsCreateNestedOneWithoutUserInput
+    subscriptions?: CalendarSubscriptionCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
+    passkeys?: PasskeyCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutMailDirectoryEntryInput = {
+    id?: string
+    name: string
+    email: string
+    emailVerified?: boolean
+    image?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    events?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    categories?: EventCategoryUncheckedCreateNestedManyWithoutUserInput
+    calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
+    participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
+    settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: CalendarSubscriptionUncheckedCreateNestedManyWithoutUserInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
+    passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutMailDirectoryEntryInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutMailDirectoryEntryInput, UserUncheckedCreateWithoutMailDirectoryEntryInput>
+  }
+
+  export type MailVaultBackupCreateWithoutDirectoryEntryInput = {
+    id?: string
+    vaultVersion: number
+    encryptedVaultB64: string
+    kdf: string
+    kdfSaltB64: string
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput = {
+    id?: string
+    vaultVersion: number
+    encryptedVaultB64: string
+    kdf: string
+    kdfSaltB64: string
+    kdfMemoryKiB: number
+    kdfIterations: number
+    kdfParallelism: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput = {
+    where: MailVaultBackupWhereUniqueInput
+    create: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
+  }
+
+  export type UserUpsertWithoutMailDirectoryEntryInput = {
+    update: XOR<UserUpdateWithoutMailDirectoryEntryInput, UserUncheckedUpdateWithoutMailDirectoryEntryInput>
+    create: XOR<UserCreateWithoutMailDirectoryEntryInput, UserUncheckedCreateWithoutMailDirectoryEntryInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutMailDirectoryEntryInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutMailDirectoryEntryInput, UserUncheckedUpdateWithoutMailDirectoryEntryInput>
+  }
+
+  export type UserUpdateWithoutMailDirectoryEntryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    emailVerified?: BoolFieldUpdateOperationsInput | boolean
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    events?: CalendarEventUpdateManyWithoutUserNestedInput
+    categories?: EventCategoryUpdateManyWithoutUserNestedInput
+    calendars?: CalendarUpdateManyWithoutUserNestedInput
+    participations?: EventParticipantUpdateManyWithoutUserNestedInput
+    settings?: UserSettingsUpdateOneWithoutUserNestedInput
+    subscriptions?: CalendarSubscriptionUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
+    passkeys?: PasskeyUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutMailDirectoryEntryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    emailVerified?: BoolFieldUpdateOperationsInput | boolean
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    events?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    categories?: EventCategoryUncheckedUpdateManyWithoutUserNestedInput
+    calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
+    participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
+    settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: CalendarSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
+    encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
+    passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type MailVaultBackupUpsertWithoutDirectoryEntryInput = {
+    update: XOR<MailVaultBackupUpdateWithoutDirectoryEntryInput, MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput>
+    create: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
+    where?: MailVaultBackupWhereInput
+  }
+
+  export type MailVaultBackupUpdateToOneWithWhereWithoutDirectoryEntryInput = {
+    where?: MailVaultBackupWhereInput
+    data: XOR<MailVaultBackupUpdateWithoutDirectoryEntryInput, MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput>
+  }
+
+  export type MailVaultBackupUpdateWithoutDirectoryEntryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    vaultVersion?: IntFieldUpdateOperationsInput | number
+    encryptedVaultB64?: StringFieldUpdateOperationsInput | string
+    kdf?: StringFieldUpdateOperationsInput | string
+    kdfSaltB64?: StringFieldUpdateOperationsInput | string
+    kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    vaultVersion?: IntFieldUpdateOperationsInput | number
+    encryptedVaultB64?: StringFieldUpdateOperationsInput | string
+    kdf?: StringFieldUpdateOperationsInput | string
+    kdfSaltB64?: StringFieldUpdateOperationsInput | string
+    kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
+    kdfIterations?: IntFieldUpdateOperationsInput | number
+    kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailDirectoryEntryCreateWithoutVaultBackupInput = {
+    id?: string
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutMailDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryUncheckedCreateWithoutVaultBackupInput = {
+    id?: string
+    userId?: string | null
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailDirectoryEntryCreateOrConnectWithoutVaultBackupInput = {
+    where: MailDirectoryEntryWhereUniqueInput
+    create: XOR<MailDirectoryEntryCreateWithoutVaultBackupInput, MailDirectoryEntryUncheckedCreateWithoutVaultBackupInput>
+  }
+
+  export type MailDirectoryEntryUpsertWithoutVaultBackupInput = {
+    update: XOR<MailDirectoryEntryUpdateWithoutVaultBackupInput, MailDirectoryEntryUncheckedUpdateWithoutVaultBackupInput>
+    create: XOR<MailDirectoryEntryCreateWithoutVaultBackupInput, MailDirectoryEntryUncheckedCreateWithoutVaultBackupInput>
+    where?: MailDirectoryEntryWhereInput
+  }
+
+  export type MailDirectoryEntryUpdateToOneWithWhereWithoutVaultBackupInput = {
+    where?: MailDirectoryEntryWhereInput
+    data: XOR<MailDirectoryEntryUpdateWithoutVaultBackupInput, MailDirectoryEntryUncheckedUpdateWithoutVaultBackupInput>
+  }
+
+  export type MailDirectoryEntryUpdateWithoutVaultBackupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutMailDirectoryEntryNestedInput
+  }
+
+  export type MailDirectoryEntryUncheckedUpdateWithoutVaultBackupInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type UserCreateWithoutSubscriptionsInput = {
@@ -33831,6 +37596,7 @@ export namespace Prisma {
     calendars?: CalendarCreateNestedManyWithoutUserInput
     participations?: EventParticipantCreateNestedManyWithoutUserInput
     settings?: UserSettingsCreateNestedOneWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordCreateNestedOneWithoutUserInput
     passkeys?: PasskeyCreateNestedManyWithoutUserInput
@@ -33851,6 +37617,7 @@ export namespace Prisma {
     calendars?: CalendarUncheckedCreateNestedManyWithoutUserInput
     participations?: EventParticipantUncheckedCreateNestedManyWithoutUserInput
     settings?: UserSettingsUncheckedCreateNestedOneWithoutUserInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedCreateNestedOneWithoutUserInput
     encryptionDevices?: UserEncryptionDeviceUncheckedCreateNestedManyWithoutUserInput
     encryptionPassword?: UserEncryptionPasswordUncheckedCreateNestedOneWithoutUserInput
     passkeys?: PasskeyUncheckedCreateNestedManyWithoutUserInput
@@ -33974,6 +37741,7 @@ export namespace Prisma {
     calendars?: CalendarUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUpdateOneWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUpdateManyWithoutUserNestedInput
@@ -33994,6 +37762,7 @@ export namespace Prisma {
     calendars?: CalendarUncheckedUpdateManyWithoutUserNestedInput
     participations?: EventParticipantUncheckedUpdateManyWithoutUserNestedInput
     settings?: UserSettingsUncheckedUpdateOneWithoutUserNestedInput
+    mailDirectoryEntry?: MailDirectoryEntryUncheckedUpdateOneWithoutUserNestedInput
     encryptionDevices?: UserEncryptionDeviceUncheckedUpdateManyWithoutUserNestedInput
     encryptionPassword?: UserEncryptionPasswordUncheckedUpdateOneWithoutUserNestedInput
     passkeys?: PasskeyUncheckedUpdateManyWithoutUserNestedInput

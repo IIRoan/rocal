@@ -18,7 +18,10 @@ import { notificationsRoutes } from "./routes/notifications";
 import { recurringRoutes } from "./routes/recurring";
 import { subscriptionsRoute } from "./routes/subscriptions";
 import { calendarSharingRoutes } from "./routes/calendar-sharing";
+import { accountPublicRoutes } from "./routes/account-public";
 import { accountRoutes } from "./routes/account";
+import { mailAccountRoutes } from "./routes/mail-account";
+import { mailRoutes } from "./routes/mail";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import {
@@ -301,6 +304,9 @@ export const createAPI = (prefix = "") => {
     .use(notificationsRoutes)
     .use(recurringRoutes)
     .use(subscriptionsRoute)
+    .use(mailRoutes)
+    .use(mailAccountRoutes)
+    .use(accountPublicRoutes)
     .use(accountRoutes);
 };
 

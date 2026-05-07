@@ -21,13 +21,16 @@ import {
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
+  clearAuthPasswords,
   clearPendingAuthPassword,
   consumePendingAuthPassword,
+  peekCachedAuthPassword,
   peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 import { signOut } from "@/lib/auth-client";
 
 const log = createLogger("e2ee-bootstrap");
+const PASSWORD_SETUP_RETRY_ATTEMPTS = 4;
 
 type GateMode = "hidden" | "setup" | "unlock" | "legacy";
 
@@ -48,6 +51,25 @@ async function refreshEncryptedQueries(
     queryClient.invalidateQueries({ queryKey: ["calendars"] }),
     queryClient.invalidateQueries({ queryKey: ["categories"] }),
   ]);
+}
+
+async function retryEncryptionPasswordSetup(
+  userId: string,
+  password: string,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < PASSWORD_SETUP_RETRY_ATTEMPTS; attempt += 1) {
+    const stored = await resetEncryptionPasswordForActiveSession(userId, password);
+
+    if (stored) {
+      return true;
+    }
+
+    if (attempt < PASSWORD_SETUP_RETRY_ATTEMPTS - 1) {
+      await Promise.resolve();
+    }
+  }
+
+  return false;
 }
 
 export function E2eeBootstrap() {
@@ -78,7 +100,7 @@ export function E2eeBootstrap() {
 
     if (!userId) {
       resetE2eeBootstrap();
-      clearPendingAuthPassword();
+      clearAuthPasswords();
       setMode("hidden");
       setPassword("");
       setConfirmPassword("");
@@ -103,7 +125,8 @@ export function E2eeBootstrap() {
     // Peek (without consuming) to know whether this was an email/password login.
     // bootstrapUser in e2ee-bootstrap.ts may consume it during auto-unlock, so
     // we capture the information here before the bootstrap runs.
-    const hadPendingPassword = !!peekPendingAuthPassword();
+    const hadPendingPassword =
+      !!peekPendingAuthPassword() || !!peekCachedAuthPassword();
     setIsEmailPasswordUser(hadPendingPassword);
 
     let isCancelled = false;
@@ -125,13 +148,14 @@ export function E2eeBootstrap() {
         }
 
         if (result.activated && !result.bootstrap.passwordEnvelope) {
-          const pendingPassword = consumePendingAuthPassword();
+          const pendingPassword =
+            consumePendingAuthPassword() ?? peekCachedAuthPassword();
 
           if (pendingPassword) {
             setIsSubmitting(true);
 
             try {
-              const stored = await resetEncryptionPasswordForActiveSession(
+              const stored = await retryEncryptionPasswordSetup(
                 userId,
                 pendingPassword,
               );
@@ -284,6 +308,7 @@ export function E2eeBootstrap() {
     setIsSubmitting(true);
     setError(null);
     try {
+      clearAuthPasswords();
       await signOut();
     } catch (signOutError) {
       log.warn("Failed to sign out from encryption gate", {

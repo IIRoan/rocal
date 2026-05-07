@@ -201,6 +201,30 @@ export const UserRelations = t.Object(
       ),
       { additionalProperties: false },
     ),
+    mailDirectoryEntry: __nullable__(
+      t.Object(
+        {
+          id: t.String(),
+          userId: __nullable__(t.String()),
+          email: t.String(),
+          localPart: t.String(),
+          domain: t.String(),
+          displayName: __nullable__(t.String()),
+          stalwartAccountId: t.String(),
+          stalwartDomainId: t.String(),
+          stalwartPublicKeyId: __nullable__(t.String()),
+          publicKeyArmored: t.String(),
+          publicKeyFingerprint: t.String(),
+          keyAlgorithm: t.String(),
+          source: t.String(),
+          trust: t.String(),
+          keyCreatedAt: __nullable__(t.Date()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     encryptionDevices: t.Array(
       t.Object(
         {
@@ -404,6 +428,19 @@ export const UserRelationsInputCreate = t.Object(
               },
               { additionalProperties: false },
             ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    mailDirectoryEntry: t.Optional(
+      t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
             { additionalProperties: false },
           ),
         },
@@ -651,6 +688,20 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      mailDirectoryEntry: t.Partial(
+        t.Object(
+          {
+            connect: t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            disconnect: t.Boolean(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       encryptionDevices: t.Partial(
         t.Object(
           {
@@ -809,6 +860,7 @@ export const UserSelect = t.Partial(
       participations: t.Boolean(),
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
+      mailDirectoryEntry: t.Boolean(),
       encryptionDevices: t.Boolean(),
       encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
@@ -829,6 +881,7 @@ export const UserInclude = t.Partial(
       participations: t.Boolean(),
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
+      mailDirectoryEntry: t.Boolean(),
       encryptionDevices: t.Boolean(),
       encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),

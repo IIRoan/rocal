@@ -46,8 +46,10 @@ jest.mock("@/lib/e2ee-password-reset", () => ({
 }));
 
 jest.mock("@/lib/e2ee-password-cache", () => ({
+  clearAuthPasswords: jest.fn(),
   clearPendingAuthPassword: jest.fn(),
   consumePendingAuthPassword: jest.fn(),
+  peekCachedAuthPassword: jest.fn(),
   peekPendingAuthPassword: jest.fn(),
 }));
 
@@ -95,8 +97,10 @@ import {
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
+  clearAuthPasswords,
   clearPendingAuthPassword,
   consumePendingAuthPassword,
+  peekCachedAuthPassword,
   peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
 
@@ -115,8 +119,10 @@ const mockUnlockE2eeWithPassword = jest.mocked(unlockE2eeWithPassword);
 const mockResetEncryptionPasswordForActiveSession = jest.mocked(
   resetEncryptionPasswordForActiveSession,
 );
+const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockClearPendingAuthPassword = jest.mocked(clearPendingAuthPassword);
 const mockConsumePendingAuthPassword = jest.mocked(consumePendingAuthPassword);
+const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
 const mockPeekPendingAuthPassword = jest.mocked(peekPendingAuthPassword);
 
 function createBootstrap(
@@ -190,10 +196,12 @@ describe("E2eeBootstrap component", () => {
       activated: false,
       bootstrap: createBootstrap(),
     });
+    mockPeekCachedAuthPassword.mockReturnValue(null);
     mockPeekPendingAuthPassword.mockReturnValue(null);
     mockConsumePendingAuthPassword.mockReturnValue(null);
     mockUnlockE2eeWithPassword.mockResolvedValue(true);
     mockResetEncryptionPasswordForActiveSession.mockResolvedValue(true);
+    mockClearAuthPasswords.mockReset();
   });
 
   afterEach(() => {
@@ -357,6 +365,37 @@ describe("E2eeBootstrap component", () => {
     await renderComponent();
 
     expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledWith(
+      "user-1",
+      "pw",
+    );
+    expect(container.textContent).not.toContain("Protect your encryption keys");
+  });
+
+  it("retries automatic email-password setup before showing the manual encryption dialog", async () => {
+    mockPeekCachedAuthPassword.mockReturnValue("pw");
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: true,
+      bootstrap: createBootstrap(),
+    });
+    mockResetEncryptionPasswordForActiveSession
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <E2eeBootstrap />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledTimes(3);
+    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenLastCalledWith(
       "user-1",
       "pw",
     );
