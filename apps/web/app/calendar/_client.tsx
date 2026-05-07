@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import dynamic from "next/dynamic";
@@ -28,10 +28,11 @@ import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useSettings } from "@/hooks/use-settings";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import { useEffect, useRef, Suspense, type ReactNode } from "react";
 import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
 
-const log = createLogger("dashboard");
+const log = createLogger("calendar");
 
 const AppSidebar = dynamic(
   () => import("@workspace/ui/components/layout").then((mod) => mod.AppSidebar),
@@ -44,7 +45,7 @@ const MobileCalendarWrapper = dynamic(
   {
     ssr: false,
     loading: () => (
-      <MobileDashboardLoadingScreen messageContext="CALENDAR_LOAD" />
+      <MobileCalendarLoadingScreen messageContext="CALENDAR_LOAD" />
     ),
   },
 );
@@ -63,20 +64,7 @@ const CommandPalette = dynamic(
   { ssr: false },
 );
 
-function DashboardLoadingScreen() {
-  return (
-    <>
-      <DashboardSkeleton />
-      <PageLoadingOverlay
-        isLoading={true}
-        messageContext="AUTH_FLOW"
-        enableCycling={true}
-      />
-    </>
-  );
-}
-
-function MobileDashboardLoadingScreen({
+function MobileCalendarLoadingScreen({
   messageContext,
 }: {
   messageContext: "CALENDAR_LOAD" | "SETTINGS_LOAD" | "DATA_SYNC";
@@ -98,7 +86,7 @@ function CalendarUrlSyncWrapper() {
   return null;
 }
 
-function DashboardSearchParamHandlers({
+function CalendarSearchParamHandlers({
   onOpenPalette,
 }: {
   onOpenPalette: (query?: string) => void;
@@ -137,7 +125,6 @@ function DashboardSearchParamHandlers({
         }
 
         if (event?.start) {
-          // Navigate to the event's month so CalendarDateSync picks it up
           calendarData.setMonth(new Date(event.start));
         }
 
@@ -238,7 +225,7 @@ function MobileLayoutContent() {
 
   if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
-      <MobileDashboardLoadingScreen
+      <MobileCalendarLoadingScreen
         messageContext={overlayContext ?? "CALENDAR_LOAD"}
       />
     );
@@ -287,7 +274,7 @@ function MobileLayoutContent() {
   );
 }
 
-export function DashboardPageContent() {
+export function CalendarPageContent() {
   return (
     <>
       <div className="md:hidden min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom">
@@ -299,7 +286,7 @@ export function DashboardPageContent() {
   );
 }
 
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function CalendarShell({ children }: { children: ReactNode }) {
   const { data: session, isPending } = useSession();
   const router = useSmoothRouter();
   const {
@@ -314,7 +301,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       const currentPath =
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
-          : "/dashboard";
+          : CALENDAR_HOME_PATH;
       const loginPath = "/login";
       router.replace(
         `${loginPath}?next=${encodeURIComponent(currentPath)}`,
@@ -347,7 +334,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <CommandPaletteProvider CommandPaletteComponent={CommandPalette}>
               <Suspense fallback={null}>
                 <CalendarUrlSyncWrapper />
-                <DashboardSearchParamHandlers onOpenPalette={openPalette} />
+                <CalendarSearchParamHandlers onOpenPalette={openPalette} />
               </Suspense>
 
               <SidebarProvider>
