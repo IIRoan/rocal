@@ -22,6 +22,10 @@ import {
   clearAuthPasswords,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  setEncPasswordCookie,
+} from "@/lib/enc-password-cookie";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
@@ -307,6 +311,7 @@ export function LoginForm() {
         }
 
         storePendingAuthPassword(password);
+        void setEncPasswordCookie(password);
 
         setEmail(availability.normalizedEmail);
 
@@ -336,6 +341,7 @@ export function LoginForm() {
         }
 
         storePendingAuthPassword(password);
+        void setEncPasswordCookie(password);
       }
 
       await syncThemeAfterAuth();
@@ -345,7 +351,7 @@ export function LoginForm() {
     } catch (err: any) {
       log.error("Email auth failed:", err);
       clearAuthPasswords();
-      setError(err.message || "Authentication failed. Please try again.");
+      clearEncPasswordCookie();
     } finally {
       setEmailLoading(false);
     }
@@ -398,6 +404,7 @@ export function LoginForm() {
       setError(null);
       setNotice(null);
       clearAuthPasswords();
+      clearEncPasswordCookie();
 
       const result = await authClient.signIn.passkey({
         autoFocus: true,
@@ -428,6 +435,7 @@ export function LoginForm() {
       setError(null);
       setNotice(null);
       clearAuthPasswords();
+      clearEncPasswordCookie();
       if (currentTheme) {
         localStorage.setItem("pending-theme-sync", currentTheme);
       }

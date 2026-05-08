@@ -11,6 +11,21 @@ import {
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 
+// jsdom does not implement matchMedia
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: jest.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     error: jest.fn(),
@@ -19,12 +34,41 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
+jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
+  const Passthrough = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  const PassthroughAsButton = ({ children, asChild: _asChild, ...props }: any) => (
+    <button {...props}>{children}</button>
+  );
+  return {
+    DropdownMenu: Passthrough,
+    DropdownMenuContent: Passthrough,
+    DropdownMenuItem: PassthroughAsButton,
+    DropdownMenuTrigger: PassthroughAsButton,
+  };
+});
+
+jest.mock("@workspace/ui/components/ui/sidebar", () => ({
+  SidebarProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SidebarInset: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+jest.mock("@workspace/ui/components/ui/button", () => ({
+  Button: ({ children, onClick, disabled, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button onClick={onClick} disabled={disabled} {...rest}>{children}</button>
+  ),
+}));
+
+jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
+  DashboardSkeleton: () => <div>Loading…</div>,
+}));
+
 jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
     Inbox: Icon,
     Lock: Icon,
     MailPlus: Icon,
+    Plus: Icon,
     RefreshCcw: Icon,
     ShieldCheck: Icon,
     Send: Icon,
@@ -54,6 +98,15 @@ jest.mock("../../lib/e2ee-password-cache", () => ({
   peekCachedAuthPassword: jest.fn(),
 }));
 
+jest.mock("../../lib/enc-password-cookie", () => ({
+  clearEncPasswordCookie: jest.fn(),
+  initEncPasswordFromCookie: jest.fn(),
+}));
+
+jest.mock("postal-mime", () => ({
+  default: { parse: jest.fn().mockResolvedValue({ text: "", html: null }) },
+}));
+
 jest.mock("../../lib/mail/vault-crypto", () => ({
   createEncryptedMailVault: jest.fn(),
   unlockEncryptedMailVault: jest.fn(),
@@ -66,6 +119,18 @@ const mockJmapClient = {
   getMailboxMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
   sendMessage: jest.fn<() => Promise<any>>(),
+  markAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  markAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  moveToTrash: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  moveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  createMailbox: jest.fn<() => Promise<any>>(),
+  deleteMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  updateMailboxSortOrders: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  getBlobAsText: jest.fn<() => Promise<any>>(),
+  bulkMoveToTrash: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  bulkMoveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  bulkMarkAsUnread: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  bulkMarkAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
 };
 
 jest.mock("../../lib/mail/jmap-client", () => ({
@@ -82,9 +147,64 @@ jest.mock("../../lib/mail/worker-client", () => ({
   },
 }));
 
+jest.mock("../../components/mail/mail-command-palette", () => ({
+  MailCommandPalette: () => null,
+}));
+
+jest.mock("../../components/mail/mail-sidebar", () => ({
+  MailSidebar: ({ activeMailbox, onSelectMailbox }: any) =>
+    activeMailbox ? (
+      <nav>
+        {activeMailbox.mailboxes.map((m: any) => (
+          <button key={m.id} onClick={() => onSelectMailbox(m.id)}>{m.name}</button>
+        ))}
+      </nav>
+    ) : null,
+}));
+
+jest.mock("../../components/mail/message-list", () => ({
+  MessageList: ({ messages }: { messages: { id: string; subject?: string }[] }) => (
+    <ul>{messages.map((m) => <li key={m.id}>{m.subject}</li>)}</ul>
+  ),
+}));
+
+jest.mock("../../components/mail/message-reader", () => ({
+  MessageReader: () => null,
+}));
+
+jest.mock("../../components/mail/compose-dialog", () => ({
+  ComposeDialog: ({ open, composeTo, composeSubject, composeBody, setComposeTo, setComposeSubject, setComposeBody, onSend }: any) =>
+    open ? (
+      <div>
+        <input placeholder="Recipient" value={composeTo} onChange={(e: any) => setComposeTo(e.target.value)} />
+        <input placeholder="Subject" value={composeSubject} onChange={(e: any) => setComposeSubject(e.target.value)} />
+        <textarea value={composeBody} onChange={(e: any) => setComposeBody(e.target.value)} />
+        <button onClick={() => void onSend()}>Send message</button>
+      </div>
+    ) : null,
+}));
+
+jest.mock("../../hooks/use-smooth-router", () => ({
+  useSmoothRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    prefetch: jest.fn(),
+    refresh: jest.fn(),
+    startRouteTransition: jest.fn(),
+    finishRouteTransition: jest.fn(),
+    isRouteTransitionActive: false,
+  }),
+}));
+
 import { MailApp } from "../../components/mail/mail-app";
 import { useSession } from "../../lib/auth-client";
 import { peekCachedAuthPassword } from "../../lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  initEncPasswordFromCookie,
+} from "../../lib/enc-password-cookie";
 import { mailDemoApiService } from "../../lib/mail/api-service";
 import {
   createEncryptedMailVault,
@@ -94,6 +214,8 @@ import { mailCryptoWorkerClient } from "../../lib/mail/worker-client";
 
 const mockUseSession = jest.mocked(useSession);
 const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
+const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
+const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
 const mockApi = jest.mocked(mailDemoApiService);
 const mockCreateEncryptedMailVault = jest.mocked(createEncryptedMailVault);
 const mockUnlockEncryptedMailVault = jest.mocked(unlockEncryptedMailVault);
@@ -150,6 +272,8 @@ describe("MailApp", () => {
       isPending: false,
     } as any);
     mockPeekCachedAuthPassword.mockReturnValue(null);
+    mockInitEncPasswordFromCookie.mockResolvedValue(undefined);
+    mockClearEncPasswordCookie.mockReset();
 
     mockApi.getConfig.mockResolvedValue({
       defaultDomain: "solace.onl",
@@ -282,12 +406,12 @@ describe("MailApp", () => {
     });
 
     setInputValue(
-      container.querySelector("#signup-mailbox-password") as HTMLInputElement,
+      container.querySelector("#signup-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
     setInputValue(
       container.querySelector(
-        "#signup-vault-password-confirm",
+        "#signup-password-confirm",
       ) as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
@@ -336,7 +460,7 @@ describe("MailApp", () => {
     await renderApp();
 
     setInputValue(
-      container.querySelector("#login-mailbox-password") as HTMLInputElement,
+      container.querySelector("#login-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -405,7 +529,7 @@ describe("MailApp", () => {
     });
 
     expect(container.textContent).toContain(
-      "Opening your mailbox with your current Solace sign-in",
+      "Opening your mailbox",
     );
     expect(container.textContent).not.toContain("Open mailbox");
 
@@ -457,7 +581,7 @@ describe("MailApp", () => {
     await renderApp();
 
     setInputValue(
-      container.querySelector("#login-mailbox-password") as HTMLInputElement,
+      container.querySelector("#login-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -505,7 +629,7 @@ describe("MailApp", () => {
     await renderApp();
 
     setInputValue(
-      container.querySelector("#login-mailbox-password") as HTMLInputElement,
+      container.querySelector("#login-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -515,6 +639,14 @@ describe("MailApp", () => {
 
     await act(async () => {
       signInButton?.click();
+      await Promise.resolve();
+    });
+
+    const composeButton = Array.from(container.querySelectorAll("button")).find(
+      (el) => el.textContent?.includes("Compose"),
+    );
+    await act(async () => {
+      composeButton?.click();
       await Promise.resolve();
     });
 
@@ -554,6 +686,7 @@ describe("MailApp", () => {
       }),
       {
         draftsMailboxId: "drafts-1",
+        sentMailboxId: "sent-1",
         fromEmail: "alice@solace.onl",
         to: ["iiroan@proton.me"],
         subject: "Hello",
@@ -561,6 +694,47 @@ describe("MailApp", () => {
         identityId: "identity-1",
       },
     );
-    expect(container.textContent).toContain("Message sent.");
+    // After sending, the hook refreshes the active mailbox messages
+    expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it("calls initEncPasswordFromCookie on mount", async () => {
+    await renderApp();
+    expect(mockInitEncPasswordFromCookie).toHaveBeenCalled();
+  });
+
+  it("auto-opens the mailbox when the encrypted cookie restores the password after mount", async () => {
+    let resolveCookieInit: (() => void) | null = null;
+    mockInitEncPasswordFromCookie.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCookieInit = () => {
+            mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+            resolve();
+          };
+        }),
+    );
+
+    await act(async () => {
+      root.render(<MailApp />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Before cookie init resolves: password field should still be visible
+    expect(container.textContent).toContain("Open mailbox");
+
+    await act(async () => {
+      resolveCookieInit?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
+      "vault-b64",
+      "StrongMailboxPassword!42",
+      expect.any(Object),
+    );
+    expect(container.textContent).toContain("Encrypted hello");
   });
 });

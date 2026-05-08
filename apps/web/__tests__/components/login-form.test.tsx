@@ -149,6 +149,11 @@ jest.mock("@/lib/e2ee-password-cache", () => ({
   storePendingAuthPassword: jest.fn(),
 }));
 
+jest.mock("@/lib/enc-password-cookie", () => ({
+  clearEncPasswordCookie: jest.fn(),
+  setEncPasswordCookie: jest.fn(),
+}));
+
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
     requestPasswordReset: jest.fn(),

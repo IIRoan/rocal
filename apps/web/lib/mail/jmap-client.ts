@@ -76,12 +76,32 @@ export function getPrimaryMailAccountId(
 
 export function buildSendMessageMethodCalls(input: {
   draftsMailboxId: string;
+  sentMailboxId: string | null;
   fromEmail: string;
   to: string[];
   subject: string;
   textBody: string;
   identityId: string;
 }): JmapMethodCall[] {
+  const submissionParams: Record<string, unknown> = {
+    create: {
+      s1: {
+        emailId: "#draft1",
+        identityId: input.identityId,
+      },
+    },
+  };
+
+  if (input.sentMailboxId) {
+    submissionParams.onSuccessUpdateEmail = {
+      "#s1": {
+        [`mailboxIds/${input.sentMailboxId}`]: true,
+        [`mailboxIds/${input.draftsMailboxId}`]: null,
+        "keywords/$draft": null,
+      },
+    };
+  }
+
   return [
     [
       "Email/set",
@@ -91,6 +111,7 @@ export function buildSendMessageMethodCalls(input: {
             mailboxIds: {
               [input.draftsMailboxId]: true,
             },
+            keywords: { "$seen": true },
             from: [{ email: input.fromEmail }],
             to: input.to.map((email) => ({ email })),
             subject: input.subject,
@@ -110,14 +131,7 @@ export function buildSendMessageMethodCalls(input: {
     ],
     [
       "EmailSubmission/set",
-      {
-        create: {
-          s1: {
-            emailId: "#draft1",
-            identityId: input.identityId,
-          },
-        },
-      },
+      submissionParams,
       "c2",
     ],
   ];
@@ -155,7 +169,14 @@ export class StalwartJmapClient {
     });
 
     if (!response.ok) {
-      throw new Error(`JMAP discovery failed with status ${response.status}.`);
+      let detail = "";
+      try {
+        const body = await response.json() as { message?: string };
+        if (body.message) detail = ` — ${body.message}`;
+      } catch { /* ignore parse failure */ }
+      if (response.status === 401) throw new Error("Incorrect password or mailbox not found.");
+      if (response.status === 503) throw new Error(`Mail server is unreachable${detail}.`);
+      throw new Error(`Could not connect to the mail server (${response.status})${detail}.`);
     }
 
     return normalizeJmapSession((await response.json()) as JmapSession, this.baseUrl);
@@ -177,13 +198,7 @@ export class StalwartJmapClient {
   async getMailboxes(session: JmapSession): Promise<JmapMailbox[]> {
     const accountId = this.requirePrimaryAccountId(session);
     const envelope = await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      [
-        "Mailbox/get",
-        {
-          accountId,
-        },
-        "c1",
-      ],
+      ["Mailbox/get", { accountId, properties: ["id", "name", "role", "parentId", "sortOrder"] }, "c1"],
     ]);
     const result = this.getMethodResult<{ list?: JmapMailbox[] }>(envelope, "Mailbox/get");
     return result.list ?? [];
@@ -258,6 +273,7 @@ export class StalwartJmapClient {
             "bcc",
             "subject",
             "receivedAt",
+            "keywords",
             "bodyStructure",
             "bodyValues",
             "textBody",
@@ -266,6 +282,7 @@ export class StalwartJmapClient {
           ],
           fetchTextBodyValues: true,
           fetchHTMLBodyValues: true,
+          fetchAllBodyValues: true,
         },
         "g1",
       ],
@@ -282,6 +299,7 @@ export class StalwartJmapClient {
     session: JmapSession,
     input: {
       draftsMailboxId: string;
+      sentMailboxId: string | null;
       fromEmail: string;
       to: string[];
       subject: string;
@@ -298,6 +316,151 @@ export class StalwartJmapClient {
       ],
       buildSendMessageMethodCalls(input),
     );
+  }
+
+  async moveToTrash(
+    session: JmapSession,
+    messageId: string,
+    trashMailboxId: string | null,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    if (trashMailboxId) {
+      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+        ["Email/set", { accountId, update: { [messageId]: { mailboxIds: { [trashMailboxId]: true } } } }, "c1"],
+      ]);
+    } else {
+      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+        ["Email/set", { accountId, destroy: [messageId] }, "c1"],
+      ]);
+    }
+  }
+
+  async updateMailboxSortOrders(
+    session: JmapSession,
+    updates: { id: string; sortOrder: number }[],
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(updates.map(({ id, sortOrder }) => [id, { sortOrder }]));
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Mailbox/set", { accountId, update }, "c1"],
+    ]);
+  }
+
+  async createMailbox(session: JmapSession, name: string): Promise<JmapMailbox> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Mailbox/set", { accountId, create: { new: { name } } }, "c1"],
+    ]);
+    const result = this.getMethodResult<{ created?: Record<string, JmapMailbox> }>(envelope, "Mailbox/set");
+    const created = result.created?.new;
+    if (!created) throw new Error("Mailbox was not created.");
+    return { ...created, name };
+  }
+
+  async deleteMailbox(session: JmapSession, mailboxId: string): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Mailbox/set", { accountId, destroy: [mailboxId] }, "c1"],
+    ]);
+  }
+
+  async moveToMailbox(
+    session: JmapSession,
+    messageId: string,
+    targetMailboxId: string,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Email/set", { accountId, update: { [messageId]: { mailboxIds: { [targetMailboxId]: true } } } }, "c1"],
+    ]);
+  }
+
+  async markAsRead(session: JmapSession, messageId: string): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Email/set", { accountId, update: { [messageId]: { "keywords/$seen": true } } }, "c1"],
+    ]);
+  }
+
+  async markAsUnread(session: JmapSession, messageId: string): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Email/set", { accountId, update: { [messageId]: { "keywords/$seen": null } } }, "c1"],
+    ]);
+  }
+
+  async bulkMoveToTrash(
+    session: JmapSession,
+    messageIds: string[],
+    trashMailboxId: string | null,
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    if (trashMailboxId) {
+      const update = Object.fromEntries(
+        messageIds.map((id) => [id, { mailboxIds: { [trashMailboxId]: true } }]),
+      );
+      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+        ["Email/set", { accountId, update }, "c1"],
+      ]);
+    } else {
+      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+        ["Email/set", { accountId, destroy: messageIds }, "c1"],
+      ]);
+    }
+  }
+
+  async bulkMoveToMailbox(
+    session: JmapSession,
+    messageIds: string[],
+    targetMailboxId: string,
+  ): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(
+      messageIds.map((id) => [id, { mailboxIds: { [targetMailboxId]: true } }]),
+    );
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Email/set", { accountId, update }, "c1"],
+    ]);
+  }
+
+  async bulkMarkAsRead(session: JmapSession, messageIds: string[]): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(messageIds.map((id) => [id, { "keywords/$seen": true }]));
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Email/set", { accountId, update }, "c1"],
+    ]);
+  }
+
+  async bulkMarkAsUnread(session: JmapSession, messageIds: string[]): Promise<void> {
+    if (messageIds.length === 0) return;
+    const accountId = this.requirePrimaryAccountId(session);
+    const update = Object.fromEntries(messageIds.map((id) => [id, { "keywords/$seen": null }]));
+    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+      ["Email/set", { accountId, update }, "c1"],
+    ]);
+  }
+
+  async getBlobAsText(session: JmapSession, blobId: string): Promise<string> {
+    const accountId = this.requirePrimaryAccountId(session);
+    if (!session.downloadUrl) {
+      throw new Error("No download URL in JMAP session.");
+    }
+    const url = session.downloadUrl
+      .replace("{accountId}", encodeURIComponent(accountId))
+      .replace("{blobId}", encodeURIComponent(blobId))
+      .replace("{name}", "encrypted.asc")
+      .replace("{type}", encodeURIComponent("application/octet-stream"));
+    const response = await this.fetcher(url, {
+      headers: { Authorization: this.authHeader },
+    });
+    if (!response.ok) {
+      throw new Error(`Blob download failed with status ${response.status}.`);
+    }
+    return response.text();
   }
 
   private requirePrimaryAccountId(session: JmapSession): string {

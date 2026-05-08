@@ -1,4 +1,5 @@
 import type {
+  JmapBodyStructure,
   JmapBodyValue,
   JmapEmailMessage,
   MessageEncryptionState,
@@ -65,22 +66,35 @@ export function classifyMessageEncryption(
 ): MessageEncryptionState {
   const { text } = extractMessageBodies(message as JmapEmailMessage);
 
-  if (text?.includes("-----BEGIN PGP MESSAGE-----")) {
+  // Inline PGP: must contain both markers (not just a quoted/forwarded fragment)
+  if (
+    text?.includes("-----BEGIN PGP MESSAGE-----") &&
+    text?.includes("-----END PGP MESSAGE-----")
+  ) {
     return "inline_pgp";
   }
 
-  if (message.bodyStructure?.type?.toLowerCase() === "multipart/encrypted") {
-    return "pgp_mime";
+  // PGP/MIME (RFC 3156): top-level body must be multipart/encrypted
+  // with the pgp-encrypted protocol — not just any multipart/encrypted.
+  // Never fall back on an empty version-part type: Stalwart's own at-rest
+  // AES-256 encryption also uses multipart/encrypted but a different protocol.
+  const topType = message.bodyStructure?.type?.toLowerCase() ?? "";
+  if (topType === "multipart/encrypted") {
+    const versionPart = message.bodyStructure?.subParts?.[0]?.type?.toLowerCase() ?? "";
+    if (versionPart === "application/pgp-encrypted") {
+      return "pgp_mime";
+    }
   }
 
+  // Only flag as encrypted if attachment has an explicit PGP MIME type
+  // — never match on application/octet-stream which is any binary file
   const hasEncryptedAttachment = (message.attachments ?? []).some((attachment) => {
-    const type = attachment.type?.toLowerCase() || "";
-    const name = attachment.name?.toLowerCase() || "";
-
+    const type = attachment.type?.toLowerCase() ?? "";
+    const name = attachment.name?.toLowerCase() ?? "";
     return (
       type === "application/pgp-encrypted" ||
-      type === "application/octet-stream" ||
-      name.endsWith(".asc") ||
+      type === "application/pgp-keys" ||
+      (name.endsWith(".asc") && name !== "smime.p7s") ||
       name.endsWith(".pgp") ||
       name.endsWith(".gpg")
     );
@@ -106,7 +120,7 @@ export function resolveSecurityLabels(input: {
     input.messageState === "pgp_mime" ||
     input.messageState === "internal_e2ee"
   ) {
-    labels.push("E2EE encrypted");
+    labels.push("PGP encrypted");
   } else if (input.messageState === "plain" && !input.accountEncryptedAtRest) {
     labels.push("Plain");
   }
@@ -124,4 +138,12 @@ export function resolveSecurityLabels(input: {
   }
 
   return labels;
+}
+
+export function extractPgpMimeCiphertextBlobId(
+  bodyStructure: JmapBodyStructure | undefined,
+): string | null {
+  if (bodyStructure?.type?.toLowerCase() !== "multipart/encrypted") return null;
+  // PGP/MIME: subParts[0] = version notice, subParts[1] = ciphertext blob
+  return bodyStructure.subParts?.[1]?.blobId ?? null;
 }

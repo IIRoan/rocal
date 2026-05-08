@@ -142,15 +142,30 @@ async function proxyJmapRequest(input: {
   }
 
   const method = input.request.method.toUpperCase();
-  const response = await (input.fetcher ?? fetch)(upstreamUrl, {
-    method,
-    headers,
-    body:
-      method === "GET" || method === "HEAD"
-        ? undefined
-        : await input.request.text(),
-    redirect: "follow",
-  });
+
+  let response: Response;
+  try {
+    response = await (input.fetcher ?? fetch)(upstreamUrl, {
+      method,
+      headers,
+      body:
+        method === "GET" || method === "HEAD"
+          ? undefined
+          : await input.request.text(),
+      redirect: "follow",
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown network error";
+    return Response.json(
+      {
+        error: "Mail server unreachable",
+        message: `Could not connect to the mail server: ${message}`,
+        statusCode: 503,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503 },
+    );
+  }
 
   const responseHeaders = new Headers();
   const responseContentType = response.headers.get("content-type");
