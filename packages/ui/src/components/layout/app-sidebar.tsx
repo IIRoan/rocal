@@ -8,6 +8,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings2,
+  ChevronDown,
+  CalendarDays,
+  Mail,
+  Check,
 } from "lucide-react";
 import { useCalendarContext } from "../calendar/calendar-context";
 import {
@@ -427,15 +431,43 @@ function AppSidebarDesktop({
           </>
         ) : (
           <div className="flex items-center justify-between">
-            <a className="inline-flex items-center gap-2" href="/">
-              <LogoSvg width="28" height="28" className="text-primary" />
-              <span
-                className="text-[15px] tracking-[-0.04em] text-foreground"
-                style={{ fontWeight: 380 }}
-              >
-                solace
-              </span>
-            </a>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-muted/50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                >
+                  <LogoSvg width="26" height="26" className="text-primary shrink-0" />
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className="text-[15px] tracking-[-0.04em] text-foreground"
+                      style={{ fontWeight: 380 }}
+                    >
+                      solace
+                    </span>
+                    <span className="text-[12px] font-medium text-muted-foreground/55 tracking-[-0.01em]">
+                      calendar
+                    </span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground/40 shrink-0" strokeWidth={2.5} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" sideOffset={6} className="w-44">
+                <DropdownMenuItem asChild>
+                  <a href="/calendar" className="flex items-center gap-2.5">
+                    <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={2} />
+                    Calendar
+                    <Check className="ml-auto h-3.5 w-3.5 text-primary shrink-0" strokeWidth={2.5} />
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href="/mail" className="flex items-center gap-2.5">
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={2} />
+                    Mail
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="flex items-center gap-0.5">
               {onOpenSearch && (
                 <Button

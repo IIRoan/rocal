@@ -90,6 +90,7 @@ export type JmapMailbox = {
   name: string;
   role?: string | null;
   parentId?: string | null;
+  sortOrder?: number;
 };
 
 export type JmapIdentity = {
@@ -109,6 +110,8 @@ export type JmapBodyValue = {
 
 export type JmapBodyStructure = {
   type?: string;
+  blobId?: string;
+  name?: string;
   subParts?: JmapBodyStructure[];
 };
 
@@ -126,6 +129,7 @@ export type JmapEmailMessage = {
   cc?: MailAddress[];
   bcc?: MailAddress[];
   receivedAt?: string;
+  keywords?: Record<string, boolean>;
   bodyStructure?: JmapBodyStructure;
   bodyValues?: Record<string, JmapBodyValue>;
   textBody?: JmapBodyPartRef[];
