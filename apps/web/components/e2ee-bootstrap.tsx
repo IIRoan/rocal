@@ -27,6 +27,11 @@ import {
   peekCachedAuthPassword,
   peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  initEncPasswordFromCookie,
+  setEncPasswordCookie,
+} from "@/lib/enc-password-cookie";
 import { signOut } from "@/lib/auth-client";
 
 const log = createLogger("e2ee-bootstrap");
@@ -101,6 +106,7 @@ export function E2eeBootstrap() {
     if (!userId) {
       resetE2eeBootstrap();
       clearAuthPasswords();
+      clearEncPasswordCookie();
       setMode("hidden");
       setPassword("");
       setConfirmPassword("");
@@ -122,96 +128,103 @@ export function E2eeBootstrap() {
 
     previousUserIdRef.current = userId;
 
-    // Peek (without consuming) to know whether this was an email/password login.
-    // bootstrapUser in e2ee-bootstrap.ts may consume it during auto-unlock, so
-    // we capture the information here before the bootstrap runs.
-    const hadPendingPassword =
-      !!peekPendingAuthPassword() || !!peekCachedAuthPassword();
-    setIsEmailPasswordUser(hadPendingPassword);
-
     let isCancelled = false;
     setError(null);
 
-    void ensureE2eeBootstrap(userId)
-      .then(async (result) => {
-        if (isCancelled) {
-          return;
-        }
+    void (async () => {
+      // Restore password from the encrypted cookie so cross-tab and
+      // post-refresh visits work without re-prompting the user.
+      await initEncPasswordFromCookie();
+      if (isCancelled) return;
 
-        if (result.activated) {
-          await refreshEncryptedQueries(queryClient);
-        }
+      // Peek (without consuming) to know whether this was an email/password login.
+      // bootstrapUser in e2ee-bootstrap.ts may consume it during auto-unlock, so
+      // we capture the information here before the bootstrap runs.
+      const hadPendingPassword =
+        !!peekPendingAuthPassword() || !!peekCachedAuthPassword();
+      setIsEmailPasswordUser(hadPendingPassword);
 
-        if (!result.bootstrap) {
-          setMode("hidden");
-          return;
-        }
-
-        if (result.activated && !result.bootstrap.passwordEnvelope) {
-          const pendingPassword =
-            consumePendingAuthPassword() ?? peekCachedAuthPassword();
-
-          if (pendingPassword) {
-            setIsSubmitting(true);
-
-            try {
-              const stored = await retryEncryptionPasswordSetup(
-                userId,
-                pendingPassword,
-              );
-
-              if (isCancelled) {
-                return;
-              }
-
-              if (stored) {
-                setMode("hidden");
-                await refreshEncryptedQueries(queryClient);
-                return;
-              }
-            } catch (setupError) {
-              log.warn("Failed to refresh encrypted data for password setup", {
-                userId,
-                error: setupError,
-              });
-            } finally {
-              if (!isCancelled) {
-                setIsSubmitting(false);
-              }
-            }
+      void ensureE2eeBootstrap(userId)
+        .then(async (result) => {
+          if (isCancelled) {
+            return;
           }
 
-          setMode("setup");
-          return;
-        }
+          if (result.activated) {
+            await refreshEncryptedQueries(queryClient);
+          }
 
-        if (result.activated) {
+          if (!result.bootstrap) {
+            setMode("hidden");
+            return;
+          }
+
+          if (result.activated && !result.bootstrap.passwordEnvelope) {
+            const pendingPassword =
+              consumePendingAuthPassword() ?? peekCachedAuthPassword();
+
+            if (pendingPassword) {
+              setIsSubmitting(true);
+
+              try {
+                const stored = await retryEncryptionPasswordSetup(
+                  userId,
+                  pendingPassword,
+                );
+
+                if (isCancelled) {
+                  return;
+                }
+
+                if (stored) {
+                  setMode("hidden");
+                  await refreshEncryptedQueries(queryClient);
+                  return;
+                }
+              } catch (setupError) {
+                log.warn("Failed to refresh encrypted data for password setup", {
+                  userId,
+                  error: setupError,
+                });
+              } finally {
+                if (!isCancelled) {
+                  setIsSubmitting(false);
+                }
+              }
+            }
+
+            setMode("setup");
+            return;
+          }
+
+          if (result.activated) {
+            setMode("hidden");
+            return;
+          }
+
+          if (result.bootstrap.passwordEnvelope) {
+            setMode("unlock");
+            return;
+          }
+
+          if (result.bootstrap.devices.length > 0) {
+            setMode("legacy");
+            return;
+          }
+
           setMode("hidden");
-          return;
-        }
+        })
+        .catch((bootstrapError) => {
+          if (isCancelled) {
+            return;
+          }
 
-        if (result.bootstrap.passwordEnvelope) {
-          setMode("unlock");
-          return;
-        }
-
-        if (result.bootstrap.devices.length > 0) {
-          setMode("legacy");
-          return;
-        }
-
-        setMode("hidden");
-      })
-      .catch((bootstrapError) => {
-        if (isCancelled) {
-          return;
-        }
-
-        log.warn("Failed to initialize E2EE bootstrap", {
-          userId,
-          error: bootstrapError,
+          log.warn("Failed to initialize E2EE bootstrap", {
+            userId,
+            error: bootstrapError,
+          });
         });
-      });
+    })();
 
     return () => {
       isCancelled = true;
@@ -249,6 +262,7 @@ export function E2eeBootstrap() {
       setMode("hidden");
       setPassword("");
       setConfirmPassword("");
+      void setEncPasswordCookie(password);
       await refreshEncryptedQueries(queryClient);
     } catch (setupError) {
       log.warn("Failed to refresh encrypted data for password setup", {
@@ -292,6 +306,7 @@ export function E2eeBootstrap() {
 
       setMode("hidden");
       setPassword("");
+      void setEncPasswordCookie(password);
       await refreshEncryptedQueries(queryClient);
     } catch (unlockError) {
       log.warn("Failed to unlock E2EE password envelope", {
