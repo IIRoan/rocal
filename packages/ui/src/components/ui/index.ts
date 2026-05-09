@@ -104,6 +104,7 @@ export {
   MobileCalendarSkeleton,
   ListSkeleton,
   FormSkeleton,
+  MailSkeleton,
 } from "./app-skeletons";
 export {
   FORCE_LOADING_DESIGN_PREVIEW,

@@ -66,24 +66,13 @@ export function classifyMessageEncryption(
 ): MessageEncryptionState {
   const { text } = extractMessageBodies(message as JmapEmailMessage);
 
-  // Inline PGP: must contain both markers (not just a quoted/forwarded fragment)
-  if (
-    text?.includes("-----BEGIN PGP MESSAGE-----") &&
-    text?.includes("-----END PGP MESSAGE-----")
-  ) {
+  if (text?.includes("-----BEGIN PGP MESSAGE-----")) {
     return "inline_pgp";
   }
 
-  // PGP/MIME (RFC 3156): top-level body must be multipart/encrypted
-  // with the pgp-encrypted protocol — not just any multipart/encrypted.
-  // Never fall back on an empty version-part type: Stalwart's own at-rest
-  // AES-256 encryption also uses multipart/encrypted but a different protocol.
   const topType = message.bodyStructure?.type?.toLowerCase() ?? "";
   if (topType === "multipart/encrypted") {
-    const versionPart = message.bodyStructure?.subParts?.[0]?.type?.toLowerCase() ?? "";
-    if (versionPart === "application/pgp-encrypted") {
-      return "pgp_mime";
-    }
+    return "pgp_mime";
   }
 
   // Only flag as encrypted if attachment has an explicit PGP MIME type
@@ -120,7 +109,7 @@ export function resolveSecurityLabels(input: {
     input.messageState === "pgp_mime" ||
     input.messageState === "internal_e2ee"
   ) {
-    labels.push("PGP encrypted");
+    labels.push("E2EE encrypted");
   } else if (input.messageState === "plain" && !input.accountEncryptedAtRest) {
     labels.push("Plain");
   }

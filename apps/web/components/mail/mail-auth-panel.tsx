@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox } from "lucide-react";
+import { Inbox, Loader2 } from "lucide-react";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import type { AuthMode } from "@/hooks/use-mail-app";
@@ -79,9 +79,15 @@ export function MailAuthPanel({
         </div>
 
         {isMailboxStatusLoading ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Checking mailbox status…</p>
+          <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <p className="text-sm">Checking mailbox status…</p>
+          </div>
         ) : isAutoOpeningMailbox ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Opening your mailbox…</p>
+          <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <p className="text-sm">Opening your mailbox…</p>
+          </div>
         ) : authMode === "sign-in" ? (
           <div className="space-y-3">
             <Input type="email" value={mailboxEmail} readOnly className="bg-muted/40 opacity-70" placeholder="Mailbox email" />

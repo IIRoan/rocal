@@ -6,7 +6,8 @@ import {
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
-import { DashboardSkeleton } from "@workspace/ui/components/ui/app-skeletons";
+import { MailSkeleton } from "@workspace/ui/components/ui/app-skeletons";
+import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { MailSidebar } from "./mail-sidebar";
 import { MailCommandPalette } from "./mail-command-palette";
@@ -79,8 +80,15 @@ export function MailApp() {
   } = useMailApp();
 
   if (isSessionPending || !session?.user) {
-    return <DashboardSkeleton />;
+    return (
+      <>
+        <MailSkeleton />
+        <PageLoadingOverlay isLoading={true} messageContext="PAGE_LOAD" enableCycling priority />
+      </>
+    );
   }
+
+  const isOverlayLoading = isMailboxStatusLoading;
 
   const selectedMailbox =
     activeMailbox?.mailboxes.find((m) => m.id === activeMailbox.selectedMailboxId) ?? null;
@@ -218,6 +226,8 @@ export function MailApp() {
         setComposeBody={setComposeBody}
         isBusy={isBusy}
       />
+
+      <PageLoadingOverlay isLoading={isOverlayLoading} messageContext="PAGE_LOAD" enableCycling priority />
     </>
   );
 }
