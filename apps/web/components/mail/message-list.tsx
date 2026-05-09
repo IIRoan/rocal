@@ -20,6 +20,7 @@ import {
 } from "@workspace/ui/components/ui/popover";
 import type { JmapEmailMessage, JmapMailbox } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
+import { SenderAvatar } from "./mail-avatar";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 
@@ -169,38 +170,46 @@ export function MessageList({
                 <button
                   type="button"
                   onClick={() => onSelect(message.id)}
-                  className={`group/row w-full px-4 py-3 text-left transition-colors data-[state=open]:bg-muted/60 data-[state=open]:ring-1 data-[state=open]:ring-inset data-[state=open]:ring-border/60 ${isChecked ? "bg-primary/5" : isSelected ? "bg-muted/80" : "hover:bg-muted/40"}`}
+                  className={`group/row w-full px-3 py-2.5 text-left transition-colors data-[state=open]:bg-muted/60 data-[state=open]:ring-1 data-[state=open]:ring-inset data-[state=open]:ring-border/60 ${isChecked ? "bg-primary/5" : isSelected ? "bg-muted/80" : "hover:bg-muted/40"}`}
                 >
-                  <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {/* Fixed-width slot: unread dot crossfades with checkbox on hover/select */}
-                      <span className="relative shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                        {!isRead && (
-                          <span
-                            className={`absolute h-1.5 w-1.5 rounded-full bg-primary transition-opacity ${isChecked ? "opacity-0" : "opacity-100 group-hover/row:opacity-0"}`}
-                            aria-label="Unread"
-                          />
-                        )}
-                        <span
-                          onClick={(e) => toggleSelect(e, message.id)}
-                          className={`absolute cursor-pointer transition-opacity ${isChecked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"}`}
-                        >
-                          {isChecked
-                            ? <CheckSquare className="h-3.5 w-3.5 text-primary" strokeWidth={2.25} />
-                            : <Square className="h-3.5 w-3.5 text-muted-foreground/50" strokeWidth={2.25} />}
+                  <div className="flex items-start gap-2.5">
+                    <SenderAvatar
+                      email={message.from?.[0]?.email ?? ""}
+                      name={message.from?.[0]?.name ?? undefined}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {/* Fixed-width slot: unread dot crossfades with checkbox on hover/select */}
+                          <span className="relative shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                            {!isRead && (
+                              <span
+                                className={`absolute h-1.5 w-1.5 rounded-full bg-primary transition-opacity ${isChecked ? "opacity-0" : "opacity-100 group-hover/row:opacity-0"}`}
+                                aria-label="Unread"
+                              />
+                            )}
+                            <span
+                              onClick={(e) => toggleSelect(e, message.id)}
+                              className={`absolute cursor-pointer transition-opacity ${isChecked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"}`}
+                            >
+                              {isChecked
+                                ? <CheckSquare className="h-3.5 w-3.5 text-primary" strokeWidth={2.25} />
+                                : <Square className="h-3.5 w-3.5 text-muted-foreground/50" strokeWidth={2.25} />}
+                            </span>
+                          </span>
+                          <span className={`text-[13px] truncate ${isRead ? "font-medium text-foreground/70" : "font-semibold text-foreground"}`}>
+                            {formatAddress(message.from)}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground/70 shrink-0">
+                          {formatMessageDate(message.receivedAt)}
                         </span>
-                      </span>
-                      <span className={`text-[13px] truncate ${isRead ? "font-medium text-foreground/70" : "font-semibold text-foreground"}`}>
-                        {formatAddress(message.from)}
-                      </span>
+                      </div>
+                      <p className={`text-[13px] truncate pl-5 ${isRead ? "text-foreground/50" : "text-foreground/80"}`}>
+                        {message.subject || "(No subject)"}
+                      </p>
                     </div>
-                    <span className="text-[11px] text-muted-foreground/70 shrink-0">
-                      {formatMessageDate(message.receivedAt)}
-                    </span>
                   </div>
-                  <p className={`text-[13px] truncate pl-5 ${isRead ? "text-foreground/50" : "text-foreground/80"}`}>
-                    {message.subject || "(No subject)"}
-                  </p>
                 </button>
               </ContextMenuTrigger>
 

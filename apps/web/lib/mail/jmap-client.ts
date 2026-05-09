@@ -76,7 +76,7 @@ export function getPrimaryMailAccountId(
 
 export function buildSendMessageMethodCalls(input: {
   draftsMailboxId: string;
-  sentMailboxId: string | null;
+  sentMailboxId?: string | null;
   fromEmail: string;
   to: string[];
   subject: string;
@@ -111,7 +111,6 @@ export function buildSendMessageMethodCalls(input: {
             mailboxIds: {
               [input.draftsMailboxId]: true,
             },
-            keywords: { "$seen": true },
             from: [{ email: input.fromEmail }],
             to: input.to.map((email) => ({ email })),
             subject: input.subject,
