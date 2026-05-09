@@ -52,6 +52,10 @@ jest.mock("@workspace/ui/components/ui/sidebar", () => ({
   SidebarInset: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+jest.mock("@workspace/ui/components/ui", () => ({
+  PageLoadingOverlay: () => null,
+}));
+
 jest.mock("@workspace/ui/components/ui/button", () => ({
   Button: ({ children, onClick, disabled, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
     <button onClick={onClick} disabled={disabled} {...rest}>{children}</button>
@@ -60,12 +64,14 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 
 jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
   DashboardSkeleton: () => <div>Loading…</div>,
+  MailSkeleton: () => <div>Loading…</div>,
 }));
 
 jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
     Inbox: Icon,
+    Loader2: Icon,
     Lock: Icon,
     MailPlus: Icon,
     Plus: Icon,
@@ -104,7 +110,8 @@ jest.mock("../../lib/enc-password-cookie", () => ({
 }));
 
 jest.mock("postal-mime", () => ({
-  default: { parse: jest.fn().mockResolvedValue({ text: "", html: null }) },
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+  default: { parse: (jest.fn() as any).mockResolvedValue({ text: "", html: null }) },
 }));
 
 jest.mock("../../lib/mail/vault-crypto", () => ({

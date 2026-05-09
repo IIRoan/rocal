@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
+import { SenderAvatar } from "./mail-avatar";
 import type { JmapMailbox } from "@/lib/mail/types";
 import {
   classifyMessageEncryption,
@@ -221,27 +222,33 @@ function HtmlEmailRenderer({
   );
 }
 
-// ─── Copy button ─────────────────────────────────────────────────────────────
+// ─── Copyable address ─────────────────────────────────────────────────────────
 
-function CopyButton({ text }: { text: string }) {
+function CopyableAddress({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    void navigator.clipboard.writeText(text).then(() => {
+
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(value).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), 2000);
     });
   };
+
   return (
     <button
       type="button"
       onClick={handleCopy}
-      aria-label="Copy"
-      className="inline-flex items-center justify-center h-5 w-5 rounded opacity-0 group-hover/addr:opacity-100 transition-opacity hover:bg-muted/60 shrink-0"
+      className="group/copy flex flex-1 min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-muted/50 active:bg-muted/70 transition-colors duration-150 text-left"
     >
-      {copied
-        ? <Check className="h-3 w-3 text-green-500" />
-        : <Copy className="h-3 w-3 text-muted-foreground/50" />}
+      <span className="text-sm break-all flex-1 text-foreground/80 group-hover/copy:text-foreground transition-colors duration-150">
+        {value}
+      </span>
+      <span className="shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+        {copied
+          ? <Check className="h-3 w-3 text-foreground/60" strokeWidth={2.5} />
+          : <Copy className="h-3 w-3 text-transparent group-hover/copy:text-muted-foreground/50 transition-colors duration-150" strokeWidth={2} />
+        }
+      </span>
     </button>
   );
 }
@@ -250,12 +257,11 @@ function CopyButton({ text }: { text: string }) {
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 min-w-0 group/addr">
+    <div className="flex items-center gap-3 min-w-0">
       <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider w-10 shrink-0">
         {label}
       </span>
-      <span className="text-sm text-foreground/80 break-all flex-1">{value}</span>
-      <CopyButton text={value} />
+      <CopyableAddress value={value} />
     </div>
   );
 }
@@ -326,58 +332,64 @@ export function MessageReader({
     (m) => m.id !== currentMailboxId && !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
   );
 
+  const senderName = message.from?.[0]?.name ?? undefined;
+
   const header = (
     <div className="shrink-0 px-6 pt-5">
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <h2 className="text-base font-semibold tracking-tight leading-tight flex-1">
-          {message.subject || "(No subject)"}
-        </h2>
-        <MailSecurityBadge
-          messageState={messageState}
-          accountEncryptedAtRest={accountEncryptedAtRest}
-          verified={verified}
-          decryptionFailed={Boolean(decryptError)}
-        />
-      </div>
-      <div className="space-y-1 pb-2.5">
-        <div className="flex items-center gap-3 min-w-0 group/addr">
-          <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider w-10 shrink-0">From</span>
-          <span className="text-sm text-foreground/80 break-all flex-1">{formatAddressFull(message.from)}</span>
-          <CopyButton text={formatAddressFull(message.from)} />
-          {isTrustedSender && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Trusted sender"
-                  className="inline-flex items-center gap-1 shrink-0 h-5 px-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium transition-colors hover:bg-primary/20 outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                >
-                  <BadgeCheck className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-                  Trusted
-                </button>
-              </PopoverTrigger>
-              <PopoverContent side="bottom" align="end" sideOffset={6} className="w-60 p-3">
-                <div className="flex items-start gap-2">
-                  <BadgeCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" strokeWidth={2.25} />
-                  <div>
-                    <div className="text-sm font-medium leading-tight">Trusted sender</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                      This message was sent from a <span className="font-medium text-foreground/80">solace.onl</span> address — a verified Solace domain.
+      <div className="flex items-start gap-3 mb-2.5">
+        <SenderAvatar email={senderEmail} name={senderName} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-base font-semibold tracking-tight leading-tight flex-1">
+              {message.subject || "(No subject)"}
+            </h2>
+            <MailSecurityBadge
+              messageState={messageState}
+              accountEncryptedAtRest={accountEncryptedAtRest}
+              verified={verified}
+              decryptionFailed={Boolean(decryptError)}
+            />
+          </div>
+          <div className="space-y-1 mt-1.5 pb-2.5">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider w-10 shrink-0">From</span>
+              <CopyableAddress value={formatAddressFull(message.from)} />
+              {isTrustedSender && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Trusted sender"
+                      className="inline-flex items-center gap-1 shrink-0 h-5 px-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium transition-colors hover:bg-primary/20 outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    >
+                      <BadgeCheck className="h-3 w-3" strokeWidth={2.25} aria-hidden />
+                      Trusted
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="bottom" align="end" sideOffset={6} className="w-60 p-3">
+                    <div className="flex items-start gap-2">
+                      <BadgeCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" strokeWidth={2.25} />
+                      <div>
+                        <div className="text-sm font-medium leading-tight">Trusted sender</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                          This message was sent from a <span className="font-medium text-foreground/80">solace.onl</span> address — a verified Solace domain.
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+            {(message.to?.length ?? 0) > 0 && <MetaRow label="To" value={formatAddressFull(message.to)} />}
+            {(message.cc?.length ?? 0) > 0 && <MetaRow label="CC" value={formatAddressFull(message.cc)} />}
+            {message.receivedAt && (
+              <MetaRow
+                label="Date"
+                value={new Date(message.receivedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+              />
+            )}
+          </div>
         </div>
-        {(message.to?.length ?? 0) > 0 && <MetaRow label="To" value={formatAddressFull(message.to)} />}
-        {(message.cc?.length ?? 0) > 0 && <MetaRow label="CC" value={formatAddressFull(message.cc)} />}
-        {message.receivedAt && (
-          <MetaRow
-            label="Date"
-            value={new Date(message.receivedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
-          />
-        )}
       </div>
       <div className="flex items-center gap-1 py-1.5 border-t border-border/40">
         <button
