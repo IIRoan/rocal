@@ -354,25 +354,26 @@ model UserEncryptionPassword {
 }
 
 model MailDirectoryEntry {
-  id                   String           @id @default(cuid())
-  userId               String?          @unique @map("user_id")
-  user                 User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  email                String           @unique
-  localPart            String           @map("local_part")
+  id                   String             @id @default(cuid())
+  userId               String?            @unique @map("user_id")
+  user                 User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email                String             @unique
+  localPart            String             @map("local_part")
   domain               String
-  displayName          String?          @map("display_name")
-  stalwartAccountId    String           @unique @map("stalwart_account_id")
-  stalwartDomainId     String           @map("stalwart_domain_id")
-  stalwartPublicKeyId  String?          @map("stalwart_public_key_id")
-  publicKeyArmored     String           @map("public_key_armored")
-  publicKeyFingerprint String           @map("public_key_fingerprint")
-  keyAlgorithm         String           @default("openpgp") @map("key_algorithm")
-  source               String           @default("internal")
-  trust                String           @default("verified")
-  keyCreatedAt         DateTime?        @map("key_created_at")
-  createdAt            DateTime         @default(now()) @map("created_at")
-  updatedAt            DateTime         @updatedAt @map("updated_at")
+  displayName          String?            @map("display_name")
+  stalwartAccountId    String             @unique @map("stalwart_account_id")
+  stalwartDomainId     String             @map("stalwart_domain_id")
+  stalwartPublicKeyId  String?            @map("stalwart_public_key_id")
+  publicKeyArmored     String             @map("public_key_armored")
+  publicKeyFingerprint String             @map("public_key_fingerprint")
+  keyAlgorithm         String             @default("openpgp") @map("key_algorithm")
+  source               String             @default("internal")
+  trust                String             @default("verified")
+  keyCreatedAt         DateTime?          @map("key_created_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
   vaultBackup          MailVaultBackup?
+  mailSyncState        MailJmapSyncState?
 
   @@index([domain, localPart])
   @@map("mail_directory_entry")
@@ -393,6 +394,21 @@ model MailVaultBackup {
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
   @@map("mail_vault_backup")
+}
+
+model MailJmapSyncState {
+  id                String             @id @default(cuid())
+  directoryEntryId  String             @unique @map("directory_entry_id")
+  directoryEntry    MailDirectoryEntry @relation(fields: [directoryEntryId], references: [id], onDelete: Cascade)
+  stalwartAccountId String             @unique @map("stalwart_account_id")
+  emailState        String             @map("email_state")
+  mailboxState      String             @map("mailbox_state")
+  threadState       String?            @map("thread_state")
+  lastSyncedAt      DateTime?          @map("last_synced_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  @@map("mail_jmap_sync_state")
 }
 
 // Calendar Subscription Models

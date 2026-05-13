@@ -390,6 +390,18 @@ exports.Prisma.MailVaultBackupScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.MailJmapSyncStateScalarFieldEnum = {
+  id: 'id',
+  directoryEntryId: 'directoryEntryId',
+  stalwartAccountId: 'stalwartAccountId',
+  emailState: 'emailState',
+  mailboxState: 'mailboxState',
+  threadState: 'threadState',
+  lastSyncedAt: 'lastSyncedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.CalendarSubscriptionScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -456,6 +468,7 @@ exports.Prisma.ModelName = {
   UserEncryptionPassword: 'UserEncryptionPassword',
   MailDirectoryEntry: 'MailDirectoryEntry',
   MailVaultBackup: 'MailVaultBackup',
+  MailJmapSyncState: 'MailJmapSyncState',
   CalendarSubscription: 'CalendarSubscription',
   CalendarSyncLog: 'CalendarSyncLog'
 };

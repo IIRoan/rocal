@@ -4,6 +4,7 @@ import type {
   MailBootstrapRequest,
   MailDemoConfig,
   MailDirectoryKey,
+  MailSyncResponse,
   MailSignupRequest,
   MailSignupResponse,
   MailVaultBackupRecord,
@@ -144,6 +145,18 @@ export class MailDemoApiService {
     });
 
     return parseJsonResponse<MailVaultBackupRecord>(response);
+  }
+
+  async syncAccount(accountId: string): Promise<MailSyncResponse> {
+    const response = await fetch(
+      `${this.baseUrl}/api/mail/sync?accountId=${encodeURIComponent(accountId)}`,
+      {
+        method: "GET",
+        credentials: "include",
+      },
+    );
+
+    return parseJsonResponse<MailSyncResponse>(response);
   }
 }
 
