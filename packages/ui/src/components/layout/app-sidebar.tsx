@@ -108,7 +108,7 @@ export function AppSidebar({
   prefetchRange,
   ...props
 }: AppSidebarProps) {
-  const { calendars, toggleCalendarVisibility, isCalendarVisible } =
+  const { calendars, isCalendarVisible } =
     useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
@@ -236,10 +236,9 @@ export function AppSidebar({
                 const isVisible = isCalendarVisible(calendar.id);
                 const calColor = getColorSwatchValue(calendar.color || "blue");
                 return (
-                  <button
+                  <div
                     key={calendar.id}
-                    onClick={() => toggleCalendarVisibility(calendar.id)}
-                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all active:scale-[0.99] ${
+                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl ${
                       isVisible
                         ? "bg-muted/50 text-foreground"
                         : "text-muted-foreground/50"
@@ -255,7 +254,7 @@ export function AppSidebar({
                     <span className="text-sm font-medium truncate">
                       {calendar.name}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
 
@@ -268,10 +267,9 @@ export function AppSidebar({
                     const isVisible = isCalendarVisible(calendar.id);
                     const calColor = getColorSwatchValue(calendar.color || "blue");
                     return (
-                      <button
+                      <div
                         key={calendar.id}
-                        onClick={() => toggleCalendarVisibility(calendar.id)}
-                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all active:scale-[0.99] ${
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl ${
                           isVisible
                             ? "bg-muted/50 text-foreground"
                             : "text-muted-foreground/50"
@@ -287,7 +285,7 @@ export function AppSidebar({
                         <span className="text-sm font-medium truncate">
                           {calendar.name}
                         </span>
-                      </button>
+                      </div>
                     );
                   })}
                 </>
@@ -302,10 +300,9 @@ export function AppSidebar({
                     const isVisible = isCalendarVisible(calendar.id);
                     const calColor = getColorSwatchValue(calendar.color || "blue");
                     return (
-                      <button
+                      <div
                         key={calendar.id}
-                        onClick={() => toggleCalendarVisibility(calendar.id)}
-                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all active:scale-[0.99] ${
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl ${
                           isVisible
                             ? "bg-muted/50 text-foreground"
                             : "text-muted-foreground/50"
@@ -321,7 +318,7 @@ export function AppSidebar({
                         <span className="text-sm font-medium truncate">
                           {calendar.name}
                         </span>
-                      </button>
+                      </div>
                     );
                   })}
                 </>
@@ -386,7 +383,7 @@ function AppSidebarDesktop({
   prefetchRange?: (range: { start: Date; end: Date }) => void;
   props: React.ComponentProps<typeof Sidebar>;
 }) {
-  const { calendars, toggleCalendarVisibility, isCalendarVisible } =
+  const { calendars, isCalendarVisible } =
     useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
@@ -551,7 +548,6 @@ function AppSidebarDesktop({
                   >
                     <CollapsedIconButton
                       label={calendar.name}
-                      onClick={() => toggleCalendarVisibility(calendar.id)}
                     >
                       <span
                         className="size-2.5 rounded-full shrink-0 transition-opacity"
@@ -586,12 +582,11 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors ${
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-default ${
                             isVisible
-                              ? "text-foreground hover:bg-muted/70"
-                              : "text-muted-foreground/40 hover:bg-muted/40 hover:text-muted-foreground/70"
+                              ? "text-foreground"
+                              : "text-muted-foreground/40"
                           }`}
-                          onClick={() => toggleCalendarVisibility(calendar.id)}
                         >
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
@@ -616,12 +611,11 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors ${
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-default ${
                             isVisible
-                              ? "text-foreground hover:bg-muted/70"
-                              : "text-muted-foreground/40 hover:bg-muted/40 hover:text-muted-foreground/70"
+                              ? "text-foreground"
+                              : "text-muted-foreground/40"
                           }`}
-                          onClick={() => toggleCalendarVisibility(calendar.id)}
                         >
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
@@ -646,12 +640,11 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors ${
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-default ${
                             isVisible
-                              ? "text-foreground hover:bg-muted/70"
-                              : "text-muted-foreground/40 hover:bg-muted/40 hover:text-muted-foreground/70"
+                              ? "text-foreground"
+                              : "text-muted-foreground/40"
                           }`}
-                          onClick={() => toggleCalendarVisibility(calendar.id)}
                         >
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"

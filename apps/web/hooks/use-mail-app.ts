@@ -23,14 +23,18 @@ import {
   extractMessageBodies,
   extractPgpMimeCiphertextBlobId,
 } from "@/lib/mail/message-security";
-import { unlockEncryptedMailVault } from "@/lib/mail/vault-crypto";
-import { getStoredMailVault, putStoredMailVault } from "@/lib/mail/vault-storage";
+import { unlockEncryptedMailVault, createEncryptedMailVault } from "@/lib/mail/vault-crypto";
+import {
+  getStoredMailVault,
+  putStoredMailVault,
+} from "@/lib/mail/vault-storage";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
 import type {
   JmapEmailMessage,
   JmapIdentity,
   JmapMailbox,
   JmapSession,
+  LabelDef,
   MailAccountStatus,
   MailDemoConfig,
   MailSyncResponse,
@@ -39,7 +43,14 @@ import type {
 
 const log = createLogger("mail-app");
 
-const PROTECTED_ROLES = new Set(["inbox", "sent", "drafts", "trash", "junk", "spam"]);
+const PROTECTED_ROLES = new Set([
+  "inbox",
+  "sent",
+  "drafts",
+  "trash",
+  "junk",
+  "spam",
+]);
 
 export type AuthMode = "sign-in" | "sign-up";
 
@@ -55,7 +66,10 @@ export type ActiveMailboxState = {
   selectedMailboxId: string | null;
 };
 
-function getPrimaryMailboxId(mailboxes: JmapMailbox[], role: string): string | null {
+function getPrimaryMailboxId(
+  mailboxes: JmapMailbox[],
+  role: string,
+): string | null {
   return mailboxes.find((m) => m.role === role)?.id ?? mailboxes[0]?.id ?? null;
 }
 
@@ -132,22 +146,30 @@ export function useMailApp() {
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [mailboxStatus, setMailboxStatus] = useState<MailAccountStatus | null>(null);
+  const [totalMessages, setTotalMessages] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [mailboxStatus, setMailboxStatus] = useState<MailAccountStatus | null>(
+    null,
+  );
   const [isMailboxStatusLoading, setIsMailboxStatusLoading] = useState(false);
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [hasAttemptedAutoOpen, setHasAttemptedAutoOpen] = useState(false);
-  const [activeMailbox, setActiveMailbox] = useState<ActiveMailboxState | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<string | null>(null);
+  const [activeMailbox, setActiveMailbox] = useState<ActiveMailboxState | null>(
+    null,
+  );
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+    null,
+  );
+  const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
+    string | null
+  >(null);
   const [selectedMessageVerified, setSelectedMessageVerified] = useState(false);
-  const [selectedMessageDecryptError, setSelectedMessageDecryptError] = useState<
-    string | null
-  >(null);
-  const [selectedMessageDecryptedHtml, setSelectedMessageDecryptedHtml] = useState<
-    string | null
-  >(null);
+  const [selectedMessageDecryptError, setSelectedMessageDecryptError] =
+    useState<string | null>(null);
+  const [selectedMessageDecryptedHtml, setSelectedMessageDecryptedHtml] =
+    useState<string | null>(null);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
@@ -188,7 +210,8 @@ export function useMailApp() {
     Boolean(mailboxStatus?.provisioned) &&
     Boolean(cachedAuthPassword) &&
     !activeMailbox;
-  const isAutoOpeningMailbox = shouldAutoOpenMailbox && (!hasAttemptedAutoOpen || isBusy);
+  const isAutoOpeningMailbox =
+    shouldAutoOpenMailbox && (!hasAttemptedAutoOpen || isBusy);
 
   // Init password from encrypted cookie (cross-tab / post-refresh)
   useEffect(() => {
@@ -205,9 +228,13 @@ export function useMailApp() {
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
           : "/mail";
-      router.replace(`/login?next=${encodeURIComponent(currentPath)}`, undefined, {
-        messageContext: "AUTH_FLOW",
-      });
+      router.replace(
+        `/login?next=${encodeURIComponent(currentPath)}`,
+        undefined,
+        {
+          messageContext: "AUTH_FLOW",
+        },
+      );
     }
   }, [isSessionPending, session?.user, router]);
 
@@ -263,7 +290,11 @@ export function useMailApp() {
       .catch((error) => {
         if (cancelled) return;
         log.error("Failed to load mailbox status", error);
-        toast.error(error instanceof Error ? error.message : "Could not load mailbox status.");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not load mailbox status.",
+        );
       })
       .finally(() => {
         if (!cancelled) setIsMailboxStatusLoading(false);
@@ -304,15 +335,21 @@ export function useMailApp() {
         if (encState === "inline_pgp") {
           const { text } = extractMessageBodies(selectedMessage);
           if (!text) {
-            setSelectedMessageDecryptError("No armored PGP body found in this message.");
+            setSelectedMessageDecryptError(
+              "No armored PGP body found in this message.",
+            );
             return;
           }
           armoredMessage = text;
         } else {
           // pgp_mime: download the ciphertext blob
-          const blobId = extractPgpMimeCiphertextBlobId(selectedMessage.bodyStructure);
+          const blobId = extractPgpMimeCiphertextBlobId(
+            selectedMessage.bodyStructure,
+          );
           if (!blobId) {
-            setSelectedMessageDecryptError("Could not locate PGP/MIME ciphertext blob.");
+            setSelectedMessageDecryptError(
+              "Could not locate PGP/MIME ciphertext blob.",
+            );
             return;
           }
           armoredMessage = await activeMailbox.client.getBlobAsText(
@@ -323,9 +360,14 @@ export function useMailApp() {
         if (cancelled) return;
         const senderEmail = selectedMessage.from?.[0]?.email;
         let senderPublicKeyArmored: string | undefined;
-        if (senderEmail && config && senderEmail.endsWith(`@${config.defaultDomain}`)) {
+        if (
+          senderEmail &&
+          config &&
+          senderEmail.endsWith(`@${config.defaultDomain}`)
+        ) {
           try {
-            const senderKey = await mailDemoApiService.getRecipientKey(senderEmail);
+            const senderKey =
+              await mailDemoApiService.getRecipientKey(senderEmail);
             senderPublicKeyArmored = senderKey.publicKeyArmored;
           } catch {
             /* best-effort */
@@ -352,7 +394,9 @@ export function useMailApp() {
         setSelectedMessagePlaintext(null);
         setSelectedMessageDecryptedHtml(null);
         setSelectedMessageVerified(false);
-        setSelectedMessageDecryptError("Could not decrypt this message on this device.");
+        setSelectedMessageDecryptError(
+          "Could not decrypt this message on this device.",
+        );
       }
     })();
     return () => {
@@ -371,17 +415,19 @@ export function useMailApp() {
             ...cur,
             messages: cur.messages.map((m) =>
               m.id === selectedMessageId
-                ? { ...m, keywords: { ...(m.keywords ?? {}), "$seen": true } }
+                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
                 : m,
             ),
           }
         : cur,
     );
-    activeMailbox.client.markAsRead(activeMailbox.session, selectedMessageId).catch((err) => {
-      log.error("Failed to mark message as read", err);
-    });
-  // Only run when the selected message changes, not on every activeMailbox update
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    activeMailbox.client
+      .markAsRead(activeMailbox.session, selectedMessageId)
+      .catch((err) => {
+        log.error("Failed to mark message as read", err);
+      });
+    // Only run when the selected message changes, not on every activeMailbox update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessageId]);
 
   const refreshMailboxMessages = useCallback(
@@ -389,10 +435,13 @@ export function useMailApp() {
       if (!activeMailbox) return;
       setIsBusy(true);
       try {
-        const messages = await activeMailbox.client.getMailboxMessages(
-          activeMailbox.session,
-          mailboxId,
-        );
+        const { messages, total } =
+          await activeMailbox.client.getMailboxMessages(
+            activeMailbox.session,
+            mailboxId,
+            { limit: 20, position: 0 },
+          );
+        setTotalMessages(total);
         setActiveMailbox((cur) =>
           cur ? { ...cur, selectedMailboxId: mailboxId, messages } : cur,
         );
@@ -402,13 +451,40 @@ export function useMailApp() {
         });
       } catch (error) {
         log.error("Failed to load mailbox messages", error);
-        toast.error(error instanceof Error ? error.message : "Could not load messages.");
+        toast.error(
+          error instanceof Error ? error.message : "Could not load messages.",
+        );
       } finally {
         setIsBusy(false);
       }
     },
     [activeMailbox],
   );
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!activeMailbox?.selectedMailboxId || isLoadingMore) return;
+    const position = activeMailbox.messages.length;
+    if (position >= totalMessages) return;
+    setIsLoadingMore(true);
+    try {
+      const { messages: more } = await activeMailbox.client.getMailboxMessages(
+        activeMailbox.session,
+        activeMailbox.selectedMailboxId,
+        { limit: 20, position },
+      );
+      if (more.length > 0) {
+        setActiveMailbox((cur) =>
+          cur
+            ? { ...cur, messages: sortMessages([...cur.messages, ...more]) }
+            : cur,
+        );
+      }
+    } catch (error) {
+      log.error("Failed to load more messages", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [activeMailbox, isLoadingMore, totalMessages]);
 
   const handleSignIn = useCallback(
     async (passwordOverride?: string) => {
@@ -427,10 +503,13 @@ export function useMailApp() {
           password: mailboxPassword,
         });
         const jmapSession = await client.discoverSession();
-        const remoteBackup = await mailDemoApiService.getAccountVaultBackup().catch(() => null);
+        const remoteBackup = await mailDemoApiService
+          .getAccountVaultBackup()
+          .catch(() => null);
         const localBackup = await getStoredMailVault(email);
         const backup = remoteBackup ?? localBackup;
-        if (!backup) throw new Error("No encrypted vault backup found for this mailbox.");
+        if (!backup)
+          throw new Error("No encrypted vault backup found for this mailbox.");
         if (remoteBackup) await putStoredMailVault(backup);
         const unlockedVault = await unlockEncryptedMailVault(
           backup.encryptedVaultB64,
@@ -448,9 +527,12 @@ export function useMailApp() {
           client.getIdentities(jmapSession),
         ]);
         const initialMailboxId = getPrimaryMailboxId(mailboxes, "inbox");
-        const messages = initialMailboxId
-          ? await client.getMailboxMessages(jmapSession, initialMailboxId)
-          : [];
+        const { messages, total: initialTotal } = initialMailboxId
+          ? await client.getMailboxMessages(jmapSession, initialMailboxId, {
+              limit: 20,
+            })
+          : { messages: [], total: 0 };
+        setTotalMessages(initialTotal);
         setActiveMailbox({
           client,
           session: jmapSession,
@@ -459,9 +541,11 @@ export function useMailApp() {
           messages,
           unlockedVault,
           accountEncryptedAtRest:
-            (accountSettings.encryptionAtRest as { "@type"?: string } | undefined)?.[
-              "@type"
-            ] === "Aes256",
+            (
+              accountSettings.encryptionAtRest as
+                | { "@type"?: string }
+                | undefined
+            )?.["@type"] === "Aes256",
           email,
           selectedMailboxId: initialMailboxId,
         });
@@ -469,7 +553,11 @@ export function useMailApp() {
         setLoginPassword(mailboxPassword);
       } catch (error) {
         log.error("Mail sign-in failed", error);
-        toast.error(error instanceof Error ? error.message : "Could not open the mailbox.");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not open the mailbox.",
+        );
       } finally {
         setIsBusy(false);
       }
@@ -495,14 +583,22 @@ export function useMailApp() {
         displayName: accountDisplayName,
         userId: accountUserId,
       });
-      setMailboxStatus({ email: provisioned.email, displayName: provisioned.displayName, provisioned: true });
+      setMailboxStatus({
+        email: provisioned.email,
+        displayName: provisioned.displayName,
+        provisioned: true,
+      });
       toast("Mailbox ready. Signing in…");
       setLoginPassword(signupPassword);
       setAuthMode("sign-in");
       await handleSignIn(signupPassword);
     } catch (error) {
       log.error("Mail signup failed", error);
-      toast.error(error instanceof Error ? error.message : "Could not create the mailbox.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not create the mailbox.",
+      );
     } finally {
       setIsBusy(false);
     }
@@ -558,11 +654,19 @@ export function useMailApp() {
     }
     setIsBusy(true);
     try {
-      const draftsMailboxId = getPrimaryMailboxId(activeMailbox.mailboxes, "drafts");
-      const sentMailboxId = getPrimaryMailboxId(activeMailbox.mailboxes, "sent");
+      const draftsMailboxId = getPrimaryMailboxId(
+        activeMailbox.mailboxes,
+        "drafts",
+      );
+      const sentMailboxId = getPrimaryMailboxId(
+        activeMailbox.mailboxes,
+        "sent",
+      );
       const identityId = activeMailbox.identities[0]?.id;
       if (!draftsMailboxId || !identityId) {
-        throw new Error("This mailbox is missing a draft mailbox or sending identity.");
+        throw new Error(
+          "This mailbox is missing a draft mailbox or sending identity.",
+        );
       }
       await activeMailbox.client.sendMessage(activeMailbox.session, {
         draftsMailboxId,
@@ -579,43 +683,62 @@ export function useMailApp() {
       setIsComposeOpen(false);
       toast("Message sent.");
       if (activeMailbox.selectedMailboxId) {
-        const refreshed = await activeMailbox.client.getMailboxMessages(
-          activeMailbox.session,
-          activeMailbox.selectedMailboxId,
+        const { messages: refreshed } =
+          await activeMailbox.client.getMailboxMessages(
+            activeMailbox.session,
+            activeMailbox.selectedMailboxId,
+            { limit: 20 },
+          );
+        setActiveMailbox((cur) =>
+          cur ? { ...cur, messages: refreshed } : cur,
         );
-        setActiveMailbox((cur) => (cur ? { ...cur, messages: refreshed } : cur));
       }
     } catch (error) {
       log.error("Failed to send mail", error);
-      toast.error(error instanceof Error ? error.message : "Could not send the message.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not send the message.",
+      );
     } finally {
       setIsBusy(false);
     }
   }, [activeMailbox, composeTo, composeSubject, composeBody]);
 
-  const handleDeleteMessage = useCallback(async (messageId?: string) => {
-    const targetId = messageId ?? selectedMessageId;
-    if (!activeMailbox || !targetId) return;
-    const trashMailbox = activeMailbox.mailboxes.find((m) => m.role === "trash");
-    const isInTrash = activeMailbox.selectedMailboxId === trashMailbox?.id;
-    const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
-    setIsBusy(true);
-    try {
-      await activeMailbox.client.moveToTrash(
-        activeMailbox.session,
-        targetId,
-        isInTrash ? null : (trashMailbox?.id ?? null),
+  const handleDeleteMessage = useCallback(
+    async (messageId?: string) => {
+      const targetId = messageId ?? selectedMessageId;
+      if (!activeMailbox || !targetId) return;
+      const trashMailbox = activeMailbox.mailboxes.find(
+        (m) => m.role === "trash",
       );
-      setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
-      setSelectedMessageId((cur) => (cur === targetId ? (remaining[0]?.id ?? null) : cur));
-      toast(isInTrash ? "Message deleted." : "Moved to trash.");
-    } catch (error) {
-      log.error("Failed to delete message", error);
-      toast.error(error instanceof Error ? error.message : "Could not delete the message.");
-    } finally {
-      setIsBusy(false);
-    }
-  }, [activeMailbox, selectedMessageId]);
+      const isInTrash = activeMailbox.selectedMailboxId === trashMailbox?.id;
+      const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
+      setIsBusy(true);
+      try {
+        await activeMailbox.client.moveToTrash(
+          activeMailbox.session,
+          targetId,
+          isInTrash ? null : (trashMailbox?.id ?? null),
+        );
+        setActiveMailbox((cur) =>
+          cur ? { ...cur, messages: remaining } : cur,
+        );
+        setSelectedMessageId((cur) =>
+          cur === targetId ? (remaining[0]?.id ?? null) : cur,
+        );
+        toast(isInTrash ? "Message deleted." : "Moved to trash.");
+      } catch (error) {
+        log.error("Failed to delete message", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not delete the message.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [activeMailbox, selectedMessageId],
+  );
 
   const handleReply = useCallback(() => {
     if (!selectedMessage) return;
@@ -639,266 +762,429 @@ export function useMailApp() {
     const { text } = extractMessageBodies(selectedMessage);
     const body = selectedMessagePlaintext ?? text ?? "";
     setComposeTo("");
-    setComposeSubject(subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`);
+    setComposeSubject(
+      subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`,
+    );
     setComposeBody(`\n\n---\nForwarded message from ${sender}:\n${body}`);
     setIsComposeOpen(true);
   }, [selectedMessage, selectedMessagePlaintext]);
 
-  const handleMoveMessage = useCallback(async (targetMailboxId: string, messageId?: string) => {
-    const targetId = messageId ?? selectedMessageId;
-    if (!activeMailbox || !targetId) return;
-    const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
-    setIsBusy(true);
-    try {
-      await activeMailbox.client.moveToMailbox(
-        activeMailbox.session,
-        targetId,
-        targetMailboxId,
-      );
-      setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
-      setSelectedMessageId((cur) => (cur === targetId ? (remaining[0]?.id ?? null) : cur));
-      const targetMailbox = activeMailbox.mailboxes.find((m) => m.id === targetMailboxId);
-      toast(`Moved to ${targetMailbox?.name ?? "mailbox"}.`);
-    } catch (error) {
-      log.error("Failed to move message", error);
-      toast.error(error instanceof Error ? error.message : "Could not move the message.");
-    } finally {
-      setIsBusy(false);
-    }
-  }, [activeMailbox, selectedMessageId]);
+  const handleMoveMessage = useCallback(
+    async (targetMailboxId: string, messageId?: string) => {
+      const targetId = messageId ?? selectedMessageId;
+      if (!activeMailbox || !targetId) return;
+      const remaining = activeMailbox.messages.filter((m) => m.id !== targetId);
+      setIsBusy(true);
+      try {
+        await activeMailbox.client.moveToMailbox(
+          activeMailbox.session,
+          targetId,
+          targetMailboxId,
+        );
+        setActiveMailbox((cur) =>
+          cur ? { ...cur, messages: remaining } : cur,
+        );
+        setSelectedMessageId((cur) =>
+          cur === targetId ? (remaining[0]?.id ?? null) : cur,
+        );
+        const targetMailbox = activeMailbox.mailboxes.find(
+          (m) => m.id === targetMailboxId,
+        );
+        toast(`Moved to ${targetMailbox?.name ?? "mailbox"}.`);
+      } catch (error) {
+        log.error("Failed to move message", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not move the message.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [activeMailbox, selectedMessageId],
+  );
 
-  const handleReorderMailboxes = useCallback(async (reordered: JmapMailbox[]) => {
-    if (!activeMailbox) return;
-    // Stamp each mailbox with its new sortOrder so the sidebar sort stays stable
-    const withOrder = reordered.map((m, i) => ({ ...m, sortOrder: i }));
-    setActiveMailbox((cur) => (cur ? { ...cur, mailboxes: withOrder } : cur));
-    const updates = withOrder.map((m) => ({ id: m.id, sortOrder: m.sortOrder! }));
-    try {
-      await activeMailbox.client.updateMailboxSortOrders(activeMailbox.session, updates);
-    } catch (error) {
-      log.error("Failed to save mailbox order", error);
-    }
-  }, [activeMailbox]);
+  const handleReorderMailboxes = useCallback(
+    async (reordered: JmapMailbox[]) => {
+      if (!activeMailbox) return;
+      // Stamp each mailbox with its new sortOrder so the sidebar sort stays stable
+      const withOrder = reordered.map((m, i) => ({ ...m, sortOrder: i }));
+      setActiveMailbox((cur) => (cur ? { ...cur, mailboxes: withOrder } : cur));
+      const updates = withOrder.map((m) => ({
+        id: m.id,
+        sortOrder: m.sortOrder!,
+      }));
+      try {
+        await activeMailbox.client.updateMailboxSortOrders(
+          activeMailbox.session,
+          updates,
+        );
+      } catch (error) {
+        log.error("Failed to save mailbox order", error);
+      }
+    },
+    [activeMailbox],
+  );
 
-  const handleCreateMailbox = useCallback(async (name: string) => {
-    if (!activeMailbox || !name.trim()) return;
-    setIsBusy(true);
-    try {
-      const created = await activeMailbox.client.createMailbox(activeMailbox.session, name.trim());
+  const handleRenameMailbox = useCallback(
+    async (mailboxId: string, name: string) => {
+      if (!activeMailbox || !name.trim()) return;
+      const mailbox = activeMailbox.mailboxes.find((m) => m.id === mailboxId);
+      if (!mailbox || PROTECTED_ROLES.has(mailbox.role?.toLowerCase() ?? ""))
+        return;
+      const trimmed = name.trim();
       setActiveMailbox((cur) =>
-        cur ? { ...cur, mailboxes: [...cur.mailboxes, created] } : cur,
+        cur
+          ? {
+              ...cur,
+              mailboxes: cur.mailboxes.map((m) =>
+                m.id === mailboxId ? { ...m, name: trimmed } : m,
+              ),
+            }
+          : cur,
       );
-      toast(`Mailbox "${name.trim()}" created.`);
-    } catch (error) {
-      log.error("Failed to create mailbox", error);
-      toast.error(error instanceof Error ? error.message : "Could not create the mailbox.");
-    } finally {
-      setIsBusy(false);
-    }
-  }, [activeMailbox]);
+      try {
+        await activeMailbox.client.renameMailbox(
+          activeMailbox.session,
+          mailboxId,
+          trimmed,
+        );
+      } catch (error) {
+        log.error("Failed to rename mailbox", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not rename the mailbox.",
+        );
+        setActiveMailbox((cur) =>
+          cur
+            ? {
+                ...cur,
+                mailboxes: cur.mailboxes.map((m) =>
+                  m.id === mailboxId ? { ...m, name: mailbox.name } : m,
+                ),
+              }
+            : cur,
+        );
+      }
+    },
+    [activeMailbox],
+  );
 
-  const handleDeleteMailbox = useCallback(async (mailboxId: string) => {
-    if (!activeMailbox) return;
-    const mailbox = activeMailbox.mailboxes.find((m) => m.id === mailboxId);
-    if (!mailbox || PROTECTED_ROLES.has(mailbox.role?.toLowerCase() ?? "")) return;
-    setIsBusy(true);
-    try {
-      await activeMailbox.client.deleteMailbox(activeMailbox.session, mailboxId);
-      const remaining = activeMailbox.mailboxes.filter((m) => m.id !== mailboxId);
-      const newSelectedId =
-        activeMailbox.selectedMailboxId === mailboxId
-          ? (remaining.find((m) => m.role === "inbox")?.id ?? remaining[0]?.id ?? null)
-          : activeMailbox.selectedMailboxId;
+  const handleCreateMailbox = useCallback(
+    async (name: string) => {
+      if (!activeMailbox || !name.trim()) return;
+      setIsBusy(true);
+      try {
+        const created = await activeMailbox.client.createMailbox(
+          activeMailbox.session,
+          name.trim(),
+        );
+        setActiveMailbox((cur) =>
+          cur ? { ...cur, mailboxes: [...cur.mailboxes, created] } : cur,
+        );
+        toast(`Mailbox "${name.trim()}" created.`);
+      } catch (error) {
+        log.error("Failed to create mailbox", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not create the mailbox.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [activeMailbox],
+  );
+
+  const handleDeleteMailbox = useCallback(
+    async (mailboxId: string) => {
+      if (!activeMailbox) return;
+      const mailbox = activeMailbox.mailboxes.find((m) => m.id === mailboxId);
+      if (!mailbox || PROTECTED_ROLES.has(mailbox.role?.toLowerCase() ?? ""))
+        return;
+      setIsBusy(true);
+      try {
+        await activeMailbox.client.deleteMailbox(
+          activeMailbox.session,
+          mailboxId,
+        );
+        const remaining = activeMailbox.mailboxes.filter(
+          (m) => m.id !== mailboxId,
+        );
+        const newSelectedId =
+          activeMailbox.selectedMailboxId === mailboxId
+            ? (remaining.find((m) => m.role === "inbox")?.id ??
+              remaining[0]?.id ??
+              null)
+            : activeMailbox.selectedMailboxId;
+        setActiveMailbox((cur) =>
+          cur
+            ? { ...cur, mailboxes: remaining, selectedMailboxId: newSelectedId }
+            : cur,
+        );
+        if (activeMailbox.selectedMailboxId === mailboxId && newSelectedId) {
+          await refreshMailboxMessages(newSelectedId);
+        }
+        toast(`Mailbox "${mailbox.name}" deleted.`);
+      } catch (error) {
+        log.error("Failed to delete mailbox", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not delete the mailbox.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [activeMailbox, refreshMailboxMessages],
+  );
+
+  const handleBulkDelete = useCallback(
+    async (messageIds: string[]) => {
+      if (!activeMailbox || messageIds.length === 0) return;
+      const trashMailbox = activeMailbox.mailboxes.find(
+        (m) => m.role === "trash",
+      );
+      const isInTrash = activeMailbox.selectedMailboxId === trashMailbox?.id;
+      const idSet = new Set(messageIds);
+      const remaining = activeMailbox.messages.filter((m) => !idSet.has(m.id));
+      setIsBusy(true);
+      try {
+        await activeMailbox.client.bulkMoveToTrash(
+          activeMailbox.session,
+          messageIds,
+          isInTrash ? null : (trashMailbox?.id ?? null),
+        );
+        setActiveMailbox((cur) =>
+          cur ? { ...cur, messages: remaining } : cur,
+        );
+        setSelectedMessageId((cur) =>
+          cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
+        );
+        toast(
+          isInTrash
+            ? `Deleted ${messageIds.length} messages.`
+            : `Moved ${messageIds.length} to trash.`,
+        );
+      } catch (error) {
+        log.error("Failed to bulk delete messages", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not delete the messages.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [activeMailbox],
+  );
+
+  const handleBulkMove = useCallback(
+    async (messageIds: string[], targetMailboxId: string) => {
+      if (!activeMailbox || messageIds.length === 0) return;
+      const idSet = new Set(messageIds);
+      const remaining = activeMailbox.messages.filter((m) => !idSet.has(m.id));
+      setIsBusy(true);
+      try {
+        await activeMailbox.client.bulkMoveToMailbox(
+          activeMailbox.session,
+          messageIds,
+          targetMailboxId,
+        );
+        setActiveMailbox((cur) =>
+          cur ? { ...cur, messages: remaining } : cur,
+        );
+        setSelectedMessageId((cur) =>
+          cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
+        );
+        const targetMailbox = activeMailbox.mailboxes.find(
+          (m) => m.id === targetMailboxId,
+        );
+        toast(
+          `Moved ${messageIds.length} to ${targetMailbox?.name ?? "mailbox"}.`,
+        );
+      } catch (error) {
+        log.error("Failed to bulk move messages", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not move the messages.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [activeMailbox],
+  );
+
+  const handleBulkMarkAsUnread = useCallback(
+    async (messageIds: string[]) => {
+      if (!activeMailbox || messageIds.length === 0) return;
+      const idSet = new Set(messageIds);
       setActiveMailbox((cur) =>
-        cur ? { ...cur, mailboxes: remaining, selectedMailboxId: newSelectedId } : cur,
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) => {
+                if (!idSet.has(m.id)) return m;
+                const keywords = { ...(m.keywords ?? {}) };
+                delete keywords["$seen"];
+                return { ...m, keywords };
+              }),
+            }
+          : cur,
       );
-      if (activeMailbox.selectedMailboxId === mailboxId && newSelectedId) {
-        await refreshMailboxMessages(newSelectedId);
+      try {
+        await activeMailbox.client.bulkMarkAsUnread(
+          activeMailbox.session,
+          messageIds,
+        );
+      } catch (error) {
+        log.error("Failed to bulk mark as unread", error);
       }
-      toast(`Mailbox "${mailbox.name}" deleted.`);
-    } catch (error) {
-      log.error("Failed to delete mailbox", error);
-      toast.error(error instanceof Error ? error.message : "Could not delete the mailbox.");
-    } finally {
-      setIsBusy(false);
-    }
-  }, [activeMailbox, refreshMailboxMessages]);
+    },
+    [activeMailbox],
+  );
 
-  const handleBulkDelete = useCallback(async (messageIds: string[]) => {
-    if (!activeMailbox || messageIds.length === 0) return;
-    const trashMailbox = activeMailbox.mailboxes.find((m) => m.role === "trash");
-    const isInTrash = activeMailbox.selectedMailboxId === trashMailbox?.id;
-    const idSet = new Set(messageIds);
-    const remaining = activeMailbox.messages.filter((m) => !idSet.has(m.id));
-    setIsBusy(true);
-    try {
-      await activeMailbox.client.bulkMoveToTrash(
-        activeMailbox.session,
-        messageIds,
-        isInTrash ? null : (trashMailbox?.id ?? null),
+  const handleBulkMarkAsRead = useCallback(
+    async (messageIds: string[]) => {
+      if (!activeMailbox || messageIds.length === 0) return;
+      const idSet = new Set(messageIds);
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) =>
+                idSet.has(m.id)
+                  ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                  : m,
+              ),
+            }
+          : cur,
       );
-      setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
-      setSelectedMessageId((cur) => (cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur));
-      toast(isInTrash ? `Deleted ${messageIds.length} messages.` : `Moved ${messageIds.length} to trash.`);
-    } catch (error) {
-      log.error("Failed to bulk delete messages", error);
-      toast.error(error instanceof Error ? error.message : "Could not delete the messages.");
-    } finally {
-      setIsBusy(false);
-    }
-  }, [activeMailbox]);
-
-  const handleBulkMove = useCallback(async (messageIds: string[], targetMailboxId: string) => {
-    if (!activeMailbox || messageIds.length === 0) return;
-    const idSet = new Set(messageIds);
-    const remaining = activeMailbox.messages.filter((m) => !idSet.has(m.id));
-    setIsBusy(true);
-    try {
-      await activeMailbox.client.bulkMoveToMailbox(activeMailbox.session, messageIds, targetMailboxId);
-      setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
-      setSelectedMessageId((cur) => (cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur));
-      const targetMailbox = activeMailbox.mailboxes.find((m) => m.id === targetMailboxId);
-      toast(`Moved ${messageIds.length} to ${targetMailbox?.name ?? "mailbox"}.`);
-    } catch (error) {
-      log.error("Failed to bulk move messages", error);
-      toast.error(error instanceof Error ? error.message : "Could not move the messages.");
-    } finally {
-      setIsBusy(false);
-    }
-  }, [activeMailbox]);
-
-  const handleBulkMarkAsUnread = useCallback(async (messageIds: string[]) => {
-    if (!activeMailbox || messageIds.length === 0) return;
-    const idSet = new Set(messageIds);
-    setActiveMailbox((cur) =>
-      cur
-        ? {
-            ...cur,
-            messages: cur.messages.map((m) => {
-              if (!idSet.has(m.id)) return m;
-              const keywords = { ...(m.keywords ?? {}) };
-              delete keywords["$seen"];
-              return { ...m, keywords };
-            }),
-          }
-        : cur,
-    );
-    try {
-      await activeMailbox.client.bulkMarkAsUnread(activeMailbox.session, messageIds);
-    } catch (error) {
-      log.error("Failed to bulk mark as unread", error);
-    }
-  }, [activeMailbox]);
-
-  const handleBulkMarkAsRead = useCallback(async (messageIds: string[]) => {
-    if (!activeMailbox || messageIds.length === 0) return;
-    const idSet = new Set(messageIds);
-    setActiveMailbox((cur) =>
-      cur
-        ? {
-            ...cur,
-            messages: cur.messages.map((m) =>
-              idSet.has(m.id) ? { ...m, keywords: { ...(m.keywords ?? {}), "$seen": true } } : m,
-            ),
-          }
-        : cur,
-    );
-    try {
-      await activeMailbox.client.bulkMarkAsRead(activeMailbox.session, messageIds);
-    } catch (error) {
-      log.error("Failed to bulk mark as read", error);
-    }
-  }, [activeMailbox]);
-
-  const handleMarkAsUnread = useCallback(async (messageId?: string) => {
-    const targetId = messageId ?? selectedMessageId;
-    if (!activeMailbox || !targetId) return;
-    setActiveMailbox((cur) =>
-      cur
-        ? {
-            ...cur,
-            messages: cur.messages.map((m) => {
-              if (m.id !== targetId) return m;
-              const keywords = { ...(m.keywords ?? {}) };
-              delete keywords["$seen"];
-              return { ...m, keywords };
-            }),
-          }
-        : cur,
-    );
-    try {
-      await activeMailbox.client.markAsUnread(activeMailbox.session, targetId);
-    } catch (error) {
-      log.error("Failed to mark message as unread", error);
-    }
-  }, [activeMailbox, selectedMessageId]);
-
-  const handleMarkAsRead = useCallback(async (messageId?: string) => {
-    const targetId = messageId ?? selectedMessageId;
-    if (!activeMailbox || !targetId) return;
-    const msg = activeMailbox.messages.find((m) => m.id === targetId);
-    if (!msg || msg.keywords?.["$seen"]) return;
-    setActiveMailbox((cur) =>
-      cur
-        ? {
-            ...cur,
-            messages: cur.messages.map((m) =>
-              m.id === targetId
-                ? { ...m, keywords: { ...(m.keywords ?? {}), "$seen": true } }
-                : m,
-            ),
-          }
-        : cur,
-    );
-    try {
-      await activeMailbox.client.markAsRead(activeMailbox.session, targetId);
-    } catch (error) {
-      log.error("Failed to mark message as read", error);
-    }
-  }, [activeMailbox, selectedMessageId]);
-
-  const handleRealtimeSync = useCallback((result: MailSyncResponse) => {
-    let resolvedSelectedMessageId: string | null | undefined;
-
-    setActiveMailbox((current) => {
-      if (!current) {
-        return current;
+      try {
+        await activeMailbox.client.bulkMarkAsRead(
+          activeMailbox.session,
+          messageIds,
+        );
+      } catch (error) {
+        log.error("Failed to bulk mark as read", error);
       }
+    },
+    [activeMailbox],
+  );
 
-      const currentAccountId = getPrimaryMailAccountId(current.session);
-      if (currentAccountId !== result.accountId) {
-        return current;
+  const handleMarkAsUnread = useCallback(
+    async (messageId?: string) => {
+      const targetId = messageId ?? selectedMessageId;
+      if (!activeMailbox || !targetId) return;
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) => {
+                if (m.id !== targetId) return m;
+                const keywords = { ...(m.keywords ?? {}) };
+                delete keywords["$seen"];
+                return { ...m, keywords };
+              }),
+            }
+          : cur,
+      );
+      try {
+        await activeMailbox.client.markAsUnread(
+          activeMailbox.session,
+          targetId,
+        );
+      } catch (error) {
+        log.error("Failed to mark message as unread", error);
       }
+    },
+    [activeMailbox, selectedMessageId],
+  );
 
-      const nextMailboxes = mergeMailboxes(current.mailboxes, result.mailbox);
-      const selectedMailboxDestroyed = Boolean(
-        current.selectedMailboxId &&
+  const handleMarkAsRead = useCallback(
+    async (messageId?: string) => {
+      const targetId = messageId ?? selectedMessageId;
+      if (!activeMailbox || !targetId) return;
+      const msg = activeMailbox.messages.find((m) => m.id === targetId);
+      if (!msg || msg.keywords?.["$seen"]) return;
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) =>
+                m.id === targetId
+                  ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                  : m,
+              ),
+            }
+          : cur,
+      );
+      try {
+        await activeMailbox.client.markAsRead(activeMailbox.session, targetId);
+      } catch (error) {
+        log.error("Failed to mark message as read", error);
+      }
+    },
+    [activeMailbox, selectedMessageId],
+  );
+
+  const handleRealtimeSync = useCallback(
+    (result: MailSyncResponse) => {
+      let resolvedSelectedMessageId: string | null | undefined;
+
+      setActiveMailbox((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const currentAccountId = getPrimaryMailAccountId(current.session);
+        if (currentAccountId !== result.accountId) {
+          return current;
+        }
+
+        const nextMailboxes = mergeMailboxes(current.mailboxes, result.mailbox);
+        const selectedMailboxDestroyed = Boolean(
+          current.selectedMailboxId &&
           result.mailbox.destroyed.includes(current.selectedMailboxId),
-      );
-      const nextSelectedMailboxId = selectedMailboxDestroyed
-        ? null
-        : current.selectedMailboxId;
-      const nextMessages = nextSelectedMailboxId
-        ? mergeMessagesForMailbox(current.messages, nextSelectedMailboxId, result.email)
-        : [];
+        );
+        const nextSelectedMailboxId = selectedMailboxDestroyed
+          ? null
+          : current.selectedMailboxId;
+        const nextMessages = nextSelectedMailboxId
+          ? mergeMessagesForMailbox(
+              current.messages,
+              nextSelectedMailboxId,
+              result.email,
+            )
+          : [];
 
-      resolvedSelectedMessageId =
-        selectedMessageId && nextMessages.some((message) => message.id === selectedMessageId)
-          ? selectedMessageId
-          : nextMessages[0]?.id ?? null;
+        resolvedSelectedMessageId =
+          selectedMessageId &&
+          nextMessages.some((message) => message.id === selectedMessageId)
+            ? selectedMessageId
+            : (nextMessages[0]?.id ?? null);
 
-      return {
-        ...current,
-        mailboxes: nextMailboxes,
-        selectedMailboxId: nextSelectedMailboxId,
-        messages: nextMessages,
-      };
-    });
+        return {
+          ...current,
+          mailboxes: nextMailboxes,
+          selectedMailboxId: nextSelectedMailboxId,
+          messages: nextMessages,
+        };
+      });
 
-    if (resolvedSelectedMessageId !== undefined) {
-      setSelectedMessageId(resolvedSelectedMessageId);
-    }
-  }, [selectedMessageId]);
+      if (resolvedSelectedMessageId !== undefined) {
+        setSelectedMessageId(resolvedSelectedMessageId);
+      }
+    },
+    [selectedMessageId],
+  );
 
   const handleManualRefresh = useCallback(async () => {
     if (!activeMailbox || isRefreshing) return;
@@ -910,7 +1196,9 @@ export function useMailApp() {
       handleRealtimeSync(result);
     } catch (error) {
       log.error("Manual refresh failed", error);
-      toast.error(error instanceof Error ? error.message : "Could not refresh mail.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not refresh mail.",
+      );
     } finally {
       setIsRefreshing(false);
     }
@@ -945,6 +1233,130 @@ export function useMailApp() {
     clearEncPasswordCookie();
     await signOut();
   }, [handleDisconnect]);
+
+  const handleToggleFlagged = useCallback(
+    async (messageId?: string) => {
+      const targetId = messageId ?? selectedMessageId;
+      if (!activeMailbox || !targetId) return;
+      const msg = activeMailbox.messages.find((m) => m.id === targetId);
+      if (!msg) return;
+      const isFlagged = msg.keywords?.["$flagged"] === true;
+      const next = !isFlagged;
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) => {
+                if (m.id !== targetId) return m;
+                const keywords = { ...(m.keywords ?? {}) };
+                if (next) keywords["$flagged"] = true;
+                else delete keywords["$flagged"];
+                return { ...m, keywords };
+              }),
+            }
+          : cur,
+      );
+      try {
+        await activeMailbox.client.toggleFlagged(
+          activeMailbox.session,
+          targetId,
+          next,
+        );
+      } catch (error) {
+        log.error("Failed to toggle flag", error);
+      }
+    },
+    [activeMailbox, selectedMessageId],
+  );
+
+  const handleSetMessageLabel = useCallback(
+    async (messageId: string, labelId: string, assigned: boolean) => {
+      if (!activeMailbox) return;
+      const keywordKey = `label:${labelId}`;
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) => {
+                if (m.id !== messageId) return m;
+                const keywords = { ...(m.keywords ?? {}) };
+                if (assigned) keywords[keywordKey] = true;
+                else delete keywords[keywordKey];
+                return { ...m, keywords };
+              }),
+            }
+          : cur,
+      );
+      try {
+        await activeMailbox.client.setMessageLabel(
+          activeMailbox.session,
+          messageId,
+          labelId,
+          assigned,
+        );
+      } catch (error) {
+        log.error("Failed to set message label", error);
+      }
+    },
+    [activeMailbox],
+  );
+
+  const saveLabelsToVault = useCallback(
+    async (updatedLabels: LabelDef[]) => {
+      if (!activeMailbox || !loginPassword) return;
+      const updatedVault: UserKeyVault = {
+        ...activeMailbox.unlockedVault,
+        labels: updatedLabels,
+      };
+      const encrypted = await createEncryptedMailVault(updatedVault, loginPassword);
+      setActiveMailbox((cur) =>
+        cur ? { ...cur, unlockedVault: updatedVault } : cur,
+      );
+      await putStoredMailVault({
+        email: activeMailbox.email,
+        vaultVersion: updatedVault.vaultVersion,
+        ...encrypted,
+      });
+      await mailDemoApiService.upsertAccountVaultBackup({
+        vaultVersion: updatedVault.vaultVersion,
+        ...encrypted,
+      });
+    },
+    [activeMailbox, loginPassword],
+  );
+
+  const handleCreateLabel = useCallback(
+    async (name: string, color: string): Promise<LabelDef | null> => {
+      if (!activeMailbox) return null;
+      const newLabel: LabelDef = { id: crypto.randomUUID(), name, color };
+      const updatedLabels = [...(activeMailbox.unlockedVault.labels ?? []), newLabel];
+      try {
+        await saveLabelsToVault(updatedLabels);
+        return newLabel;
+      } catch (error) {
+        log.error("Failed to create label", error);
+        toast.error("Could not save the label.");
+        return null;
+      }
+    },
+    [activeMailbox, saveLabelsToVault],
+  );
+
+  const handleDeleteLabel = useCallback(
+    async (labelId: string) => {
+      if (!activeMailbox) return;
+      const updatedLabels = (activeMailbox.unlockedVault.labels ?? []).filter(
+        (l) => l.id !== labelId,
+      );
+      try {
+        await saveLabelsToVault(updatedLabels);
+      } catch (error) {
+        log.error("Failed to delete label", error);
+        toast.error("Could not delete the label.");
+      }
+    },
+    [activeMailbox, saveLabelsToVault],
+  );
 
   const user = session?.user
     ? {
@@ -994,6 +1406,11 @@ export function useMailApp() {
     blockTrackingPixels,
     setBlockTrackingPixels,
     refreshMailboxMessages,
+    loadMoreMessages,
+    hasMoreMessages: activeMailbox
+      ? activeMailbox.messages.length < totalMessages
+      : false,
+    isLoadingMore,
     handleManualRefresh,
     isRefreshing,
     handleSignIn,
@@ -1005,6 +1422,7 @@ export function useMailApp() {
     handleMoveMessage,
     handleCreateMailbox,
     handleDeleteMailbox,
+    handleRenameMailbox,
     handleReorderMailboxes,
     handleMarkAsUnread,
     handleMarkAsRead,
@@ -1012,6 +1430,11 @@ export function useMailApp() {
     handleBulkMove,
     handleBulkMarkAsUnread,
     handleBulkMarkAsRead,
+    handleToggleFlagged,
+    handleSetMessageLabel,
+    handleCreateLabel,
+    handleDeleteLabel,
+    labels: activeMailbox?.unlockedVault.labels ?? [],
     handleDisconnect,
     handleSignOut,
     user,

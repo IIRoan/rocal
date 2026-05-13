@@ -175,6 +175,12 @@ export type MessageEncryptionState =
   | "internal_e2ee"
   | "unknown_encrypted";
 
+export type LabelDef = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type UserKeyVault = {
   userId: string;
   email: string;
@@ -185,6 +191,7 @@ export type UserKeyVault = {
   kdfParams: MailVaultKdfParams;
   vaultVersion: number;
   createdAt: string;
+  labels?: LabelDef[];
 };
 
 export type EncryptedMailVaultRecord = {
