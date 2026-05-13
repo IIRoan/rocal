@@ -56,6 +56,8 @@ export function MailApp() {
     blockTrackingPixels,
     setBlockTrackingPixels,
     refreshMailboxMessages,
+    handleManualRefresh,
+    isRefreshing,
     handleSignIn,
     handleSignup,
     handleSendMessage,
@@ -120,12 +122,17 @@ export function MailApp() {
                 <div className="ml-auto flex items-center gap-1">
                   <Button
                     variant="ghost" size="icon"
-                    className="size-8 rounded-lg text-muted-foreground/60 hover:text-foreground"
-                    disabled={isBusy || !activeMailbox.selectedMailboxId}
-                    onClick={() => activeMailbox.selectedMailboxId && void refreshMailboxMessages(activeMailbox.selectedMailboxId)}
-                    aria-label="Refresh"
+                    className="size-8 rounded-lg text-muted-foreground/60 hover:text-foreground disabled:opacity-40"
+                    disabled={isRefreshing || isBusy}
+                    onClick={() => void handleManualRefresh()}
+                    aria-label="Refresh mail"
+                    title="Refresh mail"
                   >
-                    <RefreshCcw size={15} strokeWidth={2} className={isBusy ? "animate-spin" : ""} />
+                    <RefreshCcw
+                      size={15}
+                      strokeWidth={2}
+                      className={isRefreshing ? "animate-spin" : "transition-transform"}
+                    />
                   </Button>
                   <Button
                     variant="ghost" size="sm"

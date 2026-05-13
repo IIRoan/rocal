@@ -374,6 +374,7 @@ model MailDirectoryEntry {
   createdAt            DateTime        @default(now()) @map("created_at")
   updatedAt            DateTime        @updatedAt @map("updated_at")
   vaultBackup          MailVaultBackup?
+  mailSyncState        MailJmapSyncState?
 
   @@index([domain, localPart])
   @@map("mail_directory_entry")
@@ -394,6 +395,21 @@ model MailVaultBackup {
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
   @@map("mail_vault_backup")
+}
+
+model MailJmapSyncState {
+  id               String             @id @default(cuid())
+  directoryEntryId String             @unique @map("directory_entry_id")
+  directoryEntry   MailDirectoryEntry @relation(fields: [directoryEntryId], references: [id], onDelete: Cascade)
+  stalwartAccountId String            @unique @map("stalwart_account_id")
+  emailState       String             @map("email_state")
+  mailboxState     String             @map("mailbox_state")
+  threadState      String?            @map("thread_state")
+  lastSyncedAt     DateTime?          @map("last_synced_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  @@map("mail_jmap_sync_state")
 }
 
 // Calendar Subscription Models

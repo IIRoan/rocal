@@ -61,6 +61,22 @@ export const MailDirectoryEntryRelations = t.Object(
         { additionalProperties: false },
       ),
     ),
+    mailSyncState: __nullable__(
+      t.Object(
+        {
+          id: t.String(),
+          directoryEntryId: t.String(),
+          stalwartAccountId: t.String(),
+          emailState: t.String(),
+          mailboxState: t.String(),
+          threadState: __nullable__(t.String()),
+          lastSyncedAt: __nullable__(t.Date()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -125,6 +141,19 @@ export const MailDirectoryEntryRelationsInputCreate = t.Object(
         { additionalProperties: false },
       ),
     ),
+    mailSyncState: t.Optional(
+      t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -147,6 +176,20 @@ export const MailDirectoryEntryRelationsInputUpdate = t.Partial(
         ),
       ),
       vaultBackup: t.Partial(
+        t.Object(
+          {
+            connect: t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            disconnect: t.Boolean(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      mailSyncState: t.Partial(
         t.Object(
           {
             connect: t.Object(
@@ -288,6 +331,7 @@ export const MailDirectoryEntrySelect = t.Partial(
       createdAt: t.Boolean(),
       updatedAt: t.Boolean(),
       vaultBackup: t.Boolean(),
+      mailSyncState: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -296,7 +340,12 @@ export const MailDirectoryEntrySelect = t.Partial(
 
 export const MailDirectoryEntryInclude = t.Partial(
   t.Object(
-    { user: t.Boolean(), vaultBackup: t.Boolean(), _count: t.Boolean() },
+    {
+      user: t.Boolean(),
+      vaultBackup: t.Boolean(),
+      mailSyncState: t.Boolean(),
+      _count: t.Boolean(),
+    },
     { additionalProperties: false },
   ),
 );

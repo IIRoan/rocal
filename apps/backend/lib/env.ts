@@ -8,6 +8,7 @@
 
 const DEV_BACKEND_URL = "http://localhost:4001";
 const DEV_FRONTEND_URL = "http://localhost:4000";
+const DEFAULT_STALWART_BASE_URL = "https://mail.solace.onl";
 
 export const env = {
   /** The port the backend listens on. */
@@ -37,8 +38,8 @@ export const env = {
     process.env.NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL ||
     "solace://api/auth",
 
-  /** Base URL for direct Stalwart HTTP/JMAP access. */
-  stalwartBaseUrl: process.env.STALWART_BASE_URL || "http://localhost:8080",
+  /** HTTPS origin for Stalwart JMAP/admin access. */
+  stalwartBaseUrl: process.env.STALWART_BASE_URL || DEFAULT_STALWART_BASE_URL,
 
   /** Default email domain used by the mail demo when provisioning new mailboxes. */
   stalwartDefaultDomain: process.env.STALWART_DEFAULT_DOMAIN || "solace.onl",

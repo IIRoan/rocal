@@ -93,6 +93,7 @@ jest.mock("../../lib/mail/api-service", () => ({
     getRecipientKey: jest.fn(),
     upsertVaultBackup: jest.fn(),
     upsertAccountVaultBackup: jest.fn(),
+    syncAccount: jest.fn(),
   },
 }));
 
@@ -142,6 +143,12 @@ const mockJmapClient = {
 
 jest.mock("../../lib/mail/jmap-client", () => ({
   StalwartJmapClient: jest.fn(() => mockJmapClient),
+  getPrimaryMailAccountId: jest.fn(
+    (session: { primaryAccounts?: Record<string, string>; accounts?: Record<string, unknown> }) =>
+      session.primaryAccounts?.["urn:ietf:params:jmap:mail"] ??
+      Object.keys(session.accounts ?? {})[0] ??
+      null,
+  ),
 }));
 
 jest.mock("../../lib/mail/worker-client", () => ({
@@ -293,6 +300,35 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: true,
     });
+    mockApi.syncAccount.mockResolvedValue({
+      accountId: "b",
+      initialized: false,
+      changedTypes: [],
+      email: {
+        oldState: "email-old",
+        newState: "email-new",
+        created: [],
+        updated: [],
+        destroyed: [],
+        records: [],
+      },
+      mailbox: {
+        oldState: "mailbox-old",
+        newState: "mailbox-new",
+        created: [],
+        updated: [],
+        destroyed: [],
+        records: [],
+      },
+      thread: {
+        oldState: "thread-old",
+        newState: "thread-new",
+        created: [],
+        updated: [],
+        destroyed: [],
+        records: [],
+      },
+    } as any);
     mockWorkerClient.generateKeyPair.mockResolvedValue({
       publicKeyArmored: "public-key-armored",
       privateKeyArmored: "private-key-armored",

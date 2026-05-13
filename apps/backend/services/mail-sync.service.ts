@@ -1,0 +1,557 @@
+import { createLogger } from "@workspace/logger";
+import type { PrismaClient } from "../generated/prisma/index.js";
+import { ForbiddenError, ValidationError } from "../lib/errors";
+import type {
+  StalwartJmapAdminClientLike,
+  StalwartJmapEnvelope,
+  StalwartJmapMethodCall,
+} from "../lib/stalwart-admin";
+
+const logger = createLogger("backend:mail-sync");
+
+const CORE_MAIL_CAPABILITIES = [
+  "urn:ietf:params:jmap:core",
+  "urn:ietf:params:jmap:mail",
+] as const;
+
+type JmapMailbox = {
+  id: string;
+  name: string;
+  role?: string | null;
+  parentId?: string | null;
+  sortOrder?: number;
+};
+
+type JmapEmail = {
+  id: string;
+  threadId?: string;
+  mailboxIds?: Record<string, boolean>;
+  from?: Array<{ email: string; name?: string | null }>;
+  to?: Array<{ email: string; name?: string | null }>;
+  cc?: Array<{ email: string; name?: string | null }>;
+  bcc?: Array<{ email: string; name?: string | null }>;
+  subject?: string | null;
+  receivedAt?: string;
+  keywords?: Record<string, boolean>;
+  bodyStructure?: Record<string, unknown>;
+  bodyValues?: Record<string, unknown>;
+  textBody?: Array<{ partId?: string }>;
+  htmlBody?: Array<{ partId?: string }>;
+  attachments?: Array<{ name?: string | null; type?: string | null }>;
+};
+
+export type MailSyncThreadRecord = {
+  id: string;
+  emailIds: string[];
+};
+
+type JmapGetResponse<T> = {
+  state: string;
+  list?: T[];
+  notFound?: string[];
+};
+
+type JmapChangesResponse = {
+  oldState: string;
+  newState: string;
+  hasMoreChanges: boolean;
+  created?: string[];
+  updated?: string[];
+  destroyed?: string[];
+};
+
+export type MailSyncCollection<T> = {
+  oldState: string | null;
+  newState: string;
+  created: string[];
+  updated: string[];
+  destroyed: string[];
+  records: T[];
+};
+
+export type MailSyncResult = {
+  accountId: string;
+  initialized: boolean;
+  changedTypes: string[];
+  email: MailSyncCollection<JmapEmail>;
+  mailbox: MailSyncCollection<JmapMailbox>;
+  thread: MailSyncCollection<MailSyncThreadRecord>;
+};
+
+type AuthorizedDirectoryEntry = {
+  id: string;
+  stalwartAccountId: string;
+};
+
+function uniqueIds(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function sortEmailsDescending<T extends { receivedAt?: string }>(records: T[]): T[] {
+  return [...records].sort((left, right) => {
+    const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
+    const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
+    return rightTime - leftTime;
+  });
+}
+
+function collectionResult<T>(input: {
+  oldState: string | null;
+  newState: string;
+  created?: string[];
+  updated?: string[];
+  destroyed?: string[];
+  records?: T[];
+}): MailSyncCollection<T> {
+  return {
+    oldState: input.oldState,
+    newState: input.newState,
+    created: uniqueIds(input.created ?? []),
+    updated: uniqueIds(input.updated ?? []),
+    destroyed: uniqueIds(input.destroyed ?? []),
+    records: input.records ?? [],
+  };
+}
+
+export class MailSyncService {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly jmapAdminClient: StalwartJmapAdminClientLike,
+  ) {}
+
+  /**
+   * Lightweight check for new JMAP state without advancing stored state or fetching records.
+   * The stored state is intentionally NOT updated here — only syncForUser advances it.
+   */
+  async detectChanges(input: {
+    userId: string;
+    accountId: string;
+  }): Promise<{ hasChanges: boolean; changedTypes: string[] }> {
+    const accountId = input.accountId.trim();
+    if (!accountId) {
+      return { hasChanges: false, changedTypes: [] };
+    }
+
+    const directoryEntry = await this.getAuthorizedDirectoryEntry(input.userId, accountId);
+    const syncState = await this.prisma.mailJmapSyncState.findUnique({
+      where: { directoryEntryId: directoryEntry.id },
+      select: { emailState: true, mailboxState: true, threadState: true },
+    });
+
+    if (!syncState) {
+      return { hasChanges: true, changedTypes: ["Email", "Mailbox"] };
+    }
+
+    const [emailChanged, mailboxChanged] = await Promise.all([
+      this.quickChangesCheck("Email", accountId, syncState.emailState).catch(() => false),
+      this.quickChangesCheck("Mailbox", accountId, syncState.mailboxState).catch(() => false),
+    ]);
+
+    const changedTypes = [
+      ...(emailChanged ? ["Email"] : []),
+      ...(mailboxChanged ? ["Mailbox"] : []),
+    ];
+
+    return { hasChanges: changedTypes.length > 0, changedTypes };
+  }
+
+  private async quickChangesCheck(
+    typeName: "Email" | "Mailbox",
+    accountId: string,
+    sinceState: string,
+  ): Promise<boolean> {
+    const response = await this.callMethod<JmapChangesResponse>(`${typeName}/changes`, {
+      accountId,
+      sinceState,
+      maxChanges: 1,
+    });
+
+    return (
+      response.hasMoreChanges ||
+      (response.created?.length ?? 0) > 0 ||
+      (response.updated?.length ?? 0) > 0 ||
+      (response.destroyed?.length ?? 0) > 0
+    );
+  }
+
+  async listAuthorizedAccountIdsForUser(userId: string): Promise<string[]> {
+    const entries = await this.prisma.mailDirectoryEntry.findMany({
+      where: { userId },
+      select: { stalwartAccountId: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return entries.map((entry) => entry.stalwartAccountId);
+  }
+
+  async syncForUser(input: {
+    userId: string;
+    accountId: string;
+  }): Promise<MailSyncResult> {
+    const accountId = input.accountId.trim();
+
+    if (!accountId) {
+      throw new ValidationError("A mail accountId is required.", "accountId");
+    }
+
+    const directoryEntry = await this.getAuthorizedDirectoryEntry(input.userId, accountId);
+    const existingState = await this.prisma.mailJmapSyncState.findUnique({
+      where: {
+        directoryEntryId: directoryEntry.id,
+      },
+      select: {
+        id: true,
+        directoryEntryId: true,
+        stalwartAccountId: true,
+        emailState: true,
+        mailboxState: true,
+        threadState: true,
+      },
+    });
+
+    if (!existingState) {
+      const initialized = await this.initializeSyncState(directoryEntry);
+      logger.info("Initialized mail sync state", {
+        accountId,
+        emailState: initialized.email.newState,
+        mailboxState: initialized.mailbox.newState,
+        threadState: initialized.thread.newState,
+      });
+      return initialized;
+    }
+
+    const [emailChanges, mailboxChanges, threadChanges] = await Promise.all([
+      this.fetchEmailChanges(accountId, existingState.emailState),
+      this.fetchMailboxChanges(accountId, existingState.mailboxState),
+      this.fetchThreadChanges(accountId, existingState.threadState ?? existingState.emailState),
+    ]);
+
+    await this.prisma.mailJmapSyncState.update({
+      where: { id: existingState.id },
+      data: {
+        emailState: emailChanges.newState,
+        mailboxState: mailboxChanges.newState,
+        threadState: threadChanges.newState,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    const changedTypes = [
+      ...(emailChanges.created.length ||
+      emailChanges.updated.length ||
+      emailChanges.destroyed.length
+        ? ["Email"]
+        : []),
+      ...(mailboxChanges.created.length ||
+      mailboxChanges.updated.length ||
+      mailboxChanges.destroyed.length
+        ? ["Mailbox"]
+        : []),
+      ...(threadChanges.created.length ||
+      threadChanges.updated.length ||
+      threadChanges.destroyed.length
+        ? ["Thread"]
+        : []),
+    ];
+
+    logger.info("Mail sync completed", {
+      accountId,
+      changedTypes,
+      emailState: emailChanges.newState,
+      mailboxState: mailboxChanges.newState,
+      threadState: threadChanges.newState,
+    });
+
+    return {
+      accountId,
+      initialized: false,
+      changedTypes,
+      email: emailChanges,
+      mailbox: mailboxChanges,
+      thread: threadChanges,
+    };
+  }
+
+  private async initializeSyncState(
+    directoryEntry: AuthorizedDirectoryEntry,
+  ): Promise<MailSyncResult> {
+    const [mailboxResponse, emailResponse, threadResponse] = await Promise.all([
+      this.getMailboxes(directoryEntry.stalwartAccountId),
+      this.getEmailState(directoryEntry.stalwartAccountId),
+      this.getThreadState(directoryEntry.stalwartAccountId),
+    ]);
+
+    await this.prisma.mailJmapSyncState.upsert({
+      where: {
+        directoryEntryId: directoryEntry.id,
+      },
+      create: {
+        directoryEntry: {
+          connect: {
+            id: directoryEntry.id,
+          },
+        },
+        stalwartAccountId: directoryEntry.stalwartAccountId,
+        emailState: emailResponse.state,
+        mailboxState: mailboxResponse.state,
+        threadState: threadResponse.state,
+        lastSyncedAt: new Date(),
+      },
+      update: {
+        stalwartAccountId: directoryEntry.stalwartAccountId,
+        emailState: emailResponse.state,
+        mailboxState: mailboxResponse.state,
+        threadState: threadResponse.state,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    return {
+      accountId: directoryEntry.stalwartAccountId,
+      initialized: true,
+      changedTypes: [],
+      email: collectionResult({
+        oldState: null,
+        newState: emailResponse.state,
+      }),
+      mailbox: collectionResult({
+        oldState: null,
+        newState: mailboxResponse.state,
+        records: mailboxResponse.list ?? [],
+      }),
+      thread: collectionResult({
+        oldState: null,
+        newState: threadResponse.state,
+      }),
+    };
+  }
+
+  private async getAuthorizedDirectoryEntry(
+    userId: string,
+    accountId: string,
+  ): Promise<AuthorizedDirectoryEntry> {
+    const entry = await this.prisma.mailDirectoryEntry.findFirst({
+      where: {
+        userId,
+        stalwartAccountId: accountId,
+      },
+      select: {
+        id: true,
+        stalwartAccountId: true,
+      },
+    });
+
+    if (!entry) {
+      throw new ForbiddenError("You are not authorized to sync that mailbox.");
+    }
+
+    return entry;
+  }
+
+  private async fetchEmailChanges(
+    accountId: string,
+    sinceState: string,
+  ): Promise<MailSyncCollection<JmapEmail>> {
+    const changes = await this.collectChanges("Email", accountId, sinceState);
+    const ids = uniqueIds([...changes.created, ...changes.updated]);
+    const records = ids.length > 0 ? await this.getEmails(accountId, ids) : [];
+
+    return collectionResult({
+      oldState: changes.oldState,
+      newState: changes.newState,
+      created: changes.created,
+      updated: changes.updated,
+      destroyed: changes.destroyed,
+      records: sortEmailsDescending(records),
+    });
+  }
+
+  private async fetchMailboxChanges(
+    accountId: string,
+    sinceState: string,
+  ): Promise<MailSyncCollection<JmapMailbox>> {
+    const changes = await this.collectChanges("Mailbox", accountId, sinceState);
+    const ids = uniqueIds([...changes.created, ...changes.updated]);
+    const records = ids.length > 0 ? await this.getMailboxesByIds(accountId, ids) : [];
+
+    return collectionResult({
+      oldState: changes.oldState,
+      newState: changes.newState,
+      created: changes.created,
+      updated: changes.updated,
+      destroyed: changes.destroyed,
+      records,
+    });
+  }
+
+  private async fetchThreadChanges(
+    accountId: string,
+    sinceState: string,
+  ): Promise<MailSyncCollection<MailSyncThreadRecord>> {
+    const changes = await this.collectChanges("Thread", accountId, sinceState);
+    const ids = uniqueIds([...changes.created, ...changes.updated]);
+    const records = ids.length > 0 ? await this.getThreads(accountId, ids) : [];
+
+    return collectionResult({
+      oldState: changes.oldState,
+      newState: changes.newState,
+      created: changes.created,
+      updated: changes.updated,
+      destroyed: changes.destroyed,
+      records,
+    });
+  }
+
+  private async collectChanges(
+    typeName: "Email" | "Mailbox" | "Thread",
+    accountId: string,
+    sinceState: string,
+  ): Promise<{
+    oldState: string;
+    newState: string;
+    created: string[];
+    updated: string[];
+    destroyed: string[];
+  }> {
+    let requestState = sinceState;
+    let oldState = sinceState;
+    const created: string[] = [];
+    const updated: string[] = [];
+    const destroyed: string[] = [];
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const response = await this.callMethod<JmapChangesResponse>(
+        `${typeName}/changes`,
+        {
+          accountId,
+          sinceState: requestState,
+          maxChanges: 200,
+        },
+      );
+
+      oldState = response.oldState;
+      created.push(...(response.created ?? []));
+      updated.push(...(response.updated ?? []));
+      destroyed.push(...(response.destroyed ?? []));
+      requestState = response.newState;
+
+      if (!response.hasMoreChanges) {
+        return {
+          oldState,
+          newState: response.newState,
+          created: uniqueIds(created),
+          updated: uniqueIds(updated),
+          destroyed: uniqueIds(destroyed),
+        };
+      }
+    }
+
+    throw new Error(`Mail sync exceeded change pagination limit for ${typeName}.`);
+  }
+
+  private async getMailboxes(accountId: string): Promise<JmapGetResponse<JmapMailbox>> {
+    return this.callMethod<JmapGetResponse<JmapMailbox>>("Mailbox/get", {
+      accountId,
+      properties: ["id", "name", "role", "parentId", "sortOrder"],
+    });
+  }
+
+  private async getMailboxesByIds(
+    accountId: string,
+    ids: string[],
+  ): Promise<JmapMailbox[]> {
+    const response = await this.callMethod<JmapGetResponse<JmapMailbox>>("Mailbox/get", {
+      accountId,
+      ids,
+      properties: ["id", "name", "role", "parentId", "sortOrder"],
+    });
+
+    return response.list ?? [];
+  }
+
+  private async getEmailState(accountId: string): Promise<JmapGetResponse<JmapEmail>> {
+    return this.callMethod<JmapGetResponse<JmapEmail>>("Email/get", {
+      accountId,
+      ids: [],
+      properties: ["id"],
+    });
+  }
+
+  private async getThreadState(
+    accountId: string,
+  ): Promise<JmapGetResponse<MailSyncThreadRecord>> {
+    return this.callMethod<JmapGetResponse<MailSyncThreadRecord>>("Thread/get", {
+      accountId,
+      ids: [],
+      properties: ["id", "emailIds"],
+    });
+  }
+
+  private async getEmails(accountId: string, ids: string[]): Promise<JmapEmail[]> {
+    const response = await this.callMethod<JmapGetResponse<JmapEmail>>("Email/get", {
+      accountId,
+      ids,
+      properties: [
+        "id",
+        "threadId",
+        "mailboxIds",
+        "from",
+        "to",
+        "cc",
+        "bcc",
+        "subject",
+        "receivedAt",
+        "keywords",
+        "bodyStructure",
+        "bodyValues",
+        "textBody",
+        "htmlBody",
+        "attachments",
+      ],
+      fetchTextBodyValues: true,
+      fetchHTMLBodyValues: true,
+      fetchAllBodyValues: true,
+    });
+
+    return response.list ?? [];
+  }
+
+  private async getThreads(
+    accountId: string,
+    ids: string[],
+  ): Promise<MailSyncThreadRecord[]> {
+    const response = await this.callMethod<JmapGetResponse<MailSyncThreadRecord>>(
+      "Thread/get",
+      {
+        accountId,
+        ids,
+        properties: ["id", "emailIds"],
+      },
+    );
+
+    return response.list ?? [];
+  }
+
+  private async callMethod<T>(
+    methodName: string,
+    argumentsObject: Record<string, unknown>,
+  ): Promise<T> {
+    const methodCall: StalwartJmapMethodCall = [methodName, argumentsObject, "c1"];
+    const envelope = await this.jmapAdminClient.callJmap({
+      using: [...CORE_MAIL_CAPABILITIES],
+      methodCalls: [methodCall],
+    });
+
+    return this.getMethodResult<T>(envelope, methodName);
+  }
+
+  private getMethodResult<T>(envelope: StalwartJmapEnvelope, methodName: string): T {
+    const tuple = (envelope.methodResponses ?? []).find((entry) => entry[0] === methodName);
+
+    if (!tuple) {
+      throw new Error(`Stalwart JMAP response did not include ${methodName}.`);
+    }
+
+    return tuple[1] as T;
+  }
+}

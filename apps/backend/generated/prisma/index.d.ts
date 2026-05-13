@@ -104,6 +104,11 @@ export type MailDirectoryEntry = $Result.DefaultSelection<Prisma.$MailDirectoryE
  */
 export type MailVaultBackup = $Result.DefaultSelection<Prisma.$MailVaultBackupPayload>
 /**
+ * Model MailJmapSyncState
+ * 
+ */
+export type MailJmapSyncState = $Result.DefaultSelection<Prisma.$MailJmapSyncStatePayload>
+/**
  * Model CalendarSubscription
  * 
  */
@@ -411,6 +416,16 @@ export class PrismaClient<
     * ```
     */
   get mailVaultBackup(): Prisma.MailVaultBackupDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.mailJmapSyncState`: Exposes CRUD operations for the **MailJmapSyncState** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more MailJmapSyncStates
+    * const mailJmapSyncStates = await prisma.mailJmapSyncState.findMany()
+    * ```
+    */
+  get mailJmapSyncState(): Prisma.MailJmapSyncStateDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.calendarSubscription`: Exposes CRUD operations for the **CalendarSubscription** model.
@@ -890,6 +905,7 @@ export namespace Prisma {
     UserEncryptionPassword: 'UserEncryptionPassword',
     MailDirectoryEntry: 'MailDirectoryEntry',
     MailVaultBackup: 'MailVaultBackup',
+    MailJmapSyncState: 'MailJmapSyncState',
     CalendarSubscription: 'CalendarSubscription',
     CalendarSyncLog: 'CalendarSyncLog'
   };
@@ -910,7 +926,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "session" | "account" | "verification" | "calendar" | "eventCategory" | "calendarEvent" | "eventParticipant" | "userSettings" | "calendarSharing" | "recurrenceException" | "eventNotification" | "notificationLog" | "passkey" | "userEncryptionDevice" | "userEncryptionPassword" | "mailDirectoryEntry" | "mailVaultBackup" | "calendarSubscription" | "calendarSyncLog"
+      modelProps: "user" | "session" | "account" | "verification" | "calendar" | "eventCategory" | "calendarEvent" | "eventParticipant" | "userSettings" | "calendarSharing" | "recurrenceException" | "eventNotification" | "notificationLog" | "passkey" | "userEncryptionDevice" | "userEncryptionPassword" | "mailDirectoryEntry" | "mailVaultBackup" | "mailJmapSyncState" | "calendarSubscription" | "calendarSyncLog"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2246,6 +2262,80 @@ export namespace Prisma {
           }
         }
       }
+      MailJmapSyncState: {
+        payload: Prisma.$MailJmapSyncStatePayload<ExtArgs>
+        fields: Prisma.MailJmapSyncStateFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.MailJmapSyncStateFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.MailJmapSyncStateFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>
+          }
+          findFirst: {
+            args: Prisma.MailJmapSyncStateFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.MailJmapSyncStateFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>
+          }
+          findMany: {
+            args: Prisma.MailJmapSyncStateFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>[]
+          }
+          create: {
+            args: Prisma.MailJmapSyncStateCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>
+          }
+          createMany: {
+            args: Prisma.MailJmapSyncStateCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.MailJmapSyncStateCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>[]
+          }
+          delete: {
+            args: Prisma.MailJmapSyncStateDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>
+          }
+          update: {
+            args: Prisma.MailJmapSyncStateUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>
+          }
+          deleteMany: {
+            args: Prisma.MailJmapSyncStateDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.MailJmapSyncStateUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.MailJmapSyncStateUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>[]
+          }
+          upsert: {
+            args: Prisma.MailJmapSyncStateUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MailJmapSyncStatePayload>
+          }
+          aggregate: {
+            args: Prisma.MailJmapSyncStateAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateMailJmapSyncState>
+          }
+          groupBy: {
+            args: Prisma.MailJmapSyncStateGroupByArgs<ExtArgs>
+            result: $Utils.Optional<MailJmapSyncStateGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.MailJmapSyncStateCountArgs<ExtArgs>
+            result: $Utils.Optional<MailJmapSyncStateCountAggregateOutputType> | number
+          }
+        }
+      }
       CalendarSubscription: {
         payload: Prisma.$CalendarSubscriptionPayload<ExtArgs>
         fields: Prisma.CalendarSubscriptionFieldRefs
@@ -2508,6 +2598,7 @@ export namespace Prisma {
     userEncryptionPassword?: UserEncryptionPasswordOmit
     mailDirectoryEntry?: MailDirectoryEntryOmit
     mailVaultBackup?: MailVaultBackupOmit
+    mailJmapSyncState?: MailJmapSyncStateOmit
     calendarSubscription?: CalendarSubscriptionOmit
     calendarSyncLog?: CalendarSyncLogOmit
   }
@@ -22206,6 +22297,7 @@ export namespace Prisma {
     updatedAt?: boolean
     user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
     vaultBackup?: boolean | MailDirectoryEntry$vaultBackupArgs<ExtArgs>
+    mailSyncState?: boolean | MailDirectoryEntry$mailSyncStateArgs<ExtArgs>
   }, ExtArgs["result"]["mailDirectoryEntry"]>
 
   export type MailDirectoryEntrySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -22274,6 +22366,7 @@ export namespace Prisma {
   export type MailDirectoryEntryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
     vaultBackup?: boolean | MailDirectoryEntry$vaultBackupArgs<ExtArgs>
+    mailSyncState?: boolean | MailDirectoryEntry$mailSyncStateArgs<ExtArgs>
   }
   export type MailDirectoryEntryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | MailDirectoryEntry$userArgs<ExtArgs>
@@ -22287,6 +22380,7 @@ export namespace Prisma {
     objects: {
       user: Prisma.$UserPayload<ExtArgs> | null
       vaultBackup: Prisma.$MailVaultBackupPayload<ExtArgs> | null
+      mailSyncState: Prisma.$MailJmapSyncStatePayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -22702,6 +22796,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     user<T extends MailDirectoryEntry$userArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntry$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     vaultBackup<T extends MailDirectoryEntry$vaultBackupArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntry$vaultBackupArgs<ExtArgs>>): Prisma__MailVaultBackupClient<$Result.GetResult<Prisma.$MailVaultBackupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    mailSyncState<T extends MailDirectoryEntry$mailSyncStateArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntry$mailSyncStateArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -23179,6 +23274,25 @@ export namespace Prisma {
      */
     include?: MailVaultBackupInclude<ExtArgs> | null
     where?: MailVaultBackupWhereInput
+  }
+
+  /**
+   * MailDirectoryEntry.mailSyncState
+   */
+  export type MailDirectoryEntry$mailSyncStateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    where?: MailJmapSyncStateWhereInput
   }
 
   /**
@@ -24379,6 +24493,1116 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: MailVaultBackupInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model MailJmapSyncState
+   */
+
+  export type AggregateMailJmapSyncState = {
+    _count: MailJmapSyncStateCountAggregateOutputType | null
+    _min: MailJmapSyncStateMinAggregateOutputType | null
+    _max: MailJmapSyncStateMaxAggregateOutputType | null
+  }
+
+  export type MailJmapSyncStateMinAggregateOutputType = {
+    id: string | null
+    directoryEntryId: string | null
+    stalwartAccountId: string | null
+    emailState: string | null
+    mailboxState: string | null
+    threadState: string | null
+    lastSyncedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MailJmapSyncStateMaxAggregateOutputType = {
+    id: string | null
+    directoryEntryId: string | null
+    stalwartAccountId: string | null
+    emailState: string | null
+    mailboxState: string | null
+    threadState: string | null
+    lastSyncedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MailJmapSyncStateCountAggregateOutputType = {
+    id: number
+    directoryEntryId: number
+    stalwartAccountId: number
+    emailState: number
+    mailboxState: number
+    threadState: number
+    lastSyncedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type MailJmapSyncStateMinAggregateInputType = {
+    id?: true
+    directoryEntryId?: true
+    stalwartAccountId?: true
+    emailState?: true
+    mailboxState?: true
+    threadState?: true
+    lastSyncedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MailJmapSyncStateMaxAggregateInputType = {
+    id?: true
+    directoryEntryId?: true
+    stalwartAccountId?: true
+    emailState?: true
+    mailboxState?: true
+    threadState?: true
+    lastSyncedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MailJmapSyncStateCountAggregateInputType = {
+    id?: true
+    directoryEntryId?: true
+    stalwartAccountId?: true
+    emailState?: true
+    mailboxState?: true
+    threadState?: true
+    lastSyncedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type MailJmapSyncStateAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MailJmapSyncState to aggregate.
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailJmapSyncStates to fetch.
+     */
+    orderBy?: MailJmapSyncStateOrderByWithRelationInput | MailJmapSyncStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: MailJmapSyncStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailJmapSyncStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailJmapSyncStates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned MailJmapSyncStates
+    **/
+    _count?: true | MailJmapSyncStateCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: MailJmapSyncStateMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: MailJmapSyncStateMaxAggregateInputType
+  }
+
+  export type GetMailJmapSyncStateAggregateType<T extends MailJmapSyncStateAggregateArgs> = {
+        [P in keyof T & keyof AggregateMailJmapSyncState]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateMailJmapSyncState[P]>
+      : GetScalarType<T[P], AggregateMailJmapSyncState[P]>
+  }
+
+
+
+
+  export type MailJmapSyncStateGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: MailJmapSyncStateWhereInput
+    orderBy?: MailJmapSyncStateOrderByWithAggregationInput | MailJmapSyncStateOrderByWithAggregationInput[]
+    by: MailJmapSyncStateScalarFieldEnum[] | MailJmapSyncStateScalarFieldEnum
+    having?: MailJmapSyncStateScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: MailJmapSyncStateCountAggregateInputType | true
+    _min?: MailJmapSyncStateMinAggregateInputType
+    _max?: MailJmapSyncStateMaxAggregateInputType
+  }
+
+  export type MailJmapSyncStateGroupByOutputType = {
+    id: string
+    directoryEntryId: string
+    stalwartAccountId: string
+    emailState: string
+    mailboxState: string
+    threadState: string | null
+    lastSyncedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: MailJmapSyncStateCountAggregateOutputType | null
+    _min: MailJmapSyncStateMinAggregateOutputType | null
+    _max: MailJmapSyncStateMaxAggregateOutputType | null
+  }
+
+  type GetMailJmapSyncStateGroupByPayload<T extends MailJmapSyncStateGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<MailJmapSyncStateGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof MailJmapSyncStateGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], MailJmapSyncStateGroupByOutputType[P]>
+            : GetScalarType<T[P], MailJmapSyncStateGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type MailJmapSyncStateSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    directoryEntryId?: boolean
+    stalwartAccountId?: boolean
+    emailState?: boolean
+    mailboxState?: boolean
+    threadState?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mailJmapSyncState"]>
+
+  export type MailJmapSyncStateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    directoryEntryId?: boolean
+    stalwartAccountId?: boolean
+    emailState?: boolean
+    mailboxState?: boolean
+    threadState?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mailJmapSyncState"]>
+
+  export type MailJmapSyncStateSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    directoryEntryId?: boolean
+    stalwartAccountId?: boolean
+    emailState?: boolean
+    mailboxState?: boolean
+    threadState?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mailJmapSyncState"]>
+
+  export type MailJmapSyncStateSelectScalar = {
+    id?: boolean
+    directoryEntryId?: boolean
+    stalwartAccountId?: boolean
+    emailState?: boolean
+    mailboxState?: boolean
+    threadState?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type MailJmapSyncStateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "directoryEntryId" | "stalwartAccountId" | "emailState" | "mailboxState" | "threadState" | "lastSyncedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["mailJmapSyncState"]>
+  export type MailJmapSyncStateInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }
+  export type MailJmapSyncStateIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }
+  export type MailJmapSyncStateIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    directoryEntry?: boolean | MailDirectoryEntryDefaultArgs<ExtArgs>
+  }
+
+  export type $MailJmapSyncStatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "MailJmapSyncState"
+    objects: {
+      directoryEntry: Prisma.$MailDirectoryEntryPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      directoryEntryId: string
+      stalwartAccountId: string
+      emailState: string
+      mailboxState: string
+      threadState: string | null
+      lastSyncedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["mailJmapSyncState"]>
+    composites: {}
+  }
+
+  type MailJmapSyncStateGetPayload<S extends boolean | null | undefined | MailJmapSyncStateDefaultArgs> = $Result.GetResult<Prisma.$MailJmapSyncStatePayload, S>
+
+  type MailJmapSyncStateCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<MailJmapSyncStateFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: MailJmapSyncStateCountAggregateInputType | true
+    }
+
+  export interface MailJmapSyncStateDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['MailJmapSyncState'], meta: { name: 'MailJmapSyncState' } }
+    /**
+     * Find zero or one MailJmapSyncState that matches the filter.
+     * @param {MailJmapSyncStateFindUniqueArgs} args - Arguments to find a MailJmapSyncState
+     * @example
+     * // Get one MailJmapSyncState
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends MailJmapSyncStateFindUniqueArgs>(args: SelectSubset<T, MailJmapSyncStateFindUniqueArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one MailJmapSyncState that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {MailJmapSyncStateFindUniqueOrThrowArgs} args - Arguments to find a MailJmapSyncState
+     * @example
+     * // Get one MailJmapSyncState
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends MailJmapSyncStateFindUniqueOrThrowArgs>(args: SelectSubset<T, MailJmapSyncStateFindUniqueOrThrowArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MailJmapSyncState that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateFindFirstArgs} args - Arguments to find a MailJmapSyncState
+     * @example
+     * // Get one MailJmapSyncState
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends MailJmapSyncStateFindFirstArgs>(args?: SelectSubset<T, MailJmapSyncStateFindFirstArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MailJmapSyncState that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateFindFirstOrThrowArgs} args - Arguments to find a MailJmapSyncState
+     * @example
+     * // Get one MailJmapSyncState
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends MailJmapSyncStateFindFirstOrThrowArgs>(args?: SelectSubset<T, MailJmapSyncStateFindFirstOrThrowArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more MailJmapSyncStates that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all MailJmapSyncStates
+     * const mailJmapSyncStates = await prisma.mailJmapSyncState.findMany()
+     * 
+     * // Get first 10 MailJmapSyncStates
+     * const mailJmapSyncStates = await prisma.mailJmapSyncState.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const mailJmapSyncStateWithIdOnly = await prisma.mailJmapSyncState.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends MailJmapSyncStateFindManyArgs>(args?: SelectSubset<T, MailJmapSyncStateFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a MailJmapSyncState.
+     * @param {MailJmapSyncStateCreateArgs} args - Arguments to create a MailJmapSyncState.
+     * @example
+     * // Create one MailJmapSyncState
+     * const MailJmapSyncState = await prisma.mailJmapSyncState.create({
+     *   data: {
+     *     // ... data to create a MailJmapSyncState
+     *   }
+     * })
+     * 
+     */
+    create<T extends MailJmapSyncStateCreateArgs>(args: SelectSubset<T, MailJmapSyncStateCreateArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many MailJmapSyncStates.
+     * @param {MailJmapSyncStateCreateManyArgs} args - Arguments to create many MailJmapSyncStates.
+     * @example
+     * // Create many MailJmapSyncStates
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends MailJmapSyncStateCreateManyArgs>(args?: SelectSubset<T, MailJmapSyncStateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many MailJmapSyncStates and returns the data saved in the database.
+     * @param {MailJmapSyncStateCreateManyAndReturnArgs} args - Arguments to create many MailJmapSyncStates.
+     * @example
+     * // Create many MailJmapSyncStates
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many MailJmapSyncStates and only return the `id`
+     * const mailJmapSyncStateWithIdOnly = await prisma.mailJmapSyncState.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends MailJmapSyncStateCreateManyAndReturnArgs>(args?: SelectSubset<T, MailJmapSyncStateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a MailJmapSyncState.
+     * @param {MailJmapSyncStateDeleteArgs} args - Arguments to delete one MailJmapSyncState.
+     * @example
+     * // Delete one MailJmapSyncState
+     * const MailJmapSyncState = await prisma.mailJmapSyncState.delete({
+     *   where: {
+     *     // ... filter to delete one MailJmapSyncState
+     *   }
+     * })
+     * 
+     */
+    delete<T extends MailJmapSyncStateDeleteArgs>(args: SelectSubset<T, MailJmapSyncStateDeleteArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one MailJmapSyncState.
+     * @param {MailJmapSyncStateUpdateArgs} args - Arguments to update one MailJmapSyncState.
+     * @example
+     * // Update one MailJmapSyncState
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends MailJmapSyncStateUpdateArgs>(args: SelectSubset<T, MailJmapSyncStateUpdateArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more MailJmapSyncStates.
+     * @param {MailJmapSyncStateDeleteManyArgs} args - Arguments to filter MailJmapSyncStates to delete.
+     * @example
+     * // Delete a few MailJmapSyncStates
+     * const { count } = await prisma.mailJmapSyncState.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends MailJmapSyncStateDeleteManyArgs>(args?: SelectSubset<T, MailJmapSyncStateDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MailJmapSyncStates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many MailJmapSyncStates
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends MailJmapSyncStateUpdateManyArgs>(args: SelectSubset<T, MailJmapSyncStateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MailJmapSyncStates and returns the data updated in the database.
+     * @param {MailJmapSyncStateUpdateManyAndReturnArgs} args - Arguments to update many MailJmapSyncStates.
+     * @example
+     * // Update many MailJmapSyncStates
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more MailJmapSyncStates and only return the `id`
+     * const mailJmapSyncStateWithIdOnly = await prisma.mailJmapSyncState.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends MailJmapSyncStateUpdateManyAndReturnArgs>(args: SelectSubset<T, MailJmapSyncStateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one MailJmapSyncState.
+     * @param {MailJmapSyncStateUpsertArgs} args - Arguments to update or create a MailJmapSyncState.
+     * @example
+     * // Update or create a MailJmapSyncState
+     * const mailJmapSyncState = await prisma.mailJmapSyncState.upsert({
+     *   create: {
+     *     // ... data to create a MailJmapSyncState
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the MailJmapSyncState we want to update
+     *   }
+     * })
+     */
+    upsert<T extends MailJmapSyncStateUpsertArgs>(args: SelectSubset<T, MailJmapSyncStateUpsertArgs<ExtArgs>>): Prisma__MailJmapSyncStateClient<$Result.GetResult<Prisma.$MailJmapSyncStatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of MailJmapSyncStates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateCountArgs} args - Arguments to filter MailJmapSyncStates to count.
+     * @example
+     * // Count the number of MailJmapSyncStates
+     * const count = await prisma.mailJmapSyncState.count({
+     *   where: {
+     *     // ... the filter for the MailJmapSyncStates we want to count
+     *   }
+     * })
+    **/
+    count<T extends MailJmapSyncStateCountArgs>(
+      args?: Subset<T, MailJmapSyncStateCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], MailJmapSyncStateCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a MailJmapSyncState.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends MailJmapSyncStateAggregateArgs>(args: Subset<T, MailJmapSyncStateAggregateArgs>): Prisma.PrismaPromise<GetMailJmapSyncStateAggregateType<T>>
+
+    /**
+     * Group by MailJmapSyncState.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MailJmapSyncStateGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends MailJmapSyncStateGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: MailJmapSyncStateGroupByArgs['orderBy'] }
+        : { orderBy?: MailJmapSyncStateGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, MailJmapSyncStateGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetMailJmapSyncStateGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the MailJmapSyncState model
+   */
+  readonly fields: MailJmapSyncStateFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for MailJmapSyncState.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__MailJmapSyncStateClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    directoryEntry<T extends MailDirectoryEntryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, MailDirectoryEntryDefaultArgs<ExtArgs>>): Prisma__MailDirectoryEntryClient<$Result.GetResult<Prisma.$MailDirectoryEntryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the MailJmapSyncState model
+   */
+  interface MailJmapSyncStateFieldRefs {
+    readonly id: FieldRef<"MailJmapSyncState", 'String'>
+    readonly directoryEntryId: FieldRef<"MailJmapSyncState", 'String'>
+    readonly stalwartAccountId: FieldRef<"MailJmapSyncState", 'String'>
+    readonly emailState: FieldRef<"MailJmapSyncState", 'String'>
+    readonly mailboxState: FieldRef<"MailJmapSyncState", 'String'>
+    readonly threadState: FieldRef<"MailJmapSyncState", 'String'>
+    readonly lastSyncedAt: FieldRef<"MailJmapSyncState", 'DateTime'>
+    readonly createdAt: FieldRef<"MailJmapSyncState", 'DateTime'>
+    readonly updatedAt: FieldRef<"MailJmapSyncState", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * MailJmapSyncState findUnique
+   */
+  export type MailJmapSyncStateFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * Filter, which MailJmapSyncState to fetch.
+     */
+    where: MailJmapSyncStateWhereUniqueInput
+  }
+
+  /**
+   * MailJmapSyncState findUniqueOrThrow
+   */
+  export type MailJmapSyncStateFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * Filter, which MailJmapSyncState to fetch.
+     */
+    where: MailJmapSyncStateWhereUniqueInput
+  }
+
+  /**
+   * MailJmapSyncState findFirst
+   */
+  export type MailJmapSyncStateFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * Filter, which MailJmapSyncState to fetch.
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailJmapSyncStates to fetch.
+     */
+    orderBy?: MailJmapSyncStateOrderByWithRelationInput | MailJmapSyncStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MailJmapSyncStates.
+     */
+    cursor?: MailJmapSyncStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailJmapSyncStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailJmapSyncStates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MailJmapSyncStates.
+     */
+    distinct?: MailJmapSyncStateScalarFieldEnum | MailJmapSyncStateScalarFieldEnum[]
+  }
+
+  /**
+   * MailJmapSyncState findFirstOrThrow
+   */
+  export type MailJmapSyncStateFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * Filter, which MailJmapSyncState to fetch.
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailJmapSyncStates to fetch.
+     */
+    orderBy?: MailJmapSyncStateOrderByWithRelationInput | MailJmapSyncStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MailJmapSyncStates.
+     */
+    cursor?: MailJmapSyncStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailJmapSyncStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailJmapSyncStates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MailJmapSyncStates.
+     */
+    distinct?: MailJmapSyncStateScalarFieldEnum | MailJmapSyncStateScalarFieldEnum[]
+  }
+
+  /**
+   * MailJmapSyncState findMany
+   */
+  export type MailJmapSyncStateFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * Filter, which MailJmapSyncStates to fetch.
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MailJmapSyncStates to fetch.
+     */
+    orderBy?: MailJmapSyncStateOrderByWithRelationInput | MailJmapSyncStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing MailJmapSyncStates.
+     */
+    cursor?: MailJmapSyncStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MailJmapSyncStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MailJmapSyncStates.
+     */
+    skip?: number
+    distinct?: MailJmapSyncStateScalarFieldEnum | MailJmapSyncStateScalarFieldEnum[]
+  }
+
+  /**
+   * MailJmapSyncState create
+   */
+  export type MailJmapSyncStateCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * The data needed to create a MailJmapSyncState.
+     */
+    data: XOR<MailJmapSyncStateCreateInput, MailJmapSyncStateUncheckedCreateInput>
+  }
+
+  /**
+   * MailJmapSyncState createMany
+   */
+  export type MailJmapSyncStateCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many MailJmapSyncStates.
+     */
+    data: MailJmapSyncStateCreateManyInput | MailJmapSyncStateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * MailJmapSyncState createManyAndReturn
+   */
+  export type MailJmapSyncStateCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * The data used to create many MailJmapSyncStates.
+     */
+    data: MailJmapSyncStateCreateManyInput | MailJmapSyncStateCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MailJmapSyncState update
+   */
+  export type MailJmapSyncStateUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * The data needed to update a MailJmapSyncState.
+     */
+    data: XOR<MailJmapSyncStateUpdateInput, MailJmapSyncStateUncheckedUpdateInput>
+    /**
+     * Choose, which MailJmapSyncState to update.
+     */
+    where: MailJmapSyncStateWhereUniqueInput
+  }
+
+  /**
+   * MailJmapSyncState updateMany
+   */
+  export type MailJmapSyncStateUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update MailJmapSyncStates.
+     */
+    data: XOR<MailJmapSyncStateUpdateManyMutationInput, MailJmapSyncStateUncheckedUpdateManyInput>
+    /**
+     * Filter which MailJmapSyncStates to update
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * Limit how many MailJmapSyncStates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * MailJmapSyncState updateManyAndReturn
+   */
+  export type MailJmapSyncStateUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * The data used to update MailJmapSyncStates.
+     */
+    data: XOR<MailJmapSyncStateUpdateManyMutationInput, MailJmapSyncStateUncheckedUpdateManyInput>
+    /**
+     * Filter which MailJmapSyncStates to update
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * Limit how many MailJmapSyncStates to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MailJmapSyncState upsert
+   */
+  export type MailJmapSyncStateUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * The filter to search for the MailJmapSyncState to update in case it exists.
+     */
+    where: MailJmapSyncStateWhereUniqueInput
+    /**
+     * In case the MailJmapSyncState found by the `where` argument doesn't exist, create a new MailJmapSyncState with this data.
+     */
+    create: XOR<MailJmapSyncStateCreateInput, MailJmapSyncStateUncheckedCreateInput>
+    /**
+     * In case the MailJmapSyncState was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<MailJmapSyncStateUpdateInput, MailJmapSyncStateUncheckedUpdateInput>
+  }
+
+  /**
+   * MailJmapSyncState delete
+   */
+  export type MailJmapSyncStateDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
+    /**
+     * Filter which MailJmapSyncState to delete.
+     */
+    where: MailJmapSyncStateWhereUniqueInput
+  }
+
+  /**
+   * MailJmapSyncState deleteMany
+   */
+  export type MailJmapSyncStateDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MailJmapSyncStates to delete
+     */
+    where?: MailJmapSyncStateWhereInput
+    /**
+     * Limit how many MailJmapSyncStates to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * MailJmapSyncState without action
+   */
+  export type MailJmapSyncStateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MailJmapSyncState
+     */
+    select?: MailJmapSyncStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MailJmapSyncState
+     */
+    omit?: MailJmapSyncStateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MailJmapSyncStateInclude<ExtArgs> | null
   }
 
 
@@ -27152,6 +28376,21 @@ export namespace Prisma {
   export type MailVaultBackupScalarFieldEnum = (typeof MailVaultBackupScalarFieldEnum)[keyof typeof MailVaultBackupScalarFieldEnum]
 
 
+  export const MailJmapSyncStateScalarFieldEnum: {
+    id: 'id',
+    directoryEntryId: 'directoryEntryId',
+    stalwartAccountId: 'stalwartAccountId',
+    emailState: 'emailState',
+    mailboxState: 'mailboxState',
+    threadState: 'threadState',
+    lastSyncedAt: 'lastSyncedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type MailJmapSyncStateScalarFieldEnum = (typeof MailJmapSyncStateScalarFieldEnum)[keyof typeof MailJmapSyncStateScalarFieldEnum]
+
+
   export const CalendarSubscriptionScalarFieldEnum: {
     id: 'id',
     name: 'name',
@@ -28804,6 +30043,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"MailDirectoryEntry"> | Date | string
     user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     vaultBackup?: XOR<MailVaultBackupNullableScalarRelationFilter, MailVaultBackupWhereInput> | null
+    mailSyncState?: XOR<MailJmapSyncStateNullableScalarRelationFilter, MailJmapSyncStateWhereInput> | null
   }
 
   export type MailDirectoryEntryOrderByWithRelationInput = {
@@ -28826,6 +30066,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     user?: UserOrderByWithRelationInput
     vaultBackup?: MailVaultBackupOrderByWithRelationInput
+    mailSyncState?: MailJmapSyncStateOrderByWithRelationInput
   }
 
   export type MailDirectoryEntryWhereUniqueInput = Prisma.AtLeast<{
@@ -28851,6 +30092,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"MailDirectoryEntry"> | Date | string
     user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     vaultBackup?: XOR<MailVaultBackupNullableScalarRelationFilter, MailVaultBackupWhereInput> | null
+    mailSyncState?: XOR<MailJmapSyncStateNullableScalarRelationFilter, MailJmapSyncStateWhereInput> | null
   }, "id" | "userId" | "email" | "stalwartAccountId">
 
   export type MailDirectoryEntryOrderByWithAggregationInput = {
@@ -28984,6 +30226,81 @@ export namespace Prisma {
     kdfParallelism?: IntWithAggregatesFilter<"MailVaultBackup"> | number
     createdAt?: DateTimeWithAggregatesFilter<"MailVaultBackup"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"MailVaultBackup"> | Date | string
+  }
+
+  export type MailJmapSyncStateWhereInput = {
+    AND?: MailJmapSyncStateWhereInput | MailJmapSyncStateWhereInput[]
+    OR?: MailJmapSyncStateWhereInput[]
+    NOT?: MailJmapSyncStateWhereInput | MailJmapSyncStateWhereInput[]
+    id?: StringFilter<"MailJmapSyncState"> | string
+    directoryEntryId?: StringFilter<"MailJmapSyncState"> | string
+    stalwartAccountId?: StringFilter<"MailJmapSyncState"> | string
+    emailState?: StringFilter<"MailJmapSyncState"> | string
+    mailboxState?: StringFilter<"MailJmapSyncState"> | string
+    threadState?: StringNullableFilter<"MailJmapSyncState"> | string | null
+    lastSyncedAt?: DateTimeNullableFilter<"MailJmapSyncState"> | Date | string | null
+    createdAt?: DateTimeFilter<"MailJmapSyncState"> | Date | string
+    updatedAt?: DateTimeFilter<"MailJmapSyncState"> | Date | string
+    directoryEntry?: XOR<MailDirectoryEntryScalarRelationFilter, MailDirectoryEntryWhereInput>
+  }
+
+  export type MailJmapSyncStateOrderByWithRelationInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    stalwartAccountId?: SortOrder
+    emailState?: SortOrder
+    mailboxState?: SortOrder
+    threadState?: SortOrderInput | SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    directoryEntry?: MailDirectoryEntryOrderByWithRelationInput
+  }
+
+  export type MailJmapSyncStateWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    directoryEntryId?: string
+    stalwartAccountId?: string
+    AND?: MailJmapSyncStateWhereInput | MailJmapSyncStateWhereInput[]
+    OR?: MailJmapSyncStateWhereInput[]
+    NOT?: MailJmapSyncStateWhereInput | MailJmapSyncStateWhereInput[]
+    emailState?: StringFilter<"MailJmapSyncState"> | string
+    mailboxState?: StringFilter<"MailJmapSyncState"> | string
+    threadState?: StringNullableFilter<"MailJmapSyncState"> | string | null
+    lastSyncedAt?: DateTimeNullableFilter<"MailJmapSyncState"> | Date | string | null
+    createdAt?: DateTimeFilter<"MailJmapSyncState"> | Date | string
+    updatedAt?: DateTimeFilter<"MailJmapSyncState"> | Date | string
+    directoryEntry?: XOR<MailDirectoryEntryScalarRelationFilter, MailDirectoryEntryWhereInput>
+  }, "id" | "directoryEntryId" | "stalwartAccountId">
+
+  export type MailJmapSyncStateOrderByWithAggregationInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    stalwartAccountId?: SortOrder
+    emailState?: SortOrder
+    mailboxState?: SortOrder
+    threadState?: SortOrderInput | SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: MailJmapSyncStateCountOrderByAggregateInput
+    _max?: MailJmapSyncStateMaxOrderByAggregateInput
+    _min?: MailJmapSyncStateMinOrderByAggregateInput
+  }
+
+  export type MailJmapSyncStateScalarWhereWithAggregatesInput = {
+    AND?: MailJmapSyncStateScalarWhereWithAggregatesInput | MailJmapSyncStateScalarWhereWithAggregatesInput[]
+    OR?: MailJmapSyncStateScalarWhereWithAggregatesInput[]
+    NOT?: MailJmapSyncStateScalarWhereWithAggregatesInput | MailJmapSyncStateScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"MailJmapSyncState"> | string
+    directoryEntryId?: StringWithAggregatesFilter<"MailJmapSyncState"> | string
+    stalwartAccountId?: StringWithAggregatesFilter<"MailJmapSyncState"> | string
+    emailState?: StringWithAggregatesFilter<"MailJmapSyncState"> | string
+    mailboxState?: StringWithAggregatesFilter<"MailJmapSyncState"> | string
+    threadState?: StringNullableWithAggregatesFilter<"MailJmapSyncState"> | string | null
+    lastSyncedAt?: DateTimeNullableWithAggregatesFilter<"MailJmapSyncState"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"MailJmapSyncState"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"MailJmapSyncState"> | Date | string
   }
 
   export type CalendarSubscriptionWhereInput = {
@@ -30906,6 +32223,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     user?: UserCreateNestedOneWithoutMailDirectoryEntryInput
     vaultBackup?: MailVaultBackupCreateNestedOneWithoutDirectoryEntryInput
+    mailSyncState?: MailJmapSyncStateCreateNestedOneWithoutDirectoryEntryInput
   }
 
   export type MailDirectoryEntryUncheckedCreateInput = {
@@ -30927,6 +32245,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     vaultBackup?: MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput
+    mailSyncState?: MailJmapSyncStateUncheckedCreateNestedOneWithoutDirectoryEntryInput
   }
 
   export type MailDirectoryEntryUpdateInput = {
@@ -30948,6 +32267,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneWithoutMailDirectoryEntryNestedInput
     vaultBackup?: MailVaultBackupUpdateOneWithoutDirectoryEntryNestedInput
+    mailSyncState?: MailJmapSyncStateUpdateOneWithoutDirectoryEntryNestedInput
   }
 
   export type MailDirectoryEntryUncheckedUpdateInput = {
@@ -30969,6 +32289,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     vaultBackup?: MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput
+    mailSyncState?: MailJmapSyncStateUncheckedUpdateOneWithoutDirectoryEntryNestedInput
   }
 
   export type MailDirectoryEntryCreateManyInput = {
@@ -31123,6 +32444,89 @@ export namespace Prisma {
     kdfMemoryKiB?: IntFieldUpdateOperationsInput | number
     kdfIterations?: IntFieldUpdateOperationsInput | number
     kdfParallelism?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailJmapSyncStateCreateInput = {
+    id?: string
+    stalwartAccountId: string
+    emailState: string
+    mailboxState: string
+    threadState?: string | null
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    directoryEntry: MailDirectoryEntryCreateNestedOneWithoutMailSyncStateInput
+  }
+
+  export type MailJmapSyncStateUncheckedCreateInput = {
+    id?: string
+    directoryEntryId: string
+    stalwartAccountId: string
+    emailState: string
+    mailboxState: string
+    threadState?: string | null
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailJmapSyncStateUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    emailState?: StringFieldUpdateOperationsInput | string
+    mailboxState?: StringFieldUpdateOperationsInput | string
+    threadState?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    directoryEntry?: MailDirectoryEntryUpdateOneRequiredWithoutMailSyncStateNestedInput
+  }
+
+  export type MailJmapSyncStateUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    directoryEntryId?: StringFieldUpdateOperationsInput | string
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    emailState?: StringFieldUpdateOperationsInput | string
+    mailboxState?: StringFieldUpdateOperationsInput | string
+    threadState?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailJmapSyncStateCreateManyInput = {
+    id?: string
+    directoryEntryId: string
+    stalwartAccountId: string
+    emailState: string
+    mailboxState: string
+    threadState?: string | null
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailJmapSyncStateUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    emailState?: StringFieldUpdateOperationsInput | string
+    mailboxState?: StringFieldUpdateOperationsInput | string
+    threadState?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailJmapSyncStateUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    directoryEntryId?: StringFieldUpdateOperationsInput | string
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    emailState?: StringFieldUpdateOperationsInput | string
+    mailboxState?: StringFieldUpdateOperationsInput | string
+    threadState?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -32527,6 +33931,11 @@ export namespace Prisma {
     isNot?: MailVaultBackupWhereInput | null
   }
 
+  export type MailJmapSyncStateNullableScalarRelationFilter = {
+    is?: MailJmapSyncStateWhereInput | null
+    isNot?: MailJmapSyncStateWhereInput | null
+  }
+
   export type MailDirectoryEntryCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -32646,6 +34055,42 @@ export namespace Prisma {
     kdfMemoryKiB?: SortOrder
     kdfIterations?: SortOrder
     kdfParallelism?: SortOrder
+  }
+
+  export type MailJmapSyncStateCountOrderByAggregateInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    stalwartAccountId?: SortOrder
+    emailState?: SortOrder
+    mailboxState?: SortOrder
+    threadState?: SortOrder
+    lastSyncedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailJmapSyncStateMaxOrderByAggregateInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    stalwartAccountId?: SortOrder
+    emailState?: SortOrder
+    mailboxState?: SortOrder
+    threadState?: SortOrder
+    lastSyncedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MailJmapSyncStateMinOrderByAggregateInput = {
+    id?: SortOrder
+    directoryEntryId?: SortOrder
+    stalwartAccountId?: SortOrder
+    emailState?: SortOrder
+    mailboxState?: SortOrder
+    threadState?: SortOrder
+    lastSyncedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type CalendarSyncLogListRelationFilter = {
@@ -33829,10 +35274,22 @@ export namespace Prisma {
     connect?: MailVaultBackupWhereUniqueInput
   }
 
+  export type MailJmapSyncStateCreateNestedOneWithoutDirectoryEntryInput = {
+    create?: XOR<MailJmapSyncStateCreateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailJmapSyncStateCreateOrConnectWithoutDirectoryEntryInput
+    connect?: MailJmapSyncStateWhereUniqueInput
+  }
+
   export type MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput = {
     create?: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
     connectOrCreate?: MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput
     connect?: MailVaultBackupWhereUniqueInput
+  }
+
+  export type MailJmapSyncStateUncheckedCreateNestedOneWithoutDirectoryEntryInput = {
+    create?: XOR<MailJmapSyncStateCreateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailJmapSyncStateCreateOrConnectWithoutDirectoryEntryInput
+    connect?: MailJmapSyncStateWhereUniqueInput
   }
 
   export type UserUpdateOneWithoutMailDirectoryEntryNestedInput = {
@@ -33855,6 +35312,16 @@ export namespace Prisma {
     update?: XOR<XOR<MailVaultBackupUpdateToOneWithWhereWithoutDirectoryEntryInput, MailVaultBackupUpdateWithoutDirectoryEntryInput>, MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput>
   }
 
+  export type MailJmapSyncStateUpdateOneWithoutDirectoryEntryNestedInput = {
+    create?: XOR<MailJmapSyncStateCreateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailJmapSyncStateCreateOrConnectWithoutDirectoryEntryInput
+    upsert?: MailJmapSyncStateUpsertWithoutDirectoryEntryInput
+    disconnect?: MailJmapSyncStateWhereInput | boolean
+    delete?: MailJmapSyncStateWhereInput | boolean
+    connect?: MailJmapSyncStateWhereUniqueInput
+    update?: XOR<XOR<MailJmapSyncStateUpdateToOneWithWhereWithoutDirectoryEntryInput, MailJmapSyncStateUpdateWithoutDirectoryEntryInput>, MailJmapSyncStateUncheckedUpdateWithoutDirectoryEntryInput>
+  }
+
   export type MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput = {
     create?: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
     connectOrCreate?: MailVaultBackupCreateOrConnectWithoutDirectoryEntryInput
@@ -33863,6 +35330,16 @@ export namespace Prisma {
     delete?: MailVaultBackupWhereInput | boolean
     connect?: MailVaultBackupWhereUniqueInput
     update?: XOR<XOR<MailVaultBackupUpdateToOneWithWhereWithoutDirectoryEntryInput, MailVaultBackupUpdateWithoutDirectoryEntryInput>, MailVaultBackupUncheckedUpdateWithoutDirectoryEntryInput>
+  }
+
+  export type MailJmapSyncStateUncheckedUpdateOneWithoutDirectoryEntryNestedInput = {
+    create?: XOR<MailJmapSyncStateCreateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput>
+    connectOrCreate?: MailJmapSyncStateCreateOrConnectWithoutDirectoryEntryInput
+    upsert?: MailJmapSyncStateUpsertWithoutDirectoryEntryInput
+    disconnect?: MailJmapSyncStateWhereInput | boolean
+    delete?: MailJmapSyncStateWhereInput | boolean
+    connect?: MailJmapSyncStateWhereUniqueInput
+    update?: XOR<XOR<MailJmapSyncStateUpdateToOneWithWhereWithoutDirectoryEntryInput, MailJmapSyncStateUpdateWithoutDirectoryEntryInput>, MailJmapSyncStateUncheckedUpdateWithoutDirectoryEntryInput>
   }
 
   export type MailDirectoryEntryCreateNestedOneWithoutVaultBackupInput = {
@@ -33877,6 +35354,20 @@ export namespace Prisma {
     upsert?: MailDirectoryEntryUpsertWithoutVaultBackupInput
     connect?: MailDirectoryEntryWhereUniqueInput
     update?: XOR<XOR<MailDirectoryEntryUpdateToOneWithWhereWithoutVaultBackupInput, MailDirectoryEntryUpdateWithoutVaultBackupInput>, MailDirectoryEntryUncheckedUpdateWithoutVaultBackupInput>
+  }
+
+  export type MailDirectoryEntryCreateNestedOneWithoutMailSyncStateInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutMailSyncStateInput, MailDirectoryEntryUncheckedCreateWithoutMailSyncStateInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutMailSyncStateInput
+    connect?: MailDirectoryEntryWhereUniqueInput
+  }
+
+  export type MailDirectoryEntryUpdateOneRequiredWithoutMailSyncStateNestedInput = {
+    create?: XOR<MailDirectoryEntryCreateWithoutMailSyncStateInput, MailDirectoryEntryUncheckedCreateWithoutMailSyncStateInput>
+    connectOrCreate?: MailDirectoryEntryCreateOrConnectWithoutMailSyncStateInput
+    upsert?: MailDirectoryEntryUpsertWithoutMailSyncStateInput
+    connect?: MailDirectoryEntryWhereUniqueInput
+    update?: XOR<XOR<MailDirectoryEntryUpdateToOneWithWhereWithoutMailSyncStateInput, MailDirectoryEntryUpdateWithoutMailSyncStateInput>, MailDirectoryEntryUncheckedUpdateWithoutMailSyncStateInput>
   }
 
   export type UserCreateNestedOneWithoutSubscriptionsInput = {
@@ -34543,6 +36034,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     vaultBackup?: MailVaultBackupCreateNestedOneWithoutDirectoryEntryInput
+    mailSyncState?: MailJmapSyncStateCreateNestedOneWithoutDirectoryEntryInput
   }
 
   export type MailDirectoryEntryUncheckedCreateWithoutUserInput = {
@@ -34563,6 +36055,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     vaultBackup?: MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput
+    mailSyncState?: MailJmapSyncStateUncheckedCreateNestedOneWithoutDirectoryEntryInput
   }
 
   export type MailDirectoryEntryCreateOrConnectWithoutUserInput = {
@@ -35016,6 +36509,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     vaultBackup?: MailVaultBackupUpdateOneWithoutDirectoryEntryNestedInput
+    mailSyncState?: MailJmapSyncStateUpdateOneWithoutDirectoryEntryNestedInput
   }
 
   export type MailDirectoryEntryUncheckedUpdateWithoutUserInput = {
@@ -35036,6 +36530,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     vaultBackup?: MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput
+    mailSyncState?: MailJmapSyncStateUncheckedUpdateOneWithoutDirectoryEntryNestedInput
   }
 
   export type UserEncryptionDeviceUpsertWithWhereUniqueWithoutUserInput = {
@@ -37395,6 +38890,33 @@ export namespace Prisma {
     create: XOR<MailVaultBackupCreateWithoutDirectoryEntryInput, MailVaultBackupUncheckedCreateWithoutDirectoryEntryInput>
   }
 
+  export type MailJmapSyncStateCreateWithoutDirectoryEntryInput = {
+    id?: string
+    stalwartAccountId: string
+    emailState: string
+    mailboxState: string
+    threadState?: string | null
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput = {
+    id?: string
+    stalwartAccountId: string
+    emailState: string
+    mailboxState: string
+    threadState?: string | null
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MailJmapSyncStateCreateOrConnectWithoutDirectoryEntryInput = {
+    where: MailJmapSyncStateWhereUniqueInput
+    create: XOR<MailJmapSyncStateCreateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput>
+  }
+
   export type UserUpsertWithoutMailDirectoryEntryInput = {
     update: XOR<UserUpdateWithoutMailDirectoryEntryInput, UserUncheckedUpdateWithoutMailDirectoryEntryInput>
     create: XOR<UserCreateWithoutMailDirectoryEntryInput, UserUncheckedCreateWithoutMailDirectoryEntryInput>
@@ -37485,6 +39007,39 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type MailJmapSyncStateUpsertWithoutDirectoryEntryInput = {
+    update: XOR<MailJmapSyncStateUpdateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedUpdateWithoutDirectoryEntryInput>
+    create: XOR<MailJmapSyncStateCreateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedCreateWithoutDirectoryEntryInput>
+    where?: MailJmapSyncStateWhereInput
+  }
+
+  export type MailJmapSyncStateUpdateToOneWithWhereWithoutDirectoryEntryInput = {
+    where?: MailJmapSyncStateWhereInput
+    data: XOR<MailJmapSyncStateUpdateWithoutDirectoryEntryInput, MailJmapSyncStateUncheckedUpdateWithoutDirectoryEntryInput>
+  }
+
+  export type MailJmapSyncStateUpdateWithoutDirectoryEntryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    emailState?: StringFieldUpdateOperationsInput | string
+    mailboxState?: StringFieldUpdateOperationsInput | string
+    threadState?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MailJmapSyncStateUncheckedUpdateWithoutDirectoryEntryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    emailState?: StringFieldUpdateOperationsInput | string
+    mailboxState?: StringFieldUpdateOperationsInput | string
+    threadState?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type MailDirectoryEntryCreateWithoutVaultBackupInput = {
     id?: string
     email: string
@@ -37503,6 +39058,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     user?: UserCreateNestedOneWithoutMailDirectoryEntryInput
+    mailSyncState?: MailJmapSyncStateCreateNestedOneWithoutDirectoryEntryInput
   }
 
   export type MailDirectoryEntryUncheckedCreateWithoutVaultBackupInput = {
@@ -37523,6 +39079,7 @@ export namespace Prisma {
     keyCreatedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    mailSyncState?: MailJmapSyncStateUncheckedCreateNestedOneWithoutDirectoryEntryInput
   }
 
   export type MailDirectoryEntryCreateOrConnectWithoutVaultBackupInput = {
@@ -37559,6 +39116,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneWithoutMailDirectoryEntryNestedInput
+    mailSyncState?: MailJmapSyncStateUpdateOneWithoutDirectoryEntryNestedInput
   }
 
   export type MailDirectoryEntryUncheckedUpdateWithoutVaultBackupInput = {
@@ -37579,6 +39137,107 @@ export namespace Prisma {
     keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    mailSyncState?: MailJmapSyncStateUncheckedUpdateOneWithoutDirectoryEntryNestedInput
+  }
+
+  export type MailDirectoryEntryCreateWithoutMailSyncStateInput = {
+    id?: string
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutMailDirectoryEntryInput
+    vaultBackup?: MailVaultBackupCreateNestedOneWithoutDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryUncheckedCreateWithoutMailSyncStateInput = {
+    id?: string
+    userId?: string | null
+    email: string
+    localPart: string
+    domain: string
+    displayName?: string | null
+    stalwartAccountId: string
+    stalwartDomainId: string
+    stalwartPublicKeyId?: string | null
+    publicKeyArmored: string
+    publicKeyFingerprint: string
+    keyAlgorithm?: string
+    source?: string
+    trust?: string
+    keyCreatedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    vaultBackup?: MailVaultBackupUncheckedCreateNestedOneWithoutDirectoryEntryInput
+  }
+
+  export type MailDirectoryEntryCreateOrConnectWithoutMailSyncStateInput = {
+    where: MailDirectoryEntryWhereUniqueInput
+    create: XOR<MailDirectoryEntryCreateWithoutMailSyncStateInput, MailDirectoryEntryUncheckedCreateWithoutMailSyncStateInput>
+  }
+
+  export type MailDirectoryEntryUpsertWithoutMailSyncStateInput = {
+    update: XOR<MailDirectoryEntryUpdateWithoutMailSyncStateInput, MailDirectoryEntryUncheckedUpdateWithoutMailSyncStateInput>
+    create: XOR<MailDirectoryEntryCreateWithoutMailSyncStateInput, MailDirectoryEntryUncheckedCreateWithoutMailSyncStateInput>
+    where?: MailDirectoryEntryWhereInput
+  }
+
+  export type MailDirectoryEntryUpdateToOneWithWhereWithoutMailSyncStateInput = {
+    where?: MailDirectoryEntryWhereInput
+    data: XOR<MailDirectoryEntryUpdateWithoutMailSyncStateInput, MailDirectoryEntryUncheckedUpdateWithoutMailSyncStateInput>
+  }
+
+  export type MailDirectoryEntryUpdateWithoutMailSyncStateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutMailDirectoryEntryNestedInput
+    vaultBackup?: MailVaultBackupUpdateOneWithoutDirectoryEntryNestedInput
+  }
+
+  export type MailDirectoryEntryUncheckedUpdateWithoutMailSyncStateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    localPart?: StringFieldUpdateOperationsInput | string
+    domain?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    stalwartAccountId?: StringFieldUpdateOperationsInput | string
+    stalwartDomainId?: StringFieldUpdateOperationsInput | string
+    stalwartPublicKeyId?: NullableStringFieldUpdateOperationsInput | string | null
+    publicKeyArmored?: StringFieldUpdateOperationsInput | string
+    publicKeyFingerprint?: StringFieldUpdateOperationsInput | string
+    keyAlgorithm?: StringFieldUpdateOperationsInput | string
+    source?: StringFieldUpdateOperationsInput | string
+    trust?: StringFieldUpdateOperationsInput | string
+    keyCreatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    vaultBackup?: MailVaultBackupUncheckedUpdateOneWithoutDirectoryEntryNestedInput
   }
 
   export type UserCreateWithoutSubscriptionsInput = {

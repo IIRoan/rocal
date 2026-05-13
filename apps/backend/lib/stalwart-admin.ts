@@ -1,11 +1,14 @@
+import { env } from "./env";
+
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
-type JmapMethodCall = [string, Record<string, unknown>, string];
+export type StalwartJmapMethodCall = [string, Record<string, unknown>, string];
 
-type JmapEnvelope = {
+export type StalwartJmapEnvelope = {
   methodResponses?: Array<[string, Record<string, unknown>, string]>;
   primaryAccounts?: Record<string, string>;
   accounts?: Record<string, unknown>;
+  eventSourceUrl?: string;
 };
 
 export type StalwartDomainRecord = {
@@ -39,11 +42,19 @@ export interface StalwartAdminClientLike {
   }): Promise<void>;
 }
 
+export interface StalwartJmapAdminClientLike extends StalwartAdminClientLike {
+  getSession(): Promise<StalwartJmapEnvelope>;
+  callJmap(input: {
+    using: string[];
+    methodCalls: StalwartJmapMethodCall[];
+  }): Promise<StalwartJmapEnvelope>;
+}
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
-export class StalwartAdminClient implements StalwartAdminClientLike {
+export class StalwartAdminClient implements StalwartJmapAdminClientLike {
   private readonly baseUrl: string;
   private adminAccountIdPromise: Promise<string> | null = null;
 
@@ -210,7 +221,7 @@ export class StalwartAdminClient implements StalwartAdminClientLike {
   }
 
   private async getAdminAccountId(): Promise<string> {
-    this.adminAccountIdPromise ??= this.fetchSession().then((session) => {
+    this.adminAccountIdPromise ??= this.getSession().then((session) => {
       const primaryAccountId =
         session.primaryAccounts?.["urn:stalwart:jmap"] ||
         session.primaryAccounts?.["urn:ietf:params:jmap:mail"] ||
@@ -228,7 +239,7 @@ export class StalwartAdminClient implements StalwartAdminClientLike {
     return this.adminAccountIdPromise;
   }
 
-  private async fetchSession(): Promise<JmapEnvelope> {
+  async getSession(): Promise<StalwartJmapEnvelope> {
     const response = await this.fetcher(`${this.baseUrl}/jmap/session`, {
       method: "GET",
       headers: {
@@ -242,10 +253,13 @@ export class StalwartAdminClient implements StalwartAdminClientLike {
       );
     }
 
-    return (await response.json()) as JmapEnvelope;
+    return (await response.json()) as StalwartJmapEnvelope;
   }
 
-  private async postJmap(methodCalls: JmapMethodCall[]): Promise<JmapEnvelope> {
+  async callJmap(input: {
+    using: string[];
+    methodCalls: StalwartJmapMethodCall[];
+  }): Promise<StalwartJmapEnvelope> {
     const response = await this.fetcher(`${this.baseUrl}/jmap/`, {
       method: "POST",
       headers: {
@@ -253,8 +267,8 @@ export class StalwartAdminClient implements StalwartAdminClientLike {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        using: ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
-        methodCalls,
+        using: input.using,
+        methodCalls: input.methodCalls,
       }),
     });
 
@@ -264,11 +278,11 @@ export class StalwartAdminClient implements StalwartAdminClientLike {
       );
     }
 
-    return (await response.json()) as JmapEnvelope;
+    return (await response.json()) as StalwartJmapEnvelope;
   }
 
   private getMethodResult<T>(
-    envelope: JmapEnvelope,
+    envelope: StalwartJmapEnvelope,
     methodName: string,
   ): T {
     const tuple = (envelope.methodResponses ?? []).find(
@@ -281,6 +295,15 @@ export class StalwartAdminClient implements StalwartAdminClientLike {
 
     return tuple[1] as T;
   }
+
+  private async postJmap(
+    methodCalls: StalwartJmapMethodCall[],
+  ): Promise<StalwartJmapEnvelope> {
+    return this.callJmap({
+      using: ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+      methodCalls,
+    });
+  }
 }
 
 export function createStalwartAdminClient(config?: {
@@ -289,8 +312,8 @@ export function createStalwartAdminClient(config?: {
   fetcher?: Fetcher;
 }) {
   return new StalwartAdminClient({
-    baseUrl: config?.baseUrl || process.env.STALWART_BASE_URL || "http://localhost:8080",
-    adminToken: config?.adminToken || process.env.STALWART_ADMIN_TOKEN || "",
+    baseUrl: config?.baseUrl || env.stalwartBaseUrl,
+    adminToken: config?.adminToken || env.stalwartAdminToken,
     fetcher: config?.fetcher,
   });
 }

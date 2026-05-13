@@ -6,6 +6,7 @@ import PostalMime from "postal-mime";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
+import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { peekCachedAuthPassword } from "@/lib/e2ee-password-cache";
 import {
   clearEncPasswordCookie,
@@ -13,7 +14,10 @@ import {
 } from "@/lib/enc-password-cookie";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
-import { StalwartJmapClient } from "@/lib/mail/jmap-client";
+import {
+  getPrimaryMailAccountId,
+  StalwartJmapClient,
+} from "@/lib/mail/jmap-client";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
@@ -29,6 +33,7 @@ import type {
   JmapSession,
   MailAccountStatus,
   MailDemoConfig,
+  MailSyncResponse,
   UserKeyVault,
 } from "@/lib/mail/types";
 
@@ -54,6 +59,71 @@ function getPrimaryMailboxId(mailboxes: JmapMailbox[], role: string): string | n
   return mailboxes.find((m) => m.role === role)?.id ?? mailboxes[0]?.id ?? null;
 }
 
+function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
+  return [...messages].sort((left, right) => {
+    const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
+    const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
+    return rightTime - leftTime;
+  });
+}
+
+function mergeMailboxes(
+  currentMailboxes: JmapMailbox[],
+  sync: MailSyncResponse["mailbox"],
+): JmapMailbox[] {
+  if (sync.records.length === 0 && sync.destroyed.length === 0) {
+    return currentMailboxes;
+  }
+
+  const destroyedIds = new Set(sync.destroyed);
+  const byId = new Map<string, JmapMailbox>();
+
+  for (const mailbox of currentMailboxes) {
+    if (!destroyedIds.has(mailbox.id)) {
+      byId.set(mailbox.id, mailbox);
+    }
+  }
+
+  for (const mailbox of sync.records) {
+    byId.set(mailbox.id, mailbox);
+  }
+
+  return [...byId.values()].sort((left, right) => {
+    const leftOrder = left.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder;
+  });
+}
+
+function mergeMessagesForMailbox(
+  currentMessages: JmapEmailMessage[],
+  mailboxId: string,
+  sync: MailSyncResponse["email"],
+): JmapEmailMessage[] {
+  if (sync.records.length === 0 && sync.destroyed.length === 0) {
+    return currentMessages;
+  }
+
+  const destroyedIds = new Set(sync.destroyed);
+  const nextMessages = new Map<string, JmapEmailMessage>();
+
+  for (const message of currentMessages) {
+    if (!destroyedIds.has(message.id)) {
+      nextMessages.set(message.id, message);
+    }
+  }
+
+  for (const message of sync.records) {
+    if (message.mailboxIds?.[mailboxId]) {
+      nextMessages.set(message.id, message);
+    } else {
+      nextMessages.delete(message.id);
+    }
+  }
+
+  return sortMessages([...nextMessages.values()]);
+}
+
 export function useMailApp() {
   const { data: session, isPending: isSessionPending } = useSession();
   const router = useSmoothRouter();
@@ -61,6 +131,7 @@ export function useMailApp() {
   const [config, setConfig] = useState<MailDemoConfig | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [isBusy, setIsBusy] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [mailboxStatus, setMailboxStatus] = useState<MailAccountStatus | null>(null);
   const [isMailboxStatusLoading, setIsMailboxStatusLoading] = useState(false);
   const [signupPassword, setSignupPassword] = useState("");
@@ -786,6 +857,75 @@ export function useMailApp() {
     }
   }, [activeMailbox, selectedMessageId]);
 
+  const handleRealtimeSync = useCallback((result: MailSyncResponse) => {
+    let resolvedSelectedMessageId: string | null | undefined;
+
+    setActiveMailbox((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const currentAccountId = getPrimaryMailAccountId(current.session);
+      if (currentAccountId !== result.accountId) {
+        return current;
+      }
+
+      const nextMailboxes = mergeMailboxes(current.mailboxes, result.mailbox);
+      const selectedMailboxDestroyed = Boolean(
+        current.selectedMailboxId &&
+          result.mailbox.destroyed.includes(current.selectedMailboxId),
+      );
+      const nextSelectedMailboxId = selectedMailboxDestroyed
+        ? null
+        : current.selectedMailboxId;
+      const nextMessages = nextSelectedMailboxId
+        ? mergeMessagesForMailbox(current.messages, nextSelectedMailboxId, result.email)
+        : [];
+
+      resolvedSelectedMessageId =
+        selectedMessageId && nextMessages.some((message) => message.id === selectedMessageId)
+          ? selectedMessageId
+          : nextMessages[0]?.id ?? null;
+
+      return {
+        ...current,
+        mailboxes: nextMailboxes,
+        selectedMailboxId: nextSelectedMailboxId,
+        messages: nextMessages,
+      };
+    });
+
+    if (resolvedSelectedMessageId !== undefined) {
+      setSelectedMessageId(resolvedSelectedMessageId);
+    }
+  }, [selectedMessageId]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (!activeMailbox || isRefreshing) return;
+    const accountId = getPrimaryMailAccountId(activeMailbox.session);
+    if (!accountId) return;
+    setIsRefreshing(true);
+    try {
+      const result = await mailDemoApiService.syncAccount(accountId);
+      handleRealtimeSync(result);
+    } catch (error) {
+      log.error("Manual refresh failed", error);
+      toast.error(error instanceof Error ? error.message : "Could not refresh mail.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [activeMailbox, isRefreshing, handleRealtimeSync]);
+
+  const realtimeAccountId = activeMailbox
+    ? getPrimaryMailAccountId(activeMailbox.session)
+    : null;
+
+  useMailRealtime({
+    accountId: realtimeAccountId,
+    enabled: Boolean(activeMailbox && session?.user),
+    onSync: handleRealtimeSync,
+  });
+
   const handleDisconnect = useCallback(async () => {
     try {
       await mailCryptoWorkerClient.clear();
@@ -854,6 +994,8 @@ export function useMailApp() {
     blockTrackingPixels,
     setBlockTrackingPixels,
     refreshMailboxMessages,
+    handleManualRefresh,
+    isRefreshing,
     handleSignIn,
     handleSignup,
     handleSendMessage,

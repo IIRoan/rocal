@@ -123,6 +123,7 @@ export type JmapAttachment = {
 export type JmapEmailMessage = {
   id: string;
   threadId?: string;
+  mailboxIds?: Record<string, boolean>;
   subject?: string | null;
   from?: MailAddress[];
   to?: MailAddress[];
@@ -135,6 +136,36 @@ export type JmapEmailMessage = {
   textBody?: JmapBodyPartRef[];
   htmlBody?: JmapBodyPartRef[];
   attachments?: JmapAttachment[];
+};
+
+export type MailRealtimeEvent = {
+  type: "mail.changed";
+  accountId: string;
+  changedTypes: string[];
+  receivedAt: string;
+};
+
+export type MailSyncThreadRecord = {
+  id: string;
+  emailIds: string[];
+};
+
+export type MailSyncCollection<T> = {
+  oldState: string | null;
+  newState: string;
+  created: string[];
+  updated: string[];
+  destroyed: string[];
+  records: T[];
+};
+
+export type MailSyncResponse = {
+  accountId: string;
+  initialized: boolean;
+  changedTypes: string[];
+  email: MailSyncCollection<JmapEmailMessage>;
+  mailbox: MailSyncCollection<JmapMailbox>;
+  thread: MailSyncCollection<MailSyncThreadRecord>;
 };
 
 export type MessageEncryptionState =
