@@ -62,6 +62,11 @@ jest.mock("@workspace/ui/components/ui/sidebar", () => ({
 
 jest.mock("@workspace/ui/components/ui", () => ({
   PageLoadingOverlay: () => null,
+  AppLoadingState: ({
+    text,
+  }: {
+    text?: string;
+  }) => <div>{text ?? "Loading..."}</div>,
 }));
 
 jest.mock("@workspace/ui/components/ui/button", () => ({
@@ -356,6 +361,13 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: true,
     });
+    mockApi.getRecipientKey.mockResolvedValue({
+      email: "bob@solace.onl",
+      publicKeyArmored: "bob-public-key",
+      fingerprint: "FACECAFE12345678",
+      source: "internal",
+      trust: "verified",
+    });
     mockApi.syncAccount.mockResolvedValue({
       accountId: "b",
       initialized: false,
@@ -441,6 +453,10 @@ describe("MailApp", () => {
     mockWorkerClient.loadVault.mockResolvedValue({
       fingerprint: "ABCD1234EF567890",
     });
+    mockWorkerClient.encryptForRecipients.mockResolvedValue({
+      armoredMessage:
+        "-----BEGIN PGP MESSAGE-----\nVersion: OpenPGP\n\nciphertext\n-----END PGP MESSAGE-----",
+    });
     mockJmapClient.discoverSession.mockResolvedValue({
       accounts: { b: { name: "alice@solace.onl" } },
       primaryAccounts: { "urn:ietf:params:jmap:mail": "b" },
@@ -489,41 +505,15 @@ describe("MailApp", () => {
     });
   }
 
-  it("submits signup data after generating and wrapping the client key vault", async () => {
+  it("auto-provisions the mailbox on first visit using the cached auth password", async () => {
     mockApi.getAccountStatus.mockResolvedValueOnce({
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: false,
     });
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
-
-    const createMailboxButton = Array.from(
-      container.querySelectorAll("button"),
-    ).find((element) => element.textContent === "Create mailbox");
-
-    await act(async () => {
-      createMailboxButton?.click();
-      await Promise.resolve();
-    });
-
-    setInputValue(
-      container.querySelector("#signup-password") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-    setInputValue(
-      container.querySelector("#signup-password-confirm") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-
-    const submitButton = Array.from(container.querySelectorAll("button"))
-      .filter((element) => element.textContent === "Create mailbox")
-      .at(-1);
-
-    await act(async () => {
-      submitButton?.click();
-      await Promise.resolve();
-    });
 
     expect(mockWorkerClient.generateKeyPair).toHaveBeenCalledWith({
       name: "Alice Example",
@@ -560,7 +550,7 @@ describe("MailApp", () => {
     await renderApp();
 
     setInputValue(
-      container.querySelector("#login-password") as HTMLInputElement,
+      container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -630,7 +620,6 @@ describe("MailApp", () => {
 
     expect(container.textContent).toContain("Opening your mailbox");
     expect(container.textContent).not.toContain("Open mailbox");
-
     await act(async () => {
       resolveUnlock?.({
         userId: "mail-user-1",
@@ -651,6 +640,7 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
   });
+
 
   it("loads messages for the selected mailbox folder", async () => {
     mockJmapClient.getMailboxMessages.mockReset();
@@ -685,7 +675,7 @@ describe("MailApp", () => {
     await renderApp();
 
     setInputValue(
-      container.querySelector("#login-password") as HTMLInputElement,
+      container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -737,7 +727,7 @@ describe("MailApp", () => {
     await renderApp();
 
     setInputValue(
-      container.querySelector("#login-password") as HTMLInputElement,
+      container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -812,6 +802,105 @@ describe("MailApp", () => {
     expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(2);
   });
 
+  it("encrypts internal mail before sending it through the JMAP proxy", async () => {
+    mockJmapClient.getMailboxMessages.mockReset();
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-1",
+          subject: "Encrypted hello",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Hello Alice" } },
+        },
+      ],
+      total: 1,
+    });
+
+    await renderApp();
+
+    setInputValue(
+      container.querySelector("#mailbox-password") as HTMLInputElement,
+      "StrongMailboxPassword!42",
+    );
+
+    const signInButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Open mailbox",
+    );
+
+    await act(async () => {
+      signInButton?.click();
+      await Promise.resolve();
+    });
+
+    const composeButton = Array.from(container.querySelectorAll("button")).find(
+      (el) => el.textContent?.includes("Compose"),
+    );
+    await act(async () => {
+      composeButton?.click();
+      await Promise.resolve();
+    });
+
+    setInputValue(
+      container.querySelector(
+        'input[placeholder="Recipient"]',
+      ) as HTMLInputElement,
+      "bob@solace.onl",
+    );
+    setInputValue(
+      container.querySelector(
+        'input[placeholder="Subject"]',
+      ) as HTMLInputElement,
+      "Hello",
+    );
+    act(() => {
+      const textarea = container.querySelector(
+        "textarea",
+      ) as HTMLTextAreaElement;
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      );
+
+      descriptor?.set?.call(textarea, "Secret body");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const sendButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Send message",
+    );
+
+    await act(async () => {
+      sendButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockApi.getRecipientKey).toHaveBeenCalledWith("bob@solace.onl");
+    expect(mockWorkerClient.encryptForRecipients).toHaveBeenCalledWith({
+      plaintext: "Secret body",
+      recipientPublicKeysArmored: expect.arrayContaining([
+        "public-key-armored",
+        "bob-public-key",
+      ]),
+    });
+    expect(mockJmapClient.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiUrl: "http://192.168.2.213:8080/jmap/",
+      }),
+      {
+        draftsMailboxId: "drafts-1",
+        sentMailboxId: "sent-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@solace.onl"],
+        subject: "Hello",
+        textBody:
+          "-----BEGIN PGP MESSAGE-----\nVersion: OpenPGP\n\nciphertext\n-----END PGP MESSAGE-----",
+        identityId: "identity-1",
+      },
+    );
+  });
+
   it("calls initEncPasswordFromCookie on mount", async () => {
     await renderApp();
     expect(mockInitEncPasswordFromCookie).toHaveBeenCalled();
@@ -854,3 +943,4 @@ describe("MailApp", () => {
     expect(container.textContent).toContain("Encrypted hello");
   });
 });
+

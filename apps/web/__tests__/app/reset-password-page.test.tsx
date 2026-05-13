@@ -133,7 +133,7 @@ describe("ResetPasswordPage", () => {
       "Reset the password you use to sign in to Solace with email.",
     );
     expect(container.textContent).toContain(
-      "GitHub and passkey sign-in keep using a separate encryption password.",
+      "If you sign in with email and password, Solace also uses this password to protect your encryption keys after you sign in.",
     );
   });
 

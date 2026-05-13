@@ -274,9 +274,6 @@ describe("E2eeBootstrap component", () => {
     expect(container.textContent).toContain(
       "Enter your encryption password to unlock encrypted data on this device.",
     );
-    expect(container.textContent).toContain(
-      "GitHub and passkey sign-in keep this password separate.",
-    );
     expect(container.textContent).toContain("Encryption password");
   });
 
@@ -363,10 +360,7 @@ describe("E2eeBootstrap component", () => {
 
     expect(container.textContent).toContain("Protect your encryption keys");
     expect(container.textContent).toContain(
-      "Choose an encryption password to protect your end-to-end encryption keys.",
-    );
-    expect(container.textContent).toContain(
-      "You'll need it when you sign in with GitHub or a passkey on a new device.",
+      "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.",
     );
     expect(container.textContent).toContain("Encryption password");
   });

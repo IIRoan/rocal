@@ -13,6 +13,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 const mockRouterReplace = jest.fn();
 const mockStartRouteTransition = jest.fn();
+const mockCompleteAuthNavigation = jest.fn();
 let mockSearchParams = new URLSearchParams();
 
 jest.mock("next/image", () => ({
@@ -127,6 +128,11 @@ jest.mock("@/lib/api-url", () => ({
   }),
 }));
 
+jest.mock("@/lib/auth-navigation", () => ({
+  completeAuthNavigation: (...args: Parameters<typeof mockCompleteAuthNavigation>) =>
+    mockCompleteAuthNavigation(...args),
+}));
+
 jest.mock("@/lib/calendar-api-service", () => ({
   calendarApiService: {
     updateUserSettings: jest.fn(),
@@ -137,6 +143,7 @@ jest.mock("@/lib/account-api-service", () => ({
   accountApiService: {
     getSignupConfig: jest.fn(),
     checkEmailAvailability: jest.fn(),
+    getAuthStatus: jest.fn(),
   },
 }));
 
@@ -163,7 +170,6 @@ jest.mock("@/lib/auth-client", () => ({
   },
   signIn: {
     email: jest.fn(),
-    social: jest.fn(),
   },
   signUp: {
     email: jest.fn(),
@@ -185,12 +191,12 @@ const mockUseSession = jest.mocked(useSession);
 const mockRequestPasswordReset = jest.mocked(authClient.requestPasswordReset);
 const mockPasskeySignIn = jest.mocked(authClient.signIn.passkey);
 const mockEmailSignIn = jest.mocked(signIn.email);
-const mockSocialSignIn = jest.mocked(signIn.social);
 const mockEmailSignUp = jest.mocked(signUp.email);
 const mockCheckEmailAvailability = jest.mocked(
   accountApiService.checkEmailAvailability,
 );
 const mockGetSignupConfig = jest.mocked(accountApiService.getSignupConfig);
+const mockGetAuthStatus = jest.mocked(accountApiService.getAuthStatus);
 const mockBootstrapMailboxForAccount = jest.mocked(bootstrapMailboxForAccount);
 const mockUpdateUserSettings = jest.mocked(calendarApiService.updateUserSettings);
 const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
@@ -245,14 +251,24 @@ describe("LoginForm", () => {
     });
     mockEmailSignIn.mockResolvedValue({});
     mockEmailSignUp.mockResolvedValue({});
-    mockSocialSignIn.mockResolvedValue({});
     mockPasskeySignIn.mockResolvedValue({ user: { id: "user-1" } });
     mockRequestPasswordReset.mockResolvedValue({});
+    mockGetAuthStatus.mockResolvedValue({
+      authenticated: true,
+      hasPasskeys: false,
+      requiresPasskeyStepUp: false,
+    });
     (
       globalThis as typeof globalThis & {
         PublicKeyCredential?: typeof PublicKeyCredential;
       }
     ).PublicKeyCredential = function PublicKeyCredential() {} as any;
+    (
+      window as typeof window & {
+        PublicKeyCredential?: typeof PublicKeyCredential;
+      }
+    ).PublicKeyCredential = function PublicKeyCredential() {} as any;
+    mockCompleteAuthNavigation.mockReset();
   });
 
   afterEach(() => {
@@ -425,28 +441,82 @@ describe("LoginForm", () => {
     );
   });
 
-  it("clears cached auth passwords for GitHub and passkey sign-ins", async () => {
+  it("auto-prompts passkey step-up after password sign-in without clearing cached auth passwords", async () => {
+    mockGetAuthStatus
+      .mockResolvedValueOnce({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: true,
+      })
+      .mockResolvedValue({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: false,
+      });
+
     await renderForm();
 
-    const gitHubButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("GitHub"),
-    );
-    const passkeyButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent?.includes("Passkey"),
+    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
     );
 
     await act(async () => {
-      gitHubButton?.click();
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       await Promise.resolve();
     });
+
+    expect(mockClearAuthPasswords).not.toHaveBeenCalled();
+    expect(mockPasskeySignIn).toHaveBeenCalledWith({
+      autoFocus: true,
+    });
+  });
+
+  it("redirects after a successful auto-prompted passkey step-up even when the passkey response omits the user payload", async () => {
+    mockGetAuthStatus
+      .mockResolvedValueOnce({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: true,
+      })
+      .mockResolvedValue({
+        authenticated: true,
+        hasPasskeys: true,
+        requiresPasskeyStepUp: false,
+    });
+    mockPasskeySignIn.mockResolvedValue({});
+
+    await renderForm();
+
+    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
 
     await act(async () => {
-      passkeyButton?.click();
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(2);
-    expect(mockSocialSignIn).toHaveBeenCalled();
-    expect(mockPasskeySignIn).toHaveBeenCalled();
+    expect(mockPasskeySignIn).toHaveBeenCalledWith({
+      autoFocus: true,
+    });
+    expect(mockCompleteAuthNavigation).toHaveBeenCalledWith("/calendar");
   });
 });

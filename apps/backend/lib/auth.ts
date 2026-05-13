@@ -15,7 +15,10 @@ import {
   sendAuthEmail,
 } from "./auth-email";
 import { getAuthTrustedOrigins } from "./origin-policy";
-import { getOAuthProviderCallbackUrl } from "./oauth-urls";
+import {
+  clearPasskeyStepUpCookie,
+  setVerifiedPasskeyStepUpCookie,
+} from "./passkey-step-up";
 
 export const BETTER_AUTH_BASE_PATH = "/api/auth";
 
@@ -28,12 +31,6 @@ const skipStateCookieCheck =
 const passkeyOrigin =
   process.env.PASSKEY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || frontendUrl;
 
-const socialRedirectUrl =
-  process.env.AUTH_REDIRECT_URL ||
-  env.mobileAuthCallbackUrl ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  frontendUrl;
-
 const logger = createLogger("backend:auth");
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -41,12 +38,6 @@ const resend = process.env.RESEND_API_KEY
 const authEmailFrom =
   process.env.AUTH_EMAIL_FROM ||
   process.env.AUTH_RESET_EMAIL_FROM || "Solace <notifications@mailing.roan.dev>";
-
-export const githubOAuthCallbackUrl = getOAuthProviderCallbackUrl(
-  backendUrl,
-  BETTER_AUTH_BASE_PATH,
-  "github",
-);
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -150,6 +141,53 @@ const passwordChangeNotificationPlugin = {
   },
 };
 
+const clearPasskeyStepUpPaths = new Set([
+  "/sign-in/email",
+  "/sign-up/email",
+  "/sign-out",
+  "/change-password",
+  "/reset-password",
+  "/set-password",
+]);
+
+const setPasskeyStepUpPaths = new Set([
+  "/passkey/verify-authentication",
+  "/passkey/verify-registration",
+]);
+
+const passkeyStepUpPlugin = {
+  id: "passkey-step-up",
+  hooks: {
+    after: [
+      {
+        matcher(context: { path?: string }) {
+          return Boolean(context.path && clearPasskeyStepUpPaths.has(context.path));
+        },
+        handler: createAuthMiddleware(async (ctx) => {
+          if (ctx.context.responseHeaders) {
+            clearPasskeyStepUpCookie({
+              headers: ctx.context.responseHeaders as Headers,
+            });
+          }
+        }),
+      },
+      {
+        matcher(context: { path?: string }) {
+          return Boolean(context.path && setPasskeyStepUpPaths.has(context.path));
+        },
+        handler: createAuthMiddleware(async (ctx) => {
+          const response = await getSuccessfulEndpointResponse(ctx.context.returned);
+          if (response && ctx.context.responseHeaders) {
+            setVerifiedPasskeyStepUpCookie({
+              headers: ctx.context.responseHeaders as Headers,
+            });
+          }
+        }),
+      },
+    ],
+  },
+};
+
 export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
@@ -202,6 +240,7 @@ export const auth = betterAuth({
       disableDefaultReference: true,
     }),
     passwordChangeNotificationPlugin,
+    passkeyStepUpPlugin,
     passkey({
       rpID: getRpId(passkeyOrigin),
       rpName: "Rocani",
@@ -223,14 +262,7 @@ export const auth = betterAuth({
   secret:
     process.env.BETTER_AUTH_SECRET || "default-dev-secret-change-in-production",
   socialProviders:
-    process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
-      ? {
-          github: {
-            clientId: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET,
-          },
-        }
-      : {},
+    {},
   baseURL: backendUrl,
   basePath: BETTER_AUTH_BASE_PATH,
   trustedOrigins: getAuthTrustedOrigins,
@@ -252,9 +284,6 @@ export const auth = betterAuth({
     crossSubDomainCookies: {
       enabled: true,
     },
-  },
-  socialProviderConfig: {
-    redirectURL: socialRedirectUrl,
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
