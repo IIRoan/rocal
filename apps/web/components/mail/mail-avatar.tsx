@@ -10,9 +10,20 @@ import {
 const LOGO_DEV_TOKEN = "pk_OqzQzTPPQCare5_eo1QArg";
 
 export const PERSONAL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.uk", "hotmail.com",
-  "hotmail.co.uk", "outlook.com", "live.com", "icloud.com", "me.com",
-  "mac.com", "protonmail.com", "proton.me", "aol.com",
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "hotmail.com",
+  "hotmail.co.uk",
+  "outlook.com",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "protonmail.com",
+  "proton.me",
+  "aol.com",
 ]);
 
 export function emailDomain(email: string): string {
@@ -32,25 +43,39 @@ const FALLBACK_PALETTES = [
 
 function paletteFor(seed: string) {
   let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) & 0xffff;
+  for (let i = 0; i < seed.length; i++)
+    h = (h * 31 + seed.charCodeAt(i)) & 0xffff;
   return FALLBACK_PALETTES[h % FALLBACK_PALETTES.length]!;
 }
 
 function getInitials(name?: string, email?: string): string {
   const src = name?.trim() || email?.split("@")[0] || "?";
-  const parts = src.replace(/[^a-zA-Z\s]/g, " ").trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+  const parts = src
+    .replace(/[^a-zA-Z\s]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length >= 2)
+    return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
   return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
-export function SenderAvatar({ email, name }: { email: string; name?: string }) {
+export function SenderAvatar({
+  email,
+  name,
+}: {
+  email: string;
+  name?: string;
+}) {
   const domain = emailDomain(email);
   const isPersonal = !domain || PERSONAL_DOMAINS.has(domain);
 
-  const sources = isPersonal ? [] : [
-    `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}`,
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
-  ];
+  const sources = isPersonal
+    ? []
+    : [
+        `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}`,
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+      ];
 
   const [srcIndex, setSrcIndex] = useState(0);
 
@@ -71,7 +96,9 @@ export function SenderAvatar({ email, name }: { email: string; name?: string }) 
           onError={() => setSrcIndex((i) => i + 1)}
         />
       )}
-      <AvatarFallback className={`${bg} ${text} text-[11px] font-semibold select-none`}>
+      <AvatarFallback
+        className={`${bg} ${text} text-[11px] font-semibold select-none`}
+      >
         {initials}
       </AvatarFallback>
     </Avatar>

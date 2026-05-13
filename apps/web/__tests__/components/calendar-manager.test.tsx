@@ -51,6 +51,10 @@ jest.mock("@workspace/ui/components/calendar", () => ({
     );
   },
   getColorSwatchValue: () => "#2563eb",
+  useCalendarContext: () => ({
+    toggleCalendarVisibility: jest.fn(),
+    isCalendarVisible: () => true,
+  }),
 }));
 
 jest.mock("lucide-react", () => {
@@ -61,6 +65,8 @@ jest.mock("lucide-react", () => {
     ArrowLeft: Icon,
     ChevronRight: Icon,
     Copy: Icon,
+    Eye: Icon,
+    EyeOff: Icon,
     Globe: Icon,
     Link2: Icon,
     Loader2: Icon,

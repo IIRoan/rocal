@@ -29,7 +29,10 @@ function base64Encode(value: string): string {
   return Buffer.from(value, "utf8").toString("base64");
 }
 
-function rewriteOrigin(urlString: string | undefined, baseUrl: string): string | undefined {
+function rewriteOrigin(
+  urlString: string | undefined,
+  baseUrl: string,
+): string | undefined {
   if (!urlString) {
     return undefined;
   }
@@ -128,11 +131,7 @@ export function buildSendMessageMethodCalls(input: {
       },
       "c1",
     ],
-    [
-      "EmailSubmission/set",
-      submissionParams,
-      "c2",
-    ],
+    ["EmailSubmission/set", submissionParams, "c2"],
   ];
 }
 
@@ -170,36 +169,62 @@ export class StalwartJmapClient {
     if (!response.ok) {
       let detail = "";
       try {
-        const body = await response.json() as { message?: string };
+        const body = (await response.json()) as { message?: string };
         if (body.message) detail = ` — ${body.message}`;
-      } catch { /* ignore parse failure */ }
-      if (response.status === 401) throw new Error("Incorrect password or mailbox not found.");
-      if (response.status === 503) throw new Error(`Mail server is unreachable${detail}.`);
-      throw new Error(`Could not connect to the mail server (${response.status})${detail}.`);
+      } catch {
+        /* ignore parse failure */
+      }
+      if (response.status === 401)
+        throw new Error("Incorrect password or mailbox not found.");
+      if (response.status === 503)
+        throw new Error(`Mail server is unreachable${detail}.`);
+      throw new Error(
+        `Could not connect to the mail server (${response.status})${detail}.`,
+      );
     }
 
-    return normalizeJmapSession((await response.json()) as JmapSession, this.baseUrl);
+    return normalizeJmapSession(
+      (await response.json()) as JmapSession,
+      this.baseUrl,
+    );
   }
 
-  async getAccountSettings(session: JmapSession): Promise<Record<string, unknown>> {
+  async getAccountSettings(
+    session: JmapSession,
+  ): Promise<Record<string, unknown>> {
     const accountId = this.requirePrimaryAccountId(session);
-    const envelope = await this.call(session, ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"], [
-      ["x:AccountSettings/get", { accountId, ids: ["singleton"] }, "c1"],
-    ]);
-    const result = this.getMethodResult<{ list?: Array<Record<string, unknown>> }>(
-      envelope,
-      "x:AccountSettings/get",
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"],
+      [["x:AccountSettings/get", { accountId, ids: ["singleton"] }, "c1"]],
     );
+    const result = this.getMethodResult<{
+      list?: Array<Record<string, unknown>>;
+    }>(envelope, "x:AccountSettings/get");
 
     return result.list?.[0] ?? { encryptionAtRest: { "@type": "Disabled" } };
   }
 
   async getMailboxes(session: JmapSession): Promise<JmapMailbox[]> {
     const accountId = this.requirePrimaryAccountId(session);
-    const envelope = await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Mailbox/get", { accountId, properties: ["id", "name", "role", "parentId", "sortOrder"] }, "c1"],
-    ]);
-    const result = this.getMethodResult<{ list?: JmapMailbox[] }>(envelope, "Mailbox/get");
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Mailbox/get",
+          {
+            accountId,
+            properties: ["id", "name", "role", "parentId", "sortOrder"],
+          },
+          "c1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{ list?: JmapMailbox[] }>(
+      envelope,
+      "Mailbox/get",
+    );
     return result.list ?? [];
   }
 
@@ -233,66 +258,76 @@ export class StalwartJmapClient {
   async getMailboxMessages(
     session: JmapSession,
     mailboxId: string,
-    limit = 50,
-  ): Promise<JmapEmailMessage[]> {
+    options: { limit?: number; position?: number } = {},
+  ): Promise<{ messages: JmapEmailMessage[]; total: number }> {
+    const { limit = 20, position = 0 } = options;
     const accountId = this.requirePrimaryAccountId(session);
-    const envelope = await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
       [
-        "Email/query",
-        {
-          accountId,
-          filter: {
-            inMailbox: mailboxId,
-          },
-          sort: [
-            {
-              property: "receivedAt",
-              isAscending: false,
+        [
+          "Email/query",
+          {
+            accountId,
+            filter: {
+              inMailbox: mailboxId,
             },
-          ],
-          limit,
-        },
-        "q1",
-      ],
-      [
-        "Email/get",
-        {
-          accountId,
-          "#ids": {
-            resultOf: "q1",
-            name: "Email/query",
-            path: "/ids",
+            sort: [
+              {
+                property: "receivedAt",
+                isAscending: false,
+              },
+            ],
+            limit,
+            position,
           },
-           properties: [
-             "id",
-             "threadId",
-             "mailboxIds",
-             "from",
-             "to",
-             "cc",
-             "bcc",
-            "subject",
-            "receivedAt",
-            "keywords",
-            "bodyStructure",
-            "bodyValues",
-            "textBody",
-            "htmlBody",
-            "attachments",
-          ],
-          fetchTextBodyValues: true,
-          fetchHTMLBodyValues: true,
-          fetchAllBodyValues: true,
-        },
-        "g1",
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": {
+              resultOf: "q1",
+              name: "Email/query",
+              path: "/ids",
+            },
+            properties: [
+              "id",
+              "threadId",
+              "mailboxIds",
+              "from",
+              "to",
+              "cc",
+              "bcc",
+              "subject",
+              "receivedAt",
+              "keywords",
+              "bodyStructure",
+              "bodyValues",
+              "textBody",
+              "htmlBody",
+              "attachments",
+            ],
+            fetchTextBodyValues: true,
+            fetchHTMLBodyValues: true,
+            fetchAllBodyValues: true,
+          },
+          "g1",
+        ],
       ],
-    ]);
+    );
+    const queryResult = this.getMethodResult<{
+      ids?: string[];
+      total?: number;
+    }>(envelope, "Email/query");
     const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
       envelope,
       "Email/get",
     );
 
-    return result.list ?? [];
+    return { messages: result.list ?? [], total: queryResult.total ?? 0 };
   }
 
   async sendMessage(
@@ -325,13 +360,28 @@ export class StalwartJmapClient {
   ): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
     if (trashMailboxId) {
-      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-        ["Email/set", { accountId, update: { [messageId]: { mailboxIds: { [trashMailboxId]: true } } } }, "c1"],
-      ]);
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [
+          [
+            "Email/set",
+            {
+              accountId,
+              update: {
+                [messageId]: { mailboxIds: { [trashMailboxId]: true } },
+              },
+            },
+            "c1",
+          ],
+        ],
+      );
     } else {
-      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-        ["Email/set", { accountId, destroy: [messageId] }, "c1"],
-      ]);
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [["Email/set", { accountId, destroy: [messageId] }, "c1"]],
+      );
     }
   }
 
@@ -341,18 +391,42 @@ export class StalwartJmapClient {
   ): Promise<void> {
     if (updates.length === 0) return;
     const accountId = this.requirePrimaryAccountId(session);
-    const update = Object.fromEntries(updates.map(({ id, sortOrder }) => [id, { sortOrder }]));
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Mailbox/set", { accountId, update }, "c1"],
-    ]);
+    const update = Object.fromEntries(
+      updates.map(({ id, sortOrder }) => [id, { sortOrder }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, update }, "c1"]],
+    );
   }
 
-  async createMailbox(session: JmapSession, name: string): Promise<JmapMailbox> {
+  async renameMailbox(
+    session: JmapSession,
+    mailboxId: string,
+    name: string,
+  ): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
-    const envelope = await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Mailbox/set", { accountId, create: { new: { name } } }, "c1"],
-    ]);
-    const result = this.getMethodResult<{ created?: Record<string, JmapMailbox> }>(envelope, "Mailbox/set");
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, update: { [mailboxId]: { name } } }, "c1"]],
+    );
+  }
+
+  async createMailbox(
+    session: JmapSession,
+    name: string,
+  ): Promise<JmapMailbox> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, create: { new: { name } } }, "c1"]],
+    );
+    const result = this.getMethodResult<{
+      created?: Record<string, JmapMailbox>;
+    }>(envelope, "Mailbox/set");
     const created = result.created?.new;
     if (!created) throw new Error("Mailbox was not created.");
     return { ...created, name };
@@ -360,9 +434,11 @@ export class StalwartJmapClient {
 
   async deleteMailbox(session: JmapSession, mailboxId: string): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Mailbox/set", { accountId, destroy: [mailboxId] }, "c1"],
-    ]);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Mailbox/set", { accountId, destroy: [mailboxId] }, "c1"]],
+    );
   }
 
   async moveToMailbox(
@@ -371,23 +447,105 @@ export class StalwartJmapClient {
     targetMailboxId: string,
   ): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Email/set", { accountId, update: { [messageId]: { mailboxIds: { [targetMailboxId]: true } } } }, "c1"],
-    ]);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          {
+            accountId,
+            update: {
+              [messageId]: { mailboxIds: { [targetMailboxId]: true } },
+            },
+          },
+          "c1",
+        ],
+      ],
+    );
   }
 
   async markAsRead(session: JmapSession, messageId: string): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Email/set", { accountId, update: { [messageId]: { "keywords/$seen": true } } }, "c1"],
-    ]);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          { accountId, update: { [messageId]: { "keywords/$seen": true } } },
+          "c1",
+        ],
+      ],
+    );
   }
 
   async markAsUnread(session: JmapSession, messageId: string): Promise<void> {
     const accountId = this.requirePrimaryAccountId(session);
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Email/set", { accountId, update: { [messageId]: { "keywords/$seen": null } } }, "c1"],
-    ]);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          { accountId, update: { [messageId]: { "keywords/$seen": null } } },
+          "c1",
+        ],
+      ],
+    );
+  }
+
+  async toggleFlagged(
+    session: JmapSession,
+    messageId: string,
+    flagged: boolean,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          {
+            accountId,
+            update: {
+              [messageId]: {
+                "keywords/$flagged": flagged ? true : null,
+              },
+            },
+          },
+          "c1",
+        ],
+      ],
+    );
+  }
+
+  async setMessageLabel(
+    session: JmapSession,
+    messageId: string,
+    labelId: string,
+    assigned: boolean,
+  ): Promise<void> {
+    const accountId = this.requirePrimaryAccountId(session);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/set",
+          {
+            accountId,
+            update: {
+              [messageId]: {
+                [`keywords/label:${labelId}`]: assigned ? true : null,
+              },
+            },
+          },
+          "c1",
+        ],
+      ],
+    );
   }
 
   async bulkMoveToTrash(
@@ -399,15 +557,22 @@ export class StalwartJmapClient {
     const accountId = this.requirePrimaryAccountId(session);
     if (trashMailboxId) {
       const update = Object.fromEntries(
-        messageIds.map((id) => [id, { mailboxIds: { [trashMailboxId]: true } }]),
+        messageIds.map((id) => [
+          id,
+          { mailboxIds: { [trashMailboxId]: true } },
+        ]),
       );
-      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-        ["Email/set", { accountId, update }, "c1"],
-      ]);
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [["Email/set", { accountId, update }, "c1"]],
+      );
     } else {
-      await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-        ["Email/set", { accountId, destroy: messageIds }, "c1"],
-      ]);
+      await this.call(
+        session,
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+        [["Email/set", { accountId, destroy: messageIds }, "c1"]],
+      );
     }
   }
 
@@ -421,27 +586,43 @@ export class StalwartJmapClient {
     const update = Object.fromEntries(
       messageIds.map((id) => [id, { mailboxIds: { [targetMailboxId]: true } }]),
     );
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Email/set", { accountId, update }, "c1"],
-    ]);
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, update }, "c1"]],
+    );
   }
 
-  async bulkMarkAsRead(session: JmapSession, messageIds: string[]): Promise<void> {
+  async bulkMarkAsRead(
+    session: JmapSession,
+    messageIds: string[],
+  ): Promise<void> {
     if (messageIds.length === 0) return;
     const accountId = this.requirePrimaryAccountId(session);
-    const update = Object.fromEntries(messageIds.map((id) => [id, { "keywords/$seen": true }]));
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Email/set", { accountId, update }, "c1"],
-    ]);
+    const update = Object.fromEntries(
+      messageIds.map((id) => [id, { "keywords/$seen": true }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, update }, "c1"]],
+    );
   }
 
-  async bulkMarkAsUnread(session: JmapSession, messageIds: string[]): Promise<void> {
+  async bulkMarkAsUnread(
+    session: JmapSession,
+    messageIds: string[],
+  ): Promise<void> {
     if (messageIds.length === 0) return;
     const accountId = this.requirePrimaryAccountId(session);
-    const update = Object.fromEntries(messageIds.map((id) => [id, { "keywords/$seen": null }]));
-    await this.call(session, ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"], [
-      ["Email/set", { accountId, update }, "c1"],
-    ]);
+    const update = Object.fromEntries(
+      messageIds.map((id) => [id, { "keywords/$seen": null }]),
+    );
+    await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [["Email/set", { accountId, update }, "c1"]],
+    );
   }
 
   async getBlobAsText(session: JmapSession, blobId: string): Promise<string> {

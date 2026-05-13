@@ -1,6 +1,5 @@
 import React from "react";
 import { Key, ChevronRight, ArrowLeft, Shield } from "lucide-react";
-import type { PaletteView } from "./constants";
 import type { UserSettings } from "@/lib/types/calendar";
 import { SettingToggleRow } from "./setting-toggle-row";
 
@@ -8,7 +7,7 @@ interface SecuritySettingsProps {
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
   goBack: () => void;
-  goForward: (view: PaletteView) => void;
+  goForward: (view: string) => void;
 }
 
 export function SecuritySettings({
@@ -49,7 +48,9 @@ export function SecuritySettings({
             }
           />
           <div className="px-3 pb-2 pt-1 text-xs text-muted-foreground leading-relaxed">
-            Full mode keeps event title, description, and location off the server. Reminder emails stay available but only include timing details.
+            Full mode keeps event title, description, and location off the
+            server. Reminder emails stay available but only include timing
+            details.
           </div>
         </div>
 

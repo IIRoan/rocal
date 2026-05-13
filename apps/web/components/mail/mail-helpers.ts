@@ -1,8 +1,6 @@
 import type { MailAddress } from "@/lib/mail/types";
 
-export function formatAddress(
-  addresses: MailAddress[] | undefined,
-): string {
+export function formatAddress(addresses: MailAddress[] | undefined): string {
   const first = addresses?.[0];
   if (!first) return "Unknown";
   return first.name?.trim() || first.email;
@@ -22,12 +20,21 @@ export function formatAddressFull(
   return formatted.join(", ");
 }
 
-export function formatMessageDate(receivedAt: string | undefined): string {
+export function formatMessageDate(
+  receivedAt: string | undefined,
+  timeFormat?: "12h" | "24h",
+  timezone?: string,
+): string {
   if (!receivedAt) return "";
   const date = new Date(receivedAt);
   const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const hour12 =
+    timeFormat === "12h" ? true : timeFormat === "24h" ? false : undefined;
+  const timeZone = timezone ?? undefined;
+  const dateStr = date.toLocaleDateString(undefined, { timeZone });
+  const todayStr = now.toLocaleDateString(undefined, { timeZone });
+  if (dateStr === todayStr) {
+    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12, timeZone });
   }
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone });
 }

@@ -1,0 +1,127 @@
+import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { StalwartJmapClient } from "../../lib/mail/jmap-client";
+import type { JmapSession } from "../../lib/mail/types";
+
+const mockSession: JmapSession = {
+  apiUrl: "https://mail.example.com/jmap/",
+  downloadUrl: undefined,
+  uploadUrl: undefined,
+  eventSourceUrl: undefined,
+  accounts: { acc1: {} as never },
+  primaryAccounts: { "urn:ietf:params:jmap:mail": "acc1" },
+};
+
+function makeMessage(id: string) {
+  return {
+    id,
+    receivedAt: new Date().toISOString(),
+    keywords: {},
+    mailboxIds: {},
+  };
+}
+
+function makeOkResponse(ids: string[], total: number, messages: object[]) {
+  return {
+    ok: true,
+    json: async () => ({
+      methodResponses: [
+        ["Email/query", { ids, total }, "q1"],
+        ["Email/get", { list: messages }, "g1"],
+      ],
+    }),
+  } as unknown as Response;
+}
+
+describe("StalwartJmapClient.getMailboxMessages pagination", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchMock: jest.MockedFunction<any>;
+  let client: StalwartJmapClient;
+
+  beforeEach(() => {
+    fetchMock = jest.fn();
+    client = new StalwartJmapClient({
+      baseUrl: "https://mail.example.com",
+      email: "test@example.com",
+      password: "secret",
+      fetcher: fetchMock as never,
+    });
+  });
+
+  it("defaults to limit=20 and position=0", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse(["m1"], 5, [makeMessage("m1")]));
+
+    await client.getMailboxMessages(mockSession, "mailbox1");
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    const queryParams = body.methodCalls[0][1];
+    expect(queryParams.limit).toBe(20);
+    expect(queryParams.position).toBe(0);
+  });
+
+  it("sends custom limit and position options", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse([], 50, []));
+
+    await client.getMailboxMessages(mockSession, "mailbox1", {
+      limit: 10,
+      position: 40,
+    });
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    const queryParams = body.methodCalls[0][1];
+    expect(queryParams.limit).toBe(10);
+    expect(queryParams.position).toBe(40);
+  });
+
+  it("returns messages array from JMAP Email/get response", async () => {
+    const msg = makeMessage("m1");
+    fetchMock.mockResolvedValue(makeOkResponse(["m1"], 1, [msg]));
+
+    const result = await client.getMailboxMessages(mockSession, "mailbox1");
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]!.id).toBe("m1");
+  });
+
+  it("returns total count from JMAP Email/query response", async () => {
+    fetchMock.mockResolvedValue(
+      makeOkResponse(["m1", "m2"], 99, [makeMessage("m1"), makeMessage("m2")]),
+    );
+
+    const result = await client.getMailboxMessages(mockSession, "mailbox1");
+    expect(result.total).toBe(99);
+  });
+
+  it("returns total=0 and empty messages when mailbox is empty", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse([], 0, []));
+
+    const result = await client.getMailboxMessages(mockSession, "mailbox1");
+    expect(result.messages).toHaveLength(0);
+    expect(result.total).toBe(0);
+  });
+
+  it("sorts Email/query before Email/get in the method calls", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse([], 0, []));
+
+    await client.getMailboxMessages(mockSession, "mailbox1");
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    expect(body.methodCalls[0][0]).toBe("Email/query");
+    expect(body.methodCalls[1][0]).toBe("Email/get");
+  });
+
+  it("filters by the provided mailboxId", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse([], 0, []));
+
+    await client.getMailboxMessages(mockSession, "specific-mailbox-id");
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1]!.body as string,
+    );
+    expect(body.methodCalls[0][1].filter.inMailbox).toBe("specific-mailbox-id");
+  });
+});

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
-import {
+import { useState } from "react";import {
   DndContext,
   closestCenter,
   PointerSensor,
@@ -28,11 +27,14 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
-  X,
   GripVertical,
   ChevronDown,
+  ChevronRight,
   CalendarDays,
   Check,
+  Settings2,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -48,14 +50,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@workspace/ui/components/ui/sidebar";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@workspace/ui/components/ui/dialog";
-import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
 import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,15 +115,16 @@ function SortableMailboxItem({
   isSelected,
   isBusy,
   onSelect,
-  onDeleteClick,
+  isHideable,
+  onHideClick,
 }: {
   mailbox: JmapMailbox;
   isSelected: boolean;
   isBusy: boolean;
   onSelect: () => void;
-  onDeleteClick: () => void;
+  isHideable: boolean;
+  onHideClick: () => void;
 }) {
-  const isDeletable = !PROTECTED_ROLES.has(mailbox.role?.toLowerCase() ?? "");
   const Icon = getMailboxIcon(mailbox.role);
 
   const {
@@ -152,7 +148,6 @@ function SortableMailboxItem({
       style={style}
       className="group/item relative"
     >
-      {/* Drag handle — sits outside the button so no nesting */}
       <button
         type="button"
         className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center opacity-0 group-hover/item:opacity-100 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground/70 transition-all z-10"
@@ -165,7 +160,7 @@ function SortableMailboxItem({
 
       <SidebarMenuButton
         className={`rounded-lg h-8 text-[13px] font-medium transition-colors pl-5 ${
-          isDeletable ? "pr-7" : ""
+          isHideable ? "pr-7" : ""
         } ${
           isSelected
             ? "text-foreground bg-muted/70"
@@ -177,15 +172,15 @@ function SortableMailboxItem({
         <span className="truncate">{mailbox.name}</span>
       </SidebarMenuButton>
 
-      {isDeletable && (
+      {isHideable && (
         <button
           type="button"
-          onClick={onDeleteClick}
+          onClick={onHideClick}
           disabled={isBusy}
-          aria-label={`Delete ${mailbox.name}`}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all disabled:opacity-30"
+          aria-label={`Hide ${mailbox.name}`}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all disabled:opacity-30"
         >
-          <X size={11} strokeWidth={2.5} />
+          <EyeOff size={11} strokeWidth={2.5} />
         </button>
       )}
     </SidebarMenuItem>
@@ -198,9 +193,8 @@ export interface MailSidebarProps {
   onSelectMailbox: (mailboxId: string) => void;
   onCompose: () => void;
   onOpenPalette: () => void;
+  onOpenMailboxes: () => void;
   onSignOut: () => void;
-  onCreateMailbox: (name: string) => void;
-  onDeleteMailbox: (mailboxId: string) => void;
   onReorderMailboxes: (reordered: JmapMailbox[]) => void;
   isBusy: boolean;
 }
@@ -211,19 +205,23 @@ export function MailSidebar({
   onSelectMailbox,
   onCompose,
   onOpenPalette,
+  onOpenMailboxes,
   onSignOut,
-  onCreateMailbox,
-  onDeleteMailbox,
   onReorderMailboxes,
   isBusy,
 }: MailSidebarProps) {
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const [isCreating, setIsCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [hiddenMailboxIds, setHiddenMailboxIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem("mail:hiddenMailboxIds");
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [hiddenExpanded, setHiddenExpanded] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -241,33 +239,19 @@ export function MailSidebar({
       })
     : [];
 
-  function commitCreate() {
-    const trimmed = newName.trim();
-    if (trimmed) onCreateMailbox(trimmed);
-    setNewName("");
-    setIsCreating(false);
-  }
+  const visibleItems = sorted.filter((m) => !hiddenMailboxIds.has(m.id));
+  const hiddenItems = sorted.filter((m) => hiddenMailboxIds.has(m.id));
 
-  function startCreate() {
-    setIsCreating(true);
-    setNewName("");
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }
-
-  function openDeleteDialog(id: string, name: string) {
-    setDeleteTarget({ id, name });
-    setDeleteConfirm("");
-  }
-
-  function closeDeleteDialog() {
-    setDeleteTarget(null);
-    setDeleteConfirm("");
-  }
-
-  function confirmDelete() {
-    if (!deleteTarget || deleteConfirm !== deleteTarget.name) return;
-    onDeleteMailbox(deleteTarget.id);
-    closeDeleteDialog();
+  function toggleHide(id: string) {
+    setHiddenMailboxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem("mail:hiddenMailboxIds", JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -280,8 +264,7 @@ export function MailSidebar({
   }
 
   return (
-    <>
-      <Sidebar variant="inset" collapsible="icon">
+    <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader className={isCollapsed ? "items-center pt-4 px-2 pb-3" : "pt-4 px-4 pb-3"}>
           {isCollapsed ? (
             <>
@@ -370,6 +353,7 @@ export function MailSidebar({
               {isCollapsed ? (
                 <SidebarGroupContent className="flex flex-col items-center gap-1">
                   {sorted.map((mailbox) => {
+                    if (hiddenMailboxIds.has(mailbox.id)) return null;
                     const Icon = getMailboxIcon(mailbox.role);
                     const isSelected = activeMailbox.selectedMailboxId === mailbox.id;
                     return (
@@ -395,15 +379,15 @@ export function MailSidebar({
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={startCreate}
-                          disabled={isBusy || isCreating}
-                          aria-label="New mailbox"
+                          onClick={onOpenMailboxes}
+                          disabled={isBusy}
+                          aria-label="Mailbox settings"
                           className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40"
                         >
-                          <Plus size={13} strokeWidth={2.25} />
+                          <Settings2 size={13} strokeWidth={2.25} />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="right">New mailbox</TooltipContent>
+                      <TooltipContent side="right">Mailbox settings</TooltipContent>
                     </Tooltip>
                   </div>
                   <SidebarGroupContent>
@@ -414,43 +398,75 @@ export function MailSidebar({
                       onDragEnd={handleDragEnd}
                     >
                       <SortableContext
-                        items={sorted.map((m) => m.id)}
+                        items={visibleItems.map((m) => m.id)}
                         strategy={verticalListSortingStrategy}
                       >
                         <SidebarMenu className="gap-0.5">
-                          {sorted.map((mailbox) => (
-                            <SortableMailboxItem
-                              key={mailbox.id}
-                              mailbox={mailbox}
-                              isSelected={activeMailbox.selectedMailboxId === mailbox.id}
-                              isBusy={isBusy}
-                              onSelect={() => onSelectMailbox(mailbox.id)}
-                              onDeleteClick={() => openDeleteDialog(mailbox.id, mailbox.name)}
-                            />
-                          ))}
-                          {isCreating && (
-                            <SidebarMenuItem>
-                              <div className="flex items-center gap-2 h-8 px-2 rounded-lg bg-muted/40">
-                                <Mail size={15} strokeWidth={2} className="text-muted-foreground/40 shrink-0" />
-                                <input
-                                  ref={inputRef}
-                                  type="text"
-                                  value={newName}
-                                  onChange={(e) => setNewName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") commitCreate();
-                                    if (e.key === "Escape") { setIsCreating(false); setNewName(""); }
-                                  }}
-                                  onBlur={commitCreate}
-                                  placeholder="Mailbox name"
-                                  className="flex-1 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-[13px] text-foreground placeholder:text-muted-foreground/40"
-                                />
-                              </div>
-                            </SidebarMenuItem>
-                          )}
+                          {visibleItems.map((mailbox) => {
+                            const isInbox = mailbox.role?.toLowerCase() === "inbox";
+                            return (
+                              <SortableMailboxItem
+                                key={mailbox.id}
+                                mailbox={mailbox}
+                                isSelected={activeMailbox.selectedMailboxId === mailbox.id}
+                                isBusy={isBusy}
+                                onSelect={() => onSelectMailbox(mailbox.id)}
+                                isHideable={!isInbox}
+                                onHideClick={() => toggleHide(mailbox.id)}
+                              />
+                            );
+                          })}
                         </SidebarMenu>
                       </SortableContext>
                     </DndContext>
+
+                    {hiddenItems.length > 0 && (
+                      <div className="mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setHiddenExpanded((v) => !v)}
+                          className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-[11px] text-muted-foreground/50 hover:text-muted-foreground/80 hover:bg-muted/30 transition-colors"
+                        >
+                          <ChevronRight
+                            size={11}
+                            strokeWidth={2.5}
+                            className={`transition-transform ${hiddenExpanded ? "rotate-90" : ""}`}
+                          />
+                          <span>{hiddenItems.length} hidden</span>
+                        </button>
+                        {hiddenExpanded && (
+                          <SidebarMenu className="gap-0.5 mt-0.5">
+                            {hiddenItems.map((mailbox) => {
+                              const Icon = getMailboxIcon(mailbox.role);
+                              const isSelected = activeMailbox.selectedMailboxId === mailbox.id;
+                              return (
+                                <SidebarMenuItem key={mailbox.id} className="group/hidden relative">
+                                  <SidebarMenuButton
+                                    className={`rounded-lg h-8 text-[13px] font-medium transition-colors pl-5 pr-7 opacity-50 ${
+                                      isSelected
+                                        ? "text-foreground bg-muted/70"
+                                        : "text-muted-foreground/60 hover:bg-muted/40 hover:text-muted-foreground/90"
+                                    }`}
+                                    onClick={() => onSelectMailbox(mailbox.id)}
+                                  >
+                                    <Icon size={15} strokeWidth={isSelected ? 2.5 : 2} />
+                                    <span className="truncate">{mailbox.name}</span>
+                                  </SidebarMenuButton>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleHide(mailbox.id)}
+                                    aria-label={`Show ${mailbox.name}`}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/hidden:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all"
+                                  >
+                                    <Eye size={11} strokeWidth={2.5} />
+                                  </button>
+                                </SidebarMenuItem>
+                              );
+                            })}
+                          </SidebarMenu>
+                        )}
+                      </div>
+                    )}
                   </SidebarGroupContent>
                 </>
               )}
@@ -464,60 +480,5 @@ export function MailSidebar({
 
         <SidebarRail />
       </Sidebar>
-
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && closeDeleteDialog()}>
-        <DialogContent
-          variant="spotlight"
-          showClose={false}
-          aria-describedby={undefined}
-          className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
-        >
-          <VisuallyHidden><DialogTitle>Delete mailbox</DialogTitle></VisuallyHidden>
-
-          <div className="flex flex-col" style={{ width: "clamp(340px, 40vw, 460px)" }}>
-            {/* Header */}
-            <div className="flex items-center gap-2 px-4 h-12 border-b border-border/50 shrink-0">
-              <span className="text-sm font-medium flex-1 text-destructive">
-                Delete &ldquo;{deleteTarget?.name}&rdquo;
-              </span>
-            </div>
-
-            {/* Body */}
-            <div className="px-4 py-4 space-y-3">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                This permanently deletes the mailbox and all messages inside it. To confirm, type{" "}
-                <span className="font-mono font-medium text-foreground">{deleteTarget?.name}</span> below.
-              </p>
-              <Input
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") confirmDelete();
-                  if (e.key === "Escape") closeDeleteDialog();
-                }}
-                placeholder={deleteTarget?.name ?? ""}
-                autoFocus
-                className="h-9 text-sm"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border/50 shrink-0">
-              <Button variant="ghost" size="sm" onClick={closeDeleteDialog}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={deleteConfirm !== deleteTarget?.name || isBusy}
-                onClick={confirmDelete}
-              >
-                {isBusy ? "Deleting…" : "Delete mailbox"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
