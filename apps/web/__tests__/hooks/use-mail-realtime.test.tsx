@@ -147,7 +147,7 @@ describe("useMailRealtime", () => {
   });
 
   it("debounces mail.changed events and refetches sync data", async () => {
-    const onSync = jest.fn();
+    const onSync = jest.fn<(result: unknown) => void>();
 
     await act(async () => {
       root.render(<HookHarness accountId="acct-1" onSync={onSync} />);
@@ -161,18 +161,24 @@ describe("useMailRealtime", () => {
     const source = MockEventSource.instances[0];
 
     act(() => {
-      source.emit("mail.changed", JSON.stringify({
-        type: "mail.changed",
-        accountId: "acct-1",
-        changedTypes: ["Email"],
-        receivedAt: "2026-05-13T09:00:00.000Z",
-      }));
-      source.emit("mail.changed", JSON.stringify({
-        type: "mail.changed",
-        accountId: "acct-1",
-        changedTypes: ["Mailbox"],
-        receivedAt: "2026-05-13T09:00:01.000Z",
-      }));
+      source.emit(
+        "mail.changed",
+        JSON.stringify({
+          type: "mail.changed",
+          accountId: "acct-1",
+          changedTypes: ["Email"],
+          receivedAt: "2026-05-13T09:00:00.000Z",
+        }),
+      );
+      source.emit(
+        "mail.changed",
+        JSON.stringify({
+          type: "mail.changed",
+          accountId: "acct-1",
+          changedTypes: ["Mailbox"],
+          receivedAt: "2026-05-13T09:00:01.000Z",
+        }),
+      );
       jest.advanceTimersByTime(749);
     });
 
@@ -188,7 +194,7 @@ describe("useMailRealtime", () => {
   });
 
   it("ignores mail.changed events for a different accountId", async () => {
-    const onSync = jest.fn();
+    const onSync = jest.fn<(result: unknown) => void>();
 
     await act(async () => {
       root.render(<HookHarness accountId="acct-1" onSync={onSync} />);
@@ -202,12 +208,15 @@ describe("useMailRealtime", () => {
     const source = MockEventSource.instances[0];
 
     await act(async () => {
-      source.emit("mail.changed", JSON.stringify({
-        type: "mail.changed",
-        accountId: "acct-OTHER",
-        changedTypes: ["Email"],
-        receivedAt: "2026-05-13T09:00:00.000Z",
-      }));
+      source.emit(
+        "mail.changed",
+        JSON.stringify({
+          type: "mail.changed",
+          accountId: "acct-OTHER",
+          changedTypes: ["Email"],
+          receivedAt: "2026-05-13T09:00:00.000Z",
+        }),
+      );
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
     });

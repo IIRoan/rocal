@@ -2,6 +2,7 @@ import type {
   JmapBodyStructure,
   JmapBodyValue,
   JmapEmailMessage,
+  MailSignatureVerificationState,
   MessageEncryptionState,
 } from "./types";
 
@@ -18,7 +19,10 @@ function getBodyValue(
 }
 
 function stripHtmlTags(value: string): string {
-  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function extractMessageBodies(message: JmapEmailMessage): {
@@ -77,17 +81,19 @@ export function classifyMessageEncryption(
 
   // Only flag as encrypted if attachment has an explicit PGP MIME type
   // — never match on application/octet-stream which is any binary file
-  const hasEncryptedAttachment = (message.attachments ?? []).some((attachment) => {
-    const type = attachment.type?.toLowerCase() ?? "";
-    const name = attachment.name?.toLowerCase() ?? "";
-    return (
-      type === "application/pgp-encrypted" ||
-      type === "application/pgp-keys" ||
-      (name.endsWith(".asc") && name !== "smime.p7s") ||
-      name.endsWith(".pgp") ||
-      name.endsWith(".gpg")
-    );
-  });
+  const hasEncryptedAttachment = (message.attachments ?? []).some(
+    (attachment) => {
+      const type = attachment.type?.toLowerCase() ?? "";
+      const name = attachment.name?.toLowerCase() ?? "";
+      return (
+        type === "application/pgp-encrypted" ||
+        type === "application/pgp-keys" ||
+        (name.endsWith(".asc") && name !== "smime.p7s") ||
+        name.endsWith(".pgp") ||
+        name.endsWith(".gpg")
+      );
+    },
+  );
 
   if (hasEncryptedAttachment) {
     return "unknown_encrypted";
@@ -127,6 +133,45 @@ export function resolveSecurityLabels(input: {
   }
 
   return labels;
+}
+
+export function resolveMessageSecurityLabel(input: {
+  messageState: MessageEncryptionState;
+  accountEncryptedAtRest: boolean;
+  signatureVerificationState: MailSignatureVerificationState;
+  decryptionFailed: boolean;
+}): string {
+  if (input.decryptionFailed) {
+    return "Decryption failed";
+  }
+
+  if (input.accountEncryptedAtRest) {
+    return "Stored encrypted at rest";
+  }
+
+  if (
+    input.messageState === "inline_pgp" ||
+    input.messageState === "pgp_mime" ||
+    input.messageState === "internal_e2ee"
+  ) {
+    if (input.signatureVerificationState === "failed") {
+      return "PGP encrypted, signature check failed";
+    }
+
+    if (input.signatureVerificationState === "unverified") {
+      return "PGP encrypted, signature not verified";
+    }
+
+    return input.signatureVerificationState === "verified"
+      ? "PGP encrypted & verified"
+      : "PGP encrypted";
+  }
+
+  if (input.messageState === "unknown_encrypted") {
+    return "Possibly encrypted";
+  }
+
+  return "Not encrypted";
 }
 
 export function extractPgpMimeCiphertextBlobId(

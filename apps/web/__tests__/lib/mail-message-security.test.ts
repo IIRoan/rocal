@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   classifyMessageEncryption,
+  resolveMessageSecurityLabel,
   resolveSecurityLabels,
 } from "../../lib/mail/message-security";
 
@@ -11,8 +12,7 @@ describe("mail message security helpers", () => {
       classifyMessageEncryption({
         bodyValues: {
           text: {
-            value:
-              "hello\n-----BEGIN PGP MESSAGE-----\nVersion: OpenPGP\n...",
+            value: "hello\n-----BEGIN PGP MESSAGE-----\nVersion: OpenPGP\n...",
           },
         },
         textBody: [{ partId: "text" }],
@@ -64,5 +64,25 @@ describe("mail message security helpers", () => {
         decryptionFailed: true,
       }),
     ).toEqual(["E2EE encrypted", "Decryption failed"]);
+  });
+
+  it("distinguishes unverifiable and failed PGP signatures", () => {
+    expect(
+      resolveMessageSecurityLabel({
+        messageState: "inline_pgp",
+        accountEncryptedAtRest: false,
+        signatureVerificationState: "unverified",
+        decryptionFailed: false,
+      }),
+    ).toBe("PGP encrypted, signature not verified");
+
+    expect(
+      resolveMessageSecurityLabel({
+        messageState: "inline_pgp",
+        accountEncryptedAtRest: false,
+        signatureVerificationState: "failed",
+        decryptionFailed: false,
+      }),
+    ).toBe("PGP encrypted, signature check failed");
   });
 });

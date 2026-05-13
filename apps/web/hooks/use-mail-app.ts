@@ -23,7 +23,10 @@ import {
   extractMessageBodies,
   extractPgpMimeCiphertextBlobId,
 } from "@/lib/mail/message-security";
-import { unlockEncryptedMailVault, createEncryptedMailVault } from "@/lib/mail/vault-crypto";
+import {
+  unlockEncryptedMailVault,
+  createEncryptedMailVault,
+} from "@/lib/mail/vault-crypto";
 import {
   getStoredMailVault,
   putStoredMailVault,
@@ -36,7 +39,9 @@ import type {
   JmapSession,
   LabelDef,
   MailAccountStatus,
+  MailDecryptResult,
   MailDemoConfig,
+  MailSignatureVerificationState,
   MailSyncResponse,
   UserKeyVault,
 } from "@/lib/mail/types";
@@ -65,6 +70,21 @@ export type ActiveMailboxState = {
   email: string;
   selectedMailboxId: string | null;
 };
+
+function resolveSignatureVerificationState(
+  decrypted: Partial<
+    Pick<
+      MailDecryptResult,
+      "hasVerifiedSignature" | "signatureVerificationState"
+    >
+  >,
+): MailSignatureVerificationState {
+  if (decrypted.signatureVerificationState) {
+    return decrypted.signatureVerificationState;
+  }
+
+  return decrypted.hasVerifiedSignature ? "verified" : "not_signed";
+}
 
 function getPrimaryMailboxId(
   mailboxes: JmapMailbox[],
@@ -165,7 +185,10 @@ export function useMailApp() {
   const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
     string | null
   >(null);
-  const [selectedMessageVerified, setSelectedMessageVerified] = useState(false);
+  const [
+    selectedMessageSignatureVerificationState,
+    setSelectedMessageSignatureVerificationState,
+  ] = useState<MailSignatureVerificationState>("not_signed");
   const [selectedMessageDecryptError, setSelectedMessageDecryptError] =
     useState<string | null>(null);
   const [selectedMessageDecryptedHtml, setSelectedMessageDecryptedHtml] =
@@ -316,7 +339,7 @@ export function useMailApp() {
     if (!selectedMessage || !activeMailbox) {
       setSelectedMessagePlaintext(null);
       setSelectedMessageDecryptedHtml(null);
-      setSelectedMessageVerified(false);
+      setSelectedMessageSignatureVerificationState("not_signed");
       setSelectedMessageDecryptError(null);
       return;
     }
@@ -324,7 +347,7 @@ export function useMailApp() {
     if (encState !== "inline_pgp" && encState !== "pgp_mime") {
       setSelectedMessagePlaintext(null);
       setSelectedMessageDecryptedHtml(null);
-      setSelectedMessageVerified(false);
+      setSelectedMessageSignatureVerificationState("not_signed");
       setSelectedMessageDecryptError(null);
       return;
     }
@@ -386,14 +409,16 @@ export function useMailApp() {
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessagePlaintext(decrypted.plaintext);
         }
-        setSelectedMessageVerified(decrypted.hasVerifiedSignature);
+        setSelectedMessageSignatureVerificationState(
+          resolveSignatureVerificationState(decrypted),
+        );
         setSelectedMessageDecryptError(null);
       } catch (error) {
         if (cancelled) return;
         log.warn("Failed to decrypt message", error);
         setSelectedMessagePlaintext(null);
         setSelectedMessageDecryptedHtml(null);
-        setSelectedMessageVerified(false);
+        setSelectedMessageSignatureVerificationState("not_signed");
         setSelectedMessageDecryptError(
           "Could not decrypt this message on this device.",
         );
@@ -1224,7 +1249,7 @@ export function useMailApp() {
     setSelectedMessageId(null);
     setSelectedMessagePlaintext(null);
     setSelectedMessageDecryptedHtml(null);
-    setSelectedMessageVerified(false);
+    setSelectedMessageSignatureVerificationState("not_signed");
     setSelectedMessageDecryptError(null);
   }, []);
 
@@ -1308,7 +1333,10 @@ export function useMailApp() {
         ...activeMailbox.unlockedVault,
         labels: updatedLabels,
       };
-      const encrypted = await createEncryptedMailVault(updatedVault, loginPassword);
+      const encrypted = await createEncryptedMailVault(
+        updatedVault,
+        loginPassword,
+      );
       setActiveMailbox((cur) =>
         cur ? { ...cur, unlockedVault: updatedVault } : cur,
       );
@@ -1329,7 +1357,10 @@ export function useMailApp() {
     async (name: string, color: string): Promise<LabelDef | null> => {
       if (!activeMailbox) return null;
       const newLabel: LabelDef = { id: crypto.randomUUID(), name, color };
-      const updatedLabels = [...(activeMailbox.unlockedVault.labels ?? []), newLabel];
+      const updatedLabels = [
+        ...(activeMailbox.unlockedVault.labels ?? []),
+        newLabel,
+      ];
       try {
         await saveLabelsToVault(updatedLabels);
         return newLabel;
@@ -1389,7 +1420,7 @@ export function useMailApp() {
     setSelectedMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,
-    selectedMessageVerified,
+    selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
     composeTo,
     setComposeTo,

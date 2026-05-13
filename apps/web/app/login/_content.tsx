@@ -48,12 +48,13 @@ function AnimatedCollapse({
   const tweenRef = useRef<gsap.core.Tween | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  useEffect(() => {
-    if (isOpen) setShouldRender(true);
-  }, [isOpen]);
-
   useGSAP(
     () => {
+      if (isOpen && !shouldRender) {
+        setShouldRender(true);
+        return;
+      }
+
       const el = containerRef.current;
       if (!el) return;
       tweenRef.current?.kill();
@@ -104,7 +105,7 @@ function AnimatedCollapse({
     { dependencies: [isOpen, shouldRender] },
   );
 
-  if (!shouldRender) return null;
+  if (!isOpen && !shouldRender) return null;
 
   return (
     <div
@@ -559,7 +560,10 @@ export function LoginForm() {
 
                 <AnimatedCollapse isOpen={isSignUp}>
                   <div className="space-y-2 pb-0.5">
-                    <Label htmlFor="desired-email" className="text-sm font-medium">
+                    <Label
+                      htmlFor="desired-email"
+                      className="text-sm font-medium"
+                    >
                       Solace email
                     </Label>
                     <div className="flex h-11 overflow-hidden rounded-lg border border-input bg-background">
@@ -582,7 +586,8 @@ export function LoginForm() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      This becomes your Solace account email and mailbox address.
+                      This becomes your Solace account email and mailbox
+                      address.
                     </p>
                   </div>
                 </AnimatedCollapse>
