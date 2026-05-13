@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   RotateCcw,
   Check,
@@ -47,9 +47,7 @@ interface AccountSettingsProps {
   resettingEncryptionPassword?: boolean;
   handleChangePassword: (values: ChangePasswordValues) => Promise<void>;
   handleSetPassword?: (values: PasswordOnlyValues) => Promise<void>;
-  handleResetEncryptionPassword?: (
-    values: PasswordOnlyValues,
-  ) => Promise<void>;
+  handleResetEncryptionPassword?: (values: PasswordOnlyValues) => Promise<void>;
   updatingProfile?: boolean;
   handleUpdateProfile?: (values: UpdateProfileValues) => Promise<void>;
 }
@@ -91,13 +89,13 @@ function AnimatedCollapse({
   const tweenRef = useRef<gsap.core.Tween | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Mount the element as soon as isOpen goes true
-  useEffect(() => {
-    if (isOpen) setShouldRender(true);
-  }, [isOpen]);
-
   useGSAP(
     () => {
+      if (isOpen && !shouldRender) {
+        setShouldRender(true);
+        return;
+      }
+
       const el = containerRef.current;
       if (!el) return;
 
@@ -151,7 +149,7 @@ function AnimatedCollapse({
     { dependencies: [isOpen, shouldRender] },
   );
 
-  if (!shouldRender) return null;
+  if (!isOpen && !shouldRender) return null;
 
   return (
     // Initial inline style hides the element before GSAP sets it up,
@@ -545,9 +543,9 @@ export function AccountSettings({
               {hasOAuthOnlyAccess
                 ? " Setting an email password adds email sign-in to this account."
                 : " Your email sign-in password stays separate from that encryption password."}{" "}
-              Resetting the encryption password only replaces the password wrapper
-              around your existing encryption keys; it does not change your OAuth
-              sign-in method.
+              Resetting the encryption password only replaces the password
+              wrapper around your existing encryption keys; it does not change
+              your OAuth sign-in method.
             </div>
           ) : null}
 
@@ -653,7 +651,9 @@ export function AccountSettings({
               ) : null}
               <FieldInput
                 label={
-                  isResetEncryptionForm ? "New encryption password" : "New password"
+                  isResetEncryptionForm
+                    ? "New encryption password"
+                    : "New password"
                 }
                 type="password"
                 value={newPassword}
@@ -686,12 +686,12 @@ export function AccountSettings({
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Saving…
                     </>
+                  ) : isChangePasswordForm ? (
+                    "Update Password"
+                  ) : isSetPasswordForm ? (
+                    "Set Password"
                   ) : (
-                    isChangePasswordForm
-                      ? "Update Password"
-                      : isSetPasswordForm
-                        ? "Set Password"
-                        : "Reset Encryption Password"
+                    "Reset Encryption Password"
                   )}
                 </button>
                 <button

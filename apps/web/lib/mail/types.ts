@@ -206,3 +206,15 @@ export type GenerateKeyPairResult = {
   revocationCertificate: string;
   fingerprint: string;
 };
+
+export type MailSignatureVerificationState =
+  | "not_signed"
+  | "verified"
+  | "unverified"
+  | "failed";
+
+export type MailDecryptResult = {
+  plaintext: string;
+  hasVerifiedSignature: boolean;
+  signatureVerificationState: MailSignatureVerificationState;
+};

@@ -41,7 +41,7 @@ export function MailApp() {
     setSelectedMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,
-    selectedMessageVerified,
+    selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
     composeTo,
     setComposeTo,
@@ -94,7 +94,9 @@ export function MailApp() {
 
   const { settings } = useSettings();
   const timeFormat = settings?.timeFormat ?? "24h";
-  const [paletteInitialView, setPaletteInitialView] = useState<string | undefined>();
+  const [paletteInitialView, setPaletteInitialView] = useState<
+    string | undefined
+  >();
 
   if (isSessionPending || !session?.user) {
     return (
@@ -126,7 +128,10 @@ export function MailApp() {
           onSelectMailbox={(id) => void refreshMailboxMessages(id)}
           onCompose={() => setIsComposeOpen(true)}
           onOpenPalette={() => setIsPaletteOpen(true)}
-          onOpenMailboxes={() => { setPaletteInitialView("mailboxes"); setIsPaletteOpen(true); }}
+          onOpenMailboxes={() => {
+            setPaletteInitialView("mailboxes");
+            setIsPaletteOpen(true);
+          }}
           onSignOut={() => void handleSignOut()}
           onReorderMailboxes={(reordered) =>
             void handleReorderMailboxes(reordered)
@@ -177,6 +182,7 @@ export function MailApp() {
               <div className="flex flex-1 min-h-0 overflow-hidden">
                 <div className="w-72 shrink-0 border-r border-border/40 flex flex-col min-h-0">
                   <MessageList
+                    key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
                     messages={activeMailbox.messages}
                     selectedMessageId={selectedMessageId}
                     onSelect={setSelectedMessageId}
@@ -210,7 +216,9 @@ export function MailApp() {
                     message={selectedMessage}
                     plaintext={selectedMessagePlaintext}
                     decryptedHtml={selectedMessageDecryptedHtml}
-                    verified={selectedMessageVerified}
+                    signatureVerificationState={
+                      selectedMessageSignatureVerificationState
+                    }
                     decryptError={selectedMessageDecryptError}
                     accountEncryptedAtRest={
                       activeMailbox.accountEncryptedAtRest
@@ -228,10 +236,16 @@ export function MailApp() {
                     onToggleFlagged={() => void handleToggleFlagged()}
                     onSetLabel={(labelId, assigned) =>
                       selectedMessage
-                        ? void handleSetMessageLabel(selectedMessage.id, labelId, assigned)
+                        ? void handleSetMessageLabel(
+                            selectedMessage.id,
+                            labelId,
+                            assigned,
+                          )
                         : undefined
                     }
-                    onCreateLabel={(name, color) => handleCreateLabel(name, color)}
+                    onCreateLabel={(name, color) =>
+                      handleCreateLabel(name, color)
+                    }
                     onDeleteLabel={(id) => void handleDeleteLabel(id)}
                     labels={labels}
                     timeFormat={timeFormat}
@@ -267,7 +281,10 @@ export function MailApp() {
 
       <MailCommandPalette
         open={isPaletteOpen}
-        onOpenChange={(v) => { setIsPaletteOpen(v); if (!v) setPaletteInitialView(undefined); }}
+        onOpenChange={(v) => {
+          setIsPaletteOpen(v);
+          if (!v) setPaletteInitialView(undefined);
+        }}
         initialView={paletteInitialView}
         onCompose={() => setIsComposeOpen(true)}
         blockRemoteImages={blockRemoteImages}

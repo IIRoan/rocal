@@ -94,6 +94,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
     end: Date;
   }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
+  activeApp?: "calendar" | "mail";
 }
 
 export function AppSidebar({
@@ -106,10 +107,10 @@ export function AppSidebar({
   isMobile = false,
   getCachedEventsForRange,
   prefetchRange,
+  activeApp = "calendar",
   ...props
 }: AppSidebarProps) {
-  const { calendars, isCalendarVisible } =
-    useCalendarContext();
+  const { calendars, isCalendarVisible } = useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
   );
@@ -265,7 +266,9 @@ export function AppSidebar({
                   </div>
                   {publicCalendars.map((calendar: CalendarData) => {
                     const isVisible = isCalendarVisible(calendar.id);
-                    const calColor = getColorSwatchValue(calendar.color || "blue");
+                    const calColor = getColorSwatchValue(
+                      calendar.color || "blue",
+                    );
                     return (
                       <div
                         key={calendar.id}
@@ -298,7 +301,9 @@ export function AppSidebar({
                   </div>
                   {subscribedCalendars.map((calendar: CalendarData) => {
                     const isVisible = isCalendarVisible(calendar.id);
-                    const calColor = getColorSwatchValue(calendar.color || "blue");
+                    const calColor = getColorSwatchValue(
+                      calendar.color || "blue",
+                    );
                     return (
                       <div
                         key={calendar.id}
@@ -353,6 +358,7 @@ export function AppSidebar({
         onCreateEvent,
         getCachedEventsForRange,
         prefetchRange,
+        activeApp,
         props,
       }}
     />
@@ -368,6 +374,7 @@ function AppSidebarDesktop({
   onCreateEvent,
   getCachedEventsForRange,
   prefetchRange,
+  activeApp,
   props,
 }: {
   user?: User;
@@ -381,10 +388,10 @@ function AppSidebarDesktop({
     end: Date;
   }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
+  activeApp: "calendar" | "mail";
   props: React.ComponentProps<typeof Sidebar>;
 }) {
-  const { calendars, isCalendarVisible } =
-    useCalendarContext();
+  const { calendars, isCalendarVisible } = useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
   );
@@ -434,7 +441,11 @@ function AppSidebarDesktop({
                   type="button"
                   className="inline-flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-muted/50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                 >
-                  <LogoSvg width="26" height="26" className="text-primary shrink-0" />
+                  <LogoSvg
+                    width="26"
+                    height="26"
+                    className="text-primary shrink-0"
+                  />
                   <div className="flex items-baseline gap-1.5">
                     <span
                       className="text-[15px] tracking-[-0.04em] text-foreground"
@@ -446,21 +457,45 @@ function AppSidebarDesktop({
                       calendar
                     </span>
                   </div>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground/40 shrink-0" strokeWidth={2.5} />
+                  <ChevronDown
+                    className="h-3 w-3 text-muted-foreground/40 shrink-0"
+                    strokeWidth={2.5}
+                  />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" sideOffset={6} className="w-44">
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                className="w-44"
+              >
                 <DropdownMenuItem asChild>
                   <a href="/calendar" className="flex items-center gap-2.5">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={2} />
+                    <CalendarDays
+                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      strokeWidth={2}
+                    />
                     Calendar
-                    <Check className="ml-auto h-3.5 w-3.5 text-primary shrink-0" strokeWidth={2.5} />
+                    {activeApp === "calendar" ? (
+                      <Check
+                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
+                        strokeWidth={2.5}
+                      />
+                    ) : null}
                   </a>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <a href="/mail" className="flex items-center gap-2.5">
-                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={2} />
+                    <Mail
+                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      strokeWidth={2}
+                    />
                     Mail
+                    {activeApp === "mail" ? (
+                      <Check
+                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
+                        strokeWidth={2.5}
+                      />
+                    ) : null}
                   </a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -546,13 +581,13 @@ function AppSidebarDesktop({
                     key={calendar.id}
                     className="flex justify-center list-none"
                   >
-                    <CollapsedIconButton
-                      label={calendar.name}
-                    >
+                    <CollapsedIconButton label={calendar.name}>
                       <span
                         className="size-2.5 rounded-full shrink-0 transition-opacity"
                         style={{
-                          backgroundColor: getColorSwatchValue(calendar.color || "blue"),
+                          backgroundColor: getColorSwatchValue(
+                            calendar.color || "blue",
+                          ),
                           opacity: isVisible ? 1 : 0.3,
                         }}
                       />
@@ -591,7 +626,9 @@ function AppSidebarDesktop({
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
                             style={{
-                              backgroundColor: getColorSwatchValue(calendar.color || "blue"),
+                              backgroundColor: getColorSwatchValue(
+                                calendar.color || "blue",
+                              ),
                               opacity: isVisible ? 1 : 0.3,
                             }}
                           />
@@ -620,7 +657,9 @@ function AppSidebarDesktop({
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
                             style={{
-                              backgroundColor: getColorSwatchValue(calendar.color || "blue"),
+                              backgroundColor: getColorSwatchValue(
+                                calendar.color || "blue",
+                              ),
                               opacity: isVisible ? 1 : 0.3,
                             }}
                           />
@@ -649,7 +688,9 @@ function AppSidebarDesktop({
                           <span
                             className="size-2 rounded-full shrink-0 transition-opacity"
                             style={{
-                              backgroundColor: getColorSwatchValue(calendar.color || "blue"),
+                              backgroundColor: getColorSwatchValue(
+                                calendar.color || "blue",
+                              ),
                               opacity: isVisible ? 1 : 0.3,
                             }}
                           />
@@ -686,7 +727,6 @@ function AppSidebarDesktop({
             </SidebarMenuItem>
           </SidebarMenu>
         )}
-
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

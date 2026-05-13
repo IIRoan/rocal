@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Avatar,
   AvatarFallback,
@@ -77,13 +77,11 @@ export function SenderAvatar({
         `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
       ];
 
-  const [srcIndex, setSrcIndex] = useState(0);
-
-  useEffect(() => {
-    setSrcIndex(0);
-  }, [email]);
-
-  const currentSrc = sources[srcIndex] ?? null;
+  const [failedSources, setFailedSources] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const currentSrc =
+    sources.find((source) => !failedSources.has(source)) ?? null;
   const initials = getInitials(name, email);
   const [bg, text] = paletteFor(email || name || "?");
 
@@ -93,7 +91,13 @@ export function SenderAvatar({
         <AvatarImage
           src={currentSrc}
           alt={domain}
-          onError={() => setSrcIndex((i) => i + 1)}
+          onError={() =>
+            setFailedSources((previous) => {
+              const next = new Set(previous);
+              next.add(currentSrc);
+              return next;
+            })
+          }
         />
       )}
       <AvatarFallback

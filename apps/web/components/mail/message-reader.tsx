@@ -30,6 +30,7 @@ import {
 } from "@/lib/mail/message-security";
 import type {
   JmapEmailMessage,
+  MailSignatureVerificationState,
   MessageEncryptionState,
 } from "@/lib/mail/types";
 import { formatAddressFull } from "./mail-helpers";
@@ -49,7 +50,7 @@ interface MailSecurityMeta {
 function resolveMailSecurityMeta(
   messageState: MessageEncryptionState,
   accountEncryptedAtRest: boolean,
-  verified: boolean,
+  signatureVerificationState: MailSignatureVerificationState,
   decryptionFailed: boolean,
 ): MailSecurityMeta {
   if (decryptionFailed) {
@@ -84,6 +85,31 @@ function resolveMailSecurityMeta(
     messageState === "pgp_mime" ||
     messageState === "internal_e2ee"
   ) {
+    if (signatureVerificationState === "failed") {
+      return {
+        label: "PGP encrypted, signature check failed",
+        description:
+          "End-to-end encrypted, but the sender signature could not be verified with the public key available on this device.",
+        Icon: ShieldAlert,
+        iconClassName: "text-amber-500",
+        protectedFields: ["Subject", "Message body", "Attachments"],
+        visibleFields: ["From", "To", "Date"],
+      };
+    }
+
+    if (signatureVerificationState === "unverified") {
+      return {
+        label: "PGP encrypted, signature not verified",
+        description:
+          "End-to-end encrypted. This message included a signature, but this device did not have a matching sender public key to verify it.",
+        Icon: ShieldAlert,
+        iconClassName: "text-foreground/60",
+        protectedFields: ["Subject", "Message body", "Attachments"],
+        visibleFields: ["From", "To", "Date"],
+      };
+    }
+
+    const verified = signatureVerificationState === "verified";
     return {
       label: verified ? "PGP encrypted & verified" : "PGP encrypted",
       description: verified
@@ -127,18 +153,18 @@ function resolveMailSecurityMeta(
 function MailSecurityBadge({
   messageState,
   accountEncryptedAtRest,
-  verified,
+  signatureVerificationState,
   decryptionFailed,
 }: {
   messageState: MessageEncryptionState;
   accountEncryptedAtRest: boolean;
-  verified: boolean;
+  signatureVerificationState: MailSignatureVerificationState;
   decryptionFailed: boolean;
 }) {
   const meta = resolveMailSecurityMeta(
     messageState,
     accountEncryptedAtRest,
-    verified,
+    signatureVerificationState,
     decryptionFailed,
   );
   const { Icon } = meta;
@@ -350,7 +376,7 @@ export interface MessageReaderProps {
   message: JmapEmailMessage | null;
   plaintext: string | null;
   decryptedHtml: string | null;
-  verified: boolean;
+  signatureVerificationState: MailSignatureVerificationState;
   decryptError: string | null;
   accountEncryptedAtRest: boolean;
   isBusy: boolean;
@@ -376,7 +402,7 @@ export function MessageReader({
   message,
   plaintext,
   decryptedHtml,
-  verified,
+  signatureVerificationState,
   decryptError,
   accountEncryptedAtRest,
   isBusy,
@@ -460,7 +486,7 @@ export function MessageReader({
             <MailSecurityBadge
               messageState={messageState}
               accountEncryptedAtRest={accountEncryptedAtRest}
-              verified={verified}
+              signatureVerificationState={signatureVerificationState}
               decryptionFailed={Boolean(decryptError)}
             />
           </div>
@@ -485,7 +511,12 @@ export function MessageReader({
             value={new Date(message.receivedAt).toLocaleString(undefined, {
               dateStyle: "medium",
               timeStyle: "short",
-              hour12: timeFormat === "12h" ? true : timeFormat === "24h" ? false : undefined,
+              hour12:
+                timeFormat === "12h"
+                  ? true
+                  : timeFormat === "24h"
+                    ? false
+                    : undefined,
               timeZone: timezone ?? undefined,
             } as Intl.DateTimeFormatOptions)}
           />
@@ -497,7 +528,10 @@ export function MessageReader({
             <span
               key={label.id}
               className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
-              style={{ backgroundColor: `${label.color}22`, color: label.color }}
+              style={{
+                backgroundColor: `${label.color}22`,
+                color: label.color,
+              }}
             >
               {label.name}
             </span>
@@ -576,11 +610,17 @@ export function MessageReader({
                 Labels
               </button>
             </PopoverTrigger>
-            <PopoverContent side="bottom" align="end" sideOffset={6} className="w-56 p-0 overflow-hidden">
+            <PopoverContent
+              side="bottom"
+              align="end"
+              sideOffset={6}
+              className="w-56 p-0 overflow-hidden"
+            >
               {labels.length > 0 && (
                 <div className="p-1 border-b border-border/40">
                   {labels.map((label) => {
-                    const assigned = message?.keywords?.[`label:${label.id}`] === true;
+                    const assigned =
+                      message?.keywords?.[`label:${label.id}`] === true;
                     return (
                       <button
                         key={label.id}
@@ -590,14 +630,29 @@ export function MessageReader({
                       >
                         <span
                           className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover transition-shadow"
-                          style={{ backgroundColor: label.color, boxShadow: assigned ? `0 0 0 1px ${label.color}` : undefined }}
+                          style={{
+                            backgroundColor: label.color,
+                            boxShadow: assigned
+                              ? `0 0 0 1px ${label.color}`
+                              : undefined,
+                          }}
                         />
-                        <span className="flex-1 truncate text-foreground/80">{label.name}</span>
-                        {assigned && <Check className="h-3 w-3 text-foreground/50 shrink-0" strokeWidth={2.5} />}
+                        <span className="flex-1 truncate text-foreground/80">
+                          {label.name}
+                        </span>
+                        {assigned && (
+                          <Check
+                            className="h-3 w-3 text-foreground/50 shrink-0"
+                            strokeWidth={2.5}
+                          />
+                        )}
                         {onDeleteLabel && (
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); onDeleteLabel(label.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteLabel(label.id);
+                            }}
                             className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
                             aria-label={`Delete label ${label.name}`}
                           >
@@ -611,7 +666,9 @@ export function MessageReader({
               )}
               {onCreateLabel && (
                 <div className="p-2 space-y-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">New label</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
+                    New label
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="color"
@@ -627,7 +684,10 @@ export function MessageReader({
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && newLabelName.trim()) {
                           setIsSavingLabel(true);
-                          void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => {
+                          void onCreateLabel(
+                            newLabelName.trim(),
+                            newLabelColor,
+                          ).then(() => {
                             setNewLabelName("");
                             setIsSavingLabel(false);
                           });
@@ -642,7 +702,10 @@ export function MessageReader({
                       onClick={() => {
                         if (!newLabelName.trim()) return;
                         setIsSavingLabel(true);
-                        void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => {
+                        void onCreateLabel(
+                          newLabelName.trim(),
+                          newLabelColor,
+                        ).then(() => {
                           setNewLabelName("");
                           setIsSavingLabel(false);
                         });

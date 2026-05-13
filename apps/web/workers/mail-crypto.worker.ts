@@ -1,4 +1,8 @@
 import * as openpgp from "openpgp";
+import type {
+  MailDecryptResult,
+  MailSignatureVerificationState,
+} from "../lib/mail/types";
 
 let activePrivateKey: openpgp.PrivateKey | null = null;
 
@@ -15,9 +19,9 @@ async function handleGenerateKeyPair(payload: {
       passphrase: payload.privateKeyPassphrase,
     });
 
-  const fingerprint = (
-    await openpgp.readKey({ armoredKey: publicKey })
-  ).getFingerprint().toUpperCase();
+  const fingerprint = (await openpgp.readKey({ armoredKey: publicKey }))
+    .getFingerprint()
+    .toUpperCase();
 
   return {
     publicKeyArmored: publicKey,
@@ -41,7 +45,9 @@ async function handleLoadActiveVault(payload: {
 
   const fingerprint = (
     await openpgp.readKey({ armoredKey: payload.publicKeyArmored })
-  ).getFingerprint().toUpperCase();
+  )
+    .getFingerprint()
+    .toUpperCase();
 
   return { fingerprint };
 }
@@ -66,14 +72,20 @@ async function handleDecryptMessage(payload: {
     verificationKeys,
   });
 
-  let hasVerifiedSignature = false;
+  let signatureVerificationState: MailSignatureVerificationState = "not_signed";
 
   if (Array.isArray(decrypted.signatures) && decrypted.signatures.length > 0) {
-    try {
-      await Promise.all(decrypted.signatures.map((signature) => signature.verified));
-      hasVerifiedSignature = true;
-    } catch {
-      hasVerifiedSignature = false;
+    if (!verificationKeys) {
+      signatureVerificationState = "unverified";
+    } else {
+      try {
+        await Promise.all(
+          decrypted.signatures.map((signature) => signature.verified),
+        );
+        signatureVerificationState = "verified";
+      } catch {
+        signatureVerificationState = "failed";
+      }
     }
   }
 
@@ -82,8 +94,9 @@ async function handleDecryptMessage(payload: {
       typeof decrypted.data === "string"
         ? decrypted.data
         : new TextDecoder().decode(decrypted.data as Uint8Array),
-    hasVerifiedSignature,
-  };
+    hasVerifiedSignature: signatureVerificationState === "verified",
+    signatureVerificationState,
+  } satisfies MailDecryptResult;
 }
 
 async function handleEncryptForRecipients(payload: {
