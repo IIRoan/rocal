@@ -19,6 +19,12 @@ export type CheckEmailAvailabilityResponse = {
   message: string;
 };
 
+export type AuthStatusResponse = {
+  authenticated: boolean;
+  hasPasskeys: boolean;
+  requiresPasskeyStepUp: boolean;
+};
+
 export class AccountApiService {
   constructor(private readonly client: HttpClient) {}
 
@@ -34,5 +40,9 @@ export class AccountApiService {
     return this.client.get<CheckEmailAvailabilityResponse>(
       `/api/account/email-availability?email=${encodeURIComponent(email)}`,
     );
+  }
+
+  async getAuthStatus(): Promise<AuthStatusResponse> {
+    return this.client.get<AuthStatusResponse>("/api/account/auth-status");
   }
 }

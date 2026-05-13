@@ -52,6 +52,7 @@ jest.mock("../lib/passkey-browser-bridge", () => ({
 }));
 
 jest.mock("../lib/session-cookie", () => ({
+  getSessionCookie: jest.fn(() => "better-auth.session=token"),
   waitForSessionCookie: jest.fn(),
 }));
 
@@ -73,6 +74,7 @@ const mockEmailSignUp = jest.mocked(authClient.signUp.email);
 const mockSignOut = jest.mocked(authClient.signOut);
 const mockGetAuthCapabilities = jest.mocked(getAuthCapabilities);
 const mockWaitForSessionCookie = jest.mocked(waitForSessionCookie);
+const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 function createSessionData() {
   return {
@@ -141,6 +143,7 @@ describe("AuthProvider", () => {
   }
 
   beforeEach(() => {
+    global.fetch = mockFetch as typeof fetch;
     capturedAuth = null;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -169,6 +172,15 @@ describe("AuthProvider", () => {
     mockSocialSignIn.mockResolvedValue(createAuthResult());
     mockPasskeySignIn.mockResolvedValue(createAuthResult());
     mockSignOut.mockResolvedValue(undefined as never);
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        authenticated: true,
+        hasPasskeys: false,
+        requiresPasskeyStepUp: false,
+      }),
+    } as Response);
   });
 
   afterEach(() => {
@@ -218,25 +230,6 @@ describe("AuthProvider", () => {
     await flushPromises();
 
     expect(getAuth().lastAuthMethod).toBe("unknown");
-    expect(getAuth().consumePendingAuthPassword()).toBeNull();
-  });
-
-  it("clears a stale pending password when GitHub sign-in is used", async () => {
-    await renderProvider();
-
-    await act(async () => {
-      await getAuth().signIn("roan@example.com", "secret-password");
-    });
-
-    await act(async () => {
-      await getAuth().signInWithGitHub();
-    });
-
-    expect(mockSocialSignIn).toHaveBeenCalledWith({
-      provider: "github",
-      callbackURL: "/calendar",
-    });
-    expect(getAuth().lastAuthMethod).toBe("github");
     expect(getAuth().consumePendingAuthPassword()).toBeNull();
   });
 

@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, RefreshCcw } from "lucide-react";
+import { Inbox, Plus, RefreshCcw } from "lucide-react";
 import {
   SidebarProvider,
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
+import { Input } from "@workspace/ui/components/ui/input";
 import { MailSkeleton } from "@workspace/ui/components/ui/app-skeletons";
-import { PageLoadingOverlay } from "@workspace/ui/components/ui";
+import { AppLoadingState, PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useSettings } from "@/hooks/use-settings";
 import { MailSidebar } from "./mail-sidebar";
@@ -16,23 +17,16 @@ import { MailCommandPalette } from "./mail-command-palette";
 import { ComposeDialog } from "./compose-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
-import { MailAuthPanel } from "./mail-auth-panel";
 
 export function MailApp() {
   const {
     session,
     isSessionPending,
     config,
-    authMode,
-    setAuthMode,
     isBusy,
+    mailboxStatus,
     isMailboxStatusLoading,
-    isAutoOpeningMailbox,
-    mailboxProvisioned,
-    signupPassword,
-    setSignupPassword,
-    signupPasswordConfirm,
-    setSignupPasswordConfirm,
+    needsPasswordPrompt,
     loginPassword,
     setLoginPassword,
     activeMailbox,
@@ -64,7 +58,6 @@ export function MailApp() {
     hasMoreMessages,
     isLoadingMore,
     handleSignIn,
-    handleSignup,
     handleSendMessage,
     handleDeleteMessage,
     handleReply,
@@ -89,7 +82,6 @@ export function MailApp() {
     user,
     mailboxEmail,
     accountEmail,
-    accountDisplayName,
   } = useMailApp();
 
   const { settings } = useSettings();
@@ -254,28 +246,50 @@ export function MailApp() {
                 </div>
               </div>
             </div>
-          ) : (
-            <MailAuthPanel
-              authMode={authMode}
-              setAuthMode={setAuthMode}
-              mailboxEmail={mailboxEmail}
-              accountEmail={accountEmail}
-              accountDisplayName={accountDisplayName}
-              signupPassword={signupPassword}
-              setSignupPassword={setSignupPassword}
-              signupPasswordConfirm={signupPasswordConfirm}
-              setSignupPasswordConfirm={setSignupPasswordConfirm}
-              loginPassword={loginPassword}
-              setLoginPassword={setLoginPassword}
-              isBusy={isBusy}
-              isMailboxStatusLoading={isMailboxStatusLoading}
-              isAutoOpeningMailbox={isAutoOpeningMailbox}
-              mailboxProvisioned={mailboxProvisioned}
-              onSignIn={() => void handleSignIn()}
-              onSignUp={() => void handleSignup()}
-              configLoaded={Boolean(config)}
-            />
-          )}
+          ) : needsPasswordPrompt ? (
+              <div className="flex flex-1 items-center justify-center p-8">
+                <div className="w-full max-w-sm space-y-4">
+                  <div>
+                    <h1 className="text-xl font-semibold">Open your mailbox</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Enter your account password to access your encrypted mailbox.
+                    </p>
+                  </div>
+                  <Input
+                    id="mailbox-password"
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Account password"
+                    onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
+                    disabled={isBusy}
+                    autoFocus
+                  />
+                  <Button
+                    className="w-full"
+                    onClick={() => void handleSignIn()}
+                    disabled={isBusy || !loginPassword || !mailboxEmail}
+                  >
+                    <Inbox size={15} />
+                    {isBusy ? "Opening…" : "Open mailbox"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <AppLoadingState
+                variant="centered"
+                className="flex-1"
+                text={
+                  isMailboxStatusLoading
+                    ? "Checking your workspace..."
+                    : !config
+                      ? "Loading your workspace..."
+                      : mailboxStatus?.provisioned
+                        ? "Opening your mailbox..."
+                        : "Setting up your mailbox..."
+                }
+              />
+            )}
         </SidebarInset>
       </SidebarProvider>
 
@@ -317,7 +331,7 @@ export function MailApp() {
 
       <PageLoadingOverlay
         isLoading={isOverlayLoading}
-        messageContext="PAGE_LOAD"
+        messageContext="DATA_SYNC"
         enableCycling
         priority
       />

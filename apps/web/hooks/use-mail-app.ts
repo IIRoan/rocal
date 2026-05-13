@@ -57,7 +57,7 @@ const PROTECTED_ROLES = new Set([
   "spam",
 ]);
 
-export type AuthMode = "sign-in" | "sign-up";
+
 
 export type ActiveMailboxState = {
   client: StalwartJmapClient;
@@ -99,6 +99,78 @@ function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
     const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
     return rightTime - leftTime;
   });
+}
+
+function normalizeEmailAddress(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function getEmailDomain(value: string): string | null {
+  const normalized = normalizeEmailAddress(value);
+  const atIndex = normalized.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex === normalized.length - 1) {
+    return null;
+  }
+
+  return normalized.slice(atIndex + 1);
+}
+
+async function resolveOutgoingMessageBody(input: {
+  activeMailbox: ActiveMailboxState;
+  recipients: string[];
+  plaintext: string;
+  internalDomain: string | null;
+}): Promise<{ textBody: string; encrypted: boolean }> {
+  if (!input.internalDomain) {
+    return {
+      textBody: input.plaintext,
+      encrypted: false,
+    };
+  }
+
+  const internalRecipients = input.recipients.filter(
+    (recipient) => getEmailDomain(recipient) === input.internalDomain,
+  );
+
+  if (internalRecipients.length === 0) {
+    return {
+      textBody: input.plaintext,
+      encrypted: false,
+    };
+  }
+
+  if (internalRecipients.length !== input.recipients.length) {
+    throw new Error(
+      "Messages can only be end-to-end encrypted when every recipient is an internal Solace mailbox.",
+    );
+  }
+
+  const senderEmail = normalizeEmailAddress(input.activeMailbox.email);
+  const recipientPublicKeysArmored = new Set<string>([
+    input.activeMailbox.unlockedVault.publicKeyArmored,
+  ]);
+
+  for (const recipient of internalRecipients) {
+    if (recipient === senderEmail) {
+      recipientPublicKeysArmored.add(
+        input.activeMailbox.unlockedVault.publicKeyArmored,
+      );
+      continue;
+    }
+
+    const recipientKey = await mailDemoApiService.getRecipientKey(recipient);
+    recipientPublicKeysArmored.add(recipientKey.publicKeyArmored);
+  }
+
+  const { armoredMessage } = await mailCryptoWorkerClient.encryptForRecipients({
+    plaintext: input.plaintext,
+    recipientPublicKeysArmored: [...recipientPublicKeysArmored],
+  });
+
+  return {
+    textBody: armoredMessage,
+    encrypted: true,
+  };
 }
 
 function mergeMailboxes(
@@ -163,7 +235,6 @@ export function useMailApp() {
   const router = useSmoothRouter();
 
   const [config, setConfig] = useState<MailDemoConfig | null>(null);
-  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [isBusy, setIsBusy] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [totalMessages, setTotalMessages] = useState(0);
@@ -172,8 +243,6 @@ export function useMailApp() {
     null,
   );
   const [isMailboxStatusLoading, setIsMailboxStatusLoading] = useState(false);
-  const [signupPassword, setSignupPassword] = useState("");
-  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [hasAttemptedAutoOpen, setHasAttemptedAutoOpen] = useState(false);
   const [activeMailbox, setActiveMailbox] = useState<ActiveMailboxState | null>(
@@ -227,14 +296,6 @@ export function useMailApp() {
   const accountDisplayName = session?.user?.name?.trim() ?? "";
   const accountUserId = session?.user?.id?.trim() ?? "";
   const mailboxEmail = mailboxStatus?.email ?? accountEmail;
-  const shouldAutoOpenMailbox =
-    Boolean(config) &&
-    Boolean(session?.user) &&
-    Boolean(mailboxStatus?.provisioned) &&
-    Boolean(cachedAuthPassword) &&
-    !activeMailbox;
-  const isAutoOpeningMailbox =
-    shouldAutoOpenMailbox && (!hasAttemptedAutoOpen || isBusy);
 
   // Init password from encrypted cookie (cross-tab / post-refresh)
   useEffect(() => {
@@ -308,7 +369,6 @@ export function useMailApp() {
       .then((status) => {
         if (cancelled) return;
         setMailboxStatus(status);
-        setAuthMode(status.provisioned ? "sign-in" : "sign-up");
       })
       .catch((error) => {
         if (cancelled) return;
@@ -590,54 +650,8 @@ export function useMailApp() {
     [config, mailboxStatus?.provisioned, mailboxEmail, loginPassword],
   );
 
-  const handleSignup = useCallback(async () => {
-    if (!config || !accountEmail || !accountUserId) return;
-    if (!signupPassword) {
-      toast.error("Enter a password to create your mailbox.");
-      return;
-    }
-    if (signupPassword !== signupPasswordConfirm) {
-      toast.error("The passwords do not match.");
-      return;
-    }
-    setIsBusy(true);
-    try {
-      const provisioned = await bootstrapMailboxForAccount({
-        email: accountEmail,
-        password: signupPassword,
-        displayName: accountDisplayName,
-        userId: accountUserId,
-      });
-      setMailboxStatus({
-        email: provisioned.email,
-        displayName: provisioned.displayName,
-        provisioned: true,
-      });
-      toast("Mailbox ready. Signing in…");
-      setLoginPassword(signupPassword);
-      setAuthMode("sign-in");
-      await handleSignIn(signupPassword);
-    } catch (error) {
-      log.error("Mail signup failed", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not create the mailbox.",
-      );
-    } finally {
-      setIsBusy(false);
-    }
-  }, [
-    config,
-    accountEmail,
-    accountUserId,
-    accountDisplayName,
-    signupPassword,
-    signupPasswordConfirm,
-    handleSignIn,
-  ]);
 
-  // Auto-open mailbox when cached password is available
+  // Auto-provision + auto-open when cached password is available
   useEffect(() => {
     if (
       !config ||
@@ -646,23 +660,51 @@ export function useMailApp() {
       isMailboxStatusLoading ||
       isBusy ||
       activeMailbox ||
-      !mailboxStatus?.provisioned ||
+      !cachedAuthPassword ||
+      !mailboxStatus ||
       hasAttemptedAutoOpen
     )
       return;
-    if (!cachedAuthPassword) return;
     setHasAttemptedAutoOpen(true);
     setLoginPassword((cur) => cur || cachedAuthPassword);
-    void handleSignIn(cachedAuthPassword);
+    if (mailboxStatus.provisioned) {
+      void handleSignIn(cachedAuthPassword);
+    } else {
+      void (async () => {
+        setIsBusy(true);
+        try {
+          const provisioned = await bootstrapMailboxForAccount({
+            email: accountEmail,
+            password: cachedAuthPassword,
+            displayName: accountDisplayName,
+            userId: accountUserId,
+          });
+          setMailboxStatus({
+            email: provisioned.email,
+            displayName: provisioned.displayName,
+            provisioned: true,
+          });
+          await handleSignIn(cachedAuthPassword);
+        } catch (error) {
+          log.error("Auto-provision failed", error);
+          toast.error("Could not set up your mailbox automatically.");
+        } finally {
+          setIsBusy(false);
+        }
+      })();
+    }
   }, [
     activeMailbox,
+    accountEmail,
+    accountUserId,
+    accountDisplayName,
     cachedAuthPassword,
     config,
     hasAttemptedAutoOpen,
     isBusy,
     isMailboxStatusLoading,
     isSessionPending,
-    mailboxStatus?.provisioned,
+    mailboxStatus,
     session?.user,
     handleSignIn,
   ]);
@@ -679,6 +721,7 @@ export function useMailApp() {
     }
     setIsBusy(true);
     try {
+      const recipients = [normalizeEmailAddress(composeTo)];
       const draftsMailboxId = getPrimaryMailboxId(
         activeMailbox.mailboxes,
         "drafts",
@@ -693,20 +736,29 @@ export function useMailApp() {
           "This mailbox is missing a draft mailbox or sending identity.",
         );
       }
+      const internalDomain =
+        config?.defaultDomain.trim().toLowerCase() ??
+        getEmailDomain(activeMailbox.email);
+      const { textBody, encrypted } = await resolveOutgoingMessageBody({
+        activeMailbox,
+        recipients,
+        plaintext: composeBody,
+        internalDomain,
+      });
       await activeMailbox.client.sendMessage(activeMailbox.session, {
         draftsMailboxId,
         sentMailboxId,
         fromEmail: activeMailbox.email,
-        to: [composeTo.trim().toLowerCase()],
+        to: recipients,
         subject: composeSubject.trim(),
-        textBody: composeBody,
+        textBody,
         identityId,
       });
       setComposeTo("");
       setComposeSubject("");
       setComposeBody("");
       setIsComposeOpen(false);
-      toast("Message sent.");
+      toast(encrypted ? "Encrypted message sent." : "Message sent.");
       if (activeMailbox.selectedMailboxId) {
         const { messages: refreshed } =
           await activeMailbox.client.getMailboxMessages(
@@ -726,7 +778,7 @@ export function useMailApp() {
     } finally {
       setIsBusy(false);
     }
-  }, [activeMailbox, composeTo, composeSubject, composeBody]);
+  }, [activeMailbox, composeTo, composeSubject, composeBody, config]);
 
   const handleDeleteMessage = useCallback(
     async (messageId?: string) => {
@@ -1397,21 +1449,21 @@ export function useMailApp() {
       }
     : null;
 
+  const needsPasswordPrompt =
+    !activeMailbox &&
+    !isMailboxStatusLoading &&
+    !isBusy &&
+    mailboxStatus !== null &&
+    !cachedAuthPassword;
+
   return {
     session,
     isSessionPending,
     config,
-    authMode,
-    setAuthMode,
     isBusy,
     mailboxStatus,
     isMailboxStatusLoading,
-    isAutoOpeningMailbox,
-    mailboxProvisioned: Boolean(mailboxStatus?.provisioned),
-    signupPassword,
-    setSignupPassword,
-    signupPasswordConfirm,
-    setSignupPasswordConfirm,
+    needsPasswordPrompt,
     loginPassword,
     setLoginPassword,
     activeMailbox,
@@ -1445,7 +1497,6 @@ export function useMailApp() {
     handleManualRefresh,
     isRefreshing,
     handleSignIn,
-    handleSignup,
     handleSendMessage,
     handleDeleteMessage,
     handleReply,

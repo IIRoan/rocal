@@ -6,7 +6,6 @@ import {
   auth,
   BETTER_AUTH_BASE_PATH,
   getAuthOpenApiDocumentation,
-  githubOAuthCallbackUrl,
 } from "./lib/auth";
 import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
@@ -341,13 +340,10 @@ app.get("/", ({ query, redirect }) => {
 app.listen(port, () => {
   logger.ok(`Server is running on ${backendUrl}`);
   logger.info(`API documentation: ${backendUrl}/api/docs`);
-  logger.info("Auth runtime config", {
-    backendUrl,
-    frontendUrl,
-    githubOAuthCallbackUrl,
-    authRedirectUrl: process.env.AUTH_REDIRECT_URL || null,
-    mobileAuthCallbackUrl: process.env.MOBILE_AUTH_CALLBACK_URL || null,
-    cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
-    nodeEnv: process.env.NODE_ENV || "development",
-  });
+    logger.info("Auth runtime config", {
+      backendUrl,
+      frontendUrl,
+      cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
+      nodeEnv: process.env.NODE_ENV || "development",
+    });
 });
