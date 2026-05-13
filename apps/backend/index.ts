@@ -22,6 +22,8 @@ import { accountPublicRoutes } from "./routes/account-public";
 import { accountRoutes } from "./routes/account";
 import { mailAccountRoutes } from "./routes/mail-account";
 import { mailRoutes } from "./routes/mail";
+import { mailSyncRoutes } from "./routes/mail-sync";
+import { defaultMailRealtimeService, realtimeMailRoutes } from "./routes/realtime-mail";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import {
@@ -131,6 +133,7 @@ export const createAPI = (prefix = "") => {
   // Initialize Calendar sync service
   const calendarSyncService = CalendarSyncService.getInstance();
   calendarSyncService.start();
+  defaultMailRealtimeService.start();
 
   app
     .onBeforeHandle(async ({ request, set }) => {
@@ -306,6 +309,8 @@ export const createAPI = (prefix = "") => {
     .use(subscriptionsRoute)
     .use(mailRoutes)
     .use(mailAccountRoutes)
+    .use(mailSyncRoutes)
+    .use(realtimeMailRoutes)
     .use(accountPublicRoutes)
     .use(accountRoutes);
 };

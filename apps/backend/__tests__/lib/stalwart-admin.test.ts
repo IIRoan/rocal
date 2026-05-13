@@ -22,7 +22,7 @@ describe("StalwartAdminClient", () => {
       (input: string, init?: RequestInit) => Promise<Response>
     >;
     client = new StalwartAdminClient({
-      baseUrl: "http://192.168.2.213:8080",
+      baseUrl: "https://mail.solace.onl/",
       adminToken: "token-1",
       fetcher,
     });
@@ -53,9 +53,7 @@ describe("StalwartAdminClient", () => {
 
     expect(domain).toEqual({ id: "domain-1", name: "solace.onl" });
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(fetcher.mock.calls[0]?.[0]).toBe(
-      "http://192.168.2.213:8080/jmap/",
-    );
+    expect(fetcher.mock.calls[0]?.[0]).toBe("https://mail.solace.onl/jmap/");
     expect(fetcher.mock.calls[0]?.[1]).toEqual(
       expect.objectContaining({
         method: "POST",
