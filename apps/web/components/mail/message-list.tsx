@@ -35,6 +35,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/ui/dropdown-menu";
+import { AppLoadingState } from "@workspace/ui/components/ui";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
 import { SenderAvatar } from "./mail-avatar";
@@ -448,7 +449,7 @@ export function MessageList({
           className="flex items-center justify-center py-4"
         >
           {isLoadingMore && (
-            <span className="text-xs text-muted-foreground/50">Loading…</span>
+            <AppLoadingState variant="inline" text="Loading your workspace..." />
           )}
         </div>
       )}

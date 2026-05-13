@@ -1,7 +1,9 @@
 import { Elysia } from "elysia";
 import { auth } from "./auth";
-import { UnauthorizedError } from "./errors";
+import { ForbiddenError, UnauthorizedError } from "./errors";
 import { hasUserId, type AuthenticatedUser } from "./auth-utils";
+import { prisma } from "./prisma";
+import { getPasskeyStepUpStatus } from "./passkey-step-up";
 
 type AuthGuardContext = {
   request: Request;
@@ -49,5 +51,20 @@ export const requireAuth = new Elysia({ name: "require-auth" })
   .onBeforeHandle(({ user }: AuthGuardBeforeHandleContext) => {
     if (!user || typeof user !== "object" || !user.id) {
       throw new UnauthorizedError();
+    }
+  })
+  .onBeforeHandle(async ({ request, user }: AuthGuardContext) => {
+    if (!user || typeof user !== "object" || !user.id) {
+      return;
+    }
+
+    const stepUpStatus = await getPasskeyStepUpStatus({
+      prisma,
+      request,
+      userId: user.id,
+    });
+
+    if (stepUpStatus.requiresPasskeyStepUp) {
+      throw new ForbiddenError("Passkey verification required.");
     }
   });

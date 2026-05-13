@@ -6,9 +6,10 @@ import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
+import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Github, Key, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Key, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
@@ -31,6 +32,7 @@ import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
 const log = createLogger("login");
 const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
+const AUTH_STATUS_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
 
 type AuthMode = "sign-in" | "sign-up" | "forgot-password";
 
@@ -120,7 +122,6 @@ function AnimatedCollapse({
 // ─── LoginForm ────────────────────────────────────────────────────────────────
 
 export function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +132,8 @@ export function LoginForm() {
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [overlayFading, setOverlayFading] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
+  const [shouldAutoPromptPasskey, setShouldAutoPromptPasskey] = useState(false);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -139,6 +142,7 @@ export function LoginForm() {
   const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
 
   const titleRef = useRef<HTMLDivElement>(null);
+  const hasAutoPromptedStepUpRef = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const { data: session, isPending } = useSession();
@@ -163,6 +167,7 @@ export function LoginForm() {
     setError(null);
     setNotice(null);
     setShowPassword(false);
+    setShouldAutoPromptPasskey(false);
 
     if (mode !== "sign-up") {
       setName("");
@@ -189,6 +194,15 @@ export function LoginForm() {
     });
   }, [getRedirectTarget, router]);
 
+  const redirectAfterCompletedAuth = useCallback(() => {
+    const target = getRedirectTarget();
+    router.startRouteTransition({
+      messageContext: "AUTH_FLOW",
+      minimumVisibleMs: 120,
+    });
+    completeAuthNavigation(target.href);
+  }, [getRedirectTarget, router]);
+
   const syncThemeAfterAuth = useCallback(async () => {
     if (
       currentTheme &&
@@ -204,16 +218,54 @@ export function LoginForm() {
     }
   }, [currentTheme]);
 
-  const handleSessionRedirect = useCallback(() => {
-    if (session?.user) {
+  const refreshAuthStatus = useCallback(async () => {
+    const authStatus = await accountApiService.getAuthStatus();
+    setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+    return authStatus;
+  }, []);
+
+  const waitForSettledAuthStatus = useCallback(async () => {
+    let lastAuthStatus: Awaited<
+      ReturnType<typeof accountApiService.getAuthStatus>
+    > | null = null;
+
+    for (const delayMs of AUTH_STATUS_RETRY_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      }
+
+      lastAuthStatus = await refreshAuthStatus();
+
+      if (
+        lastAuthStatus.authenticated &&
+        !lastAuthStatus.requiresPasskeyStepUp
+      ) {
+        return lastAuthStatus;
+      }
+    }
+
+    return lastAuthStatus;
+  }, [refreshAuthStatus]);
+
+  const handleSessionRedirect = useCallback(async () => {
+    if (!session?.user) {
+      setRequiresPasskeyStepUp(false);
+      setShouldAutoPromptPasskey(false);
+      return;
+    }
+
+    const authStatus = await refreshAuthStatus();
+    setShouldAutoPromptPasskey(authStatus.requiresPasskeyStepUp);
+
+    if (!authStatus.requiresPasskeyStepUp) {
       redirectAfterAuth();
     }
-  }, [session, redirectAfterAuth]);
+  }, [refreshAuthStatus, redirectAfterAuth, session]);
 
   useEffect(() => {
     if (!isPending) {
       setIsCheckingSession(false);
-      handleSessionRedirect();
+      void handleSessionRedirect();
     }
   }, [session, isPending, handleSessionRedirect]);
 
@@ -263,6 +315,52 @@ export function LoginForm() {
     },
     { dependencies: [authMode] },
   );
+
+  const handlePasskeyStepUp = useCallback(async () => {
+    try {
+      setPasskeyLoading(true);
+      setError(null);
+      setNotice(null);
+
+      const result = await authClient.signIn.passkey({
+        autoFocus: true,
+      });
+
+      if (result?.error) {
+        throw new Error(
+          result.error.message || "Passkey authentication failed. Please try again.",
+        );
+      }
+
+      const authStatus = await waitForSettledAuthStatus();
+
+      if (!authStatus?.authenticated) {
+        throw new Error("Your session could not be confirmed. Please try again.");
+      }
+
+      if (authStatus.requiresPasskeyStepUp) {
+        setError("Passkey verification is still required. Please try again.");
+        return;
+      }
+
+      await syncThemeAfterAuth();
+      redirectAfterCompletedAuth();
+    } catch (error: any) {
+      log.error("Passkey login failed:", error);
+      setError(
+        error.message || "Passkey authentication failed. Please try again.",
+      );
+    } finally {
+      setPasskeyLoading(false);
+    }
+  }, [redirectAfterCompletedAuth, syncThemeAfterAuth, waitForSettledAuthStatus]);
+
+  const triggerAutoPasskeyStepUp = useCallback(() => {
+    hasAutoPromptedStepUpRef.current = true;
+    setShouldAutoPromptPasskey(false);
+    setNotice("Check your device to finish signing in with your passkey.");
+    void handlePasskeyStepUp();
+  }, [handlePasskeyStepUp]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,10 +443,21 @@ export function LoginForm() {
         void setEncPasswordCookie(password);
       }
 
+      const authStatus = await refreshAuthStatus();
+      if (authStatus.requiresPasskeyStepUp) {
+        if (isPasskeySupported) {
+          triggerAutoPasskeyStepUp();
+        } else {
+          setNotice(
+            "Password accepted. Check your device to finish signing in with your passkey.",
+          );
+          setShouldAutoPromptPasskey(true);
+        }
+        return;
+      }
+
       await syncThemeAfterAuth();
-      setTimeout(() => {
-        redirectAfterAuth();
-      }, 100);
+      redirectAfterCompletedAuth();
     } catch (err: any) {
       log.error("Email auth failed:", err);
       clearAuthPasswords();
@@ -399,62 +508,32 @@ export function LoginForm() {
     }
   };
 
-  const handlePasskeyLogin = async () => {
-    try {
-      setPasskeyLoading(true);
-      setError(null);
-      setNotice(null);
-      clearAuthPasswords();
-      clearEncPasswordCookie();
-
-      const result = await authClient.signIn.passkey({
-        autoFocus: true,
-      });
-
-      if (result?.data?.user || result?.user) {
-        await syncThemeAfterAuth();
-        setTimeout(() => {
-          redirectAfterAuth();
-        }, 100);
-      } else {
-        setTimeout(() => {
-          router.refresh();
-        }, 500);
-      }
-    } catch (error: any) {
-      log.error("Passkey login failed:", error);
-      setError(
-        error.message || "Passkey authentication failed. Please try again.",
-      );
-      setPasskeyLoading(false);
+  useEffect(() => {
+    if (!requiresPasskeyStepUp) {
+      hasAutoPromptedStepUpRef.current = false;
+      setShouldAutoPromptPasskey(false);
+      return;
     }
-  };
 
-  const handleGitHubLogin = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setNotice(null);
-      clearAuthPasswords();
-      clearEncPasswordCookie();
-      if (currentTheme) {
-        localStorage.setItem("pending-theme-sync", currentTheme);
-      }
-      const frontendUrl = getAppBaseUrl();
-      const redirectTarget = getRedirectTarget();
-      const callbackTarget = redirectTarget.external
-        ? redirectTarget.href
-        : new URL(redirectTarget.href, frontendUrl).toString();
-      await signIn.social({
-        provider: "github",
-        callbackURL: callbackTarget,
-      });
-    } catch (error) {
-      log.error("Login failed:", error);
-    } finally {
-      setIsLoading(false);
+    if (
+      !shouldAutoPromptPasskey ||
+      !isPasskeySupported ||
+      passkeyLoading ||
+      authMode === "forgot-password" ||
+      hasAutoPromptedStepUpRef.current
+    ) {
+      return;
     }
-  };
+
+    triggerAutoPasskeyStepUp();
+  }, [
+    authMode,
+    isPasskeySupported,
+    passkeyLoading,
+    requiresPasskeyStepUp,
+    shouldAutoPromptPasskey,
+    triggerAutoPasskeyStepUp,
+  ]);
 
   const title = isForgotPassword
     ? "Reset your email sign-in password"
@@ -466,7 +545,7 @@ export function LoginForm() {
     ? "Enter your Solace account email and we’ll send a reset link for your email sign-in password."
     : isSignUp
       ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password also protects your encrypted data.`
-      : "Sign in to continue to Solace";
+      : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
 
   const primaryButtonLabel = isForgotPassword
     ? "Send reset link"
@@ -686,62 +765,44 @@ export function LoginForm() {
 
               <AnimatedCollapse isOpen={!isForgotPassword}>
                 <div className="pb-0.5">
-                  <div className="my-6 flex items-center gap-3">
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      or continue with
-                    </span>
-                    <div className="h-px flex-1 bg-border" />
-                  </div>
+                  {requiresPasskeyStepUp && isPasskeySupported ? (
+                    <>
+                      <div className="my-6 flex items-center gap-3">
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          second factor required
+                        </span>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
 
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleGitHubLogin}
-                      disabled={isLoading}
-                      variant="outline"
-                      className="h-11 flex-1 rounded-lg"
-                      aria-busy={isLoading}
-                    >
-                      {isLoading ? (
-                        <div
-                          className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                          style={{ borderTopColor: "currentColor", opacity: 1 }}
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <>
-                          <Github className="h-4 w-4" />
-                          <span>GitHub</span>
-                        </>
-                      )}
-                    </Button>
-
-                    {isPasskeySupported ? (
                       <Button
-                        onClick={handlePasskeyLogin}
+                        onClick={handlePasskeyStepUp}
                         disabled={passkeyLoading}
                         variant="outline"
-                        className="h-11 flex-1 rounded-lg"
+                        className="h-11 w-full rounded-lg"
                         aria-busy={passkeyLoading}
                       >
                         {passkeyLoading ? (
-                          <div
-                            className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                            style={{
-                              borderTopColor: "currentColor",
-                              opacity: 1,
-                            }}
-                            aria-hidden="true"
-                          />
+                          <>
+                            <div
+                              className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                              style={{
+                                borderTopColor: "currentColor",
+                                opacity: 1,
+                              }}
+                              aria-hidden="true"
+                            />
+                            <span>Waiting for your passkey...</span>
+                          </>
                         ) : (
                           <>
                             <Key className="h-4 w-4" />
-                            <span>Passkey</span>
+                            <span>Use passkey</span>
                           </>
                         )}
                       </Button>
-                    ) : null}
-                  </div>
+                    </>
+                  ) : null}
                 </div>
               </AnimatedCollapse>
 

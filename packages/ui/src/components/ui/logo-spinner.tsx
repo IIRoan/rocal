@@ -360,6 +360,7 @@ interface InlineLogoSpinnerProps {
   text?: string;
   messageContext?: keyof typeof COMBINED_MESSAGES;
   enableCycling?: boolean;
+  showText?: boolean;
 }
 
 export function InlineLogoSpinner({
@@ -368,6 +369,7 @@ export function InlineLogoSpinner({
   text,
   messageContext = "PAGE_LOAD",
   enableCycling = false,
+  showText = true,
 }: InlineLogoSpinnerProps) {
   const logoRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -424,16 +426,18 @@ export function InlineLogoSpinner({
           fill="currentColor"
         />
       </div>
-      <span
-        className={cn(
-          "text-sm text-muted-foreground transition-opacity duration-300",
-          isTransitioning && enableCycling && !text
-            ? "opacity-50"
-            : "opacity-100",
-        )}
-      >
-        {displayText}
-      </span>
+      {showText ? (
+        <span
+          className={cn(
+            "text-sm text-muted-foreground transition-opacity duration-300",
+            isTransitioning && enableCycling && !text
+              ? "opacity-50"
+              : "opacity-100",
+          )}
+        >
+          {displayText}
+        </span>
+      ) : null}
     </div>
   );
 }

@@ -92,8 +92,8 @@ function resolveMailSecurityMeta(
           "End-to-end encrypted, but the sender signature could not be verified with the public key available on this device.",
         Icon: ShieldAlert,
         iconClassName: "text-amber-500",
-        protectedFields: ["Subject", "Message body", "Attachments"],
-        visibleFields: ["From", "To", "Date"],
+        protectedFields: ["Message body", "Attachments"],
+        visibleFields: ["From", "To", "Subject", "Date"],
       };
     }
 
@@ -104,8 +104,8 @@ function resolveMailSecurityMeta(
           "End-to-end encrypted. This message included a signature, but this device did not have a matching sender public key to verify it.",
         Icon: ShieldAlert,
         iconClassName: "text-foreground/60",
-        protectedFields: ["Subject", "Message body", "Attachments"],
-        visibleFields: ["From", "To", "Date"],
+        protectedFields: ["Message body", "Attachments"],
+        visibleFields: ["From", "To", "Subject", "Date"],
       };
     }
 
@@ -113,17 +113,16 @@ function resolveMailSecurityMeta(
     return {
       label: verified ? "PGP encrypted & verified" : "PGP encrypted",
       description: verified
-        ? "End-to-end encrypted. The sender signed and encrypted this message with your PGP public key before sending — our servers only ever handled ciphertext."
-        : "End-to-end encrypted. The sender encrypted this with your PGP public key before sending. Our servers never saw the plaintext.",
+        ? "End-to-end encrypted. The sender signed and encrypted the message content with your PGP public key before sending, so our servers only handled ciphertext for the protected body."
+        : "End-to-end encrypted. The sender encrypted the message content with your PGP public key before sending, so our servers never saw the protected body in plaintext.",
       Icon: ShieldCheck,
       iconClassName: "text-foreground/70",
       protectedFields: [
-        "Subject",
         "Message body",
         "Attachments",
         ...(verified ? ["Sender signature verified"] : []),
       ],
-      visibleFields: ["From", "To", "Date"],
+      visibleFields: ["From", "To", "Subject", "Date"],
     };
   }
 

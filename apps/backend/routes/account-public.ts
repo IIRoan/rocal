@@ -1,5 +1,7 @@
 import { Elysia, t } from "elysia";
+import { auth } from "../lib/auth";
 import { env } from "../lib/env";
+import { getPasskeyStepUpStatus } from "../lib/passkey-step-up";
 import { prisma } from "../lib/prisma";
 import { strictObject } from "../lib/validation";
 import { AccountService } from "../services/account.service";
@@ -41,6 +43,42 @@ export const accountPublicRoutes = new Elysia({
         summary: "Check whether a Solace email address can be used for sign-up",
         description:
           "Validates the chosen Solace email handle or full in-app address, normalizes it to the configured domain, and checks whether it is already reserved by an existing Solace account or linked mailbox.",
+      },
+    },
+  )
+  .get(
+    "/auth-status",
+    async ({ request }) => {
+      const session = await auth.api.getSession({
+        headers: request.headers as Headers,
+      });
+
+      if (!session?.user?.id) {
+        return {
+          authenticated: false,
+          hasPasskeys: false,
+          requiresPasskeyStepUp: false,
+        };
+      }
+
+      const stepUpStatus = await getPasskeyStepUpStatus({
+        prisma,
+        request,
+        userId: session.user.id,
+      });
+
+      return {
+        authenticated: true,
+        hasPasskeys: stepUpStatus.hasPasskeys,
+        requiresPasskeyStepUp: stepUpStatus.requiresPasskeyStepUp,
+      };
+    },
+    {
+      detail: {
+        tags: ["Account"],
+        summary: "Get current authentication status",
+        description:
+          "Returns whether the current session is authenticated and whether a registered passkey still needs to complete the required second-factor step-up.",
       },
     },
   );

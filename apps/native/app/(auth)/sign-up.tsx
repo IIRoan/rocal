@@ -12,7 +12,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
@@ -58,7 +57,7 @@ function validatePassword(password: string): string | null {
 // ---------------------------------------------------------------------------
 
 export default function SignUpScreen() {
-  const { signUp, signInWithGitHub } = useAuth();
+  const { signUp } = useAuth();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -77,8 +76,6 @@ export default function SignUpScreen() {
 
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
-
   // Refs for focus management
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -159,23 +156,6 @@ export default function SignUpScreen() {
       setIsSubmitting(false);
     }
   }, [clearErrors, desiredEmail, name, password, router, signUp]);
-
-  const handleGitHubSignUp = useCallback(async () => {
-    clearErrors();
-    log.info("Attempting GitHub sign-up");
-    setIsGitHubLoading(true);
-    try {
-      await signInWithGitHub({ requestSignUp: true });
-      log.ok("GitHub sign-up successful");
-      router.replace(CALENDAR_HOME_ROUTE);
-    } catch (err: any) {
-      const message = err?.message ?? "GitHub sign-up failed. Please try again.";
-      log.error("GitHub sign-up failed", err);
-      setServerError(message);
-    } finally {
-      setIsGitHubLoading(false);
-    }
-  }, [clearErrors, router, signInWithGitHub]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -303,50 +283,18 @@ export default function SignUpScreen() {
               style={({ pressed }) => [
                 styles.primaryButton,
                 pressed && styles.primaryButtonPressed,
-                (isSubmitting || isGitHubLoading) && styles.buttonDisabled,
+                isSubmitting && styles.buttonDisabled,
               ]}
               onPress={handleSignUp}
-              disabled={isSubmitting || isGitHubLoading}
+              disabled={isSubmitting}
               accessibilityRole="button"
               accessibilityLabel="Create account"
-              accessibilityState={{ disabled: isSubmitting || isGitHubLoading }}
+              accessibilityState={{ disabled: isSubmitting }}
             >
               {isSubmitting ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
                 <Text style={styles.primaryButtonText}>Create account</Text>
-              )}
-            </Pressable>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.secondaryButtonPressed,
-                (isSubmitting || isGitHubLoading) && styles.buttonDisabled,
-              ]}
-              onPress={handleGitHubSignUp}
-              disabled={isSubmitting || isGitHubLoading}
-              accessibilityRole="button"
-              accessibilityLabel="Continue with GitHub"
-              accessibilityState={{ disabled: isSubmitting || isGitHubLoading }}
-            >
-              {isGitHubLoading ? (
-                <ActivityIndicator color={theme.colors.foreground} />
-              ) : (
-                <>
-                  <Feather
-                    name="github"
-                    size={16}
-                    color={theme.colors.foreground}
-                  />
-                  <Text style={styles.secondaryButtonText}>GitHub</Text>
-                </>
               )}
             </Pressable>
 
