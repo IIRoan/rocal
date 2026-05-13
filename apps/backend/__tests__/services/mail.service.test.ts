@@ -118,6 +118,93 @@ describe("MailService", () => {
     });
   });
 
+  it("attaches an existing mailbox record to the authenticated user when the email matches", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "entry-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        stalwartAccountId: "acct-1",
+        stalwartPublicKeyId: "pk-1",
+        publicKeyFingerprint: "ABCD1234EF567890",
+        userId: null,
+      });
+    mockPrisma.mailDirectoryEntry.update.mockResolvedValueOnce({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+      vaultBackup: {
+        vaultVersion: 2,
+        encryptedVaultB64: "vault-b64-updated",
+        kdf: "argon2id",
+        kdfSaltB64: "salt-b64",
+        kdfMemoryKiB: 131072,
+        kdfIterations: 4,
+        kdfParallelism: 2,
+      },
+    });
+
+    const result = await service.getMailboxStatusForUser({
+      userId: "user-1",
+      email: "Alice@Solace.Onl",
+      displayName: "Alice Example",
+    });
+
+    expect(mockPrisma.mailDirectoryEntry.update).toHaveBeenCalledWith({
+      where: { id: "entry-1" },
+      data: {
+        user: {
+          connect: {
+            id: "user-1",
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        stalwartAccountId: true,
+        stalwartPublicKeyId: true,
+        publicKeyFingerprint: true,
+        userId: true,
+      },
+    });
+    expect(result).toEqual({
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      provisioned: true,
+    });
+  });
+
+  it("rejects linking a mailbox that already belongs to another Solace account", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "entry-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        stalwartAccountId: "acct-1",
+        stalwartPublicKeyId: "pk-1",
+        publicKeyFingerprint: "ABCD1234EF567890",
+        userId: "user-2",
+      });
+
+    await expect(
+      service.getMailboxStatusForUser({
+        userId: "user-1",
+        email: "Alice@Solace.Onl",
+        displayName: "Alice Example",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(mockPrisma.mailDirectoryEntry.update).not.toHaveBeenCalled();
+  });
+
   it("provisions a new encrypted mailbox and stores the directory entry", async () => {
     const result = await service.signUp({
       displayName: "  Alice Example  ",
@@ -265,6 +352,43 @@ describe("MailService", () => {
       fingerprint: "ABCD1234EF567890",
       encryptionAtRestEnabled: true,
     });
+  });
+
+  it("rejects bootstrapping when the authenticated user already has a linked mailbox", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        password: "StrongMailboxPassword!42",
+        publicKeyArmored: "public-key-armored",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(mockAdminClient.createAccount).not.toHaveBeenCalled();
+    expect(mockPrisma.mailDirectoryEntry.create).not.toHaveBeenCalled();
   });
 
   it("rejects a mismatched fingerprint before provisioning the account", async () => {
