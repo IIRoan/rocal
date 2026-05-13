@@ -146,6 +146,40 @@ describe("mailAccountRoutes", () => {
     });
   });
 
+  it("rejects unexpected fields when bootstrapping an authenticated mailbox", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/account/bootstrap", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          password: "StrongMailboxPassword!42",
+          publicKeyArmored: "public-key-armored",
+          fingerprint: "ABCD1234EF567890",
+          algorithm: "openpgp",
+          createdAt: "2026-05-06T21:00:00.000Z",
+          vaultVersion: 1,
+          encryptedVaultB64: "vault-b64",
+          kdf: "argon2id",
+          kdfParams: {
+            saltB64: "salt-b64",
+            memoryKiB: 65536,
+            iterations: 3,
+            parallelism: 4,
+          },
+          unexpected: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(mockMailService.bootstrapForUser).not.toHaveBeenCalled();
+    await expect(readJson(response)).resolves.toEqual(
+      expect.objectContaining({
+        type: "validation",
+      }),
+    );
+  });
+
   it("returns the authenticated user's encrypted vault backup", async () => {
     const response = await createApp().handle(
       new Request("http://localhost/mail/account/vault-backup"),
@@ -168,5 +202,75 @@ describe("mailAccountRoutes", () => {
         parallelism: 4,
       },
     });
+  });
+
+  it("updates the authenticated user's encrypted vault backup", async () => {
+    const requestBody = {
+      vaultVersion: 2,
+      encryptedVaultB64: "vault-b64-updated",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 131072,
+        iterations: 4,
+        parallelism: 2,
+      },
+    };
+
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/account/vault-backup", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(requestBody),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockMailService.upsertVaultBackupForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@solace.onl",
+      ...requestBody,
+    });
+    await expect(readJson(response)).resolves.toEqual({
+      email: "alice@solace.onl",
+      vaultVersion: 2,
+      encryptedVaultB64: "vault-b64-updated",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 131072,
+        iterations: 4,
+        parallelism: 2,
+      },
+    });
+  });
+
+  it("rejects unexpected fields when updating the authenticated vault backup", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/account/vault-backup", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          vaultVersion: 2,
+          encryptedVaultB64: "vault-b64-updated",
+          kdf: "argon2id",
+          kdfParams: {
+            saltB64: "salt-b64",
+            memoryKiB: 131072,
+            iterations: 4,
+            parallelism: 2,
+          },
+          unexpected: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(mockMailService.upsertVaultBackupForUser).not.toHaveBeenCalled();
+    await expect(readJson(response)).resolves.toEqual(
+      expect.objectContaining({
+        type: "validation",
+      }),
+    );
   });
 });

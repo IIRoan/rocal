@@ -1,6 +1,7 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 
 import {
+  StalwartJmapClient,
   buildBasicAuthHeader,
   buildSendMessageMethodCalls,
   getPrimaryMailAccountId,
@@ -87,6 +88,31 @@ describe("mail JMAP helpers", () => {
     ).toBe("b");
   });
 
+  it("falls back to the Stalwart account capability when the mail capability is absent", () => {
+    expect(
+      getPrimaryMailAccountId({
+        accounts: {
+          stalwart: { name: "alice@solace.onl" },
+        },
+        primaryAccounts: {
+          "urn:stalwart:jmap": "stalwart",
+        },
+      }),
+    ).toBe("stalwart");
+  });
+
+  it("falls back to the first account when no primary account mapping is present", () => {
+    expect(
+      getPrimaryMailAccountId({
+        accounts: {
+          a: { name: "alice@solace.onl" },
+          b: { name: "alice+alt@solace.onl" },
+        },
+        primaryAccounts: {},
+      }),
+    ).toBe("a");
+  });
+
   it("builds plain-text send method calls for Email/set and EmailSubmission/set", () => {
     expect(
       buildSendMessageMethodCalls({
@@ -134,5 +160,130 @@ describe("mail JMAP helpers", () => {
         "c2",
       ],
     ]);
+  });
+
+  it("moves the sent message into the sent mailbox when one is provided", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        sentMailboxId: "sent-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@example.com"],
+        subject: "Hello",
+        textBody: "Hello from Solace Mail",
+        identityId: "identity-1",
+      }),
+    ).toEqual([
+      expect.any(Array),
+      [
+        "EmailSubmission/set",
+        {
+          create: {
+            s1: {
+              emailId: "#draft1",
+              identityId: "identity-1",
+            },
+          },
+          onSuccessUpdateEmail: {
+            "#s1": {
+              "mailboxIds/sent-1": true,
+              "mailboxIds/drafts-1": null,
+              "keywords/$draft": null,
+            },
+          },
+        },
+        "c2",
+      ],
+    ]);
+  });
+});
+
+describe("StalwartJmapClient", () => {
+  it("discovers and normalizes the JMAP session through the backend proxy", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          downloadUrl:
+            "https://mail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+          uploadUrl: "https://mail.solace.onl/jmap/upload/{accountId}/",
+          eventSourceUrl:
+            "https://mail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+          accounts: {},
+          primaryAccounts: {
+            "urn:ietf:params:jmap:mail": "b",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      email: "alice@solace.onl",
+      password: "mailbox-password",
+      fetcher,
+    });
+
+    await expect(client.discoverSession()).resolves.toEqual(
+      expect.objectContaining({
+        apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+        downloadUrl:
+          "http://localhost:4001/api/mail/jmap/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+      }),
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://localhost:4001/api/mail/jmap/.well-known/jmap",
+      {
+        method: "GET",
+        headers: {
+          Authorization: buildBasicAuthHeader(
+            "alice@solace.onl",
+            "mailbox-password",
+          ),
+        },
+        redirect: "follow",
+      },
+    );
+  });
+
+  it("surfaces mailbox-auth failures from discovery as a user-facing error", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      email: "alice@solace.onl",
+      password: "wrong-password",
+      fetcher: async () =>
+        new Response(JSON.stringify({ message: "Invalid credentials" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+
+    await expect(client.discoverSession()).rejects.toThrow(
+      "Incorrect password or mailbox not found.",
+    );
+  });
+
+  it("includes upstream details when discovery cannot reach the mail server", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      email: "alice@solace.onl",
+      password: "mailbox-password",
+      fetcher: async () =>
+        new Response(JSON.stringify({ message: "Connection refused" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+
+    await expect(client.discoverSession()).rejects.toThrow(
+      "Mail server is unreachable — Connection refused.",
+    );
   });
 });

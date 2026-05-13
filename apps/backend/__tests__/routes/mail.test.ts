@@ -200,6 +200,80 @@ describe("mailRoutes", () => {
     );
   });
 
+  it("forwards proxy query strings and response cache headers for blob downloads", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response("raw-message", {
+        status: 200,
+        headers: {
+          "Content-Type": "message/rfc822",
+          "Cache-Control": "private, max-age=60",
+        },
+      }),
+    );
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request(
+        "http://localhost/mail/jmap/jmap/download/account-1/blob-1/message.eml?accept=message%2Frfc822",
+        {
+          headers: {
+            Authorization: "Basic mailbox-auth",
+            Accept: "message/rfc822",
+          },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("raw-message");
+    expect(response.headers.get("content-type")).toBe("message/rfc822");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=60");
+    expect(proxyFetch).toHaveBeenCalledWith(
+      "http://stalwart.test/jmap/download/account-1/blob-1/message.eml?accept=message%2Frfc822",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.any(Headers),
+      }),
+    );
+  });
+
+  it("returns a 503 error when the proxied JMAP upstream is unreachable", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => {
+      throw new Error("connect ECONNREFUSED");
+    });
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/jmap/", {
+        method: "POST",
+        headers: {
+          Authorization: "Basic mailbox-auth",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+          methodCalls: [["Mailbox/get", { accountId: "b" }, "c1"]],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(readJson(response)).resolves.toEqual(
+      expect.objectContaining({
+        error: "Mail server unreachable",
+        message: expect.stringContaining("connect ECONNREFUSED"),
+      }),
+    );
+  });
+
   it("rejects proxied JMAP calls without mailbox credentials", async () => {
     const response = await createApp({
       jmapUpstreamBaseUrl: "http://stalwart.test",
@@ -357,5 +431,62 @@ describe("mailRoutes", () => {
         parallelism: 4,
       },
     });
+  });
+
+  it("stores encrypted vault backup updates from the public restore route", async () => {
+    const requestBody = {
+      email: "alice@solace.onl",
+      vaultVersion: 1,
+      encryptedVaultB64: "vault-b64",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+    };
+
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/vault/backup", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(requestBody),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockMailService.upsertVaultBackup).toHaveBeenCalledWith(requestBody);
+    await expect(readJson(response)).resolves.toEqual(requestBody);
+  });
+
+  it("rejects unexpected fields when storing a public encrypted vault backup", async () => {
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/vault/backup", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: "alice@solace.onl",
+          vaultVersion: 1,
+          encryptedVaultB64: "vault-b64",
+          kdf: "argon2id",
+          kdfParams: {
+            saltB64: "salt-b64",
+            memoryKiB: 65536,
+            iterations: 3,
+            parallelism: 4,
+          },
+          unexpected: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(mockMailService.upsertVaultBackup).not.toHaveBeenCalled();
+    await expect(readJson(response)).resolves.toEqual(
+      expect.objectContaining({
+        type: "validation",
+      }),
+    );
   });
 });
