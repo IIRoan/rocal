@@ -35,10 +35,14 @@ jest.mock("@workspace/logger", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
-  const Passthrough = ({ children }: { children: React.ReactNode }) => <>{children}</>;
-  const PassthroughAsButton = ({ children, asChild: _asChild, ...props }: any) => (
-    <button {...props}>{children}</button>
+  const Passthrough = ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
   );
+  const PassthroughAsButton = ({
+    children,
+    asChild: _asChild,
+    ...props
+  }: any) => <button {...props}>{children}</button>;
   return {
     DropdownMenu: Passthrough,
     DropdownMenuContent: Passthrough,
@@ -48,8 +52,12 @@ jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
 });
 
 jest.mock("@workspace/ui/components/ui/sidebar", () => ({
-  SidebarProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SidebarInset: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SidebarProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  SidebarInset: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui", () => ({
@@ -57,8 +65,15 @@ jest.mock("@workspace/ui/components/ui", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/button", () => ({
-  Button: ({ children, onClick, disabled, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button onClick={onClick} disabled={disabled} {...rest}>{children}</button>
+  Button: ({
+    children,
+    onClick,
+    disabled,
+    ...rest
+  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button onClick={onClick} disabled={disabled} {...rest}>
+      {children}
+    </button>
   ),
 }));
 
@@ -112,7 +127,9 @@ jest.mock("../../lib/enc-password-cookie", () => ({
 
 jest.mock("postal-mime", () => ({
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
-  default: { parse: (jest.fn() as any).mockResolvedValue({ text: "", html: null }) },
+  default: {
+    parse: (jest.fn() as any).mockResolvedValue({ text: "", html: null }),
+  },
 }));
 
 jest.mock("../../lib/mail/vault-crypto", () => ({
@@ -133,7 +150,9 @@ const mockJmapClient = {
   moveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   createMailbox: jest.fn<() => Promise<any>>(),
   deleteMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
-  updateMailboxSortOrders: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+  updateMailboxSortOrders: jest
+    .fn<() => Promise<any>>()
+    .mockResolvedValue(undefined),
   getBlobAsText: jest.fn<() => Promise<any>>(),
   bulkMoveToTrash: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
   bulkMoveToMailbox: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
@@ -144,7 +163,10 @@ const mockJmapClient = {
 jest.mock("../../lib/mail/jmap-client", () => ({
   StalwartJmapClient: jest.fn(() => mockJmapClient),
   getPrimaryMailAccountId: jest.fn(
-    (session: { primaryAccounts?: Record<string, string>; accounts?: Record<string, unknown> }) =>
+    (session: {
+      primaryAccounts?: Record<string, string>;
+      accounts?: Record<string, unknown>;
+    }) =>
       session.primaryAccounts?.["urn:ietf:params:jmap:mail"] ??
       Object.keys(session.accounts ?? {})[0] ??
       null,
@@ -165,20 +187,34 @@ jest.mock("../../components/mail/mail-command-palette", () => ({
   MailCommandPalette: () => null,
 }));
 
+jest.mock("../../hooks/use-settings", () => ({
+  useSettings: () => ({ settings: { timeFormat: "24h" }, updateSettings: jest.fn() }),
+}));
+
 jest.mock("../../components/mail/mail-sidebar", () => ({
   MailSidebar: ({ activeMailbox, onSelectMailbox }: any) =>
     activeMailbox ? (
       <nav>
         {activeMailbox.mailboxes.map((m: any) => (
-          <button key={m.id} onClick={() => onSelectMailbox(m.id)}>{m.name}</button>
+          <button key={m.id} onClick={() => onSelectMailbox(m.id)}>
+            {m.name}
+          </button>
         ))}
       </nav>
     ) : null,
 }));
 
 jest.mock("../../components/mail/message-list", () => ({
-  MessageList: ({ messages }: { messages: { id: string; subject?: string }[] }) => (
-    <ul>{messages.map((m) => <li key={m.id}>{m.subject}</li>)}</ul>
+  MessageList: ({
+    messages,
+  }: {
+    messages: { id: string; subject?: string }[];
+  }) => (
+    <ul>
+      {messages.map((m) => (
+        <li key={m.id}>{m.subject}</li>
+      ))}
+    </ul>
   ),
 }));
 
@@ -187,12 +223,32 @@ jest.mock("../../components/mail/message-reader", () => ({
 }));
 
 jest.mock("../../components/mail/compose-dialog", () => ({
-  ComposeDialog: ({ open, composeTo, composeSubject, composeBody, setComposeTo, setComposeSubject, setComposeBody, onSend }: any) =>
+  ComposeDialog: ({
+    open,
+    composeTo,
+    composeSubject,
+    composeBody,
+    setComposeTo,
+    setComposeSubject,
+    setComposeBody,
+    onSend,
+  }: any) =>
     open ? (
       <div>
-        <input placeholder="Recipient" value={composeTo} onChange={(e: any) => setComposeTo(e.target.value)} />
-        <input placeholder="Subject" value={composeSubject} onChange={(e: any) => setComposeSubject(e.target.value)} />
-        <textarea value={composeBody} onChange={(e: any) => setComposeBody(e.target.value)} />
+        <input
+          placeholder="Recipient"
+          value={composeTo}
+          onChange={(e: any) => setComposeTo(e.target.value)}
+        />
+        <input
+          placeholder="Subject"
+          value={composeSubject}
+          onChange={(e: any) => setComposeSubject(e.target.value)}
+        />
+        <textarea
+          value={composeBody}
+          onChange={(e: any) => setComposeBody(e.target.value)}
+        />
         <button onClick={() => void onSend()}>Send message</button>
       </div>
     ) : null,
@@ -399,16 +455,19 @@ describe("MailApp", () => {
       { id: "junk-1", name: "Junk Mail", role: "junk" },
       { id: "sent-1", name: "Sent Items", role: "sent" },
     ]);
-    mockJmapClient.getMailboxMessages.mockResolvedValue([
-      {
-        id: "mail-1",
-        subject: "Encrypted hello",
-        from: [{ email: "bob@solace.onl", name: "Bob" }],
-        receivedAt: "2026-05-06T21:10:00.000Z",
-        textBody: [{ partId: "text" }],
-        bodyValues: { text: { value: "Hello Alice" } },
-      },
-    ]);
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-1",
+          subject: "Encrypted hello",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Hello Alice" } },
+        },
+      ],
+      total: 1,
+    });
     mockJmapClient.getIdentities.mockResolvedValue([
       { id: "identity-1", email: "alice@solace.onl" },
     ]);
@@ -453,9 +512,7 @@ describe("MailApp", () => {
       "StrongMailboxPassword!42",
     );
     setInputValue(
-      container.querySelector(
-        "#signup-password-confirm",
-      ) as HTMLInputElement,
+      container.querySelector("#signup-password-confirm") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
@@ -571,9 +628,7 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain(
-      "Opening your mailbox",
-    );
+    expect(container.textContent).toContain("Opening your mailbox");
     expect(container.textContent).not.toContain("Open mailbox");
 
     await act(async () => {
@@ -600,26 +655,32 @@ describe("MailApp", () => {
   it("loads messages for the selected mailbox folder", async () => {
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages
-      .mockResolvedValueOnce([
-        {
-          id: "mail-1",
-          subject: "Inbox hello",
-          from: [{ email: "bob@solace.onl", name: "Bob" }],
-          receivedAt: "2026-05-06T21:10:00.000Z",
-          textBody: [{ partId: "text" }],
-          bodyValues: { text: { value: "Inbox body" } },
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: "mail-2",
-          subject: "Junk hello",
-          from: [{ email: "spam@example.com", name: "Spammer" }],
-          receivedAt: "2026-05-06T21:11:00.000Z",
-          textBody: [{ partId: "text" }],
-          bodyValues: { text: { value: "Junk body" } },
-        },
-      ]);
+      .mockResolvedValueOnce({
+        messages: [
+          {
+            id: "mail-1",
+            subject: "Inbox hello",
+            from: [{ email: "bob@solace.onl", name: "Bob" }],
+            receivedAt: "2026-05-06T21:10:00.000Z",
+            textBody: [{ partId: "text" }],
+            bodyValues: { text: { value: "Inbox body" } },
+          },
+        ],
+        total: 1,
+      })
+      .mockResolvedValueOnce({
+        messages: [
+          {
+            id: "mail-2",
+            subject: "Junk hello",
+            from: [{ email: "spam@example.com", name: "Spammer" }],
+            receivedAt: "2026-05-06T21:11:00.000Z",
+            textBody: [{ partId: "text" }],
+            bodyValues: { text: { value: "Junk body" } },
+          },
+        ],
+        total: 1,
+      });
 
     await renderApp();
 
@@ -652,22 +713,26 @@ describe("MailApp", () => {
         apiUrl: "http://192.168.2.213:8080/jmap/",
       }),
       "junk-1",
+      expect.objectContaining({ limit: 20, position: 0 }),
     );
     expect(container.textContent).toContain("Junk hello");
   });
 
   it("sends plaintext mail without looking up recipient keys", async () => {
     mockJmapClient.getMailboxMessages.mockReset();
-    mockJmapClient.getMailboxMessages.mockResolvedValue([
-      {
-        id: "mail-1",
-        subject: "Encrypted hello",
-        from: [{ email: "bob@solace.onl", name: "Bob" }],
-        receivedAt: "2026-05-06T21:10:00.000Z",
-        textBody: [{ partId: "text" }],
-        bodyValues: { text: { value: "Hello Alice" } },
-      },
-    ]);
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-1",
+          subject: "Encrypted hello",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Hello Alice" } },
+        },
+      ],
+      total: 1,
+    });
 
     await renderApp();
 
@@ -694,15 +759,21 @@ describe("MailApp", () => {
     });
 
     setInputValue(
-      container.querySelector('input[placeholder="Recipient"]') as HTMLInputElement,
+      container.querySelector(
+        'input[placeholder="Recipient"]',
+      ) as HTMLInputElement,
       "iiroan@proton.me",
     );
     setInputValue(
-      container.querySelector('input[placeholder="Subject"]') as HTMLInputElement,
+      container.querySelector(
+        'input[placeholder="Subject"]',
+      ) as HTMLInputElement,
       "Hello",
     );
     act(() => {
-      const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+      const textarea = container.querySelector(
+        "textarea",
+      ) as HTMLTextAreaElement;
       const descriptor = Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
         "value",
@@ -752,7 +823,9 @@ describe("MailApp", () => {
       () =>
         new Promise<void>((resolve) => {
           resolveCookieInit = () => {
-            mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+            mockPeekCachedAuthPassword.mockReturnValue(
+              "StrongMailboxPassword!42",
+            );
             resolve();
           };
         }),
