@@ -1,6 +1,12 @@
 import { z } from "zod";
-import type { PrismaClient } from "../generated/prisma/index.js";
-import { ValidationError, NotFoundError } from "../lib/errors";
+import { createLogger } from "@workspace/logger";
+import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
+import {
+  ConflictError,
+  NotFoundError,
+  UpstreamServiceError,
+  ValidationError,
+} from "../lib/errors";
 import { getOpenPgpPublicKeyFingerprint } from "../lib/mail-key-utils";
 import type {
   GetMailAccountStatusInput,
@@ -10,7 +16,7 @@ import type {
   MailBootstrapForUserInput,
   MailDemoConfig,
   MailDirectoryKeyResult,
-  MailSignupInput,
+  MailOAuthConfig,
   MailSignupResult,
   MailVaultKdfParams,
   MailVaultBackupResult,
@@ -20,13 +26,22 @@ import type {
 import type { StalwartAdminClientLike } from "../lib/stalwart-admin";
 
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
-const MIN_MAILBOX_PASSWORD_LENGTH = 12;
 const MIN_VAULT_MEMORY_KIB = 8192;
 const emailSchema = z.string().email();
+const logger = createLogger("backend:mail-service");
+
+const linkedMailboxSelect = {
+  id: true,
+  email: true,
+  displayName: true,
+  stalwartAccountId: true,
+  stalwartPublicKeyId: true,
+  publicKeyFingerprint: true,
+  userId: true,
+} as const;
 
 type NormalizedProvisioningInput = {
   displayName: string | null;
-  password: string;
   publicKeyArmored: string;
   fingerprint: string;
   algorithm: string;
@@ -47,13 +62,15 @@ type LinkedMailboxRecord = {
   userId: string | null;
 };
 
+type DirectoryEntryOwnershipRecord = {
+  id: string;
+  email: string;
+  userId: string | null;
+};
+
 function normalizeOptionalText(value?: string | null): string | null {
   const normalized = value?.trim() || "";
   return normalized.length > 0 ? normalized : null;
-}
-
-function normalizeLocalPart(value: string): string {
-  return value.trim().toLowerCase();
 }
 
 function normalizeEmail(value: string): string {
@@ -96,6 +113,10 @@ function parseMailboxEmail(value: string): {
 
 function normalizeFingerprint(value: string): string {
   return value.replace(/\s+/g, "").trim().toUpperCase();
+}
+
+function generateMailboxCredentialSecret(): string {
+  return `${crypto.randomUUID()}${crypto.randomUUID()}`;
 }
 
 function assertVaultParams(
@@ -142,7 +163,6 @@ function assertVaultParams(
 
 function normalizeProvisioningInput(input: {
   displayName?: string | null;
-  password: string;
   publicKeyArmored: string;
   fingerprint: string;
   algorithm: string;
@@ -153,19 +173,11 @@ function normalizeProvisioningInput(input: {
   kdfParams: MailVaultKdfParams;
 }): NormalizedProvisioningInput {
   const displayName = normalizeOptionalText(input.displayName);
-  const password = input.password.trim();
   const publicKeyArmored = input.publicKeyArmored.trim();
   const fingerprint = normalizeFingerprint(input.fingerprint);
   const algorithm = input.algorithm.trim().toLowerCase();
   const createdAt = new Date(input.createdAt);
   const encryptedVaultB64 = input.encryptedVaultB64.trim();
-
-  if (password.length < MIN_MAILBOX_PASSWORD_LENGTH) {
-    throw new ValidationError(
-      `Mailbox passwords must be at least ${MIN_MAILBOX_PASSWORD_LENGTH} characters long.`,
-      "password",
-    );
-  }
 
   if (!publicKeyArmored) {
     throw new ValidationError("A public key is required.", "publicKeyArmored");
@@ -196,7 +208,6 @@ function normalizeProvisioningInput(input: {
 
   return {
     displayName,
-    password,
     publicKeyArmored,
     fingerprint,
     algorithm,
@@ -213,6 +224,114 @@ function normalizeProvisioningInput(input: {
   };
 }
 
+function normalizeMailProvisioningError(error: unknown): never {
+  if (
+    error instanceof ValidationError ||
+    error instanceof NotFoundError ||
+    error instanceof ConflictError ||
+    error instanceof UpstreamServiceError
+  ) {
+    throw error;
+  }
+
+  const message = error instanceof Error ? error.message.trim() : "";
+
+  if (!message) {
+    throw new UpstreamServiceError(
+      "Mailbox provisioning failed for an unknown reason.",
+    );
+  }
+
+  if (/already exists|already in use|duplicate/i.test(message)) {
+    throw new ConflictError("That mailbox already exists on the mail server.");
+  }
+
+  if (/domain .*not found|domain .*was not found/i.test(message)) {
+    throw new UpstreamServiceError(
+      "The configured mail domain was not found on the mail server.",
+    );
+  }
+
+  if (
+    /account creation failed|public-key registration failed|admin session|admin jmap request failed|encryption/i.test(
+      message,
+    )
+  ) {
+    throw new UpstreamServiceError(message);
+  }
+
+  throw new UpstreamServiceError(`Mailbox provisioning failed: ${message}`);
+}
+
+function getUniqueConstraintTargets(error: unknown): string[] {
+  if (!error || typeof error !== "object" || !("meta" in error)) {
+    return [];
+  }
+
+  const target = (error as { meta?: { target?: unknown } }).meta?.target;
+  if (Array.isArray(target)) {
+    return target.map((value) => String(value));
+  }
+
+  if (typeof target === "string") {
+    return [target];
+  }
+
+  return [];
+}
+
+function isUniqueConstraintError(error: unknown, fields?: string[]): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const code = "code" in error ? (error as { code?: unknown }).code : undefined;
+  if (code !== "P2002") {
+    return false;
+  }
+
+  if (!fields || fields.length === 0) {
+    return true;
+  }
+
+  const targets = getUniqueConstraintTargets(error);
+  return fields.some((field) => targets.includes(field));
+}
+
+function normalizeMailPersistenceError(error: unknown): never {
+  if (
+    error instanceof ValidationError ||
+    error instanceof ConflictError ||
+    error instanceof NotFoundError ||
+    error instanceof UpstreamServiceError
+  ) {
+    throw error;
+  }
+
+  if (isUniqueConstraintError(error, ["email"])) {
+    throw new ConflictError("That mailbox already exists.");
+  }
+
+  if (isUniqueConstraintError(error, ["user_id", "userId"])) {
+    throw new ValidationError(
+      "A mailbox has already been provisioned for this account.",
+      "email",
+    );
+  }
+
+  if (isUniqueConstraintError(error, ["stalwart_account_id", "stalwartAccountId"])) {
+    throw new ConflictError(
+      "That mailbox is already linked to an existing mail account.",
+    );
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  throw new UpstreamServiceError(
+    `Mailbox directory persistence failed: ${message}`,
+    500,
+  );
+}
+
 export class MailService implements IMailService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -220,6 +339,7 @@ export class MailService implements IMailService {
     private readonly config: {
       defaultDomain: string;
       discoveryBaseUrl: string;
+      oauth: MailOAuthConfig;
     },
   ) {}
 
@@ -228,8 +348,128 @@ export class MailService implements IMailService {
       defaultDomain: this.config.defaultDomain,
       discoveryBaseUrl: this.config.discoveryBaseUrl,
       signupEnabled: true,
-      loginMode: "basic",
+      oauth: this.config.oauth,
     };
+  }
+
+  private async reconcileProvisionedMailboxRecord(
+    tx: Prisma.TransactionClient,
+    input: {
+      userId?: string | null;
+      email: string;
+      localPart: string;
+      domain: string;
+      provisioning: NormalizedProvisioningInput;
+    },
+    details: {
+      stalwartAccountId: string;
+      stalwartDomainId: string;
+      stalwartPublicKeyId: string;
+      derivedFingerprint: string;
+    },
+    existingEntry: DirectoryEntryOwnershipRecord,
+  ): Promise<void> {
+    const requiresEmailRepair = existingEntry.email !== input.email;
+    const isOwnedByDifferentUser = Boolean(
+      existingEntry.userId && existingEntry.userId !== input.userId,
+    );
+
+    if (isOwnedByDifferentUser) {
+      logger.warn(
+        "Provisioned Stalwart account is already linked to another Solace account",
+        {
+          email: input.email,
+          userId: input.userId ?? null,
+          existingUserId: existingEntry.userId,
+          stalwartAccountId: details.stalwartAccountId,
+          directoryEntryId: existingEntry.id,
+        },
+      );
+      throw new ValidationError(
+        "That mailbox is already linked to another Solace account.",
+        "email",
+      );
+    }
+
+    if (requiresEmailRepair) {
+      logger.warn(
+        "Repairing stale mail directory entry for a provisioned Stalwart account",
+        {
+          requestedEmail: input.email,
+          existingEmail: existingEntry.email,
+          userId: input.userId ?? null,
+          existingUserId: existingEntry.userId,
+          stalwartAccountId: details.stalwartAccountId,
+          directoryEntryId: existingEntry.id,
+          resetMailSyncState: true,
+        },
+      );
+
+      await tx.mailJmapSyncState.deleteMany({
+        where: {
+          directoryEntryId: existingEntry.id,
+        },
+      });
+    }
+
+    if (!requiresEmailRepair) {
+      logger.warn("Reusing existing mail directory entry for provisioned Stalwart account", {
+        email: input.email,
+        userId: input.userId ?? null,
+        existingUserId: existingEntry.userId,
+        stalwartAccountId: details.stalwartAccountId,
+        directoryEntryId: existingEntry.id,
+      });
+    }
+
+    await tx.mailDirectoryEntry.update({
+      where: { id: existingEntry.id },
+      data: {
+        email: input.email,
+        localPart: input.localPart,
+        domain: input.domain,
+        displayName: input.provisioning.displayName,
+        stalwartDomainId: details.stalwartDomainId,
+        stalwartPublicKeyId: details.stalwartPublicKeyId,
+        publicKeyArmored: input.provisioning.publicKeyArmored,
+        publicKeyFingerprint: details.derivedFingerprint,
+        keyAlgorithm: input.provisioning.algorithm,
+        source: "internal",
+        trust: "verified",
+        keyCreatedAt: input.provisioning.createdAt,
+        ...(input.userId && !existingEntry.userId
+          ? {
+              user: {
+                connect: {
+                  id: input.userId,
+                },
+              },
+            }
+          : {}),
+        vaultBackup: {
+          upsert: {
+            create: {
+              vaultVersion: input.provisioning.vaultVersion,
+              encryptedVaultB64: input.provisioning.encryptedVaultB64,
+              kdf: input.provisioning.kdf,
+              kdfSaltB64: input.provisioning.kdfParams.saltB64,
+              kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
+              kdfIterations: input.provisioning.kdfParams.iterations,
+              kdfParallelism: input.provisioning.kdfParams.parallelism,
+            },
+            update: {
+              vaultVersion: input.provisioning.vaultVersion,
+              encryptedVaultB64: input.provisioning.encryptedVaultB64,
+              kdf: input.provisioning.kdf,
+              kdfSaltB64: input.provisioning.kdfParams.saltB64,
+              kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
+              kdfIterations: input.provisioning.kdfParams.iterations,
+              kdfParallelism: input.provisioning.kdfParams.parallelism,
+            },
+          },
+        },
+      },
+    });
   }
 
   private async findOrAttachMailboxForUser(input: {
@@ -238,15 +478,7 @@ export class MailService implements IMailService {
   }): Promise<LinkedMailboxRecord | null> {
     const entryByUserId = await this.prisma.mailDirectoryEntry.findUnique({
       where: { userId: input.userId },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        stalwartAccountId: true,
-        stalwartPublicKeyId: true,
-        publicKeyFingerprint: true,
-        userId: true,
-      },
+      select: linkedMailboxSelect,
     });
 
     if (entryByUserId) {
@@ -255,15 +487,7 @@ export class MailService implements IMailService {
 
     const entryByEmail = await this.prisma.mailDirectoryEntry.findUnique({
       where: { email: input.email },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        stalwartAccountId: true,
-        stalwartPublicKeyId: true,
-        publicKeyFingerprint: true,
-        userId: true,
-      },
+      select: linkedMailboxSelect,
     });
 
     if (!entryByEmail) {
@@ -290,15 +514,7 @@ export class MailService implements IMailService {
           },
         },
       },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        stalwartAccountId: true,
-        stalwartPublicKeyId: true,
-        publicKeyFingerprint: true,
-        userId: true,
-      },
+      select: linkedMailboxSelect,
     });
   }
 
@@ -337,71 +553,166 @@ export class MailService implements IMailService {
       );
     }
 
-    const domain = await this.adminClient.resolveDomainByName(input.domain);
-    const account = await this.adminClient.createAccount({
-      localPart: input.localPart,
-      password: input.provisioning.password,
-      domainId: domain.id,
-      description: input.provisioning.displayName,
-    });
-    const { publicKeyId } = await this.adminClient.registerPublicKey({
-      accountId: account.accountId,
-      email: input.email,
-      publicKeyArmored: input.provisioning.publicKeyArmored,
-      description: `${input.provisioning.displayName || input.email} primary OpenPGP key`,
-    });
+    let domainId = "";
+    let accountId = "";
+    let publicKeyId = "";
 
-    await this.adminClient.enableEncryptionAtRest({
-      accountId: account.accountId,
-      publicKeyId,
-      encryptOnAppend: false,
-      allowSpamTraining: false,
-    });
+    try {
+      const domain = await this.adminClient.resolveDomainByName(input.domain);
+      domainId = domain.id;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.mailDirectoryEntry.create({
-        data: {
-          email: input.email,
-          localPart: input.localPart,
-          domain: input.domain,
-          displayName: input.provisioning.displayName,
-          stalwartAccountId: account.accountId,
-          stalwartDomainId: domain.id,
-          stalwartPublicKeyId: publicKeyId,
-          publicKeyArmored: input.provisioning.publicKeyArmored,
-          publicKeyFingerprint: derivedFingerprint,
-          keyAlgorithm: input.provisioning.algorithm,
-          source: "internal",
-          trust: "verified",
-          keyCreatedAt: input.provisioning.createdAt,
-          ...(input.userId
-            ? {
-                user: {
-                  connect: {
-                    id: input.userId,
-                  },
-                },
-              }
-            : {}),
-          vaultBackup: {
-            create: {
-              vaultVersion: input.provisioning.vaultVersion,
-              encryptedVaultB64: input.provisioning.encryptedVaultB64,
-              kdf: input.provisioning.kdf,
-              kdfSaltB64: input.provisioning.kdfParams.saltB64,
-              kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
-              kdfIterations: input.provisioning.kdfParams.iterations,
-              kdfParallelism: input.provisioning.kdfParams.parallelism,
-            },
-          },
-        },
+      const account = await this.adminClient.createAccount({
+        localPart: input.localPart,
+        secret: generateMailboxCredentialSecret(),
+        domainId,
+        description: input.provisioning.displayName,
       });
-    });
+      accountId = account.accountId;
+
+      const registeredKey = await this.adminClient.registerPublicKey({
+        accountId,
+        email: input.email,
+        publicKeyArmored: input.provisioning.publicKeyArmored,
+        description: `${input.provisioning.displayName || input.email} primary OpenPGP key`,
+      });
+      publicKeyId = registeredKey.publicKeyId;
+
+      await this.adminClient.enableEncryptionAtRest({
+        accountId,
+        publicKeyId,
+        encryptOnAppend: false,
+        allowSpamTraining: false,
+      });
+    } catch (error) {
+      normalizeMailProvisioningError(error);
+    }
+
+    if (!domainId || !accountId || !publicKeyId) {
+      throw new UpstreamServiceError(
+        "Mailbox provisioning did not complete successfully.",
+      );
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const existingByAccountId = await tx.mailDirectoryEntry.findUnique({
+          where: { stalwartAccountId: accountId },
+          select: {
+            id: true,
+            email: true,
+            userId: true,
+          },
+        });
+
+        if (existingByAccountId) {
+          await this.reconcileProvisionedMailboxRecord(
+            tx,
+            input,
+            {
+              stalwartAccountId: accountId,
+              stalwartDomainId: domainId,
+              stalwartPublicKeyId: publicKeyId,
+              derivedFingerprint,
+            },
+            existingByAccountId,
+          );
+          return;
+        }
+
+        try {
+          await tx.mailDirectoryEntry.create({
+            data: {
+              email: input.email,
+              localPart: input.localPart,
+              domain: input.domain,
+              displayName: input.provisioning.displayName,
+              stalwartAccountId: accountId,
+              stalwartDomainId: domainId,
+              stalwartPublicKeyId: publicKeyId,
+              publicKeyArmored: input.provisioning.publicKeyArmored,
+              publicKeyFingerprint: derivedFingerprint,
+              keyAlgorithm: input.provisioning.algorithm,
+              source: "internal",
+              trust: "verified",
+              keyCreatedAt: input.provisioning.createdAt,
+              ...(input.userId
+                ? {
+                    user: {
+                      connect: {
+                        id: input.userId,
+                      },
+                    },
+                  }
+                : {}),
+              vaultBackup: {
+                create: {
+                  vaultVersion: input.provisioning.vaultVersion,
+                  encryptedVaultB64: input.provisioning.encryptedVaultB64,
+                  kdf: input.provisioning.kdf,
+                  kdfSaltB64: input.provisioning.kdfParams.saltB64,
+                  kdfMemoryKiB: input.provisioning.kdfParams.memoryKiB,
+                  kdfIterations: input.provisioning.kdfParams.iterations,
+                  kdfParallelism: input.provisioning.kdfParams.parallelism,
+                },
+              },
+            },
+          });
+        } catch (error) {
+          if (isUniqueConstraintError(error, ["stalwart_account_id", "stalwartAccountId"])) {
+            const concurrentEntry = await tx.mailDirectoryEntry.findUnique({
+              where: { stalwartAccountId: accountId },
+              select: {
+                id: true,
+                email: true,
+                userId: true,
+              },
+            });
+
+            if (concurrentEntry) {
+              logger.warn(
+                "Detected concurrent mail directory entry creation during mailbox provisioning",
+                {
+                  email: input.email,
+                  userId: input.userId ?? null,
+                  stalwartAccountId: accountId,
+                  directoryEntryId: concurrentEntry.id,
+                },
+              );
+              await this.reconcileProvisionedMailboxRecord(
+                tx,
+                input,
+                {
+                  stalwartAccountId: accountId,
+                  stalwartDomainId: domainId,
+                  stalwartPublicKeyId: publicKeyId,
+                  derivedFingerprint,
+                },
+                concurrentEntry,
+              );
+              return;
+            }
+          }
+
+          throw error;
+        }
+      });
+    } catch (error) {
+      logger.error("Failed to persist provisioned mailbox state", {
+        email: input.email,
+        userId: input.userId ?? null,
+        stalwartAccountId: accountId,
+        stalwartDomainId: domainId,
+        stalwartPublicKeyId: publicKeyId,
+        derivedFingerprint,
+        error,
+      });
+      normalizeMailPersistenceError(error);
+    }
 
     return {
       email: input.email,
       displayName: input.provisioning.displayName,
-      stalwartAccountId: account.accountId,
+      stalwartAccountId: accountId,
       stalwartPublicKeyId: publicKeyId,
       fingerprint: derivedFingerprint,
       encryptionAtRestEnabled: true,
@@ -422,25 +733,6 @@ export class MailService implements IMailService {
       displayName: mailbox?.displayName ?? normalizeOptionalText(input.displayName),
       provisioned: Boolean(mailbox),
     };
-  }
-
-  async signUp(input: MailSignupInput): Promise<MailSignupResult> {
-    const localPart = normalizeLocalPart(input.localPart);
-    const email = `${localPart}@${this.config.defaultDomain}`;
-
-    if (!LOCAL_PART_PATTERN.test(localPart)) {
-      throw new ValidationError(
-        "Mailbox local parts may only contain lowercase letters, numbers, dots, underscores, and hyphens.",
-        "localPart",
-      );
-    }
-
-    return this.createMailbox({
-      email,
-      localPart,
-      domain: this.config.defaultDomain,
-      provisioning: normalizeProvisioningInput(input),
-    });
   }
 
   async bootstrapForUser(

@@ -18,7 +18,6 @@ import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { accountApiService } from "@/lib/account-api-service";
-import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import {
   clearAuthPasswords,
   storePendingAuthPassword,
@@ -413,16 +412,6 @@ export function LoginForm() {
         void setEncPasswordCookie(password);
 
         setEmail(availability.normalizedEmail);
-
-        try {
-          await bootstrapMailboxForAccount({
-            email: availability.normalizedEmail,
-            password,
-            displayName: trimmedName,
-          });
-        } catch (mailboxError) {
-          log.error("Automatic mailbox bootstrap failed:", mailboxError);
-        }
       } else {
         if (!normalizedEmail) {
           setError("Please enter your account email address.");
@@ -544,7 +533,7 @@ export function LoginForm() {
   const subtitle = isForgotPassword
     ? "Enter your Solace account email and we’ll send a reset link for your email sign-in password."
     : isSignUp
-      ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password also protects your encrypted data.`
+      ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password is used locally to protect your encrypted mail vault.`
       : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
 
   const primaryButtonLabel = isForgotPassword

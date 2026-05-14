@@ -34,6 +34,12 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
+jest.mock("sonner", () => ({
+  toast: Object.assign(jest.fn(), {
+    error: jest.fn(),
+  }),
+}));
+
 jest.mock("@workspace/ui/components/ui/dropdown-menu", () => {
   const Passthrough = ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -107,7 +113,6 @@ jest.mock("../../lib/mail/api-service", () => ({
     getConfig: jest.fn(),
     getAccountStatus: jest.fn(),
     bootstrapAccountMailbox: jest.fn(),
-    signUp: jest.fn(),
     getAccountVaultBackup: jest.fn(),
     getVaultBackup: jest.fn(),
     getRecipientKey: jest.fn(),
@@ -286,7 +291,9 @@ import {
   unlockEncryptedMailVault,
 } from "../../lib/mail/vault-crypto";
 import { mailCryptoWorkerClient } from "../../lib/mail/worker-client";
+import { toast } from "sonner";
 
+const mockToast = jest.mocked(toast);
 const mockUseSession = jest.mocked(useSession);
 const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
 const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
@@ -295,6 +302,20 @@ const mockApi = jest.mocked(mailDemoApiService);
 const mockCreateEncryptedMailVault = jest.mocked(createEncryptedMailVault);
 const mockUnlockEncryptedMailVault = jest.mocked(unlockEncryptedMailVault);
 const mockWorkerClient = jest.mocked(mailCryptoWorkerClient);
+const mockToastError = jest.mocked(toast.error);
+
+const mockMailOAuthConfig = {
+  issuer: "https://api.solace.test/api/auth",
+  discoveryUrl: "https://api.solace.test/api/.well-known/openid-configuration",
+  authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
+  tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
+  userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
+  jwksUri: "https://api.solace.test/api/auth/jwks",
+  clientId: "solace-mail-browser",
+  redirectUri: "https://app.solace.test/mail/oauth/callback",
+  scopes: ["openid", "email"],
+  audiences: ["https://mail.solace.onl"],
+};
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -329,12 +350,36 @@ async function resetMailVaultDatabase() {
   });
 }
 
+async function waitForExpectation(
+  assertion: () => void,
+  timeoutMs: number = 1500,
+) {
+  const startedAt = Date.now();
+
+  while (true) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw error;
+      }
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+    }
+  }
+}
+
 describe("MailApp", () => {
   beforeEach(async () => {
     await resetMailVaultDatabase();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    mockToast.mockReset();
+    mockToastError.mockReset();
 
     mockUseSession.mockReturnValue({
       data: {
@@ -354,7 +399,7 @@ describe("MailApp", () => {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
-      loginMode: "basic",
+      oauth: mockMailOAuthConfig,
     });
     mockApi.getAccountStatus.mockResolvedValue({
       email: "alice@solace.onl",
@@ -505,7 +550,7 @@ describe("MailApp", () => {
     });
   }
 
-  it("auto-provisions the mailbox on first visit using the cached auth password", async () => {
+  it("auto-provisions and opens the mailbox on first visit using the cached auth password", async () => {
     mockApi.getAccountStatus.mockResolvedValueOnce({
       email: "alice@solace.onl",
       displayName: "Alice Example",
@@ -529,7 +574,6 @@ describe("MailApp", () => {
       "StrongMailboxPassword!42",
     );
     expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledWith({
-      password: "StrongMailboxPassword!42",
       publicKeyArmored: "public-key-armored",
       fingerprint: "ABCD1234EF567890",
       algorithm: "openpgp",
@@ -544,6 +588,90 @@ describe("MailApp", () => {
         parallelism: 4,
       },
     });
+    expect(
+      mockApi.bootstrapAccountMailbox.mock.calls[0]?.[0],
+    ).not.toHaveProperty("password");
+    expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledTimes(1);
+    expect(mockApi.getAccountVaultBackup).toHaveBeenCalledTimes(1);
+    expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
+      "vault-b64",
+      "StrongMailboxPassword!42",
+      {
+        saltB64: "salt-b64",
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+    );
+    expect(container.textContent).toContain("Encrypted hello");
+  });
+
+  it("retries a transient auto-provision failure without surfacing a mailbox error", async () => {
+    mockApi.getAccountStatus.mockResolvedValueOnce({
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      provisioned: false,
+    });
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+    mockApi.bootstrapAccountMailbox
+      .mockRejectedValueOnce({
+        statusCode: 500,
+        message: "Mail API request failed with status 500.",
+      })
+      .mockResolvedValueOnce({
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        stalwartAccountId: "acct-1",
+        stalwartPublicKeyId: "pk-1",
+        fingerprint: "ABCD1234EF567890",
+        encryptionAtRestEnabled: true,
+      });
+
+    await renderApp();
+    await waitForExpectation(() => {
+      expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledTimes(2);
+    });
+    await waitForExpectation(() => {
+      expect(mockApi.getAccountVaultBackup).toHaveBeenCalledTimes(1);
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("provisions and opens the mailbox when no cached password is available", async () => {
+    mockApi.getAccountStatus.mockResolvedValueOnce({
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      provisioned: false,
+    });
+
+    await renderApp();
+
+    expect(container.textContent).toContain("Set up your mailbox");
+
+    setInputValue(
+      container.querySelector("#mailbox-password") as HTMLInputElement,
+      "StrongMailboxPassword!42",
+    );
+
+    const setupButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Set up mailbox",
+    );
+
+    await act(async () => {
+      setupButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        publicKeyArmored: "public-key-armored",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+      }),
+    );
+    expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
+    expect(container.textContent).toContain("Encrypted hello");
   });
 
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
@@ -782,6 +910,10 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
+    await waitForExpectation(() => {
+      expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(2);
+    });
+
     expect(mockApi.getRecipientKey).not.toHaveBeenCalled();
     expect(mockWorkerClient.encryptForRecipients).not.toHaveBeenCalled();
     expect(mockJmapClient.sendMessage).toHaveBeenCalledWith(
@@ -798,8 +930,6 @@ describe("MailApp", () => {
         identityId: "identity-1",
       },
     );
-    // After sending, the hook refreshes the active mailbox messages
-    expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(2);
   });
 
   it("encrypts internal mail before sending it through the JMAP proxy", async () => {
@@ -941,6 +1071,26 @@ describe("MailApp", () => {
       expect.any(Object),
     );
     expect(container.textContent).toContain("Encrypted hello");
+  });
+
+  it("uses encryption-password unlock copy when mail oauth mode is enabled", async () => {
+    mockApi.getConfig.mockResolvedValueOnce({
+      defaultDomain: "solace.onl",
+      discoveryBaseUrl: "http://192.168.2.213:8080",
+      signupEnabled: true,
+      oauth: mockMailOAuthConfig,
+    });
+
+    await renderApp();
+
+    expect(container.textContent).toContain(
+      "Enter your encryption password to unlock your encrypted mailbox.",
+    );
+    expect(
+      container
+        .querySelector("#mailbox-password")
+        ?.getAttribute("placeholder"),
+    ).toBe("Encryption password");
   });
 });
 

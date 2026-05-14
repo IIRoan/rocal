@@ -39,6 +39,25 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class ConflictError extends Error {
+  constructor(message: string = "Resource already exists") {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.name = "ConflictError";
+  }
+}
+
+export class UpstreamServiceError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 503,
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.name = "UpstreamServiceError";
+  }
+}
+
 export class DatabaseError extends Error {
   constructor(
     message: string,
@@ -179,6 +198,26 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
             error: "Forbidden",
             message: error.message,
             statusCode: 403,
+            timestamp,
+          } as ApiErrorResponse;
+        }
+
+        if (error instanceof ConflictError) {
+          set.status = 409;
+          return {
+            error: "Conflict",
+            message: error.message,
+            statusCode: 409,
+            timestamp,
+          } as ApiErrorResponse;
+        }
+
+        if (error instanceof UpstreamServiceError) {
+          set.status = error.statusCode;
+          return {
+            error: "Upstream Service Error",
+            message: error.message,
+            statusCode: error.statusCode,
             timestamp,
           } as ApiErrorResponse;
         }

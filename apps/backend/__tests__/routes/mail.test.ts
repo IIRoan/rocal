@@ -1,25 +1,30 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Elysia } from "elysia";
 
+const mockMailOAuthConfig = {
+  issuer: "https://api.solace.test/api/auth",
+  discoveryUrl: "https://api.solace.test/api/auth/.well-known/openid-configuration",
+  authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
+  tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
+  userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
+  jwksUri: "https://api.solace.test/api/auth/jwks",
+  clientId: "solace-mail-browser",
+  redirectUri: "https://app.solace.test/mail/oauth/callback",
+  scopes: ["openid", "email"],
+  audiences: ["https://mail.solace.onl"],
+};
+
 const mockMailService = {
   getConfig: jest.fn(() => ({
     defaultDomain: "solace.onl",
     discoveryBaseUrl: "http://localhost:8080",
     signupEnabled: true,
-    loginMode: "basic" as const,
+    oauth: mockMailOAuthConfig,
   })),
   getMailboxStatusForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     displayName: "Alice Example",
     provisioned: true,
-  })),
-  signUp: jest.fn(async () => ({
-    email: "alice@solace.onl",
-    displayName: "Alice Example",
-    stalwartAccountId: "acct-1",
-    stalwartPublicKeyId: "pk-1",
-    fingerprint: "ABCD1234EF567890",
-    encryptionAtRestEnabled: true,
   })),
   bootstrapForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
@@ -132,7 +137,7 @@ describe("mailRoutes", () => {
     }).handle(
       new Request("http://localhost/mail/jmap/.well-known/jmap", {
         headers: {
-          Authorization: "Basic mailbox-auth",
+          Authorization: "Bearer mail-access-token",
           Accept: "application/json",
         },
       }),
@@ -179,7 +184,7 @@ describe("mailRoutes", () => {
       new Request("http://localhost/mail/jmap/jmap/", {
         method: "POST",
         headers: {
-          Authorization: "Basic mailbox-auth",
+          Authorization: "Bearer mail-access-token",
           "Content-Type": "application/json",
         },
         body: requestBody,
@@ -221,7 +226,7 @@ describe("mailRoutes", () => {
         "http://localhost/mail/jmap/jmap/download/account-1/blob-1/message.eml?accept=message%2Frfc822",
         {
           headers: {
-            Authorization: "Basic mailbox-auth",
+            Authorization: "Bearer mail-access-token",
             Accept: "message/rfc822",
           },
         },
@@ -255,7 +260,7 @@ describe("mailRoutes", () => {
       new Request("http://localhost/mail/jmap/jmap/", {
         method: "POST",
         headers: {
-          Authorization: "Basic mailbox-auth",
+          Authorization: "Bearer mail-access-token",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -297,99 +302,8 @@ describe("mailRoutes", () => {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://localhost:8080",
       signupEnabled: true,
-      loginMode: "basic",
+      oauth: mockMailOAuthConfig,
     });
-  });
-
-  it("provisions a mailbox from the signup route", async () => {
-    const response = await createApp().handle(
-      new Request("http://localhost/mail/signup", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          displayName: "Alice Example",
-          localPart: "alice",
-          password: "StrongMailboxPassword!42",
-          publicKeyArmored: "public-key-armored",
-          fingerprint: "ABCD1234EF567890",
-          algorithm: "openpgp",
-          createdAt: "2026-05-06T21:00:00.000Z",
-          vaultVersion: 1,
-          encryptedVaultB64: "vault-b64",
-          kdf: "argon2id",
-          kdfParams: {
-            saltB64: "salt-b64",
-            memoryKiB: 65536,
-            iterations: 3,
-            parallelism: 4,
-          },
-        }),
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockMailService.signUp).toHaveBeenCalledWith({
-      displayName: "Alice Example",
-      localPart: "alice",
-      password: "StrongMailboxPassword!42",
-      publicKeyArmored: "public-key-armored",
-      fingerprint: "ABCD1234EF567890",
-      algorithm: "openpgp",
-      createdAt: "2026-05-06T21:00:00.000Z",
-      vaultVersion: 1,
-      encryptedVaultB64: "vault-b64",
-      kdf: "argon2id",
-      kdfParams: {
-        saltB64: "salt-b64",
-        memoryKiB: 65536,
-        iterations: 3,
-        parallelism: 4,
-      },
-    });
-    await expect(readJson(response)).resolves.toEqual({
-      email: "alice@solace.onl",
-      displayName: "Alice Example",
-      stalwartAccountId: "acct-1",
-      stalwartPublicKeyId: "pk-1",
-      fingerprint: "ABCD1234EF567890",
-      encryptionAtRestEnabled: true,
-    });
-  });
-
-  it("rejects unexpected signup fields", async () => {
-    const response = await createApp().handle(
-      new Request("http://localhost/mail/signup", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          displayName: "Alice Example",
-          localPart: "alice",
-          password: "StrongMailboxPassword!42",
-          publicKeyArmored: "public-key-armored",
-          fingerprint: "ABCD1234EF567890",
-          algorithm: "openpgp",
-          createdAt: "2026-05-06T21:00:00.000Z",
-          vaultVersion: 1,
-          encryptedVaultB64: "vault-b64",
-          kdf: "argon2id",
-          kdfParams: {
-            saltB64: "salt-b64",
-            memoryKiB: 65536,
-            iterations: 3,
-            parallelism: 4,
-          },
-          unexpected: true,
-        }),
-      }),
-    );
-
-    expect(response.status).toBe(422);
-    expect(mockMailService.signUp).not.toHaveBeenCalled();
-    await expect(readJson(response)).resolves.toEqual(
-      expect.objectContaining({
-        type: "validation",
-      }),
-    );
   });
 
   it("returns internal recipient keys for compose encryption", async () => {
@@ -408,85 +322,5 @@ describe("mailRoutes", () => {
       source: "internal",
       trust: "verified",
     });
-  });
-
-  it("returns encrypted vault backups for mailbox restore", async () => {
-    const response = await createApp().handle(
-      new Request("http://localhost/mail/vault/backup/alice@solace.onl"),
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockMailService.getVaultBackup).toHaveBeenCalledWith(
-      "alice@solace.onl",
-    );
-    await expect(readJson(response)).resolves.toEqual({
-      email: "alice@solace.onl",
-      vaultVersion: 1,
-      encryptedVaultB64: "vault-b64",
-      kdf: "argon2id",
-      kdfParams: {
-        saltB64: "salt-b64",
-        memoryKiB: 65536,
-        iterations: 3,
-        parallelism: 4,
-      },
-    });
-  });
-
-  it("stores encrypted vault backup updates from the public restore route", async () => {
-    const requestBody = {
-      email: "alice@solace.onl",
-      vaultVersion: 1,
-      encryptedVaultB64: "vault-b64",
-      kdf: "argon2id",
-      kdfParams: {
-        saltB64: "salt-b64",
-        memoryKiB: 65536,
-        iterations: 3,
-        parallelism: 4,
-      },
-    };
-
-    const response = await createApp().handle(
-      new Request("http://localhost/mail/vault/backup", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(requestBody),
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockMailService.upsertVaultBackup).toHaveBeenCalledWith(requestBody);
-    await expect(readJson(response)).resolves.toEqual(requestBody);
-  });
-
-  it("rejects unexpected fields when storing a public encrypted vault backup", async () => {
-    const response = await createApp().handle(
-      new Request("http://localhost/mail/vault/backup", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: "alice@solace.onl",
-          vaultVersion: 1,
-          encryptedVaultB64: "vault-b64",
-          kdf: "argon2id",
-          kdfParams: {
-            saltB64: "salt-b64",
-            memoryKiB: 65536,
-            iterations: 3,
-            parallelism: 4,
-          },
-          unexpected: true,
-        }),
-      }),
-    );
-
-    expect(response.status).toBe(422);
-    expect(mockMailService.upsertVaultBackup).not.toHaveBeenCalled();
-    await expect(readJson(response)).resolves.toEqual(
-      expect.objectContaining({
-        type: "validation",
-      }),
-    );
   });
 });
