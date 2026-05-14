@@ -25,7 +25,7 @@ jest.mock("next/image", () => ({
   }: React.ImgHTMLAttributes<HTMLImageElement> & {
     fill?: boolean;
     unoptimized?: boolean;
-  }) => <img {...props} />,
+  }) => require("react").createElement("img", { alt: props.alt ?? "", ...props }),
 }));
 
 jest.mock("next/link", () => ({
@@ -147,10 +147,6 @@ jest.mock("@/lib/account-api-service", () => ({
   },
 }));
 
-jest.mock("@/lib/mail/account-bootstrap", () => ({
-  bootstrapMailboxForAccount: jest.fn(),
-}));
-
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
   storePendingAuthPassword: jest.fn(),
@@ -179,13 +175,16 @@ jest.mock("@/lib/auth-client", () => ({
 
 import { LoginForm } from "../../app/login/_content";
 import { accountApiService } from "@/lib/account-api-service";
-import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   clearAuthPasswords,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  setEncPasswordCookie,
+} from "@/lib/enc-password-cookie";
 
 const mockUseSession = jest.mocked(useSession);
 const mockRequestPasswordReset = jest.mocked(authClient.requestPasswordReset);
@@ -197,10 +196,11 @@ const mockCheckEmailAvailability = jest.mocked(
 );
 const mockGetSignupConfig = jest.mocked(accountApiService.getSignupConfig);
 const mockGetAuthStatus = jest.mocked(accountApiService.getAuthStatus);
-const mockBootstrapMailboxForAccount = jest.mocked(bootstrapMailboxForAccount);
 const mockUpdateUserSettings = jest.mocked(calendarApiService.updateUserSettings);
 const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
+const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
+const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -240,14 +240,6 @@ describe("LoginForm", () => {
       available: true,
       code: "available",
       message: "That email address is available.",
-    });
-    mockBootstrapMailboxForAccount.mockResolvedValue({
-      email: "roan@solace.onl",
-      displayName: "Roan",
-      stalwartAccountId: "acct-1",
-      stalwartPublicKeyId: "pk-1",
-      fingerprint: "ABCD1234EF567890",
-      encryptionAtRestEnabled: true,
     });
     mockEmailSignIn.mockResolvedValue({});
     mockEmailSignUp.mockResolvedValue({});
@@ -304,6 +296,29 @@ describe("LoginForm", () => {
     );
     expect(container.textContent).toContain("Full name");
     expect(container.textContent).toContain("Solace email");
+    expect(mockGetSignupConfig).toHaveBeenCalled();
+  });
+
+  it("renders the configured signup domain in sign-up mode", async () => {
+    mockGetSignupConfig.mockResolvedValueOnce({
+      defaultEmailDomain: "team.solace.onl",
+    });
+
+    await renderForm();
+
+    const signUpButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Sign up",
+    );
+
+    await act(async () => {
+      signUpButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain(
+      "Choose your @team.solace.onl Solace email and password.",
+    );
+    expect(container.textContent).toContain("@team.solace.onl");
   });
 
   it("shows the clarified forgot-password title and subtitle", async () => {
@@ -391,6 +406,7 @@ describe("LoginForm", () => {
       password: "secret-password",
     });
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("secret-password");
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("secret-password");
   });
 
   it("checks email availability before signing up with email", async () => {
@@ -431,13 +447,120 @@ describe("LoginForm", () => {
       name: "Roan",
     });
     expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("secret-password");
-    expect(mockBootstrapMailboxForAccount).toHaveBeenCalledWith({
-      email: "roan@solace.onl",
-      password: "secret-password",
-      displayName: "Roan",
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("secret-password");
+  });
+
+  it("shows the availability error and skips sign-up when the Solace email is taken", async () => {
+    mockCheckEmailAvailability.mockResolvedValueOnce({
+      email: "roan",
+      localPart: "roan",
+      domain: "solace.onl",
+      normalizedEmail: "roan@solace.onl",
+      available: false,
+      code: "already_in_use",
+      message: "That Solace email is already in use.",
     });
-    expect(mockStorePendingAuthPassword.mock.invocationCallOrder[0]).toBeLessThan(
-      mockBootstrapMailboxForAccount.mock.invocationCallOrder[0],
+
+    await renderForm();
+
+    const signUpButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Sign up",
+    );
+
+    await act(async () => {
+      signUpButton?.click();
+      await Promise.resolve();
+    });
+
+    const nameInput = container.querySelector("#name") as HTMLInputElement | null;
+    const desiredEmailInput = container.querySelector(
+      "#desired-email",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Create account"),
+    );
+
+    await act(async () => {
+      setInputValue(nameInput as HTMLInputElement, "Roan");
+      setInputValue(desiredEmailInput as HTMLInputElement, "RoAn");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("That Solace email is already in use.");
+    expect(mockEmailSignUp).not.toHaveBeenCalled();
+    expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
+    expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
+  });
+
+  it("clears cached auth secrets and shows an error when email auth throws", async () => {
+    mockEmailSignIn.mockRejectedValueOnce(new Error("Authentication failed hard."));
+
+    await renderForm();
+
+    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockClearAuthPasswords).toHaveBeenCalledTimes(1);
+    expect(mockClearEncPasswordCookie).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Authentication failed hard.");
+    expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
+    expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
+  });
+
+  it("shows a passkey completion notice when step-up is required on a device without passkey support", async () => {
+    mockGetAuthStatus.mockResolvedValueOnce({
+      authenticated: true,
+      hasPasskeys: true,
+      requiresPasskeyStepUp: true,
+    });
+    (
+      globalThis as typeof globalThis & {
+        PublicKeyCredential?: typeof PublicKeyCredential;
+      }
+    ).PublicKeyCredential = undefined;
+    (
+      window as typeof window & {
+        PublicKeyCredential?: typeof PublicKeyCredential;
+      }
+    ).PublicKeyCredential = undefined;
+
+    await renderForm();
+
+    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Sign in"),
+    );
+
+    await act(async () => {
+      setInputValue(emailInput as HTMLInputElement, "roan@solace.onl");
+      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockPasskeySignIn).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(
+      "Password accepted. Check your device to finish signing in with your passkey.",
     );
   });
 

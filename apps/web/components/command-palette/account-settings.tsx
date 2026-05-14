@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import Image from "next/image";
 import {
   RotateCcw,
   Check,
@@ -186,12 +187,16 @@ function Avatar({
       : size === "sm"
         ? "h-8 w-8 text-xs"
         : "h-10 w-10 text-sm";
+  const sizePx = size === "lg" ? 56 : size === "sm" ? 32 : 40;
 
   if (imageUrl && !imgError) {
     return (
-      <img
+      <Image
         src={imageUrl}
         alt={name ?? "Profile picture"}
+        width={sizePx}
+        height={sizePx}
+        unoptimized
         onError={() => setImgError(true)}
         className={`${sizeClass} shrink-0 rounded-full object-cover ring-1 ring-border/40`}
       />
