@@ -245,6 +245,78 @@ export function buildPasswordUpdatedEmail({
   };
 }
 
+export function buildInviteEmail({
+  inviterName,
+  signupUrl,
+  token,
+  logoUrl = DEFAULT_LOGO_URL,
+  appUrl = DEFAULT_APP_URL,
+}: {
+  inviterName: string;
+  signupUrl: string;
+  token: string;
+  logoUrl?: string;
+  appUrl?: string;
+}): AuthEmailMessage {
+  const safeInviterName = escapeHtml(inviterName);
+  const safeSignupUrl = escapeHtml(signupUrl);
+  const safeToken = escapeHtml(token);
+
+  const bodyHtml = `
+    <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">You&rsquo;ve been invited to Solace</h1>
+    <p class="email-subtitle" style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0,0,0,0.50)">Invited by ${safeInviterName}</p>
+    <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
+      ${safeInviterName} has invited you to join Solace &mdash; a private, end-to-end encrypted calendar and email workspace.
+      Click the button below to create your account. Your invite expires in&nbsp;<strong>7&nbsp;days</strong>.
+    </p>
+    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
+      <tbody>
+        <tr>
+          <td align="center" valign="middle">
+            <a class="email-btn" href="${safeSignupUrl}" style='display:inline-block;background:#fff;color:#000;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;font-weight:500;line-height:100%;margin:0;text-decoration:none;padding:12px 20px;border:1px solid rgba(0,0,0,0.12);border-bottom:2px solid rgba(0,0,0,0.12);border-radius:12px'>Create your account</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="email-body" style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#1a1a1a">
+      Your invite token (you&rsquo;ll need this on the sign-up page):
+    </p>
+    <p style="margin:8px 0 0;font-family:monospace;font-size:13px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:8px;padding:10px 14px;word-break:break-all;color:#1a1a1a">${safeToken}</p>
+    <p class="email-footer" style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#a8a8a8">
+      If the button doesn&rsquo;t work, copy this link:
+      <a href="${safeSignupUrl}" style="color:#a8a8a8;text-decoration:underline;word-break:break-all">${safeSignupUrl}</a>
+    </p>`;
+
+  const footerHtml = `
+    <p class="email-footer" style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#a8a8a8">
+      If you weren&rsquo;t expecting this invitation, you can safely ignore this email.
+    </p>`;
+
+  return {
+    subject: `${inviterName} invited you to Solace`,
+    text: [
+      `${inviterName} has invited you to join Solace.`,
+      "",
+      "Create your account using the link below:",
+      signupUrl,
+      "",
+      `Your invite token: ${token}`,
+      "",
+      "Your invite expires in 7 days.",
+      "",
+      "If you weren't expecting this invitation, you can safely ignore this email.",
+    ].join("\n"),
+    html: buildEmailHtml({
+      title: "You've been invited to Solace",
+      previewText: `${inviterName} invited you to join Solace. Create your account before your invite expires.`,
+      logoUrl,
+      appUrl,
+      bodyHtml,
+      footerHtml,
+    }),
+  };
+}
+
 export function getPasswordChangeRecipient(response: unknown): {
   email: string;
   name: string;

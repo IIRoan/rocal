@@ -74,10 +74,21 @@ export class HttpClient {
     return false;
   }
 
+  private logHttpError(response: Response, details: unknown): void {
+    const message = `HTTP ${response.status} Error Response:`;
+
+    if (response.status >= 500) {
+      log.error(message, details);
+      return;
+    }
+
+    log.warn(message, details);
+  }
+
   private async parseErrorResponse(response: Response): Promise<ApiError> {
     try {
       const errorText = await response.text();
-      log.error(`HTTP ${response.status} Error Response:`, errorText);
+      this.logHttpError(response, errorText);
 
       let errorData: any;
       try {
@@ -98,7 +109,10 @@ export class HttpClient {
         details: errorData.details || [],
       };
 
-      log.error(`API Error [${response.url}]:`, apiError);
+      this.logHttpError(response, {
+        url: response.url,
+        ...apiError,
+      });
       return apiError;
     } catch (parseError) {
       log.error("Failed to parse error response:", parseError);

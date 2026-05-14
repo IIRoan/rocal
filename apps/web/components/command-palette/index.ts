@@ -4,6 +4,7 @@ export { TimeRegionSettings } from "./time-region-settings";
 export { CalendarDefaultsSettings } from "./calendar-defaults-settings";
 export { AccountSettings } from "./account-settings";
 export { SecuritySettings } from "./security-settings";
+export { InviteSettings } from "./invite-settings";
 export { SettingToggleRow, ToggleIndicator } from "./setting-toggle-row";
 export { type PaletteView } from "./constants";
 export { TransitionContainer } from "./transition-container";

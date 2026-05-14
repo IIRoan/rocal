@@ -375,6 +375,24 @@ export const UserRelations = t.Object(
       ),
       { additionalProperties: false },
     ),
+    sentInvites: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          token: t.String(),
+          invitedById: t.String(),
+          email: t.String(),
+          status: t.String(),
+          expiresAt: t.Date(),
+          claimedForEmail: __nullable__(t.String()),
+          claimedAt: __nullable__(t.Date()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
   },
   { additionalProperties: false },
 );
@@ -633,6 +651,22 @@ export const UserRelationsInputCreate = t.Object(
       ),
     ),
     passkeys: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    sentInvites: t.Optional(
       t.Object(
         {
           connect: t.Array(
@@ -1022,6 +1056,31 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      sentInvites: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
     },
     { additionalProperties: false },
   ),
@@ -1124,6 +1183,7 @@ export const UserSelect = t.Partial(
       encryptionDevices: t.Boolean(),
       encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
+      sentInvites: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -1149,6 +1209,7 @@ export const UserInclude = t.Partial(
       encryptionDevices: t.Boolean(),
       encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
+      sentInvites: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },

@@ -6,7 +6,6 @@ import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "@better-auth/core/api";
 import { oneTimeToken, openAPI, jwt } from "better-auth/plugins";
 import { createLogger } from "@workspace/logger";
-import { Resend } from "resend";
 import { prisma } from "./prisma";
 import { env, getMailOauthConfigurationErrors } from "./env";
 import { BETTER_AUTH_BASE_PATH } from "./auth-constants";
@@ -16,6 +15,7 @@ import {
   getPasswordChangeRecipient,
   sendAuthEmail,
 } from "./auth-email";
+import { resend, authEmailFrom } from "./email-client";
 import { getAuthTrustedOrigins } from "./origin-policy";
 import {
   clearPasskeyStepUpCookie,
@@ -26,6 +26,7 @@ import {
   buildMailOauthUserInfoClaims,
 } from "./mail-oauth-claims";
 import { runMailOauthClientSeedTasks } from "./mail-oauth-bootstrap";
+import { inviteService } from "./invite-service";
 
 const {
   backendUrl,
@@ -60,12 +61,6 @@ const passkeyOrigin =
   process.env.PASSKEY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || frontendUrl;
 
 const logger = createLogger("backend:auth");
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-const authEmailFrom =
-  process.env.AUTH_EMAIL_FROM ||
-  process.env.AUTH_RESET_EMAIL_FROM || "Solace <notifications@mailing.roan.dev>";
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -315,6 +310,69 @@ const passkeyStepUpPlugin = {
   },
 };
 
+const inviteRequiredPlugin = {
+  id: "invite-required",
+  hooks: {
+    before: [
+      {
+        matcher(context: { path?: string }) {
+          return context.path === "/sign-up/email";
+        },
+        handler: createAuthMiddleware(async (ctx): Promise<Response | undefined> => {
+          let email: string | undefined;
+          try {
+            const body = ctx.body as Record<string, unknown> | undefined;
+            if (typeof body?.email === "string") {
+              email = body.email.trim().toLowerCase();
+            }
+          } catch {
+            // ignore
+          }
+
+          if (!email) {
+            return new Response(
+              JSON.stringify({ message: "An invite is required to create an account." }),
+              { status: 403, headers: { "Content-Type": "application/json" } },
+            );
+          }
+
+          const check = await inviteService.checkSignupAllowed(email);
+
+          if (!check.allowed) {
+            return new Response(
+              JSON.stringify({
+                message:
+                  check.reason ||
+                  "An invite is required to create an account.",
+              }),
+              { status: 403, headers: { "Content-Type": "application/json" } },
+            );
+          }
+
+          return undefined;
+        }),
+      },
+    ],
+    after: [
+      {
+        matcher(context: { path?: string }) {
+          return context.path === "/sign-up/email";
+        },
+        handler: createAuthMiddleware(async (ctx): Promise<void> => {
+          const response = await getSuccessfulEndpointResponse<{
+            user?: { email?: string };
+          }>(ctx.context.returned);
+
+          const email = response?.user?.email?.trim().toLowerCase();
+          if (email) {
+            await inviteService.markInviteAccepted(email);
+          }
+        }),
+      },
+    ],
+  },
+};
+
 const authPlugins = [
   expo(),
   openAPI({
@@ -322,6 +380,7 @@ const authPlugins = [
   }),
   passwordChangeNotificationPlugin,
   passkeyStepUpPlugin,
+  inviteRequiredPlugin,
   passkey({
     rpID: getRpId(passkeyOrigin),
     rpName: "Rocani",

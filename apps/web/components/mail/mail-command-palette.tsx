@@ -20,6 +20,7 @@ import {
   Bell,
   Shield,
   Inbox,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -43,6 +44,7 @@ import {
   TimeRegionSettings,
   TransitionContainer,
   SettingToggleRow,
+  InviteSettings,
 } from "../command-palette/index";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";
@@ -60,7 +62,8 @@ type MailPaletteView =
   | "passkeys"
   | "mailboxes"
   | "mailbox-create"
-  | "mailbox-edit";
+  | "mailbox-edit"
+  | "invites";
 
 interface PaletteItem {
   id: string;
@@ -269,6 +272,7 @@ export function MailCommandPalette({
       { id: "notifications", label: "Notifications", icon: Bell, description: "Email alerts" },
       { id: "security", label: "Security", icon: Shield, description: "Passkeys & authentication" },
       { id: "account", label: "Account", icon: User, description: "Manage your account" },
+      { id: "invites", label: "Invites", icon: Users, description: "Invite friends to join Solace" },
     ],
     [settings?.timezone],
   );
@@ -545,6 +549,10 @@ export function MailCommandPalette({
           handleUpdateProfile={handleUpdateProfile}
         />
       );
+    }
+
+    if (currentView === "invites") {
+      return <InviteSettings goBack={goBack} />;
     }
 
     return null;

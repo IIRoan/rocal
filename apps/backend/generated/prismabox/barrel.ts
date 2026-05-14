@@ -1,4 +1,5 @@
 export * from "./User";
+export * from "./Invite";
 export * from "./Session";
 export * from "./Account";
 export * from "./Verification";
