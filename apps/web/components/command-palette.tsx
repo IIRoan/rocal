@@ -26,6 +26,7 @@ import {
   CalendarDefaultsSettings,
   AccountSettings,
   SecuritySettings,
+  InviteSettings,
   type PaletteView,
   TransitionContainer,
   NAVIGATION_ITEMS,
@@ -135,6 +136,7 @@ export function CommandPalette({
       "subscriptions-edit": ["main", "subscriptions"],
       events: ["main"],
       "event-editor": ["main"],
+      invites: ["main"],
       search: ["main"],
     };
     if (view === "main") return ["main"];
@@ -544,6 +546,8 @@ export function CommandPalette({
         return "Security";
       case "passkeys":
         return "Passkeys";
+      case "invites":
+        return "Invites";
       case "calendars":
         return "Calendar Management";
       case "calendar-create":
@@ -667,6 +671,10 @@ export function CommandPalette({
           startInAddMode={passkeyAddMode}
         />
       );
+    }
+
+    if (currentView === "invites") {
+      return <InviteSettings goBack={goBack} />;
     }
 
     if (

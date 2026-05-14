@@ -131,6 +131,19 @@ exports.Prisma.UserScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.InviteScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  invitedById: 'invitedById',
+  email: 'email',
+  status: 'status',
+  expiresAt: 'expiresAt',
+  claimedForEmail: 'claimedForEmail',
+  claimedAt: 'claimedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SessionScalarFieldEnum = {
   id: 'id',
   expiresAt: 'expiresAt',
@@ -542,6 +555,7 @@ exports.Prisma.JsonNullValueFilter = {
 
 exports.Prisma.ModelName = {
   User: 'User',
+  Invite: 'Invite',
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
