@@ -52,6 +52,6 @@ describe("ensureAuthenticatedUser", () => {
 
     await expect(
       ensureAuthenticatedUser(null, new Request("http://localhost")),
-    ).rejects.toThrow("User context missing");
+    ).rejects.toThrow("Authentication required.");
   });
 });

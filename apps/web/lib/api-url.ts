@@ -1,4 +1,6 @@
-const AUTH_REDIRECT_FALLBACK_PATH = "/dashboard";
+import { CALENDAR_HOME_PATH } from "./app-routes";
+
+const AUTH_REDIRECT_FALLBACK_PATH = CALENDAR_HOME_PATH;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 function isLoopbackHost(hostname?: string | null) {

@@ -62,7 +62,7 @@ function resolvePasswordResetRedirectUrl(): string | null {
 }
 
 export default function SignInScreen() {
-  const { signIn, signInWithGitHub, signInWithPasskey } = useAuth();
+  const { signIn, signInWithPasskey, requiresPasskeyStepUp } = useAuth();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -92,7 +92,6 @@ export default function SignInScreen() {
   const [isResetMode, setIsResetMode] = useState(false);
 
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
   const [isRequestingPasswordReset, setIsRequestingPasswordReset] =
     useState(false);
@@ -124,9 +123,13 @@ export default function SignInScreen() {
     log.info("Attempting email sign-in", { email: email.trim() });
     setIsSigningIn(true);
     try {
-      await signIn(email.trim(), password);
+      const result = await signIn(email.trim(), password);
       log.ok("Sign-in successful");
-      router.replace(CALENDAR_HOME_ROUTE);
+      if (result.requiresPasskeyStepUp) {
+        setServerError("Password accepted. Complete your passkey verification.");
+      } else {
+        router.replace(CALENDAR_HOME_ROUTE);
+      }
     } catch (err: any) {
       const message =
         err?.message ?? "Sign-in failed. Please check your credentials.";
@@ -201,23 +204,6 @@ export default function SignInScreen() {
     }
   }, [clearErrors, router, signInWithPasskey]);
 
-  const handleGitHubSignIn = useCallback(async () => {
-    clearErrors();
-    log.info("Attempting GitHub sign-in");
-    setIsGitHubLoading(true);
-    try {
-      await signInWithGitHub();
-      log.ok("GitHub sign-in successful");
-      router.replace(CALENDAR_HOME_ROUTE);
-    } catch (err: any) {
-      const message = err?.message ?? "GitHub sign-in failed. Please try again.";
-      log.error("GitHub sign-in failed", err);
-      setServerError(message);
-    } finally {
-      setIsGitHubLoading(false);
-    }
-  }, [clearErrors, router, signInWithGitHub]);
-
   const switchMode = useCallback(
     (nextMode: boolean) => {
       setIsResetMode(nextMode);
@@ -232,7 +218,6 @@ export default function SignInScreen() {
 
   const isLoading =
     isSigningIn ||
-    isGitHubLoading ||
     isPasskeyLoading ||
     isRequestingPasswordReset;
 
@@ -241,7 +226,7 @@ export default function SignInScreen() {
     : "Welcome back";
   const subtitle = isResetMode
     ? "Enter your email and we’ll send a web link to reset your email sign-in password."
-    : "Sign in to your account to continue";
+    : "Sign in with your email and password. If your account has passkeys, you'll verify with one next.";
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -345,8 +330,7 @@ export default function SignInScreen() {
                   We&apos;ll email you a secure link to reset your email sign-in
                   password on the web. If you sign in with email, Solace also
                   uses that password to protect your encryption keys after you
-                  sign in. GitHub and passkey sign-in keep using a separate
-                  encryption password.
+                  sign in.
                 </Text>
               </View>
             )}
@@ -376,40 +360,15 @@ export default function SignInScreen() {
 
             {!isResetMode ? (
               <>
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or continue with</Text>
-                  <View style={styles.dividerLine} />
-                </View>
+                {requiresPasskeyStepUp && showPasskeyButton ? (
+                  <>
+                    <View style={styles.divider}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.dividerText}>second factor required</Text>
+                      <View style={styles.dividerLine} />
+                    </View>
 
-                <View style={styles.socialButtonsRow}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.socialButton,
-                      pressed && styles.secondaryButtonPressed,
-                      isLoading && styles.buttonDisabled,
-                    ]}
-                    onPress={handleGitHubSignIn}
-                    disabled={isLoading}
-                    accessibilityRole="button"
-                    accessibilityLabel="Continue with GitHub"
-                    accessibilityState={{ disabled: isLoading }}
-                  >
-                    {isGitHubLoading ? (
-                      <ActivityIndicator color={theme.colors.foreground} />
-                    ) : (
-                      <>
-                        <Feather
-                          name="github"
-                          size={16}
-                          color={theme.colors.foreground}
-                        />
-                        <Text style={styles.secondaryButtonText}>GitHub</Text>
-                      </>
-                    )}
-                  </Pressable>
-
-                  {showPasskeyButton ? (
+                    <View style={styles.socialButtonsRow}>
                     <Pressable
                       style={({ pressed }) => [
                         styles.socialButton,
@@ -435,8 +394,9 @@ export default function SignInScreen() {
                         </>
                       )}
                     </Pressable>
-                  ) : null}
-                </View>
+                    </View>
+                  </>
+                ) : null}
               </>
             ) : null}
 

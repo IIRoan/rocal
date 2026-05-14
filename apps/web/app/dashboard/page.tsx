@@ -1,5 +1,12 @@
-import { DashboardPageContent } from "./_client";
+import { redirect } from "next/navigation";
+import { buildCalendarPath, type RouteSearchParams } from "@/lib/app-routes";
 
-export default function DashboardPage() {
-  return <DashboardPageContent />;
+type DashboardPageProps = {
+  searchParams?: Promise<RouteSearchParams> | RouteSearchParams;
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: DashboardPageProps) {
+  redirect(buildCalendarPath(await searchParams));
 }

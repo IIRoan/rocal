@@ -1,13 +1,15 @@
 import { betterAuth } from "better-auth";
 import { expo } from "@better-auth/expo";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "@better-auth/core/api";
-import { oneTimeToken, openAPI } from "better-auth/plugins";
+import { oneTimeToken, openAPI, jwt } from "better-auth/plugins";
 import { createLogger } from "@workspace/logger";
 import { Resend } from "resend";
 import { prisma } from "./prisma";
-import { env } from "./env";
+import { env, getMailOauthConfigurationErrors } from "./env";
+import { BETTER_AUTH_BASE_PATH } from "./auth-constants";
 import {
   buildPasswordResetEmail,
   buildPasswordUpdatedEmail,
@@ -15,11 +17,40 @@ import {
   sendAuthEmail,
 } from "./auth-email";
 import { getAuthTrustedOrigins } from "./origin-policy";
-import { getOAuthProviderCallbackUrl } from "./oauth-urls";
+import {
+  clearPasskeyStepUpCookie,
+  setVerifiedPasskeyStepUpCookie,
+} from "./passkey-step-up";
+import {
+  buildMailOauthAccessTokenClaims,
+  buildMailOauthUserInfoClaims,
+} from "./mail-oauth-claims";
+import { runMailOauthClientSeedTasks } from "./mail-oauth-bootstrap";
 
-export const BETTER_AUTH_BASE_PATH = "/api/auth";
+const {
+  backendUrl,
+  frontendUrl,
+  isProduction,
+  cookieSameSite,
+  mailOauthEnabled,
+  mailOauthClientId,
+  mailOauthClientSecret,
+  mailOauthClientName,
+  mailOauthRedirectUris,
+  mailOauthBrowserClientId,
+  mailOauthBrowserClientName,
+  mailOauthBrowserRedirectUris,
+  mailOauthPostLogoutRedirectUris,
+  mailOauthScopes,
+  mailOauthAudiences,
+  mailOauthCachedTrustedClientIds,
+  mailOauthLoginPage,
+  mailOauthConsentPage,
+  mailOauthPairwiseSecret,
+  stalwartBaseUrl,
+} = env;
 
-const { backendUrl, frontendUrl, isProduction, cookieSameSite } = env;
+export const isMailOauthEnabled = mailOauthEnabled;
 
 const skipStateCookieCheck =
   process.env.AUTH_SKIP_STATE_COOKIE_CHECK === "true" ||
@@ -28,12 +59,6 @@ const skipStateCookieCheck =
 const passkeyOrigin =
   process.env.PASSKEY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || frontendUrl;
 
-const socialRedirectUrl =
-  process.env.AUTH_REDIRECT_URL ||
-  env.mobileAuthCallbackUrl ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  frontendUrl;
-
 const logger = createLogger("backend:auth");
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -41,12 +66,6 @@ const resend = process.env.RESEND_API_KEY
 const authEmailFrom =
   process.env.AUTH_EMAIL_FROM ||
   process.env.AUTH_RESET_EMAIL_FROM || "Solace <notifications@mailing.roan.dev>";
-
-export const githubOAuthCallbackUrl = getOAuthProviderCallbackUrl(
-  backendUrl,
-  BETTER_AUTH_BASE_PATH,
-  "github",
-);
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -60,6 +79,105 @@ const getRpId = (url: string) => {
     return "localhost";
   }
 };
+
+const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, "");
+
+const resolveFrontendRouteUrl = (input: string | undefined, fallbackPath: string) =>
+  new URL(
+    input?.trim() || fallbackPath,
+    frontendUrl.replace(/\/+$/, "") + "/",
+  ).toString();
+
+const mailOauthTrustedClientIds =
+  [...mailOauthCachedTrustedClientIds, mailOauthClientId, mailOauthBrowserClientId]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+const mailOauthValidAudiences =
+  mailOauthAudiences.length > 0 ? mailOauthAudiences : [stalwartBaseUrl];
+
+const mailOauthLoginPageUrl = resolveFrontendRouteUrl(
+  mailOauthLoginPage,
+  "/login",
+);
+const mailOauthConsentPageUrl = resolveFrontendRouteUrl(
+  mailOauthConsentPage,
+  "/mail/oauth/consent",
+);
+const mailOauthIssuer = `${normalizeBaseUrl(backendUrl)}${BETTER_AUTH_BASE_PATH}`;
+const mailOauthConfigurationErrors = getMailOauthConfigurationErrors({
+  clientId: mailOauthClientId,
+  redirectUris: mailOauthRedirectUris,
+  browserClientId: mailOauthBrowserClientId,
+  browserRedirectUris: mailOauthBrowserRedirectUris,
+});
+
+if (isMailOauthEnabled && mailOauthConfigurationErrors.length > 0) {
+  throw new Error(mailOauthConfigurationErrors[0]!);
+}
+
+type PendingMailOauthClientSeed = {
+  clientId?: string;
+  clientSecret?: string;
+} | null;
+
+let pendingMailOauthClientSeed: PendingMailOauthClientSeed = null;
+let pendingMailOauthClientSeedLock: Promise<void> = Promise.resolve();
+
+async function withPendingMailOauthClientSeed<T>(
+  seed: PendingMailOauthClientSeed,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const previousLock = pendingMailOauthClientSeedLock;
+  let releaseLock!: () => void;
+
+  pendingMailOauthClientSeedLock = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+
+  await previousLock;
+  pendingMailOauthClientSeed = seed;
+
+  try {
+    return await callback();
+  } finally {
+    pendingMailOauthClientSeed = null;
+    releaseLock();
+  }
+}
+
+const mailOauthProviderPlugin = isMailOauthEnabled
+  ? oauthProvider({
+      scopes: mailOauthScopes,
+      validAudiences: mailOauthValidAudiences,
+      cachedTrustedClients: new Set(mailOauthTrustedClientIds),
+      loginPage: mailOauthLoginPageUrl,
+      consentPage: mailOauthConsentPageUrl,
+      allowDynamicClientRegistration: false,
+      disableJwtPlugin: true,
+      advertisedMetadata: {
+        scopes_supported: mailOauthScopes,
+      },
+      customAccessTokenClaims: ({ user, scopes, resource, metadata }) =>
+        buildMailOauthAccessTokenClaims({
+          user,
+          scopes,
+          resource,
+          metadata,
+        }),
+      customUserInfoClaims: ({ scopes, jwt }) =>
+        buildMailOauthUserInfoClaims({
+          defaultIssuer: mailOauthIssuer,
+          scopes,
+          jwt: jwt as Record<string, unknown>,
+        }),
+      pairwiseSecret: mailOauthPairwiseSecret || undefined,
+      generateClientId: () =>
+        pendingMailOauthClientSeed?.clientId || crypto.randomUUID(),
+      generateClientSecret: () =>
+        pendingMailOauthClientSeed?.clientSecret || crypto.randomUUID(),
+    })
+  : null;
 
 const passwordSecurityUrl = new URL(
   "/login",
@@ -150,6 +268,73 @@ const passwordChangeNotificationPlugin = {
   },
 };
 
+const clearPasskeyStepUpPaths = new Set([
+  "/sign-in/email",
+  "/sign-up/email",
+  "/sign-out",
+  "/change-password",
+  "/reset-password",
+  "/set-password",
+]);
+
+const setPasskeyStepUpPaths = new Set([
+  "/passkey/verify-authentication",
+  "/passkey/verify-registration",
+]);
+
+const passkeyStepUpPlugin = {
+  id: "passkey-step-up",
+  hooks: {
+    after: [
+      {
+        matcher(context: { path?: string }) {
+          return Boolean(context.path && clearPasskeyStepUpPaths.has(context.path));
+        },
+        handler: createAuthMiddleware(async (ctx) => {
+          if (ctx.context.responseHeaders) {
+            clearPasskeyStepUpCookie({
+              headers: ctx.context.responseHeaders as Headers,
+            });
+          }
+        }),
+      },
+      {
+        matcher(context: { path?: string }) {
+          return Boolean(context.path && setPasskeyStepUpPaths.has(context.path));
+        },
+        handler: createAuthMiddleware(async (ctx) => {
+          const response = await getSuccessfulEndpointResponse(ctx.context.returned);
+          if (response && ctx.context.responseHeaders) {
+            setVerifiedPasskeyStepUpCookie({
+              headers: ctx.context.responseHeaders as Headers,
+            });
+          }
+        }),
+      },
+    ],
+  },
+};
+
+const authPlugins = [
+  expo(),
+  openAPI({
+    disableDefaultReference: true,
+  }),
+  passwordChangeNotificationPlugin,
+  passkeyStepUpPlugin,
+  passkey({
+    rpID: getRpId(passkeyOrigin),
+    rpName: "Rocani",
+    origin: passkeyOrigin,
+  }),
+  oneTimeToken({
+    expiresIn: 3,
+    storeToken: "hashed",
+  }),
+  jwt(),
+  ...(mailOauthProviderPlugin ? [mailOauthProviderPlugin] : []),
+];
+
 export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
@@ -196,22 +381,7 @@ export const auth = betterAuth({
       });
     },
   },
-  plugins: [
-    expo(),
-    openAPI({
-      disableDefaultReference: true,
-    }),
-    passwordChangeNotificationPlugin,
-    passkey({
-      rpID: getRpId(passkeyOrigin),
-      rpName: "Rocani",
-      origin: passkeyOrigin,
-    }),
-    oneTimeToken({
-      expiresIn: 3,
-      storeToken: "hashed",
-    }),
-  ],
+  plugins: authPlugins,
   account: {
     // Mobile OAuth often starts in the webview and finishes in the system browser.
     // In local/dev this can split state cookies across contexts.
@@ -223,18 +393,12 @@ export const auth = betterAuth({
   secret:
     process.env.BETTER_AUTH_SECRET || "default-dev-secret-change-in-production",
   socialProviders:
-    process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
-      ? {
-          github: {
-            clientId: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET,
-          },
-        }
-      : {},
+    {},
   baseURL: backendUrl,
   basePath: BETTER_AUTH_BASE_PATH,
   trustedOrigins: getAuthTrustedOrigins,
   session: {
+    storeSessionInDatabase: true,
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60, // 5 minutes
@@ -253,11 +417,102 @@ export const auth = betterAuth({
       enabled: true,
     },
   },
-  socialProviderConfig: {
-    redirectURL: socialRedirectUrl,
-  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
+
+async function findOAuthClientById(clientId: string) {
+  return prisma.$queryRaw<Array<{ client_id: string }>>`
+    SELECT "client_id"
+    FROM "oauth_client"
+    WHERE "client_id" = ${clientId}
+    LIMIT 1
+  `;
+}
+
+async function ensureManagedMailOAuthClient(input: {
+  clientId: string;
+  clientName: string;
+  redirectUris: string[];
+  clientSecret?: string;
+  postLogoutRedirectUris?: string[];
+  type: "web" | "user-agent-based";
+  tokenEndpointAuthMethod: "client_secret_basic" | "none";
+  enableEndSession?: boolean;
+}) {
+  const existingClient = await findOAuthClientById(input.clientId);
+
+  if (existingClient.length > 0) {
+    return existingClient[0];
+  }
+
+  logger.info("Seeding managed mail OAuth client", {
+    clientId: input.clientId,
+    redirectUris: input.redirectUris,
+    audiences: mailOauthValidAudiences,
+  });
+
+  return withPendingMailOauthClientSeed(
+    {
+      clientId: input.clientId,
+      clientSecret: input.clientSecret,
+    },
+    () =>
+      auth.api.adminCreateOAuthClient({
+        body: {
+          redirect_uris: input.redirectUris,
+          scope: mailOauthScopes.join(" "),
+          client_name: input.clientName,
+          post_logout_redirect_uris:
+            input.postLogoutRedirectUris && input.postLogoutRedirectUris.length > 0
+              ? input.postLogoutRedirectUris
+              : undefined,
+          token_endpoint_auth_method: input.tokenEndpointAuthMethod,
+          grant_types: ["authorization_code", "refresh_token"],
+          response_types: ["code"],
+          type: input.type,
+          skip_consent: true,
+          enable_end_session: input.enableEndSession ?? false,
+          require_pkce: true,
+          metadata: {
+            audiences: mailOauthValidAudiences,
+            issuer: mailOauthIssuer,
+          },
+        },
+      }),
+  );
+}
+
+export async function ensureMailOAuthClients() {
+  if (!isMailOauthEnabled) {
+    return [];
+  }
+
+  const managedClients = [
+    {
+      clientId: mailOauthClientId,
+      clientName: mailOauthClientName,
+      redirectUris: mailOauthRedirectUris,
+      clientSecret: mailOauthClientSecret || undefined,
+      postLogoutRedirectUris: mailOauthPostLogoutRedirectUris,
+      tokenEndpointAuthMethod: mailOauthClientSecret
+        ? "client_secret_basic"
+        : "none",
+      type: mailOauthClientSecret ? "web" : "user-agent-based",
+      enableEndSession: mailOauthPostLogoutRedirectUris.length > 0,
+    },
+    {
+      clientId: mailOauthBrowserClientId,
+      clientName: mailOauthBrowserClientName,
+      redirectUris: mailOauthBrowserRedirectUris,
+      tokenEndpointAuthMethod: "none",
+      type: "user-agent-based",
+    },
+  ] as const;
+
+  return runMailOauthClientSeedTasks(
+    managedClients.map((client) => () => ensureManagedMailOAuthClient(client)),
+  );
+}
 
 type AuthOpenApiSchema = {
   components?: Record<string, unknown>;
