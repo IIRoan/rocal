@@ -2,16 +2,16 @@ import { describe, expect, it, jest } from "@jest/globals";
 
 import {
   StalwartJmapClient,
-  buildBasicAuthHeader,
+  buildBearerAuthHeader,
   buildSendMessageMethodCalls,
   getPrimaryMailAccountId,
   normalizeJmapSession,
 } from "../../lib/mail/jmap-client";
 
 describe("mail JMAP helpers", () => {
-  it("builds a basic auth header from mailbox credentials", () => {
-    expect(buildBasicAuthHeader("alice@solace.onl", "mailbox-password")).toBe(
-      `Basic ${Buffer.from("alice@solace.onl:mailbox-password").toString("base64")}`,
+  it("builds a bearer auth header from an access token", () => {
+    expect(buildBearerAuthHeader("access-token-123")).toBe(
+      "Bearer access-token-123",
     );
   });
 
@@ -226,8 +226,7 @@ describe("StalwartJmapClient", () => {
     );
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
-      email: "alice@solace.onl",
-      password: "mailbox-password",
+      accessToken: "mail-access-token",
       fetcher,
     });
 
@@ -243,38 +242,115 @@ describe("StalwartJmapClient", () => {
       {
         method: "GET",
         headers: {
-          Authorization: buildBasicAuthHeader(
-            "alice@solace.onl",
-            "mailbox-password",
-          ),
+          Authorization: buildBearerAuthHeader("mail-access-token"),
         },
         redirect: "follow",
       },
     );
   });
 
-  it("surfaces mailbox-auth failures from discovery as a user-facing error", async () => {
+  it("supports bearer tokens for proxied JMAP discovery", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          accounts: {},
+          primaryAccounts: {
+            "urn:ietf:params:jmap:mail": "b",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
-      email: "alice@solace.onl",
-      password: "wrong-password",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await client.discoverSession();
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://localhost:4001/api/mail/jmap/.well-known/jmap",
+      {
+        method: "GET",
+        headers: {
+          Authorization: buildBearerAuthHeader("mail-access-token"),
+        },
+        redirect: "follow",
+      },
+    );
+  });
+
+  it("supports async access-token providers for proxied JMAP discovery", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          accounts: {},
+          primaryAccounts: {
+            "urn:ietf:params:jmap:mail": "b",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const getAccessToken = jest.fn(async () => "mail-access-token");
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken,
+      fetcher,
+    });
+
+    await client.discoverSession();
+
+    expect(getAccessToken).toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://localhost:4001/api/mail/jmap/.well-known/jmap",
+      {
+        method: "GET",
+        headers: {
+          Authorization: buildBearerAuthHeader("mail-access-token"),
+        },
+        redirect: "follow",
+      },
+    );
+  });
+
+  it("surfaces bearer-auth failures without mentioning passwords", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "expired-access-token",
       fetcher: async () =>
-        new Response(JSON.stringify({ message: "Invalid credentials" }), {
+        new Response(JSON.stringify({ message: "Token expired" }), {
           status: 401,
           headers: { "Content-Type": "application/json" },
         }),
     });
 
     await expect(client.discoverSession()).rejects.toThrow(
-      "Incorrect password or mailbox not found.",
+      "Mail sign-in expired or was rejected by the mail server.",
     );
   });
 
   it("includes upstream details when discovery cannot reach the mail server", async () => {
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
-      email: "alice@solace.onl",
-      password: "mailbox-password",
+      accessToken: "mail-access-token",
       fetcher: async () =>
         new Response(JSON.stringify({ message: "Connection refused" }), {
           status: 503,

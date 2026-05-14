@@ -5,7 +5,6 @@ import type {
   MailDemoConfig,
   MailDirectoryKey,
   MailSyncResponse,
-  MailSignupRequest,
   MailSignupResponse,
   MailVaultBackupRecord,
 } from "./types";
@@ -47,19 +46,6 @@ export class MailDemoApiService {
     return parseJsonResponse<MailDemoConfig>(response);
   }
 
-  async signUp(request: MailSignupRequest): Promise<MailSignupResponse> {
-    const response = await fetch(`${this.baseUrl}/api/mail/signup`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    });
-
-    return parseJsonResponse<MailSignupResponse>(response);
-  }
-
   async getAccountStatus(): Promise<MailAccountStatus> {
     const response = await fetch(`${this.baseUrl}/api/mail/account/`, {
       method: "GET",
@@ -84,18 +70,6 @@ export class MailDemoApiService {
     return parseJsonResponse<MailSignupResponse>(response);
   }
 
-  async getVaultBackup(email: string): Promise<MailVaultBackupRecord> {
-    const response = await fetch(
-      `${this.baseUrl}/api/mail/vault/backup/${encodeURIComponent(email)}`,
-      {
-        method: "GET",
-        credentials: "include",
-      },
-    );
-
-    return parseJsonResponse<MailVaultBackupRecord>(response);
-  }
-
   async getAccountVaultBackup(): Promise<MailVaultBackupRecord> {
     const response = await fetch(`${this.baseUrl}/api/mail/account/vault-backup`, {
       method: "GET",
@@ -115,21 +89,6 @@ export class MailDemoApiService {
     );
 
     return parseJsonResponse<MailDirectoryKey>(response);
-  }
-
-  async upsertVaultBackup(
-    request: MailVaultBackupRecord,
-  ): Promise<MailVaultBackupRecord> {
-    const response = await fetch(`${this.baseUrl}/api/mail/vault/backup`, {
-      method: "PUT",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    });
-
-    return parseJsonResponse<MailVaultBackupRecord>(response);
   }
 
   async upsertAccountVaultBackup(

@@ -1,8 +1,9 @@
-import { Elysia, t } from "elysia";
-import type { IMailService } from "../contracts/mail.contract";
+import { Elysia } from "elysia";
+import type { IMailService, MailOAuthConfig } from "../contracts/mail.contract";
+import { BETTER_AUTH_BASE_PATH } from "../lib/auth-constants";
+import { createLogger } from "@workspace/logger";
 import { prisma } from "../lib/prisma";
 import { env } from "../lib/env";
-import { strictObject } from "../lib/validation";
 import { MailService } from "../services/mail.service";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 
@@ -12,95 +13,97 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
+const logger = createLogger("backend:mail-jmap-proxy");
+
 const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
+
+function summarizeBearerToken(authorization: string | null): Record<string, unknown> {
+  if (!authorization?.startsWith("Bearer ")) {
+    return { tokenType: authorization ? "non-bearer" : "missing" };
+  }
+
+  const token = authorization.slice("Bearer ".length).trim();
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return {
+      tokenType: "opaque",
+      tokenLength: token.length,
+    };
+  }
+
+  const decodePart = (input: string) => {
+    try {
+      const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+      return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  };
+
+  const header = decodePart(parts[0]!);
+  const payload = decodePart(parts[1]!);
+
+  return {
+    tokenType: "jwt",
+    alg: header?.alg,
+    kid: header?.kid,
+    iss: payload?.iss,
+    aud: payload?.aud,
+    azp: payload?.azp,
+    exp: payload?.exp,
+  };
+}
+
+function summarizeUpstreamErrorBody(body: string | null): Record<string, unknown> {
+  if (!body) {
+    return { bodyPresent: false };
+  }
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    return {
+      bodyPresent: true,
+      bodyLength: body.length,
+      error: parsed.error,
+      type: parsed.type,
+      title: parsed.title,
+      status: parsed.status,
+    };
+  } catch {
+    return {
+      bodyPresent: true,
+      bodyLength: body.length,
+      bodyFormat: "non-json",
+    };
+  }
+}
+
+function buildMailOAuthConfig(): MailOAuthConfig {
+  const authBaseUrl = `${normalizeBaseUrl(env.backendUrl)}${BETTER_AUTH_BASE_PATH}`;
+  const audiences =
+    env.mailOauthAudiences.length > 0
+      ? env.mailOauthAudiences
+      : [env.stalwartBaseUrl];
+
+  return {
+    issuer: authBaseUrl,
+    discoveryUrl: `${authBaseUrl}/.well-known/openid-configuration`,
+    authorizationEndpoint: `${authBaseUrl}/oauth2/authorize`,
+    tokenEndpoint: `${authBaseUrl}/oauth2/token`,
+    userinfoEndpoint: `${authBaseUrl}/oauth2/userinfo`,
+    jwksUri: `${authBaseUrl}/jwks`,
+    clientId: env.mailOauthBrowserClientId,
+    redirectUri: env.mailOauthBrowserRedirectUris[0] || "",
+    scopes: env.mailOauthScopes,
+    audiences,
+  };
+}
 
 export const defaultMailService = new MailService(prisma, createStalwartAdminClient(), {
   defaultDomain: env.stalwartDefaultDomain,
   discoveryBaseUrl: publicJmapProxyBaseUrl,
-});
-
-const kdfParamsSchema = strictObject({
-  saltB64: t.String({
-    minLength: 1,
-    maxLength: 512,
-  }),
-  memoryKiB: t.Number({
-    minimum: 8192,
-    maximum: 1048576,
-  }),
-  iterations: t.Number({
-    minimum: 1,
-    maximum: 16,
-  }),
-  parallelism: t.Number({
-    minimum: 1,
-    maximum: 32,
-  }),
-});
-
-const signupBodySchema = strictObject({
-  displayName: t.Optional(
-    t.String({
-      maxLength: 120,
-    }),
-  ),
-  localPart: t.String({
-    minLength: 1,
-    maxLength: 64,
-  }),
-  password: t.String({
-    minLength: 12,
-    maxLength: 256,
-  }),
-  publicKeyArmored: t.String({
-    minLength: 1,
-    maxLength: 131072,
-  }),
-  fingerprint: t.String({
-    minLength: 16,
-    maxLength: 128,
-  }),
-  algorithm: t.String({
-    minLength: 1,
-    maxLength: 32,
-  }),
-  createdAt: t.String({
-    minLength: 1,
-    maxLength: 64,
-  }),
-  vaultVersion: t.Number({
-    minimum: 1,
-    maximum: 10,
-  }),
-  encryptedVaultB64: t.String({
-    minLength: 1,
-    maxLength: 500000,
-  }),
-  kdf: t.String({
-    minLength: 1,
-    maxLength: 32,
-  }),
-  kdfParams: kdfParamsSchema,
-});
-
-const vaultBackupBodySchema = strictObject({
-  email: t.String({
-    minLength: 3,
-    maxLength: 255,
-  }),
-  vaultVersion: t.Number({
-    minimum: 1,
-    maximum: 10,
-  }),
-  encryptedVaultB64: t.String({
-    minLength: 1,
-    maxLength: 500000,
-  }),
-  kdf: t.String({
-    minLength: 1,
-    maxLength: 32,
-  }),
-  kdfParams: kdfParamsSchema,
+  oauth: buildMailOAuthConfig(),
 });
 
 async function proxyJmapRequest(input: {
@@ -156,6 +159,12 @@ async function proxyJmapRequest(input: {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown network error";
+    logger.error("JMAP proxy upstream request failed", {
+      upstreamUrl,
+      method,
+      token: summarizeBearerToken(authorization),
+      message,
+    });
     return Response.json(
       {
         error: "Mail server unreachable",
@@ -177,6 +186,23 @@ async function proxyJmapRequest(input: {
 
   if (cacheControl) {
     responseHeaders.set("Cache-Control", cacheControl);
+  }
+
+  if (!response.ok) {
+    let upstreamBody: string | null = null;
+    try {
+      upstreamBody = await response.clone().text();
+    } catch {
+      upstreamBody = null;
+    }
+
+    logger.warn("JMAP proxy upstream responded with an error", {
+      upstreamUrl,
+      method,
+      status: response.status,
+      token: summarizeBearerToken(authorization),
+      upstreamError: summarizeUpstreamErrorBody(upstreamBody),
+    });
   }
 
   return new Response(response.body, {
@@ -211,19 +237,6 @@ export function createMailRoutes(
         },
       },
     )
-    .post(
-      "/signup",
-      async ({ body }) => mailService.signUp(body),
-      {
-        body: signupBodySchema,
-        detail: {
-          tags: ["Mail"],
-          summary: "Provision a new Stalwart mailbox for the mail demo",
-          description:
-            "Creates a Stalwart mailbox, registers the client-generated OpenPGP public key, enables encryption at rest, and stores the encrypted private-key vault backup metadata.",
-        },
-      },
-    )
     .get(
       "/keys/:email",
       async ({ params }) => mailService.getDirectoryKey(params.email),
@@ -233,31 +246,6 @@ export function createMailRoutes(
           summary: "Look up an internal recipient public key",
           description:
             "Returns the stored OpenPGP public key directory entry for an internal mailbox.",
-        },
-      },
-    )
-    .get(
-      "/vault/backup/:email",
-      async ({ params }) => mailService.getVaultBackup(params.email),
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Fetch an encrypted vault backup",
-          description:
-            "Returns the encrypted private-key vault backup for mailbox restore flows. The server never decrypts the vault.",
-        },
-      },
-    )
-    .put(
-      "/vault/backup",
-      async ({ body }) => mailService.upsertVaultBackup(body),
-      {
-        body: vaultBackupBodySchema,
-        detail: {
-          tags: ["Mail"],
-          summary: "Create or replace an encrypted vault backup",
-          description:
-            "Stores ciphertext-only vault backup material for mailbox restore across devices.",
         },
       },
     )

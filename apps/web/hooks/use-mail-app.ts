@@ -14,6 +14,7 @@ import {
 } from "@/lib/enc-password-cookie";
 import { bootstrapMailboxForAccount } from "@/lib/mail/account-bootstrap";
 import { mailDemoApiService } from "@/lib/mail/api-service";
+import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
 import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
@@ -573,19 +574,36 @@ export function useMailApp() {
 
   const handleSignIn = useCallback(
     async (passwordOverride?: string) => {
-      if (!config || !mailboxStatus?.provisioned || !mailboxEmail) return;
-      const mailboxPassword = passwordOverride ?? loginPassword;
-      if (!mailboxPassword) {
-        toast.error("Enter your account password to open the mailbox.");
+      if (!config || !mailboxStatus || !mailboxEmail) return;
+      const vaultPassword = passwordOverride ?? loginPassword;
+      if (!vaultPassword) {
+        toast.error("Enter your encryption password to unlock the mailbox.");
         return;
       }
       setIsBusy(true);
       try {
-        const email = mailboxEmail.trim().toLowerCase();
+        let email = mailboxEmail.trim().toLowerCase();
+
+        if (!mailboxStatus.provisioned) {
+          const provisionedMailbox = await bootstrapMailboxForAccount({
+            email: accountEmail,
+            password: vaultPassword,
+            displayName: accountDisplayName,
+            userId: accountUserId,
+          });
+
+          email = provisionedMailbox.email.trim().toLowerCase();
+          setMailboxStatus({
+            email: provisionedMailbox.email,
+            displayName: provisionedMailbox.displayName,
+            provisioned: true,
+          });
+        }
+
+        const tokenManager = createMailOAuthTokenManager(config.oauth);
         const client = new StalwartJmapClient({
           baseUrl: config.discoveryBaseUrl,
-          email,
-          password: mailboxPassword,
+          getAccessToken: () => tokenManager.getAccessToken(),
         });
         const jmapSession = await client.discoverSession();
         const remoteBackup = await mailDemoApiService
@@ -598,12 +616,12 @@ export function useMailApp() {
         if (remoteBackup) await putStoredMailVault(backup);
         const unlockedVault = await unlockEncryptedMailVault(
           backup.encryptedVaultB64,
-          mailboxPassword,
+          vaultPassword,
           backup.kdfParams,
         );
         await mailCryptoWorkerClient.loadVault({
           privateKeyArmored: unlockedVault.encryptedPrivateKeyArmored,
-          privateKeyPassphrase: mailboxPassword,
+          privateKeyPassphrase: vaultPassword,
           publicKeyArmored: unlockedVault.publicKeyArmored,
         });
         const [accountSettings, mailboxes, identities] = await Promise.all([
@@ -635,7 +653,7 @@ export function useMailApp() {
           selectedMailboxId: initialMailboxId,
         });
         setSelectedMessageId(messages[0]?.id ?? null);
-        setLoginPassword(mailboxPassword);
+        setLoginPassword(vaultPassword);
       } catch (error) {
         log.error("Mail sign-in failed", error);
         toast.error(
@@ -647,7 +665,15 @@ export function useMailApp() {
         setIsBusy(false);
       }
     },
-    [config, mailboxStatus?.provisioned, mailboxEmail, loginPassword],
+    [
+      accountDisplayName,
+      accountEmail,
+      accountUserId,
+      config,
+      loginPassword,
+      mailboxEmail,
+      mailboxStatus,
+    ],
   );
 
 
@@ -667,37 +693,9 @@ export function useMailApp() {
       return;
     setHasAttemptedAutoOpen(true);
     setLoginPassword((cur) => cur || cachedAuthPassword);
-    if (mailboxStatus.provisioned) {
-      void handleSignIn(cachedAuthPassword);
-    } else {
-      void (async () => {
-        setIsBusy(true);
-        try {
-          const provisioned = await bootstrapMailboxForAccount({
-            email: accountEmail,
-            password: cachedAuthPassword,
-            displayName: accountDisplayName,
-            userId: accountUserId,
-          });
-          setMailboxStatus({
-            email: provisioned.email,
-            displayName: provisioned.displayName,
-            provisioned: true,
-          });
-          await handleSignIn(cachedAuthPassword);
-        } catch (error) {
-          log.error("Auto-provision failed", error);
-          toast.error("Could not set up your mailbox automatically.");
-        } finally {
-          setIsBusy(false);
-        }
-      })();
-    }
+    void handleSignIn(cachedAuthPassword);
   }, [
     activeMailbox,
-    accountEmail,
-    accountUserId,
-    accountDisplayName,
     cachedAuthPassword,
     config,
     hasAttemptedAutoOpen,

@@ -326,6 +326,86 @@ exports.Prisma.PasskeyScalarFieldEnum = {
   aaguid: 'aaguid'
 };
 
+exports.Prisma.JwksScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt',
+  alg: 'alg',
+  crv: 'crv'
+};
+
+exports.Prisma.OauthClientScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  clientSecret: 'clientSecret',
+  disabled: 'disabled',
+  skipConsent: 'skipConsent',
+  enableEndSession: 'enableEndSession',
+  subjectType: 'subjectType',
+  scopes: 'scopes',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  name: 'name',
+  uri: 'uri',
+  icon: 'icon',
+  contacts: 'contacts',
+  tos: 'tos',
+  policy: 'policy',
+  softwareId: 'softwareId',
+  softwareVersion: 'softwareVersion',
+  softwareStatement: 'softwareStatement',
+  redirectUris: 'redirectUris',
+  postLogoutRedirectUris: 'postLogoutRedirectUris',
+  tokenEndpointAuthMethod: 'tokenEndpointAuthMethod',
+  grantTypes: 'grantTypes',
+  responseTypes: 'responseTypes',
+  public: 'public',
+  type: 'type',
+  requirePKCE: 'requirePKCE',
+  referenceId: 'referenceId',
+  metadata: 'metadata'
+};
+
+exports.Prisma.OauthRefreshTokenScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  clientId: 'clientId',
+  sessionId: 'sessionId',
+  userId: 'userId',
+  referenceId: 'referenceId',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt',
+  revoked: 'revoked',
+  authTime: 'authTime',
+  scopes: 'scopes'
+};
+
+exports.Prisma.OauthAccessTokenScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  clientId: 'clientId',
+  sessionId: 'sessionId',
+  userId: 'userId',
+  referenceId: 'referenceId',
+  refreshId: 'refreshId',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt',
+  scopes: 'scopes'
+};
+
+exports.Prisma.OauthConsentScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  userId: 'userId',
+  referenceId: 'referenceId',
+  scopes: 'scopes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.UserEncryptionDeviceScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -438,6 +518,11 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -446,6 +531,12 @@ exports.Prisma.QueryMode = {
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
+};
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
 };
 
 
@@ -464,6 +555,11 @@ exports.Prisma.ModelName = {
   EventNotification: 'EventNotification',
   NotificationLog: 'NotificationLog',
   Passkey: 'Passkey',
+  Jwks: 'Jwks',
+  OauthClient: 'OauthClient',
+  OauthRefreshToken: 'OauthRefreshToken',
+  OauthAccessToken: 'OauthAccessToken',
+  OauthConsent: 'OauthConsent',
   UserEncryptionDevice: 'UserEncryptionDevice',
   UserEncryptionPassword: 'UserEncryptionPassword',
   MailDirectoryEntry: 'MailDirectoryEntry',
