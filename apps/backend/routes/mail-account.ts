@@ -27,10 +27,6 @@ const kdfParamsSchema = strictObject({
 });
 
 const bootstrapBodySchema = strictObject({
-  password: t.String({
-    minLength: 12,
-    maxLength: 256,
-  }),
   publicKeyArmored: t.String({
     minLength: 1,
     maxLength: 131072,

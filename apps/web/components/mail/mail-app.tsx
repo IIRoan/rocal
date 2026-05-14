@@ -110,6 +110,20 @@ export function MailApp() {
     activeMailbox?.mailboxes.find(
       (m) => m.id === activeMailbox.selectedMailboxId,
     ) ?? null;
+  const mailboxIsProvisioned = mailboxStatus?.provisioned ?? false;
+  const mailboxUnlockTitle = mailboxIsProvisioned
+    ? "Open your mailbox"
+    : "Set up your mailbox";
+  const mailboxUnlockDescription = mailboxIsProvisioned
+    ? "Enter your encryption password to unlock your encrypted mailbox."
+    : "Enter your encryption password to create and unlock your encrypted mailbox.";
+  const mailboxButtonLabel = isBusy
+    ? mailboxIsProvisioned
+      ? "Opening…"
+      : "Setting up…"
+    : mailboxIsProvisioned
+      ? "Open mailbox"
+      : "Set up mailbox";
 
   return (
     <>
@@ -250,9 +264,9 @@ export function MailApp() {
               <div className="flex flex-1 items-center justify-center p-8">
                 <div className="w-full max-w-sm space-y-4">
                   <div>
-                    <h1 className="text-xl font-semibold">Open your mailbox</h1>
+                    <h1 className="text-xl font-semibold">{mailboxUnlockTitle}</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Enter your account password to access your encrypted mailbox.
+                      {mailboxUnlockDescription}
                     </p>
                   </div>
                   <Input
@@ -260,7 +274,7 @@ export function MailApp() {
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Account password"
+                    placeholder="Encryption password"
                     onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
                     disabled={isBusy}
                     autoFocus
@@ -271,7 +285,7 @@ export function MailApp() {
                     disabled={isBusy || !loginPassword || !mailboxEmail}
                   >
                     <Inbox size={15} />
-                    {isBusy ? "Opening…" : "Open mailbox"}
+                    {mailboxButtonLabel}
                   </Button>
                 </div>
               </div>

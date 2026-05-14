@@ -6,6 +6,7 @@ import { putStoredMailVault } from "./vault-storage";
 import { mailCryptoWorkerClient } from "./worker-client";
 
 const SESSION_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
+const BOOTSTRAP_RETRY_DELAYS_MS = [0, 150, 300] as const;
 
 function normalizeOptionalText(value?: string | null): string | null {
   const normalized = value?.trim() || "";
@@ -16,13 +17,33 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function isAuthError(error: unknown): boolean {
+function getErrorStatusCode(error: unknown): number | null {
   const statusCode =
     typeof error === "object" && error !== null && "statusCode" in error
       ? (error as { statusCode?: unknown }).statusCode
       : null;
 
+  return typeof statusCode === "number" ? statusCode : null;
+}
+
+function isAuthError(error: unknown): boolean {
+  const statusCode = getErrorStatusCode(error);
+
   return statusCode === 401 || statusCode === 403;
+}
+
+function isRetryableBootstrapError(error: unknown): boolean {
+  const statusCode = getErrorStatusCode(error);
+
+  return (
+    statusCode === 401 ||
+    statusCode === 403 ||
+    statusCode === 429 ||
+    statusCode === 500 ||
+    statusCode === 502 ||
+    statusCode === 503 ||
+    statusCode === 504
+  );
 }
 
 async function waitForAuthenticatedUser(input: {
@@ -40,7 +61,7 @@ async function waitForAuthenticatedUser(input: {
 
   for (const delayMs of SESSION_RETRY_DELAYS_MS) {
     if (delayMs > 0) {
-      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
     const sessionResult = await authClient.getSession();
@@ -93,10 +114,15 @@ export async function bootstrapMailboxForAccount(input: {
 
   let provisionedMailbox: MailSignupResponse | null = null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < BOOTSTRAP_RETRY_DELAYS_MS.length; attempt += 1) {
+    const delayMs = BOOTSTRAP_RETRY_DELAYS_MS[attempt];
+
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
     try {
       provisionedMailbox = await mailDemoApiService.bootstrapAccountMailbox({
-        password: input.password,
         publicKeyArmored: generated.publicKeyArmored,
         fingerprint: generated.fingerprint,
         algorithm: "openpgp",
@@ -108,11 +134,13 @@ export async function bootstrapMailboxForAccount(input: {
       });
       break;
     } catch (error) {
-      if (!isAuthError(error) || attempt === 2) {
+      if (!isRetryableBootstrapError(error) || attempt === BOOTSTRAP_RETRY_DELAYS_MS.length - 1) {
         throw error;
       }
 
-      await waitForAuthenticatedUser(input);
+      if (isAuthError(error)) {
+        await waitForAuthenticatedUser(input);
+      }
     }
   }
 

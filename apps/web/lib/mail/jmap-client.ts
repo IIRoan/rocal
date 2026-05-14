@@ -13,6 +13,13 @@ type JmapEnvelope = {
   methodResponses?: Array<[string, Record<string, unknown>, string]>;
 };
 
+type JmapClientBearerAuthInput = {
+  baseUrl: string;
+  accessToken?: string;
+  getAccessToken?: (() => Promise<string> | string) | undefined;
+  fetcher?: Fetcher;
+};
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
@@ -47,8 +54,8 @@ function rewriteOrigin(
   }
 }
 
-export function buildBasicAuthHeader(email: string, password: string): string {
-  return `Basic ${base64Encode(`${email}:${password}`)}`;
+export function buildBearerAuthHeader(accessToken: string): string {
+  return `Bearer ${accessToken.trim()}`;
 }
 
 export function normalizeJmapSession(
@@ -137,31 +144,47 @@ export function buildSendMessageMethodCalls(input: {
 
 export class StalwartJmapClient {
   private readonly baseUrl: string;
-  private readonly authHeader: string;
+  private readonly accessTokenProvider?: () => Promise<string> | string;
+  private readonly fetcher: Fetcher;
 
   constructor({
     baseUrl,
-    email,
-    password,
     fetcher = defaultFetcher,
-  }: {
-    baseUrl: string;
-    email: string;
-    password: string;
-    fetcher?: Fetcher;
-  }) {
+    ...auth
+  }: JmapClientBearerAuthInput) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
-    this.authHeader = buildBasicAuthHeader(email, password);
+
+    const accessTokenProvider =
+      auth.getAccessToken ||
+      (auth.accessToken
+        ? () => auth.accessToken as string
+        : undefined);
+
+    if (!accessTokenProvider) {
+      throw new Error("A mail access token is required for JMAP clients.");
+    }
+
+    this.accessTokenProvider = accessTokenProvider;
+
     this.fetcher = fetcher;
   }
 
-  private readonly fetcher: Fetcher;
+  private async getAuthorizationHeader(): Promise<string> {
+    const accessToken = await this.accessTokenProvider?.();
+
+    if (!accessToken) {
+      throw new Error("No mail access token is available.");
+    }
+
+    return buildBearerAuthHeader(accessToken);
+  }
 
   async discoverSession(): Promise<JmapSession> {
+    const authorization = await this.getAuthorizationHeader();
     const response = await this.fetcher(`${this.baseUrl}/.well-known/jmap`, {
       method: "GET",
       headers: {
-        Authorization: this.authHeader,
+        Authorization: authorization,
       },
       redirect: "follow",
     });
@@ -175,7 +198,9 @@ export class StalwartJmapClient {
         /* ignore parse failure */
       }
       if (response.status === 401)
-        throw new Error("Incorrect password or mailbox not found.");
+        throw new Error(
+          "Mail sign-in expired or was rejected by the mail server.",
+        );
       if (response.status === 503)
         throw new Error(`Mail server is unreachable${detail}.`);
       throw new Error(
@@ -635,8 +660,9 @@ export class StalwartJmapClient {
       .replace("{blobId}", encodeURIComponent(blobId))
       .replace("{name}", "encrypted.asc")
       .replace("{type}", encodeURIComponent("application/octet-stream"));
+    const authorization = await this.getAuthorizationHeader();
     const response = await this.fetcher(url, {
-      headers: { Authorization: this.authHeader },
+      headers: { Authorization: authorization },
     });
     if (!response.ok) {
       throw new Error(`Blob download failed with status ${response.status}.`);
@@ -659,10 +685,11 @@ export class StalwartJmapClient {
     using: string[],
     methodCalls: JmapMethodCall[],
   ): Promise<JmapEnvelope> {
+    const authorization = await this.getAuthorizationHeader();
     const response = await this.fetcher(session.apiUrl, {
       method: "POST",
       headers: {
-        Authorization: this.authHeader,
+        Authorization: authorization,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

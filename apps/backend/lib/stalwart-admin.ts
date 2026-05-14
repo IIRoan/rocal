@@ -1,4 +1,5 @@
 import { env } from "./env";
+import { createLogger } from "@workspace/logger";
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -20,11 +21,23 @@ export type StalwartAccountRecord = {
   accountId: string;
 };
 
+type StalwartSetError = {
+  description?: string;
+  type?: string;
+  properties?: string[];
+  objectId?: {
+    object?: string;
+    id?: string;
+  };
+};
+
+const logger = createLogger("backend:stalwart-admin");
+
 export interface StalwartAdminClientLike {
   resolveDomainByName(domainName: string): Promise<StalwartDomainRecord>;
   createAccount(input: {
     localPart: string;
-    password: string;
+    secret: string;
     domainId: string;
     description?: string | null;
   }): Promise<StalwartAccountRecord>;
@@ -56,7 +69,6 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 export class StalwartAdminClient implements StalwartJmapAdminClientLike {
   private readonly baseUrl: string;
-  private adminAccountIdPromise: Promise<string> | null = null;
 
   constructor({
     baseUrl,
@@ -107,28 +119,33 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
 
   async createAccount(input: {
     localPart: string;
-    password: string;
+    secret: string;
     domainId: string;
     description?: string | null;
   }): Promise<StalwartAccountRecord> {
-    const adminAccountId = await this.getAdminAccountId();
     const envelope = await this.postJmap([
       [
         "x:Account/set",
         {
-          accountId: adminAccountId,
           create: {
             user1: {
               "@type": "User",
+              aliases: {},
+              credentials: {},
+              encryptionAtRest: {
+                "@type": "Disabled",
+              },
+              memberGroupIds: {},
               name: input.localPart,
               domainId: input.domainId,
-              description: input.description ?? null,
-              credentials: {
-                "0": {
-                  "@type": "Password",
-                  secret: input.password,
-                },
+              permissions: {
+                "@type": "Inherit",
               },
+              quotas: {},
+              roles: {
+                "@type": "User",
+              },
+              description: input.description ?? null,
             },
           },
         },
@@ -137,19 +154,162 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     ]);
 
     const result = this.getMethodResult<{
-      created?: Record<string, { id?: string }>;
-      notCreated?: Record<string, { description?: string }>;
+      created?: Record<
+        string,
+        {
+          id?: string;
+          emailAddress?: string;
+          name?: string;
+          domainId?: string;
+        }
+      >;
+      notCreated?: Record<string, StalwartSetError>;
     }>(envelope, "x:Account/set");
     const created = result.created?.user1;
+    const notCreated = result.notCreated?.user1;
 
-    if (!created?.id) {
-      const reason = result.notCreated?.user1?.description || "Unknown error";
+    logger.info("Stalwart createAccount response", {
+      requestedLocalPart: input.localPart,
+      requestedDomainId: input.domainId,
+      created,
+      notCreated: notCreated ?? null,
+    });
+
+    const accountId = created?.id ?? (await this.recoverExistingAccountId(input, notCreated));
+
+    if (!accountId) {
+      const reason = notCreated?.description || "Unknown error";
       throw new Error(`Stalwart account creation failed: ${reason}`);
     }
 
+    const verifiedAccount = await this.getAccount(accountId);
+    const requestedLocalPart = input.localPart.trim().toLowerCase();
+    const verifiedLocalPart = verifiedAccount.name.trim().toLowerCase();
+
+    if (verifiedLocalPart !== requestedLocalPart) {
+      logger.error("Stalwart createAccount resolved to a different mailbox name", {
+        requestedLocalPart,
+        requestedDomainId: input.domainId,
+        returnedAccountId: accountId,
+        verifiedEmailAddress: verifiedAccount.emailAddress ?? null,
+        verifiedName: verifiedAccount.name,
+        verifiedDomainId: verifiedAccount.domainId,
+      });
+      throw new Error(
+        `Stalwart returned a mismatched mailbox after account creation. Requested local part '${requestedLocalPart}' but resolved '${verifiedAccount.name}'.`,
+      );
+    }
+
+    if (verifiedAccount.domainId !== input.domainId) {
+      logger.error("Stalwart createAccount resolved to a different domain id", {
+        requestedLocalPart,
+        requestedDomainId: input.domainId,
+        returnedAccountId: accountId,
+        verifiedEmailAddress: verifiedAccount.emailAddress ?? null,
+        verifiedName: verifiedAccount.name,
+        verifiedDomainId: verifiedAccount.domainId,
+      });
+      throw new Error(
+        `Stalwart returned a mismatched domain id after account creation. Requested '${input.domainId}' but resolved '${verifiedAccount.domainId}'.`,
+      );
+    }
+
+    await this.setAccountPassword({
+      accountId,
+      secret: input.secret,
+    });
+
     return {
-      accountId: created.id,
+      accountId,
     };
+  }
+
+  private async recoverExistingAccountId(
+    input: {
+      localPart: string;
+      domainId: string;
+    },
+    error?: StalwartSetError,
+  ): Promise<string | null> {
+    if (!error) {
+      return null;
+    }
+
+    const objectId = error.objectId?.id?.trim();
+    const propertyTargets = Array.isArray(error.properties) ? error.properties : [];
+    const isEmailPrimaryKeyViolation =
+      error.type === "primaryKeyViolation" && propertyTargets.includes("email");
+
+    if (!isEmailPrimaryKeyViolation || !objectId) {
+      return null;
+    }
+
+    logger.warn("Stalwart createAccount reported an existing remote mailbox; attempting recovery", {
+      requestedLocalPart: input.localPart,
+      requestedDomainId: input.domainId,
+      existingAccountId: objectId,
+      errorType: error.type,
+      properties: propertyTargets,
+    });
+
+    return objectId;
+  }
+
+  private async getAccount(accountId: string): Promise<{
+    id: string;
+    name: string;
+    domainId: string;
+    emailAddress?: string;
+  }> {
+    const envelope = await this.postJmap([
+      [
+        "x:Account/get",
+        {
+          ids: [accountId],
+        },
+        "c1",
+      ],
+    ]);
+
+    const result = this.getMethodResult<{
+      list?: Array<{
+        id: string;
+        name: string;
+        domainId: string;
+        emailAddress?: string;
+      }>;
+    }>(envelope, "x:Account/get");
+
+    const account = result.list?.[0];
+    if (!account) {
+      throw new Error(
+        `Stalwart account lookup failed after account creation for id '${accountId}'.`,
+      );
+    }
+
+    return account;
+  }
+
+  private async setAccountPassword(input: {
+    accountId: string;
+    secret: string;
+  }): Promise<void> {
+    const envelope = await this.postJmap([
+      [
+        "x:AccountPassword/set",
+        {
+          accountId: input.accountId,
+          update: {
+            singleton: {
+              secret: input.secret,
+            },
+          },
+        },
+        "c1",
+      ],
+    ]);
+
+    this.getMethodResult(envelope, "x:AccountPassword/set");
   }
 
   async registerPublicKey(input: {
@@ -218,25 +378,6 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
         "c1",
       ],
     ]);
-  }
-
-  private async getAdminAccountId(): Promise<string> {
-    this.adminAccountIdPromise ??= this.getSession().then((session) => {
-      const primaryAccountId =
-        session.primaryAccounts?.["urn:stalwart:jmap"] ||
-        session.primaryAccounts?.["urn:ietf:params:jmap:mail"] ||
-        Object.keys(session.accounts ?? {})[0];
-
-      if (!primaryAccountId) {
-        throw new Error(
-          "Stalwart admin session did not include a usable account id.",
-        );
-      }
-
-      return primaryAccountId;
-    });
-
-    return this.adminAccountIdPromise;
   }
 
   async getSession(): Promise<StalwartJmapEnvelope> {

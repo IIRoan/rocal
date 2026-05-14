@@ -5,7 +5,11 @@ jest.mock("../../lib/mail-key-utils", () => ({
 }));
 
 import { MailService } from "../../services/mail.service";
-import { NotFoundError, ValidationError } from "../../lib/errors";
+import {
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from "../../lib/errors";
 import { getOpenPgpPublicKeyFingerprint } from "../../lib/mail-key-utils";
 
 function createMockPrisma() {
@@ -35,6 +39,9 @@ function createMockPrisma() {
         },
       })),
     },
+    mailJmapSyncState: {
+      deleteMany: jest.fn(async () => ({ count: 0 })),
+    },
     $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
       callback(mockPrisma),
     ),
@@ -57,6 +64,19 @@ function createMockAdminClient() {
   };
 }
 
+const mockMailOAuthConfig = {
+  issuer: "https://api.solace.test/api/auth",
+  discoveryUrl: "https://api.solace.test/api/auth/.well-known/openid-configuration",
+  authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
+  tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
+  userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
+  jwksUri: "https://api.solace.test/api/auth/jwks",
+  clientId: "solace-mail-browser",
+  redirectUri: "https://app.solace.test/mail/oauth/callback",
+  scopes: ["openid", "email"],
+  audiences: ["https://mail.solace.onl"],
+};
+
 describe("MailService", () => {
   let mockPrisma: ReturnType<typeof createMockPrisma>;
   let mockAdminClient: ReturnType<typeof createMockAdminClient>;
@@ -68,6 +88,7 @@ describe("MailService", () => {
     service = new MailService(mockPrisma as any, mockAdminClient, {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://192.168.2.213:8080",
+      oauth: mockMailOAuthConfig,
     });
   });
 
@@ -76,7 +97,7 @@ describe("MailService", () => {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
-      loginMode: "basic",
+      oauth: mockMailOAuthConfig,
     });
   });
 
@@ -205,94 +226,11 @@ describe("MailService", () => {
     expect(mockPrisma.mailDirectoryEntry.update).not.toHaveBeenCalled();
   });
 
-  it("provisions a new encrypted mailbox and stores the directory entry", async () => {
-    const result = await service.signUp({
-      displayName: "  Alice Example  ",
-      localPart: "  Alice  ",
-      password: "StrongMailboxPassword!42",
-      publicKeyArmored: "public-key-armored",
-      fingerprint: "abcd1234ef567890",
-      algorithm: "openpgp",
-      createdAt: "2026-05-06T21:00:00.000Z",
-      vaultVersion: 1,
-      encryptedVaultB64: "vault-b64",
-      kdf: "argon2id",
-      kdfParams: {
-        saltB64: "salt-b64",
-        memoryKiB: 65536,
-        iterations: 3,
-        parallelism: 4,
-      },
-    });
-
-    expect(getOpenPgpPublicKeyFingerprint).toHaveBeenCalledWith(
-      "public-key-armored",
-    );
-    expect(mockAdminClient.resolveDomainByName).toHaveBeenCalledWith(
-      "solace.onl",
-    );
-    expect(mockAdminClient.createAccount).toHaveBeenCalledWith({
-      localPart: "alice",
-      password: "StrongMailboxPassword!42",
-      domainId: "domain-1",
-      description: "Alice Example",
-    });
-    expect(mockAdminClient.registerPublicKey).toHaveBeenCalledWith({
-      accountId: "acct-1",
-      email: "alice@solace.onl",
-      publicKeyArmored: "public-key-armored",
-      description: "Alice Example primary OpenPGP key",
-    });
-    expect(mockAdminClient.enableEncryptionAtRest).toHaveBeenCalledWith({
-      accountId: "acct-1",
-      publicKeyId: "pk-1",
-      encryptOnAppend: false,
-      allowSpamTraining: false,
-    });
-    expect(mockPrisma.mailDirectoryEntry.create).toHaveBeenCalledWith({
-      data: {
-        email: "alice@solace.onl",
-        localPart: "alice",
-        domain: "solace.onl",
-        displayName: "Alice Example",
-        stalwartAccountId: "acct-1",
-        stalwartDomainId: "domain-1",
-        stalwartPublicKeyId: "pk-1",
-        publicKeyArmored: "public-key-armored",
-        publicKeyFingerprint: "ABCD1234EF567890",
-        keyAlgorithm: "openpgp",
-        source: "internal",
-        trust: "verified",
-        keyCreatedAt: new Date("2026-05-06T21:00:00.000Z"),
-        vaultBackup: {
-          create: {
-            vaultVersion: 1,
-            encryptedVaultB64: "vault-b64",
-            kdf: "argon2id",
-            kdfSaltB64: "salt-b64",
-            kdfMemoryKiB: 65536,
-            kdfIterations: 3,
-            kdfParallelism: 4,
-          },
-        },
-      },
-    });
-    expect(result).toEqual({
-      email: "alice@solace.onl",
-      displayName: "Alice Example",
-      stalwartAccountId: "acct-1",
-      stalwartPublicKeyId: "pk-1",
-      fingerprint: "ABCD1234EF567890",
-      encryptionAtRestEnabled: true,
-    });
-  });
-
   it("provisions a mailbox for an authenticated Solace account and links it to the user", async () => {
     const result = await service.bootstrapForUser({
       userId: "user-1",
       email: "Alice@Solace.Onl",
       displayName: "  Alice Example  ",
-      password: "StrongMailboxPassword!42",
       publicKeyArmored: "public-key-armored",
       fingerprint: "abcd1234ef567890",
       algorithm: "openpgp",
@@ -310,6 +248,14 @@ describe("MailService", () => {
 
     expect(mockAdminClient.resolveDomainByName).toHaveBeenCalledWith(
       "solace.onl",
+    );
+    expect(mockAdminClient.createAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localPart: "alice",
+        domainId: "domain-1",
+        description: "Alice Example",
+        secret: expect.any(String),
+      }),
     );
     expect(mockPrisma.mailDirectoryEntry.create).toHaveBeenCalledWith({
       data: {
@@ -352,6 +298,262 @@ describe("MailService", () => {
       fingerprint: "ABCD1234EF567890",
       encryptionAtRestEnabled: true,
     });
+    expect(mockAdminClient.createAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localPart: "alice",
+        domainId: "domain-1",
+        description: "Alice Example",
+        secret: expect.any(String),
+      }),
+    );
+
+    const createAccountCalls = mockAdminClient.createAccount.mock
+      .calls as unknown as Array<[{ secret: string }]>
+      ;
+    const generatedSecret = createAccountCalls[0]?.[0]?.secret;
+    expect(generatedSecret).toBeTruthy();
+    expect(generatedSecret?.length ?? 0).toBeGreaterThanOrEqual(60);
+  });
+
+  it("surfaces stale Stalwart mailbox conflicts without a generic 500", async () => {
+    mockAdminClient.createAccount.mockRejectedValueOnce(
+      new Error("Stalwart account creation failed: account already exists"),
+    );
+
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
+        displayName: "Alice Example",
+        publicKeyArmored: "public-key-armored",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(mockPrisma.mailDirectoryEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("reuses an existing directory entry when the provisioned Stalwart account already exists", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "entry-1",
+        email: "alice@solace.onl",
+        userId: null,
+      });
+
+    const result = await service.bootstrapForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      publicKeyArmored: "public-key-armored",
+      fingerprint: "ABCD1234EF567890",
+      algorithm: "openpgp",
+      createdAt: "2026-05-06T21:00:00.000Z",
+      vaultVersion: 1,
+      encryptedVaultB64: "vault-b64",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+    });
+
+    expect(mockPrisma.mailDirectoryEntry.create).not.toHaveBeenCalled();
+    expect(mockPrisma.mailJmapSyncState.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.mailDirectoryEntry.update).toHaveBeenCalledWith({
+      where: { id: "entry-1" },
+      data: {
+        email: "alice@solace.onl",
+        localPart: "alice",
+        domain: "solace.onl",
+        displayName: "Alice Example",
+        stalwartDomainId: "domain-1",
+        stalwartPublicKeyId: "pk-1",
+        publicKeyArmored: "public-key-armored",
+        publicKeyFingerprint: "ABCD1234EF567890",
+        keyAlgorithm: "openpgp",
+        source: "internal",
+        trust: "verified",
+        keyCreatedAt: new Date("2026-05-06T21:00:00.000Z"),
+        user: {
+          connect: {
+            id: "user-1",
+          },
+        },
+        vaultBackup: {
+          upsert: {
+            create: {
+              vaultVersion: 1,
+              encryptedVaultB64: "vault-b64",
+              kdf: "argon2id",
+              kdfSaltB64: "salt-b64",
+              kdfMemoryKiB: 65536,
+              kdfIterations: 3,
+              kdfParallelism: 4,
+            },
+            update: {
+              vaultVersion: 1,
+              encryptedVaultB64: "vault-b64",
+              kdf: "argon2id",
+              kdfSaltB64: "salt-b64",
+              kdfMemoryKiB: 65536,
+              kdfIterations: 3,
+              kdfParallelism: 4,
+            },
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      fingerprint: "ABCD1234EF567890",
+      encryptionAtRestEnabled: true,
+    });
+  });
+
+  it("repairs a stale directory entry when a reused Stalwart account id points at a different old mailbox", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "entry-stale",
+        email: "1531536@solace.onl",
+        userId: null,
+      });
+
+    const result = await service.bootstrapForUser({
+      userId: "user-1",
+      email: "testprod12@solace.onl",
+      displayName: "Test Prod 12",
+      publicKeyArmored: "public-key-armored",
+      fingerprint: "ABCD1234EF567890",
+      algorithm: "openpgp",
+      createdAt: "2026-05-06T21:00:00.000Z",
+      vaultVersion: 1,
+      encryptedVaultB64: "vault-b64",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+    });
+
+    expect(mockPrisma.mailDirectoryEntry.create).not.toHaveBeenCalled();
+    expect(mockPrisma.mailJmapSyncState.deleteMany).toHaveBeenCalledWith({
+      where: {
+        directoryEntryId: "entry-stale",
+      },
+    });
+    expect(mockPrisma.mailDirectoryEntry.update).toHaveBeenCalledWith({
+      where: { id: "entry-stale" },
+      data: {
+        email: "testprod12@solace.onl",
+        localPart: "testprod12",
+        domain: "solace.onl",
+        displayName: "Test Prod 12",
+        stalwartDomainId: "domain-1",
+        stalwartPublicKeyId: "pk-1",
+        publicKeyArmored: "public-key-armored",
+        publicKeyFingerprint: "ABCD1234EF567890",
+        keyAlgorithm: "openpgp",
+        source: "internal",
+        trust: "verified",
+        keyCreatedAt: new Date("2026-05-06T21:00:00.000Z"),
+        user: {
+          connect: {
+            id: "user-1",
+          },
+        },
+        vaultBackup: {
+          upsert: {
+            create: {
+              vaultVersion: 1,
+              encryptedVaultB64: "vault-b64",
+              kdf: "argon2id",
+              kdfSaltB64: "salt-b64",
+              kdfMemoryKiB: 65536,
+              kdfIterations: 3,
+              kdfParallelism: 4,
+            },
+            update: {
+              vaultVersion: 1,
+              encryptedVaultB64: "vault-b64",
+              kdf: "argon2id",
+              kdfSaltB64: "salt-b64",
+              kdfMemoryKiB: 65536,
+              kdfIterations: 3,
+              kdfParallelism: 4,
+            },
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      email: "testprod12@solace.onl",
+      displayName: "Test Prod 12",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      fingerprint: "ABCD1234EF567890",
+      encryptionAtRestEnabled: true,
+    });
+  });
+
+  it("rejects stale-entry repair when the reused mailbox is already linked to another Solace account", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "entry-stale",
+        email: "1531536@solace.onl",
+        userId: "user-old",
+      });
+
+    await expect(
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "testprod12@solace.onl",
+        displayName: "Test Prod 12",
+        publicKeyArmored: "public-key-armored",
+        fingerprint: "ABCD1234EF567890",
+        algorithm: "openpgp",
+        createdAt: "2026-05-06T21:00:00.000Z",
+        vaultVersion: 1,
+        encryptedVaultB64: "vault-b64",
+        kdf: "argon2id",
+        kdfParams: {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(mockPrisma.mailJmapSyncState.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.mailDirectoryEntry.update).not.toHaveBeenCalled();
   });
 
   it("rejects bootstrapping when the authenticated user already has a linked mailbox", async () => {
@@ -370,7 +572,6 @@ describe("MailService", () => {
         userId: "user-1",
         email: "alice@solace.onl",
         displayName: "Alice Example",
-        password: "StrongMailboxPassword!42",
         publicKeyArmored: "public-key-armored",
         fingerprint: "ABCD1234EF567890",
         algorithm: "openpgp",
@@ -397,10 +598,10 @@ describe("MailService", () => {
       .mockResolvedValueOnce("DIFFERENTFINGERPRINT");
 
     await expect(
-      service.signUp({
+      service.bootstrapForUser({
+        userId: "user-1",
+        email: "alice@solace.onl",
         displayName: "Alice Example",
-        localPart: "alice",
-        password: "StrongMailboxPassword!42",
         publicKeyArmored: "public-key-armored",
         fingerprint: "ABCD1234EF567890",
         algorithm: "openpgp",

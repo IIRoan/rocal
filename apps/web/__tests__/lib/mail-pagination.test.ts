@@ -41,8 +41,7 @@ describe("StalwartJmapClient.getMailboxMessages pagination", () => {
     fetchMock = jest.fn();
     client = new StalwartJmapClient({
       baseUrl: "https://mail.example.com",
-      email: "test@example.com",
-      password: "secret",
+      accessToken: "mail-access-token",
       fetcher: fetchMock as never,
     });
   });

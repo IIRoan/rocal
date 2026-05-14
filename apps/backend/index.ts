@@ -1,12 +1,18 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
+import {
+  oauthProviderAuthServerMetadata,
+  oauthProviderOpenIdConfigMetadata,
+} from "@better-auth/oauth-provider";
 import { createLogger, installGlobalConsoleLogger } from "@workspace/logger";
 import {
   auth,
-  BETTER_AUTH_BASE_PATH,
+  ensureMailOAuthClients,
   getAuthOpenApiDocumentation,
+  isMailOauthEnabled,
 } from "./lib/auth";
+import { BETTER_AUTH_BASE_PATH } from "./lib/auth-constants";
 import { env } from "./lib/env";
 import { e2eeRoutes } from "./routes/e2ee";
 import { eventsRoutes } from "./routes/events";
@@ -38,6 +44,7 @@ import {
   sessionCookieAuthSecurity,
 } from "./lib/openapi";
 import { corsOriginPolicy } from "./lib/origin-policy";
+import { patchOauthMetadataResponse } from "./lib/oauth-metadata";
 
 installGlobalConsoleLogger("backend");
 
@@ -47,6 +54,20 @@ const { backendUrl, frontendUrl } = env;
 
 function normalizePath(path: string) {
   return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
+function getLocalAuthBasePath(prefix: string): string {
+  const normalizedPrefix = normalizePath(prefix || "");
+
+  if (
+    normalizedPrefix &&
+    BETTER_AUTH_BASE_PATH.startsWith(normalizedPrefix)
+  ) {
+    const strippedPath = BETTER_AUTH_BASE_PATH.slice(normalizedPrefix.length);
+    return normalizePath(strippedPath || "/");
+  }
+
+  return normalizePath(BETTER_AUTH_BASE_PATH);
 }
 
 async function buildApiDocumentation() {
@@ -93,7 +114,17 @@ async function buildApiDocumentation() {
   }
 }
 
+if (isMailOauthEnabled) {
+  await ensureMailOAuthClients();
+}
+
 const apiDocumentation = await buildApiDocumentation();
+const oauthAuthorizationServerMetadata = isMailOauthEnabled
+  ? oauthProviderAuthServerMetadata(auth)
+  : null;
+const oauthOpenIdConfiguration = isMailOauthEnabled
+  ? oauthProviderOpenIdConfigMetadata(auth)
+  : null;
 
 // Better Auth middleware
 const betterAuth = new Elysia({ name: "better-auth" })
@@ -128,6 +159,7 @@ export const createAPI = (prefix = "") => {
   const authOpenApiSchemaPath = normalizePath(
     `${prefix}${BETTER_AUTH_BASE_PATH}/open-api/generate-schema`,
   );
+  const localAuthBasePath = getLocalAuthBasePath(prefix);
 
   // Initialize Calendar sync service
   const calendarSyncService = CalendarSyncService.getInstance();
@@ -219,6 +251,102 @@ export const createAPI = (prefix = "") => {
         ],
         exposeHeaders: ["Set-Cookie"],
       }),
+    )
+    .get(
+      "/.well-known/oauth-authorization-server",
+      async ({ request, set }) => {
+        if (!oauthAuthorizationServerMetadata) {
+          set.status = 404;
+          return {
+            error: "Not found",
+            message: "Mail OAuth is not enabled.",
+          };
+        }
+
+        return patchOauthMetadataResponse(
+          await oauthAuthorizationServerMetadata(request),
+        );
+      },
+      {
+        detail: {
+          tags: ["Auth"],
+          summary: "Get OAuth 2.0 authorization server metadata",
+          description:
+            "Returns authorization-server metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
+        },
+      },
+    )
+    .get(
+      `${localAuthBasePath}/.well-known/oauth-authorization-server`,
+      async ({ request, set }) => {
+        if (!oauthAuthorizationServerMetadata) {
+          set.status = 404;
+          return {
+            error: "Not found",
+            message: "Mail OAuth is not enabled.",
+          };
+        }
+
+        return patchOauthMetadataResponse(
+          await oauthAuthorizationServerMetadata(request),
+        );
+      },
+      {
+        detail: {
+          tags: ["Auth"],
+          summary: "Get OAuth 2.0 authorization server metadata",
+          description:
+            "Returns authorization-server metadata on the issuer-relative path expected by OIDC clients.",
+        },
+      },
+    )
+    .get(
+      "/.well-known/openid-configuration",
+      async ({ request, set }) => {
+        if (!oauthOpenIdConfiguration) {
+          set.status = 404;
+          return {
+            error: "Not found",
+            message: "Mail OAuth is not enabled.",
+          };
+        }
+
+        return patchOauthMetadataResponse(
+          await oauthOpenIdConfiguration(request),
+        );
+      },
+      {
+        detail: {
+          tags: ["Auth"],
+          summary: "Get OpenID Connect discovery metadata",
+          description:
+            "Returns OpenID Connect discovery metadata for the Solace mail OAuth issuer when mail OAuth is enabled.",
+        },
+      },
+    )
+    .get(
+      `${localAuthBasePath}/.well-known/openid-configuration`,
+      async ({ request, set }) => {
+        if (!oauthOpenIdConfiguration) {
+          set.status = 404;
+          return {
+            error: "Not found",
+            message: "Mail OAuth is not enabled.",
+          };
+        }
+
+        return patchOauthMetadataResponse(
+          await oauthOpenIdConfiguration(request),
+        );
+      },
+      {
+        detail: {
+          tags: ["Auth"],
+          summary: "Get OpenID Connect discovery metadata",
+          description:
+            "Returns OIDC discovery metadata on the issuer-relative path expected by external clients such as Stalwart.",
+        },
+      },
     )
     .use(errorHandler)
     .use(betterAuth)

@@ -5,31 +5,30 @@ export type MailVaultKdfParams = {
   parallelism: number;
 };
 
+export type MailOAuthConfig = {
+  issuer: string;
+  discoveryUrl: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  userinfoEndpoint: string;
+  jwksUri: string;
+  clientId: string;
+  redirectUri: string;
+  scopes: string[];
+  audiences: string[];
+};
+
 export type MailDemoConfig = {
   defaultDomain: string;
   discoveryBaseUrl: string;
   signupEnabled: boolean;
-  loginMode: "basic";
+  oauth: MailOAuthConfig;
 };
 
 export type MailAccountStatusResult = {
   email: string;
   displayName: string | null;
   provisioned: boolean;
-};
-
-export type MailSignupInput = {
-  displayName?: string;
-  localPart: string;
-  password: string;
-  publicKeyArmored: string;
-  fingerprint: string;
-  algorithm: string;
-  createdAt: string;
-  vaultVersion: number;
-  encryptedVaultB64: string;
-  kdf: string;
-  kdfParams: MailVaultKdfParams;
 };
 
 export type MailSignupResult = {
@@ -61,7 +60,6 @@ export type MailBootstrapForUserInput = {
   userId: string;
   email: string;
   displayName?: string | null;
-  password: string;
   publicKeyArmored: string;
   fingerprint: string;
   algorithm: string;
@@ -105,7 +103,6 @@ export interface IMailService {
   getMailboxStatusForUser(
     input: GetMailAccountStatusInput,
   ): Promise<MailAccountStatusResult>;
-  signUp(input: MailSignupInput): Promise<MailSignupResult>;
   bootstrapForUser(input: MailBootstrapForUserInput): Promise<MailSignupResult>;
   getDirectoryKey(email: string): Promise<MailDirectoryKeyResult>;
   getVaultBackup(email: string): Promise<MailVaultBackupResult>;

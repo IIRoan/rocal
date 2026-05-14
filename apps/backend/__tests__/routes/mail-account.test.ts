@@ -21,19 +21,31 @@ jest.mock("../../lib/auth-guard", () => {
   };
 });
 
+const mockMailOAuthConfig = {
+  issuer: "https://api.solace.test/api/auth",
+  discoveryUrl: "https://api.solace.test/api/auth/.well-known/openid-configuration",
+  authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
+  tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
+  userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
+  jwksUri: "https://api.solace.test/api/auth/jwks",
+  clientId: "solace-mail-browser",
+  redirectUri: "https://app.solace.test/mail/oauth/callback",
+  scopes: ["openid", "email"],
+  audiences: ["https://mail.solace.onl"],
+};
+
 const mockMailService = {
   getConfig: jest.fn(() => ({
     defaultDomain: "solace.onl",
     discoveryBaseUrl: "http://localhost:8080",
     signupEnabled: true,
-    loginMode: "basic" as const,
+    oauth: mockMailOAuthConfig,
   })),
   getMailboxStatusForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     displayName: "Alice Example",
     provisioned: true,
   })),
-  signUp: jest.fn(),
   bootstrapForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     displayName: "Alice Example",
@@ -105,7 +117,6 @@ describe("mailAccountRoutes", () => {
 
   it("bootstraps a mailbox for the authenticated Solace account", async () => {
     const requestBody = {
-      password: "StrongMailboxPassword!42",
       publicKeyArmored: "public-key-armored",
       fingerprint: "ABCD1234EF567890",
       algorithm: "openpgp",
@@ -146,13 +157,46 @@ describe("mailAccountRoutes", () => {
     });
   });
 
+  it("accepts passwordless mailbox bootstrap payloads", async () => {
+    const requestBody = {
+      publicKeyArmored: "public-key-armored",
+      fingerprint: "ABCD1234EF567890",
+      algorithm: "openpgp",
+      createdAt: "2026-05-06T21:00:00.000Z",
+      vaultVersion: 1,
+      encryptedVaultB64: "vault-b64",
+      kdf: "argon2id",
+      kdfParams: {
+        saltB64: "salt-b64",
+        memoryKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+    };
+
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/account/bootstrap", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(requestBody),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockMailService.bootstrapForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      ...requestBody,
+    });
+  });
+
   it("rejects unexpected fields when bootstrapping an authenticated mailbox", async () => {
     const response = await createApp().handle(
       new Request("http://localhost/mail/account/bootstrap", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          password: "StrongMailboxPassword!42",
           publicKeyArmored: "public-key-armored",
           fingerprint: "ABCD1234EF567890",
           algorithm: "openpgp",
