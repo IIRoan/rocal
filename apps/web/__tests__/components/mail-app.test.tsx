@@ -136,7 +136,6 @@ jest.mock("../../lib/enc-password-cookie", () => ({
 }));
 
 jest.mock("postal-mime", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
   default: {
     parse: (jest.fn() as any).mockResolvedValue({ text: "", html: null }),
   },

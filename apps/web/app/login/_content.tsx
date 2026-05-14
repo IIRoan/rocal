@@ -451,6 +451,7 @@ export function LoginForm() {
       log.error("Email auth failed:", err);
       clearAuthPasswords();
       clearEncPasswordCookie();
+      setError(err.message || "Authentication failed. Please try again.");
     } finally {
       setEmailLoading(false);
     }

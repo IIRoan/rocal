@@ -33,12 +33,15 @@ function makeOkResponse(ids: string[], total: number, messages: object[]) {
 }
 
 describe("StalwartJmapClient.getMailboxMessages pagination", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let fetchMock: jest.MockedFunction<any>;
+  let fetchMock: jest.MockedFunction<
+    (input: string, init?: RequestInit) => Promise<Response>
+  >;
   let client: StalwartJmapClient;
 
   beforeEach(() => {
-    fetchMock = jest.fn();
+    fetchMock = jest.fn() as jest.MockedFunction<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >;
     client = new StalwartJmapClient({
       baseUrl: "https://mail.example.com",
       accessToken: "mail-access-token",
