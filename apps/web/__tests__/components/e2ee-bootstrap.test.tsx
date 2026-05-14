@@ -46,9 +46,17 @@ jest.mock("@/lib/e2ee-password-reset", () => ({
 }));
 
 jest.mock("@/lib/e2ee-password-cache", () => ({
+  clearAuthPasswords: jest.fn(),
   clearPendingAuthPassword: jest.fn(),
   consumePendingAuthPassword: jest.fn(),
+  peekCachedAuthPassword: jest.fn(),
   peekPendingAuthPassword: jest.fn(),
+}));
+
+jest.mock("@/lib/enc-password-cookie", () => ({
+  clearEncPasswordCookie: jest.fn(),
+  initEncPasswordFromCookie: jest.fn(),
+  setEncPasswordCookie: jest.fn(),
 }));
 
 jest.mock("@workspace/ui/components/ui/dialog", () => ({
@@ -95,10 +103,17 @@ import {
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
+  clearAuthPasswords,
   clearPendingAuthPassword,
   consumePendingAuthPassword,
+  peekCachedAuthPassword,
   peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  initEncPasswordFromCookie,
+  setEncPasswordCookie,
+} from "@/lib/enc-password-cookie";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -115,9 +130,14 @@ const mockUnlockE2eeWithPassword = jest.mocked(unlockE2eeWithPassword);
 const mockResetEncryptionPasswordForActiveSession = jest.mocked(
   resetEncryptionPasswordForActiveSession,
 );
+const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockClearPendingAuthPassword = jest.mocked(clearPendingAuthPassword);
 const mockConsumePendingAuthPassword = jest.mocked(consumePendingAuthPassword);
+const mockPeekCachedAuthPassword = jest.mocked(peekCachedAuthPassword);
 const mockPeekPendingAuthPassword = jest.mocked(peekPendingAuthPassword);
+const mockInitEncPasswordFromCookie = jest.mocked(initEncPasswordFromCookie);
+const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
+const mockClearEncPasswordCookie = jest.mocked(clearEncPasswordCookie);
 
 function createBootstrap(
   overrides?: Partial<E2eeBootstrapResponse>,
@@ -190,10 +210,15 @@ describe("E2eeBootstrap component", () => {
       activated: false,
       bootstrap: createBootstrap(),
     });
+    mockPeekCachedAuthPassword.mockReturnValue(null);
     mockPeekPendingAuthPassword.mockReturnValue(null);
     mockConsumePendingAuthPassword.mockReturnValue(null);
     mockUnlockE2eeWithPassword.mockResolvedValue(true);
     mockResetEncryptionPasswordForActiveSession.mockResolvedValue(true);
+    mockClearAuthPasswords.mockReset();
+    mockInitEncPasswordFromCookie.mockResolvedValue(undefined);
+    mockSetEncPasswordCookie.mockResolvedValue(undefined);
+    mockClearEncPasswordCookie.mockReset();
   });
 
   afterEach(() => {
@@ -248,9 +273,6 @@ describe("E2eeBootstrap component", () => {
     expect(container.textContent).toContain("Unlock encrypted data");
     expect(container.textContent).toContain(
       "Enter your encryption password to unlock encrypted data on this device.",
-    );
-    expect(container.textContent).toContain(
-      "GitHub and passkey sign-in keep this password separate.",
     );
     expect(container.textContent).toContain("Encryption password");
   });
@@ -338,10 +360,7 @@ describe("E2eeBootstrap component", () => {
 
     expect(container.textContent).toContain("Protect your encryption keys");
     expect(container.textContent).toContain(
-      "Choose an encryption password to protect your end-to-end encryption keys.",
-    );
-    expect(container.textContent).toContain(
-      "You'll need it when you sign in with GitHub or a passkey on a new device.",
+      "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.",
     );
     expect(container.textContent).toContain("Encryption password");
   });
@@ -361,5 +380,131 @@ describe("E2eeBootstrap component", () => {
       "pw",
     );
     expect(container.textContent).not.toContain("Protect your encryption keys");
+  });
+
+  it("retries automatic email-password setup before showing the manual encryption dialog", async () => {
+    mockPeekCachedAuthPassword.mockReturnValue("pw");
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: true,
+      bootstrap: createBootstrap(),
+    });
+    mockResetEncryptionPasswordForActiveSession
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <E2eeBootstrap />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledTimes(3);
+    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenLastCalledWith(
+      "user-1",
+      "pw",
+    );
+    expect(container.textContent).not.toContain("Protect your encryption keys");
+  });
+
+  it("calls initEncPasswordFromCookie before running the bootstrap", async () => {
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: false,
+      bootstrap: null,
+    });
+
+    await renderComponent();
+
+    expect(mockInitEncPasswordFromCookie).toHaveBeenCalled();
+  });
+
+  it("cookie-restored password auto-saves encryption without showing the setup dialog", async () => {
+    // Simulate: cookie init restores a password into the cache
+    mockInitEncPasswordFromCookie.mockImplementation(async () => {
+      mockPeekCachedAuthPassword.mockReturnValue("cookie-pw");
+      mockPeekPendingAuthPassword.mockReturnValue("cookie-pw");
+    });
+    mockConsumePendingAuthPassword.mockReturnValue("cookie-pw");
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: true,
+      bootstrap: createBootstrap(),
+    });
+
+    await renderComponent();
+
+    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledWith(
+      "user-1",
+      "cookie-pw",
+    );
+    expect(container.textContent).not.toContain("Protect your encryption keys");
+  });
+
+  it("writes the cookie after a successful manual unlock", async () => {
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: false,
+      bootstrap: createBootstrap({ passwordEnvelope: createPasswordEnvelope() }),
+    });
+
+    await renderComponent();
+
+    const passwordInput = container.querySelector("#e2ee-password") as HTMLInputElement;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (el) => el.textContent?.includes("Unlock"),
+    );
+
+    await act(async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      descriptor?.set?.call(passwordInput, "my-unlock-pw");
+      passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("my-unlock-pw");
+  });
+
+  it("writes the cookie after a successful manual password setup", async () => {
+    mockEnsureE2eeBootstrap.mockResolvedValue({
+      activated: true,
+      bootstrap: createBootstrap(),
+    });
+
+    await renderComponent();
+
+    const passwordInput = container.querySelector("#e2ee-password") as HTMLInputElement;
+    const confirmInput = container.querySelector("#e2ee-password-confirm") as HTMLInputElement;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (el) => el.textContent?.includes("Save password"),
+    );
+
+    await act(async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      descriptor?.set?.call(passwordInput, "new-strong-pw!");
+      passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
+      descriptor?.set?.call(confirmInput, "new-strong-pw!");
+      confirmInput.dispatchEvent(new Event("input", { bubbles: true }));
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("new-strong-pw!");
+  });
+
+  it("clears the cookie and auth passwords when the user is signed out", async () => {
+    mockUseSession.mockReturnValue({
+      data: null,
+      isPending: false,
+    });
+
+    await renderComponent();
+
+    expect(mockClearEncPasswordCookie).toHaveBeenCalled();
+    expect(mockClearAuthPasswords).toHaveBeenCalled();
   });
 });

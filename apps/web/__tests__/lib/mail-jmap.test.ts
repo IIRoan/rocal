@@ -1,0 +1,365 @@
+import { describe, expect, it, jest } from "@jest/globals";
+
+import {
+  StalwartJmapClient,
+  buildBearerAuthHeader,
+  buildSendMessageMethodCalls,
+  getPrimaryMailAccountId,
+  normalizeJmapSession,
+} from "../../lib/mail/jmap-client";
+
+describe("mail JMAP helpers", () => {
+  it("builds a bearer auth header from an access token", () => {
+    expect(buildBearerAuthHeader("access-token-123")).toBe(
+      "Bearer access-token-123",
+    );
+  });
+
+  it("normalizes advertised session URLs back to the configured discovery base", () => {
+    const session = normalizeJmapSession(
+      {
+        apiUrl: "https://solacemailmail.solace.onl/jmap/",
+        downloadUrl:
+          "https://solacemailmail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+        uploadUrl:
+          "https://solacemailmail.solace.onl/jmap/upload/{accountId}/",
+        eventSourceUrl:
+          "https://solacemailmail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+        accounts: {},
+        primaryAccounts: {
+          "urn:ietf:params:jmap:mail": "b",
+        },
+      },
+      "http://192.168.2.213:8080",
+    );
+
+    expect(session).toEqual(
+      expect.objectContaining({
+        apiUrl: "http://192.168.2.213:8080/jmap/",
+        downloadUrl:
+          "http://192.168.2.213:8080/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+        uploadUrl: "http://192.168.2.213:8080/jmap/upload/{accountId}/",
+        eventSourceUrl:
+          "http://192.168.2.213:8080/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+      }),
+    );
+  });
+
+  it("preserves proxy base paths when normalizing advertised session URLs", () => {
+    const session = normalizeJmapSession(
+      {
+        apiUrl: "https://solacemailmail.solace.onl/jmap/",
+        downloadUrl:
+          "https://solacemailmail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+        uploadUrl:
+          "https://solacemailmail.solace.onl/jmap/upload/{accountId}/",
+        eventSourceUrl:
+          "https://solacemailmail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+        accounts: {},
+        primaryAccounts: {
+          "urn:ietf:params:jmap:mail": "b",
+        },
+      },
+      "http://localhost:4001/api/mail/jmap",
+    );
+
+    expect(session).toEqual(
+      expect.objectContaining({
+        apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+        downloadUrl:
+          "http://localhost:4001/api/mail/jmap/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+        uploadUrl: "http://localhost:4001/api/mail/jmap/jmap/upload/{accountId}/",
+        eventSourceUrl:
+          "http://localhost:4001/api/mail/jmap/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+      }),
+    );
+  });
+
+  it("returns the primary mail account id from the session", () => {
+    expect(
+      getPrimaryMailAccountId({
+        accounts: {
+          b: { name: "alice@solace.onl" },
+        },
+        primaryAccounts: {
+          "urn:ietf:params:jmap:mail": "b",
+        },
+      }),
+    ).toBe("b");
+  });
+
+  it("falls back to the Stalwart account capability when the mail capability is absent", () => {
+    expect(
+      getPrimaryMailAccountId({
+        accounts: {
+          stalwart: { name: "alice@solace.onl" },
+        },
+        primaryAccounts: {
+          "urn:stalwart:jmap": "stalwart",
+        },
+      }),
+    ).toBe("stalwart");
+  });
+
+  it("falls back to the first account when no primary account mapping is present", () => {
+    expect(
+      getPrimaryMailAccountId({
+        accounts: {
+          a: { name: "alice@solace.onl" },
+          b: { name: "alice+alt@solace.onl" },
+        },
+        primaryAccounts: {},
+      }),
+    ).toBe("a");
+  });
+
+  it("builds plain-text send method calls for Email/set and EmailSubmission/set", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@example.com", "cara@example.com"],
+        subject: "Hello",
+        textBody: "Hello from Solace Mail",
+        identityId: "identity-1",
+      }),
+    ).toEqual([
+      [
+        "Email/set",
+        {
+          create: {
+            draft1: {
+              mailboxIds: { "drafts-1": true },
+              from: [{ email: "alice@solace.onl" }],
+              to: [{ email: "bob@example.com" }, { email: "cara@example.com" }],
+              subject: "Hello",
+              bodyStructure: {
+                type: "text/plain",
+                partId: "text",
+              },
+              bodyValues: {
+                text: {
+                  value: "Hello from Solace Mail",
+                },
+              },
+            },
+          },
+        },
+        "c1",
+      ],
+      [
+        "EmailSubmission/set",
+        {
+          create: {
+            s1: {
+              emailId: "#draft1",
+              identityId: "identity-1",
+            },
+          },
+        },
+        "c2",
+      ],
+    ]);
+  });
+
+  it("moves the sent message into the sent mailbox when one is provided", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        sentMailboxId: "sent-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@example.com"],
+        subject: "Hello",
+        textBody: "Hello from Solace Mail",
+        identityId: "identity-1",
+      }),
+    ).toEqual([
+      expect.any(Array),
+      [
+        "EmailSubmission/set",
+        {
+          create: {
+            s1: {
+              emailId: "#draft1",
+              identityId: "identity-1",
+            },
+          },
+          onSuccessUpdateEmail: {
+            "#s1": {
+              "mailboxIds/sent-1": true,
+              "mailboxIds/drafts-1": null,
+              "keywords/$draft": null,
+            },
+          },
+        },
+        "c2",
+      ],
+    ]);
+  });
+});
+
+describe("StalwartJmapClient", () => {
+  it("discovers and normalizes the JMAP session through the backend proxy", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          downloadUrl:
+            "https://mail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+          uploadUrl: "https://mail.solace.onl/jmap/upload/{accountId}/",
+          eventSourceUrl:
+            "https://mail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+          accounts: {},
+          primaryAccounts: {
+            "urn:ietf:params:jmap:mail": "b",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await expect(client.discoverSession()).resolves.toEqual(
+      expect.objectContaining({
+        apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
+        downloadUrl:
+          "http://localhost:4001/api/mail/jmap/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+      }),
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://localhost:4001/api/mail/jmap/.well-known/jmap",
+      {
+        method: "GET",
+        headers: {
+          Authorization: buildBearerAuthHeader("mail-access-token"),
+        },
+        redirect: "follow",
+      },
+    );
+  });
+
+  it("supports bearer tokens for proxied JMAP discovery", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          accounts: {},
+          primaryAccounts: {
+            "urn:ietf:params:jmap:mail": "b",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher,
+    });
+
+    await client.discoverSession();
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://localhost:4001/api/mail/jmap/.well-known/jmap",
+      {
+        method: "GET",
+        headers: {
+          Authorization: buildBearerAuthHeader("mail-access-token"),
+        },
+        redirect: "follow",
+      },
+    );
+  });
+
+  it("supports async access-token providers for proxied JMAP discovery", async () => {
+    const fetcher = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () =>
+      new Response(
+        JSON.stringify({
+          apiUrl: "https://mail.solace.onl/jmap/",
+          accounts: {},
+          primaryAccounts: {
+            "urn:ietf:params:jmap:mail": "b",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const getAccessToken = jest.fn(async () => "mail-access-token");
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      getAccessToken,
+      fetcher,
+    });
+
+    await client.discoverSession();
+
+    expect(getAccessToken).toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://localhost:4001/api/mail/jmap/.well-known/jmap",
+      {
+        method: "GET",
+        headers: {
+          Authorization: buildBearerAuthHeader("mail-access-token"),
+        },
+        redirect: "follow",
+      },
+    );
+  });
+
+  it("surfaces bearer-auth failures without mentioning passwords", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "expired-access-token",
+      fetcher: async () =>
+        new Response(JSON.stringify({ message: "Token expired" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+
+    await expect(client.discoverSession()).rejects.toThrow(
+      "Mail sign-in expired or was rejected by the mail server.",
+    );
+  });
+
+  it("includes upstream details when discovery cannot reach the mail server", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost:4001/api/mail/jmap",
+      accessToken: "mail-access-token",
+      fetcher: async () =>
+        new Response(JSON.stringify({ message: "Connection refused" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+
+    await expect(client.discoverSession()).rejects.toThrow(
+      "Mail server is unreachable — Connection refused.",
+    );
+  });
+});

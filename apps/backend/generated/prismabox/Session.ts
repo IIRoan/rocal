@@ -32,6 +32,43 @@ export const SessionRelations = t.Object(
       },
       { additionalProperties: false },
     ),
+    oauthRefreshTokens: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          token: t.String(),
+          clientId: t.String(),
+          sessionId: __nullable__(t.String()),
+          userId: t.String(),
+          referenceId: __nullable__(t.String()),
+          expiresAt: t.Date(),
+          createdAt: t.Date(),
+          revoked: __nullable__(t.Date()),
+          authTime: __nullable__(t.Date()),
+          scopes: t.Array(t.String(), { additionalProperties: false }),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    oauthAccessTokens: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          token: t.String(),
+          clientId: t.String(),
+          sessionId: __nullable__(t.String()),
+          userId: __nullable__(t.String()),
+          referenceId: __nullable__(t.String()),
+          refreshId: __nullable__(t.String()),
+          expiresAt: t.Date(),
+          createdAt: t.Date(),
+          scopes: t.Array(t.String(), { additionalProperties: false }),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
   },
   { additionalProperties: false },
 );
@@ -69,6 +106,38 @@ export const SessionRelationsInputCreate = t.Object(
       },
       { additionalProperties: false },
     ),
+    oauthRefreshTokens: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    oauthAccessTokens: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { additionalProperties: false },
 );
@@ -86,6 +155,56 @@ export const SessionRelationsInputUpdate = t.Partial(
           ),
         },
         { additionalProperties: false },
+      ),
+      oauthRefreshTokens: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      oauthAccessTokens: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
       ),
     },
     { additionalProperties: false },
@@ -177,6 +296,8 @@ export const SessionSelect = t.Partial(
       userAgent: t.Boolean(),
       userId: t.Boolean(),
       user: t.Boolean(),
+      oauthRefreshTokens: t.Boolean(),
+      oauthAccessTokens: t.Boolean(),
       _count: t.Boolean(),
     },
     { additionalProperties: false },
@@ -185,7 +306,12 @@ export const SessionSelect = t.Partial(
 
 export const SessionInclude = t.Partial(
   t.Object(
-    { user: t.Boolean(), _count: t.Boolean() },
+    {
+      user: t.Boolean(),
+      oauthRefreshTokens: t.Boolean(),
+      oauthAccessTokens: t.Boolean(),
+      _count: t.Boolean(),
+    },
     { additionalProperties: false },
   ),
 );

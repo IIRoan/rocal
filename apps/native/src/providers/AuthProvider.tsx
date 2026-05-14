@@ -10,8 +10,8 @@ import React, {
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
-import { CALENDAR_HOME_ROUTE } from "../lib/auth-routing";
 import { getAuthCapabilities } from "../lib/auth-capabilities";
+import { API_BASE_URL } from "../lib/constants";
 import {
   deleteStoredPasskey,
   getDefaultPasskeyName,
@@ -22,7 +22,7 @@ import {
   resolvePasskeyBridgeBaseUrl,
   signInWithBrowserPasskey,
 } from "../lib/passkey-browser-bridge";
-import { waitForSessionCookie } from "../lib/session-cookie";
+import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,7 +41,8 @@ interface Session {
   expiresAt: Date;
 }
 
-export type AuthMethod = "email-password" | "github" | "passkey" | "unknown";
+export type AuthMethod = "email-password" | "passkey" | "unknown";
+type SignInResult = { requiresPasskeyStepUp: boolean };
 
 export interface AuthContextValue {
   /** The currently authenticated user, or null. */
@@ -52,14 +53,14 @@ export interface AuthContextValue {
   isLoading: boolean;
   /** Convenience flag — true when user and session are present. */
   isAuthenticated: boolean;
+  /** True when the user must complete a registered passkey challenge. */
+  requiresPasskeyStepUp: boolean;
   /** The auth method used for the current session when known. */
   lastAuthMethod: AuthMethod;
   /** Sign in with email and password. */
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
   /** Create a new account. */
   signUp: (name: string, email: string, password: string) => Promise<void>;
-  /** Sign in with GitHub OAuth. */
-  signInWithGitHub: (options?: { requestSignUp?: boolean }) => Promise<void>;
   /** Sign out and clear the session. */
   signOut: () => Promise<void>;
   /** Authenticate using platform biometrics (passkey). */
@@ -93,6 +94,7 @@ export function AuthProvider({
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod>("unknown");
+  const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
   const pendingAuthPasswordRef = useRef<string | null>(null);
   const authCapabilities = useMemo(
     () => {
@@ -112,6 +114,24 @@ export function AuthProvider({
   );
 
   // ── Session hydration ────────────────────────────────────────────────
+  const fetchAuthStatus = useCallback(async () => {
+    const cookie = getSessionCookie();
+    const response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
+      credentials: "include",
+      headers: cookie ? { cookie } : undefined,
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to load authentication status.");
+    }
+
+    return (await response.json()) as {
+      authenticated: boolean;
+      hasPasskeys: boolean;
+      requiresPasskeyStepUp: boolean;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -121,6 +141,10 @@ export function AuthProvider({
         if (!cancelled && result?.data) {
           setUser(result.data.user as User);
           setSession((result.data as any).session as Session);
+          const authStatus = await fetchAuthStatus();
+          if (!cancelled) {
+            setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+          }
         }
       } catch {
         // No valid session — stay unauthenticated.
@@ -133,7 +157,7 @@ export function AuthProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchAuthStatus]);
 
   // ── Auth actions ─────────────────────────────────────────────────────
 
@@ -167,6 +191,7 @@ export function AuthProvider({
   const resetAuthMethodHints = useCallback(() => {
     pendingAuthPasswordRef.current = null;
     setLastAuthMethod("unknown");
+    setRequiresPasskeyStepUp(false);
   }, []);
 
   const setEmailPasswordAuthHints = useCallback((password: string) => {
@@ -174,7 +199,7 @@ export function AuthProvider({
     setLastAuthMethod("email-password");
   }, []);
 
-  const setProviderAuthHints = useCallback((method: "github" | "passkey") => {
+  const setProviderAuthHints = useCallback((method: "passkey") => {
     pendingAuthPasswordRef.current = null;
     setLastAuthMethod(method);
   }, []);
@@ -224,12 +249,20 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-in");
+        const authStatus = await fetchAuthStatus();
+        setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+        return { requiresPasskeyStepUp: authStatus.requiresPasskeyStepUp };
       } catch (error) {
         resetAuthMethodHints();
         throw error;
       }
     },
-    [finalizeAuthenticatedSession, resetAuthMethodHints, setEmailPasswordAuthHints],
+    [
+      fetchAuthStatus,
+      finalizeAuthenticatedSession,
+      resetAuthMethodHints,
+      setEmailPasswordAuthHints,
+    ],
   );
 
   const signUp = useCallback(
@@ -250,37 +283,13 @@ export function AuthProvider({
 
       try {
         await finalizeAuthenticatedSession(result.data, "Sign-up");
+        setRequiresPasskeyStepUp(false);
       } catch (error) {
         resetAuthMethodHints();
         throw error;
       }
     },
     [finalizeAuthenticatedSession, resetAuthMethodHints, setEmailPasswordAuthHints],
-  );
-
-  const signInWithGitHub = useCallback(
-    async (options?: { requestSignUp?: boolean }) => {
-      setProviderAuthHints("github");
-      const result = await authClient.signIn.social({
-        provider: "github",
-        callbackURL: CALENDAR_HOME_ROUTE,
-        ...(options?.requestSignUp ? { requestSignUp: true } : {}),
-      });
-
-      if (result.error) {
-        throw new Error(
-          result.error.message ?? "GitHub sign-in failed. Please try again.",
-        );
-      }
-
-      try {
-        await finalizeAuthenticatedSession(result.data, "GitHub sign-in");
-      } catch (error) {
-        resetAuthMethodHints();
-        throw error;
-      }
-    },
-    [finalizeAuthenticatedSession, resetAuthMethodHints, setProviderAuthHints],
   );
 
   const signOut = useCallback(async () => {
@@ -314,6 +323,8 @@ export function AuthProvider({
 
         try {
           await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
+          const authStatus = await fetchAuthStatus();
+          setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
         } catch (error) {
           resetAuthMethodHints();
           throw error;
@@ -327,6 +338,8 @@ export function AuthProvider({
 
         try {
           await finalizeAuthenticatedSession(result, "Passkey sign-in");
+          const authStatus = await fetchAuthStatus();
+          setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
         } catch (error) {
           resetAuthMethodHints();
           throw error;
@@ -335,7 +348,13 @@ export function AuthProvider({
       }
 
     throw new Error("Passkey sign-in failed. Please try again.");
-  }, [authCapabilities, finalizeAuthenticatedSession, resetAuthMethodHints, setProviderAuthHints]);
+  }, [
+    authCapabilities,
+    fetchAuthStatus,
+    finalizeAuthenticatedSession,
+    resetAuthMethodHints,
+    setProviderAuthHints,
+  ]);
 
   const registerPasskey = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {
@@ -385,11 +404,11 @@ export function AuthProvider({
       user,
       session,
       isLoading,
-      isAuthenticated: !!user && !!session,
+      isAuthenticated: !!user && !!session && !requiresPasskeyStepUp,
+      requiresPasskeyStepUp,
       lastAuthMethod,
       signIn,
       signUp,
-      signInWithGitHub,
       signOut,
       signInWithPasskey,
       registerPasskey,
@@ -401,10 +420,10 @@ export function AuthProvider({
       user,
       session,
       isLoading,
+      requiresPasskeyStepUp,
       lastAuthMethod,
       signIn,
       signUp,
-      signInWithGitHub,
       signOut,
       signInWithPasskey,
       registerPasskey,

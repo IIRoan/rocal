@@ -188,6 +188,8 @@ export function CommandPalette({
   const [resettingEncryptionPassword, setResettingEncryptionPassword] =
     useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [localImageOverride, setLocalImageOverride] = useState<string | null | undefined>(undefined);
+  const accountImage = localImageOverride !== undefined ? localImageOverride : (session?.user?.image ?? null);
   const linkedAccounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
   const { hasOAuthAccount, hasPasswordAccount } = useMemo(
     () => summarizeLinkedAuthAccounts(linkedAccounts),
@@ -384,6 +386,7 @@ export function CommandPalette({
             result.error.message || "Unable to update your profile.",
           );
         }
+        setLocalImageOverride(imageUrl?.trim() || null);
       } catch (error) {
         log.error("Failed to update profile:", error);
         throw error;
@@ -629,7 +632,7 @@ export function CommandPalette({
           handleDeleteAccount={handleDeleteAccount}
           accountName={session?.user?.name}
           accountEmail={session?.user?.email}
-          accountImage={session?.user?.image}
+          accountImage={accountImage}
           sessionLoading={sessionLoading}
           changingPassword={changingPassword}
           settingPassword={settingPassword}

@@ -324,7 +324,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("click", handleDocumentClick, true);
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [startRouteTransition]);
+  }, [isPasskeyBridge, startRouteTransition]);
 
   useEffect(() => {
     return () => {

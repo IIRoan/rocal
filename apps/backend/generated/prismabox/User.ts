@@ -201,6 +201,122 @@ export const UserRelations = t.Object(
       ),
       { additionalProperties: false },
     ),
+    mailDirectoryEntry: __nullable__(
+      t.Object(
+        {
+          id: t.String(),
+          userId: __nullable__(t.String()),
+          email: t.String(),
+          localPart: t.String(),
+          domain: t.String(),
+          displayName: __nullable__(t.String()),
+          stalwartAccountId: t.String(),
+          stalwartDomainId: t.String(),
+          stalwartPublicKeyId: __nullable__(t.String()),
+          publicKeyArmored: t.String(),
+          publicKeyFingerprint: t.String(),
+          keyAlgorithm: t.String(),
+          source: t.String(),
+          trust: t.String(),
+          keyCreatedAt: __nullable__(t.Date()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    oauthClients: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          clientId: t.String(),
+          clientSecret: __nullable__(t.String()),
+          disabled: t.Boolean(),
+          skipConsent: __nullable__(t.Boolean()),
+          enableEndSession: __nullable__(t.Boolean()),
+          subjectType: __nullable__(t.String()),
+          scopes: t.Array(t.String(), { additionalProperties: false }),
+          userId: __nullable__(t.String()),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+          name: __nullable__(t.String()),
+          uri: __nullable__(t.String()),
+          icon: __nullable__(t.String()),
+          contacts: t.Array(t.String(), { additionalProperties: false }),
+          tos: __nullable__(t.String()),
+          policy: __nullable__(t.String()),
+          softwareId: __nullable__(t.String()),
+          softwareVersion: __nullable__(t.String()),
+          softwareStatement: __nullable__(t.String()),
+          redirectUris: t.Array(t.String(), { additionalProperties: false }),
+          postLogoutRedirectUris: t.Array(t.String(), {
+            additionalProperties: false,
+          }),
+          tokenEndpointAuthMethod: __nullable__(t.String()),
+          grantTypes: t.Array(t.String(), { additionalProperties: false }),
+          responseTypes: t.Array(t.String(), { additionalProperties: false }),
+          public: __nullable__(t.Boolean()),
+          type: __nullable__(t.String()),
+          requirePKCE: __nullable__(t.Boolean()),
+          referenceId: __nullable__(t.String()),
+          metadata: __nullable__(t.Any()),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    oauthRefreshTokens: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          token: t.String(),
+          clientId: t.String(),
+          sessionId: __nullable__(t.String()),
+          userId: t.String(),
+          referenceId: __nullable__(t.String()),
+          expiresAt: t.Date(),
+          createdAt: t.Date(),
+          revoked: __nullable__(t.Date()),
+          authTime: __nullable__(t.Date()),
+          scopes: t.Array(t.String(), { additionalProperties: false }),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    oauthAccessTokens: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          token: t.String(),
+          clientId: t.String(),
+          sessionId: __nullable__(t.String()),
+          userId: __nullable__(t.String()),
+          referenceId: __nullable__(t.String()),
+          refreshId: __nullable__(t.String()),
+          expiresAt: t.Date(),
+          createdAt: t.Date(),
+          scopes: t.Array(t.String(), { additionalProperties: false }),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
+    oauthConsents: t.Array(
+      t.Object(
+        {
+          id: t.String(),
+          clientId: t.String(),
+          userId: __nullable__(t.String()),
+          referenceId: __nullable__(t.String()),
+          scopes: t.Array(t.String(), { additionalProperties: false }),
+          createdAt: t.Date(),
+          updatedAt: t.Date(),
+        },
+        { additionalProperties: false },
+      ),
+      { additionalProperties: false },
+    ),
     encryptionDevices: t.Array(
       t.Object(
         {
@@ -395,6 +511,83 @@ export const UserRelationsInputCreate = t.Object(
       ),
     ),
     subscriptions: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    mailDirectoryEntry: t.Optional(
+      t.Object(
+        {
+          connect: t.Object(
+            {
+              id: t.String({ additionalProperties: false }),
+            },
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    oauthClients: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    oauthRefreshTokens: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    oauthAccessTokens: t.Optional(
+      t.Object(
+        {
+          connect: t.Array(
+            t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            { additionalProperties: false },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    oauthConsents: t.Optional(
       t.Object(
         {
           connect: t.Array(
@@ -651,6 +844,120 @@ export const UserRelationsInputUpdate = t.Partial(
           { additionalProperties: false },
         ),
       ),
+      mailDirectoryEntry: t.Partial(
+        t.Object(
+          {
+            connect: t.Object(
+              {
+                id: t.String({ additionalProperties: false }),
+              },
+              { additionalProperties: false },
+            ),
+            disconnect: t.Boolean(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      oauthClients: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      oauthRefreshTokens: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      oauthAccessTokens: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      oauthConsents: t.Partial(
+        t.Object(
+          {
+            connect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+            disconnect: t.Array(
+              t.Object(
+                {
+                  id: t.String({ additionalProperties: false }),
+                },
+                { additionalProperties: false },
+              ),
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       encryptionDevices: t.Partial(
         t.Object(
           {
@@ -809,6 +1116,11 @@ export const UserSelect = t.Partial(
       participations: t.Boolean(),
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
+      mailDirectoryEntry: t.Boolean(),
+      oauthClients: t.Boolean(),
+      oauthRefreshTokens: t.Boolean(),
+      oauthAccessTokens: t.Boolean(),
+      oauthConsents: t.Boolean(),
       encryptionDevices: t.Boolean(),
       encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
@@ -829,6 +1141,11 @@ export const UserInclude = t.Partial(
       participations: t.Boolean(),
       settings: t.Boolean(),
       subscriptions: t.Boolean(),
+      mailDirectoryEntry: t.Boolean(),
+      oauthClients: t.Boolean(),
+      oauthRefreshTokens: t.Boolean(),
+      oauthAccessTokens: t.Boolean(),
+      oauthConsents: t.Boolean(),
       encryptionDevices: t.Boolean(),
       encryptionPassword: t.Boolean(),
       passkeys: t.Boolean(),
