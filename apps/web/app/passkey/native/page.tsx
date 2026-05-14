@@ -154,7 +154,7 @@ export default function NativePasskeyBridgePage() {
     }
 
     window.close();
-  }, [mode, redirectToApp]);
+  }, [callbackURL, emitLog, mode, redirectToApp]);
 
   const handleContinue = useCallback(async () => {
     if (!isMounted) {

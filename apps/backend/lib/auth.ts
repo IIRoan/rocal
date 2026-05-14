@@ -315,7 +315,7 @@ const passkeyStepUpPlugin = {
   },
 };
 
-const authPlugins: any[] = [
+const authPlugins = [
   expo(),
   openAPI({
     disableDefaultReference: true,
