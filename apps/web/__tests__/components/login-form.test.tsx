@@ -79,6 +79,9 @@ jest.mock("lucide-react", () => {
     Eye: Icon,
     EyeOff: Icon,
     ArrowRight: Icon,
+    Check: Icon,
+    X: Icon,
+    Ticket: Icon,
   };
 });
 
@@ -147,6 +150,13 @@ jest.mock("@/lib/account-api-service", () => ({
   },
 }));
 
+jest.mock("@/lib/invite-api-service", () => ({
+  inviteApiService: {
+    validateInviteToken: jest.fn(),
+    claimInviteToken: jest.fn(),
+  },
+}));
+
 jest.mock("@/lib/e2ee-password-cache", () => ({
   clearAuthPasswords: jest.fn(),
   storePendingAuthPassword: jest.fn(),
@@ -175,6 +185,7 @@ jest.mock("@/lib/auth-client", () => ({
 
 import { LoginForm } from "../../app/login/_content";
 import { accountApiService } from "@/lib/account-api-service";
+import { inviteApiService } from "@/lib/invite-api-service";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
@@ -196,6 +207,8 @@ const mockCheckEmailAvailability = jest.mocked(
 );
 const mockGetSignupConfig = jest.mocked(accountApiService.getSignupConfig);
 const mockGetAuthStatus = jest.mocked(accountApiService.getAuthStatus);
+const mockValidateInviteToken = jest.mocked(inviteApiService.validateInviteToken);
+const mockClaimInviteToken = jest.mocked(inviteApiService.claimInviteToken);
 const mockUpdateUserSettings = jest.mocked(calendarApiService.updateUserSettings);
 const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
@@ -231,6 +244,16 @@ describe("LoginForm", () => {
     });
     mockGetSignupConfig.mockResolvedValue({
       defaultEmailDomain: "solace.onl",
+    });
+    mockValidateInviteToken.mockResolvedValue({
+      valid: true,
+      inviteId: "invite-1",
+      email: "roan@example.com",
+      inviterName: "Roan",
+    });
+    mockClaimInviteToken.mockResolvedValue({
+      success: true,
+      inviteId: "invite-1",
     });
     mockCheckEmailAvailability.mockResolvedValue({
       email: "roan",
@@ -425,6 +448,9 @@ describe("LoginForm", () => {
     const desiredEmailInput = container.querySelector(
       "#desired-email",
     ) as HTMLInputElement | null;
+    const inviteTokenInput = container.querySelector(
+      "#invite-token",
+    ) as HTMLInputElement | null;
     const passwordInput = container.querySelector(
       "#password",
     ) as HTMLInputElement | null;
@@ -435,19 +461,24 @@ describe("LoginForm", () => {
     await act(async () => {
       setInputValue(nameInput as HTMLInputElement, "Roan");
       setInputValue(desiredEmailInput as HTMLInputElement, "RoAn");
-      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      setInputValue(inviteTokenInput as HTMLInputElement, "valid-invite-token");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
       submitButton?.click();
       await Promise.resolve();
     });
 
     expect(mockCheckEmailAvailability).toHaveBeenCalledWith("roan");
+    expect(mockClaimInviteToken).toHaveBeenCalledWith(
+      "valid-invite-token",
+      "roan@solace.onl",
+    );
     expect(mockEmailSignUp).toHaveBeenCalledWith({
       email: "roan@solace.onl",
-      password: "secret-password",
+      password: "Secret123!",
       name: "Roan",
     });
-    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("secret-password");
-    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("secret-password");
+    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("Secret123!");
+    expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("Secret123!");
   });
 
   it("shows the availability error and skips sign-up when the Solace email is taken", async () => {
@@ -486,7 +517,7 @@ describe("LoginForm", () => {
     await act(async () => {
       setInputValue(nameInput as HTMLInputElement, "Roan");
       setInputValue(desiredEmailInput as HTMLInputElement, "RoAn");
-      setInputValue(passwordInput as HTMLInputElement, "secret-password");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
       submitButton?.click();
       await Promise.resolve();
     });
@@ -495,6 +526,52 @@ describe("LoginForm", () => {
     expect(mockEmailSignUp).not.toHaveBeenCalled();
     expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
     expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
+  });
+
+  it("shows the invite claim error without attempting sign-up when the chosen email is already claimed elsewhere", async () => {
+    mockClaimInviteToken.mockResolvedValueOnce({
+      success: false,
+      reason: "That email address already has an account.",
+    });
+
+    await renderForm();
+
+    const signUpButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Sign up",
+    );
+
+    await act(async () => {
+      signUpButton?.click();
+      await Promise.resolve();
+    });
+
+    const nameInput = container.querySelector("#name") as HTMLInputElement | null;
+    const desiredEmailInput = container.querySelector(
+      "#desired-email",
+    ) as HTMLInputElement | null;
+    const inviteTokenInput = container.querySelector(
+      "#invite-token",
+    ) as HTMLInputElement | null;
+    const passwordInput = container.querySelector(
+      "#password",
+    ) as HTMLInputElement | null;
+    const submitButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Create account"),
+    );
+
+    await act(async () => {
+      setInputValue(nameInput as HTMLInputElement, "Roan");
+      setInputValue(desiredEmailInput as HTMLInputElement, "RoAn");
+      setInputValue(inviteTokenInput as HTMLInputElement, "invite-token");
+      setInputValue(passwordInput as HTMLInputElement, "Secret123!");
+      submitButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain(
+      "That email address already has an account.",
+    );
+    expect(mockEmailSignUp).not.toHaveBeenCalled();
   });
 
   it("clears cached auth secrets and shows an error when email auth throws", async () => {
@@ -641,5 +718,18 @@ describe("LoginForm", () => {
       autoFocus: true,
     });
     expect(mockCompleteAuthNavigation).toHaveBeenCalledWith("/calendar");
+  });
+
+  it("pre-fills the invite token from the ?invite= URL param and switches to sign-up mode", async () => {
+    mockSearchParams = new URLSearchParams("invite=url-pre-fill-token");
+
+    await renderForm();
+
+    const inviteTokenInput = container.querySelector(
+      "#invite-token",
+    ) as HTMLInputElement | null;
+
+    expect(inviteTokenInput?.value).toBe("url-pre-fill-token");
+    expect(container.textContent).toContain("Create an account");
   });
 });

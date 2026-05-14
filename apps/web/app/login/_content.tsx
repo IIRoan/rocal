@@ -9,8 +9,9 @@ import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Key, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
+import { getErrorMessage } from "@workspace/calendar-core";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -18,6 +19,7 @@ import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { accountApiService } from "@/lib/account-api-service";
+import { inviteApiService } from "@/lib/invite-api-service";
 import {
   clearAuthPasswords,
   storePendingAuthPassword,
@@ -32,8 +34,13 @@ import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 const log = createLogger("login");
 const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
 const AUTH_STATUS_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
+const FIELD_VALIDATION_DEBOUNCE_MS = 500;
 
 type AuthMode = "sign-in" | "sign-up" | "forgot-password";
+
+function normalizeFormValue(value: string): string {
+  return value.trim().toLowerCase();
+}
 
 // ─── AnimatedCollapse ─────────────────────────────────────────────────────────
 
@@ -118,6 +125,52 @@ function AnimatedCollapse({
   );
 }
 
+// ─── Password Requirements ─────────────────────────────────────────────────────
+
+interface PasswordRequirement {
+  label: string;
+  met: boolean;
+}
+
+function getPasswordRequirements(password: string): PasswordRequirement[] {
+  return [
+    { label: "At least 8 characters", met: password.length >= 8 },
+    { label: "One uppercase letter", met: /[A-Z]/.test(password) },
+    { label: "One lowercase letter", met: /[a-z]/.test(password) },
+    { label: "One number", met: /[0-9]/.test(password) },
+    { label: "One special character", met: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
+function meetsMinPasswordRequirements(password: string): boolean {
+  const reqs = getPasswordRequirements(password);
+  return reqs.every((r) => r.met);
+}
+
+function PasswordRequirements({ password }: { password: string }) {
+  const requirements = getPasswordRequirements(password);
+  return (
+    <ul className="mt-2 space-y-1" aria-label="Password requirements">
+      {requirements.map((req) => (
+        <li key={req.label} className="flex items-center gap-2">
+          {req.met ? (
+            <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+          ) : (
+            <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+          )}
+          <span
+            className={`text-xs ${
+              req.met ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+            }`}
+          >
+            {req.label}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ─── LoginForm ────────────────────────────────────────────────────────────────
 
 export function LoginForm() {
@@ -139,6 +192,26 @@ export function LoginForm() {
   const [desiredEmail, setDesiredEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
+
+  // Invite token state
+  const [inviteToken, setInviteToken] = useState("");
+  const [inviteValidation, setInviteValidation] = useState<
+    | null
+    | { valid: true; inviterName?: string | null }
+    | { valid: false; reason: string }
+  >(null);
+  const [inviteValidating, setInviteValidating] = useState(false);
+
+  // Real-time email availability state
+  const [emailAvailability, setEmailAvailability] = useState<
+    | null
+    | { available: true }
+    | { available: false; message: string }
+  >(null);
+  const [emailChecking, setEmailChecking] = useState(false);
+
+  const emailCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inviteValidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const titleRef = useRef<HTMLDivElement>(null);
   const hasAutoPromptedStepUpRef = useRef(false);
@@ -170,12 +243,74 @@ export function LoginForm() {
 
     if (mode !== "sign-up") {
       setName("");
+      setInviteToken("");
+      setInviteValidation(null);
+      setEmailAvailability(null);
     }
 
     if (mode === "forgot-password") {
       setPassword("");
     }
   }, []);
+
+  // Debounced email availability check
+  useEffect(() => {
+    if (!isSignUp) return;
+    const trimmed = desiredEmail.trim().toLowerCase();
+    setEmailAvailability(null);
+    if (emailCheckTimerRef.current) clearTimeout(emailCheckTimerRef.current);
+    if (!trimmed) return;
+
+    setEmailChecking(true);
+    emailCheckTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await accountApiService.checkEmailAvailability(trimmed);
+        setEmailAvailability(
+          result.available
+            ? { available: true }
+            : { available: false, message: result.message },
+        );
+      } catch {
+        setEmailAvailability(null);
+      } finally {
+        setEmailChecking(false);
+      }
+    }, FIELD_VALIDATION_DEBOUNCE_MS);
+
+    return () => {
+      if (emailCheckTimerRef.current) clearTimeout(emailCheckTimerRef.current);
+    };
+  }, [desiredEmail, isSignUp]);
+
+  // Debounced invite token validation
+  useEffect(() => {
+    if (!isSignUp) return;
+    const trimmed = inviteToken.trim();
+    setInviteValidation(null);
+    if (inviteValidateTimerRef.current) clearTimeout(inviteValidateTimerRef.current);
+    if (!trimmed) return;
+
+    setInviteValidating(true);
+    inviteValidateTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await inviteApiService.validateInviteToken(trimmed);
+        if (result.valid) {
+          setInviteValidation({ valid: true, inviterName: result.inviterName });
+        } else {
+          const invalid = result as { valid: false; reason: string };
+          setInviteValidation({ valid: false, reason: invalid.reason ?? "Invalid token" });
+        }
+      } catch {
+        setInviteValidation({ valid: false, reason: "Could not validate token" });
+      } finally {
+        setInviteValidating(false);
+      }
+    }, FIELD_VALIDATION_DEBOUNCE_MS);
+
+    return () => {
+      if (inviteValidateTimerRef.current) clearTimeout(inviteValidateTimerRef.current);
+    };
+  }, [inviteToken, isSignUp]);
 
   const redirectAfterAuth = useCallback(() => {
     const target = getRedirectTarget();
@@ -282,8 +417,15 @@ export function LoginForm() {
     }
   }, []);
 
+  // Pre-fill invite token from ?invite= URL param and load signup domain
   useEffect(() => {
     let cancelled = false;
+
+    const urlToken = searchParams.get("invite");
+    if (urlToken) {
+      setInviteToken(urlToken.trim());
+      setAuthMode("sign-up");
+    }
 
     void accountApiService
       .getSignupConfig()
@@ -299,7 +441,7 @@ export function LoginForm() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [searchParams]);
 
   // Animate the title in when auth mode switches
   useGSAP(
@@ -361,10 +503,86 @@ export function LoginForm() {
     void handlePasskeyStepUp();
   }, [handlePasskeyStepUp]);
 
+  const finalizePasswordAuth = useCallback(
+    async (submittedPassword: string) => {
+      storePendingAuthPassword(submittedPassword);
+      void setEncPasswordCookie(submittedPassword);
+
+      const authStatus = await refreshAuthStatus();
+      if (authStatus.requiresPasskeyStepUp) {
+        if (isPasskeySupported) {
+          triggerAutoPasskeyStepUp();
+        } else {
+          setNotice(
+            "Password accepted. Check your device to finish signing in with your passkey.",
+          );
+          setShouldAutoPromptPasskey(true);
+        }
+        return false;
+      }
+
+      await syncThemeAfterAuth();
+      redirectAfterCompletedAuth();
+      return true;
+    },
+    [
+      isPasskeySupported,
+      redirectAfterCompletedAuth,
+      refreshAuthStatus,
+      syncThemeAfterAuth,
+      triggerAutoPasskeyStepUp,
+    ],
+  );
+
+  const resolveAvailableSignupEmail = useCallback(
+    async (rawDesiredEmail: string) => {
+      const normalizedDesiredEmail = normalizeFormValue(rawDesiredEmail);
+
+      if (!normalizedDesiredEmail) {
+        setError(`Please choose your @${signupDomain} email.`);
+        return null;
+      }
+
+      const availability = await accountApiService.checkEmailAvailability(
+        normalizedDesiredEmail,
+      );
+
+      if (!availability.available) {
+        setError(availability.message);
+        return null;
+      }
+
+      return availability;
+    },
+    [signupDomain],
+  );
+
+  const claimRequiredInvite = useCallback(
+    async (normalizedEmail: string) => {
+      const trimmedToken = inviteToken.trim();
+      if (!trimmedToken) {
+        setError("An invite token is required to create an account.");
+        return false;
+      }
+
+      const claimResult = await inviteApiService.claimInviteToken(
+        trimmedToken,
+        normalizedEmail,
+      );
+
+      if (!claimResult.success) {
+        setError((claimResult as { success: false; reason: string }).reason);
+        return false;
+      }
+
+      return true;
+    },
+    [inviteToken],
+  );
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedDesiredEmail = desiredEmail.trim().toLowerCase();
+    const normalizedEmail = normalizeFormValue(email);
     const trimmedName = name.trim();
 
     if (!password) {
@@ -383,17 +601,19 @@ export function LoginForm() {
           return;
         }
 
-        if (!normalizedDesiredEmail) {
-          setError(`Please choose your @${signupDomain} email.`);
+        if (!meetsMinPasswordRequirements(password)) {
+          setError(
+            "Your password doesn't meet the requirements. Please check the list below.",
+          );
           return;
         }
 
-        const availability = await accountApiService.checkEmailAvailability(
-          normalizedDesiredEmail,
-        );
+        const availability = await resolveAvailableSignupEmail(desiredEmail);
+        if (!availability) {
+          return;
+        }
 
-        if (!availability.available) {
-          setError(availability.message);
+        if (!(await claimRequiredInvite(availability.normalizedEmail))) {
           return;
         }
 
@@ -407,9 +627,6 @@ export function LoginForm() {
           setError(result.error.message || "Sign up failed. Please try again.");
           return;
         }
-
-        storePendingAuthPassword(password);
-        void setEncPasswordCookie(password);
 
         setEmail(availability.normalizedEmail);
       } else {
@@ -427,31 +644,14 @@ export function LoginForm() {
           setError(result.error.message || "Invalid email or password.");
           return;
         }
-
-        storePendingAuthPassword(password);
-        void setEncPasswordCookie(password);
       }
 
-      const authStatus = await refreshAuthStatus();
-      if (authStatus.requiresPasskeyStepUp) {
-        if (isPasskeySupported) {
-          triggerAutoPasskeyStepUp();
-        } else {
-          setNotice(
-            "Password accepted. Check your device to finish signing in with your passkey.",
-          );
-          setShouldAutoPromptPasskey(true);
-        }
-        return;
-      }
-
-      await syncThemeAfterAuth();
-      redirectAfterCompletedAuth();
+      await finalizePasswordAuth(password);
     } catch (err: any) {
       log.error("Email auth failed:", err);
       clearAuthPasswords();
       clearEncPasswordCookie();
-      setError(err.message || "Authentication failed. Please try again.");
+      setError(getErrorMessage(err, "Authentication failed. Please try again."));
     } finally {
       setEmailLoading(false);
     }
@@ -635,7 +835,15 @@ export function LoginForm() {
                     >
                       Solace email
                     </Label>
-                    <div className="flex h-11 overflow-hidden rounded-lg border border-input bg-background">
+                    <div
+                      className={`flex h-11 overflow-hidden rounded-lg border bg-background transition-colors ${
+                        emailAvailability === null
+                          ? "border-input"
+                          : emailAvailability.available
+                            ? "border-emerald-500 ring-1 ring-emerald-500/30"
+                            : "border-destructive ring-1 ring-destructive/30"
+                      }`}
+                    >
                       <Input
                         id="desired-email"
                         name="desired-email"
@@ -654,10 +862,83 @@ export function LoginForm() {
                         @{signupDomain}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      This becomes your Solace account email and mailbox
-                      address.
-                    </p>
+                    {emailChecking && (
+                      <p className="text-xs text-muted-foreground">Checking availability…</p>
+                    )}
+                    {!emailChecking && emailAvailability !== null && (
+                      <p
+                        className={`text-xs ${
+                          emailAvailability.available
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {emailAvailability.available
+                          ? "This address is available."
+                          : (emailAvailability as { available: false; message: string }).message}
+                      </p>
+                    )}
+                    {!emailChecking && !emailAvailability && (
+                      <p className="text-xs text-muted-foreground">
+                        This becomes your Solace account email and mailbox address.
+                      </p>
+                    )}
+                  </div>
+                </AnimatedCollapse>
+
+                <AnimatedCollapse isOpen={isSignUp}>
+                  <div className="space-y-2 pb-0.5">
+                    <Label
+                      htmlFor="invite-token"
+                      className="text-sm font-medium"
+                    >
+                      Invite token
+                    </Label>
+                    <div className="relative">
+                      <Ticket className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="invite-token"
+                        name="invite-token"
+                        type="text"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        placeholder="Paste your invite token"
+                        value={inviteToken}
+                        onChange={(e) => setInviteToken(e.target.value)}
+                        disabled={emailLoading}
+                        className={`h-11 rounded-lg pl-9 transition-colors ${
+                          inviteValidation === null
+                            ? ""
+                            : inviteValidation.valid
+                              ? "border-emerald-500 ring-1 ring-emerald-500/30"
+                              : "border-destructive ring-1 ring-destructive/30"
+                        }`}
+                      />
+                    </div>
+                    {inviteValidating && (
+                      <p className="text-xs text-muted-foreground">Validating token…</p>
+                    )}
+                    {!inviteValidating && inviteValidation !== null && (
+                      <p
+                        className={`text-xs ${
+                          inviteValidation.valid
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {inviteValidation.valid
+                          ? inviteValidation.inviterName
+                            ? `Valid — invited by ${inviteValidation.inviterName}`
+                            : "Valid invite token."
+                          : (inviteValidation as { valid: false; reason: string }).reason}
+                      </p>
+                    )}
+                    {!inviteValidating && inviteValidation === null && (
+                      <p className="text-xs text-muted-foreground">
+                        Solace is invite-only. Enter the token shared with you.
+                      </p>
+                    )}
                   </div>
                 </AnimatedCollapse>
 
@@ -727,6 +1008,14 @@ export function LoginForm() {
                         )}
                       </button>
                     </div>
+                    {isSignUp && password.length > 0 && (
+                      <PasswordRequirements password={password} />
+                    )}
+                    {isSignUp && password.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Min. 8 characters with uppercase, lowercase, number &amp; special character.
+                      </p>
+                    )}
                   </div>
                 </AnimatedCollapse>
 

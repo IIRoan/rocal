@@ -25,6 +25,7 @@ import { subscriptionsRoute } from "./routes/subscriptions";
 import { calendarSharingRoutes } from "./routes/calendar-sharing";
 import { accountPublicRoutes } from "./routes/account-public";
 import { accountRoutes } from "./routes/account";
+import { inviteRoutes } from "./routes/invites";
 import { mailAccountRoutes } from "./routes/mail-account";
 import { mailRoutes } from "./routes/mail";
 import { mailSyncRoutes } from "./routes/mail-sync";
@@ -439,7 +440,8 @@ export const createAPI = (prefix = "") => {
     .use(mailSyncRoutes)
     .use(realtimeMailRoutes)
     .use(accountPublicRoutes)
-    .use(accountRoutes);
+    .use(accountRoutes)
+    .use(inviteRoutes);
 };
 
 // Start the server when this file is run directly

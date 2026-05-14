@@ -13,6 +13,7 @@ import {
   Mail,
   Plus,
   Trash2,
+  Users,
 } from "lucide-react";
 
 // View labels for breadcrumb display
@@ -26,6 +27,7 @@ export const VIEW_LABELS: Record<string, string> = {
   account: "Account",
   security: "Security",
   passkeys: "Passkeys",
+  invites: "Invites",
 };
 
 // Command types - all actions, no navigation
@@ -197,6 +199,15 @@ export const NAVIGATION_ITEMS = [
     keywords: ["security", "passkey", "authentication", "password"],
     parent: null,
   },
+  {
+    id: "invites",
+    label: "Invites",
+    icon: Users,
+    description: "Invite friends to join Solace",
+    targetView: "invites",
+    keywords: ["invite", "invitations", "friends", "share", "referral"],
+    parent: null,
+  },
 ];
 
 // Expanded search items that include sub-settings with parent info for breadcrumbs
@@ -358,6 +369,17 @@ export const SEARCH_INDEX = [
     keywords: ["passkey", "security", "authentication", "passwordless"],
     parent: "security",
     parentLabel: "Security",
+  },
+  // Invites
+  {
+    id: "invites-search",
+    label: "Invites",
+    icon: Users,
+    description: "Invite friends to join Solace",
+    targetView: "invites",
+    keywords: ["invite", "invitations", "friends", "share", "referral"],
+    parent: "invites",
+    parentLabel: "Invites",
   },
 ];
 

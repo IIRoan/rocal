@@ -11,5 +11,16 @@ export type {
 export { CalendarApiService } from "./calendar-api-service";
 export type { DeleteAccountResponse } from "./calendar-api-service";
 
+export { InviteApiService } from "./invite-api-service";
+export type {
+	InviteStatus,
+	InviteRecord,
+	ListInvitesResponse,
+	CreateInviteResponse,
+	RevokeInviteResponse,
+	ValidateInviteTokenResponse,
+	ClaimInviteResponse,
+} from "./invite-api-service";
+
 export { NoopE2eeProvider } from "./e2ee-provider";
 export type { E2eeProvider } from "./e2ee-provider";
