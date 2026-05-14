@@ -36,6 +36,16 @@ export const apiDocumentationTags = [
       "Generated authentication endpoints for GitHub OAuth, passkeys, one-time tokens, session lifecycle, and account management.",
   },
   {
+    name: "Account",
+    description:
+      "Public sign-up validation and authenticated account lifecycle operations.",
+  },
+  {
+    name: "Mail",
+    description:
+      "Mailbox provisioning, vault backup access, public key lookup, and JMAP proxy routes.",
+  },
+  {
     name: "Events",
     description:
       "Create, search, update, delete, and export calendar events across the authenticated user's calendars.",

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { buildCalendarPath } from "@/lib/app-routes";
 
 export default function SettingsPage() {
-  redirect("/dashboard?palette=settings");
+  redirect(buildCalendarPath({ palette: "settings" }));
 }

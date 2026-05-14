@@ -100,8 +100,8 @@ describe("api-url helpers", () => {
   it("accepts relative callback urls and resolves them against the app origin", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
 
-    expect(getSafeAuthCallbackUrl("/dashboard?from=signin")).toBe(
-      "https://app.solace.test/dashboard?from=signin",
+    expect(getSafeAuthCallbackUrl("/calendar?from=signin")).toBe(
+      "https://app.solace.test/calendar?from=signin",
     );
   });
 
@@ -134,7 +134,7 @@ describe("api-url helpers", () => {
     expect(
       resolveAuthRedirectTarget("https://evil.test/phish", "http://[::1"),
     ).toEqual({
-      href: "/dashboard",
+      href: "/calendar",
       external: false,
     });
   });

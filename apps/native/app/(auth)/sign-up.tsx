@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,7 +12,6 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
@@ -21,11 +20,13 @@ import {
   AUTH_SIGN_IN_ROUTE,
   CALENDAR_HOME_ROUTE,
 } from "../../src/lib/auth-routing";
+import { accountApiService } from "../../src/lib/api";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { ThemeToggle } from "../../src/components/ThemeToggle";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 const log = createLogger("auth:sign-up");
+const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -37,10 +38,10 @@ function validateName(name: string): string | null {
   return null;
 }
 
-function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Email is required";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    return "Please enter a valid email address";
+function validateDesiredEmail(email: string): string | null {
+  if (!email.trim()) return "Solace email is required";
+  if (!/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(email.trim().toLowerCase())) {
+    return "Use lowercase letters, numbers, dots, underscores, or hyphens";
   }
   return null;
 }
@@ -56,15 +57,16 @@ function validatePassword(password: string): string | null {
 // ---------------------------------------------------------------------------
 
 export default function SignUpScreen() {
-  const { signUp, signInWithGitHub } = useAuth();
+  const { signUp } = useAuth();
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   // Form state
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [desiredEmail, setDesiredEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
 
   // Validation state
   const [nameError, setNameError] = useState<string | null>(null);
@@ -74,8 +76,6 @@ export default function SignUpScreen() {
 
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
-
   // Refs for focus management
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -89,11 +89,33 @@ export default function SignUpScreen() {
     setServerError(null);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void accountApiService
+      .getSignupConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setSignupDomain(config.defaultEmailDomain);
+        }
+      })
+      .catch((error) => {
+        log.error("Failed to load signup config", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSignUp = useCallback(async () => {
     clearErrors();
 
+    const trimmedName = name.trim();
+    const normalizedDesiredEmail = desiredEmail.trim().toLowerCase();
+
     const nErr = validateName(name);
-    const eErr = validateEmail(email);
+    const eErr = validateDesiredEmail(desiredEmail);
     const pErr = validatePassword(password);
 
     if (nErr) setNameError(nErr);
@@ -108,10 +130,22 @@ export default function SignUpScreen() {
       return;
     }
 
-    log.info("Attempting sign-up", { email: email.trim(), name: name.trim() });
+    log.info("Attempting sign-up", {
+      desiredEmail: normalizedDesiredEmail,
+      name: trimmedName,
+    });
     setIsSubmitting(true);
     try {
-      await signUp(name.trim(), email.trim(), password);
+      const availability = await accountApiService.checkEmailAvailability(
+        normalizedDesiredEmail,
+      );
+
+      if (!availability.available) {
+        setEmailError(availability.message);
+        return;
+      }
+
+      await signUp(trimmedName, availability.normalizedEmail, password);
       log.ok("Sign-up successful");
       router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
@@ -121,24 +155,7 @@ export default function SignUpScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [clearErrors, email, name, password, router, signUp]);
-
-  const handleGitHubSignUp = useCallback(async () => {
-    clearErrors();
-    log.info("Attempting GitHub sign-up");
-    setIsGitHubLoading(true);
-    try {
-      await signInWithGitHub({ requestSignUp: true });
-      log.ok("GitHub sign-up successful");
-      router.replace(CALENDAR_HOME_ROUTE);
-    } catch (err: any) {
-      const message = err?.message ?? "GitHub sign-up failed. Please try again.";
-      log.error("GitHub sign-up failed", err);
-      setServerError(message);
-    } finally {
-      setIsGitHubLoading(false);
-    }
-  }, [clearErrors, router, signInWithGitHub]);
+  }, [clearErrors, desiredEmail, name, password, router, signUp]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -163,8 +180,9 @@ export default function SignUpScreen() {
               <Text style={styles.appName}>Solace</Text>
               <Text style={styles.title}>Create your account</Text>
               <Text style={styles.subtitle}>
-                Get started with your personal calendar. If you sign in with
-                email, this password also protects your encrypted data.
+                Choose your @{signupDomain} Solace email and password. Your
+                Solace email becomes your account address, and this password
+                also protects your encrypted data.
               </Text>
             </View>
 
@@ -202,31 +220,30 @@ export default function SignUpScreen() {
               )}
             </View>
 
-            {/* Email field */}
+            {/* Solace email field */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                ref={emailRef}
-                style={[styles.input, emailError && styles.inputError]}
-                placeholder="you@example.com"
-                placeholderTextColor={theme.colors.mutedForeground}
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (emailError) setEmailError(null);
-                }}
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                inputMode="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                editable={!isSubmitting}
-                accessibilityLabel="Email address"
-                accessibilityHint="Enter your email address"
-              />
+              <Text style={styles.label}>Solace email</Text>
+              <View style={[styles.inputWithSuffix, emailError && styles.inputError]}>
+                <TextInput
+                  ref={emailRef}
+                  style={styles.inputInner}
+                  placeholder="your-name"
+                  placeholderTextColor={theme.colors.mutedForeground}
+                  value={desiredEmail}
+                  onChangeText={(text) => {
+                    setDesiredEmail(text);
+                    if (emailError) setEmailError(null);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  editable={!isSubmitting}
+                  accessibilityLabel="Solace email"
+                  accessibilityHint={`Choose the name before @${signupDomain}`}
+                />
+                <Text style={styles.inputSuffix}>@{signupDomain}</Text>
+              </View>
               {emailError && (
                 <Text style={styles.fieldError}>{emailError}</Text>
               )}
@@ -266,50 +283,18 @@ export default function SignUpScreen() {
               style={({ pressed }) => [
                 styles.primaryButton,
                 pressed && styles.primaryButtonPressed,
-                (isSubmitting || isGitHubLoading) && styles.buttonDisabled,
+                isSubmitting && styles.buttonDisabled,
               ]}
               onPress={handleSignUp}
-              disabled={isSubmitting || isGitHubLoading}
+              disabled={isSubmitting}
               accessibilityRole="button"
               accessibilityLabel="Create account"
-              accessibilityState={{ disabled: isSubmitting || isGitHubLoading }}
+              accessibilityState={{ disabled: isSubmitting }}
             >
               {isSubmitting ? (
                 <ActivityIndicator color={theme.colors.primaryForeground} />
               ) : (
                 <Text style={styles.primaryButtonText}>Create account</Text>
-              )}
-            </Pressable>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.secondaryButtonPressed,
-                (isSubmitting || isGitHubLoading) && styles.buttonDisabled,
-              ]}
-              onPress={handleGitHubSignUp}
-              disabled={isSubmitting || isGitHubLoading}
-              accessibilityRole="button"
-              accessibilityLabel="Continue with GitHub"
-              accessibilityState={{ disabled: isSubmitting || isGitHubLoading }}
-            >
-              {isGitHubLoading ? (
-                <ActivityIndicator color={theme.colors.foreground} />
-              ) : (
-                <>
-                  <Feather
-                    name="github"
-                    size={16}
-                    color={theme.colors.foreground}
-                  />
-                  <Text style={styles.secondaryButtonText}>GitHub</Text>
-                </>
               )}
             </Pressable>
 
@@ -370,6 +355,15 @@ function createStyles(theme: ThemeTokens) {
     },
     fieldContainer: {
       marginBottom: theme.spacing["4"],
+    },
+    inputWithSuffix: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      borderWidth: 1,
+      borderColor: theme.colors.input,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.background,
+      overflow: "hidden" as const,
     },
     inputError: {
       borderColor: theme.colors.destructive,
@@ -463,6 +457,24 @@ function createStyles(theme: ThemeTokens) {
       paddingVertical: theme.spacing["3"],
       fontSize: theme.typography.fontSize.base.size,
       color: theme.colors.foreground,
+      backgroundColor: theme.colors.background,
+    },
+    inputInner: {
+      flex: 1,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+      fontSize: theme.typography.fontSize.base.size,
+      color: theme.colors.foreground,
+      backgroundColor: theme.colors.background,
+    },
+    inputSuffix: {
+      borderLeftWidth: 1,
+      borderLeftColor: theme.colors.input,
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["3"],
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
       backgroundColor: theme.colors.background,
     },
     fieldError: {

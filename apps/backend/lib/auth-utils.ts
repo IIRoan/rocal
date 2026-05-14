@@ -1,5 +1,6 @@
 import { auth } from "./auth";
 import { createLogger } from "@workspace/logger";
+import { UnauthorizedError } from "./errors";
 
 const logger = createLogger("backend:auth-utils");
 
@@ -48,5 +49,5 @@ export async function ensureAuthenticatedUser(
   logger.error(
     "ensureAuthenticatedUser: User context missing and fallback failed",
   );
-  throw new Error("User context missing");
+  throw new UnauthorizedError("Authentication required.");
 }

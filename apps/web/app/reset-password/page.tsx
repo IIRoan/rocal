@@ -111,8 +111,7 @@ export default function ResetPasswordPage() {
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             If you sign in with email and password, Solace also uses this
-            password to protect your encryption keys after you sign in. GitHub
-            and passkey sign-in keep using a separate encryption password.
+            password to protect your encryption keys after you sign in.
           </p>
         </div>
 

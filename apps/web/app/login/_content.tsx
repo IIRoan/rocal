@@ -6,9 +6,10 @@ import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { getAppBaseUrl, resolveAuthRedirectTarget } from "@/lib/api-url";
+import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Github, Key, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Key, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
@@ -16,14 +17,21 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { accountApiService } from "@/lib/account-api-service";
 import {
-  clearPendingAuthPassword,
+  clearAuthPasswords,
   storePendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  setEncPasswordCookie,
+} from "@/lib/enc-password-cookie";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 
 const log = createLogger("login");
+const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
+const AUTH_STATUS_RETRY_DELAYS_MS = [0, 75, 150, 300, 500] as const;
 
 type AuthMode = "sign-in" | "sign-up" | "forgot-password";
 
@@ -41,12 +49,13 @@ function AnimatedCollapse({
   const tweenRef = useRef<gsap.core.Tween | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  useEffect(() => {
-    if (isOpen) setShouldRender(true);
-  }, [isOpen]);
-
   useGSAP(
     () => {
+      if (isOpen && !shouldRender) {
+        setShouldRender(true);
+        return;
+      }
+
       const el = containerRef.current;
       if (!el) return;
       tweenRef.current?.kill();
@@ -97,7 +106,7 @@ function AnimatedCollapse({
     { dependencies: [isOpen, shouldRender] },
   );
 
-  if (!shouldRender) return null;
+  if (!isOpen && !shouldRender) return null;
 
   return (
     <div
@@ -112,7 +121,6 @@ function AnimatedCollapse({
 // ─── LoginForm ────────────────────────────────────────────────────────────────
 
 export function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,12 +131,17 @@ export function LoginForm() {
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [overlayFading, setOverlayFading] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
+  const [shouldAutoPromptPasskey, setShouldAutoPromptPasskey] = useState(false);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [desiredEmail, setDesiredEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupDomain, setSignupDomain] = useState(DEFAULT_SIGNUP_DOMAIN);
 
   const titleRef = useRef<HTMLDivElement>(null);
+  const hasAutoPromptedStepUpRef = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const { data: session, isPending } = useSession();
@@ -153,6 +166,7 @@ export function LoginForm() {
     setError(null);
     setNotice(null);
     setShowPassword(false);
+    setShouldAutoPromptPasskey(false);
 
     if (mode !== "sign-up") {
       setName("");
@@ -179,6 +193,15 @@ export function LoginForm() {
     });
   }, [getRedirectTarget, router]);
 
+  const redirectAfterCompletedAuth = useCallback(() => {
+    const target = getRedirectTarget();
+    router.startRouteTransition({
+      messageContext: "AUTH_FLOW",
+      minimumVisibleMs: 120,
+    });
+    completeAuthNavigation(target.href);
+  }, [getRedirectTarget, router]);
+
   const syncThemeAfterAuth = useCallback(async () => {
     if (
       currentTheme &&
@@ -194,16 +217,54 @@ export function LoginForm() {
     }
   }, [currentTheme]);
 
-  const handleSessionRedirect = useCallback(() => {
-    if (session?.user) {
+  const refreshAuthStatus = useCallback(async () => {
+    const authStatus = await accountApiService.getAuthStatus();
+    setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+    return authStatus;
+  }, []);
+
+  const waitForSettledAuthStatus = useCallback(async () => {
+    let lastAuthStatus: Awaited<
+      ReturnType<typeof accountApiService.getAuthStatus>
+    > | null = null;
+
+    for (const delayMs of AUTH_STATUS_RETRY_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      }
+
+      lastAuthStatus = await refreshAuthStatus();
+
+      if (
+        lastAuthStatus.authenticated &&
+        !lastAuthStatus.requiresPasskeyStepUp
+      ) {
+        return lastAuthStatus;
+      }
+    }
+
+    return lastAuthStatus;
+  }, [refreshAuthStatus]);
+
+  const handleSessionRedirect = useCallback(async () => {
+    if (!session?.user) {
+      setRequiresPasskeyStepUp(false);
+      setShouldAutoPromptPasskey(false);
+      return;
+    }
+
+    const authStatus = await refreshAuthStatus();
+    setShouldAutoPromptPasskey(authStatus.requiresPasskeyStepUp);
+
+    if (!authStatus.requiresPasskeyStepUp) {
       redirectAfterAuth();
     }
-  }, [session, redirectAfterAuth]);
+  }, [refreshAuthStatus, redirectAfterAuth, session]);
 
   useEffect(() => {
     if (!isPending) {
       setIsCheckingSession(false);
-      handleSessionRedirect();
+      void handleSessionRedirect();
     }
   }, [session, isPending, handleSessionRedirect]);
 
@@ -221,6 +282,25 @@ export function LoginForm() {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void accountApiService
+      .getSignupConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setSignupDomain(config.defaultEmailDomain);
+        }
+      })
+      .catch((error) => {
+        log.error("Failed to load signup config:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Animate the title in when auth mode switches
   useGSAP(
     () => {
@@ -235,32 +315,111 @@ export function LoginForm() {
     { dependencies: [authMode] },
   );
 
+  const handlePasskeyStepUp = useCallback(async () => {
+    try {
+      setPasskeyLoading(true);
+      setError(null);
+      setNotice(null);
+
+      const result = await authClient.signIn.passkey({
+        autoFocus: true,
+      });
+
+      if (result?.error) {
+        throw new Error(
+          result.error.message || "Passkey authentication failed. Please try again.",
+        );
+      }
+
+      const authStatus = await waitForSettledAuthStatus();
+
+      if (!authStatus?.authenticated) {
+        throw new Error("Your session could not be confirmed. Please try again.");
+      }
+
+      if (authStatus.requiresPasskeyStepUp) {
+        setError("Passkey verification is still required. Please try again.");
+        return;
+      }
+
+      await syncThemeAfterAuth();
+      redirectAfterCompletedAuth();
+    } catch (error: any) {
+      log.error("Passkey login failed:", error);
+      setError(
+        error.message || "Passkey authentication failed. Please try again.",
+      );
+    } finally {
+      setPasskeyLoading(false);
+    }
+  }, [redirectAfterCompletedAuth, syncThemeAfterAuth, waitForSettledAuthStatus]);
+
+  const triggerAutoPasskeyStepUp = useCallback(() => {
+    hasAutoPromptedStepUpRef.current = true;
+    setShouldAutoPromptPasskey(false);
+    setNotice("Check your device to finish signing in with your passkey.");
+    void handlePasskeyStepUp();
+  }, [handlePasskeyStepUp]);
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedDesiredEmail = desiredEmail.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
     try {
       setEmailLoading(true);
       setError(null);
       setNotice(null);
 
       if (isSignUp) {
-        if (!name.trim()) {
+        if (!trimmedName) {
           setError("Please enter your name.");
           return;
         }
 
+        if (!normalizedDesiredEmail) {
+          setError(`Please choose your @${signupDomain} email.`);
+          return;
+        }
+
+        const availability = await accountApiService.checkEmailAvailability(
+          normalizedDesiredEmail,
+        );
+
+        if (!availability.available) {
+          setError(availability.message);
+          return;
+        }
+
         const result = await signUp.email({
-          email,
+          email: availability.normalizedEmail,
           password,
-          name,
+          name: trimmedName,
         });
 
         if (result?.error) {
           setError(result.error.message || "Sign up failed. Please try again.");
           return;
         }
+
+        storePendingAuthPassword(password);
+        void setEncPasswordCookie(password);
+
+        setEmail(availability.normalizedEmail);
       } else {
+        if (!normalizedEmail) {
+          setError("Please enter your account email address.");
+          return;
+        }
+
         const result = await signIn.email({
-          email,
+          email: normalizedEmail,
           password,
         });
 
@@ -268,18 +427,32 @@ export function LoginForm() {
           setError(result.error.message || "Invalid email or password.");
           return;
         }
+
+        storePendingAuthPassword(password);
+        void setEncPasswordCookie(password);
       }
 
-      storePendingAuthPassword(password);
+      const authStatus = await refreshAuthStatus();
+      if (authStatus.requiresPasskeyStepUp) {
+        if (isPasskeySupported) {
+          triggerAutoPasskeyStepUp();
+        } else {
+          setNotice(
+            "Password accepted. Check your device to finish signing in with your passkey.",
+          );
+          setShouldAutoPromptPasskey(true);
+        }
+        return;
+      }
 
       await syncThemeAfterAuth();
-      setTimeout(() => {
-        redirectAfterAuth();
-      }, 100);
+      redirectAfterCompletedAuth();
     } catch (err: any) {
       log.error("Email auth failed:", err);
-      clearPendingAuthPassword();
+      clearAuthPasswords();
+      clearEncPasswordCookie();
       setError(err.message || "Authentication failed. Please try again.");
+    } finally {
       setEmailLoading(false);
     }
   };
@@ -325,60 +498,32 @@ export function LoginForm() {
     }
   };
 
-  const handlePasskeyLogin = async () => {
-    try {
-      setPasskeyLoading(true);
-      setError(null);
-      setNotice(null);
-      clearPendingAuthPassword();
-
-      const result = await authClient.signIn.passkey({
-        autoFocus: true,
-      });
-
-      if (result?.data?.user || result?.user) {
-        await syncThemeAfterAuth();
-        setTimeout(() => {
-          redirectAfterAuth();
-        }, 100);
-      } else {
-        setTimeout(() => {
-          router.refresh();
-        }, 500);
-      }
-    } catch (error: any) {
-      log.error("Passkey login failed:", error);
-      setError(
-        error.message || "Passkey authentication failed. Please try again.",
-      );
-      setPasskeyLoading(false);
+  useEffect(() => {
+    if (!requiresPasskeyStepUp) {
+      hasAutoPromptedStepUpRef.current = false;
+      setShouldAutoPromptPasskey(false);
+      return;
     }
-  };
 
-  const handleGitHubLogin = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setNotice(null);
-      clearPendingAuthPassword();
-      if (currentTheme) {
-        localStorage.setItem("pending-theme-sync", currentTheme);
-      }
-      const frontendUrl = getAppBaseUrl();
-      const redirectTarget = getRedirectTarget();
-      const callbackTarget = redirectTarget.external
-        ? redirectTarget.href
-        : new URL(redirectTarget.href, frontendUrl).toString();
-      await signIn.social({
-        provider: "github",
-        callbackURL: callbackTarget,
-      });
-    } catch (error) {
-      log.error("Login failed:", error);
-    } finally {
-      setIsLoading(false);
+    if (
+      !shouldAutoPromptPasskey ||
+      !isPasskeySupported ||
+      passkeyLoading ||
+      authMode === "forgot-password" ||
+      hasAutoPromptedStepUpRef.current
+    ) {
+      return;
     }
-  };
+
+    triggerAutoPasskeyStepUp();
+  }, [
+    authMode,
+    isPasskeySupported,
+    passkeyLoading,
+    requiresPasskeyStepUp,
+    shouldAutoPromptPasskey,
+    triggerAutoPasskeyStepUp,
+  ]);
 
   const title = isForgotPassword
     ? "Reset your email sign-in password"
@@ -387,10 +532,10 @@ export function LoginForm() {
       : "Welcome back";
 
   const subtitle = isForgotPassword
-    ? "Enter your email and we’ll send a reset link for your email sign-in password."
+    ? "Enter your Solace account email and we’ll send a reset link for your email sign-in password."
     : isSignUp
-      ? "Sign up and get started with Solace. If you sign in with email, this password also protects your encrypted data."
-      : "Sign in to continue to Solace";
+      ? `Choose your @${signupDomain} Solace email and password. Your Solace email becomes both your account address and mailbox, and this password is used locally to protect your encrypted mail vault.`
+      : "Sign in with your email and password. If your account has passkeys, you'll verify with one right after.";
 
   const primaryButtonLabel = isForgotPassword
     ? "Send reset link"
@@ -482,23 +627,59 @@ export function LoginForm() {
                   </div>
                 </AnimatedCollapse>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={emailLoading}
-                    className="h-11 rounded-lg"
-                  />
-                </div>
+                <AnimatedCollapse isOpen={isSignUp}>
+                  <div className="space-y-2 pb-0.5">
+                    <Label
+                      htmlFor="desired-email"
+                      className="text-sm font-medium"
+                    >
+                      Solace email
+                    </Label>
+                    <div className="flex h-11 overflow-hidden rounded-lg border border-input bg-background">
+                      <Input
+                        id="desired-email"
+                        name="desired-email"
+                        type="text"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        placeholder="your-name"
+                        value={desiredEmail}
+                        onChange={(e) => setDesiredEmail(e.target.value)}
+                        required={isSignUp}
+                        disabled={emailLoading}
+                        className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                      <span className="flex items-center border-l border-input px-3 text-sm text-muted-foreground">
+                        @{signupDomain}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This becomes your Solace account email and mailbox
+                      address.
+                    </p>
+                  </div>
+                </AnimatedCollapse>
+
+                <AnimatedCollapse isOpen={!isSignUp}>
+                  <div className="space-y-2 pb-0.5">
+                    <Label htmlFor="email" className="text-sm font-medium">
+                      Account email
+                    </Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder={`you@${signupDomain}`}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required={!isSignUp}
+                      disabled={emailLoading}
+                      className="h-11 rounded-lg"
+                    />
+                  </div>
+                </AnimatedCollapse>
 
                 <AnimatedCollapse isOpen={!isForgotPassword}>
                   <div className="space-y-2 pb-0.5">
@@ -574,62 +755,44 @@ export function LoginForm() {
 
               <AnimatedCollapse isOpen={!isForgotPassword}>
                 <div className="pb-0.5">
-                  <div className="my-6 flex items-center gap-3">
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      or continue with
-                    </span>
-                    <div className="h-px flex-1 bg-border" />
-                  </div>
+                  {requiresPasskeyStepUp && isPasskeySupported ? (
+                    <>
+                      <div className="my-6 flex items-center gap-3">
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          second factor required
+                        </span>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
 
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleGitHubLogin}
-                      disabled={isLoading}
-                      variant="outline"
-                      className="h-11 flex-1 rounded-lg"
-                      aria-busy={isLoading}
-                    >
-                      {isLoading ? (
-                        <div
-                          className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                          style={{ borderTopColor: "currentColor", opacity: 1 }}
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <>
-                          <Github className="h-4 w-4" />
-                          <span>GitHub</span>
-                        </>
-                      )}
-                    </Button>
-
-                    {isPasskeySupported ? (
                       <Button
-                        onClick={handlePasskeyLogin}
+                        onClick={handlePasskeyStepUp}
                         disabled={passkeyLoading}
                         variant="outline"
-                        className="h-11 flex-1 rounded-lg"
+                        className="h-11 w-full rounded-lg"
                         aria-busy={passkeyLoading}
                       >
                         {passkeyLoading ? (
-                          <div
-                            className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                            style={{
-                              borderTopColor: "currentColor",
-                              opacity: 1,
-                            }}
-                            aria-hidden="true"
-                          />
+                          <>
+                            <div
+                              className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                              style={{
+                                borderTopColor: "currentColor",
+                                opacity: 1,
+                              }}
+                              aria-hidden="true"
+                            />
+                            <span>Waiting for your passkey...</span>
+                          </>
                         ) : (
                           <>
                             <Key className="h-4 w-4" />
-                            <span>Passkey</span>
+                            <span>Use passkey</span>
                           </>
                         )}
                       </Button>
-                    ) : null}
-                  </div>
+                    </>
+                  ) : null}
                 </div>
               </AnimatedCollapse>
 

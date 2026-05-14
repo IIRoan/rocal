@@ -226,10 +226,10 @@ function createMockAuthContext(
     session: null,
     isLoading: false,
     isAuthenticated: false,
+    requiresPasskeyStepUp: false,
     lastAuthMethod: "unknown",
     signIn: jest.fn(),
     signUp: jest.fn(),
-    signInWithGitHub: jest.fn(),
     signOut: jest.fn(),
     signInWithPasskey: jest.fn(),
     registerPasskey: jest.fn(),
@@ -568,12 +568,12 @@ describe("E2eeProvider", () => {
     );
   });
 
-  it("shows the separate encryption-password setup gate for GitHub sign-in", async () => {
+  it("shows the separate encryption-password setup gate for passkey sign-in", async () => {
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
-        lastAuthMethod: "github",
+        lastAuthMethod: "passkey",
         signOut,
       }),
     );
@@ -597,18 +597,18 @@ describe("E2eeProvider", () => {
 
     expect(container.textContent).toContain("Protect your encryption keys");
     expect(container.textContent).toContain(
-      "Choose an encryption password to protect your end-to-end encryption keys. You will need it when you sign in with GitHub or a passkey on a new device.",
+      "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.",
     );
     expect(container.textContent).toContain("Encryption password");
     expect(container.textContent).toContain("Save password");
   });
 
-  it("shows the separate encryption-password error when OAuth unlock fails", async () => {
+  it("shows the separate encryption-password error when passkey unlock fails", async () => {
     mockUseAuth.mockReturnValue(
       createMockAuthContext({
         clearPendingAuthPassword,
         consumePendingAuthPassword,
-        lastAuthMethod: "github",
+        lastAuthMethod: "passkey",
         signOut,
       }),
     );

@@ -21,13 +21,21 @@ import {
 } from "@/lib/e2ee-bootstrap";
 import { resetEncryptionPasswordForActiveSession } from "@/lib/e2ee-password-reset";
 import {
+  clearAuthPasswords,
   clearPendingAuthPassword,
   consumePendingAuthPassword,
+  peekCachedAuthPassword,
   peekPendingAuthPassword,
 } from "@/lib/e2ee-password-cache";
+import {
+  clearEncPasswordCookie,
+  initEncPasswordFromCookie,
+  setEncPasswordCookie,
+} from "@/lib/enc-password-cookie";
 import { signOut } from "@/lib/auth-client";
 
 const log = createLogger("e2ee-bootstrap");
+const PASSWORD_SETUP_RETRY_ATTEMPTS = 4;
 
 type GateMode = "hidden" | "setup" | "unlock" | "legacy";
 
@@ -48,6 +56,25 @@ async function refreshEncryptedQueries(
     queryClient.invalidateQueries({ queryKey: ["calendars"] }),
     queryClient.invalidateQueries({ queryKey: ["categories"] }),
   ]);
+}
+
+async function retryEncryptionPasswordSetup(
+  userId: string,
+  password: string,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < PASSWORD_SETUP_RETRY_ATTEMPTS; attempt += 1) {
+    const stored = await resetEncryptionPasswordForActiveSession(userId, password);
+
+    if (stored) {
+      return true;
+    }
+
+    if (attempt < PASSWORD_SETUP_RETRY_ATTEMPTS - 1) {
+      await Promise.resolve();
+    }
+  }
+
+  return false;
 }
 
 export function E2eeBootstrap() {
@@ -78,7 +105,8 @@ export function E2eeBootstrap() {
 
     if (!userId) {
       resetE2eeBootstrap();
-      clearPendingAuthPassword();
+      clearAuthPasswords();
+      clearEncPasswordCookie();
       setMode("hidden");
       setPassword("");
       setConfirmPassword("");
@@ -100,94 +128,103 @@ export function E2eeBootstrap() {
 
     previousUserIdRef.current = userId;
 
-    // Peek (without consuming) to know whether this was an email/password login.
-    // bootstrapUser in e2ee-bootstrap.ts may consume it during auto-unlock, so
-    // we capture the information here before the bootstrap runs.
-    const hadPendingPassword = !!peekPendingAuthPassword();
-    setIsEmailPasswordUser(hadPendingPassword);
-
     let isCancelled = false;
     setError(null);
 
-    void ensureE2eeBootstrap(userId)
-      .then(async (result) => {
-        if (isCancelled) {
-          return;
-        }
+    void (async () => {
+      // Restore password from the encrypted cookie so cross-tab and
+      // post-refresh visits work without re-prompting the user.
+      await initEncPasswordFromCookie();
+      if (isCancelled) return;
 
-        if (result.activated) {
-          await refreshEncryptedQueries(queryClient);
-        }
+      // Peek (without consuming) to know whether this was an email/password login.
+      // bootstrapUser in e2ee-bootstrap.ts may consume it during auto-unlock, so
+      // we capture the information here before the bootstrap runs.
+      const hadPendingPassword =
+        !!peekPendingAuthPassword() || !!peekCachedAuthPassword();
+      setIsEmailPasswordUser(hadPendingPassword);
 
-        if (!result.bootstrap) {
-          setMode("hidden");
-          return;
-        }
-
-        if (result.activated && !result.bootstrap.passwordEnvelope) {
-          const pendingPassword = consumePendingAuthPassword();
-
-          if (pendingPassword) {
-            setIsSubmitting(true);
-
-            try {
-              const stored = await resetEncryptionPasswordForActiveSession(
-                userId,
-                pendingPassword,
-              );
-
-              if (isCancelled) {
-                return;
-              }
-
-              if (stored) {
-                setMode("hidden");
-                await refreshEncryptedQueries(queryClient);
-                return;
-              }
-            } catch (setupError) {
-              log.warn("Failed to refresh encrypted data for password setup", {
-                userId,
-                error: setupError,
-              });
-            } finally {
-              if (!isCancelled) {
-                setIsSubmitting(false);
-              }
-            }
+      void ensureE2eeBootstrap(userId)
+        .then(async (result) => {
+          if (isCancelled) {
+            return;
           }
 
-          setMode("setup");
-          return;
-        }
+          if (result.activated) {
+            await refreshEncryptedQueries(queryClient);
+          }
 
-        if (result.activated) {
+          if (!result.bootstrap) {
+            setMode("hidden");
+            return;
+          }
+
+          if (result.activated && !result.bootstrap.passwordEnvelope) {
+            const pendingPassword =
+              consumePendingAuthPassword() ?? peekCachedAuthPassword();
+
+            if (pendingPassword) {
+              setIsSubmitting(true);
+
+              try {
+                const stored = await retryEncryptionPasswordSetup(
+                  userId,
+                  pendingPassword,
+                );
+
+                if (isCancelled) {
+                  return;
+                }
+
+                if (stored) {
+                  setMode("hidden");
+                  await refreshEncryptedQueries(queryClient);
+                  return;
+                }
+              } catch (setupError) {
+                log.warn("Failed to refresh encrypted data for password setup", {
+                  userId,
+                  error: setupError,
+                });
+              } finally {
+                if (!isCancelled) {
+                  setIsSubmitting(false);
+                }
+              }
+            }
+
+            setMode("setup");
+            return;
+          }
+
+          if (result.activated) {
+            setMode("hidden");
+            return;
+          }
+
+          if (result.bootstrap.passwordEnvelope) {
+            setMode("unlock");
+            return;
+          }
+
+          if (result.bootstrap.devices.length > 0) {
+            setMode("legacy");
+            return;
+          }
+
           setMode("hidden");
-          return;
-        }
+        })
+        .catch((bootstrapError) => {
+          if (isCancelled) {
+            return;
+          }
 
-        if (result.bootstrap.passwordEnvelope) {
-          setMode("unlock");
-          return;
-        }
-
-        if (result.bootstrap.devices.length > 0) {
-          setMode("legacy");
-          return;
-        }
-
-        setMode("hidden");
-      })
-      .catch((bootstrapError) => {
-        if (isCancelled) {
-          return;
-        }
-
-        log.warn("Failed to initialize E2EE bootstrap", {
-          userId,
-          error: bootstrapError,
+          log.warn("Failed to initialize E2EE bootstrap", {
+            userId,
+            error: bootstrapError,
+          });
         });
-      });
+    })();
 
     return () => {
       isCancelled = true;
@@ -225,6 +262,7 @@ export function E2eeBootstrap() {
       setMode("hidden");
       setPassword("");
       setConfirmPassword("");
+      void setEncPasswordCookie(password);
       await refreshEncryptedQueries(queryClient);
     } catch (setupError) {
       log.warn("Failed to refresh encrypted data for password setup", {
@@ -268,6 +306,7 @@ export function E2eeBootstrap() {
 
       setMode("hidden");
       setPassword("");
+      void setEncPasswordCookie(password);
       await refreshEncryptedQueries(queryClient);
     } catch (unlockError) {
       log.warn("Failed to unlock E2EE password envelope", {
@@ -284,6 +323,7 @@ export function E2eeBootstrap() {
     setIsSubmitting(true);
     setError(null);
     try {
+      clearAuthPasswords();
       await signOut();
     } catch (signOutError) {
       log.warn("Failed to sign out from encryption gate", {
@@ -311,12 +351,12 @@ export function E2eeBootstrap() {
   const description = isUnlock
     ? isEmailPasswordUser
       ? "Solace normally reuses your email sign-in password to unlock encrypted data on this device. If that did not finish automatically, enter the same password here. If you recently changed it, use your previous password."
-      : "Enter your encryption password to unlock encrypted data on this device. GitHub and passkey sign-in keep this password separate."
+      : "Enter your encryption password to unlock encrypted data on this device."
     : isLegacy
       ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and save an encryption password once."
       : isEmailPasswordUser
         ? "Solace normally reuses your email sign-in password to protect your encryption keys. Re-enter it below only if automatic setup did not finish."
-        : "Choose an encryption password to protect your end-to-end encryption keys. You'll need it when you sign in with GitHub or a passkey on a new device.";
+        : "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.";
 
   const Icon = isUnlock ? KeyRound : Shield;
 

@@ -850,12 +850,12 @@ export function E2eeProvider({
   const description = isUnlock
     ? usesAccountPassword
       ? "Solace normally reuses your email sign-in password to unlock encrypted data on this device. If that did not finish automatically, enter the same password here. If you recently changed it, use your previous password."
-      : "Enter your encryption password to unlock encrypted data on this device. GitHub and passkey sign-in keep this password separate."
+      : "Enter your encryption password to unlock encrypted data on this device."
     : isLegacy
       ? "This account still uses the older device-only key flow. Open a device that can already decrypt your data, sign in there, and save an encryption password once."
       : usesAccountPassword
         ? "Solace normally reuses your email sign-in password to protect your encryption keys. Re-enter it here only if automatic setup did not finish."
-        : "Choose an encryption password to protect your end-to-end encryption keys. You will need it when you sign in with GitHub or a passkey on a new device.";
+        : "Choose an encryption password to protect your end-to-end encryption keys for recovery and legacy device flows.";
 
   const passwordLabel = isUnlock
     ? usesAccountPassword

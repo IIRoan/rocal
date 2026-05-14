@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { AppLoadingState } from "../ui/app-loading-state";
 import { cn } from "../../lib/utils";
 import type { CalendarView } from "./types";
 
@@ -19,7 +19,7 @@ export function EventLoadingSkeleton({ className }: EventLoadingSkeletonProps) {
         className,
       )}
     >
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <AppLoadingState variant="centered" text="Loading your workspace..." />
     </div>
   );
 }

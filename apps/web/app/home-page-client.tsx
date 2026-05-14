@@ -6,6 +6,7 @@ import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
+import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
   PageLoadingOverlay,
@@ -750,7 +751,7 @@ export function HomePageClient() {
 
   useEffect(() => {
     if (!isPending && session?.user) {
-      router.replace("/dashboard", undefined, {
+      router.replace(CALENDAR_HOME_PATH, undefined, {
         messageContext: "AUTH_FLOW",
       });
     }

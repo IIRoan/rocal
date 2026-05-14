@@ -25,6 +25,7 @@ import {
 import {
   EncryptionStatusBadge,
   getColorSwatchValue,
+  useCalendarContext,
 } from "@workspace/ui/components/calendar";
 
 import {
@@ -52,6 +53,8 @@ import {
   AlertTriangle,
   ShieldCheck,
   Star,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface CalendarManagerProps {
@@ -72,6 +75,7 @@ export function CalendarManager({
   const { calendars } = calendarData;
   const { ownedCalendars, publicCalendars, subscribedCalendars } =
     partitionCalendarsByKind(calendars);
+  const { toggleCalendarVisibility, isCalendarVisible } = useCalendarContext();
 
   // Prefetch subscriptions so the synced-calendar edit screen renders
   // populated immediately (no Feed URL flash) when the user opens it.
@@ -253,54 +257,67 @@ export function CalendarManager({
                   Your Calendars
                 </div>
                 <div className="p-1">
-                  {ownedCalendars.map((calendar) => (
-                    <button
-                      key={calendar.id}
-                      type="button"
-                      onClick={() => {
-                        if (calendar.isSyncOnly) {
-                          onGoToSubscriptions(calendar.id);
-                          return;
-                        }
-                        setEditingCalendar(calendar);
-                        setCalendarName(calendar.name);
-                        setCalendarColor(calendar.color);
-                        setCalendarIsDefault(calendar.isDefault || false);
-                        setCalendarForceFullEncryption(
-                          calendar.forceFullEncryption || false,
-                        );
-                        setCalendarValidationErrors({});
-                        setShowRegenerateConfirm(false);
-                        void loadShareLink(calendar.id);
-                        goForward("calendar-edit");
-                      }}
-                      className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                    >
-                      <div
-                        className="h-3.5 w-3.5 rounded-sm shrink-0"
-                        style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm truncate">
-                          {calendar.name}
+                  {ownedCalendars.map((calendar) => {
+                    const isVisible = isCalendarVisible(calendar.id);
+                    return (
+                    <div key={calendar.id} className="flex items-center group/cal">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (calendar.isSyncOnly) {
+                            onGoToSubscriptions(calendar.id);
+                            return;
+                          }
+                          setEditingCalendar(calendar);
+                          setCalendarName(calendar.name);
+                          setCalendarColor(calendar.color);
+                          setCalendarIsDefault(calendar.isDefault || false);
+                          setCalendarForceFullEncryption(
+                            calendar.forceFullEncryption || false,
+                          );
+                          setCalendarValidationErrors({});
+                          setShowRegenerateConfirm(false);
+                          void loadShareLink(calendar.id);
+                          goForward("calendar-edit");
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                      >
+                        <div
+                          className="h-3.5 w-3.5 rounded-sm shrink-0"
+                          style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm truncate">
+                            {calendar.name}
+                          </div>
+                          {calendar.isSyncOnly ? (
+                            <div className="text-xs text-muted-foreground">
+                              Synced (read-only)
+                            </div>
+                          ) : calendar.isDefault ? (
+                            <div className="text-xs text-muted-foreground">
+                              Default
+                            </div>
+                          ) : null}
                         </div>
-                        {calendar.isSyncOnly ? (
-                          <div className="text-xs text-muted-foreground">
-                            Synced (read-only)
-                          </div>
-                        ) : calendar.isDefault ? (
-                          <div className="text-xs text-muted-foreground">
-                            Default
-                          </div>
-                        ) : null}
-                      </div>
-                      <EncryptionStatusBadge
-                        item={calendar}
-                        asIcon
-                        className="opacity-80"
-                      />
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />                    </button>
-                  ))}
+                        <EncryptionStatusBadge
+                          item={calendar}
+                          asIcon
+                          className="opacity-80"
+                        />
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void toggleCalendarVisibility(calendar.id)}
+                        aria-label={isVisible ? `Hide ${calendar.name}` : `Show ${calendar.name}`}
+                        className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+                      >
+                        {isVisible ? <Eye className="h-3.5 w-3.5" strokeWidth={2} /> : <EyeOff className="h-3.5 w-3.5" strokeWidth={2} />}
+                      </button>
+                    </div>
+                    );
+                  })}
                 </div>
 
                 {publicCalendars.length > 0 && (
@@ -309,33 +326,45 @@ export function CalendarManager({
                       Public Calendars
                     </div>
                     <div className="p-1">
-                      {publicCalendars.map((calendar) => (
-                        <button
-                          key={calendar.id}
-                          type="button"
-                          onClick={() => onGoToSubscriptions(calendar.id)}
-                          className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                        >
-                          <div
-                            className="h-3.5 w-3.5 rounded-sm shrink-0"
-                            style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm truncate">
-                              {calendar.name}
+                      {publicCalendars.map((calendar) => {
+                        const isVisible = isCalendarVisible(calendar.id);
+                        return (
+                        <div key={calendar.id} className="flex items-center group/cal">
+                          <button
+                            type="button"
+                            onClick={() => onGoToSubscriptions(calendar.id)}
+                            className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                          >
+                            <div
+                              className="h-3.5 w-3.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm truncate">
+                                {calendar.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Public holiday calendar
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              Public holiday calendar
-                            </div>
-                          </div>
-                          <EncryptionStatusBadge
-                            item={calendar}
-                            asIcon
-                            className="opacity-80"
-                          />
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                        </button>
-                      ))}
+                            <EncryptionStatusBadge
+                              item={calendar}
+                              asIcon
+                              className="opacity-80"
+                            />
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void toggleCalendarVisibility(calendar.id)}
+                            aria-label={isVisible ? `Hide ${calendar.name}` : `Show ${calendar.name}`}
+                            className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+                          >
+                            {isVisible ? <Eye className="h-3.5 w-3.5" strokeWidth={2} /> : <EyeOff className="h-3.5 w-3.5" strokeWidth={2} />}
+                          </button>
+                        </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -346,33 +375,45 @@ export function CalendarManager({
                       Subscribed Calendars
                     </div>
                     <div className="p-1">
-                      {subscribedCalendars.map((calendar) => (
-                        <button
-                          key={calendar.id}
-                          type="button"
-                          onClick={() => onGoToSubscriptions(calendar.id)}
-                          className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
-                        >
-                          <div
-                            className="h-3.5 w-3.5 rounded-sm shrink-0"
-                            style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm truncate">
-                              {calendar.name}
+                      {subscribedCalendars.map((calendar) => {
+                        const isVisible = isCalendarVisible(calendar.id);
+                        return (
+                        <div key={calendar.id} className="flex items-center group/cal">
+                          <button
+                            type="button"
+                            onClick={() => onGoToSubscriptions(calendar.id)}
+                            className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
+                          >
+                            <div
+                              className="h-3.5 w-3.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm truncate">
+                                {calendar.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                External subscription
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              External subscription
-                            </div>
-                          </div>
-                          <EncryptionStatusBadge
-                            item={calendar}
-                            asIcon
-                            className="opacity-80"
-                          />
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                        </button>
-                      ))}
+                            <EncryptionStatusBadge
+                              item={calendar}
+                              asIcon
+                              className="opacity-80"
+                            />
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void toggleCalendarVisibility(calendar.id)}
+                            aria-label={isVisible ? `Hide ${calendar.name}` : `Show ${calendar.name}`}
+                            className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+                          >
+                            {isVisible ? <Eye className="h-3.5 w-3.5" strokeWidth={2} /> : <EyeOff className="h-3.5 w-3.5" strokeWidth={2} />}
+                          </button>
+                        </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}

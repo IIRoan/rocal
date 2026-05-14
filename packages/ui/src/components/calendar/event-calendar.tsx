@@ -103,6 +103,7 @@ import { CalendarSkeleton } from "./calendar-skeleton";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
+import { AppLoadingState } from "../ui/app-loading-state";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1020,7 +1021,11 @@ export function EventCalendar({
                 {viewTitle}
               </h2>
               {eventsLoading && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                <AppLoadingState
+                  variant="inline-icon"
+                  size="sm"
+                  className="shrink-0"
+                />
               )}
             </div>
             <div className="flex items-center gap-2">

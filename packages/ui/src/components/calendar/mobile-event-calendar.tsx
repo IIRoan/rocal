@@ -51,6 +51,7 @@ import { CalendarDndProvider } from "./calendar-dnd-context";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ErrorBoundary } from "../ui/error-boundary";
+import { AppLoadingState } from "../ui/app-loading-state";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -593,7 +594,11 @@ export function MobileEventCalendar({
               <div className="flex items-center gap-1.5">
                 <h2 className="font-semibold text-xl">{viewTitle}</h2>
                 {eventsLoading && (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                  <AppLoadingState
+                    variant="inline-icon"
+                    size="sm"
+                    className="shrink-0"
+                  />
                 )}
               </div>
             </div>
