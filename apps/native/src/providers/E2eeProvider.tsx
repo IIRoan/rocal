@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   createContext,
   useCallback,
   useMemo,
@@ -79,19 +79,13 @@ export interface E2eeContextValue {
 
 const E2eeContext = createContext<E2eeContextValue | null>(null);
 
-export function E2eeProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.ReactNode {
+function useE2eeCore() {
   const {
     clearPendingAuthPassword,
     consumePendingAuthPassword,
     lastAuthMethod,
     signOut,
   } = useAuth();
-  const { theme } = useTheme();
-  const styles = useMemo(() => createGateStyles(theme), [theme]);
 
   const [isReady, setIsReady] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
@@ -625,6 +619,31 @@ export function E2eeProvider({
     }
   }, [resetGate, signOut]);
 
+  return {
+    isReady,
+    isEnabled,
+    gateState,
+    gatePassword,
+    setGatePassword,
+    gateConfirmPassword,
+    setGateConfirmPassword,
+    gateError,
+    isGateSubmitting,
+    sessionRef,
+    getModule,
+    bootstrap,
+    clearSession,
+    resetEncryptionPassword,
+    handleGateSubmit,
+    handleGateRetry,
+    handleGateSignOut,
+  };
+}
+
+function useE2eeProviderValue(
+  getModule: () => Promise<E2eeModule | null>,
+  sessionRef: React.RefObject<E2eeSession | null>,
+): IE2eeProvider {
   const provider = useMemo<IE2eeProvider>(() => {
     const getSession = (): E2eeSession | null => sessionRef.current;
 
@@ -823,23 +842,38 @@ export function E2eeProvider({
         }
       },
     };
-  }, [getModule]);
+  }, [getModule, sessionRef]);
 
-  const value = useMemo<E2eeContextValue>(
-    () => ({
-      isReady,
-      isEnabled,
-      provider,
-      bootstrap,
-      resetEncryptionPassword,
-      clearSession,
-    }),
-    [bootstrap, clearSession, isEnabled, isReady, provider, resetEncryptionPassword],
-  );
+  return provider;
+}
 
-  const isUnlock = gateState?.mode === "unlock";
-  const isLegacy = gateState?.mode === "legacy";
-  const usesAccountPassword = gateState?.authMethod === "email-password";
+type NativeE2eeGateModalProps = {
+  core: ReturnType<typeof useE2eeCore>;
+  theme: ThemeTokens;
+  styles: ReturnType<typeof createGateStyles>;
+};
+
+function NativeE2eeGateModal({ core, theme, styles }: NativeE2eeGateModalProps) {
+  const {
+    gateState,
+    gatePassword,
+    setGatePassword,
+    gateConfirmPassword,
+    setGateConfirmPassword,
+    gateError,
+    isGateSubmitting,
+    handleGateSubmit,
+    handleGateRetry,
+    handleGateSignOut,
+  } = core;
+
+  if (!gateState) {
+    return null;
+  }
+
+  const isUnlock = gateState.mode === "unlock";
+  const isLegacy = gateState.mode === "legacy";
+  const usesAccountPassword = gateState.authMethod === "email-password";
 
   const title = isUnlock
     ? "Unlock encrypted data"
@@ -876,116 +910,147 @@ export function E2eeProvider({
           : "Save password";
 
   return (
-    <E2eeContext.Provider value={value}>
-      {children}
-
-      {gateState ? (
-        <Modal
-          transparent
-          visible
-          animationType="fade"
-          onRequestClose={() => undefined}
+    <Modal
+      transparent
+      visible
+      animationType="fade"
+      onRequestClose={() => undefined}
+    >
+      <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalContainer}
         >
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              style={styles.modalContainer}
-            >
-              <View style={styles.modalCard}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>{title}</Text>
-                </View>
+          <View style={styles.modalCard}>
+            <View style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+            </View>
 
-                <View style={styles.body}>
-                  <Text style={styles.description}>{description}</Text>
+            <View style={styles.body}>
+              <Text style={styles.description}>{description}</Text>
 
-                  {!isLegacy ? (
-                    <>
-                      <View style={styles.fieldGroup}>
-                        <Text style={styles.label}>{passwordLabel}</Text>
-                        <TextInput
-                          value={gatePassword}
-                          onChangeText={setGatePassword}
-                          secureTextEntry
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          editable={!isGateSubmitting}
-                          style={[
-                            styles.input,
-                            gateError ? styles.inputError : undefined,
-                          ]}
-                          textContentType={
-                            isUnlock ? "password" : "newPassword"
-                          }
-                          autoComplete={
-                            isUnlock ? "password" : "new-password"
-                          }
-                        />
-                      </View>
+              {!isLegacy ? (
+                <>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>{passwordLabel}</Text>
+                    <TextInput
+                      value={gatePassword}
+                      onChangeText={setGatePassword}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      editable={!isGateSubmitting}
+                      style={[
+                        styles.input,
+                        gateError ? styles.inputError : undefined,
+                      ]}
+                      textContentType={
+                        isUnlock ? "password" : "newPassword"
+                      }
+                      autoComplete={
+                        isUnlock ? "password" : "new-password"
+                      }
+                    />
+                  </View>
 
-                      {gateState.mode === "setup" ? (
-                        <View style={styles.fieldGroup}>
-                          <Text style={styles.label}>Confirm password</Text>
-                          <TextInput
-                            value={gateConfirmPassword}
-                            onChangeText={setGateConfirmPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!isGateSubmitting}
-                            style={[
-                              styles.input,
-                              gateError ? styles.inputError : undefined,
-                            ]}
-                            textContentType="newPassword"
-                            autoComplete="new-password"
-                          />
-                        </View>
-                      ) : null}
-                    </>
-                  ) : null}
-
-                  {gateError ? (
-                    <View style={styles.errorContainer}>
-                      <Text style={styles.errorText}>{gateError}</Text>
+                  {gateState.mode === "setup" ? (
+                    <View style={styles.fieldGroup}>
+                      <Text style={styles.label}>Confirm password</Text>
+                      <TextInput
+                        value={gateConfirmPassword}
+                        onChangeText={setGateConfirmPassword}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        editable={!isGateSubmitting}
+                        style={[
+                          styles.input,
+                          gateError ? styles.inputError : undefined,
+                        ]}
+                        textContentType="newPassword"
+                        autoComplete="new-password"
+                      />
                     </View>
                   ) : null}
-                </View>
+                </>
+              ) : null}
 
-                <View style={styles.footer}>
-                  <Pressable
-                    onPress={handleGateSignOut}
-                    disabled={isGateSubmitting}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      pressed && !isGateSubmitting && styles.secondaryPressed,
-                      isGateSubmitting && styles.buttonDisabled,
-                    ]}
-                  >
-                    <Text style={styles.secondaryButtonText}>Sign out</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={isLegacy ? handleGateRetry : handleGateSubmit}
-                    disabled={isGateSubmitting}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      pressed && !isGateSubmitting && styles.primaryPressed,
-                      isGateSubmitting && styles.buttonDisabled,
-                    ]}
-                  >
-                    {isGateSubmitting ? (
-                      <ActivityIndicator color={theme.colors.primaryForeground} />
-                    ) : (
-                      <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
-                    )}
-                  </Pressable>
+              {gateError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{gateError}</Text>
                 </View>
-              </View>
-            </KeyboardAvoidingView>
+              ) : null}
+            </View>
+
+            <View style={styles.footer}>
+              <Pressable
+                onPress={handleGateSignOut}
+                disabled={isGateSubmitting}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  pressed && !isGateSubmitting && styles.secondaryPressed,
+                  isGateSubmitting && styles.buttonDisabled,
+                ]}
+              >
+                <Text style={styles.secondaryButtonText}>Sign out</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={isLegacy ? handleGateRetry : handleGateSubmit}
+                disabled={isGateSubmitting}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  pressed && !isGateSubmitting && styles.primaryPressed,
+                  isGateSubmitting && styles.buttonDisabled,
+                ]}
+              >
+                {isGateSubmitting ? (
+                  <ActivityIndicator color={theme.colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
-        </Modal>
-      ) : null}
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+export function E2eeProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
+  const core = useE2eeCore();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createGateStyles(theme), [theme]);
+  const provider = useE2eeProviderValue(core.getModule, core.sessionRef);
+
+  const value = useMemo<E2eeContextValue>(
+    () => ({
+      isReady: core.isReady,
+      isEnabled: core.isEnabled,
+      provider,
+      bootstrap: core.bootstrap,
+      resetEncryptionPassword: core.resetEncryptionPassword,
+      clearSession: core.clearSession,
+    }),
+    [
+      core.bootstrap,
+      core.clearSession,
+      core.isEnabled,
+      core.isReady,
+      core.resetEncryptionPassword,
+      provider,
+    ],
+  );
+
+  return (
+    <E2eeContext.Provider value={value}>
+      {children}
+      <NativeE2eeGateModal core={core} theme={theme} styles={styles} />
     </E2eeContext.Provider>
   );
 }

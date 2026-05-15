@@ -152,7 +152,7 @@ export function MobileEventCalendar({
   // Initialize view from sessionStorage or fallback to smart default
   const [view, setViewState] = useState<CalendarView>(() => {
     if (typeof window !== "undefined") {
-      const savedView = sessionStorage.getItem("calendar-view-selection");
+      const savedView = sessionStorage.getItem("calendar-view-selection:v1");
       if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
         return savedView as CalendarView;
       }
@@ -164,7 +164,7 @@ export function MobileEventCalendar({
   // Update view when isMobile status changes and no saved preference exists
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedViewData = sessionStorage.getItem("calendar-view-selection");
+      const savedViewData = sessionStorage.getItem("calendar-view-selection:v1");
       let validSavedView = null;
 
       // Check if we have saved data and it's not expired
@@ -180,12 +180,12 @@ export function MobileEventCalendar({
             setViewState(parsedData.view);
           } else {
             // Clear expired data
-            sessionStorage.removeItem("calendar-view-selection");
+            sessionStorage.removeItem("calendar-view-selection:v1");
           }
         } catch (e) {
           // Handle legacy format or invalid JSON
           log.warn("Invalid calendar view data in sessionStorage");
-          sessionStorage.removeItem("calendar-view-selection");
+          sessionStorage.removeItem("calendar-view-selection:v1");
         }
       }
 
@@ -210,7 +210,7 @@ export function MobileEventCalendar({
         expires: expirationTime.getTime(),
       };
       sessionStorage.setItem(
-        "calendar-view-selection",
+        "calendar-view-selection:v1",
         JSON.stringify(viewData),
       );
     }
@@ -240,7 +240,7 @@ export function MobileEventCalendar({
         const expirationTime = new Date();
         expirationTime.setHours(expirationTime.getHours() + 1);
         sessionStorage.setItem(
-          "calendar-view-selection",
+          "calendar-view-selection:v1",
           JSON.stringify({
             view: initialView,
             expires: expirationTime.getTime(),

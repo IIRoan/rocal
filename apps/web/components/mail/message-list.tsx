@@ -43,6 +43,161 @@ import { filterMessages } from "@/lib/mail/message-filter";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 
+interface BulkActionBarProps {
+  selectedIds: Set<string>;
+  messages: JmapEmailMessage[];
+  bulkIds: string[];
+  clearSelection: () => void;
+  onSelectAll: () => void;
+  moveTargets: JmapMailbox[];
+  onBulkMarkAsRead?: (ids: string[]) => void;
+  onBulkMarkAsUnread?: (ids: string[]) => void;
+  onBulkMove?: (ids: string[], targetMailboxId: string) => void;
+  onBulkDelete?: (ids: string[]) => void;
+  barRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function BulkActionBar({
+  selectedIds, bulkIds, clearSelection, onSelectAll,
+  moveTargets, onBulkMarkAsRead, onBulkMarkAsUnread, onBulkMove, onBulkDelete, barRef,
+}: BulkActionBarProps) {
+  return (
+    <div
+      ref={barRef}
+      className="sticky top-[41px] z-10 flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-background/95 backdrop-blur-sm"
+    >
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={clearSelection}
+          className="text-[11px] font-medium text-foreground/60 bg-muted/60 hover:bg-muted hover:text-foreground px-1.5 py-0.5 rounded transition-colors"
+        >
+          {selectedIds.size} selected ×
+        </button>
+        <button
+          type="button"
+          onClick={onSelectAll}
+          className="text-[11px] font-medium text-foreground/60 bg-muted/60 hover:bg-muted hover:text-foreground px-1.5 py-0.5 rounded transition-colors"
+        >
+          Select all
+        </button>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center justify-center size-6 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors"
+          >
+            <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="bottom" align="end" sideOffset={4} className="w-40">
+          <DropdownMenuItem onClick={() => { onBulkMarkAsRead?.(bulkIds); clearSelection(); }}>
+            <MailCheck className="size-3.5" strokeWidth={2.25} />
+            Mark as read
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { onBulkMarkAsUnread?.(bulkIds); clearSelection(); }}>
+            <MailOpen className="size-3.5" strokeWidth={2.25} />
+            Mark as unread
+          </DropdownMenuItem>
+          {moveTargets.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <FolderInput className="size-3.5" strokeWidth={2.25} />
+                  Move to
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-40">
+                  {moveTargets.map((mailbox) => (
+                    <DropdownMenuItem
+                      key={mailbox.id}
+                      onClick={() => { onBulkMove?.(bulkIds, mailbox.id); clearSelection(); }}
+                    >
+                      {mailbox.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => { onBulkDelete?.(bulkIds); clearSelection(); }}
+          >
+            <Trash2 className="size-3.5" strokeWidth={2.25} />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function useMessageListState(
+  messages: JmapEmailMessage[],
+  mailboxes: JmapMailbox[] | undefined,
+  currentMailboxId: string | null | undefined,
+  hasMore: boolean | undefined,
+  onLoadMore: (() => void) | undefined,
+  isLoadingMore: boolean | undefined,
+) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBarVisible, setIsBarVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const barRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const moveTargets = (mailboxes ?? []).filter(
+    (m) => m.id !== currentMailboxId && !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
+  );
+
+  const toggleSelect = (e: React.SyntheticEvent, id: string) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+    if (next.size > 0) setIsBarVisible(true);
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+  const bulkIds = Array.from(selectedIds);
+  const hasBulkSelection = selectedIds.size > 0;
+
+  useGSAP(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    if (hasBulkSelection) {
+      gsap.fromTo(bar, { y: -6, opacity: 0 }, { y: 0, opacity: 1, duration: 0.22, ease: "power2.out" });
+    } else if (isBarVisible) {
+      gsap.to(bar, { y: -6, opacity: 0, duration: 0.16, ease: "power2.in", onComplete: () => setIsBarVisible(false) });
+    }
+  }, [hasBulkSelection, isBarVisible]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const container = scrollRef.current;
+    if (!sentinel || !container || !hasMore || !onLoadMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting && !isLoadingMore) onLoadMore(); },
+      { root: container, rootMargin: "100px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, onLoadMore, isLoadingMore]);
+
+  const visibleMessages = filterMessages(messages, searchQuery);
+
+  return {
+    selectedIds, setSelectedIds, isBarVisible, searchQuery, setSearchQuery,
+    barRef, scrollRef, sentinelRef,
+    moveTargets, toggleSelect, clearSelection, bulkIds, hasBulkSelection, visibleMessages,
+  };
+}
+
 interface MessageListProps {
   messages: JmapEmailMessage[];
   selectedMessageId: string | null;
@@ -66,6 +221,8 @@ interface MessageListProps {
   isLoadingMore?: boolean;
 }
 
+const EMPTY_LABELS: LabelDef[] = [];
+
 export function MessageList({
   messages,
   selectedMessageId,
@@ -81,77 +238,18 @@ export function MessageList({
   onBulkMarkAsUnread,
   onBulkMarkAsRead,
   onToggleFlagged,
-  labels = [],
+  labels = EMPTY_LABELS,
   timeFormat,
   timezone,
   onLoadMore,
   hasMore,
   isLoadingMore,
 }: MessageListProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBarVisible, setIsBarVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const barRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  const moveTargets = (mailboxes ?? []).filter(
-    (m) =>
-      m.id !== currentMailboxId &&
-      !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
-  );
-
-  const toggleSelect = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
-    if (next.size > 0) {
-      setIsBarVisible(true);
-    }
-  };
-
-  const clearSelection = () => setSelectedIds(new Set());
-
-  const bulkIds = Array.from(selectedIds);
-  const hasBulkSelection = selectedIds.size > 0;
-
-  useGSAP(() => {
-    const bar = barRef.current;
-    if (!bar) return;
-    if (hasBulkSelection) {
-      gsap.fromTo(
-        bar,
-        { y: -6, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.22, ease: "power2.out" },
-      );
-    } else if (isBarVisible) {
-      gsap.to(bar, {
-        y: -6,
-        opacity: 0,
-        duration: 0.16,
-        ease: "power2.in",
-        onComplete: () => setIsBarVisible(false),
-      });
-    }
-  }, [hasBulkSelection, isBarVisible]);
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const container = scrollRef.current;
-    if (!sentinel || !container || !hasMore || !onLoadMore) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !isLoadingMore) onLoadMore();
-      },
-      { root: container, rootMargin: "100px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, onLoadMore, isLoadingMore]);
-
-  const visibleMessages = filterMessages(messages, searchQuery);
+  const {
+    selectedIds, setSelectedIds, isBarVisible, searchQuery, setSearchQuery,
+    barRef, scrollRef, sentinelRef,
+    moveTargets, toggleSelect, clearSelection, bulkIds, hasBulkSelection, visibleMessages,
+  } = useMessageListState(messages, mailboxes, currentMailboxId, hasMore, onLoadMore, isLoadingMore);
 
   if (messages.length === 0) {
     return (
@@ -179,97 +277,19 @@ export function MessageList({
         </div>
       </div>
       {isBarVisible && (
-        <div
-          ref={barRef}
-          className="sticky top-[41px] z-10 flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-background/95 backdrop-blur-sm"
-        >
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="text-[11px] font-medium text-foreground/60 bg-muted/60 hover:bg-muted hover:text-foreground px-1.5 py-0.5 rounded transition-colors"
-            >
-              {selectedIds.size} selected ×
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set(messages.map((m) => m.id)))}
-              className="text-[11px] font-medium text-foreground/60 bg-muted/60 hover:bg-muted hover:text-foreground px-1.5 py-0.5 rounded transition-colors"
-            >
-              Select all
-            </button>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center justify-center size-6 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors"
-              >
-                <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side="bottom"
-              align="end"
-              sideOffset={4}
-              className="w-40"
-            >
-              <DropdownMenuItem
-                onClick={() => {
-                  onBulkMarkAsRead?.(bulkIds);
-                  clearSelection();
-                }}
-              >
-                <MailCheck className="size-3.5" strokeWidth={2.25} />
-                Mark as read
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  onBulkMarkAsUnread?.(bulkIds);
-                  clearSelection();
-                }}
-              >
-                <MailOpen className="size-3.5" strokeWidth={2.25} />
-                Mark as unread
-              </DropdownMenuItem>
-              {moveTargets.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <FolderInput className="size-3.5" strokeWidth={2.25} />
-                      Move to
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-40">
-                      {moveTargets.map((mailbox) => (
-                        <DropdownMenuItem
-                          key={mailbox.id}
-                          onClick={() => {
-                            onBulkMove?.(bulkIds, mailbox.id);
-                            clearSelection();
-                          }}
-                        >
-                          {mailbox.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => {
-                  onBulkDelete?.(bulkIds);
-                  clearSelection();
-                }}
-              >
-                <Trash2 className="size-3.5" strokeWidth={2.25} />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <BulkActionBar
+          selectedIds={selectedIds}
+          messages={messages}
+          bulkIds={bulkIds}
+          clearSelection={clearSelection}
+          onSelectAll={() => setSelectedIds(new Set(messages.map((m) => m.id)))}
+          moveTargets={moveTargets}
+          onBulkMarkAsRead={onBulkMarkAsRead}
+          onBulkMarkAsUnread={onBulkMarkAsUnread}
+          onBulkMove={onBulkMove}
+          onBulkDelete={onBulkDelete}
+          barRef={barRef}
+        />
       )}
 
       <div className="flex flex-col divide-y divide-border/40">
@@ -298,8 +318,17 @@ export function MessageList({
                   >
                     <div className="flex items-start gap-2.5">
                       <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={isChecked ? "Deselect message" : "Select message"}
                         className="relative shrink-0 cursor-pointer p-2 -m-2 rounded-full"
                         onClick={(e) => toggleSelect(e, message.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSelect(e, message.id);
+                          }
+                        }}
                       >
                         <SenderAvatar
                           email={message.from?.[0]?.email ?? ""}

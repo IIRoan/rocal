@@ -139,7 +139,6 @@ export function PasskeySettings({
 
   return (
     <div className="flex flex-col">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
         <button
           onClick={onBack}
@@ -153,7 +152,6 @@ export function PasskeySettings({
       <div className="flex-1 overflow-y-auto min-h-0">
         {!showAddPasskey ? (
           <>
-            {/* Add Passkey Button */}
             <div className="p-1">
               <Button
                 variant="ghost"
@@ -173,7 +171,7 @@ export function PasskeySettings({
               <div className="px-4 py-8 text-center">
                 <Loader2 className="size-5 animate-spin mx-auto mb-2 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">
-                  Loading passkeys...
+                  Loading passkeys…
                 </p>
               </div>
             ) : passkeys.length === 0 ? (
@@ -208,7 +206,7 @@ export function PasskeySettings({
                             <div className="text-sm truncate">
                               {passkey?.name || "Unnamed Passkey"}
                             </div>
-                            <p className="text-[10px] text-muted-foreground/60">
+                            <p className="text-[10px] text-muted-foreground/60" suppressHydrationWarning>
                               Added{" "}
                               {passkey?.createdAt
                                 ? new Date(
@@ -236,7 +234,6 @@ export function PasskeySettings({
           </>
         ) : (
           <>
-            {/* Add Passkey Form */}
             <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
               Add New Passkey
             </div>
@@ -264,7 +261,7 @@ export function PasskeySettings({
                   {addPasskeyMutation.isPending ? (
                     <>
                       <Loader2 className="size-3.5 mr-1.5 animate-spin" />
-                      Adding...
+                      Adding…
                     </>
                   ) : (
                     "Create Passkey"

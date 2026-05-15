@@ -24,10 +24,6 @@ import {
 } from "../lib/passkey-browser-bridge";
 import { getSessionCookie, waitForSessionCookie } from "../lib/session-cookie";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface User {
   id: string;
   name: string;
@@ -75,21 +71,9 @@ export interface AuthContextValue {
   clearPendingAuthPassword: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
-
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
-export function AuthProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.ReactNode {
+function useAuthProviderState() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,7 +97,6 @@ export function AuthProvider({
     [],
   );
 
-  // ── Session hydration ────────────────────────────────────────────────
   const fetchAuthStatus = useCallback(async () => {
     const cookie = getSessionCookie();
     const response = await fetch(`${API_BASE_URL}/api/account/auth-status`, {
@@ -158,8 +141,6 @@ export function AuthProvider({
       cancelled = true;
     };
   }, [fetchAuthStatus]);
-
-  // ── Auth actions ─────────────────────────────────────────────────────
 
   const applySessionData = useCallback(
     (data: unknown) => {
@@ -397,8 +378,6 @@ export function AuthProvider({
     await deleteStoredPasskey(authClient, id);
   }, []);
 
-  // ── Context value ────────────────────────────────────────────────────
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -433,12 +412,17 @@ export function AuthProvider({
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return value;
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
+export function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactNode {
+  const value = useAuthProviderState();
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
 export function useAuth(): AuthContextValue {
   const ctx = use(AuthContext);
@@ -447,10 +431,6 @@ export function useAuth(): AuthContextValue {
   }
   return ctx;
 }
-
-// ---------------------------------------------------------------------------
-// Utility — call from HTTP interceptors on 401/403
-// ---------------------------------------------------------------------------
 
 /**
  * Force-clear the auth state from outside the React tree.

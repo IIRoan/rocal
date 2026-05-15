@@ -122,6 +122,323 @@ function SyncedEventInfoBadge() {
   );
 }
 
+// ─── View mode content ────────────────────────────────────────────────────────
+
+interface EventViewContentProps {
+  eventForm: EventEditorBodyProps["eventForm"];
+  eventDateDisplay: ReturnType<typeof getEventDateDisplay>;
+  recurrenceSummary: string;
+  selectedCalendar: EventEditorBodyProps["calendars"][number] | undefined;
+  reminderMinutes: number[];
+}
+
+function EventViewContent({
+  eventForm,
+  eventDateDisplay,
+  recurrenceSummary,
+  selectedCalendar,
+  reminderMinutes,
+}: EventViewContentProps) {
+  return (
+    <div className="py-1.5">
+      <div className="px-2">
+        <div className="flex items-center gap-3 p-2.5">
+          <div className="flex items-center justify-center size-6 shrink-0">
+            <CalendarIcon className="size-4 text-muted-foreground" />
+          </div>
+          <span className="text-sm font-medium truncate flex-1 min-w-0">
+            {eventForm.eventTitle || "Untitled Event"}
+          </span>
+          {eventForm.selectedEvent?.id && eventForm.selectedEvent.isSynced && (
+            <div className="flex items-center gap-1 shrink-0">
+              <SyncedEventInfoBadge />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-border/50 mx-4 my-0.5" />
+
+      <div className="px-2 py-1 space-y-0.5">
+        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+          <div className="flex items-center justify-center size-6 shrink-0">
+            <Clock className="size-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0 leading-tight">
+            <div className="text-sm">
+              {eventDateDisplay.isSameDay ? (
+                eventDateDisplay.label
+              ) : (
+                <>
+                  {eventDateDisplay.startLabel}
+                  <span className="text-muted-foreground mx-1">→</span>
+                  {eventDateDisplay.endLabel}
+                </>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {!eventForm.eventAllDay
+                ? `${eventForm.eventStartTime} – ${eventForm.eventEndTime}`
+                : "All day"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+          <div className="flex items-center justify-center size-6 shrink-0">
+            <span
+              className="size-3 rounded-full ring-1 ring-border/60"
+              style={{ backgroundColor: getColorSwatchValue(selectedCalendar?.color || "blue") }}
+              aria-hidden
+            />
+          </div>
+          <span className="text-sm truncate flex-1 min-w-0">
+            {selectedCalendar?.name || "Unknown Calendar"}
+          </span>
+        </div>
+
+        {(eventForm.notificationsLoading || reminderMinutes.length > 0) && (
+          <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+            <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
+              <Bell className="size-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              {reminderMinutes.map((minutes) => (
+                <div key={`email-reminder-${minutes}`} className="flex items-baseline gap-2 text-sm leading-tight">
+                  <span>{formatReminderMinutes(minutes)} before</span>
+                  <span className="text-xs text-muted-foreground">email</span>
+                </div>
+              ))}
+              {eventForm.notificationsLoading && reminderMinutes.length === 0 && (
+                <span className="text-xs text-muted-foreground">Loading reminders…</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {eventForm.eventLocation && (
+          <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+            <div className="flex items-center justify-center size-6 shrink-0">
+              <MapPin className="size-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm truncate">{eventForm.eventLocation}</span>
+          </div>
+        )}
+
+        {eventForm.eventDescription && (
+          <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+            <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
+              <FileText className="size-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm whitespace-pre-wrap flex-1 min-w-0">
+              {formatEventDescription(eventForm.eventDescription)}
+            </span>
+          </div>
+        )}
+
+        {eventForm.isRecurring && eventForm.recurrenceRule && (
+          <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+            <div className="flex items-center justify-center size-6 shrink-0">
+              <RotateCcw className="size-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm">{recurrenceSummary}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Date & time section ──────────────────────────────────────────────────────
+
+interface EventDateTimeSectionProps {
+  eventForm: EventEditorBodyProps["eventForm"];
+  desktop: EventEditorBodyProps["desktop"];
+  localSettings: EventEditorBodyProps["localSettings"];
+}
+
+function EventDateTimeSection({ eventForm, desktop, localSettings }: EventDateTimeSectionProps) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm">Date & Time</Label>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          {desktop ? (
+            <Popover open={eventForm.startDateOpen} onOpenChange={eventForm.setStartDateOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex-1 h-9 justify-start font-normal cursor-pointer bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground">
+                  <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
+                  {format(eventForm.eventStartDate, "EEE, MMM d")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarUI
+                  mode="single"
+                  selected={eventForm.eventStartDate}
+                  weekStartsOn={1}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    eventForm.setEventStartDate(date);
+                    if (date > eventForm.eventEndDate) { eventForm.setEventEndDate(date); }
+                    eventForm.setStartDateOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Drawer
+              open={eventForm.startDateOpen}
+              onOpenChange={(nextOpen) => {
+                if (nextOpen) { eventForm.setEndDateOpen(false); }
+                eventForm.setStartDateOpen(nextOpen);
+              }}
+            >
+              <DrawerTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 h-9 text-sm font-medium justify-start text-foreground cursor-pointer">
+                  <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
+                  <span className="truncate">{format(eventForm.eventStartDate, "EEE, MMM d")}</span>
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent responsive responsiveHeight="80dvh" className="pb-safe">
+                <DrawerTitle className="sr-only">Select start date</DrawerTitle>
+                <div className="flex justify-center p-4 pb-8">
+                  <CalendarUI
+                    mode="single"
+                    selected={eventForm.eventStartDate}
+                    weekStartsOn={1}
+                    onSelect={(date) => {
+                      if (!date) return;
+                      eventForm.setEventStartDate(date);
+                      if (date > eventForm.eventEndDate) { eventForm.setEventEndDate(date); }
+                      eventForm.setStartDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </div>
+              </DrawerContent>
+            </Drawer>
+          )}
+
+          <span className="text-muted-foreground text-sm font-medium">→</span>
+
+          {desktop ? (
+            <Popover open={eventForm.endDateOpen} onOpenChange={eventForm.setEndDateOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex-1 h-9 justify-start font-normal cursor-pointer bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground">
+                  <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
+                  {format(eventForm.eventEndDate, "EEE, MMM d")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <CalendarUI
+                  mode="single"
+                  selected={eventForm.eventEndDate}
+                  weekStartsOn={1}
+                  disabled={(date) => date < eventForm.eventStartDate}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    eventForm.setEventEndDate(date);
+                    eventForm.setEndDateOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Drawer
+              open={eventForm.endDateOpen}
+              onOpenChange={(nextOpen) => {
+                if (nextOpen) { eventForm.setStartDateOpen(false); }
+                eventForm.setEndDateOpen(nextOpen);
+              }}
+            >
+              <DrawerTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 h-9 text-sm font-medium justify-start text-foreground cursor-pointer">
+                  <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
+                  <span className="truncate">{format(eventForm.eventEndDate, "EEE, MMM d")}</span>
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent responsive responsiveHeight="80dvh" className="pb-safe">
+                <DrawerTitle className="sr-only">Select end date</DrawerTitle>
+                <div className="flex justify-center p-4 pb-8">
+                  <CalendarUI
+                    mode="single"
+                    selected={eventForm.eventEndDate}
+                    weekStartsOn={1}
+                    disabled={(date) => date < eventForm.eventStartDate}
+                    onSelect={(date) => {
+                      if (!date) return;
+                      eventForm.setEventEndDate(date);
+                      eventForm.setEndDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </div>
+              </DrawerContent>
+            </Drawer>
+          )}
+        </div>
+
+        {!eventForm.eventAllDay && (
+          <div className="flex items-center gap-2">
+            <ShadcnAutocomleteTimePicker
+              value={(() => {
+                const [hours, minutes] = eventForm.eventStartTime.split(":").map(Number);
+                const date = new Date(0);
+                date.setHours(hours || 0, minutes || 0, 0, 0);
+                return date;
+              })()}
+              onChange={(date) => {
+                const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+                eventForm.handleStartTimeChange(timeString);
+              }}
+              is24Hour={localSettings?.timeFormat === "24h"}
+              className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
+            />
+            <span className="text-muted-foreground text-sm font-medium">→</span>
+            <ShadcnAutocomleteTimePicker
+              value={(() => {
+                const [hours, minutes] = eventForm.eventEndTime.split(":").map(Number);
+                const date = new Date(0);
+                date.setHours(hours || 0, minutes || 0, 0, 0);
+                return date;
+              })()}
+              onChange={(date) => {
+                const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+                eventForm.handleEndTimeChange(timeString);
+              }}
+              is24Hour={localSettings?.timeFormat === "24h"}
+              className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
+            />
+          </div>
+        )}
+
+        {desktop ? (
+          <div className="flex items-center gap-2 py-1">
+            <Checkbox
+              id="event-all-day-checkbox"
+              checked={eventForm.eventAllDay}
+              onCheckedChange={(checked) => eventForm.setEventAllDay(checked === true)}
+            />
+            <Label htmlFor="event-all-day-checkbox" className="text-sm cursor-pointer">
+              All day
+            </Label>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between w-full py-3 px-1">
+            <span className="text-sm font-medium text-foreground">All day</span>
+            <Switch
+              checked={eventForm.eventAllDay}
+              onCheckedChange={(checked) => eventForm.setEventAllDay(checked)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function EventEditorBody({
   calendars,
   desktop,
@@ -163,121 +480,13 @@ export function EventEditorBody({
   return (
     <div className={bodyClass}>
       {isViewMode ? (
-        <div className="py-1.5">
-          <div className="px-2">
-            <div className="flex items-center gap-3 p-2.5">
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <CalendarIcon className="size-4 text-muted-foreground" />
-              </div>
-              <span className="text-sm font-medium truncate flex-1 min-w-0">
-                {eventForm.eventTitle || "Untitled Event"}
-              </span>
-              {eventForm.selectedEvent?.id && eventForm.selectedEvent.isSynced && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <SyncedEventInfoBadge />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t border-border/50 mx-4 my-0.5" />
-
-          <div className="px-2 py-1 space-y-0.5">
-            <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <Clock className="size-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0 leading-tight">
-                <div className="text-sm">
-                  {eventDateDisplay.isSameDay ? (
-                    eventDateDisplay.label
-                  ) : (
-                    <>
-                      {eventDateDisplay.startLabel}
-                      <span className="text-muted-foreground mx-1">→</span>
-                      {eventDateDisplay.endLabel}
-                    </>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {!eventForm.eventAllDay
-                    ? `${eventForm.eventStartTime} – ${eventForm.eventEndTime}`
-                    : "All day"}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
-              <div className="flex items-center justify-center size-6 shrink-0">
-                <span
-                  className="size-3 rounded-full ring-1 ring-border/60"
-                  style={{
-                    backgroundColor: getColorSwatchValue(
-                      selectedCalendar?.color || "blue",
-                    ),
-                  }}
-                  aria-hidden
-                />
-              </div>
-              <span className="text-sm truncate flex-1 min-w-0">
-                {selectedCalendar?.name || "Unknown Calendar"}
-              </span>
-            </div>
-
-            {(eventForm.notificationsLoading || reminderMinutes.length > 0) && (
-              <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
-                <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
-                  <Bell className="size-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  {reminderMinutes.map((minutes, index) => (
-                    <div
-                      key={`email-reminder-${index}-${minutes}`}
-                      className="flex items-baseline gap-2 text-sm leading-tight"
-                    >
-                      <span>{formatReminderMinutes(minutes)} before</span>
-                      <span className="text-xs text-muted-foreground">email</span>
-                    </div>
-                  ))}
-                  {eventForm.notificationsLoading && reminderMinutes.length === 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      Loading reminders…
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {eventForm.eventLocation && (
-              <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
-                <div className="flex items-center justify-center size-6 shrink-0">
-                  <MapPin className="size-4 text-muted-foreground" />
-                </div>
-                <span className="text-sm truncate">{eventForm.eventLocation}</span>
-              </div>
-            )}
-
-            {eventForm.eventDescription && (
-              <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
-                <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
-                  <FileText className="size-4 text-muted-foreground" />
-                </div>
-                <span className="text-sm whitespace-pre-wrap flex-1 min-w-0">
-                  {formatEventDescription(eventForm.eventDescription)}
-                </span>
-              </div>
-            )}
-
-            {eventForm.isRecurring && eventForm.recurrenceRule && (
-              <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
-                <div className="flex items-center justify-center size-6 shrink-0">
-                  <RotateCcw className="size-4 text-muted-foreground" />
-                </div>
-                <span className="text-sm">{recurrenceSummary}</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <EventViewContent
+          eventForm={eventForm}
+          eventDateDisplay={eventDateDisplay}
+          recurrenceSummary={recurrenceSummary}
+          selectedCalendar={selectedCalendar}
+          reminderMinutes={reminderMinutes}
+        />
       ) : (
         <div className="space-y-3">
           <Input
@@ -313,244 +522,11 @@ export function EventEditorBody({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm">Date & Time</Label>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  {desktop ? (
-                    <Popover
-                      open={eventForm.startDateOpen}
-                      onOpenChange={eventForm.setStartDateOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="flex-1 h-9 justify-start font-normal cursor-pointer bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground"
-                        >
-                          <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
-                          {format(eventForm.eventStartDate, "EEE, MMM d")}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarUI
-                          mode="single"
-                          selected={eventForm.eventStartDate}
-                          weekStartsOn={1}
-                          onSelect={(date) => {
-                            if (!date) {
-                              return;
-                            }
-
-                            eventForm.setEventStartDate(date);
-                            if (date > eventForm.eventEndDate) {
-                              eventForm.setEventEndDate(date);
-                            }
-                            eventForm.setStartDateOpen(false);
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  ) : (
-                    <Drawer
-                      open={eventForm.startDateOpen}
-                      onOpenChange={(nextOpen) => {
-                        if (nextOpen) {
-                          eventForm.setEndDateOpen(false);
-                        }
-                        eventForm.setStartDateOpen(nextOpen);
-                      }}
-                    >
-                      <DrawerTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 h-9 text-sm font-medium justify-start text-foreground cursor-pointer"
-                        >
-                          <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
-                          <span className="truncate">
-                            {format(eventForm.eventStartDate, "EEE, MMM d")}
-                          </span>
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent
-                        responsive
-                        responsiveHeight="80dvh"
-                        className="pb-safe"
-                      >
-                        <DrawerTitle className="sr-only">Select start date</DrawerTitle>
-                        <div className="flex justify-center p-4 pb-8">
-                          <CalendarUI
-                            mode="single"
-                            selected={eventForm.eventStartDate}
-                            weekStartsOn={1}
-                            onSelect={(date) => {
-                              if (!date) {
-                                return;
-                              }
-
-                              eventForm.setEventStartDate(date);
-                              if (date > eventForm.eventEndDate) {
-                                eventForm.setEventEndDate(date);
-                              }
-                              eventForm.setStartDateOpen(false);
-                            }}
-                            initialFocus
-                          />
-                        </div>
-                      </DrawerContent>
-                    </Drawer>
-                  )}
-
-                  <span className="text-muted-foreground text-sm font-medium">→</span>
-
-                  {desktop ? (
-                    <Popover
-                      open={eventForm.endDateOpen}
-                      onOpenChange={eventForm.setEndDateOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="flex-1 h-9 justify-start font-normal cursor-pointer bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground"
-                        >
-                          <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
-                          {format(eventForm.eventEndDate, "EEE, MMM d")}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="end">
-                        <CalendarUI
-                          mode="single"
-                          selected={eventForm.eventEndDate}
-                          weekStartsOn={1}
-                          disabled={(date) => date < eventForm.eventStartDate}
-                          onSelect={(date) => {
-                            if (!date) {
-                              return;
-                            }
-
-                            eventForm.setEventEndDate(date);
-                            eventForm.setEndDateOpen(false);
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  ) : (
-                    <Drawer
-                      open={eventForm.endDateOpen}
-                      onOpenChange={(nextOpen) => {
-                        if (nextOpen) {
-                          eventForm.setStartDateOpen(false);
-                        }
-                        eventForm.setEndDateOpen(nextOpen);
-                      }}
-                    >
-                      <DrawerTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 h-9 text-sm font-medium justify-start text-foreground cursor-pointer"
-                        >
-                          <CalendarIcon className="mr-2 size-4 flex-shrink-0" />
-                          <span className="truncate">
-                            {format(eventForm.eventEndDate, "EEE, MMM d")}
-                          </span>
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent
-                        responsive
-                        responsiveHeight="80dvh"
-                        className="pb-safe"
-                      >
-                        <DrawerTitle className="sr-only">Select end date</DrawerTitle>
-                        <div className="flex justify-center p-4 pb-8">
-                          <CalendarUI
-                            mode="single"
-                            selected={eventForm.eventEndDate}
-                            weekStartsOn={1}
-                            disabled={(date) => date < eventForm.eventStartDate}
-                            onSelect={(date) => {
-                              if (!date) {
-                                return;
-                              }
-
-                              eventForm.setEventEndDate(date);
-                              eventForm.setEndDateOpen(false);
-                            }}
-                            initialFocus
-                          />
-                        </div>
-                      </DrawerContent>
-                    </Drawer>
-                  )}
-                </div>
-
-                {!eventForm.eventAllDay && (
-                  <div className="flex items-center gap-2">
-                    <ShadcnAutocomleteTimePicker
-                      value={(() => {
-                        const [hours, minutes] = eventForm.eventStartTime
-                          .split(":")
-                          .map(Number);
-                        const date = new Date();
-                        date.setHours(hours || 0, minutes || 0, 0, 0);
-                        return date;
-                      })()}
-                      onChange={(date) => {
-                        const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-                        eventForm.handleStartTimeChange(timeString);
-                      }}
-                      is24Hour={localSettings?.timeFormat === "24h"}
-                      className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
-                    />
-                    <span className="text-muted-foreground text-sm font-medium">→</span>
-                    <ShadcnAutocomleteTimePicker
-                      value={(() => {
-                        const [hours, minutes] = eventForm.eventEndTime
-                          .split(":")
-                          .map(Number);
-                        const date = new Date();
-                        date.setHours(hours || 0, minutes || 0, 0, 0);
-                        return date;
-                      })()}
-                      onChange={(date) => {
-                        const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-                        eventForm.handleEndTimeChange(timeString);
-                      }}
-                      is24Hour={localSettings?.timeFormat === "24h"}
-                      className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
-                    />
-                  </div>
-                )}
-
-                {desktop ? (
-                  <div className="flex items-center gap-2 py-1">
-                    <Checkbox
-                      id="event-all-day-checkbox"
-                      checked={eventForm.eventAllDay}
-                      onCheckedChange={(checked) =>
-                        eventForm.setEventAllDay(checked === true)
-                      }
-                    />
-                    <Label
-                      htmlFor="event-all-day-checkbox"
-                      className="text-sm cursor-pointer"
-                    >
-                      All day
-                    </Label>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between w-full py-3 px-1">
-                    <span className="text-sm font-medium text-foreground">All day</span>
-                    <Switch
-                      checked={eventForm.eventAllDay}
-                      onCheckedChange={(checked) => eventForm.setEventAllDay(checked)}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+            <EventDateTimeSection
+              eventForm={eventForm}
+              desktop={desktop}
+              localSettings={localSettings}
+            />
           </div>
 
           {!desktop && (

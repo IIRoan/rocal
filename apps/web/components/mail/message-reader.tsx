@@ -35,8 +35,6 @@ import type {
 } from "@/lib/mail/types";
 import { formatAddressFull } from "./mail-helpers";
 
-// ─── Security badge ───────────────────────────────────────────────────────────
-
 interface MailSecurityMeta {
   label: string;
   description: string;
@@ -268,8 +266,6 @@ function MailSecurityBadge({
   );
 }
 
-// ─── HTML email renderer ──────────────────────────────────────────────────────
-
 function HtmlEmailRenderer({
   html,
   blockRemoteImages,
@@ -321,9 +317,7 @@ function HtmlEmailRenderer({
   );
 }
 
-// ─── Copyable address ─────────────────────────────────────────────────────────
-
-function CopyableAddress({ value }: { value: string }) {
+function CopyableAddress({ value, suppressHydrationWarning }: { value: string; suppressHydrationWarning?: boolean }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -339,7 +333,10 @@ function CopyableAddress({ value }: { value: string }) {
       onClick={handleCopy}
       className="group/copy flex flex-1 min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:bg-muted/50 active:bg-muted/70 transition-colors duration-150 text-left"
     >
-      <span className="text-sm break-all text-foreground/80 group-hover/copy:text-foreground transition-colors duration-150">
+      <span
+        className="text-sm break-all text-foreground/80 group-hover/copy:text-foreground transition-colors duration-150"
+        suppressHydrationWarning={suppressHydrationWarning}
+      >
         {value}
       </span>
       <span className="shrink-0 size-3.5 flex items-center justify-center">
@@ -356,20 +353,16 @@ function CopyableAddress({ value }: { value: string }) {
   );
 }
 
-// ─── Meta row ────────────────────────────────────────────────────────────────
-
-function MetaRow({ label, value }: { label: string; value: string }) {
+function MetaRow({ label, value, suppressHydrationWarning }: { label: string; value: string; suppressHydrationWarning?: boolean }) {
   return (
     <div className="flex items-center gap-3 min-w-0">
       <span className="text-[11px] font-semibold text-muted-foreground/50 dark:text-muted-foreground/70 uppercase tracking-wider w-10 shrink-0">
         {label}
       </span>
-      <CopyableAddress value={value} />
+      <CopyableAddress value={value} suppressHydrationWarning={suppressHydrationWarning} />
     </div>
   );
 }
-
-// ─── Message reader ───────────────────────────────────────────────────────────
 
 export interface MessageReaderProps {
   message: JmapEmailMessage | null;
@@ -397,69 +390,61 @@ export interface MessageReaderProps {
   timezone?: string;
 }
 
-export function MessageReader({
+function MessageHeader({
   message,
-  plaintext,
-  decryptedHtml,
+  isBusy,
+  isFlagged,
+  messageLabels,
+  messageState,
+  accountEncryptedAtRest,
   signatureVerificationState,
   decryptError,
-  accountEncryptedAtRest,
-  isBusy,
-  blockRemoteImages,
-  blockTrackingPixels,
-  mailboxes,
-  currentMailboxId,
-  labels = [],
+  senderEmail,
+  senderName,
+  otherMailboxes,
+  timeFormat,
+  timezone,
+  labels,
   onReply,
   onForward,
-  onDelete,
-  onMove,
   onMarkAsUnread,
+  onMove,
   onToggleFlagged,
   onSetLabel,
   onCreateLabel,
   onDeleteLabel,
-  timeFormat,
-  timezone,
-}: MessageReaderProps) {
+  onDelete,
+}: {
+  message: JmapEmailMessage;
+  isBusy: boolean;
+  isFlagged: boolean;
+  messageLabels: LabelDef[];
+  messageState: MessageEncryptionState;
+  accountEncryptedAtRest: boolean;
+  signatureVerificationState: MailSignatureVerificationState;
+  decryptError: string | null;
+  senderEmail: string;
+  senderName: string | undefined;
+  otherMailboxes: JmapMailbox[];
+  timeFormat?: "12h" | "24h";
+  timezone?: string;
+  labels: LabelDef[];
+  onReply: () => void;
+  onForward: () => void;
+  onMarkAsUnread: () => void;
+  onMove: (targetMailboxId: string) => void;
+  onToggleFlagged?: () => void;
+  onSetLabel?: (labelId: string, assigned: boolean) => void;
+  onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
+  onDeleteLabel?: (labelId: string) => void;
+  onDelete: () => void;
+}) {
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
   const [isSavingLabel, setIsSavingLabel] = useState(false);
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
-  if (!message) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <p className="text-sm text-muted-foreground">
-          Select a message to read
-        </p>
-      </div>
-    );
-  }
 
-  const isFlagged = message?.keywords?.["$flagged"] === true;
-  const messageLabels = labels.filter(
-    (l) => message?.keywords?.[`label:${l.id}`] === true,
-  );
-
-  const messageState = classifyMessageEncryption(message);
-  const { text, html } = extractMessageBodies(message);
-
-  const displayHtml = decryptedHtml ?? (html || null);
-  const displayText = plaintext ?? (text || null);
-  const isHtmlEmail = Boolean(displayHtml);
-
-  const senderEmail = message.from?.[0]?.email ?? "";
-
-  const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
-  const otherMailboxes = mailboxes.filter(
-    (m) =>
-      m.id !== currentMailboxId &&
-      !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
-  );
-
-  const senderName = message.from?.[0]?.name ?? undefined;
-
-  const header = (
+  return (
     <div className="shrink-0 px-6 pt-5">
       <div className="flex items-center gap-3 mb-3">
         <SenderAvatar email={senderEmail} name={senderName} />
@@ -507,6 +492,7 @@ export function MessageReader({
         {message.receivedAt && (
           <MetaRow
             label="Date"
+            suppressHydrationWarning
             value={new Date(message.receivedAt).toLocaleString(undefined, {
               dateStyle: "medium",
               timeStyle: "short",
@@ -692,7 +678,7 @@ export function MessageReader({
                           });
                         }
                       }}
-                      placeholder="Label name…"
+                      placeholder="Label name\u2026"
                       className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
                     />
                     <button
@@ -737,16 +723,33 @@ export function MessageReader({
       )}
     </div>
   );
+}
 
-  const bodyContent = isHtmlEmail ? (
-    <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg border border-border/50 overflow-hidden flex flex-col">
-      <HtmlEmailRenderer
-        html={displayHtml!}
-        blockRemoteImages={blockRemoteImages}
-        blockTrackingPixels={blockTrackingPixels}
-      />
-    </div>
-  ) : (
+function MessageBodyContent({
+  isHtmlEmail,
+  displayHtml,
+  displayText,
+  blockRemoteImages,
+  blockTrackingPixels,
+}: {
+  isHtmlEmail: boolean;
+  displayHtml: string | null;
+  displayText: string | null;
+  blockRemoteImages: boolean;
+  blockTrackingPixels: boolean;
+}) {
+  if (isHtmlEmail) {
+    return (
+      <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg border border-border/50 overflow-hidden flex flex-col">
+        <HtmlEmailRenderer
+          html={displayHtml!}
+          blockRemoteImages={blockRemoteImages}
+          blockTrackingPixels={blockTrackingPixels}
+        />
+      </div>
+    );
+  }
+  return (
     <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg border border-border/50 overflow-y-auto bg-white [color-scheme:light]">
       <div className="px-5 py-4">
         {displayText ? (
@@ -759,17 +762,108 @@ export function MessageReader({
       </div>
     </div>
   );
+}
+
+const EMPTY_LABELS: LabelDef[] = [];
+
+export function MessageReader({
+  message,
+  plaintext,
+  decryptedHtml,
+  signatureVerificationState,
+  decryptError,
+  accountEncryptedAtRest,
+  isBusy,
+  blockRemoteImages,
+  blockTrackingPixels,
+  mailboxes,
+  currentMailboxId,
+  labels = EMPTY_LABELS,
+  onReply,
+  onForward,
+  onDelete,
+  onMove,
+  onMarkAsUnread,
+  onToggleFlagged,
+  onSetLabel,
+  onCreateLabel,
+  onDeleteLabel,
+  timeFormat,
+  timezone,
+}: MessageReaderProps) {
+  if (!message) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <p className="text-sm text-muted-foreground">
+          Select a message to read
+        </p>
+      </div>
+    );
+  }
+
+  const isFlagged = message?.keywords?.["$flagged"] === true;
+  const messageLabels = labels.filter(
+    (l) => message?.keywords?.[`label:${l.id}`] === true,
+  );
+
+  const messageState = classifyMessageEncryption(message);
+  const { text, html } = extractMessageBodies(message);
+
+  const displayHtml = decryptedHtml ?? (html || null);
+  const displayText = plaintext ?? (text || null);
+  const isHtmlEmail = Boolean(displayHtml);
+
+  const senderEmail = message.from?.[0]?.email ?? "";
+
+  const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
+  const otherMailboxes = mailboxes.filter(
+    (m) =>
+      m.id !== currentMailboxId &&
+      !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
+  );
+
+  const senderName = message.from?.[0]?.name ?? undefined;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {header}
+      <MessageHeader
+        message={message}
+        isBusy={isBusy}
+        isFlagged={isFlagged}
+        messageLabels={messageLabels}
+        messageState={messageState}
+        accountEncryptedAtRest={accountEncryptedAtRest}
+        signatureVerificationState={signatureVerificationState}
+        decryptError={decryptError}
+        senderEmail={senderEmail}
+        senderName={senderName}
+        otherMailboxes={otherMailboxes}
+        timeFormat={timeFormat}
+        timezone={timezone}
+        labels={labels}
+        onReply={onReply}
+        onForward={onForward}
+        onMarkAsUnread={onMarkAsUnread}
+        onMove={onMove}
+        onToggleFlagged={onToggleFlagged}
+        onSetLabel={onSetLabel}
+        onCreateLabel={onCreateLabel}
+        onDeleteLabel={onDeleteLabel}
+        onDelete={onDelete}
+      />
       {isHtmlEmail && blockRemoteImages && (
         <div className="shrink-0 flex items-center gap-2 px-6 py-1.5 border-t border-border/30 text-[11px] text-muted-foreground bg-muted/30">
           <Lock className="size-3 shrink-0" strokeWidth={2.25} />
           Remote images are blocked
         </div>
       )}
-      {bodyContent}
+      <MessageBodyContent
+        isHtmlEmail={isHtmlEmail}
+        displayHtml={displayHtml}
+        displayText={displayText}
+        blockRemoteImages={blockRemoteImages}
+        blockTrackingPixels={blockTrackingPixels}
+      />
     </div>
   );
 }

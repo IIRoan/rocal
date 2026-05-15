@@ -114,9 +114,11 @@ export const WeekView = React.memo(function WeekView({
 
   // Get all-day events and multi-day events for the week
   const allDayEvents = useMemo(() => {
-    return events
-      .filter((event) => event.allDay || isMultiDayEvent(event))
-      .filter((event) => eventOverlapsRange(event, weekStart, weekEnd, "day"));
+    return events.filter(
+      (event) =>
+        (event.allDay || isMultiDayEvent(event)) &&
+        eventOverlapsRange(event, weekStart, weekEnd, "day"),
+    );
   }, [events, weekStart, weekEnd]);
 
   const allDayEventsByDay = useMemo(

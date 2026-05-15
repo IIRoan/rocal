@@ -25,7 +25,7 @@ export default function PrivacyPage() {
               How Solace handles your data
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Solace is a passion project — not a business built on your data. We make a
+              Solace is a passion project, not a business built on your data. We make a
               calendar and a private email client, both designed to help you manage your
               time and communication without ads, profiling, or data sales.
             </p>
@@ -37,28 +37,28 @@ export default function PrivacyPage() {
             <div>
               <h2 className="text-base font-semibold text-foreground">What we make</h2>
               <p className="mt-2">
-                <span className="font-medium text-foreground/80">Calendar</span> — schedule
+                <span className="font-medium text-foreground/80">Calendar</span>: schedule
                 events, set reminders, share calendars, and organise by category. Event
                 content is encrypted on your device before it leaves it, with the level
                 of protection depending on whether the event has reminders enabled.
               </p>
               <p className="mt-2">
-                <span className="font-medium text-foreground/80">Mail</span> — a private
+                <span className="font-medium text-foreground/80">Mail</span>: a private
                 email client connected to your own mailbox on our server. Messages are
                 encrypted at rest, meaning stored content is protected from server-level
                 access. Because email is a legacy protocol, messages from external
-                providers like Gmail arrive in plaintext first — this is unavoidable and
+                providers like Gmail arrive in plaintext first; this is unavoidable and
                 explained in more detail below.
               </p>
             </div>
 
             <div id="calendar-encryption">
               <h2 className="text-base font-semibold text-foreground">
-                Calendar — how encryption works
+                Calendar: how encryption works
               </h2>
               <p className="mt-2">
                 Calendar content is encrypted on your device using a key derived from
-                your password. The server only ever receives ciphertext — it cannot read
+                your password. The server only ever receives ciphertext; it cannot read
                 your event details. How much is encrypted depends on whether the event
                 has a reminder set.
               </p>
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
                 To send you a reminder email at the right time with the right event
                 details, the server needs to know when to send it and what to say. This
                 means the event title, date, and time are stored in a form the server can
-                read. Everything else — description, location, calendar name, category —
+                read. Everything else (description, location, calendar name, category)
                 stays encrypted.
               </p>
               <div className="mt-3 rounded-lg border border-border/50 overflow-hidden">
@@ -116,7 +116,7 @@ export default function PrivacyPage() {
 
             <div id="mail-encryption">
               <h2 className="text-base font-semibold text-foreground">
-                Mail — what encryption at rest covers
+                Mail: what encryption at rest covers
               </h2>
               <p className="mt-2">
                 Your mailbox uses a key derived from your password to encrypt each
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
               </p>
               <p className="mt-3 font-medium text-foreground/80">What stays readable</p>
               <p className="mt-1">
-                Routing metadata — sender, recipients, headers — remains readable to the
+                Routing metadata (sender, recipients, headers) remains readable to the
                 server even after the message is encrypted. This is necessary for
                 delivery, display, and threading to work.
               </p>
@@ -183,7 +183,7 @@ export default function PrivacyPage() {
               <p className="mt-2">
                 Both calendar and mail encryption keys are derived from your password.
                 That means if you lose your password, you lose access to your encrypted
-                content — there is no recovery path, because we never hold the key
+                content; there is no recovery path, because we never hold the key
                 ourselves. Keep your password somewhere safe.
               </p>
             </div>
@@ -230,6 +230,7 @@ export default function PrivacyPage() {
             alt="Solace — collaborate better"
             className="size-full object-cover"
             fill
+            sizes="50vw"
             loading="eager"
             unoptimized
           />

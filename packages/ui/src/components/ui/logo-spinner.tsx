@@ -10,6 +10,9 @@ import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
 
 export const FORCE_LOADING_DESIGN_PREVIEW = false;
 
+const dayNameFormatter = new Intl.DateTimeFormat(undefined, { weekday: "long" });
+const monthNameFormatter = new Intl.DateTimeFormat(undefined, { month: "long" });
+
 function getLoadingDateParts(now: Date | null) {
   if (!now) {
     return {
@@ -21,13 +24,9 @@ function getLoadingDateParts(now: Date | null) {
   }
 
   return {
-    dayName: new Intl.DateTimeFormat(undefined, {
-      weekday: "long",
-    }).format(now),
+    dayName: dayNameFormatter.format(now),
     dayNum: now.getDate().toString().padStart(2, "0"),
-    monthName: new Intl.DateTimeFormat(undefined, {
-      month: "long",
-    }).format(now),
+    monthName: monthNameFormatter.format(now),
     year: now.getFullYear().toString(),
   };
 }

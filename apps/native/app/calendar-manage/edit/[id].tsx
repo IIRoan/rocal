@@ -31,7 +31,7 @@ import { resolveCalendarSwatchColor } from "../../../src/lib/calendar-color-util
 
 type DeleteAction = "delete_events" | "move_events";
 
-export default function CalendarEditScreen() {
+function useCalendarEditState() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -255,14 +255,34 @@ export default function CalendarEditScreen() {
     Alert.alert("Copied", "The share link is now on your clipboard.");
   }, [shareLink?.shareUrl]);
 
-  if (calendarLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.primaryBase} />
-        <Text style={styles.loadingText}>Loading calendar…</Text>
-      </SafeAreaView>
-    );
-  }
+  const shareBusy =
+    shareLinkLoading ||
+    enableShareMutation.isPending ||
+    disableShareMutation.isPending;
+
+  return {
+    theme, styles, calendar, calendarLoading,
+    name, setName, color, setColor, isVisible, setIsVisible,
+    isDefault, setIsDefault, forceFullEncryption, setForceFullEncryption,
+    validationErrors, otherOwnedCalendars, selectedMoveTargetId, setSelectedMoveTargetId,
+    shareLink, shareBusy, updateMutation, deleteMutation,
+    enableShareMutation, disableShareMutation,
+    handleSave, confirmDelete, handleCopyShareLink,
+  };
+}
+
+type SubState = ReturnType<typeof useCalendarEditState>;
+
+function CalendarEditForm({ s }: { s: SubState }) {
+  const {
+    theme, styles, calendar,
+    name, setName, color, setColor, isVisible, setIsVisible,
+    isDefault, setIsDefault, forceFullEncryption, setForceFullEncryption,
+    validationErrors, otherOwnedCalendars, selectedMoveTargetId, setSelectedMoveTargetId,
+    shareLink, shareBusy, updateMutation, deleteMutation,
+    enableShareMutation, disableShareMutation,
+    handleSave, confirmDelete, handleCopyShareLink,
+  } = s;
 
   if (!calendar) {
     return (
@@ -271,11 +291,6 @@ export default function CalendarEditScreen() {
       </SafeAreaView>
     );
   }
-
-  const shareBusy =
-    shareLinkLoading ||
-    enableShareMutation.isPending ||
-    disableShareMutation.isPending;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -535,6 +550,21 @@ export default function CalendarEditScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+export default function CalendarEditScreen() {
+  const s = useCalendarEditState();
+
+  if (s.calendarLoading) {
+    return (
+      <SafeAreaView style={s.styles.centered}>
+        <ActivityIndicator size="large" color={s.theme.colors.primaryBase} />
+        <Text style={s.styles.loadingText}>Loading calendar…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return <CalendarEditForm s={s} />;
 }
 
 function FieldLabel({ text, theme }: { text: string; theme: ThemeTokens }) {

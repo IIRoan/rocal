@@ -218,7 +218,7 @@ export function EventCalendar({
     if (currentView === "month" && initialView !== "month") {
       // Check if sessionStorage has a saved view first
       if (typeof window !== "undefined") {
-        const savedViewData = sessionStorage.getItem("calendar-view-selection");
+        const savedViewData = sessionStorage.getItem("calendar-view-selection:v1");
         if (savedViewData) {
           try {
             const parsedData = JSON.parse(savedViewData);
@@ -239,7 +239,7 @@ export function EventCalendar({
     } else if (currentView === "month") {
       // Even if initialView is "month", check sessionStorage
       if (typeof window !== "undefined") {
-        const savedViewData = sessionStorage.getItem("calendar-view-selection");
+        const savedViewData = sessionStorage.getItem("calendar-view-selection:v1");
         if (savedViewData) {
           try {
             const parsedData = JSON.parse(savedViewData);
@@ -270,7 +270,7 @@ export function EventCalendar({
         expires: expirationTime.getTime(),
       };
       sessionStorage.setItem(
-        "calendar-view-selection",
+        "calendar-view-selection:v1",
         JSON.stringify(viewData),
       );
     }
@@ -1135,7 +1135,6 @@ export function EventCalendar({
                 inset: 0,
                 display: "flex",
                 flexDirection: "column",
-                willChange: "transform, opacity",
               }}
             >
               {view === "month" && (

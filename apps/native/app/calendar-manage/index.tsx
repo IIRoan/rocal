@@ -36,15 +36,11 @@ type ReadOnlyCalendarEntry = {
   calendar: Calendar | undefined;
 };
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
-export default function CalendarManageScreen() {
+function useCalendarManageState() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { push: routerPush, back: routerBack } = useRouter();
   const queryClient = useQueryClient();
-
-  // ─── Data fetching ─────────────────────────────────────────────────────────
 
   const {
     data: calendars,
@@ -92,8 +88,6 @@ export default function CalendarManageScreen() {
       })),
     [calendarById, subscriptions],
   );
-
-  // ─── Visibility toggle mutation ────────────────────────────────────────────
 
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [pendingDefaultCalendarId, setPendingDefaultCalendarId] = useState<
@@ -181,8 +175,6 @@ export default function CalendarManageScreen() {
     },
   });
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
-
   const handleToggleVisibility = useCallback(
     (calendar: Calendar) => {
       toggleVisibilityMutation.mutate({
@@ -233,9 +225,29 @@ export default function CalendarManageScreen() {
     [syncSubscriptionMutation],
   );
 
-  // ─── Render item ───────────────────────────────────────────────────────────
+  return {
+    theme, styles, routerBack,
+    calendars, isLoading, isError, error,
+    subscriptions, subscriptionsLoading,
+    sortedOwnedCalendars, readOnlyCalendars,
+    togglingIds, pendingDefaultCalendarId, pendingSyncSubscriptionId,
+    handleToggleVisibility, handleCalendarPress, handleReadOnlyPress,
+    handleCreate, handleOpenSubscriptions, handleAddOrImport,
+    handleSetDefault, handleSyncSubscription,
+  };
+}
 
-  // ─── Loading state ─────────────────────────────────────────────────────────
+export default function CalendarManageScreen() {
+  const {
+    theme, styles, routerBack,
+    calendars, isLoading, isError, error,
+    subscriptions, subscriptionsLoading,
+    sortedOwnedCalendars, readOnlyCalendars,
+    togglingIds, pendingDefaultCalendarId, pendingSyncSubscriptionId,
+    handleToggleVisibility, handleCalendarPress, handleReadOnlyPress,
+    handleCreate, handleOpenSubscriptions, handleAddOrImport,
+    handleSetDefault, handleSyncSubscription,
+  } = useCalendarManageState();
 
   if (isLoading) {
     return (
@@ -245,8 +257,6 @@ export default function CalendarManageScreen() {
       </SafeAreaView>
     );
   }
-
-  // ─── Error state ───────────────────────────────────────────────────────────
 
   if (isError) {
     const errorMessage =
@@ -267,8 +277,6 @@ export default function CalendarManageScreen() {
       </SafeAreaView>
     );
   }
-
-  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.container}>
@@ -633,8 +641,6 @@ function RoundIconButton({
     </Pressable>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {

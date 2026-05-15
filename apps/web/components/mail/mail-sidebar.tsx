@@ -261,7 +261,7 @@ export function MailSidebar({
   const [hiddenMailboxIds, setHiddenMailboxIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
-      const stored = localStorage.getItem("mail:hiddenMailboxIds");
+      const stored = localStorage.getItem("mail:hiddenMailboxIds:v1");
       return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
     } catch {
       return new Set();
@@ -274,7 +274,7 @@ export function MailSidebar({
   );
 
   const sorted = activeMailbox
-    ? [...activeMailbox.mailboxes].sort((a, b) => {
+    ? activeMailbox.mailboxes.toSorted((a, b) => {
         if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
           return a.sortOrder - b.sortOrder;
         }
@@ -295,7 +295,7 @@ export function MailSidebar({
       else next.add(id);
       try {
         localStorage.setItem(
-          "mail:hiddenMailboxIds",
+          "mail:hiddenMailboxIds:v1",
           JSON.stringify([...next]),
         );
       } catch {

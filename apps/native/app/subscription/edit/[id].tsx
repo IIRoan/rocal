@@ -33,7 +33,7 @@ import {
   type SubscriptionFieldErrors,
 } from "../../../src/lib/subscription-utils";
 
-export default function SubscriptionEditScreen() {
+function useSubscriptionEditState() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -236,6 +236,24 @@ export default function SubscriptionEditScreen() {
     await Clipboard.setStringAsync(subscription.url);
     Alert.alert("Copied", "The source URL is now on your clipboard.");
   }, [subscription?.url]);
+
+  return {
+    theme, styles, subscription, calendar, isHoliday,
+    name, setName, color, setColor, fieldErrors, setFieldErrors, subscriptionsLoading,
+    updateSubscriptionMutation, deleteSubscriptionMutation,
+    syncSubscriptionMutation, toggleVisibilityMutation,
+    handleSave, handleRemove, handleSyncNow, handleToggleVisibility, handleCopySource,
+  };
+}
+
+export default function SubscriptionEditScreen() {
+  const {
+    theme, styles, subscription, calendar, isHoliday,
+    name, setName, color, setColor, fieldErrors, setFieldErrors, subscriptionsLoading,
+    updateSubscriptionMutation, deleteSubscriptionMutation,
+    syncSubscriptionMutation, toggleVisibilityMutation,
+    handleSave, handleRemove, handleSyncNow, handleToggleVisibility, handleCopySource,
+  } = useSubscriptionEditState();
 
   if (subscriptionsLoading) {
     return (

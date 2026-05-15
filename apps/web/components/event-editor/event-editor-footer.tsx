@@ -77,7 +77,7 @@ export function EventEditorFooter({
               {eventForm.eventSaving ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Saving...
+                  Saving…
                 </>
               ) : (
                 <>
@@ -137,7 +137,7 @@ export function EventEditorFooter({
             {eventForm.eventSaving ? (
               <>
                 <Loader2 className="size-4 animate-spin mr-2" />
-                Saving...
+                Saving…
               </>
             ) : (
               <>

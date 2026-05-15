@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { GearSixIcon } from "@phosphor-icons/react";
 import {
   Plus,
@@ -415,9 +416,9 @@ function AppSidebarDesktop({
       >
         {isCollapsed ? (
           <>
-            <a className="inline-flex justify-center" href="/">
+            <Link className="inline-flex justify-center" href="/">
               <LogoSvg width="28" height="28" className="text-primary" />
-            </a>
+            </Link>
             {onOpenSearch && (
               <CollapsedIconButton label="Search" onClick={onOpenSearch}>
                 <Search size={15} strokeWidth={2} />
@@ -469,7 +470,7 @@ function AppSidebarDesktop({
                 className="w-44"
               >
                 <DropdownMenuItem asChild>
-                  <a href="/calendar" className="flex items-center gap-2.5">
+                  <Link href="/calendar" className="flex items-center gap-2.5">
                     <CalendarDays
                       className="size-4 text-muted-foreground shrink-0"
                       strokeWidth={2}
@@ -481,10 +482,10 @@ function AppSidebarDesktop({
                         strokeWidth={2.5}
                       />
                     ) : null}
-                  </a>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <a href="/mail" className="flex items-center gap-2.5">
+                  <Link href="/mail" className="flex items-center gap-2.5">
                     <Mail
                       className="size-4 text-muted-foreground shrink-0"
                       strokeWidth={2}
@@ -496,7 +497,7 @@ function AppSidebarDesktop({
                         strokeWidth={2.5}
                       />
                     ) : null}
-                  </a>
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

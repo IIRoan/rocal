@@ -186,35 +186,3 @@ export function EventDots({
     </div>
   );
 }
-
-// Utility function to group events by exact time matching
-export function groupEventsByExactTime(
-  events: CalendarEvent[],
-): CalendarEvent[][] {
-  const groups: Map<string, CalendarEvent[]> = new Map();
-
-  events.forEach((event) => {
-    const startTime = new Date(event.start).getTime();
-    const endTime = new Date(event.end).getTime();
-    const timeKey = `${startTime}-${endTime}`;
-
-    if (!groups.has(timeKey)) {
-      groups.set(timeKey, []);
-    }
-    groups.get(timeKey)!.push(event);
-  });
-
-  // Return groups, with single events as individual arrays
-  return Array.from(groups.values());
-}
-
-// Utility function to check if events have identical times
-export function haveSameExactTime(
-  event1: CalendarEvent,
-  event2: CalendarEvent,
-): boolean {
-  return (
-    new Date(event1.start).getTime() === new Date(event2.start).getTime() &&
-    new Date(event1.end).getTime() === new Date(event2.end).getTime()
-  );
-}

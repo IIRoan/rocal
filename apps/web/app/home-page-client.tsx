@@ -179,9 +179,9 @@ function MiniCalendar({ today }: { today: number }) {
         </div>
       </div>
       <div className="mb-0.5 grid grid-cols-7">
-        {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+        {["M", "T", "W", "Th", "F", "Sa", "Su"].map((l) => (
           <div
-            key={i}
+            key={l}
             className="flex h-6 items-center justify-center text-[10px] font-medium text-muted-foreground/50"
           >
             {l}
@@ -216,7 +216,7 @@ function MiniCalendar({ today }: { today: number }) {
                   {dots.slice(0, 3).map((c, di) => (
                     <span
                       key={di}
-                      className="h-[4px] w-[4px] rounded-full"
+                      className="size-[4px] rounded-full"
                       style={{ backgroundColor: `var(--event-${c})` }}
                     />
                   ))}
@@ -318,12 +318,12 @@ function WeekGrid({ today }: { today: number }) {
               style={{ left: 0, top: 0 }}
             />
           </div>
-          {WEEK_EVENTS.map((ev, i) => {
+          {WEEK_EVENTS.map((ev) => {
             const colIndex = ev.day - 1;
             const showLabel = ev.end - ev.start >= 0.75;
             return (
               <div
-                key={i}
+                key={ev.label}
                 className="absolute overflow-hidden rounded-[3px] border-l-2 px-1 py-[2px] text-[8px] font-medium leading-tight shadow-sm"
                 style={{
                   ...eventStyle(ev.color),
@@ -387,9 +387,9 @@ function DayGrid({ today }: { today: number }) {
               style={{ left: 0, top: 0 }}
             />
           </div>
-          {DAY_EVENTS.map((ev, i) => (
+          {DAY_EVENTS.map((ev) => (
             <div
-              key={i}
+              key={ev.label}
               className="absolute overflow-hidden rounded-[3px] border-l-2 px-1 py-[2px] text-[8px] font-medium leading-tight shadow-sm"
               style={{
                 ...eventStyle(ev.color),
@@ -643,8 +643,8 @@ function ThisWeekWidget() {
               <div className="flex h-[5px] items-center gap-[2px]">
                 {dots.slice(0, 2).map((c, i) => (
                   <span
-                    key={i}
-                    className="h-[4px] w-[4px] rounded-full"
+                    key={c}
+                    className="size-[4px] rounded-full"
                     style={{ backgroundColor: `var(--event-${c})` }}
                   />
                 ))}
@@ -703,7 +703,7 @@ function HeroContent({
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             Solace is a calm, focused calendar built for shared schedules,
-            recurring events, and real notifications — no ads, no noise.
+            recurring events, and real notifications. No ads, no noise.
           </p>
         </div>
 
@@ -836,6 +836,7 @@ export function HomePageClient() {
         src="/wallpaper02.jpg"
         alt=""
         fill
+        sizes="100vw"
         unoptimized
         priority
         className="pointer-events-none object-cover"
@@ -874,7 +875,7 @@ export function HomePageClient() {
             className="mb-8 text-sm leading-relaxed text-muted-foreground"
           >
             Solace is a calm, focused calendar built for shared schedules,
-            recurring events, and real notifications — no ads, no noise.
+            recurring events, and real notifications: no ads, no noise.
           </p>
           <Button
             data-hero-cta

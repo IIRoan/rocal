@@ -32,7 +32,7 @@ export function useMailRealtime(input: {
   // The server polls JMAP every 30 s per connected client, so no client-side polling needed.
   useEffect(() => {
     if (!input.enabled || !input.accountId || typeof window === "undefined") {
-      return;
+      return undefined;
     }
 
     const debounceMs = input.debounceMs ?? 750;
@@ -51,13 +51,35 @@ export function useMailRealtime(input: {
       }, debounceMs);
     };
 
+    const handleOpen = () => { log.info("Mail realtime connected"); };
+    const handleChange = (event: Event) => {
+      const payload = JSON.parse(
+        (event as MessageEvent<string>).data,
+      ) as MailRealtimeEvent;
+      if (payload.accountId !== input.accountId) return;
+      scheduleDebouncedSync();
+    };
+
+    const cleanup = () => {
+      closed = true;
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      if (eventSource) {
+        eventSource.removeEventListener("open", handleOpen);
+        eventSource.removeEventListener("mail.changed", handleChange);
+        eventSource.close();
+      }
+    };
+
     // Initial sync on mount / accountId change
     void runSync().catch((error) => {
       log.warn("Initial mail sync failed", error);
     });
 
     if (typeof EventSource !== "function") {
-      return () => { closed = true; };
+      return cleanup;
     }
 
     try {
@@ -66,21 +88,11 @@ export function useMailRealtime(input: {
       });
     } catch (error) {
       log.warn("Failed to open mail realtime EventSource", error);
-      return () => { closed = true; };
+      return cleanup;
     }
 
-    eventSource.addEventListener("open", () => {
-      log.info("Mail realtime connected");
-    });
-
-    eventSource.addEventListener("mail.changed", (event) => {
-      const payload = JSON.parse(
-        (event as MessageEvent<string>).data,
-      ) as MailRealtimeEvent;
-
-      if (payload.accountId !== input.accountId) return;
-      scheduleDebouncedSync();
-    });
+    eventSource.addEventListener("open", handleOpen);
+    eventSource.addEventListener("mail.changed", handleChange);
 
     eventSource.onerror = () => {
       if (!closed) {
@@ -88,13 +100,6 @@ export function useMailRealtime(input: {
       }
     };
 
-    return () => {
-      closed = true;
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-      eventSource?.close();
-    };
+    return cleanup;
   }, [input.accountId, input.debounceMs, input.enabled, runSync]);
 }

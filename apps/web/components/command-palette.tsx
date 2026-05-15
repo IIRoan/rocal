@@ -76,20 +76,47 @@ interface CommandPaletteProps {
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
 }
 
-export function CommandPalette({
-  open,
-  onOpenChange,
-  eventToEdit,
-  onEventSaved,
-  onEventEdit,
-  initialView = "main",
-  initialSearchQuery = "",
-  eventEditorMode = "modal",
-  popoverAnchorPosition = null,
-  initialEventViewMode = "view",
-  previewEvent = null,
-  updatePreviewEvent,
-}: CommandPaletteProps) {
+function buildInitialHistory(view: PaletteView): PaletteView[] {
+  const PARENT_CHAINS: Partial<Record<PaletteView, PaletteView[]>> = {
+    appearance: ["main"],
+    "time-region": ["main"],
+    timezone: ["main", "time-region"],
+    notifications: ["main"],
+    "calendar-defaults": ["main"],
+    account: ["main"],
+    security: ["main"],
+    passkeys: ["main", "security"],
+    calendars: ["main"],
+    "calendar-create": ["main", "calendars"],
+    "calendar-edit": ["main", "calendars"],
+    subscriptions: ["main"],
+    "subscriptions-add-feed": ["main", "subscriptions"],
+    "subscriptions-holidays": ["main", "subscriptions"],
+    "subscriptions-edit": ["main", "subscriptions"],
+    events: ["main"],
+    "event-editor": ["main"],
+    invites: ["main"],
+    search: ["main"],
+  };
+  if (view === "main") return ["main"];
+  const parents = PARENT_CHAINS[view];
+  return parents ? [...parents, view] : ["main", view];
+}
+
+function useCommandPaletteState(
+  open: boolean,
+  onOpenChange: (open: boolean) => void,
+  eventToEdit: CalendarEvent | null | undefined,
+  onEventSaved: (() => void) | undefined,
+  onEventEdit: ((event: CalendarEvent) => void) | undefined,
+  initialView: string,
+  initialSearchQuery: string,
+  eventEditorMode: EventEditorMode,
+  popoverAnchorPosition: { x: number; y: number } | null,
+  initialEventViewMode: "view" | "edit",
+  previewEvent: CalendarEvent | null,
+  updatePreviewEvent: ((updates: Partial<CalendarEvent>) => void) | undefined,
+) {
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
   const { settings, loading, updateSettings, resetSettings } = useSettings();
@@ -101,7 +128,6 @@ export function CommandPalette({
       if (typeof authClient.listAccounts !== "function") {
         return [];
       }
-
       return extractLinkedAuthAccounts(await authClient.listAccounts());
     },
     enabled:
@@ -110,36 +136,7 @@ export function CommandPalette({
   });
   const { setCurrentDate, setCurrentView: setCalendarView } =
     useCalendarContext();
-
   const isMobile = useIsMobile();
-
-  // Navigation history stack — goForward pushes, goBack pops
-  const buildInitialHistory = (view: PaletteView): PaletteView[] => {
-    const PARENT_CHAINS: Partial<Record<PaletteView, PaletteView[]>> = {
-      appearance: ["main"],
-      "time-region": ["main"],
-      timezone: ["main", "time-region"],
-      notifications: ["main"],
-      "calendar-defaults": ["main"],
-      account: ["main"],
-      security: ["main"],
-      passkeys: ["main", "security"],
-      calendars: ["main"],
-      "calendar-create": ["main", "calendars"],
-      "calendar-edit": ["main", "calendars"],
-      subscriptions: ["main"],
-      "subscriptions-add-feed": ["main", "subscriptions"],
-      "subscriptions-holidays": ["main", "subscriptions"],
-      "subscriptions-edit": ["main", "subscriptions"],
-      events: ["main"],
-      "event-editor": ["main"],
-      invites: ["main"],
-      search: ["main"],
-    };
-    if (view === "main") return ["main"];
-    const parents = PARENT_CHAINS[view];
-    return parents ? [...parents, view] : ["main", view];
-  };
 
   const [navHistory, setNavHistory] = useState<PaletteView[]>(() =>
     buildInitialHistory(initialView as PaletteView),
@@ -151,7 +148,6 @@ export function CommandPalette({
     string | undefined
   >(undefined);
 
-  // Clear subscriptionEditCalendarId when leaving subscription views
   useEffect(() => {
     const isSubscriptionView = currentView.startsWith("subscriptions");
     if (!isSubscriptionView) {
@@ -175,6 +171,7 @@ export function CommandPalette({
     setPasskeyAddMode(false);
     setNavHistory((h) => (h.length > 1 ? h.slice(0, -1) : ["main"]));
   };
+
   const showMainView = useCallback(() => {
     setNavHistory(["main"]);
   }, []);
@@ -212,7 +209,6 @@ export function CommandPalette({
     }
   }, [initialView, open]);
 
-  // Add keyboard shortcuts for navigation items (Ctrl+1 through Ctrl+8) - always at top level
   useNumberedShortcuts(
     NAVIGATION_ITEMS.map((item) => () => goForward(item.id as PaletteView)),
     open && currentView === "main",
@@ -396,8 +392,6 @@ export function CommandPalette({
     [],
   );
 
-  // Command mode handling - hooks must be at component level
-  // Execute a command action
   const executeCommand = useCallback(
     (cmd: {
       execute: {
@@ -407,7 +401,6 @@ export function CommandPalette({
     }) => {
       const { action, payload } = cmd.execute;
       switch (action) {
-        // Immediate actions that close the palette
         case "setTheme":
           if (payload?.theme) {
             updateSetting(
@@ -417,7 +410,6 @@ export function CommandPalette({
             onOpenChange(false);
           }
           break;
-        // Action commands - take user directly to the item/setting
         case "newEvent":
           goForward("events");
           break;
@@ -442,22 +434,14 @@ export function CommandPalette({
 
   const handleSearchEventSelect = (event: CalendarEvent) => {
     const eventStart = new Date(event.start);
-
-    // Navigate the calendar to the event's date and switch to week view
-    // Week view shows the time grid and auto-scrolls to ~9AM on mount,
-    // so the user lands near the event's time slot
     setCurrentDate(eventStart);
     setCalendarView("week");
-
-    // Update the URL with proper date and view params
     const dateParam = format(eventStart, "yyyy-MM-dd");
     const params = new URLSearchParams(window.location.search);
     params.set("date", dateParam);
     params.set("view", "week");
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.pushState(null, "", newUrl);
-
-    // Close the palette and open the event editor
     onOpenChange(false);
     if (onEventEdit) {
       onEventEdit(event);
@@ -477,7 +461,299 @@ export function CommandPalette({
     onSearchEventSelect: handleSearchEventSelect,
   });
 
-  if (loading || !localSettings) {
+  const workingDaysList = localSettings
+    ? parseWorkingDays(localSettings.workingDays)
+    : [];
+
+  const getDialogTitle = () => {
+    switch (currentView) {
+      case "main": return "Command Palette";
+      case "search": return "Search Events";
+      case "appearance": return "Appearance Settings";
+      case "notifications": return "Notification Settings";
+      case "time-region": return "Time & Region Settings";
+      case "timezone": return "Timezone Selection";
+      case "calendar-defaults": return "Calendar Defaults";
+      case "account": return "Account Settings";
+      case "security": return "Security";
+      case "passkeys": return "Passkeys";
+      case "invites": return "Invites";
+      case "calendars": return "Calendar Management";
+      case "calendar-create": return "Create Calendar";
+      case "calendar-edit": return "Edit Calendar";
+      case "subscriptions": return "Calendar Subscriptions";
+      case "subscriptions-add-feed": return "Add External Feed";
+      case "subscriptions-holidays": return "Holiday Calendars";
+      case "subscriptions-edit": return "Edit Calendar";
+      case "events": return "New Event";
+      default: return "Settings";
+    }
+  };
+
+  const getNewEvent = (): CalendarEvent => {
+    return createDraftCalendarEvent({
+      defaultCalendarId: localSettings?.defaultCalendarId,
+      fallbackCalendarId: calendars?.[0]?.id,
+    });
+  };
+
+  const handleGoToSubscriptions = useCallback((calendarId?: string) => {
+    setSubscriptionEditCalendarId(calendarId);
+    if (calendarId) {
+      goForward("subscriptions-edit");
+    } else {
+      goForward("subscriptions");
+    }
+  }, [goForward]);
+
+  return {
+    loading,
+    isMobile,
+    localSettings,
+    currentView,
+    paletteSearch,
+    updateSetting,
+    goBack,
+    goForward,
+    workingDaysList,
+    saving,
+    handleReset,
+    deletingAccount,
+    handleDeleteAccount,
+    session,
+    sessionLoading,
+    changingPassword,
+    settingPassword,
+    resettingEncryptionPassword,
+    hasPasswordAccount,
+    hasOAuthAccount,
+    handleChangePassword,
+    handleSetPassword,
+    handleResetEncryptionPassword,
+    updatingProfile,
+    handleUpdateProfile,
+    accountImage,
+    passkeyAddMode,
+    subscriptionEditCalendarId,
+    handleGoToSubscriptions,
+    open,
+    onOpenChange,
+    onEventSaved,
+    eventEditorMode,
+    popoverAnchorPosition,
+    updatePreviewEvent,
+    eventToEdit,
+    initialEventViewMode,
+    getDialogTitle,
+    getNewEvent,
+    calendars,
+    previewEvent,
+  };
+}
+
+type SubState = ReturnType<typeof useCommandPaletteState>;
+
+function CommandPaletteViewContent({ s }: { s: SubState }) {
+  const { currentView } = s;
+
+  if (currentView === "main" || currentView === "search") {
+    return <CommandPaletteMainSearchView search={s.paletteSearch} />;
+  }
+
+  if (currentView === "appearance") {
+    return (
+      <AppearanceSettings
+        localSettings={s.localSettings!}
+        updateSetting={s.updateSetting}
+        goBack={s.goBack}
+      />
+    );
+  }
+
+  if (currentView === "notifications") {
+    return (
+      <NotificationSettings
+        localSettings={s.localSettings!}
+        updateSetting={s.updateSetting}
+        goBack={s.goBack}
+      />
+    );
+  }
+
+  if (currentView === "time-region" || currentView === "timezone") {
+    return (
+      <TimeRegionSettings
+        localSettings={s.localSettings!}
+        updateSetting={s.updateSetting}
+        goBack={s.goBack}
+        goForward={s.goForward}
+        currentView={currentView}
+      />
+    );
+  }
+
+  if (currentView === "calendar-defaults") {
+    return (
+      <CalendarDefaultsSettings
+        localSettings={s.localSettings!}
+        updateSetting={s.updateSetting}
+        goBack={s.goBack}
+        workingDaysList={s.workingDaysList}
+      />
+    );
+  }
+
+  if (currentView === "account") {
+    return (
+      <AccountSettings
+        goBack={s.goBack}
+        saving={s.saving}
+        handleReset={s.handleReset}
+        deletingAccount={s.deletingAccount}
+        handleDeleteAccount={s.handleDeleteAccount}
+        accountName={s.session?.user?.name}
+        accountEmail={s.session?.user?.email}
+        accountImage={s.accountImage}
+        sessionLoading={s.sessionLoading}
+        changingPassword={s.changingPassword}
+        settingPassword={s.settingPassword}
+        resettingEncryptionPassword={s.resettingEncryptionPassword}
+        hasPasswordAccount={s.hasPasswordAccount}
+        hasOAuthAccount={s.hasOAuthAccount}
+        handleChangePassword={s.handleChangePassword}
+        handleSetPassword={s.handleSetPassword}
+        handleResetEncryptionPassword={s.handleResetEncryptionPassword}
+        updatingProfile={s.updatingProfile}
+        handleUpdateProfile={s.handleUpdateProfile}
+      />
+    );
+  }
+
+  if (currentView === "security") {
+    return (
+      <SecuritySettings
+        localSettings={s.localSettings!}
+        updateSetting={s.updateSetting}
+        goBack={s.goBack}
+        goForward={s.goForward}
+      />
+    );
+  }
+
+  if (currentView === "passkeys") {
+    return (
+      <PasskeySettings
+        open={s.open}
+        onBack={() => s.goBack()}
+        startInAddMode={s.passkeyAddMode}
+      />
+    );
+  }
+
+  if (currentView === "invites") {
+    return <InviteSettings goBack={s.goBack} />;
+  }
+
+  if (
+    currentView === "calendars" ||
+    currentView === "calendar-create" ||
+    currentView === "calendar-edit"
+  ) {
+    return (
+      <CalendarManager
+        onBack={s.goBack}
+        onGoToSubscriptions={s.handleGoToSubscriptions}
+        currentView={currentView}
+        onNavigateTo={s.goForward}
+      />
+    );
+  }
+
+  if (
+    currentView === "subscriptions" ||
+    currentView === "subscriptions-add-feed" ||
+    currentView === "subscriptions-holidays" ||
+    currentView === "subscriptions-edit"
+  ) {
+    return (
+      <SubscriptionManagement
+        open={s.open}
+        onBack={s.goBack}
+        currentView={currentView}
+        onNavigateTo={s.goForward}
+        initialEditCalendarId={s.subscriptionEditCalendarId}
+      />
+    );
+  }
+
+  if (currentView === "events") {
+    return (
+      <EventEditor
+        open={s.open}
+        onOpenChange={s.onOpenChange}
+        eventToEdit={s.getNewEvent()}
+        onEventSaved={s.onEventSaved}
+        onBack={() => s.goBack()}
+        localSettings={s.localSettings!}
+        editorMode={s.eventEditorMode}
+        anchorPosition={s.popoverAnchorPosition}
+        updatePreviewEvent={s.updatePreviewEvent}
+        showBackButton
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
+        <button
+          onClick={() => s.goBack()}
+          className="p-1 rounded hover:bg-muted/50 transition-colors"
+        >
+          <ArrowLeft className="size-4 text-muted-foreground" />
+        </button>
+        <span className="text-sm font-medium">Settings</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-1">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
+          <Settings className="size-4 text-muted-foreground shrink-0" />
+          <span className="text-sm">This section is coming soon</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CommandPalette({
+  open,
+  onOpenChange,
+  eventToEdit,
+  onEventSaved,
+  onEventEdit,
+  initialView = "main",
+  initialSearchQuery = "",
+  eventEditorMode = "modal",
+  popoverAnchorPosition = null,
+  initialEventViewMode = "view",
+  previewEvent = null,
+  updatePreviewEvent,
+}: CommandPaletteProps) {
+  const s = useCommandPaletteState(
+    open,
+    onOpenChange,
+    eventToEdit,
+    onEventSaved,
+    onEventEdit,
+    initialView,
+    initialSearchQuery,
+    eventEditorMode,
+    popoverAnchorPosition,
+    initialEventViewMode,
+    previewEvent,
+    updatePreviewEvent,
+  );
+
+  if (s.loading || !s.localSettings) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
@@ -492,7 +768,7 @@ export function CommandPalette({
           <div className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
               <Loader2 className="size-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Loading...</p>
+              <p className="text-xs text-muted-foreground">Loading\u2026</p>
             </div>
           </div>
         </DialogContent>
@@ -500,10 +776,7 @@ export function CommandPalette({
     );
   }
 
-  const workingDaysList = parseWorkingDays(localSettings.workingDays);
-
-  // Event editor (standalone - uses its own Dialog/Drawer/Popover)
-  if (currentView === "event-editor") {
+  if (s.currentView === "event-editor") {
     return (
       <EventEditor
         open={open}
@@ -511,7 +784,7 @@ export function CommandPalette({
         eventToEdit={eventToEdit}
         onEventSaved={onEventSaved}
         onBack={() => onOpenChange(false)}
-        localSettings={localSettings}
+        localSettings={s.localSettings}
         editorMode={eventEditorMode}
         anchorPosition={popoverAnchorPosition}
         initialEventViewMode={initialEventViewMode}
@@ -520,246 +793,12 @@ export function CommandPalette({
     );
   }
 
-  // Helper to get dialog title for accessibility
-  const getDialogTitle = () => {
-    switch (currentView) {
-      case "main":
-        return "Command Palette";
-      case "search":
-        return "Search Events";
-      case "appearance":
-        return "Appearance Settings";
-      case "notifications":
-        return "Notification Settings";
-      case "time-region":
-        return "Time & Region Settings";
-      case "timezone":
-        return "Timezone Selection";
-      case "calendar-defaults":
-        return "Calendar Defaults";
-      case "account":
-        return "Account Settings";
-      case "security":
-        return "Security";
-      case "passkeys":
-        return "Passkeys";
-      case "invites":
-        return "Invites";
-      case "calendars":
-        return "Calendar Management";
-      case "calendar-create":
-        return "Create Calendar";
-      case "calendar-edit":
-        return "Edit Calendar";
-      case "subscriptions":
-        return "Calendar Subscriptions";
-      case "subscriptions-add-feed":
-        return "Add External Feed";
-      case "subscriptions-holidays":
-        return "Holiday Calendars";
-      case "subscriptions-edit":
-        return "Edit Calendar";
-      case "events":
-        return "New Event";
-      default:
-        return "Settings";
-    }
-  };
-
-  // New event for "events" view
-  const getNewEvent = (): CalendarEvent => {
-    return createDraftCalendarEvent({
-      defaultCalendarId: localSettings?.defaultCalendarId,
-      fallbackCalendarId: calendars?.[0]?.id,
-    });
-  };
-
-  // Render view content based on currentView
-  const renderContent = () => {
-    if (currentView === "main" || currentView === "search") {
-      return <CommandPaletteMainSearchView search={paletteSearch} />;
-    }
-
-    if (currentView === "appearance") {
-      return (
-        <AppearanceSettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-        />
-      );
-    }
-
-    if (currentView === "notifications") {
-      return (
-        <NotificationSettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-        />
-      );
-    }
-
-    if (currentView === "time-region" || currentView === "timezone") {
-      return (
-        <TimeRegionSettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-          goForward={goForward}
-          currentView={currentView}
-        />
-      );
-    }
-
-    if (currentView === "calendar-defaults") {
-      return (
-        <CalendarDefaultsSettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-          workingDaysList={workingDaysList}
-        />
-      );
-    }
-
-    if (currentView === "account") {
-      return (
-        <AccountSettings
-          goBack={goBack}
-          saving={saving}
-          handleReset={handleReset}
-          deletingAccount={deletingAccount}
-          handleDeleteAccount={handleDeleteAccount}
-          accountName={session?.user?.name}
-          accountEmail={session?.user?.email}
-          accountImage={accountImage}
-          sessionLoading={sessionLoading}
-          changingPassword={changingPassword}
-          settingPassword={settingPassword}
-          resettingEncryptionPassword={resettingEncryptionPassword}
-          hasPasswordAccount={hasPasswordAccount}
-          hasOAuthAccount={hasOAuthAccount}
-          handleChangePassword={handleChangePassword}
-          handleSetPassword={handleSetPassword}
-          handleResetEncryptionPassword={handleResetEncryptionPassword}
-          updatingProfile={updatingProfile}
-          handleUpdateProfile={handleUpdateProfile}
-        />
-      );
-    }
-
-    if (currentView === "security") {
-      return (
-        <SecuritySettings
-          localSettings={localSettings}
-          updateSetting={updateSetting}
-          goBack={goBack}
-          goForward={goForward}
-        />
-      );
-    }
-
-    if (currentView === "passkeys") {
-      return (
-        <PasskeySettings
-          open={open}
-          onBack={() => goBack()}
-          startInAddMode={passkeyAddMode}
-        />
-      );
-    }
-
-    if (currentView === "invites") {
-      return <InviteSettings goBack={goBack} />;
-    }
-
-    if (
-      currentView === "calendars" ||
-      currentView === "calendar-create" ||
-      currentView === "calendar-edit"
-    ) {
-      return (
-        <CalendarManager
-          onBack={goBack}
-          onGoToSubscriptions={(calendarId?: string) => {
-            setSubscriptionEditCalendarId(calendarId);
-            if (calendarId) {
-              goForward("subscriptions-edit");
-            } else {
-              goForward("subscriptions");
-            }
-          }}
-          currentView={currentView}
-          onNavigateTo={goForward}
-        />
-      );
-    }
-
-    if (
-      currentView === "subscriptions" ||
-      currentView === "subscriptions-add-feed" ||
-      currentView === "subscriptions-holidays" ||
-      currentView === "subscriptions-edit"
-    ) {
-      return (
-        <SubscriptionManagement
-          open={open}
-          onBack={goBack}
-          currentView={currentView}
-          onNavigateTo={goForward}
-          initialEditCalendarId={subscriptionEditCalendarId}
-        />
-      );
-    }
-
-    if (currentView === "events") {
-      return (
-        <EventEditor
-          open={open}
-          onOpenChange={onOpenChange}
-          eventToEdit={getNewEvent()}
-          onEventSaved={onEventSaved}
-          onBack={() => goBack()}
-          localSettings={localSettings}
-          editorMode={eventEditorMode}
-          anchorPosition={popoverAnchorPosition}
-          updatePreviewEvent={updatePreviewEvent}
-          showBackButton
-        />
-      );
-    }
-
-    // Fallback
-    return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
-          <button
-            onClick={() => goBack()}
-            className="p-1 rounded hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="size-4 text-muted-foreground" />
-          </button>
-          <span className="text-sm font-medium">Settings</span>
-        </div>
-        <div className="flex-1 overflow-y-auto p-1">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
-            <Settings className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-sm">This section is coming soon</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Single Dialog for ALL views (except event-editor which has its own Dialog/Drawer/Popover)
-  // On mobile: bottom Drawer; on desktop: spotlight Dialog
   const paletteContent = (
     <>
-      <TransitionContainer viewKey={currentView}>
-        {renderContent()}
+      <TransitionContainer viewKey={s.currentView}>
+        <CommandPaletteViewContent s={s} />
       </TransitionContainer>
-      {currentView !== "events" && !isMobile && (
+      {s.currentView !== "events" && !s.isMobile && (
         <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
           <span>
             Type{" "}
@@ -770,11 +809,11 @@ export function CommandPalette({
           </span>
           <span className="hidden sm:flex items-center gap-2">
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-              ↑↓
+              \u21d5
             </kbd>{" "}
             to navigate
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
-              ↵
+              \u21b5
             </kbd>{" "}
             to select
           </span>
@@ -785,7 +824,7 @@ export function CommandPalette({
 
   return (
     <>
-      {isMobile ? (
+      {s.isMobile ? (
         <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
           <DrawerContent
             responsive
@@ -793,7 +832,7 @@ export function CommandPalette({
             className="bg-popover border-border/50 flex flex-col overflow-hidden p-0"
           >
             <VisuallyHidden>
-              <DrawerTitle>{getDialogTitle()}</DrawerTitle>
+              <DrawerTitle>{s.getDialogTitle()}</DrawerTitle>
             </VisuallyHidden>
             {paletteContent}
           </DrawerContent>
@@ -807,7 +846,7 @@ export function CommandPalette({
             className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
           >
             <VisuallyHidden>
-              <DialogTitle>{getDialogTitle()}</DialogTitle>
+              <DialogTitle>{s.getDialogTitle()}</DialogTitle>
             </VisuallyHidden>
             {paletteContent}
           </DialogContent>

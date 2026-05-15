@@ -252,18 +252,21 @@ export function MobileWeekView({
       const eventEnd = new Date(event.end);
 
       const allDayEvents = processedDayEvents[dayIndex] ?? [];
-      const overlapping = allDayEvents
-        .filter((pe) => {
-          if (!pe.event) return false;
-          const otherStart = new Date(pe.event.start);
-          const otherEnd = new Date(pe.event.end);
-          return areIntervalsOverlapping(
+      const overlapping: CalendarEvent[] = [];
+      for (const pe of allDayEvents) {
+        if (!pe.event) continue;
+        const otherStart = new Date(pe.event.start);
+        const otherEnd = new Date(pe.event.end);
+        if (
+          areIntervalsOverlapping(
             { start: eventStart, end: eventEnd },
             { start: otherStart, end: otherEnd },
-          );
-        })
-        .map((pe) => pe.event!)
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+          )
+        ) {
+          overlapping.push(pe.event);
+        }
+      }
+      overlapping.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
       if (overlapping.length > 1) {
         setDrawerEvents(overlapping);

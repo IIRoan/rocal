@@ -212,18 +212,21 @@ export function MobileThreeDayView({
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
       const dayEvents = processedDayEvents[dayIndex] ?? [];
-      const overlapping = dayEvents
-        .filter((pe) => {
-          if (!pe.event) return false;
-          const oStart = new Date(pe.event.start);
-          const oEnd = new Date(pe.event.end);
-          return areIntervalsOverlapping(
+      const overlapping: CalendarEvent[] = [];
+      for (const pe of dayEvents) {
+        if (!pe.event) continue;
+        const oStart = new Date(pe.event.start);
+        const oEnd = new Date(pe.event.end);
+        if (
+          areIntervalsOverlapping(
             { start: eventStart, end: eventEnd },
             { start: oStart, end: oEnd },
-          );
-        })
-        .map((pe) => pe.event!)
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+          )
+        ) {
+          overlapping.push(pe.event);
+        }
+      }
+      overlapping.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
       if (overlapping.length > 1) {
         setDrawerEvents(overlapping);

@@ -53,58 +53,46 @@ interface EventEditorProps {
   showBackButton?: boolean;
 }
 
-export function EventEditor({
-  open,
-  onOpenChange,
-  eventToEdit,
-  onEventSaved,
-  onBack,
-  localSettings,
-  editorMode = "modal",
-  anchorPosition = null,
-  initialEventViewMode = "view",
-  updatePreviewEvent,
-  showBackButton = false,
-}: EventEditorProps) {
+function useEventEditorState(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  eventToEdit: CalendarEvent | null | undefined;
+  localSettings: UserSettings;
+  editorMode: EventEditorMode;
+  updatePreviewEvent: ((updates: Partial<CalendarEvent>) => void) | undefined;
+  onEventSaved: (() => void) | undefined;
+  initialEventViewMode: "view" | "edit";
+}) {
+  const {
+    open, onOpenChange, eventToEdit, localSettings,
+    editorMode, updatePreviewEvent, onEventSaved, initialEventViewMode,
+  } = props;
+
   const calendarData = useSharedCalendarData();
   const { calendars } = calendarData;
+
   const handleClose = useCallback(() => {
     onOpenChange(false);
   }, [onOpenChange]);
+
   const eventForm = useEventForm({
     calendars,
     localSettings,
     onEventSaved,
     onClose: handleClose,
   });
+
   const {
-    eventAllDay,
-    eventCalendarId,
-    eventDescription,
-    eventEndDate,
-    eventEndTime,
-    eventLocation,
-    eventNotifications,
-    eventSaving,
-    eventStartDate,
-    eventStartTime,
-    eventTitle,
-    eventViewMode,
-    handleEventDelete: deleteEvent,
-    handleEventSave: saveEvent,
+    eventAllDay, eventCalendarId, eventDescription, eventEndDate, eventEndTime,
+    eventLocation, eventNotifications, eventStartDate, eventStartTime, eventTitle,
+    eventViewMode, handleEventDelete: deleteEvent, handleEventSave: saveEvent,
     handleRecurringDeleteAll: deleteRecurringAll,
     handleRecurringDeleteThis: deleteRecurringThis,
-    isRecurring,
-    loadEventData,
-    resetForm,
-    selectedEvent,
-    setEventViewMode,
-    setIsRecurring,
-    setShowNotifications,
-    setShowRecurringDeleteModal,
-    showNotifications,
-    showRecurringDeleteModal,
+    isRecurring, loadEventData, resetForm, selectedEvent,
+    setEventViewMode, setIsRecurring, setShowNotifications,
+    setShowRecurringDeleteModal, showNotifications, showRecurringDeleteModal,
   } = eventForm;
+
   const [showDescription, setShowDescription] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
   const lastPreviewPayloadRef = useRef<string>("");
@@ -120,89 +108,46 @@ export function EventEditor({
   }, [open, resetForm]);
 
   useEffect(() => {
-    if (!eventToEdit || !open) {
-      return;
-    }
-
+    if (!eventToEdit || !open) return;
     loadEventData(eventToEdit);
-    if (
-      eventToEdit.id &&
-      initialEventViewMode === "edit" &&
-      !eventToEdit.isSynced
-    ) {
+    if (eventToEdit.id && initialEventViewMode === "edit" && !eventToEdit.isSynced) {
       setEventViewMode("edit");
     }
-
     requestAnimationFrame(() => {
-      if (eventToEdit.description) {
-        setShowDescription(true);
-      }
-
-      if (eventToEdit.location) {
-        setShowLocation(true);
-      }
+      if (eventToEdit.description) setShowDescription(true);
+      if (eventToEdit.location) setShowLocation(true);
     });
-  }, [
-    eventToEdit,
-    initialEventViewMode,
-    loadEventData,
-    open,
-    setEventViewMode,
-  ]);
+  }, [eventToEdit, initialEventViewMode, loadEventData, open, setEventViewMode]);
 
   useEffect(() => {
     if (editorMode !== "popover" || !updatePreviewEvent || !open) {
       lastPreviewPayloadRef.current = "";
       return;
     }
-
     const [startHours, startMinutes] = eventStartTime.split(":").map(Number);
     const [endHours, endMinutes] = eventEndTime.split(":").map(Number);
     const start = new Date(eventStartDate);
     const end = new Date(eventEndDate);
-
     start.setHours(startHours || 0, startMinutes || 0, 0, 0);
     end.setHours(endHours || 0, endMinutes || 0, 0, 0);
-
     const payload = {
-      allDay: eventAllDay,
-      calendarId: eventCalendarId,
-      description: eventDescription || "",
-      endIso: end.toISOString(),
-      location: eventLocation || "",
-      startIso: start.toISOString(),
+      allDay: eventAllDay, calendarId: eventCalendarId,
+      description: eventDescription || "", endIso: end.toISOString(),
+      location: eventLocation || "", startIso: start.toISOString(),
       title: eventTitle || "(No title)",
     };
     const payloadKey = JSON.stringify(payload);
-
-    if (payloadKey === lastPreviewPayloadRef.current) {
-      return;
-    }
-
+    if (payloadKey === lastPreviewPayloadRef.current) return;
     lastPreviewPayloadRef.current = payloadKey;
     updatePreviewEvent({
-      title: payload.title,
-      start,
-      end,
-      allDay: payload.allDay,
+      title: payload.title, start, end, allDay: payload.allDay,
       calendarId: payload.calendarId,
       location: payload.location || undefined,
       description: payload.description || undefined,
     });
-  }, [
-    editorMode,
-    eventAllDay,
-    eventCalendarId,
-    eventDescription,
-    eventEndDate,
-    eventEndTime,
-    eventLocation,
-    eventStartDate,
-    eventStartTime,
-    eventTitle,
-    open,
-    updatePreviewEvent,
-  ]);
+  }, [editorMode, eventAllDay, eventCalendarId, eventDescription, eventEndDate,
+    eventEndTime, eventLocation, eventStartDate, eventStartTime, eventTitle,
+    open, updatePreviewEvent]);
 
   const handleEventSave = useCallback(
     () => saveEvent(calendarData),
@@ -212,31 +157,24 @@ export function EventEditor({
     () => deleteEvent(calendarData),
     [calendarData, deleteEvent],
   );
-  const handleRecurringDeleteThis = useCallback(
+  const handleRecurringDeleteThisCb = useCallback(
     () => deleteRecurringThis(calendarData),
     [calendarData, deleteRecurringThis],
   );
-  const handleRecurringDeleteAll = useCallback(
+  const handleRecurringDeleteAllCb = useCallback(
     () => deleteRecurringAll(calendarData),
     [calendarData, deleteRecurringAll],
   );
   const handleEventDownloadIcs = useCallback(async () => {
-    if (!selectedEvent?.id) {
-      return;
-    }
-
+    if (!selectedEvent?.id) return;
     try {
       await calendarApiService.downloadEventICS(selectedEvent.id);
     } catch (error: any) {
       toast.error(error?.message || "Failed to download event as ICS file");
     }
   }, [selectedEvent]);
-  const handleToggleLocation = useCallback(() => {
-    setShowLocation((current) => !current);
-  }, []);
-  const handleToggleDescription = useCallback(() => {
-    setShowDescription((current) => !current);
-  }, []);
+  const handleToggleLocation = useCallback(() => setShowLocation((c) => !c), []);
+  const handleToggleDescription = useCallback(() => setShowDescription((c) => !c), []);
   const handleToggleRecurring = useCallback(() => {
     setIsRecurring(!isRecurring);
   }, [isRecurring, setIsRecurring]);
@@ -247,32 +185,74 @@ export function EventEditor({
   const isViewMode = eventViewMode === "view";
   const isMobile = useIsMobile();
   const selectedCalendar = useMemo(
-    () => calendars.find((calendar) => calendar.id === eventCalendarId),
+    () => calendars.find((c) => c.id === eventCalendarId),
     [calendars, eventCalendarId],
   );
   const enabledNotificationCount = useMemo(
-    () => eventNotifications.filter((notification) => notification.isEnabled).length,
+    () => eventNotifications.filter((n) => n.isEnabled).length,
     [eventNotifications],
   );
-  const hasActiveEncryptionSession = useMemo(
-    () => getActiveE2eeSession() !== null,
-    [],
-  );
+  const hasActiveEncryptionSession = useMemo(() => getActiveE2eeSession() !== null, []);
   const previewBadgeItem = useMemo(
-    () =>
-      buildEventEditorEncryptionPreview({
-        enabledNotificationCount,
-        eventEncryptionMode: localSettings?.eventEncryptionMode,
-        hasActiveEncryptionSession,
-        selectedCalendar,
-      }),
-    [
+    () => buildEventEditorEncryptionPreview({
       enabledNotificationCount,
+      eventEncryptionMode: localSettings?.eventEncryptionMode,
       hasActiveEncryptionSession,
-      localSettings?.eventEncryptionMode,
       selectedCalendar,
-    ],
+    }),
+    [enabledNotificationCount, hasActiveEncryptionSession,
+      localSettings?.eventEncryptionMode, selectedCalendar],
   );
+
+  return {
+    calendarData,
+    eventForm,
+    showDescription, setShowDescription,
+    showLocation, setShowLocation,
+    handleEventSave, handleEventDelete, handleEventDownloadIcs,
+    handleRecurringDeleteThis: handleRecurringDeleteThisCb,
+    handleRecurringDeleteAll: handleRecurringDeleteAllCb,
+    handleToggleLocation, handleToggleDescription,
+    handleToggleRecurring, handleToggleNotifications,
+    isViewMode, isMobile,
+    showNotifications, showRecurringDeleteModal, setShowRecurringDeleteModal,
+    previewBadgeItem,
+  };
+}
+
+export function EventEditor({
+  open,
+  onOpenChange,
+  eventToEdit,
+  onEventSaved,
+  onBack,
+  localSettings,
+  editorMode = "modal",
+  anchorPosition = null,
+  initialEventViewMode = "view",
+  updatePreviewEvent,
+  showBackButton = false,
+}: EventEditorProps) {
+  const {
+    calendarData,
+    eventForm,
+    showDescription, setShowDescription,
+    showLocation, setShowLocation,
+    handleEventSave, handleEventDelete, handleEventDownloadIcs,
+    handleRecurringDeleteThis, handleRecurringDeleteAll,
+    handleToggleLocation, handleToggleDescription,
+    handleToggleRecurring, handleToggleNotifications,
+    isViewMode, isMobile,
+    showNotifications, showRecurringDeleteModal, setShowRecurringDeleteModal,
+    previewBadgeItem,
+  } = useEventEditorState({
+    open, onOpenChange, eventToEdit, localSettings,
+    editorMode, updatePreviewEvent, onEventSaved, initialEventViewMode,
+  });
+
+  const { calendars } = calendarData;
+  const { eventSaving, selectedEvent, isRecurring } = eventForm;
+
   const badgeItem = selectedEvent?.id
     ? selectedEvent
     : previewBadgeItem;

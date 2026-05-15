@@ -115,14 +115,10 @@ async function activateFromRemote(
     return createAttempt(false, bootstrap);
   }
 
-  const accountKey = await unwrapAccountKey(
-    remoteRecord.wrappedAccountKey,
-    localRecord.privateKey,
-  );
-  const blindIndexKey = await unwrapBlindIndexKey(
-    remoteRecord.wrappedSearchKey,
-    localRecord.privateKey,
-  );
+  const [accountKey, blindIndexKey] = await Promise.all([
+    unwrapAccountKey(remoteRecord.wrappedAccountKey, localRecord.privateKey),
+    unwrapBlindIndexKey(remoteRecord.wrappedSearchKey, localRecord.privateKey),
+  ]);
 
   if (!isBootstrapCurrent(userId, generation)) {
     return createAttempt(false, bootstrap);
@@ -153,15 +149,11 @@ async function createDeviceRecord(
   blindIndexKey: CryptoKey,
 ): Promise<StoredE2eeDeviceRecord> {
   const wrappingKeyPair = await generateWrappingKeyPair();
-  const publicKey = await exportWrappingPublicKey(wrappingKeyPair.publicKey);
-  const wrappedAccountKey = await wrapSymmetricKey(
-    accountKey,
-    wrappingKeyPair.publicKey,
-  );
-  const wrappedSearchKey = await wrapSymmetricKey(
-    blindIndexKey,
-    wrappingKeyPair.publicKey,
-  );
+  const [publicKey, wrappedAccountKey, wrappedSearchKey] = await Promise.all([
+    exportWrappingPublicKey(wrappingKeyPair.publicKey),
+    wrapSymmetricKey(accountKey, wrappingKeyPair.publicKey),
+    wrapSymmetricKey(blindIndexKey, wrappingKeyPair.publicKey),
+  ]);
   const timestamp = new Date().toISOString();
 
   return {
@@ -198,8 +190,10 @@ async function createInitialDevice(
   generation: number,
   bootstrap: E2eeBootstrapResponse,
 ): Promise<E2eeBootstrapAttempt> {
-  const accountKey = await generateAccountKey();
-  const blindIndexKey = await generateBlindIndexKey();
+  const [accountKey, blindIndexKey] = await Promise.all([
+    generateAccountKey(),
+    generateBlindIndexKey(),
+  ]);
   const remoteRecord = await provisionLocalDevice(
     userId,
     accountKey,

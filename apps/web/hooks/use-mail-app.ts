@@ -95,7 +95,7 @@ function getPrimaryMailboxId(
 }
 
 function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
-  return [...messages].sort((left, right) => {
+  return messages.toSorted((left, right) => {
     const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
     const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
     return rightTime - leftTime;
@@ -195,7 +195,7 @@ function mergeMailboxes(
     byId.set(mailbox.id, mailbox);
   }
 
-  return [...byId.values()].sort((left, right) => {
+  return [...byId.values()].toSorted((left, right) => {
     const leftOrder = left.sortOrder ?? Number.MAX_SAFE_INTEGER;
     const rightOrder = right.sortOrder ?? Number.MAX_SAFE_INTEGER;
     return leftOrder - rightOrder;

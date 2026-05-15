@@ -107,7 +107,7 @@ export function getEventsForDay(
  * Sort events with multi-day events first, then by start time
  */
 export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
-  return [...events].sort((a, b) => {
+  return events.toSorted((a, b) => {
     const aIsMultiDay = isMultiDayEvent(a);
     const bIsMultiDay = isMultiDayEvent(b);
 

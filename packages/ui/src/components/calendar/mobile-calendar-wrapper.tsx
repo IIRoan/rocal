@@ -103,7 +103,7 @@ export function MobileCalendarWrapper({
       const expirationTime = new Date();
       expirationTime.setHours(expirationTime.getHours() + 1);
       const viewData = { view, expires: expirationTime.getTime() };
-      sessionStorage.setItem("calendar-view-selection", JSON.stringify(viewData));
+      sessionStorage.setItem("calendar-view-selection:v1", JSON.stringify(viewData));
     }
   };
   const handleCalendarViewChange = handleViewChange;

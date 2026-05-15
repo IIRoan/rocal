@@ -173,7 +173,7 @@ function PasswordRequirements({ password }: { password: string }) {
 
 // ─── LoginForm ────────────────────────────────────────────────────────────────
 
-export function LoginForm() {
+function useLoginFormState() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -747,6 +747,450 @@ export function LoginForm() {
       ? "Creating account…"
       : "Signing in…";
 
+  return {
+    isForgotPassword,
+    isSignUp,
+    authMode,
+    resetSucceeded,
+    notice,
+    error,
+    handleEmailAuth,
+    handleForgotPassword,
+    name,
+    setName,
+    email,
+    setEmail,
+    desiredEmail,
+    setDesiredEmail,
+    password,
+    setPassword,
+    inviteToken,
+    setInviteToken,
+    emailChecking,
+    emailAvailability,
+    inviteValidating,
+    inviteValidation,
+    showPassword,
+    setShowPassword,
+    signupDomain,
+    emailLoading,
+    primaryButtonLabel,
+    primaryLoadingLabel,
+    handlePasskeyStepUp,
+    passkeyLoading,
+    requiresPasskeyStepUp,
+    isPasskeySupported,
+    switchMode,
+    title,
+    subtitle,
+    titleRef,
+    overlayVisible,
+    overlayFading,
+  };
+}
+
+type SubState = ReturnType<typeof useLoginFormState>;
+
+function LoginFormFields({ s }: { s: SubState }) {
+  const {
+    isForgotPassword,
+    isSignUp,
+    handleForgotPassword,
+    handleEmailAuth,
+    name,
+    setName,
+    email,
+    setEmail,
+    desiredEmail,
+    setDesiredEmail,
+    password,
+    setPassword,
+    inviteToken,
+    setInviteToken,
+    emailChecking,
+    emailAvailability,
+    inviteValidating,
+    inviteValidation,
+    showPassword,
+    setShowPassword,
+    signupDomain,
+    emailLoading,
+    primaryButtonLabel,
+    primaryLoadingLabel,
+    switchMode,
+  } = s;
+  return (
+    <form
+      onSubmit={
+        isForgotPassword ? handleForgotPassword : handleEmailAuth
+      }
+      className="space-y-5"
+    >
+      <AnimatedCollapse isOpen={isSignUp}>
+        <div className="space-y-2 pb-0.5">
+          <Label htmlFor="name" className="text-sm font-medium">
+            Full name
+          </Label>
+          <Input
+            id="name"
+            name="name"
+            type="text"
+            autoComplete="name"
+            placeholder="Enter your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required={isSignUp}
+            disabled={emailLoading}
+            className="h-11 rounded-lg"
+          />
+        </div>
+      </AnimatedCollapse>
+
+      <AnimatedCollapse isOpen={isSignUp}>
+        <div className="space-y-2 pb-0.5">
+          <Label
+            htmlFor="desired-email"
+            className="text-sm font-medium"
+          >
+            Solace email
+          </Label>
+          <div
+            className={`flex h-11 overflow-hidden rounded-lg border bg-background transition-colors ${
+              emailAvailability === null
+                ? "border-input"
+                : emailAvailability.available
+                  ? "border-emerald-500 ring-1 ring-emerald-500/30"
+                  : "border-destructive ring-1 ring-destructive/30"
+            }`}
+          >
+            <Input
+              id="desired-email"
+              name="desired-email"
+              type="text"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="your-name"
+              value={desiredEmail}
+              onChange={(e) => setDesiredEmail(e.target.value)}
+              required={isSignUp}
+              disabled={emailLoading}
+              className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+            <span className="flex items-center border-l border-input px-3 text-sm text-muted-foreground">
+              @{signupDomain}
+            </span>
+          </div>
+          {emailChecking && (
+            <p className="text-xs text-muted-foreground">Checking availability…</p>
+          )}
+          {!emailChecking && emailAvailability !== null && (
+            <p
+              className={`text-xs ${
+                emailAvailability.available
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-destructive"
+              }`}
+            >
+              {emailAvailability.available
+                ? "This address is available."
+                : (emailAvailability as { available: false; message: string }).message}
+            </p>
+          )}
+          {!emailChecking && !emailAvailability && (
+            <p className="text-xs text-muted-foreground">
+              This becomes your Solace account email and mailbox address.
+            </p>
+          )}
+        </div>
+      </AnimatedCollapse>
+
+      <AnimatedCollapse isOpen={isSignUp}>
+        <div className="space-y-2 pb-0.5">
+          <Label
+            htmlFor="invite-token"
+            className="text-sm font-medium"
+          >
+            Invite token
+          </Label>
+          <div className="relative">
+            <Ticket className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="invite-token"
+              name="invite-token"
+              type="text"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="Paste your invite token"
+              value={inviteToken}
+              onChange={(e) => setInviteToken(e.target.value)}
+              disabled={emailLoading}
+              className={`h-11 rounded-lg pl-9 transition-colors ${
+                inviteValidation === null
+                  ? ""
+                  : inviteValidation.valid
+                    ? "border-emerald-500 ring-1 ring-emerald-500/30"
+                    : "border-destructive ring-1 ring-destructive/30"
+              }`}
+            />
+          </div>
+          {inviteValidating && (
+            <p className="text-xs text-muted-foreground">Validating token…</p>
+          )}
+          {!inviteValidating && inviteValidation !== null && (
+            <p
+              className={`text-xs ${
+                inviteValidation.valid
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-destructive"
+              }`}
+            >
+              {inviteValidation.valid
+                ? inviteValidation.inviterName
+                  ? `Valid — invited by ${inviteValidation.inviterName}`
+                  : "Valid invite token."
+                : (inviteValidation as { valid: false; reason: string }).reason}
+            </p>
+          )}
+          {!inviteValidating && inviteValidation === null && (
+            <p className="text-xs text-muted-foreground">
+              Solace is invite-only. Enter the token shared with you.
+            </p>
+          )}
+        </div>
+      </AnimatedCollapse>
+
+      <AnimatedCollapse isOpen={!isSignUp}>
+        <div className="space-y-2 pb-0.5">
+          <Label htmlFor="email" className="text-sm font-medium">
+            Account email
+          </Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder={`you@${signupDomain}`}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required={!isSignUp}
+            disabled={emailLoading}
+            className="h-11 rounded-lg"
+          />
+        </div>
+      </AnimatedCollapse>
+
+      <AnimatedCollapse isOpen={!isForgotPassword}>
+        <div className="space-y-2 pb-0.5">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="password" className="text-sm font-medium">
+              Password
+            </Label>
+            {!isSignUp ? (
+              <button
+                type="button"
+                onClick={() => switchMode("forgot-password")}
+                className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+              >
+                Forgot password?
+              </button>
+            ) : null}
+          </div>
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete={
+                isSignUp ? "new-password" : "current-password"
+              }
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required={!isForgotPassword}
+              disabled={emailLoading}
+              className="h-11 rounded-lg pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={
+                showPassword ? "Hide password" : "Show password"
+              }
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </button>
+          </div>
+          {isSignUp && password.length > 0 && (
+            <PasswordRequirements password={password} />
+          )}
+          {isSignUp && password.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Min. 8 characters with uppercase, lowercase, number &amp; special character.
+            </p>
+          )}
+        </div>
+      </AnimatedCollapse>
+
+      <Button
+        type="submit"
+        disabled={emailLoading}
+        className="mt-2 h-11 w-full rounded-lg font-medium"
+        aria-busy={emailLoading}
+      >
+        {emailLoading ? (
+          <>
+            <div
+              className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+              aria-hidden="true"
+            />
+            <span>{primaryLoadingLabel}</span>
+          </>
+        ) : (
+          <>
+            <span>{primaryButtonLabel}</span>
+            <ArrowRight className="size-4" />
+          </>
+        )}
+      </Button>
+    </form>
+  );
+}
+
+function LoginFormBody({ s }: { s: SubState }) {
+  const {
+    isForgotPassword,
+    isSignUp,
+    resetSucceeded,
+    notice,
+    error,
+    requiresPasskeyStepUp,
+    isPasskeySupported,
+    handlePasskeyStepUp,
+    passkeyLoading,
+    switchMode,
+  } = s;
+  return (
+    <div>
+      {resetSucceeded && !isForgotPassword ? (
+        <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+          <p className="text-sm text-foreground">
+            Your email sign-in password has been updated. The next time
+            you sign in with email, Solace will also use it to protect
+            your encryption keys.
+          </p>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
+          <p className="text-sm text-foreground">{notice}</p>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div
+          className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
+          role="alert"
+        >
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
+      ) : null}
+
+      <LoginFormFields s={s} />
+
+
+      <AnimatedCollapse isOpen={!isForgotPassword}>
+        <div className="pb-0.5">
+          {requiresPasskeyStepUp && isPasskeySupported ? (
+            <>
+              <div className="my-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-medium text-muted-foreground">
+                  second factor required
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <Button
+                onClick={handlePasskeyStepUp}
+                disabled={passkeyLoading}
+                variant="outline"
+                className="h-11 w-full rounded-lg"
+                aria-busy={passkeyLoading}
+              >
+                {passkeyLoading ? (
+                  <>
+                    <div
+                      className="size-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                      style={{
+                        borderTopColor: "currentColor",
+                        opacity: 1,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span>Waiting for your passkey…</span>
+                  </>
+                ) : (
+                  <>
+                    <Key className="size-4" />
+                    <span>Use passkey</span>
+                  </>
+                )}
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </AnimatedCollapse>
+
+      {isForgotPassword ? (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Remembered your password?{" "}
+          <button
+            type="button"
+            onClick={() => switchMode("sign-in")}
+            className="font-medium text-primary transition-colors hover:text-primary/80"
+          >
+            Back to sign in
+          </button>
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {isSignUp
+            ? "Already have an account?"
+            : "Don't have an account?"}{" "}
+          <button
+            type="button"
+            onClick={() => switchMode(isSignUp ? "sign-in" : "sign-up")}
+            className="font-medium text-primary transition-colors hover:text-primary/80 underline-offset-4 hover:underline"
+          >
+            {isSignUp ? "Sign in" : "Sign up"}
+          </button>
+        </p>
+      )}
+
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        Before continuing, please read our{" "}
+        <Link
+          href="/privacy"
+          className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          privacy commitments
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export function LoginForm() {
+  const s = useLoginFormState();
+  const { overlayVisible, overlayFading, titleRef, title, subtitle } = s;
   return (
     <>
       <section className="flex min-h-[100dvh]">
@@ -773,352 +1217,7 @@ export function LoginForm() {
               </div>
             </div>
 
-            <div>
-              {resetSucceeded && !isForgotPassword ? (
-                <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
-                  <p className="text-sm text-foreground">
-                    Your email sign-in password has been updated. The next time
-                    you sign in with email, Solace will also use it to protect
-                    your encryption keys.
-                  </p>
-                </div>
-              ) : null}
-
-              {notice ? (
-                <div className="mb-5 rounded-lg border border-secondary/20 bg-secondary/10 p-3">
-                  <p className="text-sm text-foreground">{notice}</p>
-                </div>
-              ) : null}
-
-              {error ? (
-                <div
-                  className="mb-5 rounded-lg border border-destructive/20 bg-destructive/10 p-3"
-                  role="alert"
-                >
-                  <p className="text-sm text-destructive">{error}</p>
-                </div>
-              ) : null}
-
-              <form
-                onSubmit={
-                  isForgotPassword ? handleForgotPassword : handleEmailAuth
-                }
-                className="space-y-5"
-              >
-                <AnimatedCollapse isOpen={isSignUp}>
-                  <div className="space-y-2 pb-0.5">
-                    <Label htmlFor="name" className="text-sm font-medium">
-                      Full name
-                    </Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      type="text"
-                      autoComplete="name"
-                      placeholder="Enter your name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required={isSignUp}
-                      disabled={emailLoading}
-                      className="h-11 rounded-lg"
-                    />
-                  </div>
-                </AnimatedCollapse>
-
-                <AnimatedCollapse isOpen={isSignUp}>
-                  <div className="space-y-2 pb-0.5">
-                    <Label
-                      htmlFor="desired-email"
-                      className="text-sm font-medium"
-                    >
-                      Solace email
-                    </Label>
-                    <div
-                      className={`flex h-11 overflow-hidden rounded-lg border bg-background transition-colors ${
-                        emailAvailability === null
-                          ? "border-input"
-                          : emailAvailability.available
-                            ? "border-emerald-500 ring-1 ring-emerald-500/30"
-                            : "border-destructive ring-1 ring-destructive/30"
-                      }`}
-                    >
-                      <Input
-                        id="desired-email"
-                        name="desired-email"
-                        type="text"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder="your-name"
-                        value={desiredEmail}
-                        onChange={(e) => setDesiredEmail(e.target.value)}
-                        required={isSignUp}
-                        disabled={emailLoading}
-                        className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
-                      <span className="flex items-center border-l border-input px-3 text-sm text-muted-foreground">
-                        @{signupDomain}
-                      </span>
-                    </div>
-                    {emailChecking && (
-                      <p className="text-xs text-muted-foreground">Checking availability…</p>
-                    )}
-                    {!emailChecking && emailAvailability !== null && (
-                      <p
-                        className={`text-xs ${
-                          emailAvailability.available
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-destructive"
-                        }`}
-                      >
-                        {emailAvailability.available
-                          ? "This address is available."
-                          : (emailAvailability as { available: false; message: string }).message}
-                      </p>
-                    )}
-                    {!emailChecking && !emailAvailability && (
-                      <p className="text-xs text-muted-foreground">
-                        This becomes your Solace account email and mailbox address.
-                      </p>
-                    )}
-                  </div>
-                </AnimatedCollapse>
-
-                <AnimatedCollapse isOpen={isSignUp}>
-                  <div className="space-y-2 pb-0.5">
-                    <Label
-                      htmlFor="invite-token"
-                      className="text-sm font-medium"
-                    >
-                      Invite token
-                    </Label>
-                    <div className="relative">
-                      <Ticket className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="invite-token"
-                        name="invite-token"
-                        type="text"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder="Paste your invite token"
-                        value={inviteToken}
-                        onChange={(e) => setInviteToken(e.target.value)}
-                        disabled={emailLoading}
-                        className={`h-11 rounded-lg pl-9 transition-colors ${
-                          inviteValidation === null
-                            ? ""
-                            : inviteValidation.valid
-                              ? "border-emerald-500 ring-1 ring-emerald-500/30"
-                              : "border-destructive ring-1 ring-destructive/30"
-                        }`}
-                      />
-                    </div>
-                    {inviteValidating && (
-                      <p className="text-xs text-muted-foreground">Validating token…</p>
-                    )}
-                    {!inviteValidating && inviteValidation !== null && (
-                      <p
-                        className={`text-xs ${
-                          inviteValidation.valid
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-destructive"
-                        }`}
-                      >
-                        {inviteValidation.valid
-                          ? inviteValidation.inviterName
-                            ? `Valid — invited by ${inviteValidation.inviterName}`
-                            : "Valid invite token."
-                          : (inviteValidation as { valid: false; reason: string }).reason}
-                      </p>
-                    )}
-                    {!inviteValidating && inviteValidation === null && (
-                      <p className="text-xs text-muted-foreground">
-                        Solace is invite-only. Enter the token shared with you.
-                      </p>
-                    )}
-                  </div>
-                </AnimatedCollapse>
-
-                <AnimatedCollapse isOpen={!isSignUp}>
-                  <div className="space-y-2 pb-0.5">
-                    <Label htmlFor="email" className="text-sm font-medium">
-                      Account email
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder={`you@${signupDomain}`}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required={!isSignUp}
-                      disabled={emailLoading}
-                      className="h-11 rounded-lg"
-                    />
-                  </div>
-                </AnimatedCollapse>
-
-                <AnimatedCollapse isOpen={!isForgotPassword}>
-                  <div className="space-y-2 pb-0.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <Label htmlFor="password" className="text-sm font-medium">
-                        Password
-                      </Label>
-                      {!isSignUp ? (
-                        <button
-                          type="button"
-                          onClick={() => switchMode("forgot-password")}
-                          className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
-                        >
-                          Forgot password?
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete={
-                          isSignUp ? "new-password" : "current-password"
-                        }
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required={!isForgotPassword}
-                        disabled={emailLoading}
-                        className="h-11 rounded-lg pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
-                      >
-                        {showPassword ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
-                    </div>
-                    {isSignUp && password.length > 0 && (
-                      <PasswordRequirements password={password} />
-                    )}
-                    {isSignUp && password.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Min. 8 characters with uppercase, lowercase, number &amp; special character.
-                      </p>
-                    )}
-                  </div>
-                </AnimatedCollapse>
-
-                <Button
-                  type="submit"
-                  disabled={emailLoading}
-                  className="mt-2 h-11 w-full rounded-lg font-medium"
-                  aria-busy={emailLoading}
-                >
-                  {emailLoading ? (
-                    <>
-                      <div
-                        className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
-                        aria-hidden="true"
-                      />
-                      <span>{primaryLoadingLabel}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{primaryButtonLabel}</span>
-                      <ArrowRight className="size-4" />
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              <AnimatedCollapse isOpen={!isForgotPassword}>
-                <div className="pb-0.5">
-                  {requiresPasskeyStepUp && isPasskeySupported ? (
-                    <>
-                      <div className="my-6 flex items-center gap-3">
-                        <div className="h-px flex-1 bg-border" />
-                        <span className="text-xs font-medium text-muted-foreground">
-                          second factor required
-                        </span>
-                        <div className="h-px flex-1 bg-border" />
-                      </div>
-
-                      <Button
-                        onClick={handlePasskeyStepUp}
-                        disabled={passkeyLoading}
-                        variant="outline"
-                        className="h-11 w-full rounded-lg"
-                        aria-busy={passkeyLoading}
-                      >
-                        {passkeyLoading ? (
-                          <>
-                            <div
-                              className="size-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
-                              style={{
-                                borderTopColor: "currentColor",
-                                opacity: 1,
-                              }}
-                              aria-hidden="true"
-                            />
-                            <span>Waiting for your passkey...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Key className="size-4" />
-                            <span>Use passkey</span>
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-              </AnimatedCollapse>
-
-              {isForgotPassword ? (
-                <p className="mt-6 text-center text-sm text-muted-foreground">
-                  Remembered your password?{" "}
-                  <button
-                    type="button"
-                    onClick={() => switchMode("sign-in")}
-                    className="font-medium text-primary transition-colors hover:text-primary/80"
-                  >
-                    Back to sign in
-                  </button>
-                </p>
-              ) : (
-                <p className="mt-6 text-center text-sm text-muted-foreground">
-                  {isSignUp
-                    ? "Already have an account?"
-                    : "Don't have an account?"}{" "}
-                  <button
-                    type="button"
-                    onClick={() => switchMode(isSignUp ? "sign-in" : "sign-up")}
-                    className="font-medium text-primary transition-colors hover:text-primary/80 underline-offset-4 hover:underline"
-                  >
-                    {isSignUp ? "Sign in" : "Sign up"}
-                  </button>
-                </p>
-              )}
-
-              <p className="mt-6 text-center text-xs text-muted-foreground">
-                Before continuing, please read our{" "}
-                <Link
-                  href="/privacy"
-                  className="font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  privacy commitments
-                </Link>
-              </p>
-            </div>
+            <LoginFormBody s={s} />
           </div>
         </div>
 
@@ -1129,6 +1228,7 @@ export function LoginForm() {
               alt="Solace — collaborate better"
               className="size-full object-cover"
               fill
+              sizes="100vw"
               loading="eager"
               unoptimized
             />

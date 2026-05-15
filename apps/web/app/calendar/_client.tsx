@@ -92,13 +92,13 @@ function CalendarSearchParamHandlers({
   onOpenPalette: (query?: string) => void;
 }) {
   const searchParams = useSearchParams();
+  const eventId = searchParams.get("eventId");
+  const palette = searchParams.get("palette");
   const { data: session, isPending } = useSession();
   const { openEventEditor } = useCommandPaletteContext();
   const calendarData = useSharedCalendarData();
   const handledEventIdRef = useRef<string | null>(null);
   const handledPaletteRef = useRef<string | null>(null);
-  const eventId = searchParams.get("eventId");
-  const palette = searchParams.get("palette");
 
   useEffect(() => {
     if (!eventId || handledEventIdRef.current === eventId) {

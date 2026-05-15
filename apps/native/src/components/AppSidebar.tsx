@@ -51,7 +51,7 @@ const DRAWER_SPRING = { damping: 24, stiffness: 280, mass: 0.8 };
 
 const logoSource = require("../assets/logo.png");
 
-export function AppSidebar() {
+function useAppSidebarState() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
   const { selectedDate, setCurrentDate, setSelectedDate } = useCalendarView();
@@ -203,6 +203,26 @@ export function AppSidebar() {
     },
     [close, pathname, routerPush, routerReplace, setCurrentDate, setSelectedDate],
   );
+
+  return {
+    theme, styles, user, insets, isOpen, open, close,
+    calendars, calendarsLoading, calendarSections, calendarById,
+    pendingVisibilityCalendarId, avatarError, setAvatarError, selectedDate,
+    sidebarAnimatedStyle, overlayAnimatedStyle,
+    edgePanGesture, closePanGesture,
+    handleNavigate, handleToggleCalendarVisibility, handleSelectCalendarDate,
+  };
+}
+
+export function AppSidebar() {
+  const {
+    theme, styles, user, insets, isOpen, open, close,
+    calendars, calendarsLoading, calendarSections, calendarById,
+    pendingVisibilityCalendarId, avatarError, setAvatarError, selectedDate,
+    sidebarAnimatedStyle, overlayAnimatedStyle,
+    edgePanGesture, closePanGesture,
+    handleNavigate, handleToggleCalendarVisibility, handleSelectCalendarDate,
+  } = useAppSidebarState();
 
   return (
     <>

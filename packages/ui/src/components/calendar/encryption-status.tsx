@@ -21,7 +21,7 @@ export interface EncryptableCalendarItem {
   forceFullEncryption?: boolean | null;
 }
 
-export type EncryptionDisplayState =
+type EncryptionDisplayState =
   | "encrypted"
   | "shadow_write"
   | "plaintext"

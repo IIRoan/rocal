@@ -61,7 +61,7 @@ function resolvePasswordResetRedirectUrl(): string | null {
   }
 }
 
-export default function SignInScreen() {
+function useSignInState() {
   const { signIn, signInWithPasskey, requiresPasskeyStepUp } = useAuth();
   const { replace: routerReplace } = useRouter();
   const { theme } = useTheme();
@@ -227,6 +227,46 @@ export default function SignInScreen() {
   const subtitle = isResetMode
     ? "Enter your email and we’ll send a web link to reset your email sign-in password."
     : "Sign in with your email and password. If your account has passkeys, you'll verify with one next.";
+
+  return {
+    theme,
+    styles,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    emailError,
+    setEmailError,
+    passwordError,
+    setPasswordError,
+    serverError,
+    isResetMode,
+    isLoading,
+    isSigningIn,
+    isPasskeyLoading,
+    isRequestingPasswordReset,
+    passwordRef,
+    showPasskeyButton,
+    requiresPasskeyStepUp,
+    title,
+    subtitle,
+    handleSignIn,
+    handleRequestPasswordReset,
+    handlePasskeySignIn,
+    switchMode,
+  };
+}
+
+export default function SignInScreen() {
+  const s = useSignInState();
+  const {
+    theme, styles, email, setEmail, password, setPassword,
+    emailError, setEmailError, passwordError, setPasswordError, serverError, isResetMode,
+    isLoading, isSigningIn, isPasskeyLoading, isRequestingPasswordReset,
+    passwordRef, showPasskeyButton, requiresPasskeyStepUp,
+    title, subtitle, handleSignIn, handleRequestPasswordReset,
+    handlePasskeySignIn, switchMode,
+  } = s;
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>

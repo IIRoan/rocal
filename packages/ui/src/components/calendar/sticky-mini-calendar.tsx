@@ -125,18 +125,22 @@ export function StickyMiniCalendar({
 
   // All-day and multi-day events for the current week
   const allDayEvents = useMemo(() => {
-    return events
-      .filter((event) => event.allDay || isMultiDayEvent(event))
-      .filter((event) => eventOverlapsRange(event, weekStart, weekEnd, "day"));
+    return events.filter(
+      (event) =>
+        (event.allDay || isMultiDayEvent(event)) &&
+        eventOverlapsRange(event, weekStart, weekEnd, "day"),
+    );
   }, [events, weekStart, weekEnd]);
 
   // All-day events for day view (just the current day)
   const dayAllDayEventsList = useMemo(() => {
     const dayStart = startOfDay(currentDate);
     const dayEnd = endOfDay(currentDate);
-    return events
-      .filter((event) => event.allDay || isMultiDayEvent(event))
-      .filter((event) => eventOverlapsRange(event, dayStart, dayEnd, "day"));
+    return events.filter(
+      (event) =>
+        (event.allDay || isMultiDayEvent(event)) &&
+        eventOverlapsRange(event, dayStart, dayEnd, "day"),
+    );
   }, [events, currentDate]);
 
   useEffect(() => {

@@ -18,6 +18,231 @@ import { ComposeDialog } from "./compose-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
 
+type MailAppState = ReturnType<typeof useMailApp>;
+
+interface MailboxActiveSectionProps {
+  activeMailbox: NonNullable<MailAppState["activeMailbox"]>;
+  selectedMailboxName: string;
+  selectedMessageId: string | null;
+  setSelectedMessageId: (id: string | null) => void;
+  selectedMessage: MailAppState["selectedMessage"];
+  selectedMessagePlaintext: MailAppState["selectedMessagePlaintext"];
+  selectedMessageDecryptedHtml: MailAppState["selectedMessageDecryptedHtml"];
+  selectedMessageSignatureVerificationState: MailAppState["selectedMessageSignatureVerificationState"];
+  selectedMessageDecryptError: MailAppState["selectedMessageDecryptError"];
+  isBusy: boolean;
+  isRefreshing: boolean;
+  blockRemoteImages: boolean;
+  blockTrackingPixels: boolean;
+  hasMoreMessages: boolean;
+  isLoadingMore: boolean;
+  timeFormat: "12h" | "24h";
+  timezone: string | undefined;
+  labels: MailAppState["labels"];
+  onRefresh: () => void;
+  onCompose: () => void;
+  onDeleteMessage: (id?: string) => void;
+  onMoveMessage: (targetId: string, id?: string) => void;
+  onMarkAsUnread: (id?: string) => void;
+  onMarkAsRead: (id?: string) => void;
+  onBulkDelete: (ids: string[]) => void;
+  onBulkMove: (ids: string[], targetId: string) => void;
+  onBulkMarkAsUnread: (ids: string[]) => void;
+  onBulkMarkAsRead: (ids: string[]) => void;
+  onToggleFlagged: (id?: string) => void;
+  onSetMessageLabel: (messageId: string, labelId: string, assigned: boolean) => void;
+  onCreateLabel: (name: string, color: string) => ReturnType<MailAppState["handleCreateLabel"]>;
+  onDeleteLabel: (id: string) => void;
+  onReply: MailAppState["handleReply"];
+  onForward: MailAppState["handleForward"];
+  onLoadMore: () => void;
+}
+
+function MailboxActiveSection({
+  activeMailbox,
+  selectedMailboxName,
+  selectedMessageId,
+  setSelectedMessageId,
+  selectedMessage,
+  selectedMessagePlaintext,
+  selectedMessageDecryptedHtml,
+  selectedMessageSignatureVerificationState,
+  selectedMessageDecryptError,
+  isBusy,
+  isRefreshing,
+  blockRemoteImages,
+  blockTrackingPixels,
+  hasMoreMessages,
+  isLoadingMore,
+  timeFormat,
+  timezone,
+  labels,
+  onRefresh,
+  onCompose,
+  onDeleteMessage,
+  onMoveMessage,
+  onMarkAsUnread,
+  onMarkAsRead,
+  onBulkDelete,
+  onBulkMove,
+  onBulkMarkAsUnread,
+  onBulkMarkAsRead,
+  onToggleFlagged,
+  onSetMessageLabel,
+  onCreateLabel,
+  onDeleteLabel,
+  onReply,
+  onForward,
+  onLoadMore,
+}: MailboxActiveSectionProps) {
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="flex h-12 shrink-0 items-center border-b border-border/40 px-4 gap-3">
+        <h1 className="text-sm font-semibold">{selectedMailboxName}</h1>
+        <span className="text-xs text-muted-foreground/60">
+          {activeMailbox.messages.length}{" "}
+          {activeMailbox.messages.length === 1 ? "message" : "messages"}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 rounded-lg text-foreground/70 hover:text-foreground disabled:opacity-40"
+            disabled={isRefreshing || isBusy}
+            onClick={onRefresh}
+            aria-label="Refresh mail"
+            title="Refresh mail"
+          >
+            <RefreshCcw
+              size={15}
+              strokeWidth={2}
+              className={isRefreshing ? "animate-spin" : "transition-transform"}
+            />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 rounded-lg text-[13px] text-foreground/70 hover:text-foreground"
+            onClick={onCompose}
+          >
+            <Plus size={14} />
+            Compose
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="w-72 shrink-0 border-r border-border/40 flex flex-col min-h-0">
+          <MessageList
+            key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
+            messages={activeMailbox.messages}
+            selectedMessageId={selectedMessageId}
+            onSelect={setSelectedMessageId}
+            mailboxes={activeMailbox.mailboxes}
+            currentMailboxId={activeMailbox.selectedMailboxId}
+            onDelete={(id) => onDeleteMessage(id)}
+            onMove={(id, targetId) => onMoveMessage(targetId, id)}
+            onMarkAsUnread={(id) => onMarkAsUnread(id)}
+            onMarkAsRead={(id) => onMarkAsRead(id)}
+            onBulkDelete={onBulkDelete}
+            onBulkMove={(ids, targetId) => onBulkMove(ids, targetId)}
+            onBulkMarkAsUnread={onBulkMarkAsUnread}
+            onBulkMarkAsRead={onBulkMarkAsRead}
+            onToggleFlagged={(id) => onToggleFlagged(id)}
+            labels={labels}
+            timeFormat={timeFormat}
+            timezone={timezone}
+            onLoadMore={onLoadMore}
+            hasMore={hasMoreMessages}
+            isLoadingMore={isLoadingMore}
+          />
+        </div>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <MessageReader
+            message={selectedMessage}
+            plaintext={selectedMessagePlaintext}
+            decryptedHtml={selectedMessageDecryptedHtml}
+            signatureVerificationState={selectedMessageSignatureVerificationState}
+            decryptError={selectedMessageDecryptError}
+            accountEncryptedAtRest={activeMailbox.accountEncryptedAtRest}
+            isBusy={isBusy}
+            blockRemoteImages={blockRemoteImages}
+            blockTrackingPixels={blockTrackingPixels}
+            mailboxes={activeMailbox.mailboxes}
+            currentMailboxId={activeMailbox.selectedMailboxId}
+            onReply={onReply}
+            onForward={onForward}
+            onDelete={() => onDeleteMessage()}
+            onMove={(targetId) => onMoveMessage(targetId)}
+            onMarkAsUnread={() => onMarkAsUnread()}
+            onToggleFlagged={() => onToggleFlagged()}
+            onSetLabel={(labelId, assigned) =>
+              selectedMessage
+                ? onSetMessageLabel(selectedMessage.id, labelId, assigned)
+                : undefined
+            }
+            onCreateLabel={onCreateLabel}
+            onDeleteLabel={(id) => onDeleteLabel(id)}
+            labels={labels}
+            timeFormat={timeFormat}
+            timezone={timezone}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface MailboxUnlockSectionProps {
+  title: string;
+  description: string;
+  buttonLabel: string;
+  loginPassword: string;
+  setLoginPassword: (v: string) => void;
+  isBusy: boolean;
+  mailboxEmail: string | null | undefined;
+  onSignIn: () => void;
+}
+
+function MailboxUnlockSection({
+  title,
+  description,
+  buttonLabel,
+  loginPassword,
+  setLoginPassword,
+  isBusy,
+  mailboxEmail,
+  onSignIn,
+}: MailboxUnlockSectionProps) {
+  return (
+    <div className="flex flex-1 items-center justify-center p-8">
+      <div className="w-full max-w-sm space-y-4">
+        <div>
+          <h1 className="text-xl font-semibold">{title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Input
+          id="mailbox-password"
+          type="password"
+          value={loginPassword}
+          onChange={(e) => setLoginPassword(e.target.value)}
+          placeholder="Encryption password"
+          onKeyDown={(e) => e.key === "Enter" && onSignIn()}
+          disabled={isBusy}
+        />
+        <Button
+          className="w-full"
+          onClick={onSignIn}
+          disabled={isBusy || !loginPassword || !mailboxEmail}
+        >
+          <Inbox size={15} />
+          {buttonLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function MailApp() {
   const {
     session,
@@ -146,163 +371,71 @@ export function MailApp() {
         />
         <SidebarInset>
           {activeMailbox ? (
-            <div className="flex h-full flex-col overflow-hidden">
-              <header className="flex h-12 shrink-0 items-center border-b border-border/40 px-4 gap-3">
-                <h1 className="text-sm font-semibold">
-                  {selectedMailbox?.name ?? "Inbox"}
-                </h1>
-                <span className="text-xs text-muted-foreground/60">
-                  {activeMailbox.messages.length}{" "}
-                  {activeMailbox.messages.length === 1 ? "message" : "messages"}
-                </span>
-                <div className="ml-auto flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 rounded-lg text-foreground/70 hover:text-foreground disabled:opacity-40"
-                    disabled={isRefreshing || isBusy}
-                    onClick={() => void handleManualRefresh()}
-                    aria-label="Refresh mail"
-                    title="Refresh mail"
-                  >
-                    <RefreshCcw
-                      size={15}
-                      strokeWidth={2}
-                      className={
-                        isRefreshing ? "animate-spin" : "transition-transform"
-                      }
-                    />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 rounded-lg text-[13px] text-foreground/70 hover:text-foreground"
-                    onClick={() => setIsComposeOpen(true)}
-                  >
-                    <Plus size={14} />
-                    Compose
-                  </Button>
-                </div>
-              </header>
-
-              <div className="flex flex-1 min-h-0 overflow-hidden">
-                <div className="w-72 shrink-0 border-r border-border/40 flex flex-col min-h-0">
-                  <MessageList
-                    key={activeMailbox.selectedMailboxId ?? "mailbox-list"}
-                    messages={activeMailbox.messages}
-                    selectedMessageId={selectedMessageId}
-                    onSelect={setSelectedMessageId}
-                    mailboxes={activeMailbox.mailboxes}
-                    currentMailboxId={activeMailbox.selectedMailboxId}
-                    onDelete={(id) => void handleDeleteMessage(id)}
-                    onMove={(id, targetId) =>
-                      void handleMoveMessage(targetId, id)
-                    }
-                    onMarkAsUnread={(id) => void handleMarkAsUnread(id)}
-                    onMarkAsRead={(id) => void handleMarkAsRead(id)}
-                    onBulkDelete={(ids) => void handleBulkDelete(ids)}
-                    onBulkMove={(ids, targetId) =>
-                      void handleBulkMove(ids, targetId)
-                    }
-                    onBulkMarkAsUnread={(ids) =>
-                      void handleBulkMarkAsUnread(ids)
-                    }
-                    onBulkMarkAsRead={(ids) => void handleBulkMarkAsRead(ids)}
-                    onToggleFlagged={(id) => void handleToggleFlagged(id)}
-                    labels={labels}
-                    timeFormat={timeFormat}
-                    timezone={settings?.timezone}
-                    onLoadMore={() => void loadMoreMessages()}
-                    hasMore={hasMoreMessages}
-                    isLoadingMore={isLoadingMore}
-                  />
-                </div>
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <MessageReader
-                    message={selectedMessage}
-                    plaintext={selectedMessagePlaintext}
-                    decryptedHtml={selectedMessageDecryptedHtml}
-                    signatureVerificationState={
-                      selectedMessageSignatureVerificationState
-                    }
-                    decryptError={selectedMessageDecryptError}
-                    accountEncryptedAtRest={
-                      activeMailbox.accountEncryptedAtRest
-                    }
-                    isBusy={isBusy}
-                    blockRemoteImages={blockRemoteImages}
-                    blockTrackingPixels={blockTrackingPixels}
-                    mailboxes={activeMailbox.mailboxes}
-                    currentMailboxId={activeMailbox.selectedMailboxId}
-                    onReply={handleReply}
-                    onForward={handleForward}
-                    onDelete={() => void handleDeleteMessage()}
-                    onMove={(targetId) => void handleMoveMessage(targetId)}
-                    onMarkAsUnread={() => void handleMarkAsUnread()}
-                    onToggleFlagged={() => void handleToggleFlagged()}
-                    onSetLabel={(labelId, assigned) =>
-                      selectedMessage
-                        ? void handleSetMessageLabel(
-                            selectedMessage.id,
-                            labelId,
-                            assigned,
-                          )
-                        : undefined
-                    }
-                    onCreateLabel={(name, color) =>
-                      handleCreateLabel(name, color)
-                    }
-                    onDeleteLabel={(id) => void handleDeleteLabel(id)}
-                    labels={labels}
-                    timeFormat={timeFormat}
-                    timezone={settings?.timezone}
-                  />
-                </div>
-              </div>
-            </div>
+            <MailboxActiveSection
+              activeMailbox={activeMailbox}
+              selectedMailboxName={selectedMailbox?.name ?? "Inbox"}
+              selectedMessageId={selectedMessageId}
+              setSelectedMessageId={setSelectedMessageId}
+              selectedMessage={selectedMessage}
+              selectedMessagePlaintext={selectedMessagePlaintext}
+              selectedMessageDecryptedHtml={selectedMessageDecryptedHtml}
+              selectedMessageSignatureVerificationState={selectedMessageSignatureVerificationState}
+              selectedMessageDecryptError={selectedMessageDecryptError}
+              isBusy={isBusy}
+              isRefreshing={isRefreshing}
+              blockRemoteImages={blockRemoteImages}
+              blockTrackingPixels={blockTrackingPixels}
+              hasMoreMessages={hasMoreMessages}
+              isLoadingMore={isLoadingMore}
+              timeFormat={timeFormat}
+              timezone={settings?.timezone}
+              labels={labels}
+              onRefresh={() => void handleManualRefresh()}
+              onCompose={() => setIsComposeOpen(true)}
+              onDeleteMessage={(id) => void handleDeleteMessage(id)}
+              onMoveMessage={(targetId, id) => void handleMoveMessage(targetId, id)}
+              onMarkAsUnread={(id) => void handleMarkAsUnread(id)}
+              onMarkAsRead={(id) => void handleMarkAsRead(id)}
+              onBulkDelete={(ids) => void handleBulkDelete(ids)}
+              onBulkMove={(ids, targetId) => void handleBulkMove(ids, targetId)}
+              onBulkMarkAsUnread={(ids) => void handleBulkMarkAsUnread(ids)}
+              onBulkMarkAsRead={(ids) => void handleBulkMarkAsRead(ids)}
+              onToggleFlagged={(id) => void handleToggleFlagged(id)}
+              onSetMessageLabel={(messageId, labelId, assigned) =>
+                void handleSetMessageLabel(messageId, labelId, assigned)
+              }
+              onCreateLabel={handleCreateLabel}
+              onDeleteLabel={(id) => void handleDeleteLabel(id)}
+              onReply={handleReply}
+              onForward={handleForward}
+              onLoadMore={() => void loadMoreMessages()}
+            />
           ) : needsPasswordPrompt ? (
-              <div className="flex flex-1 items-center justify-center p-8">
-                <div className="w-full max-w-sm space-y-4">
-                  <div>
-                    <h1 className="text-xl font-semibold">{mailboxUnlockTitle}</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {mailboxUnlockDescription}
-                    </p>
-                  </div>
-                  <Input
-                    id="mailbox-password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Encryption password"
-                    onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
-                    disabled={isBusy}
-                  />
-                  <Button
-                    className="w-full"
-                    onClick={() => void handleSignIn()}
-                    disabled={isBusy || !loginPassword || !mailboxEmail}
-                  >
-                    <Inbox size={15} />
-                    {mailboxButtonLabel}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <AppLoadingState
-                variant="centered"
-                className="flex-1"
-                text={
-                  isMailboxStatusLoading
-                    ? "Checking your workspace..."
-                    : !config
-                      ? "Loading your workspace..."
-                      : mailboxStatus?.provisioned
-                        ? "Opening your mailbox..."
-                        : "Setting up your mailbox..."
-                }
-              />
-            )}
+            <MailboxUnlockSection
+              title={mailboxUnlockTitle}
+              description={mailboxUnlockDescription}
+              buttonLabel={mailboxButtonLabel}
+              loginPassword={loginPassword}
+              setLoginPassword={setLoginPassword}
+              isBusy={isBusy}
+              mailboxEmail={mailboxEmail}
+              onSignIn={() => void handleSignIn()}
+            />
+          ) : (
+            <AppLoadingState
+              variant="centered"
+              className="flex-1"
+              text={
+                isMailboxStatusLoading
+                  ? "Checking your workspace..."
+                  : !config
+                    ? "Loading your workspace..."
+                    : mailboxStatus?.provisioned
+                      ? "Opening your mailbox..."
+                      : "Setting up your mailbox..."
+              }
+            />
+          )}
         </SidebarInset>
       </SidebarProvider>
 

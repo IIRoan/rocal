@@ -41,7 +41,7 @@ export function useDrawerViewport({
     };
 
     visualViewport.addEventListener("resize", handleResize);
-    visualViewport.addEventListener("scroll", handleResize);
+    visualViewport.addEventListener("scroll", handleResize, { passive: true });
     handleResize();
 
     return () => {

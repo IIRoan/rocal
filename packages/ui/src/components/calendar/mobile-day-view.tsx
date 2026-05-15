@@ -89,7 +89,7 @@ export function MobileDayView({
     const result: PositionedEvent[] = [];
     const dayStart = startOfDay(currentDate);
 
-    const sortedEvents = [...timeEvents].sort((a, b) => {
+    const sortedEvents = timeEvents.toSorted((a, b) => {
       const aStart = new Date(a.start);
       const bStart = new Date(b.start);
       const aEnd = new Date(a.end);

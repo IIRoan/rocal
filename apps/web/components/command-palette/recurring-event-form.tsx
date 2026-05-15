@@ -24,22 +24,21 @@ interface RecurringEventFormProps {
 }
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
+  new Date(2024, i, 1).toLocaleDateString("en-US", { month: "long" }),
+);
 
-export function RecurringEventForm({
-  isRecurring,
-  onIsRecurringChange,
-  recurrenceRule,
-  onRecurrenceRuleChange,
-  eventStartDate: _eventStartDate,
-  eventEndDate: _eventEndDate,
-}: RecurringEventFormProps) {
+function useRecurringFormState(
+  isRecurring: boolean,
+  recurrenceRule: RecurrenceRule | null,
+  onRecurrenceRuleChange: (rule: RecurrenceRule | null) => void,
+) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [customRule, setCustomRule] = useState<RecurrenceRule>({
     frequency: "weekly",
     interval: 1,
   });
 
-  // Initialize custom rule when recurring is enabled
   useEffect(() => {
     if (isRecurring && !recurrenceRule) {
       onRecurrenceRuleChange(customRule);
@@ -57,23 +56,38 @@ export function RecurringEventForm({
     const newDays = currentDays.includes(day)
       ? currentDays.filter((d) => d !== day)
       : [...currentDays, day].sort();
-
-    handleCustomRuleUpdate({
-      byWeekDay: newDays.length > 0 ? newDays : undefined,
-    });
+    handleCustomRuleUpdate({ byWeekDay: newDays.length > 0 ? newDays : undefined });
   };
 
   const handleCountSet = (count: number | undefined) => {
-    handleCustomRuleUpdate({
-      count,
-      until: undefined, // Clear until if setting count
-    });
+    handleCustomRuleUpdate({ count, until: undefined });
   };
+
+  return {
+    showAdvanced, setShowAdvanced,
+    customRule,
+    handleCustomRuleUpdate, handleWeekdayToggle, handleCountSet,
+  };
+}
+
+export function RecurringEventForm({
+  isRecurring,
+  onIsRecurringChange,
+  recurrenceRule,
+  onRecurrenceRuleChange,
+  eventStartDate: _eventStartDate,
+  eventEndDate: _eventEndDate,
+}: RecurringEventFormProps) {
+  const {
+    showAdvanced, setShowAdvanced,
+    customRule,
+    handleCustomRuleUpdate, handleWeekdayToggle, handleCountSet,
+  } = useRecurringFormState(isRecurring, recurrenceRule, onRecurrenceRuleChange);
 
   if (!isRecurring) {
     return (
       <div className="space-y-2">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <Checkbox
             id="recurring"
             checked={isRecurring}
@@ -94,7 +108,6 @@ export function RecurringEventForm({
 
   return (
     <div className="space-y-3">
-      {/* Frequency and Interval in one row */}
       <div className="flex items-center gap-2">
         <Select
           value={customRule.frequency}
@@ -150,13 +163,12 @@ export function RecurringEventForm({
         )}
       </div>
 
-      {/* Weekly - Days of week */}
       {customRule.frequency === "weekly" && (
         <div className="flex items-center gap-1.5">
           <span className="text-sm text-muted-foreground">on</span>
           {WEEKDAY_SHORT.map((day, index) => (
             <button
-              key={index}
+              key={day}
               type="button"
               onClick={() => handleWeekdayToggle(index)}
               className={`inline-flex items-center justify-center size-7 text-xs rounded-md transition-colors ${
@@ -171,7 +183,6 @@ export function RecurringEventForm({
         </div>
       )}
 
-      {/* End condition */}
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">ends</span>
         <Select
@@ -210,20 +221,18 @@ export function RecurringEventForm({
         )}
       </div>
 
-      {/* Advanced toggle */}
       {!showAdvanced && (
         <button
           type="button"
           onClick={() => setShowAdvanced(true)}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          More options...
+          More options…
         </button>
       )}
 
       {showAdvanced && (
         <div className="space-y-3 pt-2 border-t">
-          {/* Interval override */}
           <div className="flex items-center gap-2">
             <Label className="text-sm">Repeat every</Label>
             <Input
@@ -250,7 +259,6 @@ export function RecurringEventForm({
             </span>
           </div>
 
-          {/* Monthly - Day of month */}
           {customRule.frequency === "monthly" && (
             <div className="flex items-center gap-2">
               <Label className="text-sm">On day</Label>
@@ -275,7 +283,6 @@ export function RecurringEventForm({
             </div>
           )}
 
-          {/* Yearly - Month and day */}
           {customRule.frequency === "yearly" && (
             <div className="flex items-center gap-2">
               <Label className="text-sm">On</Label>
@@ -291,11 +298,9 @@ export function RecurringEventForm({
                   <SelectValue placeholder="Month" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => (
+                  {MONTH_NAMES.map((name, i) => (
                     <SelectItem key={i + 1} value={(i + 1).toString()}>
-                      {new Date(2024, i, 1).toLocaleDateString("default", {
-                        month: "long",
-                      })}
+                      {name}
                     </SelectItem>
                   ))}
                 </SelectContent>

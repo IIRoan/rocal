@@ -55,11 +55,7 @@ import { getSettingsAccountActions } from "../../../src/lib/settings-screen-util
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
 import { BottomSheet } from "../../../src/components/BottomSheet";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type FeatherIcon = React.ComponentProps<typeof Feather>["name"];
-
-// ─── Constants ───────────────────────────────────────────────────────────────
 
 const THEME_OPTIONS: {
   label: string;
@@ -104,8 +100,6 @@ const WEEKDAY_OPTIONS: { label: string; value: number }[] = [
 ];
 
 const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function parseWorkingDayValue(value: unknown): number | null {
   if (typeof value === "number") {
@@ -164,9 +158,7 @@ function formatWorkingDaysLabel(daysSet: Set<number>): string {
   return `${count} day${count !== 1 ? "s" : ""}`;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
-export default function SettingsScreen() {
+function useSettingsScreenState() {
   const { theme, themePreference, setThemePreference } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
@@ -204,8 +196,6 @@ export default function SettingsScreen() {
     authCapabilities.passkeyMessage ??
     "Passkeys are unavailable in the current runtime.";
 
-  // ─── Data fetching ─────────────────────────────────────────────────────────
-
   const {
     data: settings,
     isLoading,
@@ -239,8 +229,6 @@ export default function SettingsScreen() {
       }),
     [ownedCalendars],
   );
-
-  // ─── Optimistic update mutation ────────────────────────────────────────────
 
   const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
   const [pendingDefaultCalendarId, setPendingDefaultCalendarId] = useState<
@@ -291,7 +279,6 @@ export default function SettingsScreen() {
     [passkeysQuery.data],
   );
 
-  // ─── Picker sheet state ──────────────────────────────────────────────────────
   type PickerKey =
     | "theme"
     | "defaultView"
@@ -412,8 +399,6 @@ export default function SettingsScreen() {
     },
   });
 
-  // ─── Theme handler ────────────────────────────────────────────────────────
-
   const handleThemeChange = useCallback(
     (pref: ThemePreference) => {
       setThemePreference(pref);
@@ -421,8 +406,6 @@ export default function SettingsScreen() {
     },
     [setThemePreference, updateSetting],
   );
-
-  // ─── Working days handler ──────────────────────────────────────────────────
 
   const workingDaysSet = useMemo(
     () => parseWorkingDays(settings?.workingDays ?? "[1,2,3,4,5]"),
@@ -442,7 +425,6 @@ export default function SettingsScreen() {
     [workingDaysSet, updateSetting],
   );
 
-  // ─── Picker display labels ───────────────────────────────────────────────────
   const themeLabel =
     THEME_OPTIONS.find((o) => o.value === themePreference)?.label ?? "System";
   const viewLabel =
@@ -787,7 +769,51 @@ export default function SettingsScreen() {
     [deletePasskey, passkeysQuery],
   );
 
-  // ─── Loading state ─────────────────────────────────────────────────────────
+  return {
+    theme, styles, settings, isLoading, isError, error,
+    sortedOwnedCalendars, themePreference, themeLabel, viewLabel,
+    timeFormatLabel, weekStartLabel, defaultCalendarLabel, workingDaysLabel, workingDaysSet,
+    pendingKeys, pendingDefaultCalendarId,
+    isSigningOut, isDeletingAccount, isChangingPassword, isUpdatingProfilePicture,
+    isSettingPassword, isResettingEncryptionPassword,
+    showProfilePictureForm, setShowProfilePictureForm,
+    profilePictureUrlInput, setProfilePictureUrlInput,
+    isRegisteringPasskey, pendingPasskeyDeletionId,
+    activePasswordSheet, setActivePasswordSheet, activePicker, setActivePicker, lastPicker, openPicker,
+    currentPasswordInput, setCurrentPasswordInput,
+    newPasswordInput, setNewPasswordInput,
+    confirmPasswordInput, setConfirmPasswordInput,
+    passwordChangeError, passkeySupportMessage, isPasskeySupported, storedPasskeys,
+    user, accountActions, hasOAuthAccount, hasPasswordAccount, updateSetting, setDefaultCalendarMutation,
+    routerPush, handleThemeChange, handleToggleWorkingDay, resetSettingsMutation,
+    handleResetSettings, handleSignOut, handleAccountAction, handleRegisterPasskey, handleDeletePasskey,
+    handleSubmitPasswordChange, handleSubmitProfilePicture, resetChangePasswordForm,
+  };
+}
+
+type SubState = ReturnType<typeof useSettingsScreenState>;
+
+function SettingsMainContent({ s }: { s: SubState }) {
+  const {
+    theme, styles, settings, isLoading, isError, error,
+    sortedOwnedCalendars, themePreference, themeLabel, viewLabel,
+    timeFormatLabel, weekStartLabel, defaultCalendarLabel, workingDaysLabel, workingDaysSet,
+    pendingKeys, pendingDefaultCalendarId,
+    isSigningOut, isDeletingAccount, isChangingPassword, isUpdatingProfilePicture,
+    isSettingPassword, isResettingEncryptionPassword,
+    showProfilePictureForm, setShowProfilePictureForm,
+    profilePictureUrlInput, setProfilePictureUrlInput,
+    isRegisteringPasskey, pendingPasskeyDeletionId,
+    activePasswordSheet, setActivePasswordSheet, activePicker, setActivePicker, lastPicker, openPicker,
+    currentPasswordInput, setCurrentPasswordInput,
+    newPasswordInput, setNewPasswordInput,
+    confirmPasswordInput, setConfirmPasswordInput,
+    passwordChangeError, passkeySupportMessage, isPasskeySupported, storedPasskeys,
+    user, accountActions, hasOAuthAccount, hasPasswordAccount, updateSetting, setDefaultCalendarMutation,
+    routerPush, handleThemeChange, handleToggleWorkingDay, resetSettingsMutation,
+    handleResetSettings, handleSignOut, handleAccountAction, handleRegisterPasskey, handleDeletePasskey,
+    handleSubmitPasswordChange, handleSubmitProfilePicture, resetChangePasswordForm,
+  } = s;
 
   if (isLoading) {
     return (
@@ -797,8 +823,6 @@ export default function SettingsScreen() {
       </SafeAreaView>
     );
   }
-
-  // ─── Error state ───────────────────────────────────────────────────────────
 
   if (isError) {
     const errorMessage =
@@ -811,8 +835,6 @@ export default function SettingsScreen() {
       </SafeAreaView>
     );
   }
-
-  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -1208,7 +1230,10 @@ export default function SettingsScreen() {
   );
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+export default function SettingsScreen() {
+  const s = useSettingsScreenState();
+  return <SettingsMainContent s={s} />;
+}
 
 /** Small uppercase section label, matching the web command palette style. */
 function SectionLabel({
@@ -2261,8 +2286,6 @@ function PasskeyRow({
     </View>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 function createStyles(theme: ThemeTokens) {
   const view = {
