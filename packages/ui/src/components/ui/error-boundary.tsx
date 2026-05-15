@@ -51,8 +51,8 @@ export class ErrorBoundary extends Component<Props, State> {
       // Default error UI
       return (
         <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <div className="flex items-center justify-center w-16 h-16 bg-destructive/10 rounded-full">
-            <AlertTriangle className="w-8 h-8 text-destructive" />
+          <div className="flex items-center justify-center size-16 bg-destructive/10 rounded-full">
+            <AlertTriangle className="size-8 text-destructive" />
           </div>
           <div className="space-y-2">
             <h3 className="text-lg font-semibold">Something went wrong</h3>
@@ -76,7 +76,7 @@ export class ErrorBoundary extends Component<Props, State> {
             variant="outline"
             className="gap-2"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="size-4" />
             Try again
           </Button>
         </div>

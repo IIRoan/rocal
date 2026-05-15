@@ -37,7 +37,7 @@ export default function SubscriptionEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState("");
@@ -95,7 +95,7 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      router.back();
+      routerBack();
     },
     onError: (error) => {
       Alert.alert(
@@ -112,7 +112,7 @@ export default function SubscriptionEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      router.back();
+      routerBack();
     },
     onError: (error) => {
       Alert.alert(

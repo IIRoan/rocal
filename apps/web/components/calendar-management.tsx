@@ -8,7 +8,7 @@ import {
 } from "@/lib/calendar-ui-helpers";
 import { useCalendarData } from "@/hooks/use-calendar-data";
 import { useCommandPalette } from "@/components/command-palette-context";
-import type { PaletteView } from "@/components/command-palette/index";
+import type { PaletteView } from "@/components/command-palette/constants";
 import type {
   ApiError,
   Calendar,
@@ -565,7 +565,7 @@ export function CalendarManagement({
                       }}
                       title="Calendar Settings"
                     >
-                      <Settings className="h-4 w-4" />
+                      <Settings className="size-4" />
                     </Button>
                     <Button
                       variant="outline"
@@ -575,7 +575,7 @@ export function CalendarManagement({
                       }}
                       title="Subscribe to external calendars"
                     >
-                      <ExternalLink className="h-4 w-4 mr-1" />
+                      <ExternalLink className="size-4 mr-1" />
                       Subscriptions
                     </Button>
                     <Button
@@ -587,7 +587,7 @@ export function CalendarManagement({
                       }}
                       title="Import .ics file"
                     >
-                      <Upload className="h-4 w-4 mr-1" />
+                      <Upload className="size-4 mr-1" />
                       Import ICS
                     </Button>
                     <Button
@@ -599,7 +599,7 @@ export function CalendarManagement({
                         setValidationErrors({});
                       }}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
+                      <Plus className="size-4 mr-1" />
                       New Calendar
                     </Button>
                   </div>
@@ -634,7 +634,7 @@ export function CalendarManagement({
                     />
                     {validationErrors.name && (
                       <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
+                        <AlertCircle className="size-3" />
                         {validationErrors.name}
                       </p>
                     )}
@@ -661,7 +661,7 @@ export function CalendarManagement({
                     />
                     {validationErrors.color && (
                       <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
+                        <AlertCircle className="size-3" />
                         {validationErrors.color}
                       </p>
                     )}
@@ -705,7 +705,7 @@ export function CalendarManagement({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <div
-                            className="w-4 h-4 rounded"
+                            className="size-4 rounded"
                             style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                           />
                           <div>
@@ -718,13 +718,13 @@ export function CalendarManagement({
                                   variant="secondary"
                                   className="text-xs bg-muted"
                                 >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  <ExternalLink className="size-3 mr-1" />
                                   Synced
                                 </Badge>
                               )}
                               {calendar.isDefault && (
                                 <Badge variant="outline" className="text-xs">
-                                  <Star className="h-3 w-3 mr-1" />
+                                  <Star className="size-3 mr-1" />
                                   Default
                                 </Badge>
                               )}
@@ -750,9 +750,9 @@ export function CalendarManagement({
                             }
                           >
                             {isCalendarVisible(calendar.id) ? (
-                              <Eye className="h-4 w-4" />
+                              <Eye className="size-4" />
                             ) : (
-                              <EyeOff className="h-4 w-4" />
+                              <EyeOff className="size-4" />
                             )}
                           </Button>
 
@@ -763,7 +763,7 @@ export function CalendarManagement({
                               onClick={() => handleSetDefault(calendar)}
                               title="Set as default calendar"
                             >
-                              <Star className="h-4 w-4" />
+                              <Star className="size-4" />
                             </Button>
                           )}
 
@@ -775,7 +775,7 @@ export function CalendarManagement({
                               title="Share calendar as ICS"
                               className="h-8 px-2 text-xs"
                             >
-                              <Share2 className="h-3.5 w-3.5 mr-1" />
+                              <Share2 className="size-3.5 mr-1" />
                               Share
                             </Button>
                           )}
@@ -790,7 +790,7 @@ export function CalendarManagement({
                               }}
                               title="Edit calendar"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="size-4" />
                             </Button>
                           )}
 
@@ -802,7 +802,7 @@ export function CalendarManagement({
                               title="Delete calendar"
                               className="text-destructive hover:text-destructive"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="size-4" />
                             </Button>
                           )}
                         </div>
@@ -823,7 +823,7 @@ export function CalendarManagement({
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center space-x-3">
                             <div
-                              className="w-4 h-4 rounded"
+                              className="size-4 rounded"
                               style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                             />
                             <div>
@@ -835,7 +835,7 @@ export function CalendarManagement({
                                   variant="secondary"
                                   className="text-xs bg-primary/10 text-primary"
                                 >
-                                  <Globe className="h-3 w-3 mr-1" />
+                                  <Globe className="size-3 mr-1" />
                                   Public
                                 </Badge>
                               </div>
@@ -860,9 +860,9 @@ export function CalendarManagement({
                               }
                             >
                               {isCalendarVisible(calendar.id) ? (
-                                <Eye className="h-4 w-4" />
+                                <Eye className="size-4" />
                               ) : (
-                                <EyeOff className="h-4 w-4" />
+                                <EyeOff className="size-4" />
                               )}
                             </Button>
                             <Button
@@ -874,7 +874,7 @@ export function CalendarManagement({
                               title="Remove public calendar"
                               className="text-destructive hover:text-destructive"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
                         </div>
@@ -895,7 +895,7 @@ export function CalendarManagement({
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center space-x-3">
                             <div
-                              className="w-4 h-4 rounded"
+                              className="size-4 rounded"
                               style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
                             />
                             <div>
@@ -907,7 +907,7 @@ export function CalendarManagement({
                                   variant="secondary"
                                   className="text-xs bg-muted"
                                 >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  <ExternalLink className="size-3 mr-1" />
                                   Subscribed
                                 </Badge>
                               </div>
@@ -932,9 +932,9 @@ export function CalendarManagement({
                               }
                             >
                               {isCalendarVisible(calendar.id) ? (
-                                <Eye className="h-4 w-4" />
+                                <Eye className="size-4" />
                               ) : (
-                                <EyeOff className="h-4 w-4" />
+                                <EyeOff className="size-4" />
                               )}
                             </Button>
                             <Button
@@ -946,7 +946,7 @@ export function CalendarManagement({
                               title="Remove subscribed calendar"
                               className="text-destructive hover:text-destructive"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
                         </div>
@@ -998,7 +998,7 @@ export function CalendarManagement({
                 />
                 {validationErrors.name && (
                   <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
+                    <AlertCircle className="size-3" />
                     {validationErrors.name}
                   </p>
                 )}
@@ -1025,7 +1025,7 @@ export function CalendarManagement({
                 />
                 {validationErrors.color && (
                   <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
+                    <AlertCircle className="size-3" />
                     {validationErrors.color}
                   </p>
                 )}
@@ -1043,7 +1043,7 @@ export function CalendarManagement({
                   void openShareDialog(selectedCalendar);
                 }}
               >
-                <Share2 className="h-4 w-4 mr-2" />
+                <Share2 className="size-4 mr-2" />
                 Share
               </Button>
             )}
@@ -1085,7 +1085,7 @@ export function CalendarManagement({
         <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <AlertTriangle className="size-5 text-destructive" />
               Delete Calendar
             </DialogTitle>
             <DialogDescription>
@@ -1223,7 +1223,7 @@ export function CalendarManagement({
               {importResult.errors && importResult.errors.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-destructive flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTriangle className="size-4" />
                     Errors ({importResult.errors.length})
                   </h4>
                   <div className="max-h-40 overflow-y-auto text-xs space-y-1 p-2 border rounded-md bg-destructive/10">
@@ -1257,7 +1257,7 @@ export function CalendarManagement({
                 </div>
                 {importFile && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
+                    <FileText className="size-4" />
                     {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
                   </div>
                 )}
@@ -1279,7 +1279,7 @@ export function CalendarManagement({
                         <SelectItem key={cal.id} value={cal.id}>
                           <div className="flex items-center gap-2">
                             <div
-                              className="w-3 h-3 rounded-full"
+                              className="size-3 rounded-full"
                               style={{ backgroundColor: getColorSwatchValue(cal.color) }}
                             />
                             {cal.name}
@@ -1386,7 +1386,7 @@ export function CalendarManagement({
                         variant="outline"
                         onClick={handleCopyShareLink}
                       >
-                        <Copy className="h-4 w-4 mr-1" />
+                        <Copy className="size-4 mr-1" />
                         Copy
                       </Button>
                     </div>
@@ -1398,13 +1398,13 @@ export function CalendarManagement({
                     onClick={() => setShowRegenerateConfirm(true)}
                     disabled={shareLinkLoading}
                   >
-                    <RefreshCw className="h-4 w-4 mr-1" />
+                    <RefreshCw className="size-4 mr-1" />
                     Regenerate URL
                   </Button>
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Link2 className="h-4 w-4" />
+                  <Link2 className="size-4" />
                   Sharing is currently off. Enable it to create a subscription
                   link.
                 </div>
@@ -1437,7 +1437,7 @@ export function CalendarManagement({
           <div className="px-5 pb-4">
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
               <p className="text-sm flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                <AlertTriangle className="size-4 mt-0.5 text-destructive shrink-0" />
                 The current URL stops working immediately. Everyone using it
                 must subscribe again with the new URL.
               </p>

@@ -1,9 +1,11 @@
 import * as React from "react";
-import { SVGProps } from "react";
+import type { SVGProps } from "react";
 
-const SvgComponent = React.memo(
-  React.forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>(
-    function SvgComponent({ fill = "currentColor", style, ...props }, ref) {
+const SvgComponent = React.memo(function SvgComponent({
+  fill = "currentColor",
+  style,
+  ...props
+}: SVGProps<SVGSVGElement>) {
       const clipId0 = React.useId();
       const clipId1 = React.useId();
       const baseStyle = React.useMemo(
@@ -26,7 +28,6 @@ const SvgComponent = React.memo(
           preserveAspectRatio="xMidYMid meet"
           role="img"
           focusable="false"
-          ref={ref}
           {...props}
         >
           <defs fill={fill}>
@@ -1091,8 +1092,6 @@ const SvgComponent = React.memo(
           </g>
         </svg>
       );
-    },
-  ),
-);
+    });
 
 export default SvgComponent;

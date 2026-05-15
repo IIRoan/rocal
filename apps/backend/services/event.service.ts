@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../generated/prisma/index.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   IEventService,
   EventSearchInput,

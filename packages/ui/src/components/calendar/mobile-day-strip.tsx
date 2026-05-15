@@ -134,7 +134,7 @@ export function MobileDayStrip({
                     <div
                       key={i}
                       className={cn(
-                        "w-1 h-1 rounded-full",
+                        "size-1 rounded-full",
                         isSelected
                           ? "bg-primary-foreground/50"
                           : event.color

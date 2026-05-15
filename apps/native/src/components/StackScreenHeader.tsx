@@ -24,13 +24,13 @@ export function StackScreenHeader({
   rightAction,
 }: StackScreenHeaderProps) {
   const { theme } = useTheme();
-  const router = useRouter();
+  const { back } = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <View style={styles.container}>
       <Pressable
-        onPress={onBack ?? (() => router.back())}
+        onPress={onBack ?? back}
         style={styles.backButton}
         accessibilityRole="button"
         accessibilityLabel="Go back"

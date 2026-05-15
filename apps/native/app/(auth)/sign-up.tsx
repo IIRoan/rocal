@@ -58,7 +58,7 @@ function validatePassword(password: string): string | null {
 
 export default function SignUpScreen() {
   const { signUp } = useAuth();
-  const router = useRouter();
+  const { replace: routerReplace } = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -147,7 +147,7 @@ export default function SignUpScreen() {
 
       await signUp(trimmedName, availability.normalizedEmail, password);
       log.ok("Sign-up successful");
-      router.replace(CALENDAR_HOME_ROUTE);
+      routerReplace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message = err?.message ?? "Sign-up failed. Please try again.";
       log.error("Sign-up failed", err);
@@ -155,7 +155,7 @@ export default function SignUpScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [clearErrors, desiredEmail, name, password, router, signUp]);
+  }, [clearErrors, desiredEmail, name, password, routerReplace, signUp]);
 
   // ── Render ─────────────────────────────────────────────────────────
 

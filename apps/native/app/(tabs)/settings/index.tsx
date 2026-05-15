@@ -170,7 +170,7 @@ export default function SettingsScreen() {
   const { theme, themePreference, setThemePreference } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const { push: routerPush } = useRouter();
   const { user, signOut, registerPasskey, deletePasskey } = useAuth();
   const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
@@ -862,7 +862,7 @@ export default function SettingsScreen() {
               settings?.timezone ??
               Intl.DateTimeFormat().resolvedOptions().timeZone
             }
-            onPress={() => router.push(SETTINGS_TIMEZONE_ROUTE)}
+            onPress={() => routerPush(SETTINGS_TIMEZONE_ROUTE)}
             theme={theme}
           />
         </View>

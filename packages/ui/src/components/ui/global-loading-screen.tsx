@@ -146,7 +146,7 @@ export function GlobalLoadingScreen({
         )}
       >
         <div className="flex items-center space-x-2">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
+          <div className="size-6 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
           <span className="text-sm font-medium text-muted-foreground">
             {message ?? "Loading"}
             {dots}
@@ -277,7 +277,7 @@ export function SectionLoading({
         className,
       )}
     >
-      <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary [animation:spin_1s_linear_infinite]" />
+      <div className="size-8 rounded-full border-2 border-primary/30 border-t-primary [animation:spin_1s_linear_infinite]" />
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">{title}</h3>
         <p className="text-sm text-muted-foreground">{description}</p>
@@ -306,7 +306,7 @@ export function LoadingOverlay({
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
           <div className="flex items-center space-x-2">
-            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
+            <div className="size-5 rounded-full border-2 border-primary border-t-transparent [animation:spin_1s_linear_infinite]" />
             <span className="text-sm font-medium">{message}</span>
           </div>
         </div>

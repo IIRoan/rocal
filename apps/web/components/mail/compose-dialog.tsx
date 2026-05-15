@@ -59,7 +59,7 @@ export function ComposeDialog({
         <div className="flex flex-col" style={{ minHeight: "clamp(400px, 60svh, 580px)", maxHeight: "calc(100dvh - 160px)" }}>
           <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
             <button type="button" onClick={onClose} className="p-1 rounded hover:bg-muted/50 transition-colors">
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium flex-1">New message</span>
             <Button
@@ -85,7 +85,6 @@ export function ComposeDialog({
               onChange={(e) => setComposeTo(e.target.value)}
               placeholder="recipient@example.com"
               disabled={isBusy}
-              autoFocus
               autoComplete="off"
               className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
             />
@@ -109,7 +108,7 @@ export function ComposeDialog({
               onChange={(e) => setComposeBody(e.target.value)}
               placeholder="Write your message…"
               disabled={isBusy}
-              className="w-full h-full min-h-32 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm resize-none placeholder:text-muted-foreground/40 leading-relaxed"
+              className="size-full min-h-32 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm resize-none placeholder:text-muted-foreground/40 leading-relaxed"
             />
           </div>
 

@@ -183,10 +183,10 @@ function Avatar({
     .toUpperCase();
   const sizeClass =
     size === "lg"
-      ? "h-14 w-14 text-base"
+      ? "size-14 text-base"
       : size === "sm"
-        ? "h-8 w-8 text-xs"
-        : "h-10 w-10 text-sm";
+        ? "size-8 text-xs"
+        : "size-10 text-sm";
   const sizePx = size === "lg" ? 56 : size === "sm" ? 32 : 40;
 
   if (imageUrl && !imgError) {
@@ -222,7 +222,6 @@ function FieldInput({
   autoComplete,
   placeholder,
   disabled,
-  autoFocus,
 }: {
   label: string;
   type?: string;
@@ -231,7 +230,6 @@ function FieldInput({
   autoComplete?: string;
   placeholder?: string;
   disabled?: boolean;
-  autoFocus?: boolean;
 }) {
   return (
     <label className="block space-y-1">
@@ -243,7 +241,6 @@ function FieldInput({
         autoComplete={autoComplete}
         placeholder={placeholder}
         disabled={disabled}
-        autoFocus={autoFocus}
         className="flex h-9 w-full rounded-md bg-input px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
       />
     </label>
@@ -416,7 +413,7 @@ export function AccountSettings({
           onClick={goBack}
           className="rounded p-1 transition-colors hover:bg-muted/50"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium">Account</span>
       </div>
@@ -440,10 +437,10 @@ export function AccountSettings({
                     setShowAvatarForm((v) => !v);
                     setProfileMessage(null);
                   }}
-                  className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-accent"
+                  className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-accent"
                   aria-label="Change profile picture"
                 >
-                  <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                  <Pencil className="size-2.5 text-muted-foreground" />
                 </button>
               ) : null}
             </div>
@@ -483,14 +480,13 @@ export function AccountSettings({
               </p>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                  <ImageIcon className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
+                  <ImageIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
                   <input
                     type="url"
                     value={avatarUrl}
                     onChange={(e) => setAvatarUrl(e.target.value)}
                     placeholder="https://example.com/avatar.png"
                     disabled={updatingProfile}
-                    autoFocus
                     className="flex h-9 w-full rounded-md bg-input pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
@@ -501,9 +497,9 @@ export function AccountSettings({
                   className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {updatingProfile ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <Check className="h-3 w-3" />
+                    <Check className="size-3" />
                   )}
                   Save
                 </button>
@@ -514,10 +510,10 @@ export function AccountSettings({
                     setProfileMessage(null);
                   }}
                   disabled={updatingProfile}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent/50 disabled:opacity-60"
+                  className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent/50 disabled:opacity-60"
                   aria-label="Cancel"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="size-3.5" />
                 </button>
               </div>
               {profileMessage?.kind === "error" ? (
@@ -562,11 +558,11 @@ export function AccountSettings({
                 setPasswordMessage(null);
               }}
               disabled={isBusy || isAnySecurityFormOpen}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                <Lock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex size-6 shrink-0 items-center justify-center">
+                <Lock className="size-4 text-muted-foreground" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Change Password</div>
@@ -586,11 +582,11 @@ export function AccountSettings({
                 setPasswordMessage(null);
               }}
               disabled={isBusy || isAnySecurityFormOpen}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                <Lock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex size-6 shrink-0 items-center justify-center">
+                <Lock className="size-4 text-muted-foreground" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Set Email Password</div>
@@ -611,11 +607,11 @@ export function AccountSettings({
                 setPasswordMessage(null);
               }}
               disabled={isBusy || isAnySecurityFormOpen}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                <RotateCcw className="h-4 w-4 text-muted-foreground" />
+              <div className="flex size-6 shrink-0 items-center justify-center">
+                <RotateCcw className="size-4 text-muted-foreground" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Reset Encryption Password</div>
@@ -651,7 +647,6 @@ export function AccountSettings({
                   onChange={setCurrentPassword}
                   autoComplete="current-password"
                   disabled={securityFormBusy}
-                  autoFocus
                 />
               ) : null}
               <FieldInput
@@ -665,7 +660,6 @@ export function AccountSettings({
                 onChange={setNewPassword}
                 autoComplete="new-password"
                 disabled={securityFormBusy}
-                autoFocus={!isChangePasswordForm}
               />
               <FieldInput
                 label={
@@ -688,7 +682,7 @@ export function AccountSettings({
                 >
                   {securityFormBusy ? (
                     <>
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="size-3 animate-spin" />
                       Saving…
                     </>
                   ) : isChangePasswordForm ? (
@@ -732,10 +726,10 @@ export function AccountSettings({
               type="button"
               onClick={() => setShowResetConfirm(true)}
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-destructive transition-colors hover:bg-destructive/8 focus:bg-destructive/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left text-destructive transition-colors hover:bg-destructive/8 focus:bg-destructive/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                <RotateCcw className="h-4 w-4" />
+              <div className="flex size-6 shrink-0 items-center justify-center">
+                <RotateCcw className="size-4" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Reset to Defaults</div>
@@ -748,10 +742,10 @@ export function AccountSettings({
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-destructive transition-colors hover:bg-destructive/8 focus:bg-destructive/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left text-destructive transition-colors hover:bg-destructive/8 focus:bg-destructive/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
-                <Trash2 className="h-4 w-4" />
+              <div className="flex size-6 shrink-0 items-center justify-center">
+                <Trash2 className="size-4" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Delete Account</div>
@@ -766,7 +760,7 @@ export function AccountSettings({
           <AnimatedCollapse isOpen={showDeleteConfirm}>
             <div className="mx-1 my-1 rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-3">
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                 <span>
                   This permanently deletes your account, calendars, events,
                   categories, subscriptions, passkeys, and settings. This cannot
@@ -784,9 +778,9 @@ export function AccountSettings({
                   className="inline-flex h-8 items-center gap-2 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {deletingAccount ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="size-3" />
                   )}
                   Delete my account
                 </button>
@@ -805,7 +799,7 @@ export function AccountSettings({
           <AnimatedCollapse isOpen={showResetConfirm}>
             <div className="mx-1 my-1 rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-3">
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                 <span>
                   This will reset all settings to their default values. This
                   cannot be undone.
@@ -821,7 +815,7 @@ export function AccountSettings({
                   disabled={isBusy}
                   className="inline-flex h-8 items-center gap-2 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  <Check className="h-3 w-3" />
+                  <Check className="size-3" />
                   Yes, reset everything
                 </button>
                 <button

@@ -1,4 +1,4 @@
-import type { PrismaClient, Prisma } from "../generated/prisma/index.js";
+import type { PrismaClient, Prisma } from "../generated/prisma/client.js";
 import type {
   ICalendarService,
   CalendarCreateInput,

@@ -251,7 +251,7 @@ export function MobileCalendarWrapper({
       )}
 
       {/* Main Calendar Content - Embla Carousel */}
-      <div className={cn("flex-1 overflow-hidden relative w-full h-full", className)}>
+      <div className={cn("flex-1 overflow-hidden relative size-full", className)}>
         <div className="overflow-hidden h-full" ref={emblaRef} style={{ touchAction: "pan-y" }}>
           <div className="flex h-full">
             {/* Previous */}

@@ -77,8 +77,8 @@ function InviteRow({
         invite.status === "revoked" || isExpired ? "opacity-50" : ""
       }`}
     >
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted shrink-0 mt-0.5">
-        <Mail className="h-4 w-4 text-muted-foreground" />
+      <div className="flex items-center justify-center size-8 rounded-full bg-muted shrink-0 mt-0.5">
+        <Mail className="size-4 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{invite.email}</p>
@@ -104,9 +104,9 @@ function InviteRow({
               title="Copy invite token"
             >
               {copied ? (
-                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                <Check className="size-3.5 text-emerald-500" />
               ) : (
-                <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                <Copy className="size-3.5 text-muted-foreground" />
               )}
             </button>
           </div>
@@ -121,9 +121,9 @@ function InviteRow({
           title="Revoke invite"
         >
           {revoking ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           ) : (
-            <X className="h-4 w-4" />
+            <X className="size-4" />
           )}
         </button>
       )}
@@ -208,16 +208,16 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
           onClick={goBack}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
-        <Users className="h-4 w-4 text-muted-foreground" />
+        <Users className="size-4 text-muted-foreground" />
         <span className="text-sm font-medium">Invites</span>
         <button
           onClick={() => refetch()}
           className="ml-auto p-1 rounded hover:bg-muted/50 transition-colors"
           title="Refresh invites"
         >
-          <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+          <RotateCcw className="size-3.5 text-muted-foreground" />
         </button>
       </div>
 
@@ -267,10 +267,10 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
               className="h-9 px-3 shrink-0"
             >
               {createMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <>
-                  <UserPlus className="h-4 w-4 mr-1.5" />
+                  <UserPlus className="size-4 mr-1.5" />
                   Invite
                 </>
               )}
@@ -281,7 +281,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
         {/* Active invites */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
@@ -319,7 +319,7 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
 
             {invites.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-                <UserPlus className="h-8 w-8 text-muted-foreground/20" />
+                <UserPlus className="size-8 text-muted-foreground/20" />
                 <p className="text-sm text-muted-foreground">No invites yet</p>
                 <p className="text-xs text-muted-foreground/70">
                   Invite someone above to get started

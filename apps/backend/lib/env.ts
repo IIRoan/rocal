@@ -34,8 +34,10 @@ export function parseCsvEnv(value?: string): string[] {
   if (!value) return [];
   return value
     .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+    .flatMap((entry) => {
+      const trimmed = entry.trim();
+      return trimmed ? [trimmed] : [];
+    });
 }
 
 function parseCsvEnvWithDefault(value: string | undefined, fallback: string[]) {

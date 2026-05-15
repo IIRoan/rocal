@@ -69,11 +69,11 @@ export function MailboxManager({
             onClick={onBack}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Mailboxes</span>
         </div>
-        <div className="flex-1 overflow-y-auto py-2 px-2">
+        <div className="flex-1 overflow-y-auto p-2">
           <div className="p-1 mb-1">
             <button
               type="button"
@@ -81,10 +81,10 @@ export function MailboxManager({
                 setCreateName("");
                 onNavigateTo("mailbox-create");
               }}
-              className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
+              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
             >
-              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <Plus className="h-4 w-4 text-primary" />
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <Plus className="size-4 text-primary" />
               </div>
               <span className="text-sm text-primary font-medium flex-1">
                 Create New Mailbox
@@ -106,10 +106,10 @@ export function MailboxManager({
                   return (
                     <div
                       key={mailbox.id}
-                      className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left opacity-60 cursor-default"
+                      className="flex items-center gap-3 p-2 w-full rounded-md text-left opacity-60 cursor-default"
                     >
-                      <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                        <Icon className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center justify-center size-6 shrink-0">
+                        <Icon className="size-4 text-muted-foreground" />
                       </div>
                       <span className="text-sm flex-1">{mailbox.name}</span>
                     </div>
@@ -137,13 +137,13 @@ export function MailboxManager({
                       setConfirmDelete(false);
                       onNavigateTo("mailbox-edit");
                     }}
-                    className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
+                    className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
                   >
-                    <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                      <Folder className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center justify-center size-6 shrink-0">
+                      <Folder className="size-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm flex-1">{mailbox.name}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 ))}
               </div>
@@ -164,7 +164,7 @@ export function MailboxManager({
             onClick={onBack}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">New Mailbox</span>
         </div>
@@ -175,7 +175,6 @@ export function MailboxManager({
             </label>
             <input
               ref={createInputRef}
-              autoFocus
               type="text"
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
@@ -221,7 +220,7 @@ export function MailboxManager({
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
             >
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <Loader2 className="size-3.5 animate-spin" />}
               Create
             </button>
           </div>
@@ -246,7 +245,7 @@ export function MailboxManager({
             }}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium truncate">{editingMailbox.name}</span>
         </div>
@@ -258,7 +257,6 @@ export function MailboxManager({
               </label>
               <input
                 ref={editInputRef}
-                autoFocus
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -303,7 +301,7 @@ export function MailboxManager({
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
               >
-                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {saving && <Loader2 className="size-3.5 animate-spin" />}
                 Save
               </button>
             </div>
@@ -315,7 +313,7 @@ export function MailboxManager({
                 onClick={() => setConfirmDelete(true)}
                 className="flex items-center gap-2 px-3 py-2 w-full rounded-md text-left text-destructive hover:bg-destructive/10 focus:outline-none transition-colors text-sm"
               >
-                <Trash2 className="h-4 w-4 shrink-0" />
+                <Trash2 className="size-4 shrink-0" />
                 Delete mailbox
               </button>
             ) : (
@@ -345,7 +343,7 @@ export function MailboxManager({
                     }}
                     className="flex items-center gap-1.5 flex-1 justify-center px-3 py-1.5 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 transition-colors"
                   >
-                    {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {saving && <Loader2 className="size-3.5 animate-spin" />}
                     Delete
                   </button>
                 </div>

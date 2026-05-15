@@ -21,7 +21,7 @@ import { useTheme } from "../src/providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 export default function NotFoundScreen() {
-  const router = useRouter();
+  const { replace: routerReplace } = useRouter();
   const { signOut, isAuthenticated } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -31,13 +31,13 @@ export default function NotFoundScreen() {
     setIsSigningOut(true);
     try {
       await signOut();
-      router.replace(AUTH_SIGN_IN_ROUTE);
+      routerReplace(AUTH_SIGN_IN_ROUTE);
     } catch {
       // Best-effort — navigation guard will redirect anyway.
     } finally {
       setIsSigningOut(false);
     }
-  }, [signOut, router]);
+  }, [signOut, routerReplace]);
 
   return (
     <SafeAreaView style={styles.flex} edges={["top", "bottom"]}>
@@ -59,7 +59,7 @@ export default function NotFoundScreen() {
               styles.primaryButton,
               pressed && styles.primaryButtonPressed,
             ]}
-            onPress={() => router.replace(CALENDAR_HOME_ROUTE)}
+            onPress={() => routerReplace(CALENDAR_HOME_ROUTE)}
             accessibilityRole="button"
             accessibilityLabel="Go to calendar"
           >
@@ -72,7 +72,7 @@ export default function NotFoundScreen() {
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
             ]}
-            onPress={() => router.replace(SETTINGS_ROUTE)}
+            onPress={() => routerReplace(SETTINGS_ROUTE)}
             accessibilityRole="button"
             accessibilityLabel="Go to settings"
           >
@@ -85,7 +85,7 @@ export default function NotFoundScreen() {
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
             ]}
-            onPress={() => router.replace(SEARCH_ROUTE)}
+            onPress={() => routerReplace(SEARCH_ROUTE)}
             accessibilityRole="button"
             accessibilityLabel="Go to search"
           >

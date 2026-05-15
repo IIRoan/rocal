@@ -1,4 +1,4 @@
-import type { UserSettings as PrismaUserSettings } from "../generated/prisma/index.js";
+import type { UserSettings as PrismaUserSettings } from "../generated/prisma/client.js";
 
 export type PublicUserSettings = Omit<PrismaUserSettings, "defaultReminder">;
 

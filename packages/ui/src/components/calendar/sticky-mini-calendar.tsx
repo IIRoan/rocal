@@ -202,7 +202,7 @@ export function StickyMiniCalendar({
                 onClick={() => setCurrentDate(day)}
                 className={cn(
                   "relative rounded-full text-[9px] font-medium transition-all touch-manipulation",
-                  "flex items-center justify-center h-4 w-4 mx-auto",
+                  "flex items-center justify-center size-4 mx-auto",
                   !isCurrentMonth && "text-muted-foreground/30",
                   isCurrentMonth &&
                     !isSelected &&
@@ -217,7 +217,7 @@ export function StickyMiniCalendar({
                     {dayEvents.slice(0, 3).map((event, i) => (
                       <span
                         key={`${event.id || "event"}-${i}`}
-                        className="w-0.5 h-0.5 rounded-full"
+                        className="size-0.5 rounded-full"
                         style={{
                           backgroundColor: resolveInlineColorValue(event.color),
                         }}
@@ -264,7 +264,7 @@ export function StickyMiniCalendar({
 
         {/* Horizontal day strip with multi-day events - current week (only for week view) */}
         {showDayStrip && (
-          <div className="px-0 py-0 border-b border-border/50">
+          <div className="p-0 border-b border-border/50">
             <div className="flex relative">
               {/* Time column spacer - matches timeline width */}
               <div className="w-11 flex-shrink-0" />

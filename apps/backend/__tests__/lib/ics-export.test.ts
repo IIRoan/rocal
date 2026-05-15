@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CalendarEvent } from "../../generated/prisma/index.js";
+import type { CalendarEvent } from "../../generated/prisma/client.js";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../../lib/ics-export";
 
 function createCalendarEvent(

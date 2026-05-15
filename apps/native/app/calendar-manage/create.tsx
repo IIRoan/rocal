@@ -27,7 +27,7 @@ import { StackScreenHeader } from "../../src/components/StackScreenHeader";
 export default function CalendarCreateScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const queryClient = useQueryClient();
 
   // ─── Form state ────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ export default function CalendarCreateScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      router.back();
+      routerBack();
     },
     onError: (err: unknown) => {
       const message =
@@ -85,8 +85,8 @@ export default function CalendarCreateScreen() {
   }, [name, color, isDefault, validate, createMutation]);
 
   const handleCancel = useCallback(() => {
-    router.back();
-  }, [router]);
+    routerBack();
+  }, [routerBack]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -117,7 +117,6 @@ export default function CalendarCreateScreen() {
             onChangeText={setName}
             placeholder="Calendar name"
             placeholderTextColor={theme.colors.mutedForeground}
-            autoFocus
             maxLength={100}
             accessibilityLabel="Calendar name"
           />

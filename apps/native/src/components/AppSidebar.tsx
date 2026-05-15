@@ -58,7 +58,7 @@ export function AppSidebar() {
   const { isOpen, open, close } = useSidebar();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const router = useRouter();
+  const { push: routerPush, replace: routerReplace } = useRouter();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
@@ -169,10 +169,10 @@ export function AppSidebar() {
     (route: string) => {
       close();
       setTimeout(() => {
-        router.push(route as any);
+        routerPush(route as any);
       }, 100);
     },
-    [close, router],
+    [close, routerPush, routerReplace],
   );
 
   const handleToggleCalendarVisibility = useCallback(
@@ -199,9 +199,9 @@ export function AppSidebar() {
         return;
       }
 
-      setTimeout(() => router.replace("/(tabs)/calendar" as any), 80);
+      setTimeout(() => routerReplace("/(tabs)/calendar" as any), 80);
     },
-    [close, pathname, router, setCurrentDate, setSelectedDate],
+    [close, pathname, routerPush, routerReplace, setCurrentDate, setSelectedDate],
   );
 
   return (

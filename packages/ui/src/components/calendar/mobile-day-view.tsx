@@ -316,7 +316,7 @@ export function MobileDayView({
                   {format(new Date(), timeFormat === "24h" ? "HH:mm" : "h:mm")}
                 </div>
                 <div className="bg-primary h-[2px] w-full shadow-sm"></div>
-                <div className="bg-primary absolute -right-1 h-2.5 w-2.5 rounded-full shadow-sm"></div>
+                <div className="bg-primary absolute -right-1 size-2.5 rounded-full shadow-sm"></div>
               </div>
             </div>
           )}

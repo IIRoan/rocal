@@ -82,8 +82,8 @@ function SheetContent({
         </SheetPrimitive.Title>
         {children}
         {showClose && (
-          <SheetPrimitive.Close className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-[100] flex h-10 w-10 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm border border-border/50 text-foreground/80 hover:text-foreground hover:bg-background hover:scale-105 hover:shadow-sm focus-visible:scale-105 transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:hover:scale-100">
-            <XIcon className="h-4 w-4" />
+          <SheetPrimitive.Close className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-[100] flex size-10 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm border border-border/50 text-foreground/80 hover:text-foreground hover:bg-background hover:scale-105 hover:shadow-sm focus-visible:scale-105 transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:hover:scale-100">
+            <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>
         )}

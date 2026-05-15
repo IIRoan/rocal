@@ -2,11 +2,11 @@
 
 import React, {
   createContext,
-  useContext,
   useState,
   useEffect,
   useRef,
   useCallback,
+  use,
   ReactNode,
 } from "react";
 import { createLogger } from "@workspace/logger";
@@ -49,7 +49,7 @@ const CalendarContext = createContext<CalendarContextType | undefined>(
 );
 
 export function useCalendarContext() {
-  const context = useContext(CalendarContext);
+  const context = use(CalendarContext);
   if (context === undefined) {
     throw new Error(
       "useCalendarContext must be used within a CalendarProvider",

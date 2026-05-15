@@ -33,7 +33,7 @@ function getErrorMessage(error: unknown): string {
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const { replace: routerReplace } = useRouter();
   const token = searchParams.get("token");
   const resetError = searchParams.get("error");
 
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
         throw new Error(result.error.message || "Unable to reset your password.");
       }
 
-      router.replace("/login?reset=success");
+      routerReplace("/login?reset=success");
     } catch (submitError) {
       log.error("Password reset failed:", submitError);
       setError(getErrorMessage(submitError));
@@ -170,7 +170,7 @@ export default function ResetPasswordPage() {
               {submitting ? (
                 <>
                   <div
-                    className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+                    className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
                     aria-hidden="true"
                   />
                   <span>Updating password…</span>
@@ -178,7 +178,7 @@ export default function ResetPasswordPage() {
               ) : (
                 <>
                   <span>Update password</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="size-4" />
                 </>
               )}
             </Button>

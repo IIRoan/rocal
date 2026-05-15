@@ -1,5 +1,5 @@
 import type { RowEncryptionState } from "../lib/encryption-state";
-import type { Calendar } from "../generated/prisma/index.js";
+import type { Calendar } from "../generated/prisma/client.js";
 
 export type CalendarCreateInput = {
   userId: string;

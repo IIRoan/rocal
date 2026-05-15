@@ -319,7 +319,7 @@ export function DayView({
                 zIndex: positionedEvent.zIndex,
               }}
             >
-              <div className="h-full w-full">
+              <div className="size-full">
                 <DraggableEvent
                   event={positionedEvent.event}
                   view="day"
@@ -343,7 +343,7 @@ export function DayView({
               style={{ top: `${currentTimePosition}%` }}
             >
               <div className="relative flex items-center">
-                <div className="bg-destructive absolute -left-1 h-2 w-2 rounded-full"></div>
+                <div className="bg-destructive absolute -left-1 size-2 rounded-full"></div>
                 <div className="bg-destructive h-[2px] w-full"></div>
               </div>
             </div>

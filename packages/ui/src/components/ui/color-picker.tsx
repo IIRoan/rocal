@@ -104,7 +104,7 @@ export function ColorPicker({
                   <button
                     key={preset.value}
                     className={cn(
-                      "w-8 h-8 rounded border-2 transition-all duration-200 ease-out hover:scale-110 hover:shadow-sm focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-ring/50 outline-none",
+                      "size-8 rounded border-2 transition-all duration-200 ease-out hover:scale-110 hover:shadow-sm focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-ring/50 outline-none",
                       value === preset.value
                         ? "border-foreground ring-2 ring-ring"
                         : "border-border hover:border-foreground",

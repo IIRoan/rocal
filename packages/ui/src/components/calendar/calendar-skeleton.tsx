@@ -103,7 +103,7 @@ export function CalendarSkeleton({
               >
                 <Skeleton className="h-4 w-8 mx-auto mb-1" variant="shimmer" />
                 <Skeleton
-                  className="h-6 w-6 mx-auto rounded-full"
+                  className="size-6 mx-auto rounded-full"
                   variant="shimmer"
                 />
               </div>
@@ -201,7 +201,7 @@ export function CalendarSkeleton({
                   variant="shimmer"
                 />
                 <Skeleton
-                  className="h-3 w-3 rounded-full bg-primary -ml-1.5"
+                  className="size-3 rounded-full bg-primary -ml-1.5"
                   variant="shimmer"
                 />
               </div>
@@ -248,7 +248,7 @@ export function CalendarSkeleton({
                         <Skeleton className="h-2 w-8" variant="wave" />
                       </div>
                       <Skeleton
-                        className="h-3 w-3 rounded-full mt-0.5"
+                        className="size-3 rounded-full mt-0.5"
                         variant="shimmer"
                       />
                       <div className="flex-1 space-y-1">
@@ -283,7 +283,7 @@ export function EventDialogSkeleton() {
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-border">
         <Skeleton className="h-6 w-32" variant="shimmer" />
-        <Skeleton className="h-6 w-6 rounded" variant="shimmer" />
+        <Skeleton className="size-6 rounded" variant="shimmer" />
       </div>
 
       {/* Title field */}
@@ -292,7 +292,7 @@ export function EventDialogSkeleton() {
         style={{ animationDelay: "0.1s" }}
       >
         <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-4" variant="shimmer" />
+          <Skeleton className="size-4" variant="shimmer" />
           <Skeleton className="h-4 w-12" variant="shimmer" />
         </div>
         <Skeleton className="h-10 w-full rounded" variant="wave" />
@@ -350,7 +350,7 @@ export function EventDialogSkeleton() {
         className="flex items-center space-x-2 animate-slide-in"
         style={{ animationDelay: "0.6s" }}
       >
-        <Skeleton className="h-4 w-4 rounded" variant="shimmer" />
+        <Skeleton className="size-4 rounded" variant="shimmer" />
         <Skeleton className="h-4 w-24" variant="shimmer" />
       </div>
 
@@ -360,7 +360,7 @@ export function EventDialogSkeleton() {
         style={{ animationDelay: "0.7s" }}
       >
         <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-4" variant="shimmer" />
+          <Skeleton className="size-4" variant="shimmer" />
           <Skeleton className="h-4 w-16" variant="shimmer" />
         </div>
         <Skeleton className="h-10 w-full rounded" variant="wave" />
@@ -389,8 +389,8 @@ export function SidebarCalendarSkeleton() {
       <div className="flex items-center justify-between animate-slide-in">
         <Skeleton className="h-5 w-20" variant="shimmer" />
         <div className="flex gap-1">
-          <Skeleton className="h-6 w-6 rounded" variant="shimmer" />
-          <Skeleton className="h-6 w-6 rounded" variant="shimmer" />
+          <Skeleton className="size-6 rounded" variant="shimmer" />
+          <Skeleton className="size-6 rounded" variant="shimmer" />
         </div>
       </div>
 
@@ -418,7 +418,7 @@ export function SidebarCalendarSkeleton() {
               return (
                 <Skeleton
                   key={dayIndex}
-                  className={`h-6 w-6 ${isToday ? "rounded-full" : "rounded"}`}
+                  className={`size-6 ${isToday ? "rounded-full" : "rounded"}`}
                   variant={isToday ? "shimmer" : "wave"}
                   style={{
                     animationDelay: `${(weekIndex * 7 + dayIndex) * 0.02}s`,
@@ -441,9 +441,9 @@ export function SidebarCalendarSkeleton() {
             key={i}
             className="flex items-center gap-3 p-2 rounded hover:bg-accent/50 transition-colors"
           >
-            <Skeleton className="h-3 w-3 rounded-full" variant="shimmer" />
+            <Skeleton className="size-3 rounded-full" variant="shimmer" />
             <Skeleton className="h-4 flex-1" variant="wave" />
-            <Skeleton className="h-4 w-4 rounded" variant="shimmer" />
+            <Skeleton className="size-4 rounded" variant="shimmer" />
           </div>
         ))}
       </div>
@@ -460,7 +460,7 @@ export function SidebarCalendarSkeleton() {
             className="flex items-center gap-3 p-2 rounded hover:bg-accent/50 transition-colors"
           >
             <Skeleton
-              className="h-3 w-3 rounded-full"
+              className="size-3 rounded-full"
               variant="shimmer"
               style={{ animationDelay: `${i * 0.1}s` }}
             />

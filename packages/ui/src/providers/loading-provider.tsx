@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useCallback, useState } from "react";
+import React, { createContext, useCallback, useState, use } from "react";
 import { GlobalLoadingScreen } from "../components/ui/global-loading-screen";
 import type { GlobalLoadingScreenProps } from "../components/ui/global-loading-screen";
 
@@ -162,7 +162,7 @@ export function LoadingProvider({
 
 // Hook to use loading context
 export function useLoading(): LoadingContextType {
-  const context = useContext(LoadingContext);
+  const context = use(LoadingContext);
   if (!context) {
     throw new Error("useLoading must be used within a LoadingProvider");
   }

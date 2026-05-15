@@ -107,7 +107,7 @@ const SECTION_DATA = Object.entries(TIMEZONE_GROUPS).map(([title, data]) => ({
 export default function TimezoneScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -156,9 +156,9 @@ export default function TimezoneScreen() {
   const handleSelect = useCallback(
     (timezone: string) => {
       updateSettingsMutation.mutate({ timezone });
-      router.back();
+      routerBack();
     },
-    [updateSettingsMutation, router],
+    [updateSettingsMutation, routerBack],
   );
 
   // ─── Search filtering ─────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ export default function TimezoneScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => routerBack()}
           style={({ pressed }) => [
             styles.backButton,
             pressed && { opacity: 0.6 },

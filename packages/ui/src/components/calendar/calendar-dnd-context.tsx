@@ -2,10 +2,10 @@
 
 import {
   createContext,
-  useContext,
   useId,
   useRef,
   useState,
+  use,
   type ReactNode,
 } from "react";
 import {
@@ -61,7 +61,7 @@ const CalendarDndContext = createContext<CalendarDndContextType>({
 });
 
 // Hook to use the context
-export const useCalendarDnd = () => useContext(CalendarDndContext);
+export const useCalendarDnd = () => use(CalendarDndContext);
 
 // Props for the provider
 interface CalendarDndProviderProps {

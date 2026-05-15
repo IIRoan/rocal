@@ -119,7 +119,7 @@ export function MobileMonthPicker({
               onClick={() => handleDateClick(day)}
               className={cn(
                 "relative rounded-full text-xs font-medium transition-all touch-manipulation",
-                "flex items-center justify-center h-6 w-6 mx-auto",
+                "flex items-center justify-center size-6 mx-auto",
                 !isCurrentMonth && "text-muted-foreground/30",
                 isCurrentMonth &&
                   !isSelected &&
@@ -131,10 +131,10 @@ export function MobileMonthPicker({
               {format(day, "d")}
               {/* Event indicator dot */}
               {hasEvents && !isSelected && (
-                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary/60" />
+                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 size-1 rounded-full bg-primary/60" />
               )}
               {hasEvents && isSelected && (
-                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary-foreground/60" />
+                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 size-1 rounded-full bg-primary-foreground/60" />
               )}
             </button>
           );

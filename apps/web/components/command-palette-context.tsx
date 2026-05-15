@@ -2,10 +2,10 @@
 
 import {
   createContext,
-  useContext,
   useState,
   ReactNode,
   startTransition,
+  use,
 } from "react";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
@@ -39,7 +39,7 @@ const CommandPaletteContext = createContext<
 >(undefined);
 
 export function useCommandPalette() {
-  const context = useContext(CommandPaletteContext);
+  const context = use(CommandPaletteContext);
   if (!context) {
     throw new Error(
       "useCommandPalette must be used within a CommandPaletteProvider",

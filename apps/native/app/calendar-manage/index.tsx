@@ -41,7 +41,7 @@ type ReadOnlyCalendarEntry = {
 export default function CalendarManageScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { push: routerPush, back: routerBack } = useRouter();
   const queryClient = useQueryClient();
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
@@ -195,29 +195,29 @@ export default function CalendarManageScreen() {
 
   const handleCalendarPress = useCallback(
     (calendar: Calendar) => {
-      router.push(`/calendar-manage/edit/${calendar.id}`);
+      routerPush(`/calendar-manage/edit/${calendar.id}`);
     },
-    [router],
+    [routerPush, routerBack],
   );
 
   const handleReadOnlyPress = useCallback(
     (subscription: CalendarSubscription) => {
-      router.push(`/subscription/edit/${subscription.id}`);
+      routerPush(`/subscription/edit/${subscription.id}`);
     },
-    [router],
+    [routerPush, routerBack],
   );
 
   const handleCreate = useCallback(() => {
-    router.push("/calendar-manage/create");
-  }, [router]);
+    routerPush("/calendar-manage/create");
+  }, [routerPush, routerBack]);
 
   const handleOpenSubscriptions = useCallback(() => {
-    router.push("/subscription");
-  }, [router]);
+    routerPush("/subscription");
+  }, [routerPush, routerBack]);
 
   const handleAddOrImport = useCallback(() => {
-    router.push("/subscription/create");
-  }, [router]);
+    routerPush("/subscription/create");
+  }, [routerPush, routerBack]);
 
   const handleSetDefault = useCallback(
     (calendarId: string) => {
@@ -258,7 +258,7 @@ export default function CalendarManageScreen() {
         <Text style={styles.errorText}>{errorMessage}</Text>
         <Pressable
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => routerBack()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >

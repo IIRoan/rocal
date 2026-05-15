@@ -1,9 +1,9 @@
 import React, {
   createContext,
   useCallback,
-  useContext,
   useMemo,
   useState,
+  use,
 } from "react";
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ export function SidebarProvider({
 // ---------------------------------------------------------------------------
 
 export function useSidebar(): SidebarContextValue {
-  const ctx = useContext(SidebarContext);
+  const ctx = use(SidebarContext);
   if (!ctx) {
     throw new Error("useSidebar must be used within a SidebarProvider");
   }

@@ -150,9 +150,9 @@ interface EncryptionStatusBadgeProps {
    */
   asIcon?: boolean;
   /**
-   * Override the icon and button size. Defaults to "sm" (h-3 w-3 icon, h-5 w-5
-   * button). Use "md" to match standard toolbar icon buttons (h-4 w-4 icon,
-   * h-7 w-7 button).
+   * Override the icon and button size. Defaults to "sm" (size-3 icon, size-5
+   * button). Use "md" to match standard toolbar icon buttons (size-4 icon,
+   * size-7 button).
    */
   iconSize?: "sm" | "md";
 }
@@ -167,9 +167,9 @@ export function EncryptionStatusBadge({
   const meta = getEncryptionStatusMeta(item);
   const { Icon } = meta;
 
-  const iconCls = iconSize === "md" ? "h-7 w-7" : "h-4 w-4";
-  const buttonCls = iconSize === "md" ? "h-7 w-7 rounded" : "h-4 w-4 rounded-sm";
-  const spanCls = iconSize === "md" ? "h-7 w-7" : "h-4 w-4";
+  const iconCls = iconSize === "md" ? "size-7" : "size-4";
+  const buttonCls = iconSize === "md" ? "size-7 rounded" : "size-4 rounded-sm";
+  const spanCls = iconSize === "md" ? "size-7" : "size-4";
 
   if (hidePlaintext && meta.state === "plaintext") {
     return null;
@@ -225,11 +225,11 @@ export function EncryptionStatusBadge({
         <div className="flex items-start gap-2.5 px-3 pt-3 pb-2 border-b border-border/50">
           <div
             className={cn(
-              "flex items-center justify-center h-7 w-7 rounded-md shrink-0 bg-muted/50",
+              "flex items-center justify-center size-7 rounded-md shrink-0 bg-muted/50",
             )}
           >
             <Icon
-              className={cn("h-4 w-4", meta.iconClassName)}
+              className={cn("size-4", meta.iconClassName)}
               strokeWidth={2.25}
               aria-hidden
             />
@@ -256,7 +256,7 @@ export function EncryptionStatusBadge({
                     className="text-xs flex items-center gap-1.5"
                   >
                     <ShieldCheck
-                      className="h-3 w-3 text-primary shrink-0"
+                      className="size-3 text-primary shrink-0"
                       strokeWidth={2.25}
                       aria-hidden
                     />
@@ -278,7 +278,7 @@ export function EncryptionStatusBadge({
                     className="text-xs flex items-center gap-1.5 text-muted-foreground"
                   >
                     <Lock
-                      className="h-3 w-3 opacity-40 shrink-0"
+                      className="size-3 opacity-40 shrink-0"
                       strokeWidth={2.25}
                       aria-hidden
                     />

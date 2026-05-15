@@ -8,7 +8,7 @@ function VisuallyHidden({
   return (
     <span
       className={cn(
-        "sr-only absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0",
+        "sr-only absolute size-px p-0 -m-px overflow-hidden whitespace-nowrap border-0",
         className,
       )}
       {...props}

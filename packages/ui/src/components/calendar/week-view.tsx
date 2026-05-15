@@ -504,7 +504,7 @@ export const WeekView = React.memo(function WeekView({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="h-full w-full px-[1px] sm:px-1">
+                  <div className="size-full px-[1px] sm:px-1">
                     {positionedEvent.event && (
                       <DraggableEvent
                         event={positionedEvent.event}
@@ -531,7 +531,7 @@ export const WeekView = React.memo(function WeekView({
                 style={{ top: `${currentTimePosition}%` }}
               >
                 <div className="relative flex items-center">
-                  <div className="bg-[var(--calendar-accent)] absolute -left-1 h-2 w-2 rounded-full"></div>
+                  <div className="bg-[var(--calendar-accent)] absolute -left-1 size-2 rounded-full"></div>
                   <div className="bg-[var(--calendar-accent)] h-[2px] w-full"></div>
                 </div>
               </div>

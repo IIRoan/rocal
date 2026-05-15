@@ -552,7 +552,7 @@ export function MobileEventCalendar({
             className="mt-4"
             onClick={() => window.location.reload()}
           >
-            <Loader2 className="w-4 h-4 mr-2" />
+            <Loader2 className="size-4 mr-2" />
             Retry
           </Button>
         </div>

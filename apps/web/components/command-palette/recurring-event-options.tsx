@@ -81,7 +81,7 @@ export function RecurringEventOptions({
       <div className="space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-lg font-semibold">
-            <Icon className="h-5 w-5 text-destructive" />
+            <Icon className="size-5 text-destructive" />
             Delete Event
           </div>
           <p className="text-sm text-muted-foreground">
@@ -95,7 +95,7 @@ export function RecurringEventOptions({
             className="w-full"
             onClick={onFallbackDelete}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
+            <Trash2 className="size-4 mr-2" />
             Delete Event
           </Button>
         </div>
@@ -118,7 +118,7 @@ export function RecurringEventOptions({
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-2 text-lg font-semibold">
           <Icon
-            className={`h-5 w-5 ${isEdit ? "text-primary" : "text-destructive"}`}
+            className={`size-5 ${isEdit ? "text-primary" : "text-destructive"}`}
           />
           {actionWord} Recurring Event
         </div>
@@ -132,7 +132,7 @@ export function RecurringEventOptions({
         {/* This occurrence only */}
         <Button
           variant="outline"
-          className="w-full justify-start text-left h-auto py-4 px-4"
+          className="w-full justify-start text-left h-auto p-4"
           onClick={() => {
             if (isEdit) {
               onEditThisOnly(occurrenceDate);
@@ -142,7 +142,7 @@ export function RecurringEventOptions({
           }}
         >
           <div className="flex items-center gap-3">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="size-4 text-muted-foreground" />
             <div>
               <div className="font-medium">
                 {actionWord} this occurrence only
@@ -153,13 +153,13 @@ export function RecurringEventOptions({
               </div>
             </div>
           </div>
-          <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+          <ArrowRight className="size-4 ml-auto text-muted-foreground" />
         </Button>
 
         {/* This and future occurrences */}
         <Button
           variant="outline"
-          className="w-full justify-start text-left h-auto py-4 px-4"
+          className="w-full justify-start text-left h-auto p-4"
           onClick={() => {
             if (isEdit) {
               onEditThisAndFuture(occurrenceDate);
@@ -169,7 +169,7 @@ export function RecurringEventOptions({
           }}
         >
           <div className="flex items-center gap-3">
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            <ArrowRight className="size-4 text-muted-foreground" />
             <div>
               <div className="font-medium">
                 {actionWord} this and future occurrences
@@ -179,13 +179,13 @@ export function RecurringEventOptions({
               </div>
             </div>
           </div>
-          <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+          <ArrowRight className="size-4 ml-auto text-muted-foreground" />
         </Button>
 
         {/* All occurrences (entire series) */}
         <Button
           variant="outline"
-          className="w-full justify-start text-left h-auto py-4 px-4"
+          className="w-full justify-start text-left h-auto p-4"
           onClick={() => {
             if (isEdit) {
               onEditSeries();
@@ -195,7 +195,7 @@ export function RecurringEventOptions({
           }}
         >
           <div className="flex items-center gap-3">
-            <RotateCcw className="h-4 w-4 text-muted-foreground" />
+            <RotateCcw className="size-4 text-muted-foreground" />
             <div>
               <div className="font-medium">{actionWord} entire series</div>
               <div className="text-xs text-muted-foreground">
@@ -203,7 +203,7 @@ export function RecurringEventOptions({
               </div>
             </div>
           </div>
-          <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground" />
+          <ArrowRight className="size-4 ml-auto text-muted-foreground" />
         </Button>
       </div>
 

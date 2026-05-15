@@ -81,7 +81,7 @@ function TabButton({
       {...props}
     >
       <div className={cn(
-        "flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150",
+        "flex items-center justify-center size-7 rounded-lg transition-all duration-150",
         isActive && "bg-primary/10",
         !isActive && "active:bg-accent/50",
       )}>

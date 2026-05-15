@@ -145,7 +145,7 @@ export function PasskeySettings({
           onClick={onBack}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium">Passkeys</span>
       </div>
@@ -161,24 +161,24 @@ export function PasskeySettings({
                 disabled={passkeyLoading}
                 className="w-full justify-start h-auto px-3 py-2 font-normal"
               >
-                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Plus className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-sm flex-1 text-left">
                   Add New Passkey
                 </span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
               </Button>
             </div>
 
             {passkeyLoading && passkeys.length === 0 ? (
               <div className="px-4 py-8 text-center">
-                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-muted-foreground" />
+                <Loader2 className="size-5 animate-spin mx-auto mb-2 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">
                   Loading passkeys...
                 </p>
               </div>
             ) : passkeys.length === 0 ? (
               <div className="px-4 py-6 text-center border-t border-border/50">
-                <Key className="h-6 w-6 mx-auto mb-2 text-muted-foreground/50" />
+                <Key className="size-6 mx-auto mb-2 text-muted-foreground/50" />
                 <p className="text-xs text-muted-foreground mb-1">
                   No passkeys found
                 </p>
@@ -202,7 +202,7 @@ export function PasskeySettings({
                           className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/20 transition-colors"
                         >
                           <div className="p-1 rounded bg-muted/50 shrink-0">
-                            <DeviceIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                            <DeviceIcon className="size-3.5 text-muted-foreground" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm truncate">
@@ -225,7 +225,7 @@ export function PasskeySettings({
                             }
                             className="p-1.5 h-auto hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive shrink-0"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="size-3.5" />
                           </Button>
                         </div>
                       );
@@ -263,7 +263,7 @@ export function PasskeySettings({
                 >
                   {addPasskeyMutation.isPending ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      <Loader2 className="size-3.5 mr-1.5 animate-spin" />
                       Adding...
                     </>
                   ) : (

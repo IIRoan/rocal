@@ -38,14 +38,12 @@ import {
   extractLinkedAuthAccounts,
   summarizeLinkedAuthAccounts,
 } from "@workspace/calendar-core";
-import {
-  AccountSettings,
-  NotificationSettings,
-  TimeRegionSettings,
-  TransitionContainer,
-  SettingToggleRow,
-  InviteSettings,
-} from "../command-palette/index";
+import { AccountSettings } from "../command-palette/account-settings";
+import { NotificationSettings } from "../command-palette/notification-settings";
+import { SettingToggleRow } from "../command-palette/setting-toggle-row";
+import { TimeRegionSettings } from "../command-palette/time-region-settings";
+import { TransitionContainer } from "../command-palette/transition-container";
+import { InviteSettings } from "../command-palette/invite-settings";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";
 import type { JmapMailbox } from "@/lib/mail/types";
@@ -320,13 +318,12 @@ export function MailCommandPalette({
           className="flex flex-col"
           style={{ minHeight: "clamp(240px, 40svh, 360px)", maxHeight: "calc(100dvh - 200px)" }}
         >
-          <div className="flex items-center gap-2 px-3 py-3 sm:py-2 border-b border-border/50 shrink-0">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-2 p-3 sm:py-2 border-b border-border/50 shrink-0">
+            <Search className="size-4 text-muted-foreground shrink-0" />
             <input
               type="text"
               placeholder="Search or jump to…"
               value={query}
-              autoFocus
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
@@ -335,7 +332,7 @@ export function MailCommandPalette({
             />
             {query && (
               <button type="button" onClick={() => setQuery("")} className="p-1 rounded hover:bg-muted/50 transition-colors">
-                <X className="h-4 w-4 text-muted-foreground" />
+                <X className="size-4 text-muted-foreground" />
               </button>
             )}
           </div>
@@ -349,16 +346,16 @@ export function MailCommandPalette({
                     key={item.id}
                     type="button"
                     onClick={() => handleSelect(item)}
-                    className={`flex items-center gap-3 px-2 py-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${index === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"}`}
+                    className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${index === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"}`}
                   >
-                    <div className="flex items-center justify-center w-8 h-8 sm:w-6 sm:h-6 shrink-0">
+                    <div className="flex items-center justify-center size-8 sm:w-6 sm:h-6 shrink-0">
                       <item.icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm flex-1 truncate">{item.label}</span>
                     <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
                       {item.description}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 ))}
               </div>
@@ -387,11 +384,11 @@ export function MailCommandPalette({
         <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
           <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
             <button type="button" onClick={goBack} className="p-1 rounded hover:bg-muted/50 transition-colors">
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Appearance</span>
           </div>
-          <div className="flex-1 overflow-y-auto py-2 px-2">
+          <div className="flex-1 overflow-y-auto p-2">
             <div className="px-1 pb-1">
               <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Theme</span>
             </div>
@@ -400,14 +397,14 @@ export function MailCommandPalette({
                 key={item.value}
                 type="button"
                 onClick={() => void updateSetting("theme", item.value as UserSettings["theme"])}
-                className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
+                className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
               >
-                <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                  <item.icon className={`h-4 w-4 ${item.color}`} />
+                <div className="flex items-center justify-center size-6 shrink-0">
+                  <item.icon className={`size-4 ${item.color}`} />
                 </div>
                 <span className="text-sm flex-1">{item.label}</span>
                 {localSettings?.theme === item.value && (
-                  <Check className="h-4 w-4 text-primary shrink-0" />
+                  <Check className="size-4 text-primary shrink-0" />
                 )}
               </button>
             ))}
@@ -449,27 +446,27 @@ export function MailCommandPalette({
         <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
           <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
             <button type="button" onClick={goBack} className="p-1 rounded hover:bg-muted/50 transition-colors">
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Security</span>
           </div>
-          <div className="flex-1 overflow-y-auto py-2 px-2">
+          <div className="flex-1 overflow-y-auto p-2">
             <div className="px-1 pb-1">
               <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Authentication</span>
             </div>
             <button
               type="button"
               onClick={() => { setPasskeyAddMode(false); goForward("passkeys"); }}
-              className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
+              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
             >
-              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <Shield className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <Shield className="size-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Passkeys</div>
                 <div className="text-xs text-muted-foreground">Manage passwordless authentication</div>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+              <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
             </button>
             <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
               <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Images &amp; Privacy</span>

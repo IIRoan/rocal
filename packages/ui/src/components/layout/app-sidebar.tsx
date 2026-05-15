@@ -458,7 +458,7 @@ function AppSidebarDesktop({
                     </span>
                   </div>
                   <ChevronDown
-                    className="h-3 w-3 text-muted-foreground/40 shrink-0"
+                    className="size-3 text-muted-foreground/40 shrink-0"
                     strokeWidth={2.5}
                   />
                 </button>
@@ -471,13 +471,13 @@ function AppSidebarDesktop({
                 <DropdownMenuItem asChild>
                   <a href="/calendar" className="flex items-center gap-2.5">
                     <CalendarDays
-                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      className="size-4 text-muted-foreground shrink-0"
                       strokeWidth={2}
                     />
                     Calendar
                     {activeApp === "calendar" ? (
                       <Check
-                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
+                        className="ml-auto size-3.5 text-primary shrink-0"
                         strokeWidth={2.5}
                       />
                     ) : null}
@@ -486,13 +486,13 @@ function AppSidebarDesktop({
                 <DropdownMenuItem asChild>
                   <a href="/mail" className="flex items-center gap-2.5">
                     <Mail
-                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      className="size-4 text-muted-foreground shrink-0"
                       strokeWidth={2}
                     />
                     Mail
                     {activeApp === "mail" ? (
                       <Check
-                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
+                        className="ml-auto size-3.5 text-primary shrink-0"
                         strokeWidth={2.5}
                       />
                     ) : null}

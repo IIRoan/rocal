@@ -107,7 +107,7 @@ function TimeGrid({
             >
               {timeString}
               {isCurrentTime && !isSelected && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                <span className="absolute -top-1 -right-1 size-2 bg-primary rounded-full" />
               )}
             </button>
           );
@@ -310,7 +310,7 @@ export function ShadcnAutocomleteTimePicker({
         className,
       )}
     >
-      <Clock className="mr-2 h-4 w-4 flex-shrink-0" data-testid="ClockIcon" />
+      <Clock className="mr-2 size-4 flex-shrink-0" data-testid="ClockIcon" />
       {currentTimeString}
     </Button>
   );

@@ -86,7 +86,7 @@ export function SenderAvatar({
   const [bg, text] = paletteFor(email || name || "?");
 
   return (
-    <Avatar className="h-8 w-8 shrink-0">
+    <Avatar className="size-8 shrink-0">
       {currentSrc && (
         <AvatarImage
           src={currentSrc}

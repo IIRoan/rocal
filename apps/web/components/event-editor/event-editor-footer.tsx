@@ -44,13 +44,13 @@ export function EventEditorFooter({
                 onClick={handleDelete}
                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                <Trash2 className="h-4 w-4" /> Delete
+                <Trash2 className="size-4" /> Delete
               </Button>
             )}
             <div className="flex-1" />
             {eventForm.selectedEvent?.id && (
               <Button variant="ghost" size="sm" onClick={handleEventDownloadIcs}>
-                <Download className="h-4 w-4" /> ICS
+                <Download className="size-4" /> ICS
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -63,7 +63,7 @@ export function EventEditorFooter({
                 onClick={() => eventForm.setEventViewMode("edit")}
                 className="text-primary hover:bg-primary/10"
               >
-                <Edit3 className="h-4 w-4" /> Edit
+                <Edit3 className="size-4" /> Edit
               </Button>
             )}
           </>
@@ -76,12 +76,12 @@ export function EventEditorFooter({
             <Button size="sm" onClick={handleEventSave} disabled={!canSave}>
               {eventForm.eventSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4" />
+                  <Save className="size-4" />
                   Save
                 </>
               )}
@@ -102,13 +102,13 @@ export function EventEditorFooter({
               onClick={handleDelete}
               className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
+              <Trash2 className="size-4 mr-2" /> Delete
             </Button>
           )}
           <div className="flex-1" />
           {eventForm.selectedEvent?.id && (
             <Button variant="outline" onClick={handleEventDownloadIcs}>
-              <Download className="h-4 w-4 mr-2" /> ICS
+              <Download className="size-4 mr-2" /> ICS
             </Button>
           )}
           <Button variant="outline" onClick={onBack}>
@@ -116,7 +116,7 @@ export function EventEditorFooter({
           </Button>
           {eventForm.selectedEvent?.id && !eventForm.selectedEvent.isSynced && (
             <Button onClick={() => eventForm.setEventViewMode("edit")}>
-              <Edit3 className="h-4 w-4 mr-2" /> Edit
+              <Edit3 className="size-4 mr-2" /> Edit
             </Button>
           )}
         </>
@@ -136,12 +136,12 @@ export function EventEditorFooter({
           <Button onClick={handleEventSave} disabled={!canSave}>
             {eventForm.eventSaving ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="size-4 animate-spin mr-2" />
                 Saving...
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 mr-2" />
+                <Save className="size-4 mr-2" />
                 Save
               </>
             )}

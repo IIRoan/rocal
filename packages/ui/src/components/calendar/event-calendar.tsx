@@ -965,7 +965,7 @@ export function EventCalendar({
             className="mt-4"
             onClick={() => window.location.reload()}
           >
-            <Loader2 className="w-4 h-4 mr-2" />
+            <Loader2 className="size-4 mr-2" />
             Retry
           </Button>
         </div>
@@ -1033,7 +1033,7 @@ export function EventCalendar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 -scale-x-[1]"
+                  className="size-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60 -scale-x-[1]"
                   onClick={handlePrevious}
                   onMouseEnter={() => prefetchAdjacentRange("prev")}
                   aria-label="Previous"
@@ -1055,7 +1055,7 @@ export function EventCalendar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60"
+                  className="size-7 rounded-none text-muted-foreground/70 hover:text-foreground hover:bg-accent/60"
                   onClick={handleNext}
                   onMouseEnter={() => prefetchAdjacentRange("next")}
                   aria-label="Next"

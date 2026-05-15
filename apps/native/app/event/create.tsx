@@ -32,7 +32,7 @@ import { toLocalISOString } from "../../src/components/event/event-form-utils";
 export default function EventCreateScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -70,7 +70,7 @@ export default function EventCreateScreen() {
       const optimisticEvent = buildOptimisticEvent(data, user?.id ?? "", tempId);
       snapshotRef.current = await optimisticallyInsertEvent(queryClient, optimisticEvent);
       // Navigate back immediately so the user sees the event in the timeline
-      router.back();
+      routerBack();
       return { tempId };
     },
     onSuccess: () => {
@@ -99,8 +99,8 @@ export default function EventCreateScreen() {
   );
 
   const handleCancel = useCallback(() => {
-    router.back();
-  }, [router]);
+    routerBack();
+  }, [routerBack]);
 
   // ─── Compute initial values from query params ─────────────────────────────
 

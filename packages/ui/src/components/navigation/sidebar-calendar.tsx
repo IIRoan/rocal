@@ -271,7 +271,7 @@ export function SidebarCalendar({
                           key={`${event.id || "event"}-${i}`}
                           className={cn(
                             "rounded-full",
-                            isMobile ? "w-1 h-1" : "w-1 h-1",
+                            isMobile ? "size-1" : "size-1",
                             isSelected && "dark:bg-black bg-white",
                           )}
                           style={{

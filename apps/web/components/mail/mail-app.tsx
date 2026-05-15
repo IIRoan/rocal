@@ -277,7 +277,6 @@ export function MailApp() {
                     placeholder="Encryption password"
                     onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
                     disabled={isBusy}
-                    autoFocus
                   />
                   <Button
                     className="w-full"

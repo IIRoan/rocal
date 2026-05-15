@@ -298,7 +298,7 @@ export function MobileThreeDayView({
                     {dayAllDay.slice(0, 3).map((ev, i) => (
                       <div
                         key={i}
-                        className="w-1 h-1 rounded-full"
+                        className="size-1 rounded-full"
                         style={{
                           backgroundColor: resolveInlineColorValue(ev.color || "blue"),
                         }}
@@ -353,7 +353,7 @@ export function MobileThreeDayView({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="h-full w-full overflow-hidden px-0.5">
+                  <div className="size-full overflow-hidden px-0.5">
                     {positionedEvent.event && (
                       <DraggableEvent
                         event={positionedEvent.event}
@@ -376,7 +376,7 @@ export function MobileThreeDayView({
                   style={{ top: `${currentTimePosition}%` }}
                 >
                   <div className="relative flex items-center">
-                    <div className="bg-primary absolute -left-0.5 h-2 w-2 rounded-full" />
+                    <div className="bg-primary absolute -left-0.5 size-2 rounded-full" />
                     <div className="bg-primary h-[2px] w-full" />
                   </div>
                 </div>
@@ -439,23 +439,23 @@ export function MobileThreeDayView({
               </div>
             }
           >
-            <div className="overflow-y-auto px-2 py-2 pb-6">
+            <div className="overflow-y-auto p-2 pb-6">
               {drawerEvents.map((event) => {
                 const eventStart = new Date(event.start);
                 const eventEnd = new Date(event.end);
                 return (
                   <button
                     key={event.id}
-                    className="w-full text-left flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
+                    className="w-full text-left flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
                     onClick={() => {
                       onEventSelect(event);
                       setDrawerOpen(false);
                       setDrawerEvents([]);
                     }}
                   >
-                    <div className="flex items-center justify-center w-6 h-6 shrink-0">
+                    <div className="flex items-center justify-center size-6 shrink-0">
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="size-3 rounded-full"
                         style={{ backgroundColor: resolveInlineColorValue(event.color || "blue") }}
                       />
                     </div>

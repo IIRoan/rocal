@@ -675,9 +675,7 @@ describe("LoginForm", () => {
     });
 
     expect(mockClearAuthPasswords).not.toHaveBeenCalled();
-    expect(mockPasskeySignIn).toHaveBeenCalledWith({
-      autoFocus: true,
-    });
+    expect(mockPasskeySignIn).toHaveBeenCalledWith({});
   });
 
   it("redirects after a successful auto-prompted passkey step-up even when the passkey response omits the user payload", async () => {
@@ -714,9 +712,7 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    expect(mockPasskeySignIn).toHaveBeenCalledWith({
-      autoFocus: true,
-    });
+    expect(mockPasskeySignIn).toHaveBeenCalledWith({});
     expect(mockCompleteAuthNavigation).toHaveBeenCalledWith("/calendar");
   });
 

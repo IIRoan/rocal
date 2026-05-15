@@ -215,7 +215,7 @@ export default function PrivacyPage() {
               href={CALENDAR_HOME_PATH}
               className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="size-4" />
               <span>Back to calendar</span>
             </Link>
           </div>
@@ -228,7 +228,7 @@ export default function PrivacyPage() {
           <Image
             src="/wallpaper.jpg"
             alt="Solace — collaborate better"
-            className="h-full w-full object-cover"
+            className="size-full object-cover"
             fill
             loading="eager"
             unoptimized

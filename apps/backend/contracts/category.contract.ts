@@ -1,5 +1,5 @@
 import type { RowEncryptionState } from "../lib/encryption-state";
-import type { EventCategory } from "../generated/prisma/index.js";
+import type { EventCategory } from "../generated/prisma/client.js";
 
 export type CategoryWithCount = EventCategory & { usageCount: number };
 

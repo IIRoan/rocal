@@ -406,8 +406,8 @@ export function E2eeBootstrap() {
         <form onSubmit={handleSubmit} className="flex flex-col">
           {/* Header — command palette style */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
-            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
-              <Icon className="h-3.5 w-3.5 text-primary" />
+            <div className="flex items-center justify-center size-6 rounded-md bg-primary/10 shrink-0">
+              <Icon className="size-3.5 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium leading-tight truncate">
@@ -439,7 +439,6 @@ export function E2eeBootstrap() {
                     autoComplete={
                       isUnlock ? "current-password" : "new-password"
                     }
-                    autoFocus
                     disabled={isSubmitting}
                     className="h-9"
                   />
@@ -502,7 +501,7 @@ export function E2eeBootstrap() {
                 disabled={isSubmitting}
                 className="h-8"
               >
-                <LogOut className="mr-1.5 h-3.5 w-3.5" />
+                <LogOut className="mr-1.5 size-3.5" />
                 Sign out
               </Button>
               {isLegacy ? (

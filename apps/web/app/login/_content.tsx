@@ -154,9 +154,9 @@ function PasswordRequirements({ password }: { password: string }) {
       {requirements.map((req) => (
         <li key={req.label} className="flex items-center gap-2">
           {req.met ? (
-            <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <Check className="size-3.5 shrink-0 text-emerald-500" />
           ) : (
-            <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+            <X className="size-3.5 shrink-0 text-muted-foreground/50" />
           )}
           <span
             className={`text-xs ${
@@ -463,9 +463,7 @@ export function LoginForm() {
       setError(null);
       setNotice(null);
 
-      const result = await authClient.signIn.passkey({
-        autoFocus: true,
-      });
+      const result = await authClient.signIn.passkey({});
 
       if (result?.error) {
         throw new Error(
@@ -895,7 +893,7 @@ export function LoginForm() {
                       Invite token
                     </Label>
                     <div className="relative">
-                      <Ticket className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Ticket className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         id="invite-token"
                         name="invite-token"
@@ -1002,9 +1000,9 @@ export function LoginForm() {
                         }
                       >
                         {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="size-4" />
                         ) : (
-                          <Eye className="h-4 w-4" />
+                          <Eye className="size-4" />
                         )}
                       </button>
                     </div>
@@ -1028,7 +1026,7 @@ export function LoginForm() {
                   {emailLoading ? (
                     <>
                       <div
-                        className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+                        className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
                         aria-hidden="true"
                       />
                       <span>{primaryLoadingLabel}</span>
@@ -1036,7 +1034,7 @@ export function LoginForm() {
                   ) : (
                     <>
                       <span>{primaryButtonLabel}</span>
-                      <ArrowRight className="h-4 w-4" />
+                      <ArrowRight className="size-4" />
                     </>
                   )}
                 </Button>
@@ -1064,7 +1062,7 @@ export function LoginForm() {
                         {passkeyLoading ? (
                           <>
                             <div
-                              className="h-4 w-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
+                              className="size-4 animate-spin rounded-full border-2 border-current opacity-30 border-t-current"
                               style={{
                                 borderTopColor: "currentColor",
                                 opacity: 1,
@@ -1075,7 +1073,7 @@ export function LoginForm() {
                           </>
                         ) : (
                           <>
-                            <Key className="h-4 w-4" />
+                            <Key className="size-4" />
                             <span>Use passkey</span>
                           </>
                         )}
@@ -1129,7 +1127,7 @@ export function LoginForm() {
             <Image
               src="/wallpaper.jpg"
               alt="Solace — collaborate better"
-              className="h-full w-full object-cover"
+              className="size-full object-cover"
               fill
               loading="eager"
               unoptimized

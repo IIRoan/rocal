@@ -59,7 +59,7 @@ export function CalendarDefaultsSettings({
           onClick={() => goBack()}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium">Calendar Defaults</span>
       </div>
@@ -68,7 +68,7 @@ export function CalendarDefaultsSettings({
               <div className="px-4 py-3 border-b border-border/50">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <BookOpen className="size-4 text-muted-foreground shrink-0" />
                     <span className="text-sm">Default calendar</span>
                   </div>
                   <Select
@@ -93,7 +93,7 @@ export function CalendarDefaultsSettings({
               <div className="px-4 py-3 border-b border-border/50">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Calendar className="size-4 text-muted-foreground shrink-0" />
                     <span className="text-sm">Default view</span>
                   </div>
                   <Select
@@ -120,7 +120,7 @@ export function CalendarDefaultsSettings({
               <div className="px-4 py-3 border-b border-border/50">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Calendar className="size-4 text-muted-foreground shrink-0" />
                     <span className="text-sm">First day of week</span>
                   </div>
                   <Select
@@ -167,10 +167,10 @@ export function CalendarDefaultsSettings({
                     }}
                     className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                   >
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Calendar className="size-4 text-muted-foreground shrink-0" />
                     <span className="text-sm flex-1">{day.label}</span>
                     {workingDaysList.includes(day.value) && (
-                      <Check className="h-4 w-4 text-primary shrink-0" />
+                      <Check className="size-4 text-primary shrink-0" />
                     )}
                   </button>
                 ))}

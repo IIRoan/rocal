@@ -242,9 +242,7 @@ export default function NativePasskeyBridgePage() {
         return;
       }
 
-      const signInResult = await authClient.signIn.passkey({
-        autoFocus: true,
-      });
+      const signInResult = await authClient.signIn.passkey({});
 
       emitLog("info", "Passkey sign-in returned", {
         hasError: Boolean(signInResult.error),

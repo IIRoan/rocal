@@ -1,10 +1,10 @@
 import {
   createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
+  use,
   type ReactNode,
 } from "react";
 import {
@@ -63,7 +63,7 @@ export function SheetProvider({ children }: { children: ReactNode }) {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useSheet(): SheetContextValue {
-  const ctx = useContext(SheetContext);
+  const ctx = use(SheetContext);
   if (!ctx) {
     throw new Error("useSheet must be used within a SheetProvider");
   }

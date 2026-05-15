@@ -51,7 +51,7 @@ function eventToInitialValues(
 export default function EventEditScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const queryClient = useQueryClient();
 
   // ─── Route params ──────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ export default function EventEditScreen() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.eventDetail(id!),
       });
-      router.back();
+      routerBack();
     },
     onError: (err: unknown) => {
       const message =
@@ -128,8 +128,8 @@ export default function EventEditScreen() {
   );
 
   const handleCancel = useCallback(() => {
-    router.back();
-  }, [router]);
+    routerBack();
+  }, [routerBack]);
 
   // ─── Compute initial values from fetched event ─────────────────────────────
 

@@ -166,7 +166,7 @@ export function MessageList({
       <div className="sticky top-0 z-20 px-3 py-2 border-b border-border/40 bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-2 rounded-md bg-muted/60 px-2.5 py-1.5 focus-within:bg-muted/80 transition-colors">
           <Search
-            className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
+            className="size-3.5 shrink-0 text-muted-foreground/60"
             strokeWidth={2}
           />
           <input
@@ -203,9 +203,9 @@ export function MessageList({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors"
+                className="flex items-center justify-center size-6 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -220,7 +220,7 @@ export function MessageList({
                   clearSelection();
                 }}
               >
-                <MailCheck className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <MailCheck className="size-3.5" strokeWidth={2.25} />
                 Mark as read
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -229,7 +229,7 @@ export function MessageList({
                   clearSelection();
                 }}
               >
-                <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <MailOpen className="size-3.5" strokeWidth={2.25} />
                 Mark as unread
               </DropdownMenuItem>
               {moveTargets.length > 0 && (
@@ -237,7 +237,7 @@ export function MessageList({
                   <DropdownMenuSeparator />
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
-                      <FolderInput className="h-3.5 w-3.5" strokeWidth={2.25} />
+                      <FolderInput className="size-3.5" strokeWidth={2.25} />
                       Move to
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="w-40">
@@ -264,7 +264,7 @@ export function MessageList({
                   clearSelection();
                 }}
               >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <Trash2 className="size-3.5" strokeWidth={2.25} />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -310,12 +310,12 @@ export function MessageList({
                         >
                           {isChecked ? (
                             <CheckSquare
-                              className="h-4 w-4 text-primary"
+                              className="size-4 text-primary"
                               strokeWidth={2.25}
                             />
                           ) : (
                             <Square
-                              className="h-4 w-4 text-muted-foreground/60"
+                              className="size-4 text-muted-foreground/60"
                               strokeWidth={2.25}
                             />
                           )}
@@ -331,7 +331,7 @@ export function MessageList({
                           <div className="flex items-center gap-1.5 shrink-0">
                             {!isRead && (
                               <span
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
+                                className="size-1.5 rounded-full bg-primary"
                                 aria-label="Unread"
                               />
                             )}
@@ -360,7 +360,7 @@ export function MessageList({
                               aria-label={isFlagged ? "Unstar" : "Star"}
                             >
                               <Star
-                                className={`h-3 w-3 ${isFlagged ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`}
+                                className={`size-3 ${isFlagged ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`}
                                 strokeWidth={2}
                               />
                             </span>

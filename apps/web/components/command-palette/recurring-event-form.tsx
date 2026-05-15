@@ -84,7 +84,7 @@ export function RecurringEventForm({
             htmlFor="recurring"
             className="text-sm font-medium cursor-pointer flex items-center gap-2"
           >
-            <RotateCcw className="h-4 w-4 text-muted-foreground" />
+            <RotateCcw className="size-4 text-muted-foreground" />
             Make this a recurring event
           </Label>
         </div>
@@ -159,7 +159,7 @@ export function RecurringEventForm({
               key={index}
               type="button"
               onClick={() => handleWeekdayToggle(index)}
-              className={`inline-flex items-center justify-center h-7 w-7 text-xs rounded-md transition-colors ${
+              className={`inline-flex items-center justify-center size-7 text-xs rounded-md transition-colors ${
                 customRule.byWeekDay?.includes(index)
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-muted/80"

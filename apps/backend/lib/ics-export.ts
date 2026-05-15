@@ -1,4 +1,4 @@
-import type { CalendarEvent } from "../generated/prisma/index.js";
+import type { CalendarEvent } from "../generated/prisma/client.js";
 import type { IcsBuildEventInput, IcsRecurrenceRule } from "@workspace/calendar-ics";
 import { RecurrenceEngine } from "./recurrence";
 

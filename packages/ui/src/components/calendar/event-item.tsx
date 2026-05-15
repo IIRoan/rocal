@@ -105,7 +105,7 @@ function EventWrapper({
     return (
       <div
         className={cn(
-          "flex h-full w-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none",
+          "flex size-full overflow-hidden text-left font-medium transition-all duration-200 ease-out outline-none select-none",
           "min-h-[20px] sm:min-h-[24px]",
           "px-[2px] sm:px-2",
           "border-2 border-dashed rounded-md",
@@ -135,7 +135,7 @@ function EventWrapper({
   return (
     <button
       className={cn(
-        "group/ev relative flex h-full w-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
+        "group/ev relative flex size-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
         "data-past-event:opacity-65",
@@ -403,7 +403,7 @@ export function EventItem({
           {/* Color indicator */}
           <span
             aria-hidden
-            className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
+            className="mt-1.5 size-2.5 shrink-0 rounded-full ring-2 ring-background"
             style={{ backgroundColor: "var(--ev-accent)" }}
           />
 

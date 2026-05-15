@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createLogger } from "@workspace/logger";
-import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
+import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import {
   ConflictError,
   NotFoundError,

@@ -1,11 +1,11 @@
 import React, {
   createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
+  use,
 } from "react";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
@@ -441,7 +441,7 @@ export function AuthProvider({
 // ---------------------------------------------------------------------------
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
+  const ctx = use(AuthContext);
   if (!ctx) {
     throw new Error("useAuth must be used within an AuthProvider");
   }

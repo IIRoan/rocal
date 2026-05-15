@@ -1,4 +1,4 @@
-import type { CalendarEvent, Prisma } from "../generated/prisma/index.js";
+import type { CalendarEvent, Prisma } from "../generated/prisma/client.js";
 import {
   parseICSFile as parseICSFileFromPackage,
   type IcsParseResult,

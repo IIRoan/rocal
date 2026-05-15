@@ -35,7 +35,7 @@ type ReadOnlyCalendarEntry = {
 export default function SubscriptionListScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { push: routerPush } = useRouter();
   const queryClient = useQueryClient();
 
   const {
@@ -149,14 +149,14 @@ export default function SubscriptionListScreen() {
   });
 
   const handleOpenCreate = useCallback(() => {
-    router.push("/subscription/create");
-  }, [router]);
+    routerPush("/subscription/create");
+  }, [routerPush]);
 
   const handleOpenEdit = useCallback(
     (subscription: CalendarSubscription) => {
-      router.push(`/subscription/edit/${subscription.id}`);
+      routerPush(`/subscription/edit/${subscription.id}`);
     },
-    [router],
+    [routerPush],
   );
 
   const handleToggleVisibility = useCallback(

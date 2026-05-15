@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import type { PrismaClient } from "../generated/prisma/index.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import type {
   ISubscriptionService,
   SubscriptionCreateInput,
@@ -419,35 +419,69 @@ export class SubscriptionService implements ISubscriptionService {
     const createdEvents = [];
     const errors = [...parseResult.errors];
 
-    for (const parsedEvent of parseResult.events) {
-      try {
-        const existingEvent = await this.prisma.calendarEvent.findFirst({
-          where: { calendarId, externalId: parsedEvent.uid, isSynced: false },
-        });
+    const importedUids = [...new Set(parseResult.events.map((event) => event.uid))];
+    const existingEvents = importedUids.length
+      ? await this.prisma.calendarEvent.findMany({
+          where: {
+            calendarId,
+            externalId: { in: importedUids },
+            isSynced: false,
+          },
+          select: { externalId: true },
+        })
+      : [];
 
-        if (existingEvent) {
-          errors.push(
-            `Event "${parsedEvent.title}" with UID ${parsedEvent.uid} already exists in calendar`,
-          );
-          continue;
-        }
+    const seenEventUids = new Set(
+      existingEvents.flatMap((event) =>
+        event.externalId ? [event.externalId] : [],
+      ),
+    );
 
-        const eventData = convertParsedEventToCalendarEvent(
-          parsedEvent,
-          userId,
-          calendarId,
-        );
-
-        const createdEvent = await this.prisma.calendarEvent.create({
-          data: eventData,
-        });
-        createdEvents.push(createdEvent);
-      } catch (error) {
+    const createOperations = parseResult.events.flatMap((parsedEvent) => {
+      if (seenEventUids.has(parsedEvent.uid)) {
         errors.push(
-          `Failed to create event "${parsedEvent.title}": ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Event "${parsedEvent.title}" with UID ${parsedEvent.uid} already exists in calendar`,
         );
+        return [];
       }
-    }
+
+      seenEventUids.add(parsedEvent.uid);
+
+      const eventData = convertParsedEventToCalendarEvent(
+        parsedEvent,
+        userId,
+        calendarId,
+      );
+
+      return [
+        {
+          parsedEvent,
+          operation: this.prisma.calendarEvent.create({ data: eventData }),
+        },
+      ];
+    });
+
+    const createResults = await Promise.allSettled(
+      createOperations.map(({ operation }) => operation),
+    );
+
+    createResults.forEach((result, index) => {
+      const createOperation = createOperations[index];
+      if (!createOperation) {
+        return;
+      }
+
+      const { parsedEvent } = createOperation;
+      if (result.status === "fulfilled") {
+        createdEvents.push(result.value);
+        return;
+      }
+
+      const error = result.reason;
+      errors.push(
+        `Failed to create event "${parsedEvent.title}": ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    });
 
     return {
       success: true,
@@ -526,6 +560,9 @@ export class SubscriptionService implements ISubscriptionService {
         parseResult.events.map((event) => event.uid),
       );
 
+      const createOperations = [];
+      const updateOperations = [];
+
       for (const parsedEvent of parseResult.events) {
         const existingEvent = currentEventsByUid.get(parsedEvent.uid);
 
@@ -536,34 +573,44 @@ export class SubscriptionService implements ISubscriptionService {
             subscription.calendarId,
             subscription.id,
           );
-          await this.prisma.calendarEvent.create({ data: eventData });
-          eventsAdded++;
+          createOperations.push(
+            this.prisma.calendarEvent.create({ data: eventData }),
+          );
         } else if (isEventModified(existingEvent, parsedEvent)) {
-          await this.prisma.calendarEvent.update({
-            where: { id: existingEvent.id },
-            data: {
-              title: parsedEvent.title,
-              description: parsedEvent.description,
-              start: parsedEvent.start,
-              end: parsedEvent.end,
-              allDay: parsedEvent.allDay,
-              location: parsedEvent.location,
-              recurrence: parsedEvent.recurrence
-                ? JSON.stringify(parsedEvent.recurrence)
-                : null,
-              timezone: parsedEvent.timezone || "UTC",
-              syncedAt: new Date(),
-            },
-          });
-          eventsUpdated++;
+          updateOperations.push(
+            this.prisma.calendarEvent.update({
+              where: { id: existingEvent.id },
+              data: {
+                title: parsedEvent.title,
+                description: parsedEvent.description,
+                start: parsedEvent.start,
+                end: parsedEvent.end,
+                allDay: parsedEvent.allDay,
+                location: parsedEvent.location,
+                recurrence: parsedEvent.recurrence
+                  ? JSON.stringify(parsedEvent.recurrence)
+                  : null,
+                timezone: parsedEvent.timezone || "UTC",
+                syncedAt: new Date(),
+              },
+            }),
+          );
         }
       }
 
-      for (const [uid, event] of currentEventsByUid) {
-        if (!newEventUids.has(uid)) {
-          await this.prisma.calendarEvent.delete({ where: { id: event.id } });
-          eventsDeleted++;
-        }
+      await Promise.all([...createOperations, ...updateOperations]);
+      eventsAdded = createOperations.length;
+      eventsUpdated = updateOperations.length;
+
+      const deletedEventIds = [...currentEventsByUid.entries()].flatMap(
+        ([uid, event]) => (newEventUids.has(uid) ? [] : [event.id]),
+      );
+
+      if (deletedEventIds.length > 0) {
+        const deleteResult = await this.prisma.calendarEvent.deleteMany({
+          where: { id: { in: deletedEventIds } },
+        });
+        eventsDeleted = deleteResult.count;
       }
 
       const etag = response.headers.get("etag");

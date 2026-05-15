@@ -92,8 +92,8 @@ function ReminderRow({
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
           <div className="flex items-center gap-2 w-full cursor-pointer group">
-            <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
-              <Bell className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-center size-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+              <Bell className="size-4 text-muted-foreground" />
             </div>
             <div className="flex-1 inline-flex items-center justify-between gap-1 px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 text-sm font-medium text-foreground transition-colors">
               <span>{formatTimeShort(value)} before</span>
@@ -104,12 +104,12 @@ function ReminderRow({
                     e.stopPropagation();
                     onRemove();
                   }}
-                  className="flex items-center justify-center h-6 w-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  className="flex items-center justify-center size-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="size-3.5" />
                 </button>
               ) : (
-                <ChevronDown className="h-4 w-4 opacity-50" />
+                <ChevronDown className="size-4 opacity-50" />
               )}
             </div>
           </div>
@@ -126,8 +126,8 @@ function ReminderRow({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div className="flex items-center gap-2 w-full cursor-pointer group">
-          <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
-            <Bell className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center justify-center size-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+            <Bell className="size-4 text-muted-foreground" />
           </div>
           <div className="flex-1 inline-flex items-center justify-between gap-1 px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 text-sm font-medium text-foreground transition-colors">
             <span>{formatTimeShort(value)} before</span>
@@ -138,12 +138,12 @@ function ReminderRow({
                   e.stopPropagation();
                   onRemove();
                 }}
-                className="flex items-center justify-center h-6 w-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                className="flex items-center justify-center size-6 -mr-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="size-3.5" />
               </button>
             ) : (
-              <ChevronDown className="h-4 w-4 opacity-50" />
+              <ChevronDown className="size-4 opacity-50" />
             )}
           </div>
         </div>
@@ -203,8 +203,8 @@ export function NotificationManager({
           "disabled:opacity-50 disabled:cursor-not-allowed",
         )}
       >
-        <div className="flex items-center justify-center h-9 w-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
-          <Plus className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center justify-center size-9 shrink-0 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+          <Plus className="size-4 text-muted-foreground" />
         </div>
         <div className="flex-1 flex items-center px-3 h-9 rounded-lg bg-muted/30 group-hover:bg-muted/50 transition-colors">
           <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">

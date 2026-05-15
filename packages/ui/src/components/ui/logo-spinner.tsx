@@ -62,17 +62,17 @@ export function LogoSpinner({
   const displayText = text || message;
 
   const sizeClasses = {
-    sm: "h-8 w-8",
-    md: "h-12 w-12",
-    lg: "h-16 w-16",
-    xl: "h-20 w-20",
+    sm: "size-8",
+    md: "size-12",
+    lg: "size-16",
+    xl: "size-20",
   };
 
   const shellClasses = {
-    sm: "h-12 w-12 rounded-xl",
-    md: "h-16 w-16 rounded-2xl",
-    lg: "h-20 w-20 rounded-[1.4rem]",
-    xl: "h-24 w-24 rounded-[1.75rem]",
+    sm: "size-12 rounded-xl",
+    md: "size-16 rounded-2xl",
+    lg: "size-20 rounded-[1.4rem]",
+    xl: "size-24 rounded-[1.75rem]",
   };
 
   useEffect(() => {
@@ -212,7 +212,7 @@ function LoadingBoard({
       {/* Top row: logo + wordmark left, day name right */}
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Logo className="h-4 w-4 text-primary" fill="currentColor" />
+          <Logo className="size-4 text-primary" fill="currentColor" />
           <span className="text-[9px] font-semibold uppercase tracking-[0.5em] text-muted-foreground/40">
             Solace
           </span>
@@ -384,8 +384,8 @@ export function InlineLogoSpinner({
   const displayText = text || message;
 
   const sizeClasses = {
-    sm: "h-4 w-4",
-    md: "h-6 w-6",
+    sm: "size-4",
+    md: "size-6",
   };
 
   useEffect(() => {

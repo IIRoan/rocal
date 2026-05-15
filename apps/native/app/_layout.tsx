@@ -21,7 +21,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { bootstrap, clearSession, provider } = useE2ee();
   const segments = useSegments();
-  const router = useRouter();
+  const { replace: routerReplace } = useRouter();
 
   // Redirect based on auth state.
   useEffect(() => {
@@ -35,13 +35,13 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     // Expo Router can ignore redirects triggered during the same auth-state
     // transition, so defer to the next tick.
     const timeoutId = setTimeout(() => {
-      router.replace(redirectPath);
+      routerReplace(redirectPath);
     }, 0);
 
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, routerReplace]);
 
   // Bootstrap E2EE after authentication.
   useEffect(() => {

@@ -1,9 +1,9 @@
 import React, {
   createContext,
   useCallback,
-  useContext,
   useMemo,
   useState,
+  use,
 } from "react";
 import type { CalendarView } from "@workspace/calendar-core";
 
@@ -68,7 +68,7 @@ export function CalendarViewProvider({
 }
 
 export function useCalendarView(): CalendarViewContextValue {
-  const ctx = useContext(CalendarViewContext);
+  const ctx = use(CalendarViewContext);
   if (!ctx) {
     throw new Error("useCalendarView must be used within a CalendarViewProvider");
   }

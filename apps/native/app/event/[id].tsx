@@ -15,7 +15,7 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const { openEventSheet } = useSheet();
 
   useEffect(() => {
@@ -23,9 +23,9 @@ export default function EventDetailScreen() {
       openEventSheet({ type: "view", eventId: id });
       // Navigate back immediately — the sheet is rendered at root level
       // so it stays visible even after this screen unmounts.
-      router.back();
+      routerBack();
     }
-  }, [id, openEventSheet, router]);
+  }, [id, openEventSheet, routerBack]);
 
   return <SafeAreaView style={styles.container} />;
 }

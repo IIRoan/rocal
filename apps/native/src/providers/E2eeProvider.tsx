@@ -1,10 +1,10 @@
 import React, {
   createContext,
   useCallback,
-  useContext,
   useMemo,
   useRef,
   useState,
+  use,
 } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -909,7 +909,6 @@ export function E2eeProvider({
                           secureTextEntry
                           autoCapitalize="none"
                           autoCorrect={false}
-                          autoFocus
                           editable={!isGateSubmitting}
                           style={[
                             styles.input,
@@ -1127,7 +1126,7 @@ function createGateStyles(theme: ThemeTokens) {
 }
 
 export function useE2ee(): E2eeContextValue {
-  const ctx = useContext(E2eeContext);
+  const ctx = use(E2eeContext);
   if (!ctx) {
     throw new Error("useE2ee must be used within an E2eeProvider");
   }

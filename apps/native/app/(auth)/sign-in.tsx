@@ -63,7 +63,7 @@ function resolvePasswordResetRedirectUrl(): string | null {
 
 export default function SignInScreen() {
   const { signIn, signInWithPasskey, requiresPasskeyStepUp } = useAuth();
-  const router = useRouter();
+  const { replace: routerReplace } = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const authCapabilities = useMemo(
@@ -128,7 +128,7 @@ export default function SignInScreen() {
       if (result.requiresPasskeyStepUp) {
         setServerError("Password accepted. Complete your passkey verification.");
       } else {
-        router.replace(CALENDAR_HOME_ROUTE);
+        routerReplace(CALENDAR_HOME_ROUTE);
       }
     } catch (err: any) {
       const message =
@@ -138,7 +138,7 @@ export default function SignInScreen() {
     } finally {
       setIsSigningIn(false);
     }
-  }, [clearErrors, email, password, router, signIn]);
+  }, [clearErrors, email, password, routerReplace, signIn]);
 
   const handleRequestPasswordReset = useCallback(async () => {
     clearErrors();
@@ -194,7 +194,7 @@ export default function SignInScreen() {
     try {
       await signInWithPasskey();
       log.ok("Passkey sign-in successful");
-      router.replace(CALENDAR_HOME_ROUTE);
+      routerReplace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
       const message = err?.message ?? "Passkey sign-in failed. Please try again.";
       log.error("Passkey sign-in failed", err);
@@ -202,7 +202,7 @@ export default function SignInScreen() {
     } finally {
       setIsPasskeyLoading(false);
     }
-  }, [clearErrors, router, signInWithPasskey]);
+  }, [clearErrors, routerReplace, signInWithPasskey]);
 
   const switchMode = useCallback(
     (nextMode: boolean) => {

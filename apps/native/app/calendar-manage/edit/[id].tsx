@@ -35,7 +35,7 @@ export default function CalendarEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { back: routerBack } = useRouter();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState("");
@@ -104,7 +104,7 @@ export default function CalendarEditScreen() {
         queryKey: QUERY_KEYS.calendarShareLink(id!),
       });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      router.back();
+      routerBack();
     },
     onError: (error) => {
       Alert.alert(
@@ -126,7 +126,7 @@ export default function CalendarEditScreen() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.calendars() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings() });
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      router.back();
+      routerBack();
     },
     onError: (error) => {
       Alert.alert(

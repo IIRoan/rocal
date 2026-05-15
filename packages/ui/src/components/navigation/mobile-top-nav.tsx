@@ -125,7 +125,7 @@ export function MobileTopNav({
           variant="ghost"
           size="sm"
           onClick={onOpenAddEvent}
-          className="h-7 w-7 p-0 relative z-[101]"
+          className="size-7 p-0 relative z-[101]"
           aria-label="Add new event"
         >
           <Plus size={18} />

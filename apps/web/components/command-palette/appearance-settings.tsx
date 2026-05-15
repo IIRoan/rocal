@@ -26,7 +26,7 @@ export function AppearanceSettings({
                 onClick={() => goBack()}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+                <ArrowLeft className="size-4 text-muted-foreground" />
               </button>
               <span className="text-sm font-medium">Appearance</span>
             </div>
@@ -60,14 +60,14 @@ export function AppearanceSettings({
                     key={item.value}
                     type="button"
                     onClick={() => updateSetting("theme", item.value)}
-                    className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
+                    className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
                   >
-                    <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                      <item.icon className={`h-4 w-4 ${item.color}`} />
+                    <div className="flex items-center justify-center size-6 shrink-0">
+                      <item.icon className={`size-4 ${item.color}`} />
                     </div>
                     <span className="text-sm flex-1">{item.label}</span>
                     {localSettings.theme === item.value && (
-                      <Check className="h-4 w-4 text-primary shrink-0" />
+                      <Check className="size-4 text-primary shrink-0" />
                     )}
                   </button>
                 ))}
@@ -83,16 +83,16 @@ export function AppearanceSettings({
                     key={view}
                     type="button"
                     onClick={() => updateSetting("defaultView", view)}
-                    className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
+                    className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
                   >
-                    <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                      <Layout className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center justify-center size-6 shrink-0">
+                      <Layout className="size-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm flex-1 capitalize">
                       {view === "3day" ? "3 Days" : `${view} View`}
                     </span>
                     {localSettings.defaultView === view && (
-                      <Check className="h-4 w-4 text-primary shrink-0" />
+                      <Check className="size-4 text-primary shrink-0" />
                     )}
                   </button>
                 ))}

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../generated/prisma/index.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import { env } from "./env";
 
 export const PASSKEY_STEP_UP_COOKIE_NAME = "solace-passkey-step-up";

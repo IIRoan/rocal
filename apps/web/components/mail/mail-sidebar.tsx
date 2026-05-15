@@ -222,7 +222,7 @@ function SortableMailboxItem({
           onClick={onHideClick}
           disabled={isBusy}
           aria-label={`Hide ${mailbox.name}`}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all disabled:opacity-30"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all disabled:opacity-30"
         >
           <EyeOff size={11} strokeWidth={2.5} />
         </button>
@@ -361,7 +361,7 @@ export function MailSidebar({
                     </span>
                   </div>
                   <ChevronDown
-                    className="h-3 w-3 text-muted-foreground/40 shrink-0"
+                    className="size-3 text-muted-foreground/40 shrink-0"
                     strokeWidth={2.5}
                   />
                 </button>
@@ -374,13 +374,13 @@ export function MailSidebar({
                 <DropdownMenuItem asChild>
                   <Link href="/calendar" className="flex items-center gap-2.5">
                     <CalendarDays
-                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      className="size-4 text-muted-foreground shrink-0"
                       strokeWidth={2}
                     />
                     Calendar
                     {activeApp === "calendar" ? (
                       <Check
-                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
+                        className="ml-auto size-3.5 text-primary shrink-0"
                         strokeWidth={2.5}
                       />
                     ) : null}
@@ -389,13 +389,13 @@ export function MailSidebar({
                 <DropdownMenuItem asChild>
                   <Link href="/mail" className="flex items-center gap-2.5">
                     <Mail
-                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      className="size-4 text-muted-foreground shrink-0"
                       strokeWidth={2}
                     />
                     Mail
                     {activeApp === "mail" ? (
                       <Check
-                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
+                        className="ml-auto size-3.5 text-primary shrink-0"
                         strokeWidth={2.5}
                       />
                     ) : null}
@@ -487,7 +487,7 @@ export function MailSidebar({
                         onClick={onOpenMailboxes}
                         disabled={isBusy}
                         aria-label="Mailbox settings"
-                        className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40"
+                        className="size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40"
                       >
                         <Settings2 size={13} strokeWidth={2.25} />
                       </button>
@@ -577,7 +577,7 @@ export function MailSidebar({
                                   type="button"
                                   onClick={() => toggleHide(mailbox.id)}
                                   aria-label={`Show ${mailbox.name}`}
-                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/hidden:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all"
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/hidden:opacity-100 size-5 flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted/60 transition-all"
                                 >
                                   <Eye size={11} strokeWidth={2.5} />
                                 </button>

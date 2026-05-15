@@ -297,17 +297,17 @@ export function EventEditor({
       onClick={() => onOpenChange(false)}
       className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
     >
-      <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+      <ArrowLeft className="size-4 text-muted-foreground" />
     </button>
   ) : (
-    <Plus className="h-4 w-4 text-muted-foreground ml-1" />
+    <Plus className="size-4 text-muted-foreground ml-1" />
   );
   const embeddedLeadingSlot = (
     <button
       onClick={onBack}
       className="p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
     >
-      <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+      <ArrowLeft className="size-4 text-muted-foreground" />
     </button>
   );
 
