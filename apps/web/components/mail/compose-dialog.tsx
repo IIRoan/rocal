@@ -42,16 +42,29 @@ function ComposeForm({
   setComposeBody,
   isBusy,
   onKeyDown,
-}: Omit<ComposeDialogProps, "open"> & { onKeyDown?: (e: React.KeyboardEvent) => void }) {
+}: Omit<ComposeDialogProps, "open"> & {
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+}) {
   return (
-    <div className="flex flex-col" style={{ minHeight: "clamp(400px, 60svh, 580px)", maxHeight: "calc(100dvh - 160px)" }}>
+    <div
+      className="flex flex-col"
+      style={{
+        minHeight: "clamp(400px, 60svh, 580px)",
+        maxHeight: "calc(100dvh - 160px)",
+      }}
+    >
       <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
-        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-muted/50 transition-colors">
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 rounded hover:bg-muted/50 transition-colors"
+        >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium flex-1">New message</span>
         <Button
-          size="sm" className="h-7 text-xs"
+          size="sm"
+          className="h-7 text-xs"
           onClick={() => void onSend()}
           disabled={isBusy || !composeTo.trim() || !composeSubject.trim()}
         >
@@ -61,12 +74,18 @@ function ComposeForm({
       </div>
 
       <div className="flex items-center gap-3 px-4 h-11 border-b border-border/50 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">From</span>
-        <span className="flex-1 text-sm text-muted-foreground truncate">{fromEmail}</span>
+        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+          From
+        </span>
+        <span className="flex-1 text-sm text-muted-foreground truncate">
+          {fromEmail}
+        </span>
       </div>
 
       <div className="flex items-center gap-3 px-4 h-11 border-b border-border/50 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">To</span>
+        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+          To
+        </span>
         <input
           type="email"
           value={composeTo}
@@ -80,7 +99,9 @@ function ComposeForm({
       </div>
 
       <div className="flex items-center gap-3 px-4 h-11 border-b border-border/50 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">Subject</span>
+        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+          Subject
+        </span>
         <input
           type="text"
           value={composeSubject}
@@ -104,7 +125,10 @@ function ComposeForm({
       <div className="px-4 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
         <span className="text-muted-foreground/40">Sent as plaintext</span>
         <span className="hidden sm:flex items-center gap-2">
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">⌘↵</kbd> to send
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+            ⌘↵
+          </kbd>{" "}
+          to send
         </span>
       </div>
     </div>
@@ -174,7 +198,9 @@ export function ComposeDialog({
         className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
         onKeyDown={handleKeyDown}
       >
-        <VisuallyHidden><DialogTitle>New message</DialogTitle></VisuallyHidden>
+        <VisuallyHidden>
+          <DialogTitle>New message</DialogTitle>
+        </VisuallyHidden>
         <ComposeForm {...formProps} />
       </DialogContent>
     </Dialog>

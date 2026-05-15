@@ -9,10 +9,16 @@ import {
 describe("native passkey bridge helpers", () => {
   it("recognizes supported native callback schemes", () => {
     expect(isValidNativePasskeyCallbackURL("solace://calendar")).toBe(true);
-    expect(isValidNativePasskeyCallbackURL("exp://192.168.1.1:8081/--/calendar")).toBe(true);
-    expect(isValidNativePasskeyCallbackURL("exps://192.168.1.1:8081/--/calendar")).toBe(true);
+    expect(
+      isValidNativePasskeyCallbackURL("exp://192.168.1.1:8081/--/calendar"),
+    ).toBe(true);
+    expect(
+      isValidNativePasskeyCallbackURL("exps://192.168.1.1:8081/--/calendar"),
+    ).toBe(true);
     expect(isValidNativePasskeyCallbackURL("solace-dev://calendar")).toBe(true);
-    expect(isValidNativePasskeyCallbackURL("https://app.example.com")).toBe(false);
+    expect(isValidNativePasskeyCallbackURL("https://app.example.com")).toBe(
+      false,
+    );
     expect(isValidNativePasskeyCallbackURL("javascript:alert(1)")).toBe(false);
     expect(isValidNativePasskeyCallbackURL(null)).toBe(false);
   });

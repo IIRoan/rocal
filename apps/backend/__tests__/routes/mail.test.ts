@@ -3,7 +3,8 @@ import { Elysia } from "elysia";
 
 const mockMailOAuthConfig = {
   issuer: "https://api.solace.test/api/auth",
-  discoveryUrl: "https://api.solace.test/api/auth/.well-known/openid-configuration",
+  discoveryUrl:
+    "https://api.solace.test/api/auth/.well-known/openid-configuration",
   authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
   tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
   userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
@@ -115,20 +116,21 @@ describe("mailRoutes", () => {
   it("proxies JMAP discovery through the backend", async () => {
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
-    >(async () =>
-      new Response(
-        JSON.stringify({
-          apiUrl: "https://mail.solace.onl/jmap/",
-          accounts: {},
-          primaryAccounts: {},
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            apiUrl: "https://mail.solace.onl/jmap/",
+            accounts: {},
+            primaryAccounts: {},
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        },
-      ),
+        ),
     );
 
     const response = await createApp({
@@ -161,16 +163,19 @@ describe("mailRoutes", () => {
   it("proxies JMAP method calls through the backend", async () => {
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
-    >(async () =>
-      new Response(
-        JSON.stringify({ methodResponses: [["Mailbox/get", { list: [] }, "c1"]] }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            methodResponses: [["Mailbox/get", { list: [] }, "c1"]],
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        },
-      ),
+        ),
     );
     const requestBody = JSON.stringify({
       using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
@@ -208,14 +213,15 @@ describe("mailRoutes", () => {
   it("forwards proxy query strings and response cache headers for blob downloads", async () => {
     const proxyFetch = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
-    >(async () =>
-      new Response("raw-message", {
-        status: 200,
-        headers: {
-          "Content-Type": "message/rfc822",
-          "Cache-Control": "private, max-age=60",
-        },
-      }),
+    >(
+      async () =>
+        new Response("raw-message", {
+          status: 200,
+          headers: {
+            "Content-Type": "message/rfc822",
+            "Cache-Control": "private, max-age=60",
+          },
+        }),
     );
 
     const response = await createApp({

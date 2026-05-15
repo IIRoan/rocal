@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Inbox, Plus, RefreshCcw, ArrowLeft, Settings2, PenSquare } from "lucide-react";
+import {
+  Inbox,
+  Plus,
+  RefreshCcw,
+  ArrowLeft,
+  Settings2,
+  PenSquare,
+} from "lucide-react";
 import {
   SidebarProvider,
   SidebarInset,
@@ -9,7 +16,10 @@ import {
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { MailSkeleton } from "@workspace/ui/components/ui/app-skeletons";
-import { AppLoadingState, PageLoadingOverlay } from "@workspace/ui/components/ui";
+import {
+  AppLoadingState,
+  PageLoadingOverlay,
+} from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useSettings } from "@/hooks/use-settings";
@@ -183,7 +193,9 @@ export function MailApp() {
                     </h1>
                     <span className="text-xs text-muted-foreground/60">
                       {activeMailbox.messages.length}{" "}
-                      {activeMailbox.messages.length === 1 ? "message" : "messages"}
+                      {activeMailbox.messages.length === 1
+                        ? "message"
+                        : "messages"}
                     </span>
                     <div className="ml-auto flex items-center gap-1">
                       {isMobile && (
@@ -211,7 +223,9 @@ export function MailApp() {
                           size={15}
                           strokeWidth={2}
                           className={
-                            isRefreshing ? "animate-spin" : "transition-transform"
+                            isRefreshing
+                              ? "animate-spin"
+                              : "transition-transform"
                           }
                         />
                       </Button>
@@ -338,49 +352,51 @@ export function MailApp() {
               )}
             </div>
           ) : needsPasswordPrompt ? (
-              <div className="flex flex-1 items-center justify-center p-8">
-                <div className="w-full max-w-sm space-y-4">
-                  <div>
-                    <h1 className="text-xl font-semibold">{mailboxUnlockTitle}</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {mailboxUnlockDescription}
-                    </p>
-                  </div>
-                  <Input
-                    id="mailbox-password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Encryption password"
-                    onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
-                    disabled={isBusy}
-                    autoFocus
-                  />
-                  <Button
-                    className="w-full"
-                    onClick={() => void handleSignIn()}
-                    disabled={isBusy || !loginPassword || !mailboxEmail}
-                  >
-                    <Inbox size={15} />
-                    {mailboxButtonLabel}
-                  </Button>
+            <div className="flex flex-1 items-center justify-center p-8">
+              <div className="w-full max-w-sm space-y-4">
+                <div>
+                  <h1 className="text-xl font-semibold">
+                    {mailboxUnlockTitle}
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {mailboxUnlockDescription}
+                  </p>
                 </div>
+                <Input
+                  id="mailbox-password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Encryption password"
+                  onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
+                  disabled={isBusy}
+                  autoFocus
+                />
+                <Button
+                  className="w-full"
+                  onClick={() => void handleSignIn()}
+                  disabled={isBusy || !loginPassword || !mailboxEmail}
+                >
+                  <Inbox size={15} />
+                  {mailboxButtonLabel}
+                </Button>
               </div>
-            ) : (
-              <AppLoadingState
-                variant="centered"
-                className="flex-1"
-                text={
-                  isMailboxStatusLoading
-                    ? "Checking your workspace..."
-                    : !config
-                      ? "Loading your workspace..."
-                      : mailboxStatus?.provisioned
-                        ? "Opening your mailbox..."
-                        : "Setting up your mailbox..."
-                }
-              />
-            )}
+            </div>
+          ) : (
+            <AppLoadingState
+              variant="centered"
+              className="flex-1"
+              text={
+                isMailboxStatusLoading
+                  ? "Checking your workspace..."
+                  : !config
+                    ? "Loading your workspace..."
+                    : mailboxStatus?.provisioned
+                      ? "Opening your mailbox..."
+                      : "Setting up your mailbox..."
+              }
+            />
+          )}
         </SidebarInset>
       </SidebarProvider>
 

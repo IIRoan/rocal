@@ -1,8 +1,16 @@
-export type LogLevel = "debug" | "info" | "ok" | "warn" | "error" | "skip" | "step";
+export type LogLevel =
+  | "debug"
+  | "info"
+  | "ok"
+  | "warn"
+  | "error"
+  | "skip"
+  | "step";
 
 type ConsoleMethod = "debug" | "info" | "log" | "warn" | "error";
 
-const IS_BROWSER = typeof window !== "undefined" && typeof window.document !== "undefined";
+const IS_BROWSER =
+  typeof window !== "undefined" && typeof window.document !== "undefined";
 
 let IS_PROD = false;
 try {
@@ -36,12 +44,12 @@ const COLORS = {
 
 const LEVEL_LABELS: Record<LogLevel, string> = {
   debug: "DEBUG",
-  info:  "INFO ",
-  ok:    "OK   ",
-  warn:  "WARN ",
+  info: "INFO ",
+  ok: "OK   ",
+  warn: "WARN ",
   error: "ERROR",
-  skip:  "SKIP ",
-  step:  "STEP ",
+  skip: "SKIP ",
+  step: "STEP ",
 };
 
 const LEVEL_METHODS: Record<LogLevel, ConsoleMethod> = {
@@ -93,7 +101,10 @@ export interface LoggerOptions {
 export class WorkspaceLogger {
   private readonly options: LoggerOptions;
 
-  constructor(private readonly scope?: string, options?: LoggerOptions) {
+  constructor(
+    private readonly scope?: string,
+    options?: LoggerOptions,
+  ) {
     this.options = { timestamp: true, ...options };
   }
 
@@ -101,7 +112,9 @@ export class WorkspaceLogger {
     if (IS_BROWSER && IS_PROD) return;
 
     const globalRef = globalThis as typeof globalThis & {
-      [LOGGER_ORIGINALS]?: Partial<Record<ConsoleMethod, Console[ConsoleMethod]>>;
+      [LOGGER_ORIGINALS]?: Partial<
+        Record<ConsoleMethod, Console[ConsoleMethod]>
+      >;
     };
     const originals = globalRef[LOGGER_ORIGINALS];
     const method = LEVEL_METHODS[level];
@@ -114,15 +127,19 @@ export class WorkspaceLogger {
         CSS_COLORS.faint,
         CSS_COLORS[level as keyof typeof CSS_COLORS],
         CSS_COLORS.faint,
-        ...args
+        ...args,
       );
       return;
     }
 
-    const timeStr = this.options.timestamp ? `${COLORS.faint}${timestamp()}${COLORS.reset} ` : "";
+    const timeStr = this.options.timestamp
+      ? `${COLORS.faint}${timestamp()}${COLORS.reset} `
+      : "";
     const levelColor = COLORS[level];
     const levelStr = `${levelColor}${LEVEL_LABELS[level]}${COLORS.reset}`;
-    const scopeStr = this.scope ? ` ${COLORS.faint}<${this.scope}>${COLORS.reset}` : "";
+    const scopeStr = this.scope
+      ? ` ${COLORS.faint}<${this.scope}>${COLORS.reset}`
+      : "";
     const message = normalizeArgs(args);
     const line = `${timeStr}${levelStr}${scopeStr} ${message}`.trimEnd();
 
@@ -158,11 +175,17 @@ export class WorkspaceLogger {
   }
 
   child(scope: string): WorkspaceLogger {
-    return new WorkspaceLogger(this.scope ? `${this.scope}:${scope}` : scope, this.options);
+    return new WorkspaceLogger(
+      this.scope ? `${this.scope}:${scope}` : scope,
+      this.options,
+    );
   }
 }
 
-export function createLogger(scope?: string, options?: LoggerOptions): WorkspaceLogger {
+export function createLogger(
+  scope?: string,
+  options?: LoggerOptions,
+): WorkspaceLogger {
   return new WorkspaceLogger(scope, options);
 }
 
@@ -199,7 +222,7 @@ export function installGlobalConsoleLogger(scope?: string): WorkspaceLogger {
           CSS_COLORS.faint,
           CSS_COLORS[level as keyof typeof CSS_COLORS],
           CSS_COLORS.faint,
-          ...args
+          ...args,
         );
         return;
       }
@@ -208,7 +231,8 @@ export function installGlobalConsoleLogger(scope?: string): WorkspaceLogger {
       const levelColor = COLORS[level];
       const levelStr = `${levelColor}${LEVEL_LABELS[level]}${COLORS.reset}`;
       const scopeStr = scope ? ` ${COLORS.faint}<${scope}>${COLORS.reset}` : "";
-      const line = `${timeStr} ${levelStr}${scopeStr} ${normalizeArgs(args)}`.trimEnd();
+      const line =
+        `${timeStr} ${levelStr}${scopeStr} ${normalizeArgs(args)}`.trimEnd();
       originalConsole[method]!(line);
     };
   };

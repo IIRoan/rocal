@@ -70,7 +70,13 @@ const configuredPlugins = [
         compileSdkVersion: 34,
       },
     },
-  ] as [string, { ios: { deploymentTarget: string }; android: { compileSdkVersion: number } }],
+  ] as [
+    string,
+    {
+      ios: { deploymentTarget: string };
+      android: { compileSdkVersion: number };
+    },
+  ],
 ] satisfies NonNullable<ExpoConfig["plugins"]>;
 const associatedDomains = Array.from(
   new Set([

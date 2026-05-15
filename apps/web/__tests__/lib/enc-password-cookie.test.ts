@@ -1,6 +1,13 @@
 /** @jest-environment jsdom */
 
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 import { webcrypto } from "crypto";
 import { TextEncoder, TextDecoder } from "util";
 
@@ -41,14 +48,16 @@ beforeEach(async () => {
 
   // Clean slate: remove device key and cookie
   localStorage.clear();
-  document.cookie = "solace_enc_pw=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  document.cookie =
+    "solace_enc_pw=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   mockStorePendingAuthPassword.mockReset();
   mockClearAuthPasswords.mockReset();
 });
 
 afterEach(() => {
   localStorage.clear();
-  document.cookie = "solace_enc_pw=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  document.cookie =
+    "solace_enc_pw=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 });
 
 describe("enc-password-cookie", () => {
@@ -122,7 +131,9 @@ describe("enc-password-cookie", () => {
       await mod2.initEncPasswordFromCookie();
 
       expect(mod2.peekEncPassword()).toBe("session-password");
-      expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("session-password");
+      expect(mockStorePendingAuthPassword).toHaveBeenCalledWith(
+        "session-password",
+      );
     });
 
     it("is a no-op when memory cache is already populated", async () => {

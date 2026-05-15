@@ -34,7 +34,8 @@ export function formatEventTime(event: CalendarEvent): string {
  */
 export function formatReminderLabel(minutes: number): string {
   if (minutes === 0) return "At time of event";
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} before`;
+  if (minutes < 60)
+    return `${minutes} minute${minutes === 1 ? "" : "s"} before`;
   const hours = Math.floor(minutes / 60);
   const remaining = minutes % 60;
   if (remaining === 0) return `${hours} hour${hours === 1 ? "" : "s"} before`;

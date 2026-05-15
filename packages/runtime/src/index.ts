@@ -268,7 +268,12 @@ function isPrivateIpv4(hostname: string): boolean {
 
   const secondOctet = octets[1];
 
-  return octets[0] === 172 && secondOctet !== undefined && secondOctet >= 16 && secondOctet <= 31;
+  return (
+    octets[0] === 172 &&
+    secondOctet !== undefined &&
+    secondOctet >= 16 &&
+    secondOctet <= 31
+  );
 }
 
 function isLocalDevelopmentHost(hostname: string): boolean {

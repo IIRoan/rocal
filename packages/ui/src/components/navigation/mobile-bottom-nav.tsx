@@ -23,11 +23,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 interface MobileBottomNavProps {
   currentDate: Date;
@@ -80,18 +76,22 @@ function TabButton({
       className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full touch-manipulation"
       {...props}
     >
-      <div className={cn(
-        "flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150",
-        isActive && "bg-primary/10",
-        !isActive && "active:bg-accent/50",
-      )}>
+      <div
+        className={cn(
+          "flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150",
+          isActive && "bg-primary/10",
+          !isActive && "active:bg-accent/50",
+        )}
+      >
         {icon}
       </div>
       <div className="flex items-center gap-0.5">
-        <span className={cn(
-          "text-[10px] font-medium",
-          isActive ? "text-primary" : "text-muted-foreground",
-        )}>
+        <span
+          className={cn(
+            "text-[10px] font-medium",
+            isActive ? "text-primary" : "text-muted-foreground",
+          )}
+        >
           {label}
         </span>
         {hasDropdown && (
@@ -172,12 +172,14 @@ export function MobileBottomNav({
     >
       <div className="relative">
         <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-        
+
         <div className="bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
           <div className="pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center h-12">
               <TabButton
-                icon={<ChevronLeft size={20} className="text-muted-foreground" />}
+                icon={
+                  <ChevronLeft size={20} className="text-muted-foreground" />
+                }
                 label="Prev"
                 onClick={handlePrevious}
               />
@@ -192,7 +194,10 @@ export function MobileBottomNav({
                 <PopoverTrigger asChild>
                   <TabButton
                     icon={getViewIcon(currentView, 20)}
-                    label={VIEW_OPTIONS.find((opt) => opt.value === currentView)?.shortLabel || "View"}
+                    label={
+                      VIEW_OPTIONS.find((opt) => opt.value === currentView)
+                        ?.shortLabel || "View"
+                    }
                     isActive={isViewOpen}
                     hasDropdown
                     isDropdownOpen={isViewOpen}
@@ -235,7 +240,9 @@ export function MobileBottomNav({
               </Popover>
 
               <TabButton
-                icon={<ChevronRight size={20} className="text-muted-foreground" />}
+                icon={
+                  <ChevronRight size={20} className="text-muted-foreground" />
+                }
                 label="Next"
                 onClick={handleNext}
               />

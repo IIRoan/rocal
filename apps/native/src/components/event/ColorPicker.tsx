@@ -60,9 +60,7 @@ export function ColorPicker({
               accessibilityLabel={`${color} color${isSelected ? ", selected" : ""}`}
               accessibilityState={{ selected: isSelected }}
             >
-              {isSelected ? (
-                <Text style={styles.checkmark}>✓</Text>
-              ) : null}
+              {isSelected ? <Text style={styles.checkmark}>✓</Text> : null}
             </Pressable>
           );
         })}
@@ -101,14 +99,12 @@ function createStyles(theme: ThemeTokens) {
     label: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     checkmark: {
       fontSize: 16,
-      fontWeight: theme.typography.fontWeight
-        .bold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.bold as TextStyle["fontWeight"],
       color: "#ffffff",
     },
   } satisfies Record<string, TextStyle>;

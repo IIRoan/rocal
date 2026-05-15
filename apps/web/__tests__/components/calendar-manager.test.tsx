@@ -45,7 +45,10 @@ jest.mock("@workspace/ui/components/calendar", () => ({
     }
 
     return (
-      <button type="button" data-testid={`badge-${item.id ?? item.name ?? "button"}`}>
+      <button
+        type="button"
+        data-testid={`badge-${item.id ?? item.name ?? "button"}`}
+      >
         badge
       </button>
     );
@@ -87,8 +90,9 @@ import { CalendarManager } from "../../components/calendar-manager";
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const mockUseSharedCalendarData =
-  useSharedCalendarData as jest.MockedFunction<typeof useSharedCalendarData>;
+const mockUseSharedCalendarData = useSharedCalendarData as jest.MockedFunction<
+  typeof useSharedCalendarData
+>;
 
 let container: HTMLDivElement;
 let root: Root;
@@ -155,6 +159,8 @@ describe("CalendarManager", () => {
 
     expect(calendarRow).toBeDefined();
     expect(calendarRow?.querySelector("button")).toBeNull();
-    expect(container.querySelector('[data-testid="badge-cal-1"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="badge-cal-1"]'),
+    ).not.toBeNull();
   });
 });

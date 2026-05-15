@@ -83,7 +83,9 @@ function InviteRow({
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{invite.email}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className={`text-xs font-medium ${STATUS_COLORS[invite.status]}`}>
+          <span
+            className={`text-xs font-medium ${STATUS_COLORS[invite.status]}`}
+          >
             {STATUS_LABELS[invite.status]}
             {isExpired ? " (expired)" : ""}
           </span>
@@ -149,11 +151,17 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
       inviteApiService.createInvite(emailAddress),
     onSuccess: (_data, emailAddress) => {
       setEmail("");
-      setMessage({ kind: "success", text: `Invite email sent to ${emailAddress}.` });
+      setMessage({
+        kind: "success",
+        text: `Invite email sent to ${emailAddress}.`,
+      });
       queryClient.invalidateQueries({ queryKey: ["invites"] });
     },
     onError: (err: unknown) => {
-      setMessage({ kind: "error", text: getErrorMessage(err, "Failed to create invite.") });
+      setMessage({
+        kind: "error",
+        text: getErrorMessage(err, "Failed to create invite."),
+      });
     },
   });
 
@@ -165,7 +173,10 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
     },
     onError: (err: unknown) => {
       setRevokingId(null);
-      setMessage({ kind: "error", text: getErrorMessage(err, "Failed to revoke invite.") });
+      setMessage({
+        kind: "error",
+        text: getErrorMessage(err, "Failed to revoke invite."),
+      });
     },
   });
 
@@ -201,7 +212,10 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
   );
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "clamp(300px, 55svh, 480px)" }}>
+    <div
+      className="flex flex-col"
+      style={{ minHeight: "clamp(300px, 55svh, 480px)" }}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
         <button
@@ -226,7 +240,8 @@ export function InviteSettings({ goBack }: InviteSettingsProps) {
         {/* Create invite form */}
         <div className="px-4 pt-4 pb-3">
           <p className="text-xs text-muted-foreground mb-3">
-            Invite someone to join Solace. They&apos;ll receive a token to use at sign-up.
+            Invite someone to join Solace. They&apos;ll receive a token to use
+            at sign-up.
           </p>
 
           {message && (

@@ -18,7 +18,9 @@ interface CalendarViewContextValue {
   setSelectedDate: (date: React.SetStateAction<Date>) => void;
 }
 
-const CalendarViewContext = createContext<CalendarViewContextValue | null>(null);
+const CalendarViewContext = createContext<CalendarViewContextValue | null>(
+  null,
+);
 
 export function CalendarViewProvider({
   children,
@@ -70,7 +72,9 @@ export function CalendarViewProvider({
 export function useCalendarView(): CalendarViewContextValue {
   const ctx = useContext(CalendarViewContext);
   if (!ctx) {
-    throw new Error("useCalendarView must be used within a CalendarViewProvider");
+    throw new Error(
+      "useCalendarView must be used within a CalendarViewProvider",
+    );
   }
   return ctx;
 }

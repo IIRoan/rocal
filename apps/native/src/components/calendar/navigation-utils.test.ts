@@ -62,7 +62,6 @@ describe("navigateCalendarDate", () => {
       const result = navigateCalendarDate(baseDate, "3day", -1);
       expect(isSameDay(result, addDays(baseDate, -3))).toBe(true);
     });
-
   });
 
   // ─── Agenda View ─────────────────────────────────────────────────────────

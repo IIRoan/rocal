@@ -23,9 +23,11 @@ jest.mock("../../lib/prisma", () => ({
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -51,7 +53,9 @@ import { calendarsRoutes } from "../../routes/calendars";
 import { ALLOWED_CALENDAR_COLORS } from "../../lib/colors";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   calendar: {
     findMany: jest.Mock<() => Promise<any>>;

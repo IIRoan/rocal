@@ -23,12 +23,7 @@ import { isMultiDayEvent } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerShell,
-  DrawerTitle,
-} from "../ui/drawer";
+import { Drawer, DrawerContent, DrawerShell, DrawerTitle } from "../ui/drawer";
 import { resolveInlineColorValue } from "./utils";
 
 // Show entire 24 hours for mobile week view
@@ -114,8 +109,7 @@ export function MobileWeekView({
       const positionedEvents: PositionedEvent[] = [];
       const dayStart = startOfDay(day);
 
-      const columns: { event: CalendarEvent; start: Date; end: Date }[][] =
-        [];
+      const columns: { event: CalendarEvent; start: Date; end: Date }[][] = [];
       const eventColumnMapping: Map<CalendarEvent, number> = new Map();
 
       dayEvents.forEach((event) => {
@@ -212,7 +206,14 @@ export function MobileWeekView({
           left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.34 : 0.67;
         } else if (overlappingColumns === 4) {
           width = 0.2475;
-          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.255 : columnIndex === 2 ? 0.51 : 0.765;
+          left =
+            columnIndex === 0
+              ? 0
+              : columnIndex === 1
+                ? 0.255
+                : columnIndex === 2
+                  ? 0.51
+                  : 0.765;
         } else {
           // For 5+ events, guarantee no overflow
           const gap = 0.005;
@@ -244,8 +245,7 @@ export function MobileWeekView({
   ) => {
     e.stopPropagation();
 
-    const isMobile =
-      typeof window !== "undefined" && window.innerWidth < 640;
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
 
     if (isMobile) {
       const eventStart = new Date(event.start);
@@ -263,7 +263,9 @@ export function MobileWeekView({
           );
         })
         .map((pe) => pe.event!)
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        .sort(
+          (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+        );
 
       if (overlapping.length > 1) {
         setDrawerEvents(overlapping);
@@ -361,7 +363,9 @@ export function MobileWeekView({
                         <DraggableEvent
                           event={positionedEvent.event}
                           view="week"
-                          onClick={(e) => handleEventClick(positionedEvent.event, e, dayIndex)}
+                          onClick={(e) =>
+                            handleEventClick(positionedEvent.event, e, dayIndex)
+                          }
                           showTime
                           height={positionedEvent.height}
                           timeFormat={timeFormat}
@@ -428,12 +432,18 @@ export function MobileWeekView({
 
           {/* Mobile event selection drawer */}
           <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <DrawerContent responsive responsiveHeight="70dvh" className="overflow-hidden">
+            <DrawerContent
+              responsive
+              responsiveHeight="70dvh"
+              className="overflow-hidden"
+            >
               <DrawerTitle className="sr-only">Select Event</DrawerTitle>
               <DrawerShell
                 header={
                   <div className="px-5 py-3 border-b border-border/40">
-                    <span className="text-base font-semibold">Select Event</span>
+                    <span className="text-base font-semibold">
+                      Select Event
+                    </span>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {drawerEvents[0] &&
                         format(new Date(drawerEvents[0].start), "EEEE, MMMM d")}
@@ -459,7 +469,9 @@ export function MobileWeekView({
                           <div
                             className="w-3 h-3 rounded-full"
                             style={{
-                              backgroundColor: resolveInlineColorValue(event.color || "blue"),
+                              backgroundColor: resolveInlineColorValue(
+                                event.color || "blue",
+                              ),
                             }}
                           />
                         </div>

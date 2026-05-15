@@ -21,8 +21,22 @@ function createEvent(
     calendarId,
     color,
     userId: "user-1",
-    createdAt: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 8, 0, 0),
-    updatedAt: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 8, 0, 0),
+    createdAt: new Date(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      8,
+      0,
+      0,
+    ),
+    updatedAt: new Date(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      8,
+      0,
+      0,
+    ),
   };
 }
 
@@ -93,11 +107,11 @@ describe("buildMiniCalendarDayEventsMap", () => {
       visibleCalendarIds: new Set(["visible"]),
     });
 
-    expect(dayEventsMap.get(toMiniCalendarDayKey(targetDay))?.map((event) => event.id)).toEqual([
-      "event-1",
-      "event-2",
-      "event-3",
-    ]);
+    expect(
+      dayEventsMap
+        .get(toMiniCalendarDayKey(targetDay))
+        ?.map((event) => event.id),
+    ).toEqual(["event-1", "event-2", "event-3"]);
   });
 
   it("returns empty indicator lists for days without cached events", () => {
@@ -168,7 +182,9 @@ describe("buildMiniCalendarDayEventsMap", () => {
       days,
       gridStart: startOfDay(gridStart),
       gridEnd: endOfDay(gridEnd),
-      cachedEvents: [createEvent("outside-event", outsideDay, "visible", "teal")],
+      cachedEvents: [
+        createEvent("outside-event", outsideDay, "visible", "teal"),
+      ],
       calendarColorMap,
       visibleCalendarIds: new Set(["visible"]),
     });

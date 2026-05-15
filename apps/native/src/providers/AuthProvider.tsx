@@ -96,22 +96,19 @@ export function AuthProvider({
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod>("unknown");
   const [requiresPasskeyStepUp, setRequiresPasskeyStepUp] = useState(false);
   const pendingAuthPasswordRef = useRef<string | null>(null);
-  const authCapabilities = useMemo(
-    () => {
-      const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
+  const authCapabilities = useMemo(() => {
+    const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
 
-      return getAuthCapabilities({
-        platformOs: Platform.OS,
-        expoExecutionEnvironment: Constants.executionEnvironment,
-        expoAppOwnership: Constants.appOwnership,
-        hasPublicKeyCredential:
-          typeof globalThis.PublicKeyCredential === "function",
-        hasSecurePasskeyBridgeOrigin:
-          isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
-      });
-    },
-    [],
-  );
+    return getAuthCapabilities({
+      platformOs: Platform.OS,
+      expoExecutionEnvironment: Constants.executionEnvironment,
+      expoAppOwnership: Constants.appOwnership,
+      hasPublicKeyCredential:
+        typeof globalThis.PublicKeyCredential === "function",
+      hasSecurePasskeyBridgeOrigin:
+        isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
+    });
+  }, []);
 
   // ── Session hydration ────────────────────────────────────────────────
   const fetchAuthStatus = useCallback(async () => {
@@ -289,7 +286,11 @@ export function AuthProvider({
         throw error;
       }
     },
-    [finalizeAuthenticatedSession, resetAuthMethodHints, setEmailPasswordAuthHints],
+    [
+      finalizeAuthenticatedSession,
+      resetAuthMethodHints,
+      setEmailPasswordAuthHints,
+    ],
   );
 
   const signOut = useCallback(async () => {
@@ -309,9 +310,9 @@ export function AuthProvider({
       );
     }
 
-      if (authCapabilities.passkeyMode === "web") {
-        setProviderAuthHints("passkey");
-        const result = await authClient.signIn.passkey();
+    if (authCapabilities.passkeyMode === "web") {
+      setProviderAuthHints("passkey");
+      const result = await authClient.signIn.passkey();
 
       if (result.error) {
         throw new Error(
@@ -321,31 +322,31 @@ export function AuthProvider({
         );
       }
 
-        try {
-          await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
-          const authStatus = await fetchAuthStatus();
-          setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
-        } catch (error) {
-          resetAuthMethodHints();
-          throw error;
-        }
-        return;
+      try {
+        await finalizeAuthenticatedSession(result.data, "Passkey sign-in");
+        const authStatus = await fetchAuthStatus();
+        setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+      } catch (error) {
+        resetAuthMethodHints();
+        throw error;
       }
+      return;
+    }
 
-      if (authCapabilities.passkeyMode === "browser-bridge") {
-        setProviderAuthHints("passkey");
-        const result = await signInWithBrowserPasskey(authClient);
+    if (authCapabilities.passkeyMode === "browser-bridge") {
+      setProviderAuthHints("passkey");
+      const result = await signInWithBrowserPasskey(authClient);
 
-        try {
-          await finalizeAuthenticatedSession(result, "Passkey sign-in");
-          const authStatus = await fetchAuthStatus();
-          setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
-        } catch (error) {
-          resetAuthMethodHints();
-          throw error;
-        }
-        return;
+      try {
+        await finalizeAuthenticatedSession(result, "Passkey sign-in");
+        const authStatus = await fetchAuthStatus();
+        setRequiresPasskeyStepUp(authStatus.requiresPasskeyStepUp);
+      } catch (error) {
+        resetAuthMethodHints();
+        throw error;
       }
+      return;
+    }
 
     throw new Error("Passkey sign-in failed. Please try again.");
   }, [
@@ -359,8 +360,7 @@ export function AuthProvider({
   const registerPasskey = useCallback(async () => {
     if (!authCapabilities.supportsPasskeys) {
       throw new Error(
-        authCapabilities.passkeyMessage ??
-          "Unable to finish passkey setup.",
+        authCapabilities.passkeyMessage ?? "Unable to finish passkey setup.",
       );
     }
 
@@ -391,7 +391,6 @@ export function AuthProvider({
 
     throw new Error("Unable to finish passkey setup.");
   }, [authCapabilities]);
-
 
   const deletePasskey = useCallback(async (id: string) => {
     await deleteStoredPasskey(authClient, id);

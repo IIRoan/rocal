@@ -160,7 +160,9 @@ function PasswordRequirements({ password }: { password: string }) {
           )}
           <span
             className={`text-xs ${
-              req.met ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+              req.met
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-muted-foreground"
             }`}
           >
             {req.label}
@@ -204,14 +206,14 @@ export function LoginForm() {
 
   // Real-time email availability state
   const [emailAvailability, setEmailAvailability] = useState<
-    | null
-    | { available: true }
-    | { available: false; message: string }
+    null | { available: true } | { available: false; message: string }
   >(null);
   const [emailChecking, setEmailChecking] = useState(false);
 
   const emailCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inviteValidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inviteValidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const titleRef = useRef<HTMLDivElement>(null);
   const hasAutoPromptedStepUpRef = useRef(false);
@@ -287,7 +289,8 @@ export function LoginForm() {
     if (!isSignUp) return;
     const trimmed = inviteToken.trim();
     setInviteValidation(null);
-    if (inviteValidateTimerRef.current) clearTimeout(inviteValidateTimerRef.current);
+    if (inviteValidateTimerRef.current)
+      clearTimeout(inviteValidateTimerRef.current);
     if (!trimmed) return;
 
     setInviteValidating(true);
@@ -298,17 +301,24 @@ export function LoginForm() {
           setInviteValidation({ valid: true, inviterName: result.inviterName });
         } else {
           const invalid = result as { valid: false; reason: string };
-          setInviteValidation({ valid: false, reason: invalid.reason ?? "Invalid token" });
+          setInviteValidation({
+            valid: false,
+            reason: invalid.reason ?? "Invalid token",
+          });
         }
       } catch {
-        setInviteValidation({ valid: false, reason: "Could not validate token" });
+        setInviteValidation({
+          valid: false,
+          reason: "Could not validate token",
+        });
       } finally {
         setInviteValidating(false);
       }
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
-      if (inviteValidateTimerRef.current) clearTimeout(inviteValidateTimerRef.current);
+      if (inviteValidateTimerRef.current)
+        clearTimeout(inviteValidateTimerRef.current);
     };
   }, [inviteToken, isSignUp]);
 
@@ -469,14 +479,17 @@ export function LoginForm() {
 
       if (result?.error) {
         throw new Error(
-          result.error.message || "Passkey authentication failed. Please try again.",
+          result.error.message ||
+            "Passkey authentication failed. Please try again.",
         );
       }
 
       const authStatus = await waitForSettledAuthStatus();
 
       if (!authStatus?.authenticated) {
-        throw new Error("Your session could not be confirmed. Please try again.");
+        throw new Error(
+          "Your session could not be confirmed. Please try again.",
+        );
       }
 
       if (authStatus.requiresPasskeyStepUp) {
@@ -494,7 +507,11 @@ export function LoginForm() {
     } finally {
       setPasskeyLoading(false);
     }
-  }, [redirectAfterCompletedAuth, syncThemeAfterAuth, waitForSettledAuthStatus]);
+  }, [
+    redirectAfterCompletedAuth,
+    syncThemeAfterAuth,
+    waitForSettledAuthStatus,
+  ]);
 
   const triggerAutoPasskeyStepUp = useCallback(() => {
     hasAutoPromptedStepUpRef.current = true;
@@ -651,7 +668,9 @@ export function LoginForm() {
       log.error("Email auth failed:", err);
       clearAuthPasswords();
       clearEncPasswordCookie();
-      setError(getErrorMessage(err, "Authentication failed. Please try again."));
+      setError(
+        getErrorMessage(err, "Authentication failed. Please try again."),
+      );
     } finally {
       setEmailLoading(false);
     }
@@ -863,7 +882,9 @@ export function LoginForm() {
                       </span>
                     </div>
                     {emailChecking && (
-                      <p className="text-xs text-muted-foreground">Checking availability…</p>
+                      <p className="text-xs text-muted-foreground">
+                        Checking availability…
+                      </p>
                     )}
                     {!emailChecking && emailAvailability !== null && (
                       <p
@@ -875,12 +896,18 @@ export function LoginForm() {
                       >
                         {emailAvailability.available
                           ? "This address is available."
-                          : (emailAvailability as { available: false; message: string }).message}
+                          : (
+                              emailAvailability as {
+                                available: false;
+                                message: string;
+                              }
+                            ).message}
                       </p>
                     )}
                     {!emailChecking && !emailAvailability && (
                       <p className="text-xs text-muted-foreground">
-                        This becomes your Solace account email and mailbox address.
+                        This becomes your Solace account email and mailbox
+                        address.
                       </p>
                     )}
                   </div>
@@ -917,7 +944,9 @@ export function LoginForm() {
                       />
                     </div>
                     {inviteValidating && (
-                      <p className="text-xs text-muted-foreground">Validating token…</p>
+                      <p className="text-xs text-muted-foreground">
+                        Validating token…
+                      </p>
                     )}
                     {!inviteValidating && inviteValidation !== null && (
                       <p
@@ -931,7 +960,12 @@ export function LoginForm() {
                           ? inviteValidation.inviterName
                             ? `Valid — invited by ${inviteValidation.inviterName}`
                             : "Valid invite token."
-                          : (inviteValidation as { valid: false; reason: string }).reason}
+                          : (
+                              inviteValidation as {
+                                valid: false;
+                                reason: string;
+                              }
+                            ).reason}
                       </p>
                     )}
                     {!inviteValidating && inviteValidation === null && (
@@ -1013,7 +1047,8 @@ export function LoginForm() {
                     )}
                     {isSignUp && password.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Min. 8 characters with uppercase, lowercase, number &amp; special character.
+                        Min. 8 characters with uppercase, lowercase, number
+                        &amp; special character.
                       </p>
                     )}
                   </div>

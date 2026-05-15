@@ -10,11 +10,7 @@ type CommandPaletteMainSearchViewProps = {
   search: UseCommandPaletteSearchResult;
 };
 
-function SearchOnlyEmptyState({
-  debouncedQuery,
-}: {
-  debouncedQuery: string;
-}) {
+function SearchOnlyEmptyState({ debouncedQuery }: { debouncedQuery: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-2">
       <Search className="h-8 w-8 text-muted-foreground/20" />
@@ -101,7 +97,10 @@ export function CommandPaletteMainSearchView({
   return (
     <div
       className="flex flex-col"
-      style={{ minHeight: "clamp(280px, 50svh, 420px)", maxHeight: "calc(100dvh - 200px)" }}
+      style={{
+        minHeight: "clamp(280px, 50svh, 420px)",
+        maxHeight: "calc(100dvh - 200px)",
+      }}
     >
       <div className="flex items-center gap-2 px-3 py-3 sm:py-2 border-b border-border/50">
         {isCommandMode && !isSearchOnly ? (

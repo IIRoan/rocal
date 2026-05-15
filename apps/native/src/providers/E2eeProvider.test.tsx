@@ -26,19 +26,25 @@ jest.mock("react-native", () => {
       disabled,
       onPress,
     }: {
-      children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
+      children:
+        | React.ReactNode
+        | ((state: { pressed: boolean }) => React.ReactNode);
       disabled?: boolean;
       onPress?: () => void;
     }) => (
       <button type="button" disabled={disabled} onClick={onPress}>
-        {typeof children === "function" ? children({ pressed: false }) : children}
+        {typeof children === "function"
+          ? children({ pressed: false })
+          : children}
       </button>
     ),
     StyleSheet: {
       create: <T,>(styles: T) => styles,
       hairlineWidth: 1,
     },
-    Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    Text: ({ children }: { children: React.ReactNode }) => (
+      <span>{children}</span>
+    ),
     TextInput: ({
       value,
       onChangeText,
@@ -59,7 +65,9 @@ jest.mock("react-native", () => {
         }
       />
     ),
-    View: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    View: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
   };
 });
 
@@ -113,8 +121,9 @@ import { useAuth } from "./AuthProvider";
 import { useTheme } from "./ThemeProvider";
 import { E2eeProvider, useE2ee } from "./E2eeProvider";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 type E2eeContextValue = ReturnType<typeof useE2ee>;
 
@@ -349,9 +358,7 @@ describe("E2eeProvider", () => {
     mockSetItemAsync.mockResolvedValue();
     mockInstallCryptoPolyfill.mockResolvedValue(undefined);
     mockCreateE2eeModule.mockReturnValue(mockE2eeModule as never);
-    mockCreateNativeCryptoProvider.mockReturnValue(
-      mockCryptoProvider as never,
-    );
+    mockCreateNativeCryptoProvider.mockReturnValue(mockCryptoProvider as never);
 
     mockCryptoProvider.subtle.exportKey.mockResolvedValue({
       kty: "RSA",

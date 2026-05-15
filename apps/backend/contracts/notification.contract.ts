@@ -78,11 +78,17 @@ export type NotificationDeleteResult = {
 };
 
 export interface INotificationService {
-  getForEvent(userId: string, eventId: string): Promise<EventNotificationsResult>;
+  getForEvent(
+    userId: string,
+    eventId: string,
+  ): Promise<EventNotificationsResult>;
   setForEvent(
     userId: string,
     eventId: string,
     notifications: NotificationConfigInput[],
   ): Promise<NotificationUpdateResult>;
-  deleteForEvent(userId: string, eventId: string): Promise<NotificationDeleteResult>;
+  deleteForEvent(
+    userId: string,
+    eventId: string,
+  ): Promise<NotificationDeleteResult>;
 }

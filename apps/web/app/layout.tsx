@@ -77,9 +77,7 @@ export default function RootLayout({
               >
                 <LoadingProvider>
                   <SettingsProvider>
-                    <CalendarProvider>
-                      {children}
-                    </CalendarProvider>
+                    <CalendarProvider>{children}</CalendarProvider>
                     <Toaster />
                   </SettingsProvider>
                 </LoadingProvider>

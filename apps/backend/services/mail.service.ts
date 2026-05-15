@@ -129,10 +129,7 @@ function assertVaultParams(
   },
 ): void {
   if (kdf.trim().toLowerCase() !== "argon2id") {
-    throw new ValidationError(
-      "Mail vault backups must use Argon2id.",
-      "kdf",
-    );
+    throw new ValidationError("Mail vault backups must use Argon2id.", "kdf");
   }
 
   if (!params.saltB64.trim()) {
@@ -319,7 +316,9 @@ function normalizeMailPersistenceError(error: unknown): never {
     );
   }
 
-  if (isUniqueConstraintError(error, ["stalwart_account_id", "stalwartAccountId"])) {
+  if (
+    isUniqueConstraintError(error, ["stalwart_account_id", "stalwartAccountId"])
+  ) {
     throw new ConflictError(
       "That mailbox is already linked to an existing mail account.",
     );
@@ -413,13 +412,16 @@ export class MailService implements IMailService {
     }
 
     if (!requiresEmailRepair) {
-      logger.warn("Reusing existing mail directory entry for provisioned Stalwart account", {
-        email: input.email,
-        userId: input.userId ?? null,
-        existingUserId: existingEntry.userId,
-        stalwartAccountId: details.stalwartAccountId,
-        directoryEntryId: existingEntry.id,
-      });
+      logger.warn(
+        "Reusing existing mail directory entry for provisioned Stalwart account",
+        {
+          email: input.email,
+          userId: input.userId ?? null,
+          existingUserId: existingEntry.userId,
+          stalwartAccountId: details.stalwartAccountId,
+          directoryEntryId: existingEntry.id,
+        },
+      );
     }
 
     await tx.mailDirectoryEntry.update({
@@ -537,7 +539,9 @@ export class MailService implements IMailService {
     let derivedFingerprint: string;
     try {
       derivedFingerprint = normalizeFingerprint(
-        await getOpenPgpPublicKeyFingerprint(input.provisioning.publicKeyArmored),
+        await getOpenPgpPublicKeyFingerprint(
+          input.provisioning.publicKeyArmored,
+        ),
       );
     } catch {
       throw new ValidationError(
@@ -658,7 +662,12 @@ export class MailService implements IMailService {
             },
           });
         } catch (error) {
-          if (isUniqueConstraintError(error, ["stalwart_account_id", "stalwartAccountId"])) {
+          if (
+            isUniqueConstraintError(error, [
+              "stalwart_account_id",
+              "stalwartAccountId",
+            ])
+          ) {
             const concurrentEntry = await tx.mailDirectoryEntry.findUnique({
               where: { stalwartAccountId: accountId },
               select: {
@@ -730,7 +739,8 @@ export class MailService implements IMailService {
 
     return {
       email: mailbox?.email ?? normalizedEmail,
-      displayName: mailbox?.displayName ?? normalizeOptionalText(input.displayName),
+      displayName:
+        mailbox?.displayName ?? normalizeOptionalText(input.displayName),
       provisioned: Boolean(mailbox),
     };
   }
@@ -774,7 +784,9 @@ export class MailService implements IMailService {
     });
 
     if (!entry) {
-      throw new NotFoundError("No internal public key was found for that email.");
+      throw new NotFoundError(
+        "No internal public key was found for that email.",
+      );
     }
 
     return {
@@ -807,7 +819,9 @@ export class MailService implements IMailService {
     });
 
     if (!entry?.vaultBackup) {
-      throw new NotFoundError("No encrypted vault backup was found for that mailbox.");
+      throw new NotFoundError(
+        "No encrypted vault backup was found for that mailbox.",
+      );
     }
 
     return {
@@ -935,7 +949,9 @@ export class MailService implements IMailService {
     });
 
     if (!record.vaultBackup) {
-      throw new NotFoundError("No encrypted vault backup was stored for that mailbox.");
+      throw new NotFoundError(
+        "No encrypted vault backup was stored for that mailbox.",
+      );
     }
 
     return {

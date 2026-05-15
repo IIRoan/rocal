@@ -52,10 +52,7 @@ export default function EventCreateScreen() {
 
   // ─── Fetch calendars ───────────────────────────────────────────────────────
 
-  const {
-    data: calendars,
-    isLoading: calendarsLoading,
-  } = useQuery({
+  const { data: calendars, isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
   });
@@ -67,8 +64,15 @@ export default function EventCreateScreen() {
       calendarApiService.createEvent(data),
     onMutate: async (data: CreateEventRequest) => {
       const tempId = generateOptimisticId();
-      const optimisticEvent = buildOptimisticEvent(data, user?.id ?? "", tempId);
-      snapshotRef.current = await optimisticallyInsertEvent(queryClient, optimisticEvent);
+      const optimisticEvent = buildOptimisticEvent(
+        data,
+        user?.id ?? "",
+        tempId,
+      );
+      snapshotRef.current = await optimisticallyInsertEvent(
+        queryClient,
+        optimisticEvent,
+      );
       // Navigate back immediately so the user sees the event in the timeline
       router.back();
       return { tempId };

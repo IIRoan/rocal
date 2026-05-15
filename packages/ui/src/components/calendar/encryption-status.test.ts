@@ -18,7 +18,9 @@ describe("resolveEncryptionState", () => {
 
 describe("getEncryptionStatusMeta", () => {
   it("labels shadow-write items as hybrid encrypted", () => {
-    expect(getEncryptionStatusMeta({ encryptionState: "shadow_write" })).toEqual(
+    expect(
+      getEncryptionStatusMeta({ encryptionState: "shadow_write" }),
+    ).toEqual(
       expect.objectContaining({
         state: "shadow_write",
         label: "Hybrid encrypted",
@@ -48,9 +50,7 @@ describe("getEncryptionStatusMeta", () => {
   });
 
   it("surfaces force-full-encryption calendars with a dedicated state", () => {
-    expect(
-      getEncryptionStatusMeta({ forceFullEncryption: true }),
-    ).toEqual(
+    expect(getEncryptionStatusMeta({ forceFullEncryption: true })).toEqual(
       expect.objectContaining({
         state: "force_full",
         label: "Force-encrypted calendar",
@@ -81,9 +81,9 @@ describe("getEncryptionStatusMeta", () => {
 
 describe("resolveEncryptionState force-full precedence", () => {
   it("returns force_full when the flag is set", () => {
-    expect(
-      resolveEncryptionState({ forceFullEncryption: true }),
-    ).toBe("force_full");
+    expect(resolveEncryptionState({ forceFullEncryption: true })).toBe(
+      "force_full",
+    );
   });
 
   it("ignores a falsy force flag", () => {

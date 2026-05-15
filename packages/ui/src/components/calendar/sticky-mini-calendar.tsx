@@ -318,9 +318,7 @@ export function StickyMiniCalendar({
                     <div
                       className={cn(
                         "h-0.5 rounded-full mx-auto mt-1 transition-all duration-200",
-                        isCurrentDay
-                          ? "bg-primary w-5"
-                          : "bg-transparent w-0",
+                        isCurrentDay ? "bg-primary w-5" : "bg-transparent w-0",
                       )}
                     />
 

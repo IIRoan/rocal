@@ -79,8 +79,7 @@ export function useCalendarPresentation({
   );
 
   const visibleCalendarIds = useMemo(
-    () =>
-      createVisibleCalendarIdSet(calendarData.calendars, isCalendarVisible),
+    () => createVisibleCalendarIdSet(calendarData.calendars, isCalendarVisible),
     [calendarData.calendars, isCalendarVisible],
   );
 

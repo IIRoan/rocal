@@ -20,7 +20,9 @@ function isOpenIdConfiguration(metadata: Record<string, unknown>): boolean {
   return isNonEmptyString(metadata.userinfo_endpoint);
 }
 
-function shouldReplaceSigningAlgorithms(metadata: Record<string, unknown>): boolean {
+function shouldReplaceSigningAlgorithms(
+  metadata: Record<string, unknown>,
+): boolean {
   const algorithms = metadata.id_token_signing_alg_values_supported;
 
   if (!Array.isArray(algorithms)) {
@@ -33,7 +35,9 @@ function shouldReplaceSigningAlgorithms(metadata: Record<string, unknown>): bool
     return true;
   }
 
-  return normalizedAlgorithms.length === 1 && normalizedAlgorithms[0] === "HS256";
+  return (
+    normalizedAlgorithms.length === 1 && normalizedAlgorithms[0] === "HS256"
+  );
 }
 
 export function ensureCompatibleOauthMetadata(

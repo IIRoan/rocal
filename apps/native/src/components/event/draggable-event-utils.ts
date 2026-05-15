@@ -62,7 +62,10 @@ export function yOffsetToTime(
   yOffset: number,
   hourHeight: number,
 ): { hour: number; minute: number } {
-  const totalMinutes = Math.max(0, Math.min((yOffset / hourHeight) * 60, 24 * 60 - 1));
+  const totalMinutes = Math.max(
+    0,
+    Math.min((yOffset / hourHeight) * 60, 24 * 60 - 1),
+  );
   const snapped = snapToInterval(totalMinutes);
   const clampedMinutes = Math.min(snapped, 24 * 60 - SNAP_INTERVAL_MINUTES);
   return {

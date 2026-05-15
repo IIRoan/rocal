@@ -236,7 +236,9 @@ export class CalendarSharingService implements ICalendarSharingService {
       throw new NotFoundError("Shared calendar not found");
     }
 
-    if (calendar.events.some((event) => event.encryptionState === "encrypted")) {
+    if (
+      calendar.events.some((event) => event.encryptionState === "encrypted")
+    ) {
       throw new ValidationError(
         "This shared calendar contains fully encrypted events and cannot be exported.",
       );

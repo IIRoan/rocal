@@ -114,9 +114,7 @@ export function parseRRule(rrule: string | null): ParsedRule | null {
  * Build an RRULE string from a structured object.
  */
 export function buildRRule(parsed: ParsedRule): string {
-  const parts: string[] = [
-    `FREQ=${parsed.frequency.toUpperCase()}`,
-  ];
+  const parts: string[] = [`FREQ=${parsed.frequency.toUpperCase()}`];
 
   if (parsed.interval > 1) {
     parts.push(`INTERVAL=${parsed.interval}`);

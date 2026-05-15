@@ -1,10 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import {
-  Animated,
-  StyleSheet,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { Animated, StyleSheet, View, type ViewStyle } from "react-native";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { CalendarView } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -57,10 +52,7 @@ function MonthSkeleton({
       {Array.from({ length: 6 }, (_, row) => (
         <View key={row} style={styles.monthRow}>
           {Array.from({ length: 7 }, (_, col) => (
-            <Animated.View
-              key={col}
-              style={[styles.monthCell, { opacity }]}
-            />
+            <Animated.View key={col} style={[styles.monthCell, { opacity }]} />
           ))}
         </View>
       ))}
@@ -84,10 +76,7 @@ function TimelineSkeleton({
         {/* Time gutter */}
         <View style={styles.timeGutter}>
           {Array.from({ length: 8 }, (_, i) => (
-            <Animated.View
-              key={i}
-              style={[styles.timeLabel, { opacity }]}
-            />
+            <Animated.View key={i} style={[styles.timeLabel, { opacity }]} />
           ))}
         </View>
 
@@ -104,18 +93,12 @@ function TimelineSkeleton({
             {/* Fake event blocks */}
             {col % 2 === 0 && (
               <Animated.View
-                style={[
-                  styles.fakeEvent,
-                  { top: 40, height: 60, opacity },
-                ]}
+                style={[styles.fakeEvent, { top: 40, height: 60, opacity }]}
               />
             )}
             {col % 3 === 0 && (
               <Animated.View
-                style={[
-                  styles.fakeEvent,
-                  { top: 160, height: 40, opacity },
-                ]}
+                style={[styles.fakeEvent, { top: 160, height: 40, opacity }]}
               />
             )}
           </View>
@@ -137,9 +120,7 @@ function AgendaSkeleton({
       {Array.from({ length: 4 }, (_, section) => (
         <View key={section} style={styles.agendaSection}>
           {/* Section header bar */}
-          <Animated.View
-            style={[styles.agendaSectionHeader, { opacity }]}
-          />
+          <Animated.View style={[styles.agendaSectionHeader, { opacity }]} />
           {/* Event rows */}
           {Array.from({ length: 2 + (section % 2) }, (_, row) => (
             <Animated.View

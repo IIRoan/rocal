@@ -37,35 +37,41 @@ export function EventEditorFooter({
       <div className="px-3 py-2 border-t border-border/50 flex flex-row items-center gap-2 shrink-0">
         {isViewMode ? (
           <>
-            {eventForm.selectedEvent?.id && !eventForm.selectedEvent.isSynced && (
+            {eventForm.selectedEvent?.id &&
+              !eventForm.selectedEvent.isSynced && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+              )}
+            <div className="flex-1" />
+            {eventForm.selectedEvent?.id && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleDelete}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleEventDownloadIcs}
               >
-                <Trash2 className="h-4 w-4" /> Delete
-              </Button>
-            )}
-            <div className="flex-1" />
-            {eventForm.selectedEvent?.id && (
-              <Button variant="ghost" size="sm" onClick={handleEventDownloadIcs}>
                 <Download className="h-4 w-4" /> ICS
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={onClose}>
               Close
             </Button>
-            {eventForm.selectedEvent?.id && !eventForm.selectedEvent.isSynced && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => eventForm.setEventViewMode("edit")}
-                className="text-primary hover:bg-primary/10"
-              >
-                <Edit3 className="h-4 w-4" /> Edit
-              </Button>
-            )}
+            {eventForm.selectedEvent?.id &&
+              !eventForm.selectedEvent.isSynced && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => eventForm.setEventViewMode("edit")}
+                  className="text-primary hover:bg-primary/10"
+                >
+                  <Edit3 className="h-4 w-4" /> Edit
+                </Button>
+              )}
           </>
         ) : (
           <>

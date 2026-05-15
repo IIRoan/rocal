@@ -163,8 +163,7 @@ export interface CategoriesResponse {
   categories: EventCategory[];
 }
 
-export interface CreateEventRequest
-  extends EventContentEncryptionShadowRequest {
+export interface CreateEventRequest extends EventContentEncryptionShadowRequest {
   title: string;
   description?: string;
   start: string;
@@ -242,10 +241,9 @@ export interface UserSettings {
   updatedAt: Date;
 }
 
-export interface UpdateSettingsRequest
-  extends Partial<
-    Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
-  > {
+export interface UpdateSettingsRequest extends Partial<
+  Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">
+> {
   userId?: string;
 }
 

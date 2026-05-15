@@ -41,8 +41,13 @@ function createMockPrisma() {
         categoryFixture(data),
       ),
       update: jest.fn(
-        async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
-          categoryFixture({ id: where.id, ...data }),
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Record<string, unknown>;
+        }) => categoryFixture({ id: where.id, ...data }),
       ),
       delete: jest.fn(async () => categoryFixture()),
     },
@@ -97,22 +102,19 @@ describe("CategoryService", () => {
   it.each([
     ["  ", "Category name is required and cannot be empty"],
     ["x".repeat(101), "Category name cannot exceed 100 characters"],
-  ])(
-    "rejects invalid category names: %s",
-    async (name, message) => {
-      await expect(
-        service.create({
-          userId: "user-1",
-          name,
-          color: "blue",
-        }),
-        ).rejects.toMatchObject({
-        name: "ValidationError",
-        field: "name",
-        message,
-        } as Partial<ValidationError>);
-    },
-  );
+  ])("rejects invalid category names: %s", async (name, message) => {
+    await expect(
+      service.create({
+        userId: "user-1",
+        name,
+        color: "blue",
+      }),
+    ).rejects.toMatchObject({
+      name: "ValidationError",
+      field: "name",
+      message,
+    } as Partial<ValidationError>);
+  });
 
   it("rejects invalid colors during update", async () => {
     mockPrisma.eventCategory.findFirst.mockResolvedValueOnce(categoryFixture());
@@ -132,7 +134,9 @@ describe("CategoryService", () => {
   it("rejects duplicate names during update", async () => {
     mockPrisma.eventCategory.findFirst
       .mockResolvedValueOnce(categoryFixture())
-      .mockResolvedValueOnce(categoryFixture({ id: "category-2", name: "Personal" }));
+      .mockResolvedValueOnce(
+        categoryFixture({ id: "category-2", name: "Personal" }),
+      );
 
     await expect(
       service.update({

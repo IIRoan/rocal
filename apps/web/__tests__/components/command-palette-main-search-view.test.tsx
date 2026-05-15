@@ -98,7 +98,9 @@ describe("CommandPaletteMainSearchView", () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector('[data-testid="event-search-results"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="event-search-results"]'),
+    ).not.toBeNull();
     expect(container.textContent).toContain("Planning");
   });
 });

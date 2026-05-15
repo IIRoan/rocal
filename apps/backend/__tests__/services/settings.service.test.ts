@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("../../lib/event-encryption", () => ({
   backfillEncryptedEventsToCiphertextOnly: jest.fn(async () => 2),
-  normalizeEventEncryptionMode: jest.fn(
-    (value?: string | null) => (value === "full" ? "full" : "hybrid"),
+  normalizeEventEncryptionMode: jest.fn((value?: string | null) =>
+    value === "full" ? "full" : "hybrid",
   ),
 }));
 
@@ -92,8 +92,13 @@ function createMockPrisma() {
     },
     userSettings: {
       upsert: jest.fn(
-        async ({ create, update }: { create: Record<string, unknown>; update: Record<string, unknown> }) =>
-          settingsFixture({ ...create, ...update }),
+        async ({
+          create,
+          update,
+        }: {
+          create: Record<string, unknown>;
+          update: Record<string, unknown>;
+        }) => settingsFixture({ ...create, ...update }),
       ),
     },
     calendarEvent: {
@@ -103,13 +108,20 @@ function createMockPrisma() {
 
   const prisma = {
     userSettings: {
-      findUnique: jest.fn<() => Promise<any | null>>(async () => settingsFixture()),
+      findUnique: jest.fn<() => Promise<any | null>>(async () =>
+        settingsFixture(),
+      ),
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) =>
         settingsFixture(data),
       ),
       upsert: jest.fn(
-        async ({ create, update }: { create: Record<string, unknown>; update: Record<string, unknown> }) =>
-          settingsFixture({ ...create, ...update }),
+        async ({
+          create,
+          update,
+        }: {
+          create: Record<string, unknown>;
+          update: Record<string, unknown>;
+        }) => settingsFixture({ ...create, ...update }),
       ),
       deleteMany: jest.fn(async () => ({ count: 1 })),
     },
@@ -119,8 +131,9 @@ function createMockPrisma() {
     calendarEvent: {
       updateMany: jest.fn(async () => ({ count: 0 })),
     },
-    $transaction: jest.fn(async (callback: (tx: MockSettingsTransaction) => Promise<any>) =>
-      callback(tx),
+    $transaction: jest.fn(
+      async (callback: (tx: MockSettingsTransaction) => Promise<any>) =>
+        callback(tx),
     ),
   };
 

@@ -81,9 +81,7 @@ export function parseWorkingDays(
 
     if (
       Array.isArray(parsedDays) &&
-      parsedDays.every(
-        (day) => Number.isInteger(day) && day >= 0 && day <= 6,
-      )
+      parsedDays.every((day) => Number.isInteger(day) && day >= 0 && day <= 6)
     ) {
       return parsedDays as number[];
     }

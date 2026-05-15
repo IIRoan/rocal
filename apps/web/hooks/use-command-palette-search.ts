@@ -239,7 +239,9 @@ export function useCommandPaletteSearch({
     [onSearchEventSelect],
   );
 
-  const handleSearchInputChange = useCallback<ChangeEventHandler<HTMLInputElement>>(
+  const handleSearchInputChange = useCallback<
+    ChangeEventHandler<HTMLInputElement>
+  >(
     (event) => {
       stopEventPropagation(event);
       setSearchQuery(event.target.value);
@@ -247,7 +249,9 @@ export function useCommandPaletteSearch({
     [setSearchQuery],
   );
 
-  const handleSearchInputKeyDown = useCallback<KeyboardEventHandler<HTMLInputElement>>(
+  const handleSearchInputKeyDown = useCallback<
+    KeyboardEventHandler<HTMLInputElement>
+  >(
     (event) => {
       if (event.key === "Backspace" && searchQuery === ">") {
         setSearchQuery("");

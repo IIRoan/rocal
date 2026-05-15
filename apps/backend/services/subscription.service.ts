@@ -55,7 +55,10 @@ export class SubscriptionService implements ISubscriptionService {
     const parsedUrl = new URL(url);
 
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      throw new ValidationError("Only HTTP and HTTPS URLs are supported", "url");
+      throw new ValidationError(
+        "Only HTTP and HTTPS URLs are supported",
+        "url",
+      );
     }
 
     const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
@@ -144,7 +147,10 @@ export class SubscriptionService implements ISubscriptionService {
 
         if ([301, 302, 303, 307, 308].includes(response.status)) {
           if (redirectCount === MAX_CALENDAR_REDIRECTS) {
-            throw new ValidationError("Too many redirects while fetching calendar URL", "url");
+            throw new ValidationError(
+              "Too many redirects while fetching calendar URL",
+              "url",
+            );
           }
 
           const location = response.headers.get("location");
@@ -177,7 +183,10 @@ export class SubscriptionService implements ISubscriptionService {
       }
     }
 
-    throw new ValidationError("Too many redirects while fetching calendar URL", "url");
+    throw new ValidationError(
+      "Too many redirects while fetching calendar URL",
+      "url",
+    );
   }
 
   async list(userId: string) {
@@ -204,7 +213,10 @@ export class SubscriptionService implements ISubscriptionService {
       });
 
     if (existingSubscription) {
-      throw new ValidationError("You are already subscribed to this calendar URL", "url");
+      throw new ValidationError(
+        "You are already subscribed to this calendar URL",
+        "url",
+      );
     }
 
     // Test the URL
@@ -320,9 +332,13 @@ export class SubscriptionService implements ISubscriptionService {
     const trimmedName = name?.trim();
 
     if (trimmedName !== undefined) {
-      if (!trimmedName) throw new ValidationError("Calendar name is required", "name");
+      if (!trimmedName)
+        throw new ValidationError("Calendar name is required", "name");
       if (trimmedName.length > 100)
-        throw new ValidationError("Calendar name cannot exceed 100 characters", "name");
+        throw new ValidationError(
+          "Calendar name cannot exceed 100 characters",
+          "name",
+        );
     }
 
     if (color !== undefined && !isValidCalendarColor(color)) {
@@ -503,7 +519,10 @@ export class SubscriptionService implements ISubscriptionService {
       }
 
       if (!response.ok) {
-        throw new ValidationError(`HTTP ${response.status}: ${response.statusText}`, "url");
+        throw new ValidationError(
+          `HTTP ${response.status}: ${response.statusText}`,
+          "url",
+        );
       }
 
       const icsContent = await response.text();

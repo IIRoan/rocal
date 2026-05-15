@@ -113,9 +113,16 @@ export function DraggableEvent({
 
       // Determine which column the event was dropped in.
       const eventStartDate = new Date(event.start);
-      const effectiveOriginalCol = findEventColumnIndex(eventStartDate, columnDates);
+      const effectiveOriginalCol = findEventColumnIndex(
+        eventStartDate,
+        columnDates,
+      );
       const absoluteX = effectiveOriginalCol * columnWidth + finalTranslateX;
-      const colIdx = xOffsetToColumnIndex(absoluteX, columnWidth, columnDates.length);
+      const colIdx = xOffsetToColumnIndex(
+        absoluteX,
+        columnWidth,
+        columnDates.length,
+      );
 
       const targetDate = columnDates[colIdx];
       if (!targetDate) return;
@@ -125,9 +132,7 @@ export function DraggableEvent({
 
       // Only fire if the time actually changed
       const originalStart = new Date(event.start);
-      if (
-        newStart.getTime() !== originalStart.getTime()
-      ) {
+      if (newStart.getTime() !== originalStart.getTime()) {
         onDrop({ event, newStart, newEnd });
       }
     },
@@ -172,12 +177,20 @@ export function DraggableEvent({
 
       // Check if we've moved to a new snap position for hover haptic
       const absoluteY = top + translateY.value;
-      const totalMinutes = Math.max(0, Math.min((absoluteY / HOUR_HEIGHT) * 60, 24 * 60 - 1));
-      const snappedMinutes = Math.round(totalMinutes / SNAP_INTERVAL_MINUTES) * SNAP_INTERVAL_MINUTES;
+      const totalMinutes = Math.max(
+        0,
+        Math.min((absoluteY / HOUR_HEIGHT) * 60, 24 * 60 - 1),
+      );
+      const snappedMinutes =
+        Math.round(totalMinutes / SNAP_INTERVAL_MINUTES) *
+        SNAP_INTERVAL_MINUTES;
       const currentHour = Math.floor(snappedMinutes / 60);
 
       const eventStartDate = new Date(event.start);
-      const effectiveOriginalCol = findEventColumnIndex(eventStartDate, columnDates);
+      const effectiveOriginalCol = findEventColumnIndex(
+        eventStartDate,
+        columnDates,
+      );
       const absoluteX = effectiveOriginalCol * columnWidth + translateX.value;
       const currentCol = Math.max(
         0,

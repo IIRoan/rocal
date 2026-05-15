@@ -43,8 +43,9 @@ describe("command-palette-interactions", () => {
 
     expect(isCommandMode).toBe(true);
     expect(commandQuery).toBe("pass");
-    expect(getMatchingPaletteCommands(commands, isCommandMode, commandQuery))
-      .toEqual([{ command: "open passkeys", label: "Open Passkeys" }]);
+    expect(
+      getMatchingPaletteCommands(commands, isCommandMode, commandQuery),
+    ).toEqual([{ command: "open passkeys", label: "Open Passkeys" }]);
     expect(getMatchingPaletteCommands(commands, false, commandQuery)).toEqual(
       [],
     );

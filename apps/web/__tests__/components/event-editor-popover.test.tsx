@@ -61,17 +61,18 @@ describe("EventEditorPopover", () => {
 
     previewElement = document.createElement("div");
     previewElement.dataset.previewEvent = "true";
-    previewElement.getBoundingClientRect = () => ({
-      bottom: 240,
-      height: 120,
-      left: 120,
-      right: 280,
-      top: 120,
-      width: 160,
-      x: 120,
-      y: 120,
-      toJSON: () => ({}),
-    }) as DOMRect;
+    previewElement.getBoundingClientRect = () =>
+      ({
+        bottom: 240,
+        height: 120,
+        left: 120,
+        right: 280,
+        top: 120,
+        width: 160,
+        x: 120,
+        y: 120,
+        toJSON: () => ({}),
+      }) as DOMRect;
     document.body.appendChild(previewElement);
 
     originalRequestAnimationFrame = globalThis.requestAnimationFrame;
@@ -80,10 +81,14 @@ describe("EventEditorPopover", () => {
     globalThis.requestAnimationFrame =
       globalThis.requestAnimationFrame ??
       (((callback: FrameRequestCallback) =>
-        window.setTimeout(() => callback(performance.now()), 0)) as typeof globalThis.requestAnimationFrame);
+        window.setTimeout(
+          () => callback(performance.now()),
+          0,
+        )) as typeof globalThis.requestAnimationFrame);
     globalThis.cancelAnimationFrame =
       globalThis.cancelAnimationFrame ??
-      (((handle: number) => window.clearTimeout(handle)) as typeof globalThis.cancelAnimationFrame);
+      (((handle: number) =>
+        window.clearTimeout(handle)) as typeof globalThis.cancelAnimationFrame);
   });
 
   afterEach(() => {
@@ -136,8 +141,12 @@ describe("EventEditorPopover", () => {
     });
 
     expect(document.body.textContent).toContain("Popover Editor");
-    expect(document.querySelector('[data-testid="event-editor-body"]')).not.toBeNull();
-    expect(document.querySelector('[data-testid="event-editor-footer"]')).not.toBeNull();
+    expect(
+      document.querySelector('[data-testid="event-editor-body"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-testid="event-editor-footer"]'),
+    ).not.toBeNull();
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

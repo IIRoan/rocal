@@ -55,8 +55,12 @@ export interface IInviteService {
   createInvite(input: CreateInviteInput): Promise<CreateInviteResult>;
   listInvites(input: ListInvitesInput): Promise<ListInvitesResult>;
   revokeInvite(input: RevokeInviteInput): Promise<RevokeInviteResult>;
-  validateInviteToken(input: ValidateInviteTokenInput): Promise<ValidateInviteTokenResult>;
+  validateInviteToken(
+    input: ValidateInviteTokenInput,
+  ): Promise<ValidateInviteTokenResult>;
   claimInviteToken(input: ClaimInviteInput): Promise<ClaimInviteResult>;
-  checkSignupAllowed(email: string): Promise<{ allowed: boolean; reason?: string }>;
+  checkSignupAllowed(
+    email: string,
+  ): Promise<{ allowed: boolean; reason?: string }>;
   markInviteAccepted(email: string): Promise<void>;
 }

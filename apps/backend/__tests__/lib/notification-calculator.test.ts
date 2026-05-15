@@ -59,11 +59,12 @@ describe("NotificationCalculator", () => {
   });
 
   it("marks future notifications as valid", () => {
-    const result = NotificationCalculator.calculateNotificationTimeWithValidation(
-      new Date("2024-01-10T12:00:30.000Z"),
-      30,
-      new Date("2024-01-10T11:00:15.000Z"),
-    );
+    const result =
+      NotificationCalculator.calculateNotificationTimeWithValidation(
+        new Date("2024-01-10T12:00:30.000Z"),
+        30,
+        new Date("2024-01-10T11:00:15.000Z"),
+      );
 
     expect(result).toEqual({
       notificationTime: new Date("2024-01-10T11:30:00.000Z"),
@@ -72,11 +73,12 @@ describe("NotificationCalculator", () => {
   });
 
   it("reports past notifications as invalid", () => {
-    const result = NotificationCalculator.calculateNotificationTimeWithValidation(
-      new Date("2024-01-10T12:00:00.000Z"),
-      90,
-      new Date("2024-01-10T11:00:00.000Z"),
-    );
+    const result =
+      NotificationCalculator.calculateNotificationTimeWithValidation(
+        new Date("2024-01-10T12:00:00.000Z"),
+        90,
+        new Date("2024-01-10T11:00:00.000Z"),
+      );
 
     expect(result).toEqual({
       notificationTime: new Date("2024-01-10T10:30:00.000Z"),
@@ -88,10 +90,11 @@ describe("NotificationCalculator", () => {
   it("surfaces calculation errors through the validation wrapper", () => {
     jest.useFakeTimers().setSystemTime(new Date("2024-01-10T09:00:00.000Z"));
 
-    const result = NotificationCalculator.calculateNotificationTimeWithValidation(
-      new Date("invalid"),
-      15,
-    );
+    const result =
+      NotificationCalculator.calculateNotificationTimeWithValidation(
+        new Date("invalid"),
+        15,
+      );
 
     expect(result).toEqual({
       notificationTime: new Date("2024-01-10T09:00:00.000Z"),
@@ -143,9 +146,9 @@ describe("NotificationCalculator", () => {
   });
 
   it("rejects invalid dates during minute rounding", () => {
-    expect(() => NotificationCalculator.roundToMinute(new Date("invalid"))).toThrow(
-      "Invalid date provided",
-    );
+    expect(() =>
+      NotificationCalculator.roundToMinute(new Date("invalid")),
+    ).toThrow("Invalid date provided");
   });
 
   it("formats local datetime strings in UTC", () => {
@@ -165,8 +168,16 @@ describe("NotificationCalculator", () => {
 
   it("calculates multiple notification results while preserving config references", () => {
     const configs = [
-      { notificationType: "email" as const, minutesBefore: 15, isEnabled: true },
-      { notificationType: "browser" as const, minutesBefore: 180, isEnabled: false },
+      {
+        notificationType: "email" as const,
+        minutesBefore: 15,
+        isEnabled: true,
+      },
+      {
+        notificationType: "browser" as const,
+        minutesBefore: 180,
+        isEnabled: false,
+      },
     ];
 
     const results = NotificationCalculator.calculateMultipleNotificationTimes(

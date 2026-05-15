@@ -13,7 +13,10 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
-import { hydrateEncryptedEventWithoutSession, ENCRYPTED_EVENT_PLACEHOLDER_TITLE } from "@workspace/e2ee";
+import {
+  hydrateEncryptedEventWithoutSession,
+  ENCRYPTED_EVENT_PLACEHOLDER_TITLE,
+} from "@workspace/e2ee";
 import { waitForPendingE2eeBootstrap } from "./e2ee-bootstrap";
 import { createBlindIndexTokens, decryptJsonPayload } from "./e2ee-crypto";
 import {

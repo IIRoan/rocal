@@ -77,16 +77,22 @@ const getRpId = (url: string) => {
 
 const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, "");
 
-const resolveFrontendRouteUrl = (input: string | undefined, fallbackPath: string) =>
+const resolveFrontendRouteUrl = (
+  input: string | undefined,
+  fallbackPath: string,
+) =>
   new URL(
     input?.trim() || fallbackPath,
     frontendUrl.replace(/\/+$/, "") + "/",
   ).toString();
 
-const mailOauthTrustedClientIds =
-  [...mailOauthCachedTrustedClientIds, mailOauthClientId, mailOauthBrowserClientId]
-    .map((value) => value.trim())
-    .filter(Boolean);
+const mailOauthTrustedClientIds = [
+  ...mailOauthCachedTrustedClientIds,
+  mailOauthClientId,
+  mailOauthBrowserClientId,
+]
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 const mailOauthValidAudiences =
   mailOauthAudiences.length > 0 ? mailOauthAudiences : [stalwartBaseUrl];
@@ -283,7 +289,9 @@ const passkeyStepUpPlugin = {
     after: [
       {
         matcher(context: { path?: string }) {
-          return Boolean(context.path && clearPasskeyStepUpPaths.has(context.path));
+          return Boolean(
+            context.path && clearPasskeyStepUpPaths.has(context.path),
+          );
         },
         handler: createAuthMiddleware(async (ctx) => {
           if (ctx.context.responseHeaders) {
@@ -295,10 +303,14 @@ const passkeyStepUpPlugin = {
       },
       {
         matcher(context: { path?: string }) {
-          return Boolean(context.path && setPasskeyStepUpPaths.has(context.path));
+          return Boolean(
+            context.path && setPasskeyStepUpPaths.has(context.path),
+          );
         },
         handler: createAuthMiddleware(async (ctx) => {
-          const response = await getSuccessfulEndpointResponse(ctx.context.returned);
+          const response = await getSuccessfulEndpointResponse(
+            ctx.context.returned,
+          );
           if (response && ctx.context.responseHeaders) {
             setVerifiedPasskeyStepUpCookie({
               headers: ctx.context.responseHeaders as Headers,
@@ -318,39 +330,49 @@ const inviteRequiredPlugin = {
         matcher(context: { path?: string }) {
           return context.path === "/sign-up/email";
         },
-        handler: createAuthMiddleware(async (ctx): Promise<Response | undefined> => {
-          let email: string | undefined;
-          try {
-            const body = ctx.body as Record<string, unknown> | undefined;
-            if (typeof body?.email === "string") {
-              email = body.email.trim().toLowerCase();
+        handler: createAuthMiddleware(
+          async (ctx): Promise<Response | undefined> => {
+            let email: string | undefined;
+            try {
+              const body = ctx.body as Record<string, unknown> | undefined;
+              if (typeof body?.email === "string") {
+                email = body.email.trim().toLowerCase();
+              }
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
-          }
 
-          if (!email) {
-            return new Response(
-              JSON.stringify({ message: "An invite is required to create an account." }),
-              { status: 403, headers: { "Content-Type": "application/json" } },
-            );
-          }
+            if (!email) {
+              return new Response(
+                JSON.stringify({
+                  message: "An invite is required to create an account.",
+                }),
+                {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" },
+                },
+              );
+            }
 
-          const check = await inviteService.checkSignupAllowed(email);
+            const check = await inviteService.checkSignupAllowed(email);
 
-          if (!check.allowed) {
-            return new Response(
-              JSON.stringify({
-                message:
-                  check.reason ||
-                  "An invite is required to create an account.",
-              }),
-              { status: 403, headers: { "Content-Type": "application/json" } },
-            );
-          }
+            if (!check.allowed) {
+              return new Response(
+                JSON.stringify({
+                  message:
+                    check.reason ||
+                    "An invite is required to create an account.",
+                }),
+                {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" },
+                },
+              );
+            }
 
-          return undefined;
-        }),
+            return undefined;
+          },
+        ),
       },
     ],
     after: [
@@ -451,8 +473,7 @@ export const auth = betterAuth({
   }),
   secret:
     process.env.BETTER_AUTH_SECRET || "default-dev-secret-change-in-production",
-  socialProviders:
-    {},
+  socialProviders: {},
   baseURL: backendUrl,
   basePath: BETTER_AUTH_BASE_PATH,
   trustedOrigins: getAuthTrustedOrigins,
@@ -522,7 +543,8 @@ async function ensureManagedMailOAuthClient(input: {
           scope: mailOauthScopes.join(" "),
           client_name: input.clientName,
           post_logout_redirect_uris:
-            input.postLogoutRedirectUris && input.postLogoutRedirectUris.length > 0
+            input.postLogoutRedirectUris &&
+            input.postLogoutRedirectUris.length > 0
               ? input.postLogoutRedirectUris
               : undefined,
           token_endpoint_auth_method: input.tokenEndpointAuthMethod,

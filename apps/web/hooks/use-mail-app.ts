@@ -58,8 +58,6 @@ const PROTECTED_ROLES = new Set([
   "spam",
 ]);
 
-
-
 export type ActiveMailboxState = {
   client: StalwartJmapClient;
   session: JmapSession;
@@ -675,7 +673,6 @@ export function useMailApp() {
       mailboxStatus,
     ],
   );
-
 
   // Auto-provision + auto-open when cached password is available
   useEffect(() => {

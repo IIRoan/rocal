@@ -26,7 +26,10 @@ export function normalizeLocalPart(value: string): string {
   return value.trim().toLowerCase();
 }
 
-export function buildSolaceEmailAddress(localPart: string, domain: string): string {
+export function buildSolaceEmailAddress(
+  localPart: string,
+  domain: string,
+): string {
   return `${normalizeLocalPart(localPart)}@${normalizeEmail(domain)}`;
 }
 

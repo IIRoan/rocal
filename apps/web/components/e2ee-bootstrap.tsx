@@ -63,7 +63,10 @@ async function retryEncryptionPasswordSetup(
   password: string,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < PASSWORD_SETUP_RETRY_ATTEMPTS; attempt += 1) {
-    const stored = await resetEncryptionPasswordForActiveSession(userId, password);
+    const stored = await resetEncryptionPasswordForActiveSession(
+      userId,
+      password,
+    );
 
     if (stored) {
       return true;
@@ -182,10 +185,13 @@ export function E2eeBootstrap() {
                   return;
                 }
               } catch (setupError) {
-                log.warn("Failed to refresh encrypted data for password setup", {
-                  userId,
-                  error: setupError,
-                });
+                log.warn(
+                  "Failed to refresh encrypted data for password setup",
+                  {
+                    userId,
+                    error: setupError,
+                  },
+                );
               } finally {
                 if (!isCancelled) {
                   setIsSubmitting(false);
@@ -269,7 +275,9 @@ export function E2eeBootstrap() {
         userId,
         error: setupError,
       });
-      setError("Could not save your encryption password and refresh encrypted data.");
+      setError(
+        "Could not save your encryption password and refresh encrypted data.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -296,11 +304,11 @@ export function E2eeBootstrap() {
       const unlocked = await unlockE2eeWithPassword(userId, password);
 
       if (!unlocked) {
-          setError(
-            isEmailPasswordUser
-              ? "That password didn't match. If you recently changed your email sign-in password, use your previous one here."
-              : "That password did not unlock your encrypted data.",
-          );
+        setError(
+          isEmailPasswordUser
+            ? "That password didn't match. If you recently changed your email sign-in password, use your previous one here."
+            : "That password did not unlock your encrypted data.",
+        );
         return;
       }
 

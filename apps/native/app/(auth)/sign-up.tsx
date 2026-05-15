@@ -40,7 +40,9 @@ function validateName(name: string): string | null {
 
 function validateDesiredEmail(email: string): string | null {
   if (!email.trim()) return "Solace email is required";
-  if (!/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(email.trim().toLowerCase())) {
+  if (
+    !/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(email.trim().toLowerCase())
+  ) {
     return "Use lowercase letters, numbers, dots, underscores, or hyphens";
   }
   return null;
@@ -215,15 +217,18 @@ export default function SignUpScreen() {
                 accessibilityLabel="Full name"
                 accessibilityHint="Enter your full name"
               />
-              {nameError && (
-                <Text style={styles.fieldError}>{nameError}</Text>
-              )}
+              {nameError && <Text style={styles.fieldError}>{nameError}</Text>}
             </View>
 
             {/* Solace email field */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Solace email</Text>
-              <View style={[styles.inputWithSuffix, emailError && styles.inputError]}>
+              <View
+                style={[
+                  styles.inputWithSuffix,
+                  emailError && styles.inputError,
+                ]}
+              >
                 <TextInput
                   ref={emailRef}
                   style={styles.inputInner}
@@ -427,7 +432,8 @@ function createStyles(theme: ThemeTokens) {
     title: {
       fontSize: theme.typography.fontSize["2xl"].size,
       lineHeight: theme.typography.fontSize["2xl"].lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: theme.spacing["1"],
     },
@@ -486,7 +492,8 @@ function createStyles(theme: ThemeTokens) {
     primaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
     },
     dividerText: {
@@ -508,7 +515,8 @@ function createStyles(theme: ThemeTokens) {
     footerLink: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryBase,
     },
   } satisfies Record<string, TextStyle>;

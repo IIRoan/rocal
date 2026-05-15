@@ -117,8 +117,7 @@ describe("event-editor-view-model", () => {
     expect(formatReminderMinutes(20160)).toBe("2 weeks");
 
     expect(getEnabledEmailReminderMinutes(reminderNotifications)).toEqual([
-      5,
-      60,
+      5, 60,
     ]);
   });
 

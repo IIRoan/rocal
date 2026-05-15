@@ -83,9 +83,7 @@ export class AccountService implements IAccountService {
     };
   }
 
-  async deleteAccount(
-    input: DeleteAccountInput,
-  ): Promise<DeleteAccountResult> {
+  async deleteAccount(input: DeleteAccountInput): Promise<DeleteAccountResult> {
     const existingUser = await this.prisma.user.findUnique({
       where: { id: input.userId },
       select: { id: true },

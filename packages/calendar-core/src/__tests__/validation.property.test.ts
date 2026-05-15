@@ -104,9 +104,7 @@ describe("validateEventData - Property Tests", () => {
       fc.assert(
         fc.property(longDescriptionArb, (description) => {
           const errors = validateEventData(buildEvent({ description }));
-          expect(errors).toContain(
-            "Description cannot exceed 1000 characters",
-          );
+          expect(errors).toContain("Description cannot exceed 1000 characters");
         }),
       );
     });
@@ -123,9 +121,7 @@ describe("validateEventData - Property Tests", () => {
         fc.integer({ min: 0, max: 24 * 60 }),
       )
       .map(([endDate, minutesBefore]) => {
-        const startDate = new Date(
-          endDate.getTime() + minutesBefore * 60_000,
-        );
+        const startDate = new Date(endDate.getTime() + minutesBefore * 60_000);
         return {
           start: startDate.toISOString(),
           end: endDate.toISOString(),
@@ -155,15 +151,11 @@ describe("validateEventData - Property Tests", () => {
 
             // Should not contain any of the validation errors we're testing
             expect(errors).not.toContain("Title is required");
-            expect(errors).not.toContain(
-              "Title cannot exceed 255 characters",
-            );
+            expect(errors).not.toContain("Title cannot exceed 255 characters");
             expect(errors).not.toContain(
               "Description cannot exceed 1000 characters",
             );
-            expect(errors).not.toContain(
-              "End time must be after start time",
-            );
+            expect(errors).not.toContain("End time must be after start time");
           },
         ),
       );

@@ -82,12 +82,14 @@ export function CalendarViewSwitcher({
           onPress={onToggleMonthStrip}
           style={styles.dateHeaderButton}
           accessibilityRole="button"
-          accessibilityLabel={monthStripExpanded ? "Collapse month calendar" : "Expand month calendar"}
+          accessibilityLabel={
+            monthStripExpanded
+              ? "Collapse month calendar"
+              : "Expand month calendar"
+          }
         >
           <Text style={styles.dateHeader}>{dateHeader}</Text>
-          <Text style={styles.chevron}>
-            {monthStripExpanded ? "▲" : "▼"}
-          </Text>
+          <Text style={styles.chevron}>{monthStripExpanded ? "▲" : "▼"}</Text>
         </Pressable>
 
         <Pressable
@@ -108,7 +110,6 @@ export function CalendarViewSwitcher({
           <Text style={styles.navArrow}>›</Text>
         </Pressable>
       </View>
-
     </View>
   );
 }
@@ -173,8 +174,7 @@ function createStyles(theme: ThemeTokens) {
     todayText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
   } satisfies Record<string, TextStyle>;

@@ -123,7 +123,9 @@ function toggleWorkingDay(workingDays: Set<number>, day: number): Set<number> {
   return next;
 }
 
-function createDefaultSettings(overrides?: Partial<UserSettings>): UserSettings {
+function createDefaultSettings(
+  overrides?: Partial<UserSettings>,
+): UserSettings {
   return {
     id: "settings-1",
     userId: "user-1",
@@ -167,7 +169,7 @@ describe("parseWorkingDays", () => {
   });
 
   it("filters invalid JSON values", () => {
-    const result = parseWorkingDays("[1,2,8,-1,\"3\",null]");
+    const result = parseWorkingDays('[1,2,8,-1,"3",null]');
     expect(result).toEqual(new Set([1, 2, 3]));
   });
 
@@ -382,7 +384,12 @@ describe("Working days toggle", () => {
 
 describe("Loading and error state logic", () => {
   it("identifies a loading state", () => {
-    const state = { data: undefined, isLoading: true, isError: false, error: null };
+    const state = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+    };
     expect(state.isLoading).toBe(true);
     expect(state.data).toBeUndefined();
   });
@@ -435,7 +442,9 @@ describe("Default values for undefined settings", () => {
 
   it("defaults workingDays to the web-compatible JSON shape", () => {
     const settings = getSettings();
-    const workingDays = parseWorkingDays(settings?.workingDays ?? "[1,2,3,4,5]");
+    const workingDays = parseWorkingDays(
+      settings?.workingDays ?? "[1,2,3,4,5]",
+    );
     expect(workingDays).toEqual(new Set([1, 2, 3, 4, 5]));
   });
 });

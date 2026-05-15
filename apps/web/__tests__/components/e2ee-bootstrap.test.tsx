@@ -60,11 +60,15 @@ jest.mock("@/lib/enc-password-cookie", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/dialog", () => ({
-  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogContent: ({
-    children,
-  }: React.HTMLAttributes<HTMLDivElement>) => <div>{children}</div>,
-  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Dialog: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DialogContent: ({ children }: React.HTMLAttributes<HTMLDivElement>) => (
+    <div>{children}</div>
+  ),
+  DialogTitle: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui/button", () => ({
@@ -77,7 +81,9 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/input", () => ({
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} />
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui/label", () => ({
@@ -90,7 +96,9 @@ jest.mock("@workspace/ui/components/ui/label", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/visually-hidden", () => ({
-  VisuallyHidden: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  VisuallyHidden: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 import { E2eeBootstrap } from "../../components/e2ee-bootstrap";
@@ -297,7 +305,9 @@ describe("E2eeBootstrap component", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Enter your email sign-in password.");
+    expect(container.textContent).toContain(
+      "Enter your email sign-in password.",
+    );
   });
 
   it("shows auth-method-specific wrong-password errors in unlock mode", async () => {
@@ -405,11 +415,12 @@ describe("E2eeBootstrap component", () => {
       await Promise.resolve();
     });
 
-    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledTimes(3);
-    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenLastCalledWith(
-      "user-1",
-      "pw",
+    expect(mockResetEncryptionPasswordForActiveSession).toHaveBeenCalledTimes(
+      3,
     );
+    expect(
+      mockResetEncryptionPasswordForActiveSession,
+    ).toHaveBeenLastCalledWith("user-1", "pw");
     expect(container.textContent).not.toContain("Protect your encryption keys");
   });
 
@@ -448,18 +459,25 @@ describe("E2eeBootstrap component", () => {
   it("writes the cookie after a successful manual unlock", async () => {
     mockEnsureE2eeBootstrap.mockResolvedValue({
       activated: false,
-      bootstrap: createBootstrap({ passwordEnvelope: createPasswordEnvelope() }),
+      bootstrap: createBootstrap({
+        passwordEnvelope: createPasswordEnvelope(),
+      }),
     });
 
     await renderComponent();
 
-    const passwordInput = container.querySelector("#e2ee-password") as HTMLInputElement;
+    const passwordInput = container.querySelector(
+      "#e2ee-password",
+    ) as HTMLInputElement;
     const submitButton = Array.from(container.querySelectorAll("button")).find(
       (el) => el.textContent?.includes("Unlock"),
     );
 
     await act(async () => {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      );
       descriptor?.set?.call(passwordInput, "my-unlock-pw");
       passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
       submitButton?.click();
@@ -477,14 +495,21 @@ describe("E2eeBootstrap component", () => {
 
     await renderComponent();
 
-    const passwordInput = container.querySelector("#e2ee-password") as HTMLInputElement;
-    const confirmInput = container.querySelector("#e2ee-password-confirm") as HTMLInputElement;
+    const passwordInput = container.querySelector(
+      "#e2ee-password",
+    ) as HTMLInputElement;
+    const confirmInput = container.querySelector(
+      "#e2ee-password-confirm",
+    ) as HTMLInputElement;
     const submitButton = Array.from(container.querySelectorAll("button")).find(
       (el) => el.textContent?.includes("Save password"),
     );
 
     await act(async () => {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      );
       descriptor?.set?.call(passwordInput, "new-strong-pw!");
       passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
       descriptor?.set?.call(confirmInput, "new-strong-pw!");

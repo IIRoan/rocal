@@ -11,7 +11,9 @@ import {
 import { resolveRouteUser } from "../../lib/request-user";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 
 describe("resolveRouteUser", () => {
   it("returns the existing authenticated user without fallback lookup", async () => {
@@ -31,7 +33,10 @@ describe("resolveRouteUser", () => {
     mockEnsureAuthenticatedUser.mockResolvedValueOnce(user);
 
     await expect(resolveRouteUser(undefined, request)).resolves.toBe(user);
-    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(undefined, request);
+    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+      undefined,
+      request,
+    );
   });
 
   it("falls back to ensureAuthenticatedUser when authenticatedUser is null", async () => {
@@ -40,6 +45,9 @@ describe("resolveRouteUser", () => {
     mockEnsureAuthenticatedUser.mockResolvedValueOnce(user);
 
     await expect(resolveRouteUser(null, request)).resolves.toBe(user);
-    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(undefined, request);
+    expect(mockEnsureAuthenticatedUser).toHaveBeenCalledWith(
+      undefined,
+      request,
+    );
   });
 });

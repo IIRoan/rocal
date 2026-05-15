@@ -61,8 +61,9 @@ import { getAuthCapabilities } from "../lib/auth-capabilities";
 import { waitForSessionCookie } from "../lib/session-cookie";
 import { AuthProvider, useAuth } from "./AuthProvider";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 type AuthContextValue = ReturnType<typeof useAuth>;
 
@@ -206,7 +207,11 @@ describe("AuthProvider", () => {
     await renderProvider();
 
     await act(async () => {
-      await getAuth().signUp("Roan", "roan@example.com", "new-account-password");
+      await getAuth().signUp(
+        "Roan",
+        "roan@example.com",
+        "new-account-password",
+      );
     });
 
     expect(getAuth().lastAuthMethod).toBe("email-password");

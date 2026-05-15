@@ -51,9 +51,7 @@ describe("calendar-ui-helpers", () => {
     expect(getErrorMessage({ message: "  Trimmed error  " }, "Fallback")).toBe(
       "  Trimmed error  ",
     );
-    expect(getErrorMessage({ message: "   " }, "Fallback")).toBe(
-      "Fallback",
-    );
+    expect(getErrorMessage({ message: "   " }, "Fallback")).toBe("Fallback");
     expect(getErrorMessage(null, "Fallback")).toBe("Fallback");
   });
 });

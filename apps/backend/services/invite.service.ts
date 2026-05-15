@@ -182,7 +182,9 @@ export class InviteService implements IInviteService {
     }
 
     if (invite.status === "accepted") {
-      throw new ValidationError("Cannot revoke an invite that has already been accepted.");
+      throw new ValidationError(
+        "Cannot revoke an invite that has already been accepted.",
+      );
     }
 
     if (invite.status === "revoked") {
@@ -194,7 +196,10 @@ export class InviteService implements IInviteService {
       data: { status: "revoked" },
     });
 
-    logger.info("Invite revoked", { inviteId: input.id, by: input.invitedById });
+    logger.info("Invite revoked", {
+      inviteId: input.id,
+      by: input.invitedById,
+    });
 
     return { success: true };
   }

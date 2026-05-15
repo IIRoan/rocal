@@ -47,7 +47,9 @@ function DrawerOverlay({
   );
 }
 
-type DrawerContentProps = React.ComponentProps<typeof DrawerPrimitive.Content> & {
+type DrawerContentProps = React.ComponentProps<
+  typeof DrawerPrimitive.Content
+> & {
   responsive?: boolean;
   responsiveHeight?: string;
   keyboardAware?: boolean;

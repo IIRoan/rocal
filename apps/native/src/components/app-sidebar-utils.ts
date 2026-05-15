@@ -118,10 +118,10 @@ export interface SidebarViewOption {
 }
 
 export const SIDEBAR_VIEW_OPTIONS: SidebarViewOption[] = [
-  { view: "day",    label: "Day",    icon: "square" },
-  { view: "3day",   label: "3 Day",  icon: "columns" },
-  { view: "week",   label: "Week",   icon: "grid" },
-  { view: "month",  label: "Month",  icon: "calendar" },
+  { view: "day", label: "Day", icon: "square" },
+  { view: "3day", label: "3 Day", icon: "columns" },
+  { view: "week", label: "Week", icon: "grid" },
+  { view: "month", label: "Month", icon: "calendar" },
   { view: "agenda", label: "Agenda", icon: "list" },
 ];
 

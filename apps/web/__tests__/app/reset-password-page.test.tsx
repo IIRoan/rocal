@@ -55,7 +55,9 @@ jest.mock("@/lib/auth-client", () => ({
 }));
 
 jest.mock("@workspace/ui/components/layout", () => ({
-  Logo: (props: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>Solace</div>,
+  Logo: (props: React.HTMLAttributes<HTMLDivElement>) => (
+    <div {...props}>Solace</div>
+  ),
   ThemeToggle: () => <button type="button">Theme</button>,
 }));
 
@@ -69,7 +71,9 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/input", () => ({
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} />
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui/label", () => ({
