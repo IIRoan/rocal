@@ -391,7 +391,7 @@ function AppSidebarDesktop({
   activeApp: "calendar" | "mail";
   props: React.ComponentProps<typeof Sidebar>;
 }) {
-  const { calendars, isCalendarVisible } = useCalendarContext();
+  const { calendars, isCalendarVisible, toggleCalendarVisibility } = useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
   );
@@ -581,7 +581,10 @@ function AppSidebarDesktop({
                     key={calendar.id}
                     className="flex justify-center list-none"
                   >
-                    <CollapsedIconButton label={calendar.name}>
+                    <CollapsedIconButton
+                      label={calendar.name}
+                      onClick={() => void toggleCalendarVisibility(calendar.id)}
+                    >
                       <span
                         className="size-2.5 rounded-full shrink-0 transition-opacity"
                         style={{
@@ -617,7 +620,8 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-default ${
+                          onClick={() => void toggleCalendarVisibility(calendar.id)}
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
                               : "text-muted-foreground/40"
@@ -648,7 +652,8 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-default ${
+                          onClick={() => void toggleCalendarVisibility(calendar.id)}
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
                               : "text-muted-foreground/40"
@@ -679,7 +684,8 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-default ${
+                          onClick={() => void toggleCalendarVisibility(calendar.id)}
+                          className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
                               : "text-muted-foreground/40"
