@@ -283,7 +283,7 @@ export function useCalendarEventsLoader(
 
   return {
     events: eventsQuery.data ?? [],
-    eventsLoading: eventsQuery.isFetching,
+    eventsLoading: eventsQuery.isLoading,
     eventsError: eventsQuery.error as unknown as ApiError | null,
     currentDateRange: fetchRange,
     setDateRange,

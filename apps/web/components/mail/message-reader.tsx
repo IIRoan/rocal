@@ -16,12 +16,21 @@ import {
   Tag,
   Plus,
   X,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerClose,
+} from "@workspace/ui/components/ui/drawer";
+import { useIsMobile } from "@workspace/ui/hooks";
 import { SenderAvatar } from "./mail-avatar";
 import type { JmapMailbox, LabelDef } from "@/lib/mail/types";
 import {
@@ -426,6 +435,11 @@ export function MessageReader({
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
   const [isSavingLabel, setIsSavingLabel] = useState(false);
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [isBodyExpanded, setIsBodyExpanded] = useState(false);
+  const isMobile = useIsMobile();
+
+  const PLAINTEXT_COLLAPSE_THRESHOLD = 1200;
   if (!message) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -537,199 +551,319 @@ export function MessageReader({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-1 py-1.5 border-t border-border/40">
-        <button
-          type="button"
-          onClick={onReply}
-          disabled={isBusy}
-          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-        >
-          <Reply className="h-3.5 w-3.5" strokeWidth={2.25} />
-          Reply
-        </button>
-        <button
-          type="button"
-          onClick={onForward}
-          disabled={isBusy}
-          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-        >
-          <Forward className="h-3.5 w-3.5" strokeWidth={2.25} />
-          Forward
-        </button>
-        <button
-          type="button"
-          onClick={onMarkAsUnread}
-          disabled={isBusy}
-          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-        >
-          <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
-          Mark unread
-        </button>
-        {otherMailboxes.length > 0 && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                disabled={isBusy}
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-              >
-                <FolderInput className="h-3.5 w-3.5" strokeWidth={2.25} />
-                Move
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="bottom"
-              align="start"
-              sideOffset={6}
-              className="w-48 p-1"
+      {/* Action bar */}
+      {isMobile ? (
+        /* ── Mobile action bar: Reply + Forward + overflow "⋯" ── */
+        <>
+          <div className="flex items-center gap-1 py-1.5 border-t border-border/40">
+            <button
+              type="button"
+              onClick={onReply}
+              disabled={isBusy}
+              aria-label="Reply"
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
             >
-              {otherMailboxes.map((mailbox) => (
+              <Reply className="h-4 w-4" strokeWidth={2.25} />
+              Reply
+            </button>
+            <button
+              type="button"
+              onClick={onForward}
+              disabled={isBusy}
+              aria-label="Forward"
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+            >
+              <Forward className="h-4 w-4" strokeWidth={2.25} />
+              Forward
+            </button>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setMoreActionsOpen(true)}
+              disabled={isBusy}
+              aria-label="More actions"
+              className="inline-flex items-center justify-center h-8 w-8 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+            >
+              <MoreHorizontal className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+          </div>
+
+          {/* Mobile overflow drawer */}
+          <Drawer open={moreActionsOpen} onOpenChange={setMoreActionsOpen}>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>Message actions</DrawerTitle>
+              </DrawerHeader>
+              <div className="px-4 pb-6 space-y-1 overflow-y-auto">
                 <button
-                  key={mailbox.id}
                   type="button"
-                  onClick={() => onMove(mailbox.id)}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
+                  onClick={() => { onMarkAsUnread(); setMoreActionsOpen(false); }}
+                  disabled={isBusy}
+                  className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                 >
-                  {mailbox.name}
+                  <MailOpen className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+                  Mark as unread
                 </button>
-              ))}
-            </PopoverContent>
-          </Popover>
-        )}
-        <div className="flex-1" />
-        {(onSetLabel && labels.length > 0) || onCreateLabel ? (
-          <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                disabled={isBusy}
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-              >
-                <Tag className="h-3.5 w-3.5" strokeWidth={2.25} />
-                Labels
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="bottom"
-              align="end"
-              sideOffset={6}
-              className="w-56 p-0 overflow-hidden"
-            >
-              {labels.length > 0 && (
-                <div className="p-1 border-b border-border/40">
-                  {labels.map((label) => {
-                    const assigned =
-                      message?.keywords?.[`label:${label.id}`] === true;
-                    return (
+                {otherMailboxes.length > 0 && (
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <button
-                        key={label.id}
                         type="button"
-                        onClick={() => onSetLabel?.(label.id, !assigned)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
+                        disabled={isBusy}
+                        className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                       >
-                        <span
-                          className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover transition-shadow"
-                          style={{
-                            backgroundColor: label.color,
-                            boxShadow: assigned
-                              ? `0 0 0 1px ${label.color}`
-                              : undefined,
-                          }}
-                        />
-                        <span className="flex-1 truncate text-foreground/80">
-                          {label.name}
-                        </span>
-                        {assigned && (
-                          <Check
-                            className="h-3 w-3 text-foreground/50 shrink-0"
-                            strokeWidth={2.5}
-                          />
-                        )}
-                        {onDeleteLabel && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteLabel(label.id);
-                            }}
-                            className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
-                            aria-label={`Delete label ${label.name}`}
-                          >
-                            <X className="h-3 w-3" strokeWidth={2.5} />
-                          </button>
-                        )}
+                        <FolderInput className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+                        Move to…
                       </button>
-                    );
-                  })}
-                </div>
-              )}
-              {onCreateLabel && (
-                <div className="p-2 space-y-1.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
-                    New label
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" sideOffset={6} className="w-48 p-1">
+                      {otherMailboxes.map((mailbox) => (
+                        <button
+                          key={mailbox.id}
+                          type="button"
+                          onClick={() => { onMove(mailbox.id); setMoreActionsOpen(false); }}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
+                        >
+                          {mailbox.name}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                )}
+                {((onSetLabel && labels.length > 0) || onCreateLabel) && (
+                  <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
+                      >
+                        <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+                        Labels
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" sideOffset={6} className="w-56 p-0 overflow-hidden">
+                      {labels.length > 0 && (
+                        <div className="p-1 border-b border-border/40">
+                          {labels.map((label) => {
+                            const assigned = message?.keywords?.[`label:${label.id}`] === true;
+                            return (
+                              <button
+                                key={label.id}
+                                type="button"
+                                onClick={() => onSetLabel?.(label.id, !assigned)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
+                              >
+                                <span className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover" style={{ backgroundColor: label.color, boxShadow: assigned ? `0 0 0 1px ${label.color}` : undefined }} />
+                                <span className="flex-1 truncate text-foreground/80">{label.name}</span>
+                                {assigned && <Check className="h-3 w-3 text-foreground/50 shrink-0" strokeWidth={2.5} />}
+                                {onDeleteLabel && (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); onDeleteLabel(label.id); }} className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors" aria-label={`Delete label ${label.name}`}>
+                                    <X className="h-3 w-3" strokeWidth={2.5} />
+                                  </button>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {onCreateLabel && (
+                        <div className="p-2 space-y-1.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">New label</div>
+                          <div className="flex items-center gap-1.5">
+                            <input type="color" value={newLabelColor} onChange={(e) => setNewLabelColor(e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent" title="Label color" />
+                            <input type="text" value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newLabelName.trim()) { setIsSavingLabel(true); void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => { setNewLabelName(""); setIsSavingLabel(false); }); } }} placeholder="Label name…" className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40" />
+                            <button type="button" disabled={!newLabelName.trim() || isSavingLabel} onClick={() => { if (!newLabelName.trim()) return; setIsSavingLabel(true); void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => { setNewLabelName(""); setIsSavingLabel(false); }); }} className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors" aria-label="Create label">
+                              <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { onDelete(); setMoreActionsOpen(false); }}
+                  disabled={isBusy}
+                  className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-destructive/80 hover:bg-destructive/10 active:bg-destructive/20 transition-colors disabled:opacity-40"
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={2} />
+                  Delete message
+                </button>
+                <DrawerClose asChild>
+                  <button type="button" className="w-full flex items-center justify-center h-11 px-3 rounded-lg text-sm text-muted-foreground hover:bg-accent/40 transition-colors mt-2">
+                    Cancel
+                  </button>
+                </DrawerClose>
+              </div>
+            </DrawerContent>
+          </Drawer>
+        </>
+      ) : (
+        /* ── Desktop action bar: full inline buttons ── */
+        <div className="flex items-center gap-1 py-1.5 border-t border-border/40">
+          <button
+            type="button"
+            onClick={onReply}
+            disabled={isBusy}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+          >
+            <Reply className="h-3.5 w-3.5" strokeWidth={2.25} />
+            Reply
+          </button>
+          <button
+            type="button"
+            onClick={onForward}
+            disabled={isBusy}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+          >
+            <Forward className="h-3.5 w-3.5" strokeWidth={2.25} />
+            Forward
+          </button>
+          <button
+            type="button"
+            onClick={onMarkAsUnread}
+            disabled={isBusy}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+          >
+            <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+            Mark unread
+          </button>
+          {otherMailboxes.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+                >
+                  <FolderInput className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  Move
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" sideOffset={6} className="w-48 p-1">
+                {otherMailboxes.map((mailbox) => (
+                  <button
+                    key={mailbox.id}
+                    type="button"
+                    onClick={() => onMove(mailbox.id)}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
+                  >
+                    {mailbox.name}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+          <div className="flex-1" />
+          {(onSetLabel && labels.length > 0) || onCreateLabel ? (
+            <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+                >
+                  <Tag className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  Labels
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" sideOffset={6} className="w-56 p-0 overflow-hidden">
+                {labels.length > 0 && (
+                  <div className="p-1 border-b border-border/40">
+                    {labels.map((label) => {
+                      const assigned = message?.keywords?.[`label:${label.id}`] === true;
+                      return (
+                        <button
+                          key={label.id}
+                          type="button"
+                          onClick={() => onSetLabel?.(label.id, !assigned)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
+                        >
+                          <span
+                            className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover transition-shadow"
+                            style={{
+                              backgroundColor: label.color,
+                              boxShadow: assigned ? `0 0 0 1px ${label.color}` : undefined,
+                            }}
+                          />
+                          <span className="flex-1 truncate text-foreground/80">{label.name}</span>
+                          {assigned && (
+                            <Check className="h-3 w-3 text-foreground/50 shrink-0" strokeWidth={2.5} />
+                          )}
+                          {onDeleteLabel && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteLabel(label.id);
+                              }}
+                              className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
+                              aria-label={`Delete label ${label.name}`}
+                            >
+                              <X className="h-3 w-3" strokeWidth={2.5} />
+                            </button>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="color"
-                      value={newLabelColor}
-                      onChange={(e) => setNewLabelColor(e.target.value)}
-                      className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
-                      title="Label color"
-                    />
-                    <input
-                      type="text"
-                      value={newLabelName}
-                      onChange={(e) => setNewLabelName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newLabelName.trim()) {
+                )}
+                {onCreateLabel && (
+                  <div className="p-2 space-y-1.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">New label</div>
+                    <div className="flex items-center gap-1.5">
+                      <input type="color" value={newLabelColor} onChange={(e) => setNewLabelColor(e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent" title="Label color" />
+                      <input
+                        type="text"
+                        value={newLabelName}
+                        onChange={(e) => setNewLabelName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newLabelName.trim()) {
+                            setIsSavingLabel(true);
+                            void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => {
+                              setNewLabelName("");
+                              setIsSavingLabel(false);
+                            });
+                          }
+                        }}
+                        placeholder="Label name…"
+                        className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
+                      />
+                      <button
+                        type="button"
+                        disabled={!newLabelName.trim() || isSavingLabel}
+                        onClick={() => {
+                          if (!newLabelName.trim()) return;
                           setIsSavingLabel(true);
-                          void onCreateLabel(
-                            newLabelName.trim(),
-                            newLabelColor,
-                          ).then(() => {
+                          void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => {
                             setNewLabelName("");
                             setIsSavingLabel(false);
                           });
-                        }
-                      }}
-                      placeholder="Label name…"
-                      className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
-                    />
-                    <button
-                      type="button"
-                      disabled={!newLabelName.trim() || isSavingLabel}
-                      onClick={() => {
-                        if (!newLabelName.trim()) return;
-                        setIsSavingLabel(true);
-                        void onCreateLabel(
-                          newLabelName.trim(),
-                          newLabelColor,
-                        ).then(() => {
-                          setNewLabelName("");
-                          setIsSavingLabel(false);
-                        });
-                      }}
-                      className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
-                      aria-label="Create label"
-                    >
-                      <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
-                    </button>
+                        }}
+                        className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
+                        aria-label="Create label"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
-        ) : null}
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={isBusy}
-          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
-        >
-          <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
-          Delete
-        </button>
-      </div>
+                )}
+              </PopoverContent>
+            </Popover>
+          ) : null}
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isBusy}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+          >
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+            Delete
+          </button>
+        </div>
+      )}
       {decryptError && (
         <div className="rounded-md border border-amber-200/60 bg-amber-50/60 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 mt-3">
           {decryptError}
@@ -750,9 +884,22 @@ export function MessageReader({
     <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg border border-border/50 overflow-y-auto bg-white [color-scheme:light]">
       <div className="px-5 py-4">
         {displayText ? (
-          <div className="text-sm leading-relaxed text-[#111] whitespace-pre-wrap">
-            {displayText}
-          </div>
+          <>
+            <div className="text-sm leading-relaxed text-[#111] whitespace-pre-wrap">
+              {!isBodyExpanded && displayText.length > PLAINTEXT_COLLAPSE_THRESHOLD
+                ? displayText.slice(0, PLAINTEXT_COLLAPSE_THRESHOLD) + "…"
+                : displayText}
+            </div>
+            {displayText.length > PLAINTEXT_COLLAPSE_THRESHOLD && (
+              <button
+                type="button"
+                onClick={() => setIsBodyExpanded((v) => !v)}
+                className="mt-3 text-xs font-medium text-primary/70 hover:text-primary transition-colors"
+              >
+                {isBodyExpanded ? "Show less" : `Show more (${Math.round(displayText.length / 1000)}k chars)`}
+              </button>
+            )}
+          </>
         ) : (
           <span className="text-sm italic text-[#666]">No message body</span>
         )}

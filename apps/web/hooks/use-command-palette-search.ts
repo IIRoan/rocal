@@ -117,7 +117,7 @@ export function useCommandPaletteSearch({
         filteredItems,
         isCommandMode,
         query: debouncedQuery,
-        rootItems: NAVIGATION_ITEMS,
+        rootItems: NAVIGATION_ITEMS.filter((item) => item.parent === null),
       }),
     [filteredItems, isCommandMode, debouncedQuery],
   );
