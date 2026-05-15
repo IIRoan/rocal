@@ -63,12 +63,9 @@ describe("isHexCalendarColor", () => {
 });
 
 describe("isValidCalendarColor", () => {
-  it.each(ALLOWED_CALENDAR_COLORS)(
-    "accepts named color '%s'",
-    (color) => {
-      expect(isValidCalendarColor(color)).toBe(true);
-    },
-  );
+  it.each(ALLOWED_CALENDAR_COLORS)("accepts named color '%s'", (color) => {
+    expect(isValidCalendarColor(color)).toBe(true);
+  });
 
   it("accepts valid 6-digit hex colors", () => {
     expect(isValidCalendarColor("#FF0000")).toBe(true);

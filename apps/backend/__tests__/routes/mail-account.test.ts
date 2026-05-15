@@ -2,11 +2,13 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { Elysia } from "elysia";
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-    email: "alice@solace.onl",
-    name: "Alice Example",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+      email: "alice@solace.onl",
+      name: "Alice Example",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -23,7 +25,8 @@ jest.mock("../../lib/auth-guard", () => {
 
 const mockMailOAuthConfig = {
   issuer: "https://api.solace.test/api/auth",
-  discoveryUrl: "https://api.solace.test/api/auth/.well-known/openid-configuration",
+  discoveryUrl:
+    "https://api.solace.test/api/auth/.well-known/openid-configuration",
   authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
   tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
   userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",

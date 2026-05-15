@@ -72,7 +72,7 @@ describe("Property 1: Design token completeness", () => {
         expect(theme).toHaveProperty("borderRadius");
         expect(theme).toHaveProperty("shadows");
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -84,7 +84,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof theme.colors[key]).toBe("string");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -97,7 +97,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof primary[step]).toBe("string");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -113,7 +113,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof calColor.fg).toBe("string");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -126,7 +126,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof value).toBe("number");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -137,7 +137,7 @@ describe("Property 1: Design token completeness", () => {
         expect(typeof theme.typography.fontFamily.sans).toBe("string");
         expect(typeof theme.typography.fontFamily.mono).toBe("string");
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -151,7 +151,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof value.lineHeight).toBe("number");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -164,7 +164,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof value).toBe("string");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -177,7 +177,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof value).toBe("number");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -195,7 +195,7 @@ describe("Property 1: Design token completeness", () => {
           expect(typeof s.color).toBe("string");
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });

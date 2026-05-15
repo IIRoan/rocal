@@ -5,10 +5,7 @@ import type {
   EventNotification,
 } from "@workspace/ui/components/calendar";
 
-import type {
-  EventEncryptionMode,
-  RecurrenceRule,
-} from "./types/calendar";
+import type { EventEncryptionMode, RecurrenceRule } from "./types/calendar";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -140,9 +137,9 @@ export function isRecurringEventDeleteCandidate(
 ) {
   return Boolean(
     event?.recurrence ||
-      event?.isRecurringInstance ||
-      event?.parentEventId ||
-      (event?.id && event.id.includes("_")),
+    event?.isRecurringInstance ||
+    event?.parentEventId ||
+    (event?.id && event.id.includes("_")),
   );
 }
 

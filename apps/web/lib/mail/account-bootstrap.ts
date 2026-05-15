@@ -71,7 +71,9 @@ async function waitForAuthenticatedUser(input: {
       return {
         userId: user.id,
         email: normalizeEmail(user.email),
-        displayName: normalizeOptionalText(user.name) ?? normalizeOptionalText(input.displayName),
+        displayName:
+          normalizeOptionalText(user.name) ??
+          normalizeOptionalText(input.displayName),
       };
     }
   }
@@ -114,7 +116,11 @@ export async function bootstrapMailboxForAccount(input: {
 
   let provisionedMailbox: MailSignupResponse | null = null;
 
-  for (let attempt = 0; attempt < BOOTSTRAP_RETRY_DELAYS_MS.length; attempt += 1) {
+  for (
+    let attempt = 0;
+    attempt < BOOTSTRAP_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
     const delayMs = BOOTSTRAP_RETRY_DELAYS_MS[attempt];
 
     if (delayMs > 0) {
@@ -134,7 +140,10 @@ export async function bootstrapMailboxForAccount(input: {
       });
       break;
     } catch (error) {
-      if (!isRetryableBootstrapError(error) || attempt === BOOTSTRAP_RETRY_DELAYS_MS.length - 1) {
+      if (
+        !isRetryableBootstrapError(error) ||
+        attempt === BOOTSTRAP_RETRY_DELAYS_MS.length - 1
+      ) {
         throw error;
       }
 

@@ -161,17 +161,10 @@ describe("groupEventsIntoSections", () => {
 
   it("places all-day events before timed events within a section", () => {
     const events = [
-      makeEvent(
-        "timed",
-        new Date(2025, 0, 15, 9),
-        new Date(2025, 0, 15, 10),
-      ),
-      makeEvent(
-        "allday",
-        new Date(2025, 0, 15, 0),
-        new Date(2025, 0, 16, 0),
-        { allDay: true },
-      ),
+      makeEvent("timed", new Date(2025, 0, 15, 9), new Date(2025, 0, 15, 10)),
+      makeEvent("allday", new Date(2025, 0, 15, 0), new Date(2025, 0, 16, 0), {
+        allDay: true,
+      }),
     ];
     const sections = groupEventsIntoSections(events);
 

@@ -142,7 +142,9 @@ function EventWrapper({
         "hover:brightness-[1.04] hover:shadow-sm hover:z-10",
         "active:brightness-[0.97]",
         "touch-manipulation",
-        compact ? "min-h-0 px-1" : "min-h-[20px] sm:min-h-[24px] px-1.5 sm:px-2",
+        compact
+          ? "min-h-0 px-1"
+          : "min-h-[20px] sm:min-h-[24px] px-1.5 sm:px-2",
         getEventColorClasses(event.color),
         getBorderRadiusClasses(isFirstDay, isLastDay),
         className,
@@ -417,7 +419,11 @@ export function EventItem({
             </div>
             {event.location && (
               <div className="flex items-center gap-1 text-[12px] text-muted-foreground min-w-0">
-                <MapPinIcon size={12} weight="fill" className="shrink-0 opacity-70" />
+                <MapPinIcon
+                  size={12}
+                  weight="fill"
+                  className="shrink-0 opacity-70"
+                />
                 <span className="truncate">{event.location}</span>
               </div>
             )}

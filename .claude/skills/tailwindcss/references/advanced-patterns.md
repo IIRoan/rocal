@@ -6,14 +6,16 @@
 
 ```vue
 <template>
-  <div class="
+  <div
+    class="
     grid
     grid-cols-12
     gap-4
     h-screen
     p-4
     bg-jarvis-bg-dark
-  ">
+  "
+  >
     <!-- Top status bar -->
     <div class="col-span-12 h-12 flex items-center justify-between">
       <StatusIndicators />
@@ -71,19 +73,23 @@ keyframes: {
 
 ```vue
 <template>
-  <div class="
+  <div
+    class="
     flex
     flex-col md:flex-row
     gap-4
     p-2 md:p-4
-  ">
+  "
+  >
     <!-- Collapses on mobile -->
-    <aside class="
+    <aside
+      class="
       w-full md:w-64
       flex md:flex-col
       gap-2
       overflow-x-auto md:overflow-visible
-    ">
+    "
+    >
       <MiniPanel v-for="panel in panels" :key="panel.id" />
     </aside>
 
@@ -99,22 +105,22 @@ keyframes: {
 
 ```javascript
 // plugins/holographic.js
-const plugin = require('tailwindcss/plugin')
+const plugin = require("tailwindcss/plugin");
 
-module.exports = plugin(function({ addUtilities, theme }) {
-  const glows = {}
+module.exports = plugin(function ({ addUtilities, theme }) {
+  const glows = {};
 
-  Object.entries(theme('colors.jarvis')).forEach(([name, color]) => {
-    if (typeof color === 'string') {
+  Object.entries(theme("colors.jarvis")).forEach(([name, color]) => {
+    if (typeof color === "string") {
       glows[`.glow-${name}`] = {
-        boxShadow: `0 0 10px ${color}, 0 0 20px ${color}40, 0 0 30px ${color}20`
-      }
+        boxShadow: `0 0 10px ${color}, 0 0 20px ${color}40, 0 0 30px ${color}20`,
+      };
       glows[`.text-glow-${name}`] = {
-        textShadow: `0 0 10px ${color}`
-      }
+        textShadow: `0 0 10px ${color}`,
+      };
     }
-  })
+  });
 
-  addUtilities(glows)
-})
+  addUtilities(glows);
+});
 ```

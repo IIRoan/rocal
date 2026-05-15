@@ -51,10 +51,7 @@ export function EventCard({
       <View style={[styles.colorBar, { backgroundColor: colors.bg }]} />
 
       <View style={styles.content}>
-        <Text
-          style={[styles.title, { color: colors.fg }]}
-          numberOfLines={1}
-        >
+        <Text style={[styles.title, { color: colors.fg }]} numberOfLines={1}>
           {event.title}
         </Text>
 
@@ -99,8 +96,7 @@ function createStyles(theme: ThemeTokens) {
     title: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     time: {
       fontSize: 10,

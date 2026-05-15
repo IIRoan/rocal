@@ -54,9 +54,8 @@ export default function SubscriptionListScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] = useState<
-    string | null
-  >(null);
+  const [pendingVisibilityCalendarId, setPendingVisibilityCalendarId] =
+    useState<string | null>(null);
   const [pendingSyncSubscriptionId, setPendingSyncSubscriptionId] = useState<
     string | null
   >(null);
@@ -74,7 +73,9 @@ export default function SubscriptionListScreen() {
   const holidayCalendars = useMemo(
     () =>
       sortedSubscriptions
-        .filter((subscription) => getSubscriptionType(subscription) === "holiday")
+        .filter(
+          (subscription) => getSubscriptionType(subscription) === "holiday",
+        )
         .map((subscription) => ({
           subscription,
           calendar: calendarById.get(subscription.calendar.id),
@@ -85,7 +86,9 @@ export default function SubscriptionListScreen() {
   const externalFeeds = useMemo(
     () =>
       sortedSubscriptions
-        .filter((subscription) => getSubscriptionType(subscription) === "external")
+        .filter(
+          (subscription) => getSubscriptionType(subscription) === "external",
+        )
         .map((subscription) => ({
           subscription,
           calendar: calendarById.get(subscription.calendar.id),
@@ -133,7 +136,9 @@ export default function SubscriptionListScreen() {
       if (result.status === "error") {
         Alert.alert(
           "Sync finished with issues",
-          result.message ?? result.errors?.join("\n") ?? "The calendar feed returned an error.",
+          result.message ??
+            result.errors?.join("\n") ??
+            "The calendar feed returned an error.",
         );
       }
     },
@@ -232,10 +237,12 @@ export default function SubscriptionListScreen() {
             <Feather name="rss" size={20} color={theme.colors.primaryBase} />
           </View>
           <View style={styles.heroBody}>
-            <Text style={styles.heroTitle}>External feeds, holidays, and imports</Text>
+            <Text style={styles.heroTitle}>
+              External feeds, holidays, and imports
+            </Text>
             <Text style={styles.heroText}>
-              Read-only calendars stay separate from your editable calendars and can
-              be hidden, synced, or removed at any time.
+              Read-only calendars stay separate from your editable calendars and
+              can be hidden, synced, or removed at any time.
             </Text>
           </View>
           <Pressable style={styles.primaryButton} onPress={handleOpenCreate}>
@@ -262,7 +269,9 @@ export default function SubscriptionListScreen() {
               entry={entry}
               onOpen={() => handleOpenEdit(entry.subscription)}
               onToggleVisibility={() => handleToggleVisibility(entry)}
-              visibilityPending={pendingVisibilityCalendarId === entry.subscription.calendar.id}
+              visibilityPending={
+                pendingVisibilityCalendarId === entry.subscription.calendar.id
+              }
               theme={theme}
             />
           ))
@@ -288,7 +297,9 @@ export default function SubscriptionListScreen() {
               onOpen={() => handleOpenEdit(entry.subscription)}
               onToggleVisibility={() => handleToggleVisibility(entry)}
               onSync={() => handleSync(entry.subscription.id)}
-              visibilityPending={pendingVisibilityCalendarId === entry.subscription.calendar.id}
+              visibilityPending={
+                pendingVisibilityCalendarId === entry.subscription.calendar.id
+              }
               syncPending={pendingSyncSubscriptionId === entry.subscription.id}
               theme={theme}
             />
@@ -367,7 +378,9 @@ function ReadOnlyCalendarRow({
   }
 
   if (kind === "external") {
-    metaParts.push(`Last synced ${formatLastSync(entry.subscription.lastSyncAt).toLowerCase()}`);
+    metaParts.push(
+      `Last synced ${formatLastSync(entry.subscription.lastSyncAt).toLowerCase()}`,
+    );
   }
 
   return (
@@ -376,7 +389,10 @@ function ReadOnlyCalendarRow({
         <View
           style={[
             styles.colorSwatch,
-            { backgroundColor: entry.subscription.calendar.color || theme.colors.primaryBase },
+            {
+              backgroundColor:
+                entry.subscription.calendar.color || theme.colors.primaryBase,
+            },
           ]}
         />
         <View style={styles.rowCopy}>
@@ -609,8 +625,7 @@ function createStyles(theme: ThemeTokens) {
     emptyTitle: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     emptyText: {
@@ -621,8 +636,7 @@ function createStyles(theme: ThemeTokens) {
     rowTitle: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     rowMeta: {

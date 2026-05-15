@@ -36,9 +36,7 @@ describe("mail OAuth hardening", () => {
         clientId: "solace-mail",
         redirectUris: ["https://app.solace.test/mail/oauth/callback"],
         browserClientId: "solace-mail-browser",
-        browserRedirectUris: [
-          "https://app.solace.test/mail/oauth/callback",
-        ],
+        browserRedirectUris: ["https://app.solace.test/mail/oauth/callback"],
       }),
     ).toBe(true);
 
@@ -47,9 +45,7 @@ describe("mail OAuth hardening", () => {
         clientId: "solace-mail",
         redirectUris: [],
         browserClientId: "solace-mail-browser",
-        browserRedirectUris: [
-          "https://app.solace.test/mail/oauth/callback",
-        ],
+        browserRedirectUris: ["https://app.solace.test/mail/oauth/callback"],
       }),
     ).toBe(false);
   });

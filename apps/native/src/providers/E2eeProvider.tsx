@@ -186,7 +186,10 @@ export function E2eeProvider({
         );
       }
 
-      await SecureStore.setItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID, deviceId);
+      await SecureStore.setItemAsync(
+        SECURE_STORE_KEYS.E2EE_DEVICE_ID,
+        deviceId,
+      );
       await SecureStore.setItemAsync(
         SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
         JSON.stringify(exportedPrivateKey),
@@ -289,8 +292,7 @@ export function E2eeProvider({
           return;
         }
 
-        const bootstrapData =
-          (await response.json()) as E2eeBootstrapResponse;
+        const bootstrapData = (await response.json()) as E2eeBootstrapResponse;
 
         if (!bootstrapData.enabled) {
           log.info("E2EE is not enabled for this user");
@@ -647,7 +649,8 @@ export function E2eeProvider({
             title: (request as { title?: string }).title,
             description:
               (request as { description?: string | null }).description ?? null,
-            location: (request as { location?: string | null }).location ?? null,
+            location:
+              (request as { location?: string | null }).location ?? null,
           };
 
           const encrypted = await e2ee.encryptJsonPayload(
@@ -756,7 +759,9 @@ export function E2eeProvider({
         }
       },
 
-      async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
+      async hydrateEncryptedEvent(
+        event: CalendarEvent,
+      ): Promise<CalendarEvent> {
         if (
           event.encryptionState !== "encrypted" ||
           !event.encryptedContent ||
@@ -834,7 +839,14 @@ export function E2eeProvider({
       resetEncryptionPassword,
       clearSession,
     }),
-    [bootstrap, clearSession, isEnabled, isReady, provider, resetEncryptionPassword],
+    [
+      bootstrap,
+      clearSession,
+      isEnabled,
+      isReady,
+      provider,
+      resetEncryptionPassword,
+    ],
   );
 
   const isUnlock = gateState?.mode === "unlock";
@@ -918,9 +930,7 @@ export function E2eeProvider({
                           textContentType={
                             isUnlock ? "password" : "newPassword"
                           }
-                          autoComplete={
-                            isUnlock ? "password" : "new-password"
-                          }
+                          autoComplete={isUnlock ? "password" : "new-password"}
                         />
                       </View>
 
@@ -976,9 +986,13 @@ export function E2eeProvider({
                     ]}
                   >
                     {isGateSubmitting ? (
-                      <ActivityIndicator color={theme.colors.primaryForeground} />
+                      <ActivityIndicator
+                        color={theme.colors.primaryForeground}
+                      />
                     ) : (
-                      <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
+                      <Text style={styles.primaryButtonText}>
+                        {primaryLabel}
+                      </Text>
                     )}
                   </Pressable>
                 </View>
@@ -1029,7 +1043,8 @@ function createGateStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
       color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
     body: {
       gap: theme.spacing["3"],
@@ -1118,7 +1133,8 @@ function createGateStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
       color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
     buttonDisabled: {
       opacity: 0.6,

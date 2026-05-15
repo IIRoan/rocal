@@ -14,7 +14,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CreateCalendarRequest, EventColor } from "@workspace/calendar-core";
+import type {
+  CreateCalendarRequest,
+  EventColor,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../src/lib/api";
@@ -103,8 +106,8 @@ export default function CalendarCreateScreen() {
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>Create an editable calendar</Text>
           <Text style={styles.heroText}>
-            Owned calendars can be edited, shared, and set as the default for new
-            events.
+            Owned calendars can be edited, shared, and set as the default for
+            new events.
           </Text>
         </View>
 
@@ -297,8 +300,7 @@ function createStyles(theme: ThemeTokens) {
     fieldLabel: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: theme.spacing["1"],
     },
@@ -322,15 +324,13 @@ function createStyles(theme: ThemeTokens) {
     cancelButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     submitButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
     },
   } satisfies Record<string, TextStyle>;

@@ -1,10 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
 import {
   getApiBaseUrl,
@@ -109,7 +103,10 @@ describe("api-url helpers", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://app.solace.test";
 
     expect(
-      resolveAuthRedirectTarget("/fallback", "https://app.solace.test/settings#security"),
+      resolveAuthRedirectTarget(
+        "/fallback",
+        "https://app.solace.test/settings#security",
+      ),
     ).toEqual({
       href: "/settings#security",
       external: false,
@@ -121,7 +118,10 @@ describe("api-url helpers", () => {
     process.env.NEXT_PUBLIC_API_URL = "https://api.solace.test";
 
     expect(
-      resolveAuthRedirectTarget("/fallback", "https://api.solace.test/auth/callback?ok=1"),
+      resolveAuthRedirectTarget(
+        "/fallback",
+        "https://api.solace.test/auth/callback?ok=1",
+      ),
     ).toEqual({
       href: "https://api.solace.test/auth/callback?ok=1",
       external: true,

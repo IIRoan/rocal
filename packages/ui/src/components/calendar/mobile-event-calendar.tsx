@@ -39,13 +39,52 @@ import { CalendarEvent, CalendarView, User, CALENDAR_VIEWS } from "./types";
 import dynamic from "next/dynamic";
 import { CalendarSkeleton } from "./calendar-skeleton";
 
-const AgendaView = dynamic(() => import("./agenda-view").then((mod) => mod.AgendaView), { ssr: false, loading: () => <CalendarSkeleton view="agenda" compactView={false} /> });
-const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), { ssr: false, loading: () => <CalendarSkeleton view="day" compactView={false} /> });
-const MonthView = dynamic(() => import("./month-view").then((mod) => mod.MonthView), { ssr: false, loading: () => <CalendarSkeleton view="month" compactView={false} /> });
-const WeekView = dynamic(() => import("./week-view").then((mod) => mod.WeekView), { ssr: false, loading: () => <CalendarSkeleton view="week" compactView={false} /> });
-const MobileDayView = dynamic(() => import("./mobile-day-view").then((mod) => mod.MobileDayView), { ssr: false, loading: () => <CalendarSkeleton view="day" compactView={false} /> });
-const MobileWeekView = dynamic(() => import("./mobile-week-view").then((mod) => mod.MobileWeekView), { ssr: false, loading: () => <CalendarSkeleton view="week" compactView={false} /> });
-const MobileThreeDayView = dynamic(() => import("./mobile-three-day-view").then((mod) => mod.MobileThreeDayView), { ssr: false, loading: () => <CalendarSkeleton view="3day" compactView={false} /> });
+const AgendaView = dynamic(
+  () => import("./agenda-view").then((mod) => mod.AgendaView),
+  {
+    ssr: false,
+    loading: () => <CalendarSkeleton view="agenda" compactView={false} />,
+  },
+);
+const DayView = dynamic(() => import("./day-view").then((mod) => mod.DayView), {
+  ssr: false,
+  loading: () => <CalendarSkeleton view="day" compactView={false} />,
+});
+const MonthView = dynamic(
+  () => import("./month-view").then((mod) => mod.MonthView),
+  {
+    ssr: false,
+    loading: () => <CalendarSkeleton view="month" compactView={false} />,
+  },
+);
+const WeekView = dynamic(
+  () => import("./week-view").then((mod) => mod.WeekView),
+  {
+    ssr: false,
+    loading: () => <CalendarSkeleton view="week" compactView={false} />,
+  },
+);
+const MobileDayView = dynamic(
+  () => import("./mobile-day-view").then((mod) => mod.MobileDayView),
+  {
+    ssr: false,
+    loading: () => <CalendarSkeleton view="day" compactView={false} />,
+  },
+);
+const MobileWeekView = dynamic(
+  () => import("./mobile-week-view").then((mod) => mod.MobileWeekView),
+  {
+    ssr: false,
+    loading: () => <CalendarSkeleton view="week" compactView={false} />,
+  },
+);
+const MobileThreeDayView = dynamic(
+  () => import("./mobile-three-day-view").then((mod) => mod.MobileThreeDayView),
+  {
+    ssr: false,
+    loading: () => <CalendarSkeleton view="3day" compactView={false} />,
+  },
+);
 import { EventNotification } from "./notification-manager";
 import { CalendarDndProvider } from "./calendar-dnd-context";
 import { cn } from "../../lib/utils";
@@ -145,7 +184,8 @@ export function MobileEventCalendar({
   user,
 }: MobileEventCalendarProps) {
   // Use the shared calendar context instead of local state
-  const { currentDate: contextCurrentDate, setCurrentDate } = useCalendarContext();
+  const { currentDate: contextCurrentDate, setCurrentDate } =
+    useCalendarContext();
   const currentDate = currentDateOverride || contextCurrentDate;
   const isMobile = useIsMobile();
 
@@ -153,7 +193,10 @@ export function MobileEventCalendar({
   const [view, setViewState] = useState<CalendarView>(() => {
     if (typeof window !== "undefined") {
       const savedView = sessionStorage.getItem("calendar-view-selection");
-      if (savedView && (CALENDAR_VIEWS as readonly string[]).includes(savedView)) {
+      if (
+        savedView &&
+        (CALENDAR_VIEWS as readonly string[]).includes(savedView)
+      ) {
         return savedView as CalendarView;
       }
     }
@@ -258,14 +301,22 @@ export function MobileEventCalendar({
       start = startOfMonth(date);
       end = endOfMonth(date);
     } else if (v === "week") {
-      start = startOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      end = endOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      start = startOfWeek(date, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
+      end = endOfWeek(date, {
+        weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      });
     } else if (v === "day") {
-      start = new Date(date); start.setHours(0, 0, 0, 0);
-      end = new Date(date); end.setHours(23, 59, 59, 999);
+      start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(date);
+      end.setHours(23, 59, 59, 999);
     } else if (v === "3day") {
-      start = addDays(date, -1); start.setHours(0, 0, 0, 0);
-      end = addDays(date, 1); end.setHours(23, 59, 59, 999);
+      start = addDays(date, -1);
+      start.setHours(0, 0, 0, 0);
+      end = addDays(date, 1);
+      end.setHours(23, 59, 59, 999);
     } else if (v === "agenda") {
       start = new Date(date);
       end = addDays(date, AgendaDaysToShow - 1);

@@ -129,7 +129,10 @@ describe("mapErrorToField", () => {
       ["Description cannot exceed 1000 characters", "description"],
       ["Location cannot exceed 255 characters", "location"],
       ["End time must be after start time", "end"],
-      ["Color must be one of: blue, orange, violet, rose, emerald, red, cyan, lime, amber, indigo, pink, teal or a valid hex color", "color"],
+      [
+        "Color must be one of: blue, orange, violet, rose, emerald, red, cyan, lime, amber, indigo, pink, teal or a valid hex color",
+        "color",
+      ],
     ];
     for (const [error, field] of expectations) {
       expect(mapErrorToField(error)).toBe(field);

@@ -321,7 +321,11 @@ export function getPasswordChangeRecipient(response: unknown): {
   email: string;
   name: string;
 } | null {
-  if (typeof response !== "object" || response === null || !("user" in response)) {
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    !("user" in response)
+  ) {
     return null;
   }
 

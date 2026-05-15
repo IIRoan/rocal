@@ -92,7 +92,9 @@ export function createJsCryptoProvider(): CryptoProvider {
           ) as unknown as CryptoKey;
         }
 
-        throw new Error(`Unsupported generateKey algorithm: ${algorithm?.name}`);
+        throw new Error(
+          `Unsupported generateKey algorithm: ${algorithm?.name}`,
+        );
       },
       importKey: async (
         format: string,
@@ -191,7 +193,10 @@ export function createJsCryptoProvider(): CryptoProvider {
         const tagLengthBytes = Math.max((algorithm.tagLength ?? 128) / 8, 16);
         const ciphertext = encryptedBytes.slice(0, -tagLengthBytes);
         const tag = encryptedBytes.slice(-tagLengthBytes);
-        const decipher = forge.cipher.createDecipher("AES-GCM", secretKey.bytes);
+        const decipher = forge.cipher.createDecipher(
+          "AES-GCM",
+          secretKey.bytes,
+        );
         const iv = toBinaryString(algorithm.iv);
         const additionalData = algorithm.additionalData
           ? toBinaryString(algorithm.additionalData)
@@ -293,7 +298,9 @@ export function createJsCryptoProvider(): CryptoProvider {
           derivedKeyType?.name !== "AES-GCM" ||
           algorithm.hash !== "SHA-256"
         ) {
-          throw new Error("Only PBKDF2-SHA256 to AES-GCM derivation is supported.");
+          throw new Error(
+            "Only PBKDF2-SHA256 to AES-GCM derivation is supported.",
+          );
         }
 
         const derivedBytes = forge.pkcs5.pbkdf2(
@@ -469,16 +476,19 @@ function createRandomBytes(byteLength: number): string {
   return toBinaryString(ExpoCrypto.getRandomValues(new Uint8Array(byteLength)));
 }
 
-function toBinaryString(value: BufferSource | ArrayBufferView | ArrayBuffer): string {
+function toBinaryString(
+  value: BufferSource | ArrayBufferView | ArrayBuffer,
+): string {
   if (typeof value === "string") {
     return value;
   }
 
-  const array = value instanceof Uint8Array
-    ? value
-    : value instanceof ArrayBuffer
-      ? new Uint8Array(value)
-      : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  const array =
+    value instanceof Uint8Array
+      ? value
+      : value instanceof ArrayBuffer
+        ? new Uint8Array(value)
+        : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
 
   return Array.from(array, (byte) => String.fromCharCode(byte)).join("");
 }

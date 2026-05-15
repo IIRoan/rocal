@@ -30,61 +30,49 @@ const baseDateArb: fc.Arbitrary<Date> = fc
 describe("getDefaultCalendarDateRange - Week Start Day Properties", () => {
   it("the start date's day of week matches the configured weekStartDay", () => {
     fc.assert(
-      fc.property(
-        baseDateArb,
-        weekStartDayArb,
-        (baseDate, weekStartDay) => {
-          const { start } = getDefaultCalendarDateRange({
-            baseDate,
-            view: "week",
-            weekStartDay,
-          });
+      fc.property(baseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
+        const { start } = getDefaultCalendarDateRange({
+          baseDate,
+          view: "week",
+          weekStartDay,
+        });
 
-          expect(start.getDay()).toBe(weekStartDay);
-        },
-      ),
+        expect(start.getDay()).toBe(weekStartDay);
+      }),
     );
   });
 
   it("the week range covers exactly 7 consecutive days", () => {
     fc.assert(
-      fc.property(
-        baseDateArb,
-        weekStartDayArb,
-        (baseDate, weekStartDay) => {
-          const { start, end } = getDefaultCalendarDateRange({
-            baseDate,
-            view: "week",
-            weekStartDay,
-          });
+      fc.property(baseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
+        const { start, end } = getDefaultCalendarDateRange({
+          baseDate,
+          view: "week",
+          weekStartDay,
+        });
 
-          // start is at 00:00:00.000 of the first day, end is at 23:59:59.999
-          // of the 7th day, so differenceInCalendarDays should be 6
-          // (same week, 7 days = indices 0..6)
-          const daySpan = differenceInCalendarDays(end, start);
-          expect(daySpan).toBe(6);
-        },
-      ),
+        // start is at 00:00:00.000 of the first day, end is at 23:59:59.999
+        // of the 7th day, so differenceInCalendarDays should be 6
+        // (same week, 7 days = indices 0..6)
+        const daySpan = differenceInCalendarDays(end, start);
+        expect(daySpan).toBe(6);
+      }),
     );
   });
 
   it("the target date falls within the generated week range", () => {
     fc.assert(
-      fc.property(
-        baseDateArb,
-        weekStartDayArb,
-        (baseDate, weekStartDay) => {
-          const { start, end } = getDefaultCalendarDateRange({
-            baseDate,
-            view: "week",
-            weekStartDay,
-          });
+      fc.property(baseDateArb, weekStartDayArb, (baseDate, weekStartDay) => {
+        const { start, end } = getDefaultCalendarDateRange({
+          baseDate,
+          view: "week",
+          weekStartDay,
+        });
 
-          // start <= baseDate <= end
-          expect(start.getTime()).toBeLessThanOrEqual(baseDate.getTime());
-          expect(baseDate.getTime()).toBeLessThanOrEqual(end.getTime());
-        },
-      ),
+        // start <= baseDate <= end
+        expect(start.getTime()).toBeLessThanOrEqual(baseDate.getTime());
+        expect(baseDate.getTime()).toBeLessThanOrEqual(end.getTime());
+      }),
     );
   });
 });

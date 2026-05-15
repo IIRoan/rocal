@@ -15,7 +15,10 @@ import {
 } from "lucide-react";
 import type { JmapMailbox } from "@/lib/mail/types";
 
-const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+const ROLE_ICONS: Record<
+  string,
+  React.ComponentType<{ className?: string }>
+> = {
   inbox: Inbox,
   sent: Send,
   drafts: FileText,
@@ -24,7 +27,14 @@ const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   spam: AlertOctagon,
 };
 
-const PROTECTED_ROLES = new Set(["inbox", "sent", "drafts", "trash", "junk", "spam"]);
+const PROTECTED_ROLES = new Set([
+  "inbox",
+  "sent",
+  "drafts",
+  "trash",
+  "junk",
+  "spam",
+]);
 
 interface MailboxManagerProps {
   mailboxes: JmapMailbox[];
@@ -45,7 +55,9 @@ export function MailboxManager({
   onDeleteMailbox,
   onRenameMailbox,
 }: MailboxManagerProps) {
-  const [editingMailbox, setEditingMailbox] = useState<JmapMailbox | null>(null);
+  const [editingMailbox, setEditingMailbox] = useState<JmapMailbox | null>(
+    null,
+  );
   const [newName, setNewName] = useState("");
   const [createName, setCreateName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -248,7 +260,9 @@ export function MailboxManager({
           >
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </button>
-          <span className="text-sm font-medium truncate">{editingMailbox.name}</span>
+          <span className="text-sm font-medium truncate">
+            {editingMailbox.name}
+          </span>
         </div>
         <div className="flex-1 overflow-y-auto py-3 px-4">
           {onRenameMailbox && (
@@ -268,7 +282,10 @@ export function MailboxManager({
                     void (async () => {
                       setSaving(true);
                       try {
-                        await onRenameMailbox(editingMailbox.id, newName.trim());
+                        await onRenameMailbox(
+                          editingMailbox.id,
+                          newName.trim(),
+                        );
                         onBack();
                       } finally {
                         setSaving(false);
@@ -284,7 +301,10 @@ export function MailboxManager({
             <div className="flex items-center justify-end gap-2 mb-4">
               <button
                 type="button"
-                onClick={() => { setConfirmDelete(false); onBack(); }}
+                onClick={() => {
+                  setConfirmDelete(false);
+                  onBack();
+                }}
                 className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
               >
                 Cancel
@@ -321,7 +341,8 @@ export function MailboxManager({
             ) : (
               <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
                 <p className="text-sm text-destructive mb-3">
-                  Delete <strong>{editingMailbox.name}</strong>? All messages inside will be permanently removed.
+                  Delete <strong>{editingMailbox.name}</strong>? All messages
+                  inside will be permanently removed.
                 </p>
                 <div className="flex items-center gap-2">
                   <button

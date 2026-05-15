@@ -2,12 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Clock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "./button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from "./drawer";
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "./drawer";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-timepicker";
 
@@ -319,7 +314,11 @@ export function ShadcnAutocomleteTimePicker({
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent responsive responsiveHeight="300px" className="max-h-[300px]">
+        <DrawerContent
+          responsive
+          responsiveHeight="300px"
+          className="max-h-[300px]"
+        >
           <DrawerTitle className="sr-only">Select time</DrawerTitle>
           <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
             <TimeGrid
@@ -366,7 +365,11 @@ export function ShadcnAutocomleteTimePicker({
   return (
     <Drawer open={open} onOpenChange={setOpen} direction="bottom">
       <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-      <DrawerContent responsive responsiveHeight="400px" className="max-h-[400px]">
+      <DrawerContent
+        responsive
+        responsiveHeight="400px"
+        className="max-h-[400px]"
+      >
         <DrawerTitle className="sr-only">Select time</DrawerTitle>
         <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
           <TimeGrid

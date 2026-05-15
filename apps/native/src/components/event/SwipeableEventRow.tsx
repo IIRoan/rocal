@@ -151,7 +151,10 @@ export function SwipeableEventRow({
   }));
 
   const deleteActionAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.abs(translateX.value) / (DELETE_ACTION_WIDTH * 0.5)),
+    opacity: Math.min(
+      1,
+      Math.abs(translateX.value) / (DELETE_ACTION_WIDTH * 0.5),
+    ),
   }));
 
   const deleteTextAnimatedStyle = useAnimatedStyle(() => ({
@@ -170,9 +173,7 @@ export function SwipeableEventRow({
   return (
     <View style={styles.container}>
       {/* Delete action revealed behind the row */}
-      <Animated.View
-        style={[styles.deleteAction, deleteActionAnimatedStyle]}
-      >
+      <Animated.View style={[styles.deleteAction, deleteActionAnimatedStyle]}>
         <Pressable
           style={styles.deleteButton}
           onPress={showDeleteConfirmation}
@@ -236,7 +237,8 @@ function createStyles(theme: ThemeTokens) {
     deleteText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.destructiveForeground,
     },
   } satisfies Record<string, TextStyle>;

@@ -117,7 +117,9 @@ jest.mock("@workspace/ui/components/ui/drawer", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/visually-hidden", () => ({
-  VisuallyHidden: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  VisuallyHidden: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 jest.mock("@workspace/ui/hooks/use-mobile", () => ({
@@ -148,8 +150,9 @@ import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const mockUseSharedCalendarData =
-  useSharedCalendarData as jest.MockedFunction<typeof useSharedCalendarData>;
+const mockUseSharedCalendarData = useSharedCalendarData as jest.MockedFunction<
+  typeof useSharedCalendarData
+>;
 const mockUseIsMobile = useIsMobile as jest.MockedFunction<typeof useIsMobile>;
 const mockGetEventNotifications =
   calendarApiService.getEventNotifications as jest.MockedFunction<

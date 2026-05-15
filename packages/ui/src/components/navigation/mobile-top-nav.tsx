@@ -4,13 +4,7 @@ import React from "react";
 import { Menu, Plus } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
-import {
-  format,
-  startOfWeek,
-  endOfWeek,
-  addDays,
-  isSameMonth,
-} from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays, isSameMonth } from "date-fns";
 import { CalendarView } from "../calendar/types";
 import { AgendaDaysToShow } from "../calendar/constants";
 

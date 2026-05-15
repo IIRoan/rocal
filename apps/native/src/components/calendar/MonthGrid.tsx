@@ -78,9 +78,7 @@ export function MonthGrid({
             const isCurrentMonth = isSameMonth(date, currentDate);
             const isToday = isSameDay(date, today);
             const isSelected =
-              selectedDate != null &&
-              !isToday &&
-              isSameDay(date, selectedDate);
+              selectedDate != null && !isToday && isSameDay(date, selectedDate);
             const dayEvents = eventsByDay.get(dateKey) ?? [];
             const extraCount = dayEvents.length - MAX_DOTS;
 
@@ -214,7 +212,8 @@ function createStyles(theme: ThemeTokens) {
     },
     todayText: {
       color: theme.colors.primaryForeground,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
     selectedText: {
       color: theme.colors.accentForeground,

@@ -90,7 +90,8 @@ async function* parseSseStream(
 
       const separatorIndex = line.indexOf(":");
       const field = separatorIndex >= 0 ? line.slice(0, separatorIndex) : line;
-      const rawValue = separatorIndex >= 0 ? line.slice(separatorIndex + 1) : "";
+      const rawValue =
+        separatorIndex >= 0 ? line.slice(separatorIndex + 1) : "";
       const valueText = rawValue.startsWith(" ") ? rawValue.slice(1) : rawValue;
 
       if (field === "event") {
@@ -172,7 +173,9 @@ export class MailRealtimeService {
       try {
         logger.info("Connecting to Stalwart JMAP EventSource");
         await this.consumeEventSource();
-        logger.warn("Stalwart JMAP EventSource connection closed; reconnecting.");
+        logger.warn(
+          "Stalwart JMAP EventSource connection closed; reconnecting.",
+        );
       } catch (error) {
         logger.error("Stalwart JMAP EventSource listener failed", {
           error,

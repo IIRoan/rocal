@@ -3,7 +3,10 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { format, parse, startOfDay } from "date-fns";
-import { useCalendarContext, CALENDAR_VIEWS } from "@workspace/ui/components/calendar";
+import {
+  useCalendarContext,
+  CALENDAR_VIEWS,
+} from "@workspace/ui/components/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 
 const DATE_PARAM = "date";

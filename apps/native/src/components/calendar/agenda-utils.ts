@@ -1,10 +1,4 @@
-import {
-  format,
-  isToday,
-  isTomorrow,
-  startOfDay,
-  compareAsc,
-} from "date-fns";
+import { format, isToday, isTomorrow, startOfDay, compareAsc } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -65,7 +59,10 @@ export function groupEventsIntoSections(
   if (events.length === 0) return [];
 
   // Group by date key
-  const map = new Map<string, { date: Date; events: DecoratedCalendarEvent[] }>();
+  const map = new Map<
+    string,
+    { date: Date; events: DecoratedCalendarEvent[] }
+  >();
 
   for (const event of events) {
     const day = startOfDay(new Date(event.start));

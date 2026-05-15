@@ -131,14 +131,62 @@ const borderRadius: Record<string, number> = {
 };
 
 const shadows: Record<string, ShadowTokenValue> = {
-  "2xs": { offsetX: 0, offsetY: 1, blurRadius: 3, spreadRadius: 0, color: "rgba(0,0,0,0.05)" },
-  xs: { offsetX: 0, offsetY: 1, blurRadius: 3, spreadRadius: 0, color: "rgba(0,0,0,0.05)" },
-  sm: { offsetX: 0, offsetY: 1, blurRadius: 3, spreadRadius: 0, color: "rgba(0,0,0,0.1)" },
-  DEFAULT: { offsetX: 0, offsetY: 1, blurRadius: 3, spreadRadius: 0, color: "rgba(0,0,0,0.1)" },
-  md: { offsetX: 0, offsetY: 2, blurRadius: 4, spreadRadius: 0, color: "rgba(0,0,0,0.1)" },
-  lg: { offsetX: 0, offsetY: 4, blurRadius: 6, spreadRadius: 0, color: "rgba(0,0,0,0.1)" },
-  xl: { offsetX: 0, offsetY: 8, blurRadius: 10, spreadRadius: 0, color: "rgba(0,0,0,0.1)" },
-  "2xl": { offsetX: 0, offsetY: 1, blurRadius: 3, spreadRadius: 0, color: "rgba(0,0,0,0.25)" },
+  "2xs": {
+    offsetX: 0,
+    offsetY: 1,
+    blurRadius: 3,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.05)",
+  },
+  xs: {
+    offsetX: 0,
+    offsetY: 1,
+    blurRadius: 3,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.05)",
+  },
+  sm: {
+    offsetX: 0,
+    offsetY: 1,
+    blurRadius: 3,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.1)",
+  },
+  DEFAULT: {
+    offsetX: 0,
+    offsetY: 1,
+    blurRadius: 3,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.1)",
+  },
+  md: {
+    offsetX: 0,
+    offsetY: 2,
+    blurRadius: 4,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.1)",
+  },
+  lg: {
+    offsetX: 0,
+    offsetY: 4,
+    blurRadius: 6,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.1)",
+  },
+  xl: {
+    offsetX: 0,
+    offsetY: 8,
+    blurRadius: 10,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.1)",
+  },
+  "2xl": {
+    offsetX: 0,
+    offsetY: 1,
+    blurRadius: 3,
+    spreadRadius: 0,
+    color: "rgba(0,0,0,0.25)",
+  },
 };
 
 // ─── Light Theme ─────────────────────────────────────────────────────────────
@@ -267,9 +315,7 @@ export const darkTheme: ThemeTokens = {
  * Algorithm: oklch → OKLab → linear-sRGB → sRGB → hex
  */
 function oklchToHex(oklchStr: string): string {
-  const match = oklchStr.match(
-    /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/,
-  );
+  const match = oklchStr.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
   if (!match) return oklchStr; // passthrough non-oklch values (e.g. rgba)
 
   const L = parseFloat(match[1]);
@@ -381,10 +427,12 @@ export function toTailwindTheme(tokens: ThemeTokens): Record<string, unknown> {
       mono: tokens.typography.fontFamily.mono,
     },
     fontSize: Object.fromEntries(
-      Object.entries(tokens.typography.fontSize).map(([key, { size, lineHeight }]) => [
-        key,
-        [`${size}px`, { lineHeight: `${lineHeight}px` }],
-      ]),
+      Object.entries(tokens.typography.fontSize).map(
+        ([key, { size, lineHeight }]) => [
+          key,
+          [`${size}px`, { lineHeight: `${lineHeight}px` }],
+        ],
+      ),
     ),
     fontWeight: tokens.typography.fontWeight,
     borderRadius: Object.fromEntries(

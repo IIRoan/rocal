@@ -7,7 +7,10 @@ import type { Calendar, CalendarEvent } from "./types";
  * The color is resolved from the event's own color or its calendar's color.
  * Nullable fields are normalized to undefined for easier UI consumption.
  */
-export interface DecoratedCalendarEvent extends Omit<CalendarEvent, "description" | "location" | "categoryId" | "reminder" | "color"> {
+export interface DecoratedCalendarEvent extends Omit<
+  CalendarEvent,
+  "description" | "location" | "categoryId" | "reminder" | "color"
+> {
   description?: string;
   color?: string;
   location?: string;

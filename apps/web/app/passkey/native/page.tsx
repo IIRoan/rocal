@@ -71,7 +71,11 @@ export default function NativePasskeyBridgePage() {
   const [error, setError] = useState<string | null>(null);
 
   const emitLog = useCallback(
-    (level: "debug" | "info" | "warn" | "error", event: string, data?: unknown) => {
+    (
+      level: "debug" | "info" | "warn" | "error",
+      event: string,
+      data?: unknown,
+    ) => {
       log[level](event, data);
     },
     [],
@@ -125,7 +129,9 @@ export default function NativePasskeyBridgePage() {
         callbackUrl: summarizeUrl(callbackURL),
         optionKeys: Object.keys(options),
       });
-      window.location.replace(buildNativePasskeyCallbackURL(callbackURL, options));
+      window.location.replace(
+        buildNativePasskeyCallbackURL(callbackURL, options),
+      );
       return true;
     },
     [callbackURL, emitLog, isValidCallback],
@@ -204,11 +210,14 @@ export default function NativePasskeyBridgePage() {
           );
         }
 
-        const bridgeSession = await authClient.$fetch("/one-time-token/verify", {
-          method: "POST",
-          body: { token: bridgeToken },
-          throw: false,
-        });
+        const bridgeSession = await authClient.$fetch(
+          "/one-time-token/verify",
+          {
+            method: "POST",
+            body: { token: bridgeToken },
+            throw: false,
+          },
+        );
 
         emitLog("debug", "Verified bridge session for passkey registration", {
           hasSession: Boolean(bridgeSession.data),

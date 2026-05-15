@@ -67,8 +67,7 @@ export const apiDocumentationTags = [
   },
   {
     name: "Notifications",
-    description:
-      "Reminder rules and delivery scheduling for upcoming events.",
+    description: "Reminder rules and delivery scheduling for upcoming events.",
   },
   {
     name: "Recurring",

@@ -1,9 +1,4 @@
-import {
-  startOfMonth,
-  startOfWeek,
-  addDays,
-  format,
-} from "date-fns";
+import { startOfMonth, startOfWeek, addDays, format } from "date-fns";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
 
@@ -12,20 +7,21 @@ import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
 export const DAYS_IN_GRID = 42; // 6 rows × 7 columns
 export const MAX_DOTS = 3;
 
-export const KNOWN_CALENDAR_COLORS: ReadonlySet<string> = new Set<CalendarColor>([
-  "blue",
-  "orange",
-  "violet",
-  "rose",
-  "emerald",
-  "red",
-  "cyan",
-  "lime",
-  "amber",
-  "indigo",
-  "pink",
-  "teal",
-]);
+export const KNOWN_CALENDAR_COLORS: ReadonlySet<string> =
+  new Set<CalendarColor>([
+    "blue",
+    "orange",
+    "violet",
+    "rose",
+    "emerald",
+    "red",
+    "cyan",
+    "lime",
+    "amber",
+    "indigo",
+    "pink",
+    "teal",
+  ]);
 
 // ─── Day-of-week header labels ──────────────────────────────────────────────
 
@@ -54,9 +50,12 @@ export function getOrderedDayLabels(weekStartDay: number): string[] {
  * Generate the 42 dates (6 weeks) that fill the month grid, starting from
  * the first day of the week that contains the first day of the month.
  */
-export function generateGridDates(currentDate: Date, weekStartDay: number): Date[] {
+export function generateGridDates(
+  currentDate: Date,
+  weekStartDay: number,
+): Date[] {
   const monthStart = startOfMonth(currentDate);
-  const weekStartsOn = ((weekStartDay % 7) + 7) % 7 as Day;
+  const weekStartsOn = (((weekStartDay % 7) + 7) % 7) as Day;
   const gridStart = startOfWeek(monthStart, { weekStartsOn });
 
   const dates: Date[] = [];

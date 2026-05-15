@@ -247,7 +247,8 @@ export const subscriptionsRoute = new Elysia({ normalize: false })
         {
           body: strictObject({
             calendarId: t.String({
-              description: "Destination calendar that should receive the imported events.",
+              description:
+                "Destination calendar that should receive the imported events.",
             }),
             icsContent: t.String({
               description: "Raw ICS file contents.",

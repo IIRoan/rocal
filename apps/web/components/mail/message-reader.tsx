@@ -597,11 +597,17 @@ export function MessageReader({
               <div className="px-4 pb-6 space-y-1 overflow-y-auto">
                 <button
                   type="button"
-                  onClick={() => { onMarkAsUnread(); setMoreActionsOpen(false); }}
+                  onClick={() => {
+                    onMarkAsUnread();
+                    setMoreActionsOpen(false);
+                  }}
                   disabled={isBusy}
                   className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                 >
-                  <MailOpen className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+                  <MailOpen
+                    className="h-4 w-4 text-muted-foreground"
+                    strokeWidth={2}
+                  />
                   Mark as unread
                 </button>
                 {otherMailboxes.length > 0 && (
@@ -612,16 +618,27 @@ export function MessageReader({
                         disabled={isBusy}
                         className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                       >
-                        <FolderInput className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+                        <FolderInput
+                          className="h-4 w-4 text-muted-foreground"
+                          strokeWidth={2}
+                        />
                         Move to…
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="start" sideOffset={6} className="w-48 p-1">
+                    <PopoverContent
+                      side="top"
+                      align="start"
+                      sideOffset={6}
+                      className="w-48 p-1"
+                    >
                       {otherMailboxes.map((mailbox) => (
                         <button
                           key={mailbox.id}
                           type="button"
-                          onClick={() => { onMove(mailbox.id); setMoreActionsOpen(false); }}
+                          onClick={() => {
+                            onMove(mailbox.id);
+                            setMoreActionsOpen(false);
+                          }}
                           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
                         >
                           {mailbox.name}
@@ -631,34 +648,71 @@ export function MessageReader({
                   </Popover>
                 )}
                 {((onSetLabel && labels.length > 0) || onCreateLabel) && (
-                  <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
+                  <Popover
+                    open={labelPopoverOpen}
+                    onOpenChange={setLabelPopoverOpen}
+                  >
                     <PopoverTrigger asChild>
                       <button
                         type="button"
                         disabled={isBusy}
                         className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                       >
-                        <Tag className="h-4 w-4 text-muted-foreground" strokeWidth={2} />
+                        <Tag
+                          className="h-4 w-4 text-muted-foreground"
+                          strokeWidth={2}
+                        />
                         Labels
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="start" sideOffset={6} className="w-56 p-0 overflow-hidden">
+                    <PopoverContent
+                      side="top"
+                      align="start"
+                      sideOffset={6}
+                      className="w-56 p-0 overflow-hidden"
+                    >
                       {labels.length > 0 && (
                         <div className="p-1 border-b border-border/40">
                           {labels.map((label) => {
-                            const assigned = message?.keywords?.[`label:${label.id}`] === true;
+                            const assigned =
+                              message?.keywords?.[`label:${label.id}`] === true;
                             return (
                               <button
                                 key={label.id}
                                 type="button"
-                                onClick={() => onSetLabel?.(label.id, !assigned)}
+                                onClick={() =>
+                                  onSetLabel?.(label.id, !assigned)
+                                }
                                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
                               >
-                                <span className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover" style={{ backgroundColor: label.color, boxShadow: assigned ? `0 0 0 1px ${label.color}` : undefined }} />
-                                <span className="flex-1 truncate text-foreground/80">{label.name}</span>
-                                {assigned && <Check className="h-3 w-3 text-foreground/50 shrink-0" strokeWidth={2.5} />}
+                                <span
+                                  className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
+                                  style={{
+                                    backgroundColor: label.color,
+                                    boxShadow: assigned
+                                      ? `0 0 0 1px ${label.color}`
+                                      : undefined,
+                                  }}
+                                />
+                                <span className="flex-1 truncate text-foreground/80">
+                                  {label.name}
+                                </span>
+                                {assigned && (
+                                  <Check
+                                    className="h-3 w-3 text-foreground/50 shrink-0"
+                                    strokeWidth={2.5}
+                                  />
+                                )}
                                 {onDeleteLabel && (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); onDeleteLabel(label.id); }} className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors" aria-label={`Delete label ${label.name}`}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteLabel(label.id);
+                                    }}
+                                    className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
+                                    aria-label={`Delete label ${label.name}`}
+                                  >
                                     <X className="h-3 w-3" strokeWidth={2.5} />
                                   </button>
                                 )}
@@ -669,12 +723,57 @@ export function MessageReader({
                       )}
                       {onCreateLabel && (
                         <div className="p-2 space-y-1.5">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">New label</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
+                            New label
+                          </div>
                           <div className="flex items-center gap-1.5">
-                            <input type="color" value={newLabelColor} onChange={(e) => setNewLabelColor(e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent" title="Label color" />
-                            <input type="text" value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newLabelName.trim()) { setIsSavingLabel(true); void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => { setNewLabelName(""); setIsSavingLabel(false); }); } }} placeholder="Label name…" className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40" />
-                            <button type="button" disabled={!newLabelName.trim() || isSavingLabel} onClick={() => { if (!newLabelName.trim()) return; setIsSavingLabel(true); void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => { setNewLabelName(""); setIsSavingLabel(false); }); }} className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors" aria-label="Create label">
-                              <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+                            <input
+                              type="color"
+                              value={newLabelColor}
+                              onChange={(e) => setNewLabelColor(e.target.value)}
+                              className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
+                              title="Label color"
+                            />
+                            <input
+                              type="text"
+                              value={newLabelName}
+                              onChange={(e) => setNewLabelName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && newLabelName.trim()) {
+                                  setIsSavingLabel(true);
+                                  void onCreateLabel(
+                                    newLabelName.trim(),
+                                    newLabelColor,
+                                  ).then(() => {
+                                    setNewLabelName("");
+                                    setIsSavingLabel(false);
+                                  });
+                                }
+                              }}
+                              placeholder="Label name…"
+                              className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
+                            />
+                            <button
+                              type="button"
+                              disabled={!newLabelName.trim() || isSavingLabel}
+                              onClick={() => {
+                                if (!newLabelName.trim()) return;
+                                setIsSavingLabel(true);
+                                void onCreateLabel(
+                                  newLabelName.trim(),
+                                  newLabelColor,
+                                ).then(() => {
+                                  setNewLabelName("");
+                                  setIsSavingLabel(false);
+                                });
+                              }}
+                              className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
+                              aria-label="Create label"
+                            >
+                              <Plus
+                                className="h-3.5 w-3.5"
+                                strokeWidth={2.25}
+                              />
                             </button>
                           </div>
                         </div>
@@ -684,7 +783,10 @@ export function MessageReader({
                 )}
                 <button
                   type="button"
-                  onClick={() => { onDelete(); setMoreActionsOpen(false); }}
+                  onClick={() => {
+                    onDelete();
+                    setMoreActionsOpen(false);
+                  }}
                   disabled={isBusy}
                   className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-destructive/80 hover:bg-destructive/10 active:bg-destructive/20 transition-colors disabled:opacity-40"
                 >
@@ -692,7 +794,10 @@ export function MessageReader({
                   Delete message
                 </button>
                 <DrawerClose asChild>
-                  <button type="button" className="w-full flex items-center justify-center h-11 px-3 rounded-lg text-sm text-muted-foreground hover:bg-accent/40 transition-colors mt-2">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-center h-11 px-3 rounded-lg text-sm text-muted-foreground hover:bg-accent/40 transition-colors mt-2"
+                  >
                     Cancel
                   </button>
                 </DrawerClose>
@@ -742,7 +847,12 @@ export function MessageReader({
                   Move
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="bottom" align="start" sideOffset={6} className="w-48 p-1">
+              <PopoverContent
+                side="bottom"
+                align="start"
+                sideOffset={6}
+                className="w-48 p-1"
+              >
                 {otherMailboxes.map((mailbox) => (
                   <button
                     key={mailbox.id}
@@ -769,11 +879,17 @@ export function MessageReader({
                   Labels
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="bottom" align="end" sideOffset={6} className="w-56 p-0 overflow-hidden">
+              <PopoverContent
+                side="bottom"
+                align="end"
+                sideOffset={6}
+                className="w-56 p-0 overflow-hidden"
+              >
                 {labels.length > 0 && (
                   <div className="p-1 border-b border-border/40">
                     {labels.map((label) => {
-                      const assigned = message?.keywords?.[`label:${label.id}`] === true;
+                      const assigned =
+                        message?.keywords?.[`label:${label.id}`] === true;
                       return (
                         <button
                           key={label.id}
@@ -785,12 +901,19 @@ export function MessageReader({
                             className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover transition-shadow"
                             style={{
                               backgroundColor: label.color,
-                              boxShadow: assigned ? `0 0 0 1px ${label.color}` : undefined,
+                              boxShadow: assigned
+                                ? `0 0 0 1px ${label.color}`
+                                : undefined,
                             }}
                           />
-                          <span className="flex-1 truncate text-foreground/80">{label.name}</span>
+                          <span className="flex-1 truncate text-foreground/80">
+                            {label.name}
+                          </span>
                           {assigned && (
-                            <Check className="h-3 w-3 text-foreground/50 shrink-0" strokeWidth={2.5} />
+                            <Check
+                              className="h-3 w-3 text-foreground/50 shrink-0"
+                              strokeWidth={2.5}
+                            />
                           )}
                           {onDeleteLabel && (
                             <button
@@ -812,9 +935,17 @@ export function MessageReader({
                 )}
                 {onCreateLabel && (
                   <div className="p-2 space-y-1.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">New label</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
+                      New label
+                    </div>
                     <div className="flex items-center gap-1.5">
-                      <input type="color" value={newLabelColor} onChange={(e) => setNewLabelColor(e.target.value)} className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent" title="Label color" />
+                      <input
+                        type="color"
+                        value={newLabelColor}
+                        onChange={(e) => setNewLabelColor(e.target.value)}
+                        className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
+                        title="Label color"
+                      />
                       <input
                         type="text"
                         value={newLabelName}
@@ -822,7 +953,10 @@ export function MessageReader({
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && newLabelName.trim()) {
                             setIsSavingLabel(true);
-                            void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => {
+                            void onCreateLabel(
+                              newLabelName.trim(),
+                              newLabelColor,
+                            ).then(() => {
                               setNewLabelName("");
                               setIsSavingLabel(false);
                             });
@@ -837,7 +971,10 @@ export function MessageReader({
                         onClick={() => {
                           if (!newLabelName.trim()) return;
                           setIsSavingLabel(true);
-                          void onCreateLabel(newLabelName.trim(), newLabelColor).then(() => {
+                          void onCreateLabel(
+                            newLabelName.trim(),
+                            newLabelColor,
+                          ).then(() => {
                             setNewLabelName("");
                             setIsSavingLabel(false);
                           });
@@ -886,7 +1023,8 @@ export function MessageReader({
         {displayText ? (
           <>
             <div className="text-sm leading-relaxed text-[#111] whitespace-pre-wrap">
-              {!isBodyExpanded && displayText.length > PLAINTEXT_COLLAPSE_THRESHOLD
+              {!isBodyExpanded &&
+              displayText.length > PLAINTEXT_COLLAPSE_THRESHOLD
                 ? displayText.slice(0, PLAINTEXT_COLLAPSE_THRESHOLD) + "…"
                 : displayText}
             </div>
@@ -896,7 +1034,9 @@ export function MessageReader({
                 onClick={() => setIsBodyExpanded((v) => !v)}
                 className="mt-3 text-xs font-medium text-primary/70 hover:text-primary transition-colors"
               >
-                {isBodyExpanded ? "Show less" : `Show more (${Math.round(displayText.length / 1000)}k chars)`}
+                {isBodyExpanded
+                  ? "Show less"
+                  : `Show more (${Math.round(displayText.length / 1000)}k chars)`}
               </button>
             )}
           </>

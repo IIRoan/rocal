@@ -1,8 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import {
-  ensureCompatibleOauthMetadata,
-} from "../../lib/oauth-metadata";
+import { ensureCompatibleOauthMetadata } from "../../lib/oauth-metadata";
 
 describe("ensureCompatibleOauthMetadata", () => {
   it("adds jwks_uri and corrects the signing algorithm for OIDC discovery metadata", () => {

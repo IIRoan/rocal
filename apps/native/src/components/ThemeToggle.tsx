@@ -1,5 +1,11 @@
 import { useCallback } from "react";
-import { Pressable, StyleSheet, Text, type ViewStyle, type TextStyle } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  type ViewStyle,
+  type TextStyle,
+} from "react-native";
 import { useTheme, type ThemePreference } from "../providers/ThemeProvider";
 import type { ThemeTokens } from "@workspace/design-tokens";
 

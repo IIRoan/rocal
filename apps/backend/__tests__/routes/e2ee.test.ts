@@ -24,9 +24,11 @@ jest.mock("../../lib/prisma", () => ({
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -47,7 +49,9 @@ import { prisma } from "../../lib/prisma";
 import { e2eeRoutes } from "../../routes/e2ee";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   userEncryptionDevice: {
     findMany: jest.Mock<() => Promise<any>>;

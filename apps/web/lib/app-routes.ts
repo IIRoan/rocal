@@ -6,7 +6,11 @@ export const LEGACY_DASHBOARD_PATH = "/dashboard";
 export type RouteSearchParamValue = string | string[] | null | undefined;
 export type RouteSearchParams = Record<string, RouteSearchParamValue>;
 
-type RouteSearchParamsInput = RouteSearchParams | URLSearchParams | null | undefined;
+type RouteSearchParamsInput =
+  | RouteSearchParams
+  | URLSearchParams
+  | null
+  | undefined;
 
 function appendSearchParam(
   params: URLSearchParams,
@@ -45,6 +49,8 @@ export function buildPathWithSearch(
   return query ? `${path}?${query}` : path;
 }
 
-export function buildCalendarPath(searchParams?: RouteSearchParamsInput): string {
+export function buildCalendarPath(
+  searchParams?: RouteSearchParamsInput,
+): string {
   return buildPathWithSearch(CALENDAR_HOME_PATH, searchParams);
 }

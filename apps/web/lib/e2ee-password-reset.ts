@@ -27,7 +27,9 @@ type EventSensitiveFields = {
   location: string | null;
 };
 
-function normalizeOptionalText(value: string | null | undefined): string | null {
+function normalizeOptionalText(
+  value: string | null | undefined,
+): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
@@ -44,10 +46,12 @@ function resolveSnapshotKeyVersion(snapshot: {
   return Math.max(
     DEFAULT_ENCRYPTION_KEY_VERSION,
     ...snapshot.calendars.map(
-      (calendar) => calendar.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION,
+      (calendar) =>
+        calendar.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION,
     ),
     ...snapshot.categories.map(
-      (category) => category.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION,
+      (category) =>
+        category.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION,
     ),
     ...snapshot.events.map(
       (event) => event.encryptionKeyVersion ?? DEFAULT_ENCRYPTION_KEY_VERSION,
@@ -183,7 +187,10 @@ async function buildEventUpdate(
     description: serializeOptionalText(sensitiveFields.description),
     location: serializeOptionalText(sensitiveFields.location),
     encryptedContent: JSON.stringify(encryptedContent),
-    blindIndexTokens: await createBlindIndexTokens(blindIndexKey, blindIndexSource),
+    blindIndexTokens: await createBlindIndexTokens(
+      blindIndexKey,
+      blindIndexSource,
+    ),
     encryptionKeyVersion: keyVersion,
   };
 }

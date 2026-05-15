@@ -43,7 +43,12 @@ jest.mock("../ui/popover", () => {
     }: {
       children: React.ReactNode;
       className?: string;
-    }) => React.createElement("div", { "data-testid": "popover", className }, children),
+    }) =>
+      React.createElement(
+        "div",
+        { "data-testid": "popover", className },
+        children,
+      ),
   };
 });
 
@@ -83,11 +88,15 @@ describe("EncryptionStatusBadge", () => {
       root.render(<EncryptionStatusBadge item={{}} hidePlaintext={false} />);
     });
 
-    const button = container.querySelector("button[aria-label='Not encrypted']");
+    const button = container.querySelector(
+      "button[aria-label='Not encrypted']",
+    );
     const popover = container.querySelector("[data-testid='popover']");
 
     expect(button).not.toBeNull();
-    expect(popover?.textContent).toContain("Stored as plaintext on the server.");
+    expect(popover?.textContent).toContain(
+      "Stored as plaintext on the server.",
+    );
     expect(popover?.textContent).toContain("Visible to server");
     expect(popover?.textContent).not.toContain("Encrypted on server");
   });
@@ -103,7 +112,9 @@ describe("EncryptionStatusBadge", () => {
       );
     });
 
-    const badge = container.querySelector("span[aria-label='End-to-end encrypted']");
+    const badge = container.querySelector(
+      "span[aria-label='End-to-end encrypted']",
+    );
     const button = container.querySelector("button");
 
     expect(button).toBeNull();
@@ -130,9 +141,9 @@ describe("EncryptionStatusBadge", () => {
     );
     expect(popover?.textContent).toContain("Calendar name");
     expect(popover?.textContent).toContain("Start & end times");
-    expect(popover?.querySelectorAll("[data-icon='shield-check']").length).toBeGreaterThan(
-      1,
-    );
+    expect(
+      popover?.querySelectorAll("[data-icon='shield-check']").length,
+    ).toBeGreaterThan(1);
   });
 
   it("renders hybrid items with the expected server-visible fields", () => {
@@ -142,7 +153,9 @@ describe("EncryptionStatusBadge", () => {
       );
     });
 
-    const button = container.querySelector("button[aria-label='Hybrid encrypted']");
+    const button = container.querySelector(
+      "button[aria-label='Hybrid encrypted']",
+    );
     const popover = container.querySelector("[data-testid='popover']");
 
     expect(button).not.toBeNull();

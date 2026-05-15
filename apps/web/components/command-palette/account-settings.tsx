@@ -69,7 +69,9 @@ function getErrorMessage(error: unknown): string {
     "message" in error &&
     typeof (error as { message: unknown }).message === "string"
   )
-    return (error as { message: string }).message.trim() || "Something went wrong.";
+    return (
+      (error as { message: string }).message.trim() || "Something went wrong."
+    );
   return "Something went wrong.";
 }
 
@@ -120,7 +122,11 @@ function AnimatedCollapse({
             ease: "power2.out",
             overwrite: true,
             onComplete: () =>
-              gsap.set(el, { height: "auto", overflow: "visible", clearProps: "y" }),
+              gsap.set(el, {
+                height: "auto",
+                overflow: "visible",
+                clearProps: "y",
+              }),
           },
         );
       } else {
@@ -142,7 +148,10 @@ function AnimatedCollapse({
   if (!isOpen && !shouldRender) return null;
 
   return (
-    <div ref={containerRef} style={{ height: 0, overflow: "hidden", opacity: 0 }}>
+    <div
+      ref={containerRef}
+      style={{ height: 0, overflow: "hidden", opacity: 0 }}
+    >
       {children}
     </div>
   );
@@ -160,9 +169,15 @@ function Avatar({
   size?: "sm" | "md" | "lg";
 }) {
   const [imgError, setImgError] = useState(false);
-  const initial = (name?.trim() || email?.trim() || "S").charAt(0).toUpperCase();
+  const initial = (name?.trim() || email?.trim() || "S")
+    .charAt(0)
+    .toUpperCase();
   const sizeClass =
-    size === "lg" ? "h-14 w-14 text-base" : size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm";
+    size === "lg"
+      ? "h-14 w-14 text-base"
+      : size === "sm"
+        ? "h-8 w-8 text-xs"
+        : "h-10 w-10 text-sm";
   const sizePx = size === "lg" ? 56 : size === "sm" ? 32 : 40;
 
   if (imageUrl && !imgError) {
@@ -179,7 +194,9 @@ function Avatar({
     );
   }
   return (
-    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary`}>
+    <div
+      className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary`}
+    >
       {initial}
     </div>
   );
@@ -226,7 +243,9 @@ function InlineMessage({ msg }: { msg: SectionMessage }) {
   return (
     <div
       className={`rounded-md px-3 py-2 text-xs ${
-        msg.kind === "success" ? "bg-secondary/10 text-secondary-foreground" : "bg-destructive/10 text-destructive"
+        msg.kind === "success"
+          ? "bg-secondary/10 text-secondary-foreground"
+          : "bg-destructive/10 text-destructive"
       }`}
       role={msg.kind === "error" ? "alert" : "status"}
     >
@@ -274,13 +293,19 @@ export function AccountSettings({
   const [profileMessage, setProfileMessage] = useState<SectionMessage>(null);
 
   const isBusy =
-    saving || deletingAccount || changingPassword || settingPassword || resettingEncryptionPassword || updatingProfile;
+    saving ||
+    deletingAccount ||
+    changingPassword ||
+    settingPassword ||
+    resettingEncryptionPassword ||
+    updatingProfile;
   const hasOAuthOnlyAccess = hasOAuthAccount && !hasPasswordAccount;
   const isChangePasswordForm = activeSecurityForm === "change-password";
   const isSetPasswordForm = activeSecurityForm === "set-password";
   const isResetEncryptionForm = activeSecurityForm === "reset-encryption";
   const isAnySecurityFormOpen = activeSecurityForm !== null;
-  const securityFormBusy = changingPassword || settingPassword || resettingEncryptionPassword;
+  const securityFormBusy =
+    changingPassword || settingPassword || resettingEncryptionPassword;
 
   const displayName = accountName?.trim() || null;
   const displayEmail = accountEmail?.trim() || null;
@@ -291,23 +316,33 @@ export function AccountSettings({
     setConfirmPassword("");
   };
 
-  const handlePasswordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePasswordSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
     setPasswordMessage(null);
 
     if (!newPassword.trim()) {
       setPasswordMessage({
         kind: "error",
-        text: isChangePasswordForm ? "Enter your current password and a new password." : "Enter a new password and confirm it.",
+        text: isChangePasswordForm
+          ? "Enter your current password and a new password."
+          : "Enter a new password and confirm it.",
       });
       return;
     }
     if (isChangePasswordForm && !currentPassword.trim()) {
-      setPasswordMessage({ kind: "error", text: "Enter your current password and a new password." });
+      setPasswordMessage({
+        kind: "error",
+        text: "Enter your current password and a new password.",
+      });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordMessage({ kind: "error", text: "New password and confirmation must match." });
+      setPasswordMessage({
+        kind: "error",
+        text: "New password and confirmation must match.",
+      });
       return;
     }
     try {
@@ -318,14 +353,16 @@ export function AccountSettings({
           text: "Your email sign-in password has been updated. After email sign-in, Solace will also use it to protect your encryption keys.",
         });
       } else if (isSetPasswordForm) {
-        if (!handleSetPassword) throw new Error("Password setup is unavailable.");
+        if (!handleSetPassword)
+          throw new Error("Password setup is unavailable.");
         await handleSetPassword({ newPassword });
         setPasswordMessage({
           kind: "success",
           text: "An email sign-in password has been added to your account. OAuth and passkey sign-in still use your separate encryption password unless you reset it below.",
         });
       } else {
-        if (!handleResetEncryptionPassword) throw new Error("Encryption password reset is unavailable.");
+        if (!handleResetEncryptionPassword)
+          throw new Error("Encryption password reset is unavailable.");
         await handleResetEncryptionPassword({ newPassword });
         setPasswordMessage({
           kind: "success",
@@ -352,9 +389,15 @@ export function AccountSettings({
   };
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}>
+    <div
+      className="flex flex-col"
+      style={{ minHeight: "320px", maxHeight: "calc(100dvh - 200px)" }}
+    >
       <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border/50 px-4">
-        <button onClick={goBack} className="rounded p-1 transition-colors hover:bg-muted/50">
+        <button
+          onClick={goBack}
+          className="rounded p-1 transition-colors hover:bg-muted/50"
+        >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium">Account</span>
@@ -364,11 +407,20 @@ export function AccountSettings({
         <div className="px-4 pt-3 pb-1">
           <div className="flex items-center gap-3 py-1">
             <div className="relative shrink-0">
-              <Avatar name={displayName} email={displayEmail} imageUrl={accountImage} size="lg" />
+              <Avatar
+                name={displayName}
+                email={displayEmail}
+                imageUrl={accountImage}
+                size="lg"
+              />
               {handleUpdateProfile ? (
                 <button
                   type="button"
-                  onClick={() => { setAvatarUrl(accountImage ?? ""); setShowAvatarForm((v) => !v); setProfileMessage(null); }}
+                  onClick={() => {
+                    setAvatarUrl(accountImage ?? "");
+                    setShowAvatarForm((v) => !v);
+                    setProfileMessage(null);
+                  }}
                   className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-accent"
                   aria-label="Change profile picture"
                 >
@@ -388,7 +440,9 @@ export function AccountSettings({
                     {displayName ?? displayEmail ?? "Solace account"}
                   </p>
                   {displayEmail ? (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{displayEmail}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {displayEmail}
+                    </p>
                   ) : null}
                 </>
               )}
@@ -396,7 +450,9 @@ export function AccountSettings({
           </div>
 
           {profileMessage && !showAvatarForm ? (
-            <div className="mt-2"><InlineMessage msg={profileMessage} /></div>
+            <div className="mt-2">
+              <InlineMessage msg={profileMessage} />
+            </div>
           ) : null}
 
           <AnimatedCollapse isOpen={showAvatarForm && !!handleUpdateProfile}>
@@ -423,12 +479,19 @@ export function AccountSettings({
                   disabled={updatingProfile}
                   className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {updatingProfile ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                  {updatingProfile ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Check className="h-3 w-3" />
+                  )}
                   Save
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowAvatarForm(false); setProfileMessage(null); }}
+                  onClick={() => {
+                    setShowAvatarForm(false);
+                    setProfileMessage(null);
+                  }}
                   disabled={updatingProfile}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent/50 disabled:opacity-60"
                   aria-label="Cancel"
@@ -437,7 +500,9 @@ export function AccountSettings({
                 </button>
               </div>
               {profileMessage?.kind === "error" ? (
-                <p className="mt-2 text-xs text-destructive" role="alert">{profileMessage.text}</p>
+                <p className="mt-2 text-xs text-destructive" role="alert">
+                  {profileMessage.text}
+                </p>
               ) : null}
             </div>
           </AnimatedCollapse>
@@ -445,9 +510,13 @@ export function AccountSettings({
 
         {!onOpenSecurity ? (
           <>
-            <div className="px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">Security</div>
+            <div className="px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+              Security
+            </div>
             {passwordMessage && !isAnySecurityFormOpen ? (
-              <div className="mx-3 mb-1"><InlineMessage msg={passwordMessage} /></div>
+              <div className="mx-3 mb-1">
+                <InlineMessage msg={passwordMessage} />
+              </div>
             ) : null}
             <div className="px-2 pb-1">
               {hasOAuthAccount ? (
@@ -456,24 +525,34 @@ export function AccountSettings({
                   {hasOAuthOnlyAccess
                     ? " Setting an email password adds email sign-in to this account."
                     : " Your email sign-in password stays separate from that encryption password."}{" "}
-                  Resetting the encryption password only replaces the password wrapper around your existing encryption keys; it does not change your OAuth sign-in method.
+                  Resetting the encryption password only replaces the password
+                  wrapper around your existing encryption keys; it does not
+                  change your OAuth sign-in method.
                 </div>
               ) : null}
 
               {hasPasswordAccount ? (
                 <button
                   type="button"
-                  onClick={() => { setActiveSecurityForm("change-password"); setPasswordMessage(null); }}
+                  onClick={() => {
+                    setActiveSecurityForm("change-password");
+                    setPasswordMessage(null);
+                  }}
                   disabled={isBusy || isAnySecurityFormOpen}
                   className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
+                  style={{
+                    display: isAnySecurityFormOpen ? "none" : undefined,
+                  }}
                 >
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center">
                     <Lock className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">Change Password</div>
-                    <div className="text-xs text-muted-foreground">Update your email sign-in password. Solace also uses it for encryption after email sign-in.</div>
+                    <div className="text-xs text-muted-foreground">
+                      Update your email sign-in password. Solace also uses it
+                      for encryption after email sign-in.
+                    </div>
                   </div>
                 </button>
               ) : null}
@@ -481,17 +560,26 @@ export function AccountSettings({
               {hasOAuthOnlyAccess ? (
                 <button
                   type="button"
-                  onClick={() => { setActiveSecurityForm("set-password"); setPasswordMessage(null); }}
+                  onClick={() => {
+                    setActiveSecurityForm("set-password");
+                    setPasswordMessage(null);
+                  }}
                   disabled={isBusy || isAnySecurityFormOpen}
                   className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
+                  style={{
+                    display: isAnySecurityFormOpen ? "none" : undefined,
+                  }}
                 >
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center">
                     <Lock className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">Set Email Password</div>
-                    <div className="text-xs text-muted-foreground">Add an email sign-in password to this account. This does not change the separate encryption password used by OAuth or passkey sign-in.</div>
+                    <div className="text-xs text-muted-foreground">
+                      Add an email sign-in password to this account. This does
+                      not change the separate encryption password used by OAuth
+                      or passkey sign-in.
+                    </div>
                   </div>
                 </button>
               ) : null}
@@ -499,17 +587,27 @@ export function AccountSettings({
               {hasOAuthAccount ? (
                 <button
                   type="button"
-                  onClick={() => { setActiveSecurityForm("reset-encryption"); setPasswordMessage(null); }}
+                  onClick={() => {
+                    setActiveSecurityForm("reset-encryption");
+                    setPasswordMessage(null);
+                  }}
                   disabled={isBusy || isAnySecurityFormOpen}
                   className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus:bg-accent/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ display: isAnySecurityFormOpen ? "none" : undefined }}
+                  style={{
+                    display: isAnySecurityFormOpen ? "none" : undefined,
+                  }}
                 >
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center">
                     <RotateCcw className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">Reset Encryption Password</div>
-                    <div className="text-xs text-muted-foreground">Choose a new encryption password for OAuth or passkey sign-in. This keeps your encrypted data intact and only replaces the password used to unlock your keys on new devices.</div>
+                    <div className="text-xs text-muted-foreground">
+                      Choose a new encryption password for OAuth or passkey
+                      sign-in. This keeps your encrypted data intact and only
+                      replaces the password used to unlock your keys on new
+                      devices.
+                    </div>
                   </div>
                 </button>
               ) : null}
@@ -528,10 +626,22 @@ export function AccountSettings({
                         : "Choose a new encryption password for OAuth or passkey sign-in. This only replaces the password wrapper around your existing encryption keys and does not change your OAuth sign-in method."}
                   </p>
                   {isChangePasswordForm ? (
-                    <FieldInput label="Current password" type="password" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" disabled={securityFormBusy} autoFocus />
+                    <FieldInput
+                      label="Current password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={setCurrentPassword}
+                      autoComplete="current-password"
+                      disabled={securityFormBusy}
+                      autoFocus
+                    />
                   ) : null}
                   <FieldInput
-                    label={isResetEncryptionForm ? "New encryption password" : "New password"}
+                    label={
+                      isResetEncryptionForm
+                        ? "New encryption password"
+                        : "New password"
+                    }
                     type="password"
                     value={newPassword}
                     onChange={setNewPassword}
@@ -540,7 +650,11 @@ export function AccountSettings({
                     autoFocus={!isChangePasswordForm}
                   />
                   <FieldInput
-                    label={isResetEncryptionForm ? "Confirm new encryption password" : "Confirm new password"}
+                    label={
+                      isResetEncryptionForm
+                        ? "Confirm new encryption password"
+                        : "Confirm new password"
+                    }
                     type="password"
                     value={confirmPassword}
                     onChange={setConfirmPassword}
@@ -554,12 +668,25 @@ export function AccountSettings({
                       className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                     >
                       {securityFormBusy ? (
-                        <><Loader2 className="h-3 w-3 animate-spin" />Saving…</>
-                      ) : isChangePasswordForm ? "Update Password" : isSetPasswordForm ? "Set Password" : "Reset Encryption Password"}
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Saving…
+                        </>
+                      ) : isChangePasswordForm ? (
+                        "Update Password"
+                      ) : isSetPasswordForm ? (
+                        "Set Password"
+                      ) : (
+                        "Reset Encryption Password"
+                      )}
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setActiveSecurityForm(null); resetSecurityForm(); setPasswordMessage(null); }}
+                      onClick={() => {
+                        setActiveSecurityForm(null);
+                        resetSecurityForm();
+                        setPasswordMessage(null);
+                      }}
                       disabled={securityFormBusy}
                       className="inline-flex h-8 items-center rounded-md border border-border bg-background px-4 text-xs font-medium text-foreground transition-colors hover:bg-accent/40 disabled:opacity-60"
                     >
@@ -572,9 +699,11 @@ export function AccountSettings({
           </>
         ) : null}
 
-        {(onOpenInvites || onOpenSecurity) ? (
+        {onOpenInvites || onOpenSecurity ? (
           <>
-            <div className="mt-1 border-t border-border/50 px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">More</div>
+            <div className="mt-1 border-t border-border/50 px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+              More
+            </div>
             <div className="px-2 pb-1">
               {onOpenSecurity ? (
                 <button
@@ -588,7 +717,9 @@ export function AccountSettings({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">Security</div>
-                    <div className="text-xs text-muted-foreground">Passkeys &amp; authentication</div>
+                    <div className="text-xs text-muted-foreground">
+                      Passkeys &amp; authentication
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                 </button>
@@ -605,7 +736,9 @@ export function AccountSettings({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">Invites</div>
-                    <div className="text-xs text-muted-foreground">Invite friends to join Solace</div>
+                    <div className="text-xs text-muted-foreground">
+                      Invite friends to join Solace
+                    </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                 </button>
@@ -618,7 +751,12 @@ export function AccountSettings({
           Danger Zone
         </div>
         <div className="px-2 pb-4">
-          <div style={{ display: showResetConfirm || showDeleteConfirm ? "none" : undefined }}>
+          <div
+            style={{
+              display:
+                showResetConfirm || showDeleteConfirm ? "none" : undefined,
+            }}
+          >
             <button
               type="button"
               onClick={() => setShowResetConfirm(true)}
@@ -630,7 +768,9 @@ export function AccountSettings({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Reset to Defaults</div>
-                <div className="text-xs text-destructive/70">Restore preferences to their original values.</div>
+                <div className="text-xs text-destructive/70">
+                  Restore preferences to their original values.
+                </div>
               </div>
             </button>
             <button
@@ -644,7 +784,9 @@ export function AccountSettings({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm">Delete Account</div>
-                <div className="text-xs text-destructive/70">Permanently remove your account and all data.</div>
+                <div className="text-xs text-destructive/70">
+                  Permanently remove your account and all data.
+                </div>
               </div>
             </button>
           </div>
@@ -654,17 +796,26 @@ export function AccountSettings({
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                 <span>
-                  This permanently deletes your account, calendars, events, categories, subscriptions, passkeys, and settings. This cannot be undone.
+                  This permanently deletes your account, calendars, events,
+                  categories, subscriptions, passkeys, and settings. This cannot
+                  be undone.
                 </span>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { handleDeleteAccount(); setShowDeleteConfirm(false); }}
+                  onClick={() => {
+                    handleDeleteAccount();
+                    setShowDeleteConfirm(false);
+                  }}
                   disabled={isBusy}
                   className="inline-flex h-8 items-center gap-2 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {deletingAccount ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  {deletingAccount ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3 w-3" />
+                  )}
                   Delete my account
                 </button>
                 <button
@@ -682,12 +833,18 @@ export function AccountSettings({
             <div className="mx-1 my-1 rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-3">
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-                <span>This will reset all settings to their default values. This cannot be undone.</span>
+                <span>
+                  This will reset all settings to their default values. This
+                  cannot be undone.
+                </span>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { handleReset(); setShowResetConfirm(false); }}
+                  onClick={() => {
+                    handleReset();
+                    setShowResetConfirm(false);
+                  }}
                   disabled={isBusy}
                   className="inline-flex h-8 items-center gap-2 rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >

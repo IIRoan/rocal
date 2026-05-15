@@ -411,7 +411,8 @@ describe("useEventForm reminder hydration", () => {
     });
     expect(mockUpdateEventNotifications).toHaveBeenCalledWith("event-1", []);
 
-    const cachedEvents = queryClient.getQueryData<readonly any[]>(eventsQueryKey);
+    const cachedEvents =
+      queryClient.getQueryData<readonly any[]>(eventsQueryKey);
     expect(cachedEvents).toEqual([
       expect.objectContaining({
         id: "event-1",

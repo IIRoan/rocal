@@ -22,7 +22,9 @@ interface SuiteResult {
 
 const rootDir = path.join(__dirname, "..");
 const useCoverage = process.argv.includes("--coverage");
-const summaryPath = process.argv.find((a) => a.startsWith("--summary="))?.split("=")[1];
+const summaryPath = process.argv
+  .find((a) => a.startsWith("--summary="))
+  ?.split("=")[1];
 
 const suites: TestSuite[] = [
   {
@@ -57,13 +59,19 @@ const suites: TestSuite[] = [
   },
 ];
 
-function parseTestCounts(output: string): { passed: number; failed: number; total: number } {
+function parseTestCounts(output: string): {
+  passed: number;
+  failed: number;
+  total: number;
+} {
   let passed = 0;
   let failed = 0;
   let total = 0;
 
   // Jest output: "Tests:       5 failed, 224 passed, 229 total"
-  const jestMatch = output.match(/Tests:\s+(?:(\d+)\s+failed,\s+)?(\d+)\s+passed,\s+(\d+)\s+total/);
+  const jestMatch = output.match(
+    /Tests:\s+(?:(\d+)\s+failed,\s+)?(\d+)\s+passed,\s+(\d+)\s+total/,
+  );
   if (jestMatch) {
     failed = parseInt(jestMatch[1] || "0", 10);
     passed = parseInt(jestMatch[2], 10);
@@ -125,7 +133,9 @@ function runSuite(suite: TestSuite): Promise<SuiteResult> {
 }
 
 async function main() {
-  log.info(`Running ${suites.length} test suites${useCoverage ? " with coverage" : ""}...`);
+  log.info(
+    `Running ${suites.length} test suites${useCoverage ? " with coverage" : ""}...`,
+  );
   log.info(`Suites: ${suites.map((s) => s.name).join(", ")}\n`);
 
   const results: SuiteResult[] = [];
@@ -146,7 +156,8 @@ async function main() {
   log.info("Test Summary:\n");
 
   for (const result of results) {
-    const counts = result.total > 0 ? ` (${result.passed}/${result.total} tests)` : "";
+    const counts =
+      result.total > 0 ? ` (${result.passed}/${result.total} tests)` : "";
     if (result.exitCode === 0) {
       log.ok(`  ${result.name}${counts}`);
     } else {
@@ -157,9 +168,13 @@ async function main() {
   console.log();
 
   if (totalTests > 0) {
-    log.info(`Tests:  ${totalPassed} passed, ${totalFailed} failed, ${totalTests} total`);
+    log.info(
+      `Tests:  ${totalPassed} passed, ${totalFailed} failed, ${totalTests} total`,
+    );
   }
-  log.info(`Suites: ${suitesPassed.length} passed, ${suitesFailed.length} failed, ${results.length} total`);
+  log.info(
+    `Suites: ${suitesPassed.length} passed, ${suitesFailed.length} failed, ${results.length} total`,
+  );
 
   console.log();
 
@@ -185,9 +200,13 @@ async function main() {
 
     lines.push("");
     if (totalTests > 0) {
-      lines.push(`**Tests:** ${totalPassed} passed, ${totalFailed} failed, ${totalTests} total`);
+      lines.push(
+        `**Tests:** ${totalPassed} passed, ${totalFailed} failed, ${totalTests} total`,
+      );
     }
-    lines.push(`**Suites:** ${suitesPassed.length} passed, ${suitesFailed.length} failed, ${results.length} total`);
+    lines.push(
+      `**Suites:** ${suitesPassed.length} passed, ${suitesFailed.length} failed, ${results.length} total`,
+    );
     lines.push("");
 
     fs.writeFileSync(summaryPath, lines.join("\n"));

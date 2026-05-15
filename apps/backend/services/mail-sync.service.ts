@@ -87,7 +87,9 @@ function uniqueIds(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-function sortEmailsDescending<T extends { receivedAt?: string }>(records: T[]): T[] {
+function sortEmailsDescending<T extends { receivedAt?: string }>(
+  records: T[],
+): T[] {
   return [...records].sort((left, right) => {
     const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
     const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
@@ -132,7 +134,10 @@ export class MailSyncService {
       return { hasChanges: false, changedTypes: [] };
     }
 
-    const directoryEntry = await this.getAuthorizedDirectoryEntry(input.userId, accountId);
+    const directoryEntry = await this.getAuthorizedDirectoryEntry(
+      input.userId,
+      accountId,
+    );
     const syncState = await this.prisma.mailJmapSyncState.findUnique({
       where: { directoryEntryId: directoryEntry.id },
       select: { emailState: true, mailboxState: true, threadState: true },
@@ -143,8 +148,14 @@ export class MailSyncService {
     }
 
     const [emailChanged, mailboxChanged] = await Promise.all([
-      this.quickChangesCheck("Email", accountId, syncState.emailState).catch(() => false),
-      this.quickChangesCheck("Mailbox", accountId, syncState.mailboxState).catch(() => false),
+      this.quickChangesCheck("Email", accountId, syncState.emailState).catch(
+        () => false,
+      ),
+      this.quickChangesCheck(
+        "Mailbox",
+        accountId,
+        syncState.mailboxState,
+      ).catch(() => false),
     ]);
 
     const changedTypes = [
@@ -160,11 +171,14 @@ export class MailSyncService {
     accountId: string,
     sinceState: string,
   ): Promise<boolean> {
-    const response = await this.callMethod<JmapChangesResponse>(`${typeName}/changes`, {
-      accountId,
-      sinceState,
-      maxChanges: 1,
-    });
+    const response = await this.callMethod<JmapChangesResponse>(
+      `${typeName}/changes`,
+      {
+        accountId,
+        sinceState,
+        maxChanges: 1,
+      },
+    );
 
     return (
       response.hasMoreChanges ||
@@ -194,7 +208,10 @@ export class MailSyncService {
       throw new ValidationError("A mail accountId is required.", "accountId");
     }
 
-    const directoryEntry = await this.getAuthorizedDirectoryEntry(input.userId, accountId);
+    const directoryEntry = await this.getAuthorizedDirectoryEntry(
+      input.userId,
+      accountId,
+    );
     const existingState = await this.prisma.mailJmapSyncState.findUnique({
       where: {
         directoryEntryId: directoryEntry.id,
@@ -223,7 +240,10 @@ export class MailSyncService {
     const [emailChanges, mailboxChanges, threadChanges] = await Promise.all([
       this.fetchEmailChanges(accountId, existingState.emailState),
       this.fetchMailboxChanges(accountId, existingState.mailboxState),
-      this.fetchThreadChanges(accountId, existingState.threadState ?? existingState.emailState),
+      this.fetchThreadChanges(
+        accountId,
+        existingState.threadState ?? existingState.emailState,
+      ),
     ]);
 
     await this.prisma.mailJmapSyncState.update({
@@ -372,7 +392,8 @@ export class MailSyncService {
   ): Promise<MailSyncCollection<JmapMailbox>> {
     const changes = await this.collectChanges("Mailbox", accountId, sinceState);
     const ids = uniqueIds([...changes.created, ...changes.updated]);
-    const records = ids.length > 0 ? await this.getMailboxesByIds(accountId, ids) : [];
+    const records =
+      ids.length > 0 ? await this.getMailboxesByIds(accountId, ids) : [];
 
     return collectionResult({
       oldState: changes.oldState,
@@ -446,10 +467,14 @@ export class MailSyncService {
       }
     }
 
-    throw new Error(`Mail sync exceeded change pagination limit for ${typeName}.`);
+    throw new Error(
+      `Mail sync exceeded change pagination limit for ${typeName}.`,
+    );
   }
 
-  private async getMailboxes(accountId: string): Promise<JmapGetResponse<JmapMailbox>> {
+  private async getMailboxes(
+    accountId: string,
+  ): Promise<JmapGetResponse<JmapMailbox>> {
     return this.callMethod<JmapGetResponse<JmapMailbox>>("Mailbox/get", {
       accountId,
       properties: ["id", "name", "role", "parentId", "sortOrder"],
@@ -460,16 +485,21 @@ export class MailSyncService {
     accountId: string,
     ids: string[],
   ): Promise<JmapMailbox[]> {
-    const response = await this.callMethod<JmapGetResponse<JmapMailbox>>("Mailbox/get", {
-      accountId,
-      ids,
-      properties: ["id", "name", "role", "parentId", "sortOrder"],
-    });
+    const response = await this.callMethod<JmapGetResponse<JmapMailbox>>(
+      "Mailbox/get",
+      {
+        accountId,
+        ids,
+        properties: ["id", "name", "role", "parentId", "sortOrder"],
+      },
+    );
 
     return response.list ?? [];
   }
 
-  private async getEmailState(accountId: string): Promise<JmapGetResponse<JmapEmail>> {
+  private async getEmailState(
+    accountId: string,
+  ): Promise<JmapGetResponse<JmapEmail>> {
     return this.callMethod<JmapGetResponse<JmapEmail>>("Email/get", {
       accountId,
       ids: [],
@@ -480,38 +510,47 @@ export class MailSyncService {
   private async getThreadState(
     accountId: string,
   ): Promise<JmapGetResponse<MailSyncThreadRecord>> {
-    return this.callMethod<JmapGetResponse<MailSyncThreadRecord>>("Thread/get", {
-      accountId,
-      ids: [],
-      properties: ["id", "emailIds"],
-    });
+    return this.callMethod<JmapGetResponse<MailSyncThreadRecord>>(
+      "Thread/get",
+      {
+        accountId,
+        ids: [],
+        properties: ["id", "emailIds"],
+      },
+    );
   }
 
-  private async getEmails(accountId: string, ids: string[]): Promise<JmapEmail[]> {
-    const response = await this.callMethod<JmapGetResponse<JmapEmail>>("Email/get", {
-      accountId,
-      ids,
-      properties: [
-        "id",
-        "threadId",
-        "mailboxIds",
-        "from",
-        "to",
-        "cc",
-        "bcc",
-        "subject",
-        "receivedAt",
-        "keywords",
-        "bodyStructure",
-        "bodyValues",
-        "textBody",
-        "htmlBody",
-        "attachments",
-      ],
-      fetchTextBodyValues: true,
-      fetchHTMLBodyValues: true,
-      fetchAllBodyValues: true,
-    });
+  private async getEmails(
+    accountId: string,
+    ids: string[],
+  ): Promise<JmapEmail[]> {
+    const response = await this.callMethod<JmapGetResponse<JmapEmail>>(
+      "Email/get",
+      {
+        accountId,
+        ids,
+        properties: [
+          "id",
+          "threadId",
+          "mailboxIds",
+          "from",
+          "to",
+          "cc",
+          "bcc",
+          "subject",
+          "receivedAt",
+          "keywords",
+          "bodyStructure",
+          "bodyValues",
+          "textBody",
+          "htmlBody",
+          "attachments",
+        ],
+        fetchTextBodyValues: true,
+        fetchHTMLBodyValues: true,
+        fetchAllBodyValues: true,
+      },
+    );
 
     return response.list ?? [];
   }
@@ -520,14 +559,13 @@ export class MailSyncService {
     accountId: string,
     ids: string[],
   ): Promise<MailSyncThreadRecord[]> {
-    const response = await this.callMethod<JmapGetResponse<MailSyncThreadRecord>>(
-      "Thread/get",
-      {
-        accountId,
-        ids,
-        properties: ["id", "emailIds"],
-      },
-    );
+    const response = await this.callMethod<
+      JmapGetResponse<MailSyncThreadRecord>
+    >("Thread/get", {
+      accountId,
+      ids,
+      properties: ["id", "emailIds"],
+    });
 
     return response.list ?? [];
   }
@@ -536,7 +574,11 @@ export class MailSyncService {
     methodName: string,
     argumentsObject: Record<string, unknown>,
   ): Promise<T> {
-    const methodCall: StalwartJmapMethodCall = [methodName, argumentsObject, "c1"];
+    const methodCall: StalwartJmapMethodCall = [
+      methodName,
+      argumentsObject,
+      "c1",
+    ];
     const envelope = await this.jmapAdminClient.callJmap({
       using: [...CORE_MAIL_CAPABILITIES],
       methodCalls: [methodCall],
@@ -545,8 +587,13 @@ export class MailSyncService {
     return this.getMethodResult<T>(envelope, methodName);
   }
 
-  private getMethodResult<T>(envelope: StalwartJmapEnvelope, methodName: string): T {
-    const tuple = (envelope.methodResponses ?? []).find((entry) => entry[0] === methodName);
+  private getMethodResult<T>(
+    envelope: StalwartJmapEnvelope,
+    methodName: string,
+  ): T {
+    const tuple = (envelope.methodResponses ?? []).find(
+      (entry) => entry[0] === methodName,
+    );
 
     if (!tuple) {
       throw new Error(`Stalwart JMAP response did not include ${methodName}.`);

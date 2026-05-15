@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
 const links = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/calendar', label: 'Calendar' },
-  { href: '/tasks', label: 'Tasks' },
-  { href: '/settings', label: 'Settings' },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/tasks", label: "Tasks" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export const MobileNavigation = () => {

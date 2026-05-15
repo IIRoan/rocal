@@ -123,7 +123,9 @@ describe("RecurringService", () => {
   });
 
   it("uses the occurrence date as the default range for this_only edits", async () => {
-    mockPrisma.calendarEvent.findFirst.mockResolvedValue(recurringEventFixture());
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
 
     await service.editSeries({
       userId: "user-1",
@@ -156,7 +158,9 @@ describe("RecurringService", () => {
   });
 
   it("preserves duration from the updated start when splitting future occurrences", async () => {
-    mockPrisma.calendarEvent.findFirst.mockResolvedValue(recurringEventFixture());
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
 
     await service.editSeries({
       userId: "user-1",
@@ -169,21 +173,19 @@ describe("RecurringService", () => {
       },
     });
 
-    const updatedRuleCalls =
-      mockPrisma.calendarEvent.update.mock.calls as unknown as Array<
-        [{ data: { recurrence: string } }]
-      >;
-    const createdEventCalls =
-      mockPrisma.calendarEvent.create.mock.calls as unknown as Array<
-        [{ data: Record<string, unknown> }]
-      >;
+    const updatedRuleCalls = mockPrisma.calendarEvent.update.mock
+      .calls as unknown as Array<[{ data: { recurrence: string } }]>;
+    const createdEventCalls = mockPrisma.calendarEvent.create.mock
+      .calls as unknown as Array<[{ data: Record<string, unknown> }]>;
     const updatedRuleCall = updatedRuleCalls[0]?.[0];
     const createdEventCall = createdEventCalls[0]?.[0];
 
     expect(updatedRuleCall).toBeDefined();
     expect(createdEventCall).toBeDefined();
     if (!updatedRuleCall || !createdEventCall) {
-      throw new Error("Expected editSeries to update and create calendar events");
+      throw new Error(
+        "Expected editSeries to update and create calendar events",
+      );
     }
 
     const updatedRule = RecurrenceEngine.parseRecurrenceRule(
@@ -202,7 +204,9 @@ describe("RecurringService", () => {
   });
 
   it("marks existing occurrence exceptions as deleted when removing one occurrence", async () => {
-    mockPrisma.calendarEvent.findFirst.mockResolvedValue(recurringEventFixture());
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
     mockPrisma.recurrenceException.findUnique.mockResolvedValue({
       id: "exception-1",
       type: "modified",
@@ -233,7 +237,9 @@ describe("RecurringService", () => {
   });
 
   it("deletes the whole series including child instances and exceptions", async () => {
-    mockPrisma.calendarEvent.findFirst.mockResolvedValue(recurringEventFixture());
+    mockPrisma.calendarEvent.findFirst.mockResolvedValue(
+      recurringEventFixture(),
+    );
 
     const result = await service.deleteSeries({
       userId: "user-1",

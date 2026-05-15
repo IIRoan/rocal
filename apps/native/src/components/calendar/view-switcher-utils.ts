@@ -1,9 +1,4 @@
-import {
-  format,
-  startOfWeek,
-  endOfWeek,
-  isSameMonth,
-} from "date-fns";
+import { format, startOfWeek, endOfWeek, isSameMonth } from "date-fns";
 import type { CalendarView } from "@workspace/calendar-core";
 import { getThreeDayDates } from "./timeline-utils";
 

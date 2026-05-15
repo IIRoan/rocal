@@ -14,7 +14,10 @@ type PrismaLogEvent = {
 
 type PrismaEventClient = PrismaClient & {
   $on(event: "query", callback: (event: PrismaQueryEvent) => void): void;
-  $on(event: "error" | "warn" | "info", callback: (event: PrismaLogEvent) => void): void;
+  $on(
+    event: "error" | "warn" | "info",
+    callback: (event: PrismaLogEvent) => void,
+  ): void;
 };
 
 // Global Prisma client instance to prevent multiple connections

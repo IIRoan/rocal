@@ -14,7 +14,10 @@ interface SecuritySettingsProps {
   changingPassword?: boolean;
   settingPassword?: boolean;
   resettingEncryptionPassword?: boolean;
-  handleChangePassword?: (v: { currentPassword: string; newPassword: string }) => Promise<void>;
+  handleChangePassword?: (v: {
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
   handleSetPassword?: (v: { newPassword: string }) => Promise<void>;
   handleResetEncryptionPassword?: (v: { newPassword: string }) => Promise<void>;
 }

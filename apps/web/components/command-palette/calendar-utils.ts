@@ -112,7 +112,12 @@ export const handleCalendarUpdate = async (
 
   setters.setCalendarValidationErrors({});
 
-  const errors = validateCalendarForm(calendarName, calendarColor, calendars, editingCalendar);
+  const errors = validateCalendarForm(
+    calendarName,
+    calendarColor,
+    calendars,
+    editingCalendar,
+  );
   if (Object.keys(errors).length > 0) {
     setters.setCalendarValidationErrors(errors);
     return;

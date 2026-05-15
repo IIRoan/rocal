@@ -34,8 +34,9 @@ export class HttpClient {
   private retries: number;
   private retryDelay: number;
   private credentials: RequestCredentials;
-  private getHeaders?:
-    | (() => Record<string, string> | Promise<Record<string, string>>);
+  private getHeaders?: () =>
+    | Record<string, string>
+    | Promise<Record<string, string>>;
   private onAuthError?: (statusCode: 401) => void;
 
   constructor(config: HttpClientConfig) {
@@ -137,9 +138,7 @@ export class HttpClient {
     const fullUrl = url.startsWith("http") ? url : `${this.baseURL}${url}`;
 
     // Resolve platform-specific headers once per request
-    const extraHeaders = this.getHeaders
-      ? await this.getHeaders()
-      : {};
+    const extraHeaders = this.getHeaders ? await this.getHeaders() : {};
 
     let lastError: any;
 

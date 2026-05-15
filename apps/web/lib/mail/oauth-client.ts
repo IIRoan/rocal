@@ -32,7 +32,9 @@ export function appendMailOAuthResourceParams(
   params: URLSearchParams,
   audiences: string[],
 ): URLSearchParams {
-  for (const audience of audiences.map((entry) => entry.trim()).filter(Boolean)) {
+  for (const audience of audiences
+    .map((entry) => entry.trim())
+    .filter(Boolean)) {
     params.append("resource", audience);
   }
 
@@ -123,9 +125,9 @@ async function postTokenRequest(
     },
     body: body.toString(),
   });
-  const payload = (await response.json().catch(() => null)) as
-    | MailOAuthTokenResponse
-    | null;
+  const payload = (await response
+    .json()
+    .catch(() => null)) as MailOAuthTokenResponse | null;
 
   if (!response.ok || !payload) {
     throw new Error(
@@ -258,7 +260,11 @@ async function requestAuthorizationCode(
       }
 
       if (!data.code) {
-        reject(new Error("Silent mail sign-in did not return an authorization code."));
+        reject(
+          new Error(
+            "Silent mail sign-in did not return an authorization code.",
+          ),
+        );
         return;
       }
 

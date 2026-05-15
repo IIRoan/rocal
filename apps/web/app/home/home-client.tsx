@@ -68,7 +68,10 @@ export function HomeAppClient() {
 
       return () => ctx.revert();
     },
-    { scope: containerRef, dependencies: [isPending, session?.user, prefersReducedMotion] },
+    {
+      scope: containerRef,
+      dependencies: [isPending, session?.user, prefersReducedMotion],
+    },
   );
 
   if (isPending || !session?.user) {
@@ -78,10 +81,7 @@ export function HomeAppClient() {
   const firstName = session.user.name?.split(" ")[0] ?? "there";
 
   return (
-    <div
-      ref={containerRef}
-      className="min-h-svh bg-background flex flex-col"
-    >
+    <div ref={containerRef} className="min-h-svh bg-background flex flex-col">
       {/* Header */}
       <header
         data-home-header
@@ -92,7 +92,11 @@ export function HomeAppClient() {
           <ThemeToggle />
           <button
             type="button"
-            onClick={() => void signOut().then(() => { window.location.href = "/login"; })}
+            onClick={() =>
+              void signOut().then(() => {
+                window.location.href = "/login";
+              })
+            }
             className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
             aria-label="Sign out"
             title="Sign out"

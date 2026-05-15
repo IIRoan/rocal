@@ -90,8 +90,7 @@ function resolveTheme(
   preference: ThemePreference,
   systemScheme: "light" | "dark",
 ): { theme: ThemeTokens; colorScheme: "light" | "dark" } {
-  const colorScheme =
-    preference === "system" ? systemScheme : preference;
+  const colorScheme = preference === "system" ? systemScheme : preference;
   return {
     theme: colorScheme === "dark" ? nativeDarkTheme : nativeLightTheme,
     colorScheme,

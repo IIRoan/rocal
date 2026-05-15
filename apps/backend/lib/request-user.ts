@@ -1,7 +1,4 @@
-import {
-  ensureAuthenticatedUser,
-  type AuthenticatedUser,
-} from "./auth-utils";
+import { ensureAuthenticatedUser, type AuthenticatedUser } from "./auth-utils";
 
 export async function resolveRouteUser(
   authenticatedUser: AuthenticatedUser | null | undefined,

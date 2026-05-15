@@ -33,5 +33,7 @@ export interface ICategoryService {
   list(userId: string): Promise<{ categories: CategoryWithCount[] }>;
   create(input: CategoryCreateInput): Promise<EventCategory>;
   update(input: CategoryUpdateInput): Promise<EventCategory>;
-  delete(input: CategoryDeleteInput): Promise<{ success: boolean; message: string }>;
+  delete(
+    input: CategoryDeleteInput,
+  ): Promise<{ success: boolean; message: string }>;
 }

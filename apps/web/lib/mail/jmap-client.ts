@@ -156,9 +156,7 @@ export class StalwartJmapClient {
 
     const accessTokenProvider =
       auth.getAccessToken ||
-      (auth.accessToken
-        ? () => auth.accessToken as string
-        : undefined);
+      (auth.accessToken ? () => auth.accessToken as string : undefined);
 
     if (!accessTokenProvider) {
       throw new Error("A mail access token is required for JMAP clients.");

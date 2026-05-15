@@ -22,18 +22,14 @@ export const accountPublicRoutes = new Elysia({
   prefix: "/account",
   normalize: false,
 })
-  .get(
-    "/signup-config",
-    () => accountService.getSignupConfig(),
-    {
-      detail: {
-        tags: ["Account"],
-        summary: "Get public Solace sign-up configuration",
-        description:
-          "Returns the Solace email domain used when new password accounts choose their in-app email address.",
-      },
+  .get("/signup-config", () => accountService.getSignupConfig(), {
+    detail: {
+      tags: ["Account"],
+      summary: "Get public Solace sign-up configuration",
+      description:
+        "Returns the Solace email domain used when new password accounts choose their in-app email address.",
     },
-  )
+  })
   .get(
     "/email-availability",
     async ({ query }) => accountService.checkEmailAvailability(query),
@@ -85,7 +81,8 @@ export const accountPublicRoutes = new Elysia({
   )
   .get(
     "/invite/validate",
-    async ({ query }) => inviteService.validateInviteToken({ token: query.token }),
+    async ({ query }) =>
+      inviteService.validateInviteToken({ token: query.token }),
     {
       query: strictObject({
         token: t.String({ minLength: 1, maxLength: 500 }),

@@ -7,7 +7,11 @@
  */
 
 import type { QueryClient } from "@tanstack/react-query";
-import type { CalendarEvent, EventsResponse, CreateEventRequest } from "@workspace/calendar-core";
+import type {
+  CalendarEvent,
+  EventsResponse,
+  CreateEventRequest,
+} from "@workspace/calendar-core";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +62,11 @@ export function buildOptimisticEvent(
 /**
  * Returns true if `event` falls within (or overlaps) the range [rangeStart, rangeEnd].
  */
-function eventOverlapsRange(event: CalendarEvent, rangeStart: Date, rangeEnd: Date): boolean {
+function eventOverlapsRange(
+  event: CalendarEvent,
+  rangeStart: Date,
+  rangeEnd: Date,
+): boolean {
   return event.start < rangeEnd && event.end > rangeStart;
 }
 

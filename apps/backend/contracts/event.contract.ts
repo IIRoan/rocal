@@ -80,8 +80,16 @@ export type EventIcsExportResult = {
 };
 
 export interface IEventService {
-  search(input: EventSearchInput): Promise<{ events: unknown[]; total: number }>;
-  list(input: EventListInput): Promise<{ events: unknown[]; categories: unknown[]; calendars: unknown[] }>;
+  search(
+    input: EventSearchInput,
+  ): Promise<{ events: unknown[]; total: number }>;
+  list(
+    input: EventListInput,
+  ): Promise<{
+    events: unknown[];
+    categories: unknown[];
+    calendars: unknown[];
+  }>;
   getById(userId: string, eventId: string): Promise<unknown>;
   create(input: EventCreateInput): Promise<unknown>;
   update(input: EventUpdateInput): Promise<unknown>;

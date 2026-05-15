@@ -29,7 +29,10 @@ import { inviteRoutes } from "./routes/invites";
 import { mailAccountRoutes } from "./routes/mail-account";
 import { mailRoutes } from "./routes/mail";
 import { mailSyncRoutes } from "./routes/mail-sync";
-import { defaultMailRealtimeService, realtimeMailRoutes } from "./routes/realtime-mail";
+import {
+  defaultMailRealtimeService,
+  realtimeMailRoutes,
+} from "./routes/realtime-mail";
 import { errorHandler, UnauthorizedError } from "./lib/errors";
 import { CalendarSyncService } from "./lib/calendar-sync-service";
 import {
@@ -60,10 +63,7 @@ function normalizePath(path: string) {
 function getLocalAuthBasePath(prefix: string): string {
   const normalizedPrefix = normalizePath(prefix || "");
 
-  if (
-    normalizedPrefix &&
-    BETTER_AUTH_BASE_PATH.startsWith(normalizedPrefix)
-  ) {
+  if (normalizedPrefix && BETTER_AUTH_BASE_PATH.startsWith(normalizedPrefix)) {
     const strippedPath = BETTER_AUTH_BASE_PATH.slice(normalizedPrefix.length);
     return normalizePath(strippedPath || "/");
   }
@@ -470,10 +470,10 @@ app.get("/", ({ query, redirect }) => {
 app.listen(port, () => {
   logger.ok(`Server is running on ${backendUrl}`);
   logger.info(`API documentation: ${backendUrl}/api/docs`);
-    logger.info("Auth runtime config", {
-      backendUrl,
-      frontendUrl,
-      cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
-      nodeEnv: process.env.NODE_ENV || "development",
-    });
+  logger.info("Auth runtime config", {
+    backendUrl,
+    frontendUrl,
+    cookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || "lax",
+    nodeEnv: process.env.NODE_ENV || "development",
+  });
 });

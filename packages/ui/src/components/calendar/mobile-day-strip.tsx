@@ -143,7 +143,11 @@ export function MobileDayStrip({
                       )}
                       style={
                         !isSelected && event.color
-                          ? { backgroundColor: resolveInlineColorValue(event.color) }
+                          ? {
+                              backgroundColor: resolveInlineColorValue(
+                                event.color,
+                              ),
+                            }
                           : undefined
                       }
                     />

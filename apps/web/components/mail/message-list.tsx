@@ -449,7 +449,10 @@ export function MessageList({
           className="flex items-center justify-center py-4"
         >
           {isLoadingMore && (
-            <AppLoadingState variant="inline" text="Loading your workspace..." />
+            <AppLoadingState
+              variant="inline"
+              text="Loading your workspace..."
+            />
           )}
         </div>
       )}

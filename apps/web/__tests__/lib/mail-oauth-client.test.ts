@@ -7,10 +7,10 @@ import {
 
 describe("mail oauth client helpers", () => {
   it("appends each configured audience as a resource parameter", () => {
-    const params = appendMailOAuthResourceParams(
-      new URLSearchParams(),
-      ["https://mail.solace.onl", "https://cloudflared.roan.dev/api/auth/oauth2/userinfo"],
-    );
+    const params = appendMailOAuthResourceParams(new URLSearchParams(), [
+      "https://mail.solace.onl",
+      "https://cloudflared.roan.dev/api/auth/oauth2/userinfo",
+    ]);
 
     expect(params.getAll("resource")).toEqual([
       "https://mail.solace.onl",

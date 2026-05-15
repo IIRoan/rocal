@@ -30,9 +30,7 @@ export function QueryProvider({
   children: React.ReactNode;
 }): React.ReactNode {
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 }
 

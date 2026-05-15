@@ -17,9 +17,11 @@ jest.mock("../../lib/prisma", () => ({
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -40,7 +42,9 @@ import { prisma } from "../../lib/prisma";
 import { categoriesRoutes } from "../../routes/categories";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   eventCategory: {
     findMany: jest.Mock<() => Promise<any>>;
@@ -177,9 +181,7 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(422);
-    await expect(readText(response)).resolves.toContain(
-      "Expected union value",
-    );
+    await expect(readText(response)).resolves.toContain("Expected union value");
     expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 
@@ -198,7 +200,9 @@ describe("categoriesRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toContain("Color must be one of:");
+    await expect(readText(response)).resolves.toContain(
+      "Color must be one of:",
+    );
     expect(mockPrisma.eventCategory.create).not.toHaveBeenCalled();
   });
 

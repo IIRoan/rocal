@@ -17,10 +17,14 @@ type InviteRow = {
 function createMockPrisma() {
   return {
     user: {
-      findUnique: jest.fn<() => Promise<{ id: string } | null>>(async () => null),
+      findUnique: jest.fn<() => Promise<{ id: string } | null>>(
+        async () => null,
+      ),
     },
     invite: {
-      findFirst: jest.fn<() => Promise<Partial<InviteRow> | null>>(async () => null),
+      findFirst: jest.fn<() => Promise<Partial<InviteRow> | null>>(
+        async () => null,
+      ),
       findUnique: jest.fn<() => Promise<InviteRow | null>>(async () => null),
       create: jest.fn(async () => ({
         id: "invite-1",
