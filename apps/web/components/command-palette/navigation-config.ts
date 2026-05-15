@@ -197,7 +197,7 @@ export const NAVIGATION_ITEMS = [
     description: "Security settings",
     targetView: "security",
     keywords: ["security", "passkey", "authentication", "password"],
-    parent: null,
+    parent: "account",
   },
   {
     id: "invites",
@@ -206,7 +206,7 @@ export const NAVIGATION_ITEMS = [
     description: "Invite friends to join Solace",
     targetView: "invites",
     keywords: ["invite", "invitations", "friends", "share", "referral"],
-    parent: null,
+    parent: "account",
   },
 ];
 

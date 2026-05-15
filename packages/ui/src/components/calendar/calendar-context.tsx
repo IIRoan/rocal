@@ -169,6 +169,10 @@ export function CalendarProvider({
   const [localVisibilityState, setLocalVisibilityState] = useState<
     Record<string, boolean>
   >({});
+  // Ref always reflects the latest localVisibilityState so debounced callbacks
+  // don't capture stale closure values when the timeout fires.
+  const localVisibilityStateRef = useRef<Record<string, boolean>>({});
+  localVisibilityStateRef.current = localVisibilityState;
   const pendingUpdatesRef = useRef<Set<string>>(new Set());
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -276,6 +280,8 @@ export function CalendarProvider({
 
     const updates = Array.from(pendingUpdatesRef.current);
     pendingUpdatesRef.current.clear();
+    // Capture the latest visibility state via ref, not stale closure
+    const currentVisibility = localVisibilityStateRef.current;
     const previousVisibilityByCalendarId = new Map(
       updates.map((calendarId) => [
         calendarId,
@@ -286,7 +292,7 @@ export function CalendarProvider({
     // Batch update all pending visibility changes
     const results = await Promise.allSettled(
       updates.map(async (calendarId) => {
-        const newVisibility = localVisibilityState[calendarId];
+        const newVisibility = currentVisibility[calendarId];
         if (newVisibility === undefined) {
           return;
         }
@@ -326,7 +332,7 @@ export function CalendarProvider({
         result.reason,
       );
     });
-  }, [calendars, localVisibilityState, onUpdateCalendar]);
+  }, [calendars, onUpdateCalendar]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -404,7 +410,9 @@ export function CalendarProvider({
       }
 
       const calendar = calendars.find((cal) => cal.id === calendarId);
-      return calendar?.isVisible ?? false;
+      // Default to true (visible) for calendars not yet tracked — they're newly
+      // added and should appear until the user explicitly hides them.
+      return calendar?.isVisible ?? true;
     },
     [localVisibilityState, calendars],
   );
@@ -413,7 +421,7 @@ export function CalendarProvider({
   const getVisibleCalendars = useCallback(() => {
     return calendars.filter((cal) => {
       const localVisibility = localVisibilityState[cal.id];
-      return localVisibility !== undefined ? localVisibility : cal.isVisible;
+      return localVisibility !== undefined ? localVisibility : (cal.isVisible ?? true);
     });
   }, [calendars, localVisibilityState]);
 

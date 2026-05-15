@@ -161,6 +161,8 @@ export function useCalendarData(
       calendarApiService.createCalendar(calendar),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
+      // Invalidate events too — new calendars (e.g. holiday) may have events
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 
@@ -173,8 +175,9 @@ export function useCalendarData(
       calendar: UpdateCalendarRequest;
     }) => calendarApiService.updateCalendar(id, calendar),
     onSuccess: () => {
+      // Only refresh calendar metadata — visibility/name/color changes don't
+      // alter server-side events, so there is no need to re-fetch events here.
       queryClient.invalidateQueries({ queryKey: ["calendars"] });
-      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 

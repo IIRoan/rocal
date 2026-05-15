@@ -217,7 +217,7 @@ export function CommandPalette({
 
   // Add keyboard shortcuts for navigation items (Ctrl+1 through Ctrl+8) - always at top level
   useNumberedShortcuts(
-    NAVIGATION_ITEMS.map((item) => () => goForward(item.id as PaletteView)),
+    NAVIGATION_ITEMS.filter((item) => item.parent === null).map((item) => () => goForward(item.id as PaletteView)),
     open && currentView === "main",
   );
 
@@ -648,6 +648,8 @@ export function CommandPalette({
           handleResetEncryptionPassword={handleResetEncryptionPassword}
           updatingProfile={updatingProfile}
           handleUpdateProfile={handleUpdateProfile}
+          onOpenInvites={() => goForward("invites")}
+          onOpenSecurity={() => goForward("security")}
         />
       );
     }
@@ -659,6 +661,14 @@ export function CommandPalette({
           updateSetting={updateSetting}
           goBack={goBack}
           goForward={goForward}
+          hasPasswordAccount={hasPasswordAccount}
+          hasOAuthAccount={hasOAuthAccount}
+          changingPassword={changingPassword}
+          settingPassword={settingPassword}
+          resettingEncryptionPassword={resettingEncryptionPassword}
+          handleChangePassword={handleChangePassword}
+          handleSetPassword={handleSetPassword}
+          handleResetEncryptionPassword={handleResetEncryptionPassword}
         />
       );
     }

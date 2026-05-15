@@ -2,12 +2,21 @@ import React from "react";
 import { Key, ChevronRight, ArrowLeft, Shield } from "lucide-react";
 import type { UserSettings } from "@/lib/types/calendar";
 import { SettingToggleRow } from "./setting-toggle-row";
+import { PasswordSection } from "./password-section";
 
 interface SecuritySettingsProps {
   localSettings: UserSettings;
   updateSetting: (key: keyof UserSettings, value: any) => void;
   goBack: () => void;
   goForward: (view: string) => void;
+  hasPasswordAccount?: boolean;
+  hasOAuthAccount?: boolean;
+  changingPassword?: boolean;
+  settingPassword?: boolean;
+  resettingEncryptionPassword?: boolean;
+  handleChangePassword?: (v: { currentPassword: string; newPassword: string }) => Promise<void>;
+  handleSetPassword?: (v: { newPassword: string }) => Promise<void>;
+  handleResetEncryptionPassword?: (v: { newPassword: string }) => Promise<void>;
 }
 
 export function SecuritySettings({
@@ -15,12 +24,20 @@ export function SecuritySettings({
   updateSetting,
   goBack,
   goForward,
+  hasPasswordAccount = false,
+  hasOAuthAccount = false,
+  changingPassword = false,
+  settingPassword = false,
+  resettingEncryptionPassword = false,
+  handleChangePassword,
+  handleSetPassword,
+  handleResetEncryptionPassword,
 }: SecuritySettingsProps) {
   const isFullEncryptionEnabled = localSettings.eventEncryptionMode === "full";
+  const showPasswordSection = hasPasswordAccount || hasOAuthAccount;
 
   return (
     <div className="flex flex-col">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 shrink-0">
         <button
           onClick={() => goBack()}
@@ -54,7 +71,6 @@ export function SecuritySettings({
           </div>
         </div>
 
-        {/* Authentication Section */}
         <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
           Authentication
         </div>
@@ -74,6 +90,26 @@ export function SecuritySettings({
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
           </button>
         </div>
+
+        {showPasswordSection && handleChangePassword ? (
+          <>
+            <div className="px-4 py-2 text-xs font-medium text-muted-foreground border-t border-border/50 mt-1">
+              Password
+            </div>
+            <div className="px-1 pb-2">
+              <PasswordSection
+                hasPasswordAccount={hasPasswordAccount}
+                hasOAuthAccount={hasOAuthAccount}
+                changingPassword={changingPassword}
+                settingPassword={settingPassword}
+                resettingEncryptionPassword={resettingEncryptionPassword}
+                handleChangePassword={handleChangePassword}
+                handleSetPassword={handleSetPassword}
+                handleResetEncryptionPassword={handleResetEncryptionPassword}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );

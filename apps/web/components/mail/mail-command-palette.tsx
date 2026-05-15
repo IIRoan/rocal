@@ -17,10 +17,12 @@ import {
   Check,
   Palette,
   Globe,
-  Bell,
   Shield,
   Inbox,
-  Users,
+  Tag,
+  Plus,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -46,9 +48,11 @@ import {
   SettingToggleRow,
   InviteSettings,
 } from "../command-palette/index";
+import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";
 import type { JmapMailbox } from "@/lib/mail/types";
+import type { LabelDef } from "@/lib/mail/types";
 import type { UserSettings } from "@/lib/types/calendar";
 
 type MailPaletteView =
@@ -63,7 +67,8 @@ type MailPaletteView =
   | "mailboxes"
   | "mailbox-create"
   | "mailbox-edit"
-  | "invites";
+  | "invites"
+  | "labels";
 
 interface PaletteItem {
   id: string;
@@ -84,10 +89,190 @@ export interface MailCommandPaletteProps {
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
   onRenameMailbox?: (id: string, name: string) => Promise<void>;
+  labels?: LabelDef[];
+  onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
+  onDeleteLabel?: (id: string) => Promise<void>;
   initialView?: string;
 }
 
 const log = createLogger("mail-command-palette");
+
+const LABEL_COLORS: { value: string; hex: string }[] = [
+  { value: "blue", hex: "#3b82f6" },
+  { value: "red", hex: "#ef4444" },
+  { value: "green", hex: "#22c55e" },
+  { value: "yellow", hex: "#facc15" },
+  { value: "orange", hex: "#f97316" },
+  { value: "purple", hex: "#a855f7" },
+  { value: "pink", hex: "#ec4899" },
+  { value: "teal", hex: "#14b8a6" },
+];
+
+function LabelsView({
+  goBack,
+  labels,
+  onCreateLabel,
+  onDeleteLabel,
+}: {
+  goBack: () => void;
+  labels: LabelDef[];
+  onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
+  onDeleteLabel?: (id: string) => Promise<void>;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState("blue");
+  const [hexInput, setHexInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const isValidHex = (v: string) => /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
+
+  const colorPreview = isValidHex(newColor) ? newColor : (LABEL_COLORS.find((c) => c.value === newColor)?.hex ?? "#888");
+
+  const handleHexInput = (v: string) => {
+    setHexInput(v);
+    if (isValidHex(v)) setNewColor(v);
+  };
+
+  const handlePresetClick = (value: string) => {
+    setNewColor(value);
+    setHexInput("");
+  };
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !onCreateLabel) return;
+    setSaving(true);
+    try {
+      await onCreateLabel(newName.trim(), newColor);
+      setNewName("");
+      setNewColor("blue");
+      setHexInput("");
+      setCreating(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!onDeleteLabel) return;
+    setDeletingId(id);
+    try {
+      await onDeleteLabel(id);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+      <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
+        <button type="button" onClick={goBack} className="p-1 rounded hover:bg-muted/50 transition-colors">
+          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <span className="text-sm font-medium flex-1">Labels</span>
+        {onCreateLabel ? (
+          <button
+            type="button"
+            onClick={() => setCreating((v) => !v)}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
+            aria-label="New label"
+          >
+            <Plus className="h-4 w-4 text-muted-foreground" />
+          </button>
+        ) : null}
+      </div>
+      <div className="flex-1 overflow-y-auto py-2 px-2">
+        {creating ? (
+          <div className="mx-1 mb-2 rounded-lg border border-border/50 bg-muted/20 p-3 space-y-3">
+            <input
+              autoFocus
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Label name"
+              disabled={saving}
+              onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); if (e.key === "Escape") setCreating(false); }}
+              className="flex h-9 w-full rounded-md bg-input px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+            />
+            <div className="flex gap-1.5 flex-wrap items-center">
+              {LABEL_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => handlePresetClick(c.value)}
+                  style={{ backgroundColor: c.hex }}
+                  className={`h-5 w-5 rounded-full transition-transform ${newColor === c.value ? "ring-2 ring-ring ring-offset-1 scale-110" : ""}`}
+                  aria-label={c.value}
+                />
+              ))}
+              <div className="flex items-center gap-1.5 ml-1">
+                <div className="h-5 w-5 rounded-full border border-border/50 shrink-0" style={{ backgroundColor: colorPreview }} />
+                <input
+                  type="text"
+                  value={hexInput}
+                  onChange={(e) => handleHexInput(e.target.value)}
+                  placeholder="#000000"
+                  className="h-7 w-20 rounded-md bg-input px-2 text-xs font-mono text-foreground outline-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/30"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={saving || !newName.trim()}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                Create
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreating(false); setNewName(""); }}
+                className="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent/40"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {labels.length === 0 && !creating ? (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">No labels yet.</div>
+        ) : null}
+        {labels.map((label) => {
+          const displayColor = /^#/.test(label.color)
+            ? label.color
+            : (LABEL_COLORS.find((c) => c.value === label.color)?.hex ?? "#888");
+          return (
+            <div
+              key={label.id}
+              className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/50 group"
+            >
+              <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: displayColor }} />
+              <span className="text-sm flex-1 truncate">{label.name}</span>
+              {onDeleteLabel ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(label.id)}
+                  disabled={deletingId === label.id}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                  aria-label="Delete label"
+                >
+                  {deletingId === label.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function MailCommandPalette({
   open,
@@ -101,6 +286,9 @@ export function MailCommandPalette({
   onCreateMailbox,
   onDeleteMailbox,
   onRenameMailbox,
+  labels = [],
+  onCreateLabel,
+  onDeleteLabel,
   initialView,
 }: MailCommandPaletteProps) {
   const [navHistory, setNavHistory] = useState<MailPaletteView[]>(["main"]);
@@ -267,12 +455,10 @@ export function MailCommandPalette({
     () => [
       { id: "compose", label: "Compose", icon: SquarePen, description: "Write a new message" },
       { id: "mailboxes", label: "Mailboxes", icon: Inbox, description: "Create, edit, and delete mailboxes" },
+      { id: "labels", label: "Labels", icon: Tag, description: "Manage message labels" },
       { id: "appearance", label: "Appearance", icon: Palette, description: "Theme and display" },
       { id: "time-region", label: "Time & Region", icon: Globe, description: settings?.timezone ?? "Timezone, time format" },
-      { id: "notifications", label: "Notifications", icon: Bell, description: "Email alerts" },
-      { id: "security", label: "Security", icon: Shield, description: "Passkeys & authentication" },
       { id: "account", label: "Account", icon: User, description: "Manage your account" },
-      { id: "invites", label: "Invites", icon: Users, description: "Invite friends to join Solace" },
     ],
     [settings?.timezone],
   );
@@ -488,6 +674,19 @@ export function MailCommandPalette({
               checked={blockTrackingPixels}
               onToggle={onToggleBlockTrackingPixels}
             />
+            <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
+              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Password</span>
+            </div>
+            <PasswordSection
+              hasPasswordAccount={hasPasswordAccount}
+              hasOAuthAccount={hasOAuthAccount}
+              changingPassword={changingPassword}
+              settingPassword={settingPassword}
+              resettingEncryptionPassword={resettingEncryptionPassword}
+              handleChangePassword={handleChangePassword}
+              handleSetPassword={handleSetPassword}
+              handleResetEncryptionPassword={handleResetEncryptionPassword}
+            />
           </div>
         </div>
       );
@@ -547,12 +746,18 @@ export function MailCommandPalette({
           handleResetEncryptionPassword={handleResetEncryptionPassword}
           updatingProfile={updatingProfile}
           handleUpdateProfile={handleUpdateProfile}
+          onOpenInvites={() => goForward("invites")}
+          onOpenSecurity={() => goForward("security")}
         />
       );
     }
 
     if (currentView === "invites") {
       return <InviteSettings goBack={goBack} />;
+    }
+
+    if (currentView === "labels") {
+      return <LabelsView goBack={goBack} labels={labels} onCreateLabel={onCreateLabel} onDeleteLabel={onDeleteLabel} />;
     }
 
     return null;
