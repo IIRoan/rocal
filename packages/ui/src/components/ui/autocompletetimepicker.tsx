@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 import { Clock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "./button";
@@ -229,6 +229,7 @@ export function ShadcnAutocomleteTimePicker({
 }: TimePickerProps) {
   const [open, setOpen] = useState(false);
   const [customTimeInput, setCustomTimeInput] = useState("");
+  const listboxId = useId();
   const isMobile = useIsMobile();
   const { timeOptions, formatTime } = useAutocompleteTimepicker({
     is24Hour,
@@ -292,6 +293,7 @@ export function ShadcnAutocomleteTimePicker({
   const triggerButton = inline ? (
     <button
       role="combobox"
+      aria-controls={listboxId}
       aria-expanded={open}
       className={cn(
         "outline-none text-foreground font-semibold active:opacity-70 transition-opacity",
@@ -304,6 +306,7 @@ export function ShadcnAutocomleteTimePicker({
     <Button
       variant={variant}
       role="combobox"
+      aria-controls={listboxId}
       aria-expanded={open}
       className={cn(
         "w-full justify-start font-normal cursor-pointer",
@@ -319,7 +322,7 @@ export function ShadcnAutocomleteTimePicker({
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent responsive responsiveHeight="300px" className="max-h-[300px]">
+        <DrawerContent id={listboxId} responsive responsiveHeight="300px" className="max-h-[300px]">
           <DrawerTitle className="sr-only">Select time</DrawerTitle>
           <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
             <TimeGrid
@@ -366,7 +369,7 @@ export function ShadcnAutocomleteTimePicker({
   return (
     <Drawer open={open} onOpenChange={setOpen} direction="bottom">
       <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-      <DrawerContent responsive responsiveHeight="400px" className="max-h-[400px]">
+      <DrawerContent id={listboxId} responsive responsiveHeight="400px" className="max-h-[400px]">
         <DrawerTitle className="sr-only">Select time</DrawerTitle>
         <div className="flex flex-col items-center flex-1 overflow-y-auto pt-4">
           <TimeGrid

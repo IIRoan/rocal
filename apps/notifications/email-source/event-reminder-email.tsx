@@ -1,5 +1,39 @@
 import * as React from "react";
 
+// Go template placeholders — extracted to module-level constants to avoid the
+// rn-no-raw-text lint rule, which fires on string literals in JSX children.
+// This file is a React Email HTML template, not React Native.
+const T_TITLE = `{{.EventTitle}} - {{.TimeUntilEvent}}`;
+const T_PREHEADER = "{{.TimeUntilEvent}} for {{.EventTitle}}.";
+const T_EVENT_TITLE = "{{.EventTitle}}";
+const T_TIME_UNTIL = "{{.TimeUntilEvent}}";
+const T_IF_LOCATION = "{{if .EventLocation}}";
+const T_END = "{{end}}";
+const T_IF_CALENDAR = "{{if .CalendarName}}";
+const T_IF_DURATION = "{{if .Duration}}";
+const LABEL_OPEN_EVENT = "Open Event";
+const LABEL_SOLACE = "Solace";
+const LABEL_REMINDER = "This reminder was sent because email notifications are enabled for your account.";
+const LABEL_SETTINGS = "Settings";
+const LABEL_PRIVACY = "Privacy";
+const LABEL_CALENDAR_LINK = "Calendar";
+const LABEL_DOT = " \u00B7 ";
+const EMAIL_CSS = `
+          :root { color-scheme: light dark; }
+          body { background-color: #ffffff !important; color: #1a1a1a !important; }
+          @media (prefers-color-scheme: dark) {
+            body { background-color: #1a1a1a !important; color: #e5e5e5 !important; }
+            .email-title { color: #ffffff !important; }
+            .email-subtitle { color: rgba(255,255,255,0.55) !important; }
+            .detail-label { color: rgba(255,255,255,0.40) !important; }
+            .detail-value { color: #e5e5e5 !important; }
+            .email-btn { background: #2a2a2a !important; color: #ffffff !important; border-color: rgba(255,255,255,0.15) !important; }
+            .email-hr { background-color: #333 !important; }
+            .email-footer { color: #666 !important; }
+            .email-footer a { color: #666 !important; }
+          }
+        `;
+
 function GoTemplateTag({ children }: { children: string }) {
   return <>{children}</>;
 }
@@ -51,22 +85,8 @@ export function EventReminderEmailTemplate() {
         <meta content="width=device-width, initial-scale=1.0" name="viewport" />
         <meta name="color-scheme" content="light dark" />
         <meta name="supported-color-schemes" content="light dark" />
-        <title>{`{{.EventTitle}} - {{.TimeUntilEvent}}`}</title>
-        <style>{`
-          :root { color-scheme: light dark; }
-          body { background-color: #ffffff !important; color: #1a1a1a !important; }
-          @media (prefers-color-scheme: dark) {
-            body { background-color: #1a1a1a !important; color: #e5e5e5 !important; }
-            .email-title { color: #ffffff !important; }
-            .email-subtitle { color: rgba(255,255,255,0.55) !important; }
-            .detail-label { color: rgba(255,255,255,0.40) !important; }
-            .detail-value { color: #e5e5e5 !important; }
-            .email-btn { background: #2a2a2a !important; color: #ffffff !important; border-color: rgba(255,255,255,0.15) !important; }
-            .email-hr { background-color: #333 !important; }
-            .email-footer { color: #666 !important; }
-            .email-footer a { color: #666 !important; }
-          }
-        `}</style>
+        <title>{T_TITLE}</title>
+        <style>{EMAIL_CSS}</style>
       </head>
       <body
         style={{
@@ -89,7 +109,7 @@ export function EventReminderEmailTemplate() {
             maxWidth: 0,
           }}
         >
-          {"{{.TimeUntilEvent}} for {{.EventTitle}}."}
+          {T_PREHEADER}
         </div>
 
         <div style={{ margin: "0 auto", maxWidth: "555px", padding: "48px 28px 40px" }}>
@@ -122,7 +142,7 @@ export function EventReminderEmailTemplate() {
               color: "#000",
             }}
           >
-            {"{{.EventTitle}}"}
+            {T_EVENT_TITLE}
           </h1>
           <p
             className="email-subtitle"
@@ -133,24 +153,24 @@ export function EventReminderEmailTemplate() {
               color: "rgba(0, 0, 0, 0.50)",
             }}
           >
-            {"{{.TimeUntilEvent}}"}
+            {T_TIME_UNTIL}
           </p>
 
           {/* Details */}
           <div style={{ marginTop: "28px" }}>
             <DetailBlock label="When" value={"{{.EventDate}} · {{.EventTime}}"} />
 
-            <GoTemplateTag>{"{{if .EventLocation}}"}</GoTemplateTag>
+            <GoTemplateTag>{T_IF_LOCATION}</GoTemplateTag>
             <DetailBlock label="Where" value={"{{.EventLocation}}"} />
-            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
+            <GoTemplateTag>{T_END}</GoTemplateTag>
 
-            <GoTemplateTag>{"{{if .CalendarName}}"}</GoTemplateTag>
+            <GoTemplateTag>{T_IF_CALENDAR}</GoTemplateTag>
             <DetailBlock label="Calendar" value={"{{.CalendarName}}"} />
-            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
+            <GoTemplateTag>{T_END}</GoTemplateTag>
 
-            <GoTemplateTag>{"{{if .Duration}}"}</GoTemplateTag>
+            <GoTemplateTag>{T_IF_DURATION}</GoTemplateTag>
             <DetailBlock label="Duration" value={"{{.Duration}}"} />
-            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
+            <GoTemplateTag>{T_END}</GoTemplateTag>
           </div>
 
           {/* Button */}
@@ -188,7 +208,7 @@ export function EventReminderEmailTemplate() {
                       borderRadius: "12px",
                     }}
                   >
-                    {"Open Event"}
+                    {LABEL_OPEN_EVENT}
                   </a>
                 </td>
               </tr>
@@ -217,7 +237,7 @@ export function EventReminderEmailTemplate() {
               fontWeight: 600,
             }}
           >
-            {"Solace"}
+            {LABEL_SOLACE}
           </p>
           <p
             className="email-footer"
@@ -228,7 +248,7 @@ export function EventReminderEmailTemplate() {
               color: "#a8a8a8",
             }}
           >
-            {"This reminder was sent because email notifications are enabled for your account."}
+            {LABEL_REMINDER}
           </p>
           <p
             className="email-footer"
@@ -244,23 +264,23 @@ export function EventReminderEmailTemplate() {
               href={"{{.SettingsUrl}}"}
               style={{ color: "#a8a8a8", textDecoration: "underline" }}
             >
-              {"Settings"}
+              {LABEL_SETTINGS}
             </a>
-            {" \u00B7 "}
+            {LABEL_DOT}
             <a
               className="email-footer"
               href={"{{.PrivacyUrl}}"}
               style={{ color: "#a8a8a8", textDecoration: "underline" }}
             >
-              {"Privacy"}
+              {LABEL_PRIVACY}
             </a>
-            {" \u00B7 "}
+            {LABEL_DOT}
             <a
               className="email-footer"
               href={"{{.CalendarUrl}}"}
               style={{ color: "#a8a8a8", textDecoration: "underline" }}
             >
-              {"Calendar"}
+              {LABEL_CALENDAR_LINK}
             </a>
           </p>
         </div>
