@@ -391,7 +391,8 @@ function AppSidebarDesktop({
   activeApp: "calendar" | "mail";
   props: React.ComponentProps<typeof Sidebar>;
 }) {
-  const { calendars, isCalendarVisible, toggleCalendarVisibility } = useCalendarContext();
+  const { calendars, isCalendarVisible, toggleCalendarVisibility } =
+    useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
   );
@@ -620,7 +621,9 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          onClick={() => void toggleCalendarVisibility(calendar.id)}
+                          onClick={() =>
+                            void toggleCalendarVisibility(calendar.id)
+                          }
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
@@ -652,7 +655,9 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          onClick={() => void toggleCalendarVisibility(calendar.id)}
+                          onClick={() =>
+                            void toggleCalendarVisibility(calendar.id)
+                          }
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"
@@ -684,7 +689,9 @@ function AppSidebarDesktop({
                     return (
                       <SidebarMenuItem key={calendar.id}>
                         <SidebarMenuButton
-                          onClick={() => void toggleCalendarVisibility(calendar.id)}
+                          onClick={() =>
+                            void toggleCalendarVisibility(calendar.id)
+                          }
                           className={`rounded-lg h-8 text-[13px] font-medium transition-colors cursor-pointer select-none ${
                             isVisible
                               ? "text-foreground"

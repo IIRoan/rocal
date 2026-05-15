@@ -213,9 +213,8 @@ describe("event encryption policy", () => {
 
 describe("backfillEncryptedEventsToCiphertextOnly", () => {
   it("returns early when no calendar scope is provided", async () => {
-    const updateMany = jest.fn<
-      (args: MockUpdateManyArgs) => Promise<{ count: number }>
-    >();
+    const updateMany =
+      jest.fn<(args: MockUpdateManyArgs) => Promise<{ count: number }>>();
 
     await expect(
       backfillEncryptedEventsToCiphertextOnly(
@@ -229,9 +228,8 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
 
   it("re-encrypts a single calendar while preserving reminder-backed shadows when requested", async () => {
     const now = new Date("2026-04-24T10:00:00.000Z");
-    const updateMany = jest.fn<
-      (args: MockUpdateManyArgs) => Promise<{ count: number }>
-    >();
+    const updateMany =
+      jest.fn<(args: MockUpdateManyArgs) => Promise<{ count: number }>>();
 
     updateMany.mockResolvedValue({ count: 2 });
 
@@ -266,9 +264,8 @@ describe("backfillEncryptedEventsToCiphertextOnly", () => {
   });
 
   it("uses an in-clause and deduplicates calendar ids for multi-calendar reencryption", async () => {
-    const updateMany = jest.fn<
-      (args: MockUpdateManyArgs) => Promise<{ count: number }>
-    >();
+    const updateMany =
+      jest.fn<(args: MockUpdateManyArgs) => Promise<{ count: number }>>();
 
     updateMany.mockResolvedValue({ count: 3 });
 

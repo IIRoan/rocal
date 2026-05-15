@@ -29,13 +29,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import {
-  addMonths,
-  format,
-  isSameDay,
-  isSameMonth,
-  subMonths,
-} from "date-fns";
+import { addMonths, format, isSameDay, isSameMonth, subMonths } from "date-fns";
 import {
   buildPaddedCalendarMonthRanges,
   getPaddedCalendarMonthRange,
@@ -125,7 +119,10 @@ export function SidebarMiniCalendar({
     );
   }, [selectedDate]);
 
-  const previousMonth = useMemo(() => subMonths(calendarMonth, 1), [calendarMonth]);
+  const previousMonth = useMemo(
+    () => subMonths(calendarMonth, 1),
+    [calendarMonth],
+  );
   const nextMonth = useMemo(() => addMonths(calendarMonth, 1), [calendarMonth]);
   const previousMonthRange = useMemo(
     () => getPaddedCalendarMonthRange(previousMonth),
@@ -175,7 +172,10 @@ export function SidebarMiniCalendar({
       currentMonthRange.end.toISOString(),
     ),
     queryFn: () =>
-      calendarApiService.getEvents(currentMonthRange.start, currentMonthRange.end),
+      calendarApiService.getEvents(
+        currentMonthRange.start,
+        currentMonthRange.end,
+      ),
     staleTime: MINI_CALENDAR_STALE_TIME,
     placeholderData: keepPreviousData,
   });
@@ -224,7 +224,10 @@ export function SidebarMiniCalendar({
         key: `next-${format(nextMonth, "yyyy-MM")}`,
         monthDate: nextMonth,
         weeks: Array.from({ length: 6 }, (_, index) =>
-          generateGridDates(nextMonth, weekStartDay).slice(index * 7, index * 7 + 7),
+          generateGridDates(nextMonth, weekStartDay).slice(
+            index * 7,
+            index * 7 + 7,
+          ),
         ),
         eventsByDay: groupEventsByDay(decorateEvents(nextMonthData)),
       },
@@ -291,66 +294,59 @@ export function SidebarMiniCalendar({
     );
   }, []);
 
-  const monthSwipeGesture = useMemo(
-    () => {
-      const gesture = Gesture.Pan()
-        .enabled(pageWidth > 1)
-        .activeOffsetX([-12, 12])
-        .failOffsetY([-8, 8])
-        .onBegin(() => {
-          "worklet";
-          cancelAnimation(translateX);
-        })
-        .onUpdate((event) => {
-          "worklet";
-          translateX.value =
-            -pageWidth +
-            rubberBand(
-              event.translationX,
-              pageWidth * 0.9,
-              RUBBER_BAND_FACTOR,
-            );
-        })
-        .onEnd((event) => {
-          "worklet";
-          const committedLeft =
-            event.translationX < -SWIPE_COMMIT_THRESHOLD ||
-            event.velocityX < -VELOCITY_COMMIT;
-          const committedRight =
-            event.translationX > SWIPE_COMMIT_THRESHOLD ||
-            event.velocityX > VELOCITY_COMMIT;
+  const monthSwipeGesture = useMemo(() => {
+    const gesture = Gesture.Pan()
+      .enabled(pageWidth > 1)
+      .activeOffsetX([-12, 12])
+      .failOffsetY([-8, 8])
+      .onBegin(() => {
+        "worklet";
+        cancelAnimation(translateX);
+      })
+      .onUpdate((event) => {
+        "worklet";
+        translateX.value =
+          -pageWidth +
+          rubberBand(event.translationX, pageWidth * 0.9, RUBBER_BAND_FACTOR);
+      })
+      .onEnd((event) => {
+        "worklet";
+        const committedLeft =
+          event.translationX < -SWIPE_COMMIT_THRESHOLD ||
+          event.velocityX < -VELOCITY_COMMIT;
+        const committedRight =
+          event.translationX > SWIPE_COMMIT_THRESHOLD ||
+          event.velocityX > VELOCITY_COMMIT;
 
-          if (committedLeft) {
-            translateX.value = withTiming(
-              -pageWidth * 2,
-              { duration: PAGE_DURATION },
-              (finished) => {
-                if (finished) {
-                  runOnJS(commitMonthChange)(1);
-                }
-              },
-            );
-          } else if (committedRight) {
-            translateX.value = withTiming(
-              0,
-              { duration: PAGE_DURATION },
-              (finished) => {
-                if (finished) {
-                  runOnJS(commitMonthChange)(-1);
-                }
-              },
-            );
-          } else {
-            translateX.value = withSpring(-pageWidth, PAGE_SPRING);
-          }
-        });
+        if (committedLeft) {
+          translateX.value = withTiming(
+            -pageWidth * 2,
+            { duration: PAGE_DURATION },
+            (finished) => {
+              if (finished) {
+                runOnJS(commitMonthChange)(1);
+              }
+            },
+          );
+        } else if (committedRight) {
+          translateX.value = withTiming(
+            0,
+            { duration: PAGE_DURATION },
+            (finished) => {
+              if (finished) {
+                runOnJS(commitMonthChange)(-1);
+              }
+            },
+          );
+        } else {
+          translateX.value = withSpring(-pageWidth, PAGE_SPRING);
+        }
+      });
 
-      return drawerCloseGesture
-        ? gesture.blocksExternalGesture(drawerCloseGesture)
-        : gesture;
-    },
-    [commitMonthChange, drawerCloseGesture, pageWidth, translateX],
-  );
+    return drawerCloseGesture
+      ? gesture.blocksExternalGesture(drawerCloseGesture)
+      : gesture;
+  }, [commitMonthChange, drawerCloseGesture, pageWidth, translateX]);
 
   const stripAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -366,7 +362,10 @@ export function SidebarMiniCalendar({
     ) => (
       <View>
         {pageWeeks.map((week, weekIndex) => (
-          <View key={`${format(pageMonth, "yyyy-MM")}-week-${weekIndex}`} style={styles.weekRow}>
+          <View
+            key={`${format(pageMonth, "yyyy-MM")}-week-${weekIndex}`}
+            style={styles.weekRow}
+          >
             {week.map((date) => {
               const isSelected = isSameDay(date, effectiveSelectedDate);
               const inCurrentMonth = isSameMonth(date, pageMonth);
@@ -439,31 +438,52 @@ export function SidebarMiniCalendar({
       <View style={styles.headerRow}>
         <Pressable
           onPress={handleGoToToday}
-          style={({ pressed }) => [styles.headerTitleButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.headerTitleButton,
+            pressed && styles.pressed,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Go to today"
         >
           <Text>
-            <Text style={styles.monthLabel}>{format(calendarMonth, "MMMM")}</Text>
-            <Text style={styles.yearLabel}>{` ${format(calendarMonth, "yyyy")}`}</Text>
+            <Text style={styles.monthLabel}>
+              {format(calendarMonth, "MMMM")}
+            </Text>
+            <Text
+              style={styles.yearLabel}
+            >{` ${format(calendarMonth, "yyyy")}`}</Text>
           </Text>
         </Pressable>
         <View style={styles.headerActions}>
           <Pressable
             onPress={handlePreviousMonth}
-            style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.navButton,
+              pressed && styles.pressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Previous month"
           >
-            <Feather name="chevron-left" size={16} color={theme.colors.mutedForeground} />
+            <Feather
+              name="chevron-left"
+              size={16}
+              color={theme.colors.mutedForeground}
+            />
           </Pressable>
           <Pressable
             onPress={handleNextMonth}
-            style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.navButton,
+              pressed && styles.pressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Next month"
           >
-            <Feather name="chevron-right" size={16} color={theme.colors.mutedForeground} />
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={theme.colors.mutedForeground}
+            />
           </Pressable>
         </View>
       </View>
@@ -487,7 +507,10 @@ export function SidebarMiniCalendar({
               ]}
             >
               {pages.map((page) => (
-                <View key={page.key} style={[styles.page, { width: pageWidth }]}>
+                <View
+                  key={page.key}
+                  style={[styles.page, { width: pageWidth }]}
+                >
                   {renderMonthPage(
                     page.monthDate,
                     page.weeks,

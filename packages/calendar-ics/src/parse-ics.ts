@@ -267,7 +267,11 @@ function normalizeAllDayRange(
 
   return {
     start: buildUtcDateFromTimeZoneDateParts(startDateParts, timezone, false),
-    end: buildUtcDateFromTimeZoneDateParts(lastCoveredDateParts, timezone, true),
+    end: buildUtcDateFromTimeZoneDateParts(
+      lastCoveredDateParts,
+      timezone,
+      true,
+    ),
   };
 }
 
@@ -306,8 +310,14 @@ function parseNumberArray(
   return Array.from(new Set(parsed));
 }
 
-function toSundayFirstWeekdayIndex(mondayFirstIndex: number): number | undefined {
-  if (!Number.isInteger(mondayFirstIndex) || mondayFirstIndex < 0 || mondayFirstIndex > 6) {
+function toSundayFirstWeekdayIndex(
+  mondayFirstIndex: number,
+): number | undefined {
+  if (
+    !Number.isInteger(mondayFirstIndex) ||
+    mondayFirstIndex < 0 ||
+    mondayFirstIndex > 6
+  ) {
     return undefined;
   }
 
@@ -320,7 +330,8 @@ function parseWeekdayEntry(entry: unknown): number | undefined {
   }
 
   if (typeof entry === "string") {
-    const code = entry.length >= 2 ? entry.slice(-2).toUpperCase() : entry.toUpperCase();
+    const code =
+      entry.length >= 2 ? entry.slice(-2).toUpperCase() : entry.toUpperCase();
     return WEEKDAY_CODE_TO_INDEX[code];
   }
 
@@ -342,7 +353,11 @@ function parseWeekdayEntry(entry: unknown): number | undefined {
 }
 
 function parseByWeekDay(value: unknown): number[] | undefined {
-  const source = Array.isArray(value) ? value : value === undefined ? [] : [value];
+  const source = Array.isArray(value)
+    ? value
+    : value === undefined
+      ? []
+      : [value];
 
   const parsed = source
     .map((entry) => parseWeekdayEntry(entry))
@@ -361,8 +376,11 @@ function parseRecurrenceRule(rrule: unknown): IcsRecurrenceRule | undefined {
   }
 
   const options = isRecord(rrule.options) ? rrule.options : undefined;
-  const origOptions = isRecord(rrule.origOptions) ? rrule.origOptions : undefined;
-  const source = origOptions && Object.keys(origOptions).length > 0 ? origOptions : options;
+  const origOptions = isRecord(rrule.origOptions)
+    ? rrule.origOptions
+    : undefined;
+  const source =
+    origOptions && Object.keys(origOptions).length > 0 ? origOptions : options;
 
   if (!source) {
     return undefined;
@@ -397,7 +415,10 @@ function parseRecurrenceRule(rrule: unknown): IcsRecurrenceRule | undefined {
   }
 
   const byWeekDay = parseByWeekDay(
-    source.byweekday ?? source.bynweekday ?? options?.byweekday ?? options?.bynweekday,
+    source.byweekday ??
+      source.bynweekday ??
+      options?.byweekday ??
+      options?.bynweekday,
   );
   if (byWeekDay?.length) {
     recurrence.byWeekDay = byWeekDay;
@@ -432,11 +453,17 @@ function parseRecurrenceRule(rrule: unknown): IcsRecurrenceRule | undefined {
   return recurrence;
 }
 
-function isAllDayEvent(event: Pick<ical.VEvent, "datetype" | "start">): boolean {
-  return event.datetype === "date" || (event.start as EventDate).dateOnly === true;
+function isAllDayEvent(
+  event: Pick<ical.VEvent, "datetype" | "start">,
+): boolean {
+  return (
+    event.datetype === "date" || (event.start as EventDate).dateOnly === true
+  );
 }
 
-function getEventTimezone(event: Pick<ical.VEvent, "start" | "end">): string | undefined {
+function getEventTimezone(
+  event: Pick<ical.VEvent, "start" | "end">,
+): string | undefined {
   const startTz = (event.start as EventDate).tz;
   if (typeof startTz === "string" && startTz.trim()) {
     return normalizeIcsTimezone(startTz);
@@ -561,7 +588,8 @@ export function parseICSFile(
 
       const metadata = component as unknown as UnknownRecord;
       result.calendarName =
-        result.calendarName ?? getFirstStringValue(metadata, CALENDAR_NAME_KEYS);
+        result.calendarName ??
+        getFirstStringValue(metadata, CALENDAR_NAME_KEYS);
       result.calendarDescription =
         result.calendarDescription ??
         getFirstStringValue(metadata, CALENDAR_DESCRIPTION_KEYS);

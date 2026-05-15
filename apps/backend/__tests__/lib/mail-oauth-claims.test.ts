@@ -38,7 +38,10 @@ describe("mail OAuth claim helpers", () => {
         },
         scopes: ["openid", "email", "profile"],
         metadata: {
-          audiences: ["https://mail.solace.onl", "https://cloudflared.roan.dev/api/auth/oauth2/userinfo"],
+          audiences: [
+            "https://mail.solace.onl",
+            "https://cloudflared.roan.dev/api/auth/oauth2/userinfo",
+          ],
         },
       }),
     ).toEqual({

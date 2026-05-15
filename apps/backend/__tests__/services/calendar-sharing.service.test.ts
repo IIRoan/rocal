@@ -22,9 +22,10 @@ describe("CalendarSharingService.disableShareLink", () => {
     >();
     const update = jest.fn<() => Promise<{ id: string }>>();
     const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique = jest.fn<
-      () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-    >();
+    const findUnique =
+      jest.fn<
+        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
+      >();
 
     findFirst.mockResolvedValueOnce({
       id: "cal-1",
@@ -94,9 +95,10 @@ describe("CalendarSharingService.disableShareLink", () => {
     >();
     const update = jest.fn<() => Promise<{ id: string }>>();
     const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique = jest.fn<
-      () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-    >();
+    const findUnique =
+      jest.fn<
+        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
+      >();
 
     findFirst.mockResolvedValueOnce({
       id: "cal-1",
@@ -155,9 +157,10 @@ describe("CalendarSharingService.disableShareLink", () => {
     >();
     const update = jest.fn<() => Promise<{ id: string }>>();
     const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique = jest.fn<
-      () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-    >();
+    const findUnique =
+      jest.fn<
+        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
+      >();
 
     findFirst.mockResolvedValueOnce({
       id: "cal-1",
@@ -217,9 +220,10 @@ describe("CalendarSharingService.disableShareLink", () => {
     >();
     const update = jest.fn<() => Promise<{ id: string }>>();
     const updateMany = jest.fn<() => Promise<{ count: number }>>();
-    const findUnique = jest.fn<
-      () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
-    >();
+    const findUnique =
+      jest.fn<
+        () => Promise<{ eventEncryptionMode: "hybrid" | "full" } | null>
+      >();
 
     findFirst.mockResolvedValueOnce({
       id: "cal-1",

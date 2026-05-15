@@ -15,9 +15,7 @@ describe("passkey step-up cookies", () => {
 
     const cookieHeader = headers.get("set-cookie");
 
-    expect(cookieHeader).toContain(
-      `${PASSKEY_STEP_UP_COOKIE_NAME}=verified`,
-    );
+    expect(cookieHeader).toContain(`${PASSKEY_STEP_UP_COOKIE_NAME}=verified`);
     expect(cookieHeader).toContain("Path=/");
     expect(cookieHeader).toContain("HttpOnly");
   });

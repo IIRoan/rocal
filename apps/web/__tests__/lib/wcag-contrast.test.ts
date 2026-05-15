@@ -17,9 +17,33 @@ function oklchToWcagLuminance(oklchStr: string): number {
   const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
   const s_ = L - 0.0894841775 * a - 1.291485548 * b;
 
-  const rLin = Math.max(0, Math.min(1, +4.0767416621 * (l_ * l_ * l_) - 3.3077115913 * (m_ * m_ * m_) + 0.2309699292 * (s_ * s_ * s_)));
-  const gLin = Math.max(0, Math.min(1, -1.2684380046 * (l_ * l_ * l_) + 2.6097574011 * (m_ * m_ * m_) - 0.3413193965 * (s_ * s_ * s_)));
-  const bLin = Math.max(0, Math.min(1, -0.0041960863 * (l_ * l_ * l_) - 0.7034186147 * (m_ * m_ * m_) + 1.707614701 * (s_ * s_ * s_)));
+  const rLin = Math.max(
+    0,
+    Math.min(
+      1,
+      +4.0767416621 * (l_ * l_ * l_) -
+        3.3077115913 * (m_ * m_ * m_) +
+        0.2309699292 * (s_ * s_ * s_),
+    ),
+  );
+  const gLin = Math.max(
+    0,
+    Math.min(
+      1,
+      -1.2684380046 * (l_ * l_ * l_) +
+        2.6097574011 * (m_ * m_ * m_) -
+        0.3413193965 * (s_ * s_ * s_),
+    ),
+  );
+  const bLin = Math.max(
+    0,
+    Math.min(
+      1,
+      -0.0041960863 * (l_ * l_ * l_) -
+        0.7034186147 * (m_ * m_ * m_) +
+        1.707614701 * (s_ * s_ * s_),
+    ),
+  );
 
   return 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
 }
@@ -130,7 +154,10 @@ describe("WCAG Contrast - Solace Web Design System", () => {
 
     // Destructive uses WCAG AA for UI components (≥3:1), not normal text (≥4.5:1)
     it("destructive-foreground on destructive meets WCAG AA for UI components (≥3:1)", () => {
-      const ratio = contrastRatio(LIGHT.destructiveForeground, LIGHT.destructive);
+      const ratio = contrastRatio(
+        LIGHT.destructiveForeground,
+        LIGHT.destructive,
+      );
       expect(ratio).toBeGreaterThanOrEqual(3.0);
     });
   });

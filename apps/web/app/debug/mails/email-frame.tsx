@@ -14,7 +14,8 @@ export function EmailFrame({ html }: { html: string }) {
       try {
         const doc = iframe!.contentDocument;
         if (doc?.documentElement) {
-          const h = doc.documentElement.scrollHeight || doc.body?.scrollHeight || 400;
+          const h =
+            doc.documentElement.scrollHeight || doc.body?.scrollHeight || 400;
           setHeight(h);
         }
       } catch {

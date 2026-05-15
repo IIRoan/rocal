@@ -1,13 +1,7 @@
 /** @jest-environment jsdom */
 
 import React, { act } from "react";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 
 import { useDrawerViewport } from "./use-drawer-viewport";
@@ -83,7 +77,8 @@ describe("useDrawerViewport", () => {
       callback(0);
       return 1;
     }) as typeof globalThis.requestAnimationFrame;
-    globalThis.cancelAnimationFrame = (() => {}) as typeof globalThis.cancelAnimationFrame;
+    globalThis.cancelAnimationFrame =
+      (() => {}) as typeof globalThis.cancelAnimationFrame;
   });
 
   afterEach(() => {

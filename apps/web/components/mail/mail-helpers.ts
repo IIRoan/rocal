@@ -34,7 +34,16 @@ export function formatMessageDate(
   const dateStr = date.toLocaleDateString(undefined, { timeZone });
   const todayStr = now.toLocaleDateString(undefined, { timeZone });
   if (dateStr === todayStr) {
-    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12, timeZone });
+    return date.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12,
+      timeZone,
+    });
   }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone });
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    timeZone,
+  });
 }

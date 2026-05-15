@@ -83,10 +83,12 @@ describe("settings toggle rows", () => {
     await act(async () => {
       root.render(
         <NotificationSettings
-          localSettings={{
-            emailNotifications: true,
-            eventEncryptionMode: "hybrid",
-          } as any}
+          localSettings={
+            {
+              emailNotifications: true,
+              eventEncryptionMode: "hybrid",
+            } as any
+          }
           updateSetting={updateSetting}
           goBack={() => {}}
         />,

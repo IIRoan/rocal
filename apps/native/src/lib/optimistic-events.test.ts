@@ -6,7 +6,11 @@ import {
   rollbackFromSnapshot,
   type CacheSnapshot,
 } from "./optimistic-events";
-import type { CalendarEvent, CreateEventRequest, EventsResponse } from "@workspace/calendar-core";
+import type {
+  CalendarEvent,
+  CreateEventRequest,
+  EventsResponse,
+} from "@workspace/calendar-core";
 
 // ─── Mock QueryClient ─────────────────────────────────────────────────────────
 
@@ -34,7 +38,11 @@ function makeMockQueryClient(initial: Record<string, EventsResponse>) {
     setQueryData: jest.fn((queryKey: string[], updater: unknown) => {
       const key = queryKey.join("|");
       if (typeof updater === "function") {
-        store[key] = (updater as (prev: EventsResponse | undefined) => EventsResponse | undefined)(store[key]);
+        store[key] = (
+          updater as (
+            prev: EventsResponse | undefined,
+          ) => EventsResponse | undefined
+        )(store[key]);
       } else {
         store[key] = updater as EventsResponse | undefined;
       }
@@ -86,7 +94,9 @@ describe("generateOptimisticId", () => {
   });
 
   it("generates unique IDs on each call", () => {
-    const ids = new Set(Array.from({ length: 50 }, () => generateOptimisticId()));
+    const ids = new Set(
+      Array.from({ length: 50 }, () => generateOptimisticId()),
+    );
     expect(ids.size).toBe(50);
   });
 });
@@ -110,7 +120,11 @@ describe("buildOptimisticEvent", () => {
 
   it("defaults allDay to false when not provided", () => {
     const { allDay: _, ...withoutAllDay } = BASE_REQUEST;
-    const event = buildOptimisticEvent(withoutAllDay as CreateEventRequest, "u", "t");
+    const event = buildOptimisticEvent(
+      withoutAllDay as CreateEventRequest,
+      "u",
+      "t",
+    );
     expect(event.allDay).toBe(false);
   });
 
@@ -220,7 +234,10 @@ describe("optimisticallyRemoveEvent", () => {
       [key.join("|")]: makeEventResponse([EXISTING_EVENT]),
     });
 
-    const snapshot = await optimisticallyRemoveEvent(client as never, "ev-existing");
+    const snapshot = await optimisticallyRemoveEvent(
+      client as never,
+      "ev-existing",
+    );
 
     expect(snapshot.length).toBe(1);
     expect(snapshot[0].data?.events).toContainEqual(EXISTING_EVENT);
@@ -237,7 +254,10 @@ describe("rollbackFromSnapshot", () => {
     });
 
     // Optimistically remove so cache is now empty
-    const snapshot = await optimisticallyRemoveEvent(client as never, "ev-existing");
+    const snapshot = await optimisticallyRemoveEvent(
+      client as never,
+      "ev-existing",
+    );
     expect(client._store[key.join("|")]?.events.length).toBe(0);
 
     // Roll back — original event should be restored
@@ -259,10 +279,17 @@ describe("rollbackFromSnapshot", () => {
       [key2.join("|")]: makeEventResponse([EXISTING_EVENT]),
     });
 
-    const snapshot = await optimisticallyRemoveEvent(client as never, "ev-existing");
+    const snapshot = await optimisticallyRemoveEvent(
+      client as never,
+      "ev-existing",
+    );
     rollbackFromSnapshot(client as never, snapshot);
 
-    expect(client._store[key1.join("|")]?.events).toContainEqual(EXISTING_EVENT);
-    expect(client._store[key2.join("|")]?.events).toContainEqual(EXISTING_EVENT);
+    expect(client._store[key1.join("|")]?.events).toContainEqual(
+      EXISTING_EVENT,
+    );
+    expect(client._store[key2.join("|")]?.events).toContainEqual(
+      EXISTING_EVENT,
+    );
   });
 });

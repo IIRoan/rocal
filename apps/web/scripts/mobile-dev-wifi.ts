@@ -16,7 +16,8 @@ const apiUrlObj = new URL(apiUrl);
 const liveReloadHost = appUrlObj.hostname || "localhost";
 const liveReloadPort =
   appUrlObj.port || (appUrlObj.protocol === "https:" ? "443" : "80");
-const apiPort = apiUrlObj.port || (apiUrlObj.protocol === "https:" ? "443" : "80");
+const apiPort =
+  apiUrlObj.port || (apiUrlObj.protocol === "https:" ? "443" : "80");
 const autoStartDevServer = process.env.MOBILE_DEV_AUTO_START !== "false";
 const waitTimeoutMs = 90_000;
 const pollIntervalMs = 1_000;
@@ -49,7 +50,8 @@ const rawArgs = process.argv.slice(2);
 
 const adbConnectArg = rawArgs.find((arg) => arg.startsWith("--adb-connect="));
 const adbConnectEndpoint =
-  adbConnectArg?.slice("--adb-connect=".length) || process.env.MOBILE_ADB_CONNECT;
+  adbConnectArg?.slice("--adb-connect=".length) ||
+  process.env.MOBILE_ADB_CONNECT;
 const passthroughArgs = rawArgs.filter(
   (arg) => !arg.startsWith("--adb-connect="),
 );
@@ -150,7 +152,8 @@ const reversePort = (deviceId: string, port: string) => {
 
   if (result.code !== 0) {
     throw new Error(
-      result.stderr || `Failed to adb reverse tcp:${port} for device ${deviceId}`,
+      result.stderr ||
+        `Failed to adb reverse tcp:${port} for device ${deviceId}`,
     );
   }
 };
@@ -283,7 +286,9 @@ if (targetDeviceId) {
   }
 }
 
-console.log(`[mobile:dev:wifi] Starting Android live reload on ${liveReloadUrl}`);
+console.log(
+  `[mobile:dev:wifi] Starting Android live reload on ${liveReloadUrl}`,
+);
 console.log(`[mobile:dev:wifi] Running: ${command.join(" ")}`);
 
 const proc = bun.spawn(command, {

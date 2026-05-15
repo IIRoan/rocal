@@ -10,7 +10,10 @@ import type {
 } from "./types";
 
 class MailApiError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
     super(message);
     Object.setPrototypeOf(this, new.target.prototype);
     this.name = "MailApiError";
@@ -71,10 +74,13 @@ export class MailDemoApiService {
   }
 
   async getAccountVaultBackup(): Promise<MailVaultBackupRecord> {
-    const response = await fetch(`${this.baseUrl}/api/mail/account/vault-backup`, {
-      method: "GET",
-      credentials: "include",
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/mail/account/vault-backup`,
+      {
+        method: "GET",
+        credentials: "include",
+      },
+    );
 
     return parseJsonResponse<MailVaultBackupRecord>(response);
   }
@@ -94,14 +100,17 @@ export class MailDemoApiService {
   async upsertAccountVaultBackup(
     request: Omit<MailVaultBackupRecord, "email">,
   ): Promise<MailVaultBackupRecord> {
-    const response = await fetch(`${this.baseUrl}/api/mail/account/vault-backup`, {
-      method: "PUT",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${this.baseUrl}/api/mail/account/vault-backup`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(request),
       },
-      body: JSON.stringify(request),
-    });
+    );
 
     return parseJsonResponse<MailVaultBackupRecord>(response);
   }

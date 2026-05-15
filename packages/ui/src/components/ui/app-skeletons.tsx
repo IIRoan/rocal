@@ -350,7 +350,9 @@ export function ListSkeleton({
 // Mail app skeleton matching the sidebar + message-list + reader layout
 export function MailSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("flex h-screen bg-background animate-fade-in", className)}>
+    <div
+      className={cn("flex h-screen bg-background animate-fade-in", className)}
+    >
       {/* Sidebar */}
       <div className="hidden md:flex w-56 flex-col border-r border-border bg-sidebar shrink-0">
         <div className="p-4 border-b border-sidebar-border">
@@ -361,7 +363,10 @@ export function MailSkeleton({ className }: { className?: string }) {
         </div>
         <div className="flex-1 p-3 space-y-1">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded">
+            <div
+              key={i}
+              className="flex items-center gap-2 px-2 py-1.5 rounded"
+            >
               <Skeleton className="h-3.5 w-3.5 rounded" variant="shimmer" />
               <Skeleton className="h-3.5 flex-1" variant="wave" />
               <Skeleton className="h-3.5 w-5 rounded" variant="shimmer" />

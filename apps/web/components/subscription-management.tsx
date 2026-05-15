@@ -177,8 +177,7 @@ export function SubscriptionManagement({
   const [internalEditCalendarId, setInternalEditCalendarId] = useState<
     string | undefined
   >(undefined);
-  const editTargetCalendarId =
-    initialEditCalendarId ?? internalEditCalendarId;
+  const editTargetCalendarId = initialEditCalendarId ?? internalEditCalendarId;
 
   // Active override: only honored when it matches the current target. Stale
   // overrides for a previous target are simply ignored (no effect needed),
@@ -194,9 +193,8 @@ export function SubscriptionManagement({
   const editingSubscriptionData: CalendarSubscription | null = useMemo(() => {
     if (!editTargetCalendarId) return null;
     return (
-      subscriptions.find(
-        (sub) => sub.calendar.id === editTargetCalendarId,
-      ) ?? null
+      subscriptions.find((sub) => sub.calendar.id === editTargetCalendarId) ??
+      null
     );
   }, [editTargetCalendarId, subscriptions]);
 
@@ -1007,40 +1005,42 @@ export function SubscriptionManagement({
             </div>
 
             {/* Holiday calendar info */}
-            {isHolidayCalendar && editingSubscriptionData && (() => {
-              const holidayInfo = findNationalHolidayCalendarByUrl(
-                editingSubscriptionData.url,
-              );
-              return (
-                <div className="px-4 pb-4 border-t border-border/50 pt-3">
-                  <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <Globe className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="text-sm font-medium">
-                          {holidayInfo?.countryName ||
-                            editingSubscriptionData.calendar.name}
-                          {holidayInfo?.language ? (
-                            <span className="text-muted-foreground font-normal">
-                              {" \u00b7 "}
-                              {holidayInfo.language}
-                            </span>
-                          ) : null}
+            {isHolidayCalendar &&
+              editingSubscriptionData &&
+              (() => {
+                const holidayInfo = findNationalHolidayCalendarByUrl(
+                  editingSubscriptionData.url,
+                );
+                return (
+                  <div className="px-4 pb-4 border-t border-border/50 pt-3">
+                    <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-2">
+                      <div className="flex items-start gap-2.5">
+                        <Globe className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="text-sm font-medium">
+                            {holidayInfo?.countryName ||
+                              editingSubscriptionData.calendar.name}
+                            {holidayInfo?.language ? (
+                              <span className="text-muted-foreground font-normal">
+                                {" \u00b7 "}
+                                {holidayInfo.language}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Public holidays are read-only and refresh
+                            automatically in the background. Last synced{" "}
+                            {formatLastSync(
+                              editingSubscriptionData.lastSyncAt ?? undefined,
+                            ).toLowerCase()}
+                            .
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Public holidays are read-only and refresh automatically
-                          in the background. Last synced{" "}
-                          {formatLastSync(
-                            editingSubscriptionData.lastSyncAt ?? undefined,
-                          ).toLowerCase()}
-                          .
-                        </p>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
 
             {/* Sync Section — external feeds only */}
             {!isHolidayCalendar && (

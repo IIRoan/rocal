@@ -6,10 +6,7 @@ import { gsap } from "@workspace/ui/lib/gsap";
 import { EventEditorBody } from "./event-editor-body";
 import { EventEditorFooter } from "./event-editor-footer";
 import { EventEditorDesktopHeader } from "./event-editor-header";
-import type {
-  EventEditorBadgeItem,
-  EventEditorFormState,
-} from "./types";
+import type { EventEditorBadgeItem, EventEditorFormState } from "./types";
 import type { Calendar } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
 
@@ -135,7 +132,9 @@ export function EventEditorPopover({
           const isScrollable =
             getComputedStyle(child).overflowY !== "visible" &&
             child.scrollHeight > child.clientHeight;
-          measuredHeight += isScrollable ? child.scrollHeight : child.offsetHeight;
+          measuredHeight += isScrollable
+            ? child.scrollHeight
+            : child.offsetHeight;
         }
 
         if (measuredHeight === 0) {

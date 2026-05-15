@@ -247,7 +247,10 @@ export function DayView({
   );
 
   return (
-    <div data-slot="day-view" className="absolute inset-0 flex flex-col bg-background animate-fade-in">
+    <div
+      data-slot="day-view"
+      className="absolute inset-0 flex flex-col bg-background animate-fade-in"
+    >
       {showAllDaySection && (
         <div className="border-border/70 bg-muted/50 border-t shrink-0">
           <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
@@ -277,10 +280,10 @@ export function DayView({
                     onView={onEventView}
                   >
                     {/* Always show the title in day view for better usability */}
-                      <div className="flex items-center gap-1 min-w-0">
-                        <EncryptionStatusBadge item={event} asIcon />
-                        <span className="truncate">{event.title}</span>
-                      </div>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <EncryptionStatusBadge item={event} asIcon />
+                      <span className="truncate">{event.title}</span>
+                    </div>
                   </EventItem>
                 );
               })}

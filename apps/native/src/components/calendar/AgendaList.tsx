@@ -49,10 +49,7 @@ export function AgendaList({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const sections = useMemo(
-    () => groupEventsIntoSections(events),
-    [events],
-  );
+  const sections = useMemo(() => groupEventsIntoSections(events), [events]);
 
   if (events.length === 0) {
     return (
@@ -94,9 +91,7 @@ export function AgendaList({
             accessibilityLabel={accessibilityParts.join(", ")}
           >
             {/* Color indicator bar */}
-            <View
-              style={[styles.colorBar, { backgroundColor: colors.bg }]}
-            />
+            <View style={[styles.colorBar, { backgroundColor: colors.bg }]} />
 
             <View style={styles.eventContent}>
               <Text style={styles.eventTitle} numberOfLines={1}>

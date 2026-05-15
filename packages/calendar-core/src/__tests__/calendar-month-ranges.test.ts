@@ -31,21 +31,11 @@ describe("calendar month range helpers", () => {
       "2025-10",
       "2026-02",
     ]);
-    expect(ranges[0].start).toEqual(
-      new Date(2025, 11, 25, 0, 0, 0, 0),
-    );
-    expect(ranges[1].start).toEqual(
-      new Date(2025, 10, 24, 0, 0, 0, 0),
-    );
-    expect(ranges[2].start).toEqual(
-      new Date(2026, 0, 25, 0, 0, 0, 0),
-    );
-    expect(ranges[3].start).toEqual(
-      new Date(2025, 9, 25, 0, 0, 0, 0),
-    );
-    expect(ranges[4].start).toEqual(
-      new Date(2026, 1, 22, 0, 0, 0, 0),
-    );
+    expect(ranges[0].start).toEqual(new Date(2025, 11, 25, 0, 0, 0, 0));
+    expect(ranges[1].start).toEqual(new Date(2025, 10, 24, 0, 0, 0, 0));
+    expect(ranges[2].start).toEqual(new Date(2026, 0, 25, 0, 0, 0, 0));
+    expect(ranges[3].start).toEqual(new Date(2025, 9, 25, 0, 0, 0, 0));
+    expect(ranges[4].start).toEqual(new Date(2026, 1, 22, 0, 0, 0, 0));
   });
 
   it("can skip the current month for look-ahead prefetching", () => {

@@ -15,7 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { UserSettings, UpdateSettingsRequest } from "@workspace/calendar-core";
+import type {
+  UserSettings,
+  UpdateSettingsRequest,
+} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../../src/providers/ThemeProvider";
 import { calendarApiService } from "../../../src/lib/api";
@@ -199,11 +202,7 @@ export default function TimezoneScreen() {
 
       {/* Search */}
       <View style={styles.searchRow}>
-        <Feather
-          name="search"
-          size={16}
-          color={theme.colors.mutedForeground}
-        />
+        <Feather name="search" size={16} color={theme.colors.mutedForeground} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search timezones…"
@@ -310,11 +309,7 @@ function TimezoneRow({
       accessibilityState={{ selected: isSelected }}
       accessibilityLabel={`${tz.label} (${tz.value})`}
     >
-      <Feather
-        name="globe"
-        size={16}
-        color={theme.colors.mutedForeground}
-      />
+      <Feather name="globe" size={16} color={theme.colors.mutedForeground} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           style={{

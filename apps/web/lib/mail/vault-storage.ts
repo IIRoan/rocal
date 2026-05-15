@@ -21,7 +21,9 @@ async function openDatabase(): Promise<IDBDatabase | null> {
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () =>
-      reject(request.error ?? new Error("Failed to open the mail vault store."));
+      reject(
+        request.error ?? new Error("Failed to open the mail vault store."),
+      );
   });
 }
 
@@ -45,7 +47,9 @@ async function withStore<T>(
     };
 
     request.onerror = () => {
-      reject(request.error ?? new Error("Mail vault IndexedDB request failed."));
+      reject(
+        request.error ?? new Error("Mail vault IndexedDB request failed."),
+      );
     };
 
     transaction.oncomplete = () => {
@@ -54,7 +58,8 @@ async function withStore<T>(
 
     transaction.onerror = () => {
       reject(
-        transaction.error ?? new Error("Mail vault IndexedDB transaction failed."),
+        transaction.error ??
+          new Error("Mail vault IndexedDB transaction failed."),
       );
     };
   });

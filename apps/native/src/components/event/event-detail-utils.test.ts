@@ -7,9 +7,7 @@ import type { CalendarEvent } from "@workspace/calendar-core";
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
-function makeEvent(
-  overrides: Record<string, unknown> = {},
-): CalendarEvent {
+function makeEvent(overrides: Record<string, unknown> = {}): CalendarEvent {
   return {
     id: "evt-1",
     title: "Test Event",

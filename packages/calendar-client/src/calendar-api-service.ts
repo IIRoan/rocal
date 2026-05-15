@@ -218,9 +218,7 @@ export class CalendarApiService {
     try {
       const searchParams = new URLSearchParams({ q: params.q });
 
-      const blindIndexTokens = await this.e2ee.createBlindIndexTokens(
-        params.q,
-      );
+      const blindIndexTokens = await this.e2ee.createBlindIndexTokens(params.q);
       if (blindIndexTokens.length > 0) {
         searchParams.set("blindIndexTokens", blindIndexTokens.join(","));
       }
@@ -296,8 +294,7 @@ export class CalendarApiService {
 
   async createCalendar(calendar: CreateCalendarRequest): Promise<Calendar> {
     try {
-      const payload =
-        await this.e2ee.attachCalendarEncryptionShadow(calendar);
+      const payload = await this.e2ee.attachCalendarEncryptionShadow(calendar);
       const response = await this.client.post<Calendar>(
         "/api/calendars",
         payload,
@@ -313,8 +310,7 @@ export class CalendarApiService {
     calendar: UpdateCalendarRequest,
   ): Promise<Calendar> {
     try {
-      const payload =
-        await this.e2ee.attachCalendarEncryptionShadow(calendar);
+      const payload = await this.e2ee.attachCalendarEncryptionShadow(calendar);
       const response = await this.client.put<Calendar>(
         `/api/calendars/${id}`,
         payload,
@@ -369,8 +365,7 @@ export class CalendarApiService {
     category: CreateCategoryRequest,
   ): Promise<EventCategory> {
     try {
-      const payload =
-        await this.e2ee.attachCategoryEncryptionShadow(category);
+      const payload = await this.e2ee.attachCategoryEncryptionShadow(category);
       const response = await this.client.post<EventCategory>(
         "/api/categories",
         payload,
@@ -386,8 +381,7 @@ export class CalendarApiService {
     category: UpdateCategoryRequest,
   ): Promise<EventCategory> {
     try {
-      const payload =
-        await this.e2ee.attachCategoryEncryptionShadow(category);
+      const payload = await this.e2ee.attachCategoryEncryptionShadow(category);
       const response = await this.client.put<EventCategory>(
         `/api/categories/${id}`,
         payload,
@@ -400,9 +394,7 @@ export class CalendarApiService {
 
   async deleteCategory(id: string): Promise<DeleteResponse> {
     try {
-      return await this.client.delete<DeleteResponse>(
-        `/api/categories/${id}`,
-      );
+      return await this.client.delete<DeleteResponse>(`/api/categories/${id}`);
     } catch (error) {
       throw this.transformError(error, "Failed to delete category");
     }

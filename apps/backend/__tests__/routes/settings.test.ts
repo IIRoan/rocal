@@ -18,15 +18,19 @@ jest.mock("../../lib/prisma", () => ({
       updateMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
     $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
-      callback((jest.requireMock("../../lib/prisma") as { prisma: any }).prisma),
+      callback(
+        (jest.requireMock("../../lib/prisma") as { prisma: any }).prisma,
+      ),
     ),
   },
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -47,7 +51,9 @@ import { prisma } from "../../lib/prisma";
 import { settingsRoutes } from "../../routes/settings";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   userSettings: {
     findUnique: jest.Mock<() => Promise<any>>;
@@ -67,9 +73,7 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia({ normalize: false })
-    .use(errorHandler)
-    .use(settingsRoutes);
+  return new Elysia({ normalize: false }).use(errorHandler).use(settingsRoutes);
 }
 
 async function readJson(response: Response) {
@@ -130,7 +134,9 @@ describe("settingsRoutes", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(readText(response)).resolves.toBe("Invalid timezone identifier");
+    await expect(readText(response)).resolves.toBe(
+      "Invalid timezone identifier",
+    );
   });
 
   it("rejects inverted working hours", async () => {

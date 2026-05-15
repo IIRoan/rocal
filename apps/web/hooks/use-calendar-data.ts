@@ -16,7 +16,10 @@ import {
   EventNotification as ApiEventNotification,
 } from "../lib/types/calendar";
 import { EventNotification } from "@workspace/ui/components/calendar";
-import { useCalendarEventsLoader, type DateRange } from "./use-calendar-events-loader";
+import {
+  useCalendarEventsLoader,
+  type DateRange,
+} from "./use-calendar-events-loader";
 
 const log = createLogger("calendar-data");
 
@@ -93,10 +96,7 @@ export interface UseCalendarDataReturn {
 export function useCalendarData(
   options: UseCalendarDataOptions = {},
 ): UseCalendarDataReturn {
-  const {
-    cacheTimeout = 5 * 60 * 1000,
-    autoRefetch = true,
-  } = options;
+  const { cacheTimeout = 5 * 60 * 1000, autoRefetch = true } = options;
 
   const queryClient = useQueryClient();
 
@@ -298,9 +298,7 @@ export function useCalendarData(
 
     // Loading states
     loading:
-      eventsLoading ||
-      calendarsQuery.isLoading ||
-      categoriesQuery.isLoading,
+      eventsLoading || calendarsQuery.isLoading || categoriesQuery.isLoading,
     eventsLoading,
     calendarsLoading: calendarsQuery.isLoading,
     categoriesLoading: categoriesQuery.isLoading,

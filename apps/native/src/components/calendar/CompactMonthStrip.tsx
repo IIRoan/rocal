@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   LayoutChangeEvent,
   Pressable,
@@ -225,7 +231,6 @@ function MonthPage({
 
   const renderDatesRow = useCallback(
     (rowDates: Date[], key: string | number) => {
-
       return (
         <View key={key} style={styles.weekRow}>
           {rowDates.map((date) => {
@@ -351,29 +356,26 @@ export function CompactMonthStrip({
     [weekStartDay],
   );
   const eventsByDay = useMemo(() => groupEventsByDay(events), [events]);
-  const pages = useMemo(
-    () => {
-      if (!swipeEnabled) {
-        return [
-          {
-            key: `0-${format(currentDate, "yyyy-MM")}`,
-            monthDate: currentDate,
-            gridDates: generateGridDates(currentDate, weekStartDay),
-          },
-        ];
-      }
+  const pages = useMemo(() => {
+    if (!swipeEnabled) {
+      return [
+        {
+          key: `0-${format(currentDate, "yyyy-MM")}`,
+          monthDate: currentDate,
+          gridDates: generateGridDates(currentDate, weekStartDay),
+        },
+      ];
+    }
 
-      return [-1, 0, 1].map((offset) => {
-        const monthDate = addMonths(currentDate, offset);
-        return {
-          key: `${offset}-${format(monthDate, "yyyy-MM")}`,
-          monthDate,
-          gridDates: generateGridDates(monthDate, weekStartDay),
-        };
-      });
-    },
-    [currentDate, swipeEnabled, weekStartDay],
-  );
+    return [-1, 0, 1].map((offset) => {
+      const monthDate = addMonths(currentDate, offset);
+      return {
+        key: `${offset}-${format(monthDate, "yyyy-MM")}`,
+        monthDate,
+        gridDates: generateGridDates(monthDate, weekStartDay),
+      };
+    });
+  }, [currentDate, swipeEnabled, weekStartDay]);
 
   // ─── Animated height for expand/collapse ─────────────────────────────────
 
@@ -395,7 +397,12 @@ export function CompactMonthStrip({
       expanded ? expandedContentHeight : collapsedContentHeight,
       HEIGHT_SPRING,
     );
-  }, [expanded, expandedContentHeight, collapsedContentHeight, animatedContentHeight]);
+  }, [
+    expanded,
+    expandedContentHeight,
+    collapsedContentHeight,
+    animatedContentHeight,
+  ]);
 
   const contentAreaAnimatedStyle = useAnimatedStyle(() => ({
     height: animatedContentHeight.value,
@@ -449,17 +456,25 @@ export function CompactMonthStrip({
         e.velocityX > VELOCITY_COMMIT;
 
       if (committedLeft) {
-        translateX.value = withTiming(-pageWidth * 2, { duration: PAGE_DURATION }, (finished) => {
-          if (finished) {
-            runOnJS(handleNavigateLeft)();
-          }
-        });
+        translateX.value = withTiming(
+          -pageWidth * 2,
+          { duration: PAGE_DURATION },
+          (finished) => {
+            if (finished) {
+              runOnJS(handleNavigateLeft)();
+            }
+          },
+        );
       } else if (committedRight) {
-        translateX.value = withTiming(0, { duration: PAGE_DURATION }, (finished) => {
-          if (finished) {
-            runOnJS(handleNavigateRight)();
-          }
-        });
+        translateX.value = withTiming(
+          0,
+          { duration: PAGE_DURATION },
+          (finished) => {
+            if (finished) {
+              runOnJS(handleNavigateRight)();
+            }
+          },
+        );
       } else {
         translateX.value = withSpring(-pageWidth, PAGE_SPRING);
       }
@@ -529,7 +544,10 @@ export function CompactMonthStrip({
                 ]}
               >
                 {pages.map((page) => (
-                  <View key={page.key} style={[styles.page, { width: pageWidth }]}>
+                  <View
+                    key={page.key}
+                    style={[styles.page, { width: pageWidth }]}
+                  >
                     <MonthPage
                       monthDate={page.monthDate}
                       gridDates={page.gridDates}
@@ -695,8 +713,8 @@ function createStyles(theme: ThemeTokens) {
     },
     todayText: {
       color: theme.colors.primaryForeground,
-      fontWeight:
-        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
     selectedText: {
       color: theme.colors.accentForeground,

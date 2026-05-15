@@ -79,7 +79,9 @@ function SyncedEventInfoBadge() {
             <RefreshCw className="h-4 w-4" strokeWidth={2.25} aria-hidden />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-medium leading-tight">Synced event</div>
+            <div className="text-sm font-medium leading-tight">
+              Synced event
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
               This event is mirrored from an external calendar provider.
             </p>
@@ -134,7 +136,8 @@ export function EventEditorBody({
   showLocation,
 }: EventEditorBodyProps) {
   const selectedCalendar = useMemo(
-    () => calendars.find((calendar) => calendar.id === eventForm.eventCalendarId),
+    () =>
+      calendars.find((calendar) => calendar.id === eventForm.eventCalendarId),
     [calendars, eventForm.eventCalendarId],
   );
   const selectableCalendars = useMemo(
@@ -172,11 +175,12 @@ export function EventEditorBody({
               <span className="text-sm font-medium truncate flex-1 min-w-0">
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
-              {eventForm.selectedEvent?.id && eventForm.selectedEvent.isSynced && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <SyncedEventInfoBadge />
-                </div>
-              )}
+              {eventForm.selectedEvent?.id &&
+                eventForm.selectedEvent.isSynced && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <SyncedEventInfoBadge />
+                  </div>
+                )}
             </div>
           </div>
 
@@ -236,14 +240,17 @@ export function EventEditorBody({
                       className="flex items-baseline gap-2 text-sm leading-tight"
                     >
                       <span>{formatReminderMinutes(minutes)} before</span>
-                      <span className="text-xs text-muted-foreground">email</span>
+                      <span className="text-xs text-muted-foreground">
+                        email
+                      </span>
                     </div>
                   ))}
-                  {eventForm.notificationsLoading && reminderMinutes.length === 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      Loading reminders…
-                    </span>
-                  )}
+                  {eventForm.notificationsLoading &&
+                    reminderMinutes.length === 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        Loading reminders…
+                      </span>
+                    )}
                 </div>
               </div>
             )}
@@ -253,7 +260,9 @@ export function EventEditorBody({
                 <div className="flex items-center justify-center w-6 h-6 shrink-0">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <span className="text-sm truncate">{eventForm.eventLocation}</span>
+                <span className="text-sm truncate">
+                  {eventForm.eventLocation}
+                </span>
               </div>
             )}
 
@@ -304,7 +313,11 @@ export function EventEditorBody({
                       <div className="flex items-center gap-2">
                         <div
                           className="size-2.5 rounded-full"
-                          style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                          style={{
+                            backgroundColor: getColorSwatchValue(
+                              calendar.color,
+                            ),
+                          }}
                         />
                         <span>{calendar.name}</span>
                       </div>
@@ -379,7 +392,9 @@ export function EventEditorBody({
                         responsiveHeight="80dvh"
                         className="pb-safe"
                       >
-                        <DrawerTitle className="sr-only">Select start date</DrawerTitle>
+                        <DrawerTitle className="sr-only">
+                          Select start date
+                        </DrawerTitle>
                         <div className="flex justify-center p-4 pb-8">
                           <CalendarUI
                             mode="single"
@@ -403,7 +418,9 @@ export function EventEditorBody({
                     </Drawer>
                   )}
 
-                  <span className="text-muted-foreground text-sm font-medium">→</span>
+                  <span className="text-muted-foreground text-sm font-medium">
+                    →
+                  </span>
 
                   {desktop ? (
                     <Popover
@@ -464,7 +481,9 @@ export function EventEditorBody({
                         responsiveHeight="80dvh"
                         className="pb-safe"
                       >
-                        <DrawerTitle className="sr-only">Select end date</DrawerTitle>
+                        <DrawerTitle className="sr-only">
+                          Select end date
+                        </DrawerTitle>
                         <div className="flex justify-center p-4 pb-8">
                           <CalendarUI
                             mode="single"
@@ -505,7 +524,9 @@ export function EventEditorBody({
                       is24Hour={localSettings?.timeFormat === "24h"}
                       className={`flex-1 h-9 cursor-pointer ${desktop ? "bg-input border-0 shadow-none hover:bg-input/80 text-input-foreground" : ""}`}
                     />
-                    <span className="text-muted-foreground text-sm font-medium">→</span>
+                    <span className="text-muted-foreground text-sm font-medium">
+                      →
+                    </span>
                     <ShadcnAutocomleteTimePicker
                       value={(() => {
                         const [hours, minutes] = eventForm.eventEndTime
@@ -543,10 +564,14 @@ export function EventEditorBody({
                   </div>
                 ) : (
                   <div className="flex items-center justify-between w-full py-3 px-1">
-                    <span className="text-sm font-medium text-foreground">All day</span>
+                    <span className="text-sm font-medium text-foreground">
+                      All day
+                    </span>
                     <Switch
                       checked={eventForm.eventAllDay}
-                      onCheckedChange={(checked) => eventForm.setEventAllDay(checked)}
+                      onCheckedChange={(checked) =>
+                        eventForm.setEventAllDay(checked)
+                      }
                     />
                   </div>
                 )}
@@ -560,9 +585,7 @@ export function EventEditorBody({
               <EventEditorFieldToggles
                 className="flex flex-wrap items-center gap-2"
                 isRecurring={eventForm.isRecurring}
-                onToggleDescription={() =>
-                  setShowDescription(!showDescription)
-                }
+                onToggleDescription={() => setShowDescription(!showDescription)}
                 onToggleLocation={() => setShowLocation(!showLocation)}
                 onToggleNotifications={() =>
                   eventForm.setShowNotifications(!eventForm.showNotifications)

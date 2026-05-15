@@ -3,12 +3,12 @@ import { getAuthCapabilities } from "./auth-capabilities";
 describe("getAuthCapabilities", () => {
   it("uses the browser bridge for passkeys in Expo Go", () => {
     expect(
-        getAuthCapabilities({
-          platformOs: "ios",
-          expoExecutionEnvironment: "storeClient",
-          expoAppOwnership: "expo",
-          hasSecurePasskeyBridgeOrigin: true,
-        }),
+      getAuthCapabilities({
+        platformOs: "ios",
+        expoExecutionEnvironment: "storeClient",
+        expoAppOwnership: "expo",
+        hasSecurePasskeyBridgeOrigin: true,
+      }),
     ).toEqual({
       supportsPassword: true,
       supportsGitHubOAuth: true,
@@ -21,11 +21,11 @@ describe("getAuthCapabilities", () => {
 
   it("supports passkeys in native builds when the native module is available", () => {
     expect(
-        getAuthCapabilities({
-          platformOs: "android",
-          expoExecutionEnvironment: "standalone",
-          hasSecurePasskeyBridgeOrigin: true,
-        }),
+      getAuthCapabilities({
+        platformOs: "android",
+        expoExecutionEnvironment: "standalone",
+        hasSecurePasskeyBridgeOrigin: true,
+      }),
     ).toEqual({
       supportsPassword: true,
       supportsGitHubOAuth: true,
@@ -38,11 +38,11 @@ describe("getAuthCapabilities", () => {
 
   it("uses the browser bridge in native builds even without browser WebAuthn globals", () => {
     expect(
-        getAuthCapabilities({
-          platformOs: "ios",
-          expoExecutionEnvironment: "standalone",
-          hasSecurePasskeyBridgeOrigin: true,
-        }),
+      getAuthCapabilities({
+        platformOs: "ios",
+        expoExecutionEnvironment: "standalone",
+        hasSecurePasskeyBridgeOrigin: true,
+      }),
     ).toEqual({
       supportsPassword: true,
       supportsGitHubOAuth: true,
@@ -80,7 +80,7 @@ describe("getAuthCapabilities", () => {
       supportsPasskeys: false,
       passkeyMode: "unsupported",
       passkeyMessage: "Passkeys are unavailable in this browser.",
-      });
+    });
   });
 
   it("marks Expo Go passkeys unsupported when the bridge origin is insecure", () => {

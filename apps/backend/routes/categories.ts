@@ -83,13 +83,15 @@ export const categoriesRoutes = new Elysia({
             }),
             encryptedName: t.Optional(
               t.String({
-                description: "Client-encrypted shadow copy of the category name.",
+                description:
+                  "Client-encrypted shadow copy of the category name.",
               }),
             ),
             blindIndexTokens: t.Optional(
               t.Array(
                 t.String({
-                  description: "Blind-index token hash for encrypted search rollout.",
+                  description:
+                    "Blind-index token hash for encrypted search rollout.",
                 }),
               ),
             ),
@@ -160,13 +162,15 @@ export const categoriesRoutes = new Elysia({
             ),
             encryptedName: t.Optional(
               t.String({
-                description: "Client-encrypted shadow copy of the category name.",
+                description:
+                  "Client-encrypted shadow copy of the category name.",
               }),
             ),
             blindIndexTokens: t.Optional(
               t.Array(
                 t.String({
-                  description: "Blind-index token hash for encrypted search rollout.",
+                  description:
+                    "Blind-index token hash for encrypted search rollout.",
                 }),
               ),
             ),

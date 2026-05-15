@@ -114,7 +114,11 @@ function ReminderRow({
             </div>
           </div>
         </DrawerTrigger>
-        <DrawerContent responsive responsiveHeight="60dvh" className="max-h-[60dvh]">
+        <DrawerContent
+          responsive
+          responsiveHeight="60dvh"
+          className="max-h-[60dvh]"
+        >
           <DrawerTitle className="sr-only">Select reminder time</DrawerTitle>
           {content}
         </DrawerContent>

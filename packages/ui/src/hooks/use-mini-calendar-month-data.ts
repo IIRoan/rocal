@@ -95,7 +95,10 @@ export function useMiniCalendarMonthData({
     if (!getCachedEventsForRange) return;
 
     const check = () => {
-      const cached = getCachedEventsForRange({ start: grid.start, end: grid.end });
+      const cached = getCachedEventsForRange({
+        start: grid.start,
+        end: grid.end,
+      });
       const count = cached?.length ?? 0;
       if (count !== lastEventCountRef.current) {
         lastEventCountRef.current = count;

@@ -19,7 +19,9 @@ function addHost(target: Set<string>, value?: string | null) {
   }
 }
 
-export function getAllowedNextDevOrigins(env: Record<string, string | undefined> = process.env) {
+export function getAllowedNextDevOrigins(
+  env: Record<string, string | undefined> = process.env,
+) {
   const origins = new Set(["localhost", "127.0.0.1"]);
 
   addHost(origins, env.NEXT_PUBLIC_APP_URL);

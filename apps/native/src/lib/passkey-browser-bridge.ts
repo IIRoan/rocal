@@ -22,7 +22,9 @@ interface BrowserPasskeyDependencies {
     startUrl: string,
     callbackUrl: string,
   ) => Promise<BrowserAuthSessionResult>;
-  addUrlListener: (listener: (url: string) => void) => BrowserPasskeySubscription;
+  addUrlListener: (
+    listener: (url: string) => void,
+  ) => BrowserPasskeySubscription;
 }
 
 const PASSKEY_BRIDGE_PATH = "/passkey/native";
@@ -145,7 +147,9 @@ export async function signInWithBrowserPasskey(
   });
 
   if (parsed.error) {
-    log.error("Browser passkey sign-in returned error", { error: parsed.error });
+    log.error("Browser passkey sign-in returned error", {
+      error: parsed.error,
+    });
     throw new Error(parsed.error);
   }
 
@@ -291,17 +295,23 @@ async function resolveAuthSessionCallback(
           expectedCallbackUrl: summarizeUrl(options.callbackUrl),
         });
 
-        if (result.url && matchesAuthCallbackUrl(result.url, options.callbackUrl)) {
+        if (
+          result.url &&
+          matchesAuthCallbackUrl(result.url, options.callbackUrl)
+        ) {
           cleanup();
           resolve(result.url);
           return;
         }
 
-        log.warn("Auth session ended before callback arrived; waiting for grace period", {
-          graceMs: AUTH_SESSION_CALLBACK_GRACE_MS,
-          type: result.type,
-          url: summarizeUrl(result.url),
-        });
+        log.warn(
+          "Auth session ended before callback arrived; waiting for grace period",
+          {
+            graceMs: AUTH_SESSION_CALLBACK_GRACE_MS,
+            type: result.type,
+            url: summarizeUrl(result.url),
+          },
+        );
 
         cancelTimer = setTimeout(() => {
           if (settled) {
@@ -324,12 +334,17 @@ async function resolveAuthSessionCallback(
   });
 }
 
-async function generateOneTimeToken(client: PasskeyRouteClient): Promise<string> {
+async function generateOneTimeToken(
+  client: PasskeyRouteClient,
+): Promise<string> {
   log.debug("Generating browser passkey bridge token");
-  const result = await client.$fetch<{ token: string }>("/one-time-token/generate", {
-    method: "GET",
-    throw: false,
-  });
+  const result = await client.$fetch<{ token: string }>(
+    "/one-time-token/generate",
+    {
+      method: "GET",
+      throw: false,
+    },
+  );
 
   if (!result.data?.token) {
     log.error("Failed to generate browser passkey bridge token", result.error);
@@ -353,7 +368,9 @@ async function verifyOneTimeToken(
 
   if (!result.data) {
     log.error("Failed to verify browser passkey one-time token", result.error);
-    throw new Error(result.error?.message ?? "Unable to finish passkey sign-in.");
+    throw new Error(
+      result.error?.message ?? "Unable to finish passkey sign-in.",
+    );
   }
 
   log.debug("Verified browser passkey one-time token");

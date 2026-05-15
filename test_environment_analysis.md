@@ -21,19 +21,19 @@ Details:
 
 **Babel Configuration (`babel.config.js`)**
 
-*   **`presets`**: The configuration uses `'module:metro-react-native-babel-preset'`, which is the standard preset for React Native projects. This preset should be sufficient for transforming React Native code.
+- **`presets`**: The configuration uses `'module:metro-react-native-babel-preset'`, which is the standard preset for React Native projects. This preset should be sufficient for transforming React Native code.
 
 **Jest Configuration (`jest.config.js`)**
 
-*   **`preset`**: `'react-native'`. This is the correct preset for testing React Native applications.
-*   **`transform`**: `{'^.+\\.(js|jsx|ts|tsx)$': 'babel-jest'}`. This tells Jest to use `babel-jest` for transforming JavaScript and TypeScript files.
-*   **`transformIgnorePatterns`**: `['node_modules/(?!((jest-)?react-native|@react-native(-community)?|@rneui/base|@rneui/themed)/)']`. This is a critical setting. It tells Jest to *not* transform files in `node_modules`, *except* for the ones that are explicitly listed. The intention is to transform the `react-native` modules that are not pre-compiled to a format that Jest can understand.
-*   **`modulePathIgnorePatterns`**: `['<rootDir>/node_modules/react-native/Libraries/react-native/react-native-implementation.js']`. This is an unusual setting and might be a workaround for a specific issue. It's possible this is causing problems.
-*   **`setupFilesAfterEnv`**: `['<rootDir>/jest.setup.js']`. This file is used to set up the testing environment.
+- **`preset`**: `'react-native'`. This is the correct preset for testing React Native applications.
+- **`transform`**: `{'^.+\\.(js|jsx|ts|tsx)$': 'babel-jest'}`. This tells Jest to use `babel-jest` for transforming JavaScript and TypeScript files.
+- **`transformIgnorePatterns`**: `['node_modules/(?!((jest-)?react-native|@react-native(-community)?|@rneui/base|@rneui/themed)/)']`. This is a critical setting. It tells Jest to _not_ transform files in `node_modules`, _except_ for the ones that are explicitly listed. The intention is to transform the `react-native` modules that are not pre-compiled to a format that Jest can understand.
+- **`modulePathIgnorePatterns`**: `['<rootDir>/node_modules/react-native/Libraries/react-native/react-native-implementation.js']`. This is an unusual setting and might be a workaround for a specific issue. It's possible this is causing problems.
+- **`setupFilesAfterEnv`**: `['<rootDir>/jest.setup.js']`. This file is used to set up the testing environment.
 
 **Jest Setup (`jest.setup.js`)**
 
-*   This file mocks `react-native` and overrides `StyleSheet.create` to return an empty object. This is a common practice to avoid issues with styles in tests.
+- This file mocks `react-native` and overrides `StyleSheet.create` to return an empty object. This is a common practice to avoid issues with styles in tests.
 
 #### 3. Structure of the `mobile-ui` package
 
@@ -50,8 +50,8 @@ packages/mobile-ui/
 
 #### 4. Dependencies of the `mobile-ui` package
 
-*   **`dependencies`**: `react`, `react-native`
-*   **`devDependencies`**: `@testing-library/react-native`, `jest`, `react-test-renderer`
+- **`dependencies`**: `react`, `react-native`
+- **`devDependencies`**: `@testing-library/react-native`, `jest`, `react-test-renderer`
 
 All dependencies are using `*` for the version, which could lead to issues if a breaking change is introduced in a dependency.
 
@@ -67,16 +67,19 @@ All dependencies are using `*` for the version, which could lead to issues if a 
 #### 6. Possible Solutions
 
 1.  **Simplify `transformIgnorePatterns`**: The current `transformIgnorePatterns` is quite complex. A simpler version that is often effective is:
+
     ```javascript
     transformIgnorePatterns: [
       'node_modules/(?!(react-native|@react-native|@react-navigation))'
     ],
     ```
+
     This pattern transforms `react-native` and any scoped `@react-native` packages.
 
 2.  **Remove `modulePathIgnorePatterns`**: The `modulePathIgnorePatterns` setting is suspicious. Removing it would be a good first step to see if it's the cause of the problem.
 
 3.  **Pin Dependency Versions**: The `*` version for dependencies should be replaced with specific versions to ensure consistency. For example:
+
     ```json
     "dependencies": {
       "react": "18.2.0",
@@ -88,9 +91,11 @@ All dependencies are using `*` for the version, which could lead to issues if a 
       "react-test-renderer": "18.2.0"
     }
     ```
+
     After changing the versions, run `bun install` to update the dependencies.
 
 4.  **Clear Caches**: To be absolutely sure, clear all caches again:
+
     ```bash
     jest --clearCache
     rm -rf node_modules

@@ -1,11 +1,7 @@
 import { Lock, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { cn } from "../../lib/utils";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import type { EncryptionState } from "./types";
 
 export interface EncryptableCalendarItem {
@@ -168,7 +164,8 @@ export function EncryptionStatusBadge({
   const { Icon } = meta;
 
   const iconCls = iconSize === "md" ? "h-7 w-7" : "h-4 w-4";
-  const buttonCls = iconSize === "md" ? "h-7 w-7 rounded" : "h-4 w-4 rounded-sm";
+  const buttonCls =
+    iconSize === "md" ? "h-7 w-7 rounded" : "h-4 w-4 rounded-sm";
   const spanCls = iconSize === "md" ? "h-7 w-7" : "h-4 w-4";
 
   if (hidePlaintext && meta.state === "plaintext") {
@@ -293,4 +290,3 @@ export function EncryptionStatusBadge({
     </Popover>
   );
 }
-

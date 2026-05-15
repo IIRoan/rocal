@@ -43,7 +43,11 @@ export class SettingsService implements ISettingsService {
     const normalizedBody = {
       ...body,
       ...(body.eventEncryptionMode !== undefined
-        ? { eventEncryptionMode: normalizeEventEncryptionMode(body.eventEncryptionMode) }
+        ? {
+            eventEncryptionMode: normalizeEventEncryptionMode(
+              body.eventEncryptionMode,
+            ),
+          }
         : {}),
     };
 
@@ -110,7 +114,8 @@ export class SettingsService implements ISettingsService {
       }
     }
 
-    const disableCalendarSharing = normalizedBody.eventEncryptionMode === "full";
+    const disableCalendarSharing =
+      normalizedBody.eventEncryptionMode === "full";
 
     if (!disableCalendarSharing) {
       const settings = await this.prisma.userSettings.upsert({

@@ -40,13 +40,10 @@ describe("passkey auth helpers", () => {
       undefined,
     );
 
-    expect(routeClient.$fetch).toHaveBeenCalledWith(
-      "/passkey/delete-passkey",
-      {
-        method: "POST",
-        body: { id: "passkey-1" },
-        throw: false,
-      },
-    );
+    expect(routeClient.$fetch).toHaveBeenCalledWith("/passkey/delete-passkey", {
+      method: "POST",
+      body: { id: "passkey-1" },
+      throw: false,
+    });
   });
 });

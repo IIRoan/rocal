@@ -160,7 +160,9 @@ describe("toFetchRange", () => {
       jan31.setHours(0, 0, 0, 0);
       const frEndDay = new Date(fr.end);
       frEndDay.setHours(0, 0, 0, 0);
-      expect(differenceInCalendarDays(frEndDay, jan31)).toBe(MONTH_PADDING_DAYS);
+      expect(differenceInCalendarDays(frEndDay, jan31)).toBe(
+        MONTH_PADDING_DAYS,
+      );
     });
   });
 
@@ -236,9 +238,7 @@ describe("buildViewPrefetchRanges", () => {
     for (const range of ranges) {
       // Each range should be a full padded month (at least 28 + 2×7 - 1 = 41 calendar-day difference)
       const span = differenceInCalendarDays(range.end, range.start);
-      expect(span).toBeGreaterThanOrEqual(
-        28 + 2 * MONTH_PADDING_DAYS - 1,
-      );
+      expect(span).toBeGreaterThanOrEqual(28 + 2 * MONTH_PADDING_DAYS - 1);
     }
   });
 
@@ -314,6 +314,8 @@ describe("getDefaultCalendarDateRange", () => {
   it("agenda view starts on the base date", () => {
     const range = viewRange(baseDate, "agenda");
     expect(range.start.getDate()).toBe(baseDate.getDate());
-    expect(differenceInCalendarDays(range.end, range.start)).toBeGreaterThanOrEqual(1);
+    expect(
+      differenceInCalendarDays(range.end, range.start),
+    ).toBeGreaterThanOrEqual(1);
   });
 });

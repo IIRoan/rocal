@@ -3,9 +3,9 @@ export type { HttpClientConfig, RequestOptions } from "./http-client";
 
 export { AccountApiService } from "./account-api-service";
 export type {
-	AccountSignupConfigResponse,
-	CheckEmailAvailabilityCode,
-	CheckEmailAvailabilityResponse,
+  AccountSignupConfigResponse,
+  CheckEmailAvailabilityCode,
+  CheckEmailAvailabilityResponse,
 } from "./account-api-service";
 
 export { CalendarApiService } from "./calendar-api-service";
@@ -13,13 +13,13 @@ export type { DeleteAccountResponse } from "./calendar-api-service";
 
 export { InviteApiService } from "./invite-api-service";
 export type {
-	InviteStatus,
-	InviteRecord,
-	ListInvitesResponse,
-	CreateInviteResponse,
-	RevokeInviteResponse,
-	ValidateInviteTokenResponse,
-	ClaimInviteResponse,
+  InviteStatus,
+  InviteRecord,
+  ListInvitesResponse,
+  CreateInviteResponse,
+  RevokeInviteResponse,
+  ValidateInviteTokenResponse,
+  ClaimInviteResponse,
 } from "./invite-api-service";
 
 export { NoopE2eeProvider } from "./e2ee-provider";

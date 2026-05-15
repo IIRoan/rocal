@@ -82,7 +82,9 @@ export default function ResetPasswordPage() {
       });
 
       if (result?.error) {
-        throw new Error(result.error.message || "Unable to reset your password.");
+        throw new Error(
+          result.error.message || "Unable to reset your password.",
+        );
       }
 
       router.replace("/login?reset=success");
@@ -98,7 +100,12 @@ export default function ResetPasswordPage() {
     <section className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-secondary/20 via-background to-background px-6 py-10">
       <div className="w-full max-w-md rounded-2xl border border-border/60 bg-background/95 p-6 shadow-xl backdrop-blur">
         <div className="mb-8 flex items-center justify-between">
-          <Logo width={40} height={40} className="text-primary" aria-label="Solace" />
+          <Logo
+            width={40}
+            height={40}
+            className="text-primary"
+            aria-label="Solace"
+          />
           <ThemeToggle />
         </div>
 

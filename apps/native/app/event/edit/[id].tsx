@@ -68,10 +68,7 @@ export default function EventEditScreen() {
 
   // ─── Fetch event data ──────────────────────────────────────────────────────
 
-  const {
-    data: event,
-    isLoading: eventLoading,
-  } = useQuery({
+  const { data: event, isLoading: eventLoading } = useQuery({
     queryKey: QUERY_KEYS.eventDetail(id ?? ""),
     queryFn: () => calendarApiService.getEvent(id!),
     enabled: !!id,
@@ -79,10 +76,7 @@ export default function EventEditScreen() {
 
   // ─── Fetch calendars ───────────────────────────────────────────────────────
 
-  const {
-    data: calendars,
-    isLoading: calendarsLoading,
-  } = useQuery({
+  const { data: calendars, isLoading: calendarsLoading } = useQuery({
     queryKey: QUERY_KEYS.calendars(),
     queryFn: () => calendarApiService.getCalendars(),
   });

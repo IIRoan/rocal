@@ -7,7 +7,10 @@ import { env } from "../lib/env";
 import { MailService } from "../services/mail.service";
 import { createStalwartAdminClient } from "../lib/stalwart-admin";
 
-type JmapProxyFetcher = (input: string, init?: RequestInit) => Promise<Response>;
+type JmapProxyFetcher = (
+  input: string,
+  init?: RequestInit,
+) => Promise<Response>;
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
@@ -17,7 +20,9 @@ const logger = createLogger("backend:mail-jmap-proxy");
 
 const publicJmapProxyBaseUrl = `${normalizeBaseUrl(env.backendUrl)}/api/mail/jmap`;
 
-function summarizeBearerToken(authorization: string | null): Record<string, unknown> {
+function summarizeBearerToken(
+  authorization: string | null,
+): Record<string, unknown> {
   if (!authorization?.startsWith("Bearer ")) {
     return { tokenType: authorization ? "non-bearer" : "missing" };
   }
@@ -34,8 +39,13 @@ function summarizeBearerToken(authorization: string | null): Record<string, unkn
   const decodePart = (input: string) => {
     try {
       const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
-      const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-      return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>;
+      const padded = normalized.padEnd(
+        normalized.length + ((4 - (normalized.length % 4)) % 4),
+        "=",
+      );
+      return JSON.parse(
+        Buffer.from(padded, "base64").toString("utf8"),
+      ) as Record<string, unknown>;
     } catch {
       return null;
     }
@@ -55,7 +65,9 @@ function summarizeBearerToken(authorization: string | null): Record<string, unkn
   };
 }
 
-function summarizeUpstreamErrorBody(body: string | null): Record<string, unknown> {
+function summarizeUpstreamErrorBody(
+  body: string | null,
+): Record<string, unknown> {
   if (!body) {
     return { bodyPresent: false };
   }
@@ -100,11 +112,15 @@ function buildMailOAuthConfig(): MailOAuthConfig {
   };
 }
 
-export const defaultMailService = new MailService(prisma, createStalwartAdminClient(), {
-  defaultDomain: env.stalwartDefaultDomain,
-  discoveryBaseUrl: publicJmapProxyBaseUrl,
-  oauth: buildMailOAuthConfig(),
-});
+export const defaultMailService = new MailService(
+  prisma,
+  createStalwartAdminClient(),
+  {
+    defaultDomain: env.stalwartDefaultDomain,
+    discoveryBaseUrl: publicJmapProxyBaseUrl,
+    oauth: buildMailOAuthConfig(),
+  },
+);
 
 async function proxyJmapRequest(input: {
   request: Request;
@@ -158,7 +174,8 @@ async function proxyJmapRequest(input: {
       redirect: "follow",
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown network error";
+    const message =
+      err instanceof Error ? err.message : "Unknown network error";
     logger.error("JMAP proxy upstream request failed", {
       upstreamUrl,
       method,
@@ -219,24 +236,21 @@ export function createMailRoutes(
   } = {},
 ) {
   const jmapFetch = options.jmapFetch ?? fetch;
-  const jmapUpstreamBaseUrl = options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;
+  const jmapUpstreamBaseUrl =
+    options.jmapUpstreamBaseUrl ?? env.stalwartBaseUrl;
 
   return new Elysia({
     prefix: "/mail",
     normalize: false,
   })
-    .get(
-      "/config",
-      () => mailService.getConfig(),
-      {
-        detail: {
-          tags: ["Mail"],
-          summary: "Get public mail-demo configuration",
-          description:
-            "Returns the public mailbox domain and Stalwart discovery base used by the mail demo.",
-        },
+    .get("/config", () => mailService.getConfig(), {
+      detail: {
+        tags: ["Mail"],
+        summary: "Get public mail-demo configuration",
+        description:
+          "Returns the public mailbox domain and Stalwart discovery base used by the mail demo.",
       },
-    )
+    })
     .get(
       "/keys/:email",
       async ({ params }) => mailService.getDirectoryKey(params.email),

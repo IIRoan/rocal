@@ -109,7 +109,9 @@ export function ColorPicker({
                         ? "border-foreground ring-2 ring-ring"
                         : "border-border hover:border-foreground",
                     )}
-                    style={{ backgroundColor: getSwatchBackground(preset.value) }}
+                    style={{
+                      backgroundColor: getSwatchBackground(preset.value),
+                    }}
                     onClick={() => handlePresetClick(preset.value)}
                     title={preset.label}
                   >

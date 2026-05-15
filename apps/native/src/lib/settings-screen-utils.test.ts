@@ -77,9 +77,7 @@ describe("Settings screen account actions", () => {
         canSignOut: false,
         hasPasswordAccount: false,
         hasOAuthAccount: false,
-      }).map(
-        (action) => action.key,
-      ),
+      }).map((action) => action.key),
     ).toEqual(["reset-preferences"]);
   });
 
@@ -89,9 +87,7 @@ describe("Settings screen account actions", () => {
         canSignOut: true,
         hasPasswordAccount: true,
         hasOAuthAccount: true,
-      }).map(
-        (action) => action.key,
-      ),
+      }).map((action) => action.key),
     ).toEqual([
       "change-password",
       "reset-encryption-password",

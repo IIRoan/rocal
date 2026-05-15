@@ -44,7 +44,10 @@ import {
   getActiveE2eeSession,
   setActiveE2eeSession,
 } from "../../lib/e2ee-session";
-import { getStoredE2eeDevice, putStoredE2eeDevice } from "../../lib/e2ee-storage";
+import {
+  getStoredE2eeDevice,
+  putStoredE2eeDevice,
+} from "../../lib/e2ee-storage";
 import {
   createPasswordEnvelope,
   exportWrappingPublicKey,
@@ -81,40 +84,59 @@ const mockUpsertPasswordEnvelope =
   >;
 const mockClearActiveE2eeSession =
   clearActiveE2eeSession as jest.MockedFunction<typeof clearActiveE2eeSession>;
-const mockGetActiveE2eeSession =
-  getActiveE2eeSession as jest.MockedFunction<typeof getActiveE2eeSession>;
-const mockSetActiveE2eeSession =
-  setActiveE2eeSession as jest.MockedFunction<typeof setActiveE2eeSession>;
-const mockGetStoredE2eeDevice =
-  getStoredE2eeDevice as jest.MockedFunction<typeof getStoredE2eeDevice>;
-const mockPutStoredE2eeDevice =
-  putStoredE2eeDevice as jest.MockedFunction<typeof putStoredE2eeDevice>;
+const mockGetActiveE2eeSession = getActiveE2eeSession as jest.MockedFunction<
+  typeof getActiveE2eeSession
+>;
+const mockSetActiveE2eeSession = setActiveE2eeSession as jest.MockedFunction<
+  typeof setActiveE2eeSession
+>;
+const mockGetStoredE2eeDevice = getStoredE2eeDevice as jest.MockedFunction<
+  typeof getStoredE2eeDevice
+>;
+const mockPutStoredE2eeDevice = putStoredE2eeDevice as jest.MockedFunction<
+  typeof putStoredE2eeDevice
+>;
 const mockCreatePasswordEnvelope =
   createPasswordEnvelope as jest.MockedFunction<typeof createPasswordEnvelope>;
 const mockExportWrappingPublicKey =
-  exportWrappingPublicKey as jest.MockedFunction<typeof exportWrappingPublicKey>;
-const mockGenerateAccountKey =
-  generateAccountKey as jest.MockedFunction<typeof generateAccountKey>;
-const mockGenerateBlindIndexKey =
-  generateBlindIndexKey as jest.MockedFunction<typeof generateBlindIndexKey>;
-const mockGenerateDeviceId =
-  generateDeviceId as jest.MockedFunction<typeof generateDeviceId>;
+  exportWrappingPublicKey as jest.MockedFunction<
+    typeof exportWrappingPublicKey
+  >;
+const mockGenerateAccountKey = generateAccountKey as jest.MockedFunction<
+  typeof generateAccountKey
+>;
+const mockGenerateBlindIndexKey = generateBlindIndexKey as jest.MockedFunction<
+  typeof generateBlindIndexKey
+>;
+const mockGenerateDeviceId = generateDeviceId as jest.MockedFunction<
+  typeof generateDeviceId
+>;
 const mockGenerateWrappingKeyPair =
-  generateWrappingKeyPair as jest.MockedFunction<typeof generateWrappingKeyPair>;
-const mockIsWebCryptoAvailable =
-  isWebCryptoAvailable as jest.MockedFunction<typeof isWebCryptoAvailable>;
-const mockUnwrapAccountKey =
-  unwrapAccountKey as jest.MockedFunction<typeof unwrapAccountKey>;
-const mockUnwrapBlindIndexKey =
-  unwrapBlindIndexKey as jest.MockedFunction<typeof unwrapBlindIndexKey>;
+  generateWrappingKeyPair as jest.MockedFunction<
+    typeof generateWrappingKeyPair
+  >;
+const mockIsWebCryptoAvailable = isWebCryptoAvailable as jest.MockedFunction<
+  typeof isWebCryptoAvailable
+>;
+const mockUnwrapAccountKey = unwrapAccountKey as jest.MockedFunction<
+  typeof unwrapAccountKey
+>;
+const mockUnwrapBlindIndexKey = unwrapBlindIndexKey as jest.MockedFunction<
+  typeof unwrapBlindIndexKey
+>;
 const mockUnwrapPasswordEnvelope =
   unwrapPasswordEnvelope as jest.MockedFunction<typeof unwrapPasswordEnvelope>;
-const mockWrapSymmetricKey =
-  wrapSymmetricKey as jest.MockedFunction<typeof wrapSymmetricKey>;
+const mockWrapSymmetricKey = wrapSymmetricKey as jest.MockedFunction<
+  typeof wrapSymmetricKey
+>;
 const mockClearPendingAuthPassword =
-  clearPendingAuthPassword as jest.MockedFunction<typeof clearPendingAuthPassword>;
+  clearPendingAuthPassword as jest.MockedFunction<
+    typeof clearPendingAuthPassword
+  >;
 const mockConsumePendingAuthPassword =
-  consumePendingAuthPassword as jest.MockedFunction<typeof consumePendingAuthPassword>;
+  consumePendingAuthPassword as jest.MockedFunction<
+    typeof consumePendingAuthPassword
+  >;
 
 function createLocalDeviceRecord(userId: string) {
   return {
@@ -229,7 +251,9 @@ describe("e2ee bootstrap guards", () => {
   });
 
   it("discards a stale bootstrap result after reset", async () => {
-    let resolveBootstrap!: (value: ReturnType<typeof createRemoteBootstrap>) => void;
+    let resolveBootstrap!: (
+      value: ReturnType<typeof createRemoteBootstrap>,
+    ) => void;
     mockGetBootstrap.mockReturnValue(
       new Promise((resolve) => {
         resolveBootstrap = resolve;
@@ -279,7 +303,9 @@ describe("e2ee bootstrap guards", () => {
 
   it("unlocks with a pending auth password when a password envelope exists", async () => {
     mockGetStoredE2eeDevice.mockResolvedValueOnce(null);
-    mockConsumePendingAuthPassword.mockReturnValueOnce("correct horse battery staple");
+    mockConsumePendingAuthPassword.mockReturnValueOnce(
+      "correct horse battery staple",
+    );
     mockGetBootstrap.mockResolvedValue({
       ...createRemoteBootstrap("user-1"),
       devices: [],
@@ -318,7 +344,10 @@ describe("e2ee bootstrap guards", () => {
     });
 
     await expect(
-      storePasswordEnvelopeForActiveSession("user-1", "correct horse battery staple"),
+      storePasswordEnvelopeForActiveSession(
+        "user-1",
+        "correct horse battery staple",
+      ),
     ).resolves.toBe(true);
 
     expect(mockCreatePasswordEnvelope).toHaveBeenCalledWith(

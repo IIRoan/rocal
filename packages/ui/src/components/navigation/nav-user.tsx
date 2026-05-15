@@ -1,8 +1,4 @@
-import {
-  CaretDownIcon,
-  GearSixIcon,
-  SignOutIcon,
-} from "@phosphor-icons/react";
+import { CaretDownIcon, GearSixIcon, SignOutIcon } from "@phosphor-icons/react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {

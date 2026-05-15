@@ -15,9 +15,12 @@ import { requireAuth } from "../../lib/auth-guard";
 const mockGetSession = auth.api.getSession as unknown as jest.Mock<
   () => Promise<any>
 >;
-const deriveHook = requireAuth.event.transform![0]!.fn as (ctx: any) => Promise<any>;
-const beforeHandleHook =
-  requireAuth.event.beforeHandle![0]!.fn as (ctx: any) => void;
+const deriveHook = requireAuth.event.transform![0]!.fn as (
+  ctx: any,
+) => Promise<any>;
+const beforeHandleHook = requireAuth.event.beforeHandle![0]!.fn as (
+  ctx: any,
+) => void;
 
 describe("requireAuth", () => {
   it("returns the existing user and session from context", async () => {

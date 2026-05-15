@@ -148,7 +148,9 @@ describe("StalwartAdminClient", () => {
 
     expect(account).toEqual({ accountId: "acct-1" });
 
-    const createBody = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body ?? "{}"));
+    const createBody = JSON.parse(
+      String(fetcher.mock.calls[0]?.[1]?.body ?? "{}"),
+    );
     expect(createBody.methodCalls[0]).toEqual([
       "x:Account/set",
       {
@@ -177,7 +179,9 @@ describe("StalwartAdminClient", () => {
       "c1",
     ]);
 
-    const getBody = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"));
+    const getBody = JSON.parse(
+      String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"),
+    );
     expect(getBody.methodCalls[0]).toEqual([
       "x:Account/get",
       {
@@ -186,7 +190,9 @@ describe("StalwartAdminClient", () => {
       "c1",
     ]);
 
-    const passwordBody = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body ?? "{}"));
+    const passwordBody = JSON.parse(
+      String(fetcher.mock.calls[2]?.[1]?.body ?? "{}"),
+    );
     expect(passwordBody.methodCalls[0]).toEqual([
       "x:AccountPassword/set",
       {
@@ -340,8 +346,7 @@ describe("StalwartAdminClient", () => {
         create: {
           pk1: {
             description: "Primary OpenPGP key",
-            key:
-              "-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----",
+            key: "-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----",
             emailAddresses: {
               "alice@solace.onl": true,
             },

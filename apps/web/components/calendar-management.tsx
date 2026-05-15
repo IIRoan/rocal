@@ -166,7 +166,8 @@ export function CalendarManagement({
   const [shareLinkLoading, setShareLinkLoading] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
-  const [subscriptionView, setSubscriptionView] = useState<PaletteView>("subscriptions");
+  const [subscriptionView, setSubscriptionView] =
+    useState<PaletteView>("subscriptions");
   const [pendingUnsubscribe, setPendingUnsubscribe] = useState<{
     subscriptionId: string;
     calendarName: string;
@@ -484,7 +485,9 @@ export function CalendarManagement({
           : "Calendar share link enabled successfully",
       );
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to enable calendar share link"));
+      toast.error(
+        getErrorMessage(error, "Failed to enable calendar share link"),
+      );
     } finally {
       setShareLinkLoading(false);
     }
@@ -505,7 +508,9 @@ export function CalendarManagement({
       });
       toast.success("Calendar share link disabled successfully");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to disable calendar share link"));
+      toast.error(
+        getErrorMessage(error, "Failed to disable calendar share link"),
+      );
     } finally {
       setShareLinkLoading(false);
     }
@@ -518,7 +523,9 @@ export function CalendarManagement({
       await navigator.clipboard.writeText(shareLinkInfo.shareUrl);
       toast.success("Share link copied to clipboard");
     } catch {
-      toast.error("Unable to copy link automatically. Please copy it manually.");
+      toast.error(
+        "Unable to copy link automatically. Please copy it manually.",
+      );
     }
   };
 
@@ -706,7 +713,11 @@ export function CalendarManagement({
                         <div className="flex items-center space-x-3">
                           <div
                             className="w-4 h-4 rounded"
-                            style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                            style={{
+                              backgroundColor: getColorSwatchValue(
+                                calendar.color,
+                              ),
+                            }}
                           />
                           <div>
                             <div className="flex items-center gap-2">
@@ -824,7 +835,11 @@ export function CalendarManagement({
                           <div className="flex items-center space-x-3">
                             <div
                               className="w-4 h-4 rounded"
-                              style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                              style={{
+                                backgroundColor: getColorSwatchValue(
+                                  calendar.color,
+                                ),
+                              }}
                             />
                             <div>
                               <div className="flex items-center gap-2">
@@ -896,7 +911,11 @@ export function CalendarManagement({
                           <div className="flex items-center space-x-3">
                             <div
                               className="w-4 h-4 rounded"
-                              style={{ backgroundColor: getColorSwatchValue(calendar.color) }}
+                              style={{
+                                backgroundColor: getColorSwatchValue(
+                                  calendar.color,
+                                ),
+                              }}
                             />
                             <div>
                               <div className="flex items-center gap-2">
@@ -1280,7 +1299,9 @@ export function CalendarManagement({
                           <div className="flex items-center gap-2">
                             <div
                               className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: getColorSwatchValue(cal.color) }}
+                              style={{
+                                backgroundColor: getColorSwatchValue(cal.color),
+                              }}
                             />
                             {cal.name}
                           </div>
@@ -1479,9 +1500,9 @@ export function CalendarManagement({
                 : "Unsubscribe from calendar?"}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to {pendingUnsubscribe?.action}{" "}
-              &ldquo;{pendingUnsubscribe?.calendarName}&rdquo;? The read-only
-              calendar and its synced events will be deleted.
+              Are you sure you want to {pendingUnsubscribe?.action} &ldquo;
+              {pendingUnsubscribe?.calendarName}&rdquo;? The read-only calendar
+              and its synced events will be deleted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">

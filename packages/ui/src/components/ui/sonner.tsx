@@ -32,9 +32,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "inline-flex items-center justify-center rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors",
           closeButton:
             "absolute right-2 top-2 rounded-md p-0.5 text-muted-foreground/50 hover:text-foreground transition-colors",
-          success: "[&_[data-icon]]:text-emerald-600 dark:[&_[data-icon]]:text-emerald-400",
+          success:
+            "[&_[data-icon]]:text-emerald-600 dark:[&_[data-icon]]:text-emerald-400",
           error: "[&_[data-icon]]:text-destructive",
-          warning: "[&_[data-icon]]:text-amber-600 dark:[&_[data-icon]]:text-amber-400",
+          warning:
+            "[&_[data-icon]]:text-amber-600 dark:[&_[data-icon]]:text-amber-400",
           info: "[&_[data-icon]]:text-primary",
         },
       }}

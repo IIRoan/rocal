@@ -107,14 +107,20 @@ export class CategoryService implements ICategoryService {
     });
 
     if (!existingCategory) {
-      throw new ValidationError("Category not found or access denied", "categoryId");
+      throw new ValidationError(
+        "Category not found or access denied",
+        "categoryId",
+      );
     }
 
     if (color !== undefined) {
       assertValidEntityColor(color);
     }
 
-    if (normalizedName !== undefined && normalizedName !== existingCategory.name) {
+    if (
+      normalizedName !== undefined &&
+      normalizedName !== existingCategory.name
+    ) {
       const duplicateCategory = await this.prisma.eventCategory.findFirst({
         where: {
           userId,
@@ -154,7 +160,10 @@ export class CategoryService implements ICategoryService {
     });
 
     if (!existingCategory) {
-      throw new ValidationError("Category not found or access denied", "categoryId");
+      throw new ValidationError(
+        "Category not found or access denied",
+        "categoryId",
+      );
     }
 
     await this.prisma.calendarEvent.updateMany({

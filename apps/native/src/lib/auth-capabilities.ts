@@ -92,7 +92,6 @@ export function getAuthCapabilities(
     supportsGitHubOAuth: true,
     supportsPasskeys: false,
     passkeyMode: "unsupported",
-    passkeyMessage:
-      "Passkeys are unavailable in the current runtime.",
+    passkeyMessage: "Passkeys are unavailable in the current runtime.",
   };
 }

@@ -251,7 +251,9 @@ describe("AccountSettings", () => {
   });
 
   it("submits the OAuth-only set-password flow with separate explainer copy", async () => {
-    const handleSetPassword = jest.fn<() => Promise<void>>(async () => undefined);
+    const handleSetPassword = jest.fn<() => Promise<void>>(
+      async () => undefined,
+    );
 
     await act(async () => {
       root.render(

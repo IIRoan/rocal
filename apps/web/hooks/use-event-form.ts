@@ -109,10 +109,7 @@ function replaceLegacyReminder(
     return nonEmailNotifications;
   }
 
-  return [
-    ...nonEmailNotifications,
-    createLegacyReminderNotification(reminder),
-  ];
+  return [...nonEmailNotifications, createLegacyReminderNotification(reminder)];
 }
 
 interface UseEventFormProps {
@@ -648,19 +645,24 @@ export function useEventForm({
             ),
           };
 
-          queryClient.setQueriesData<CalendarEvent[]>({ queryKey: ["events"] }, (oldEvents) => {
-            if (!oldEvents) {
-              return oldEvents;
-            }
+          queryClient.setQueriesData<CalendarEvent[]>(
+            { queryKey: ["events"] },
+            (oldEvents) => {
+              if (!oldEvents) {
+                return oldEvents;
+              }
 
-            if (oldEvents.some((event) => event.id === nextEvent.id)) {
-              return oldEvents.map((event) =>
-                event.id === nextEvent.id ? { ...event, ...nextEvent } : event,
-              );
-            }
+              if (oldEvents.some((event) => event.id === nextEvent.id)) {
+                return oldEvents.map((event) =>
+                  event.id === nextEvent.id
+                    ? { ...event, ...nextEvent }
+                    : event,
+                );
+              }
 
-            return isUpdate ? oldEvents : [...oldEvents, nextEvent];
-          });
+              return isUpdate ? oldEvents : [...oldEvents, nextEvent];
+            },
+          );
 
           setSelectedEvent(nextEvent);
         }

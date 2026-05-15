@@ -75,15 +75,21 @@ export function splitRecurringSeriesRule(
 export function buildRecurringEventCreateData(
   input: BuildRecurringEventCreateDataInput,
 ) {
-  const { existingEvent, updates, userId, parentEventId, recurrence, occurrenceDate } =
-    input;
+  const {
+    existingEvent,
+    updates,
+    userId,
+    parentEventId,
+    recurrence,
+    occurrenceDate,
+  } = input;
   const durationMs = Math.max(
     0,
     existingEvent.end.getTime() - existingEvent.start.getTime(),
   );
   const start = updates.start
     ? new Date(updates.start)
-    : occurrenceDate ?? existingEvent.start;
+    : (occurrenceDate ?? existingEvent.start);
   const end = updates.end
     ? new Date(updates.end)
     : new Date(start.getTime() + durationMs);

@@ -268,8 +268,18 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     // matches the Spotify / Apple Music sheet-dismiss feel.
     const sheetAnimatedStyle = useAnimatedStyle(() => {
       const progress = translateY.value / maxHeight;
-      const scale = interpolate(progress, [0, 0.6], [1, 0.96], Extrapolation.CLAMP);
-      const radius = interpolate(progress, [0, 0.15], [16, 26], Extrapolation.CLAMP);
+      const scale = interpolate(
+        progress,
+        [0, 0.6],
+        [1, 0.96],
+        Extrapolation.CLAMP,
+      );
+      const radius = interpolate(
+        progress,
+        [0, 0.15],
+        [16, 26],
+        Extrapolation.CLAMP,
+      );
       return {
         transform: [
           { translateY: translateY.value - keyboardHeight.value },

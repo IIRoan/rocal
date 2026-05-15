@@ -221,8 +221,18 @@ describe("resolveEventBlockColor", () => {
 
   it("works with all 12 known calendar colors", () => {
     const knownColors = [
-      "blue", "orange", "violet", "rose", "emerald", "red",
-      "cyan", "lime", "amber", "indigo", "pink", "teal",
+      "blue",
+      "orange",
+      "violet",
+      "rose",
+      "emerald",
+      "red",
+      "cyan",
+      "lime",
+      "amber",
+      "indigo",
+      "pink",
+      "teal",
     ] as const;
     for (const color of knownColors) {
       const result = resolveEventBlockColor(color, theme);
@@ -321,7 +331,6 @@ describe("isToday", () => {
   });
 });
 
-
 // ─── getThreeDayDates ────────────────────────────────────────────────────────
 
 describe("getThreeDayDates", () => {
@@ -387,7 +396,11 @@ describe("getThreeDayStripDates", () => {
 describe("isAllDayOrMultiDayEvent", () => {
   it("returns true for explicitly all-day events", () => {
     const event = {
-      ...makeEvent("all-day", new Date(2025, 0, 10, 0), new Date(2025, 0, 10, 23, 59)),
+      ...makeEvent(
+        "all-day",
+        new Date(2025, 0, 10, 0),
+        new Date(2025, 0, 10, 23, 59),
+      ),
       allDay: true,
     } as DecoratedCalendarEvent;
 
@@ -418,7 +431,11 @@ describe("isAllDayOrMultiDayEvent", () => {
 describe("eventOverlapsDate", () => {
   it("matches all-day events on the same date", () => {
     const event = {
-      ...makeEvent("all-day", new Date(2025, 0, 10, 0), new Date(2025, 0, 11, 0)),
+      ...makeEvent(
+        "all-day",
+        new Date(2025, 0, 10, 0),
+        new Date(2025, 0, 11, 0),
+      ),
       allDay: true,
     } as DecoratedCalendarEvent;
 
@@ -441,7 +458,11 @@ describe("eventOverlapsDate", () => {
 describe("getAllDayEventsForDate", () => {
   it("returns only all-day and multi-day events for the target date", () => {
     const allDayEvent = {
-      ...makeEvent("all-day", new Date(2025, 0, 10, 0), new Date(2025, 0, 11, 0)),
+      ...makeEvent(
+        "all-day",
+        new Date(2025, 0, 10, 0),
+        new Date(2025, 0, 11, 0),
+      ),
       allDay: true,
     } as DecoratedCalendarEvent;
     const multiDayEvent = makeEvent(

@@ -8,7 +8,10 @@ export { EventCalendar, type EventCalendarProps } from "./event-calendar";
 export { EventItem } from "./event-item";
 export { EventDots } from "./event-dots";
 export { EventsPopup } from "./events-popup";
-export { NotificationManager, type EventNotification } from "./notification-manager";
+export {
+  NotificationManager,
+  type EventNotification,
+} from "./notification-manager";
 export { DraggableEvent } from "./draggable-event";
 export { DroppableCell } from "./droppable-cell";
 export {
@@ -22,9 +25,7 @@ export {
   EventDialogSkeleton,
   SidebarCalendarSkeleton,
 } from "./calendar-skeleton";
-export {
-  EventLoadingSkeleton,
-} from "./event-loading-skeleton";
+export { EventLoadingSkeleton } from "./event-loading-skeleton";
 
 // Context providers
 export { CalendarDndProvider, useCalendarDnd } from "./calendar-dnd-context";

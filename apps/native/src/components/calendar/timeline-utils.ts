@@ -171,7 +171,9 @@ export function getThreeDayStripDates(currentDate: Date): Date[] {
   return Array.from({ length: 7 }, (_, index) => addDays(rowStart, index));
 }
 
-export function isAllDayOrMultiDayEvent(event: DecoratedCalendarEvent): boolean {
+export function isAllDayOrMultiDayEvent(
+  event: DecoratedCalendarEvent,
+): boolean {
   const eventStart = new Date(event.start);
   const eventEnd = new Date(event.end);
 

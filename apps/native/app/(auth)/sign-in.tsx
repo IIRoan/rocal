@@ -66,22 +66,19 @@ export default function SignInScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const authCapabilities = useMemo(
-    () => {
-      const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
+  const authCapabilities = useMemo(() => {
+    const passkeyBridgeBaseUrl = resolvePasskeyBridgeBaseUrl();
 
-      return getAuthCapabilities({
-        platformOs: Platform.OS,
-        expoExecutionEnvironment: Constants.executionEnvironment,
-        expoAppOwnership: Constants.appOwnership,
-        hasPublicKeyCredential:
-          typeof globalThis.PublicKeyCredential === "function",
-        hasSecurePasskeyBridgeOrigin:
-          isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
-      });
-    },
-    [],
-  );
+    return getAuthCapabilities({
+      platformOs: Platform.OS,
+      expoExecutionEnvironment: Constants.executionEnvironment,
+      expoAppOwnership: Constants.appOwnership,
+      hasPublicKeyCredential:
+        typeof globalThis.PublicKeyCredential === "function",
+      hasSecurePasskeyBridgeOrigin:
+        isPasskeyBridgeOriginSecure(passkeyBridgeBaseUrl),
+    });
+  }, []);
   const showPasskeyButton = authCapabilities.supportsPasskeys;
 
   const [email, setEmail] = useState("");
@@ -126,7 +123,9 @@ export default function SignInScreen() {
       const result = await signIn(email.trim(), password);
       log.ok("Sign-in successful");
       if (result.requiresPasskeyStepUp) {
-        setServerError("Password accepted. Complete your passkey verification.");
+        setServerError(
+          "Password accepted. Complete your passkey verification.",
+        );
       } else {
         router.replace(CALENDAR_HOME_ROUTE);
       }
@@ -196,7 +195,8 @@ export default function SignInScreen() {
       log.ok("Passkey sign-in successful");
       router.replace(CALENDAR_HOME_ROUTE);
     } catch (err: any) {
-      const message = err?.message ?? "Passkey sign-in failed. Please try again.";
+      const message =
+        err?.message ?? "Passkey sign-in failed. Please try again.";
       log.error("Passkey sign-in failed", err);
       setServerError(message);
     } finally {
@@ -217,9 +217,7 @@ export default function SignInScreen() {
   );
 
   const isLoading =
-    isSigningIn ||
-    isPasskeyLoading ||
-    isRequestingPasswordReset;
+    isSigningIn || isPasskeyLoading || isRequestingPasswordReset;
 
   const title = isResetMode
     ? "Reset your email sign-in password"
@@ -284,7 +282,9 @@ export default function SignInScreen() {
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email address"
               />
-              {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
+              {emailError ? (
+                <Text style={styles.fieldError}>{emailError}</Text>
+              ) : null}
             </View>
 
             {!isResetMode ? (
@@ -341,9 +341,7 @@ export default function SignInScreen() {
                 pressed && styles.primaryButtonPressed,
                 isLoading && styles.buttonDisabled,
               ]}
-              onPress={
-                isResetMode ? handleRequestPasswordReset : handleSignIn
-              }
+              onPress={isResetMode ? handleRequestPasswordReset : handleSignIn}
               disabled={isLoading}
               accessibilityRole="button"
               accessibilityLabel={isResetMode ? "Send reset link" : "Sign in"}
@@ -364,36 +362,40 @@ export default function SignInScreen() {
                   <>
                     <View style={styles.divider}>
                       <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>second factor required</Text>
+                      <Text style={styles.dividerText}>
+                        second factor required
+                      </Text>
                       <View style={styles.dividerLine} />
                     </View>
 
                     <View style={styles.socialButtonsRow}>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.socialButton,
-                        pressed && styles.secondaryButtonPressed,
-                        isLoading && styles.buttonDisabled,
-                      ]}
-                      onPress={handlePasskeySignIn}
-                      disabled={isLoading}
-                      accessibilityRole="button"
-                      accessibilityLabel="Continue with passkey"
-                      accessibilityState={{ disabled: isLoading }}
-                    >
-                      {isPasskeyLoading ? (
-                        <ActivityIndicator color={theme.colors.foreground} />
-                      ) : (
-                        <>
-                          <Feather
-                            name="key"
-                            size={16}
-                            color={theme.colors.foreground}
-                          />
-                          <Text style={styles.secondaryButtonText}>Passkey</Text>
-                        </>
-                      )}
-                    </Pressable>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.socialButton,
+                          pressed && styles.secondaryButtonPressed,
+                          isLoading && styles.buttonDisabled,
+                        ]}
+                        onPress={handlePasskeySignIn}
+                        disabled={isLoading}
+                        accessibilityRole="button"
+                        accessibilityLabel="Continue with passkey"
+                        accessibilityState={{ disabled: isLoading }}
+                      >
+                        {isPasskeyLoading ? (
+                          <ActivityIndicator color={theme.colors.foreground} />
+                        ) : (
+                          <>
+                            <Feather
+                              name="key"
+                              size={16}
+                              color={theme.colors.foreground}
+                            />
+                            <Text style={styles.secondaryButtonText}>
+                              Passkey
+                            </Text>
+                          </>
+                        )}
+                      </Pressable>
                     </View>
                   </>
                 ) : null}
@@ -413,7 +415,9 @@ export default function SignInScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={styles.footerText}>Don&apos;t have an account? </Text>
+                  <Text style={styles.footerText}>
+                    Don&apos;t have an account?{" "}
+                  </Text>
                   <Link href={AUTH_SIGN_UP_ROUTE} asChild>
                     <Pressable accessibilityRole="link">
                       <Text style={styles.footerLink}>Sign up</Text>
@@ -550,8 +554,8 @@ function createStyles(theme: ThemeTokens) {
     title: {
       fontSize: theme.typography.fontSize["2xl"].size,
       lineHeight: theme.typography.fontSize["2xl"].lineHeight,
-      fontWeight:
-        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: theme.spacing["1"],
     },
@@ -576,8 +580,7 @@ function createStyles(theme: ThemeTokens) {
     inlineLink: {
       fontSize: theme.typography.fontSize.xs.size,
       lineHeight: theme.typography.fontSize.xs.lineHeight,
-      fontWeight:
-        theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.primaryBase,
     },
     helperText: {
@@ -604,8 +607,8 @@ function createStyles(theme: ThemeTokens) {
     primaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight:
-        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
     },
     dividerText: {
@@ -616,8 +619,7 @@ function createStyles(theme: ThemeTokens) {
     secondaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight:
-        theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     footerText: {
@@ -628,8 +630,8 @@ function createStyles(theme: ThemeTokens) {
     footerLink: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight:
-        theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryBase,
     },
   } satisfies Record<string, TextStyle>;

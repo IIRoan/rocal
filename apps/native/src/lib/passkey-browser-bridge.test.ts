@@ -26,9 +26,9 @@ function createRouteClient(
 
 describe("passkey browser bridge", () => {
   it("derives the web app base url from the API base url for local development", () => {
-    expect(
-      resolvePasskeyBridgeBaseUrl("http://192.168.88.246:4001/api"),
-    ).toBe("http://192.168.88.246:4000");
+    expect(resolvePasskeyBridgeBaseUrl("http://192.168.88.246:4001/api")).toBe(
+      "http://192.168.88.246:4000",
+    );
   });
 
   it("builds browser bridge urls with the expected query params", () => {
@@ -120,10 +120,13 @@ describe("passkey browser bridge", () => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(routeClient.$fetch).toHaveBeenCalledWith("/one-time-token/generate", {
-      method: "GET",
-      throw: false,
-    });
+    expect(routeClient.$fetch).toHaveBeenCalledWith(
+      "/one-time-token/generate",
+      {
+        method: "GET",
+        throw: false,
+      },
+    );
     expect(openAuthSessionAsync).toHaveBeenCalledWith(
       "https://app.example.com/passkey/native?mode=register&callbackURL=solace%3A%2F%2Fsettings&bridgeToken=setup-ott&passkeyName=This+device",
       "solace://settings",

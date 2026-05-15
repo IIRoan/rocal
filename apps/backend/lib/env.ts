@@ -21,8 +21,10 @@ function buildDefaultMailOauthBrowserRedirectUris(
 ): string[] {
   try {
     return [
-      new URL("/mail/oauth/callback", frontendUrl.replace(/\/+$/, "") + "/")
-        .toString(),
+      new URL(
+        "/mail/oauth/callback",
+        frontendUrl.replace(/\/+$/, "") + "/",
+      ).toString(),
     ];
   } catch {
     return [];
@@ -183,8 +185,7 @@ export const env = {
   mailOauthEnabled: resolvedMailOauthEnabled,
 
   /** OAuth client secret used for confidential mail OAuth clients. */
-  mailOauthClientSecret:
-    process.env.MAIL_OAUTH_CLIENT_SECRET?.trim() || "",
+  mailOauthClientSecret: process.env.MAIL_OAUTH_CLIENT_SECRET?.trim() || "",
 
   /** Friendly name for the seeded mail OAuth client. */
   mailOauthClientName: resolvedMailOauthClientName,
@@ -230,8 +231,7 @@ export const env = {
   mailOauthConsentPage: process.env.MAIL_OAUTH_CONSENT_PAGE?.trim() || "",
 
   /** Optional pairwise subject secret for OIDC clients that request pairwise subjects. */
-  mailOauthPairwiseSecret:
-    process.env.MAIL_OAUTH_PAIRWISE_SECRET?.trim() || "",
+  mailOauthPairwiseSecret: process.env.MAIL_OAUTH_PAIRWISE_SECRET?.trim() || "",
 } as const;
 
 /** Extract the origin from a URL string, returning the input on failure. */

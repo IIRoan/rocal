@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
@@ -47,7 +54,8 @@ const mockPrisma = prisma as unknown as {
   };
 };
 
-const mockSyncCalendarSubscription = syncCalendarSubscription as unknown as jest.Mock;
+const mockSyncCalendarSubscription =
+  syncCalendarSubscription as unknown as jest.Mock;
 
 describe("CalendarSyncService", () => {
   let service: CalendarSyncService;
@@ -124,26 +132,29 @@ describe("CalendarSyncService", () => {
 
     await service.syncAllActiveSubscriptions();
 
-    expect(mockPrisma.calendarSubscription.findMany).toHaveBeenNthCalledWith(1, {
-      where: {
-        isActive: true,
-        OR: [
-          { lastSyncAt: null },
-          {
-            lastSyncAt: {
-              lt: new Date(Date.now() - 15 * 60 * 1000),
+    expect(mockPrisma.calendarSubscription.findMany).toHaveBeenNthCalledWith(
+      1,
+      {
+        where: {
+          isActive: true,
+          OR: [
+            { lastSyncAt: null },
+            {
+              lastSyncAt: {
+                lt: new Date(Date.now() - 15 * 60 * 1000),
+              },
             },
-          },
-        ],
+          ],
+        },
+        include: {
+          calendar: true,
+          user: true,
+        },
+        orderBy: {
+          lastSyncAt: "asc",
+        },
       },
-      include: {
-        calendar: true,
-        user: true,
-      },
-      orderBy: {
-        lastSyncAt: "asc",
-      },
-    });
+    );
     expect(mockSyncCalendarSubscription).toHaveBeenCalledTimes(1);
     expect(mockSyncCalendarSubscription).toHaveBeenCalledWith(
       expect.objectContaining({ id: "sub-due" }),
@@ -168,17 +179,34 @@ describe("CalendarSyncService", () => {
       .mockResolvedValueOnce([
         { id: "sub-1", name: "One", lastSyncAt: null, syncIntervalMinutes: 15 },
         { id: "sub-2", name: "Two", lastSyncAt: null, syncIntervalMinutes: 15 },
-        { id: "sub-3", name: "Three", lastSyncAt: null, syncIntervalMinutes: 15 },
-        { id: "sub-4", name: "Four", lastSyncAt: null, syncIntervalMinutes: 15 },
-        { id: "sub-5", name: "Five", lastSyncAt: null, syncIntervalMinutes: 15 },
+        {
+          id: "sub-3",
+          name: "Three",
+          lastSyncAt: null,
+          syncIntervalMinutes: 15,
+        },
+        {
+          id: "sub-4",
+          name: "Four",
+          lastSyncAt: null,
+          syncIntervalMinutes: 15,
+        },
+        {
+          id: "sub-5",
+          name: "Five",
+          lastSyncAt: null,
+          syncIntervalMinutes: 15,
+        },
         { id: "sub-6", name: "Six", lastSyncAt: null, syncIntervalMinutes: 15 },
       ])
       .mockResolvedValueOnce([]);
-    mockSyncCalendarSubscription.mockImplementation(async (subscription: any) => {
-      if (subscription.id === "sub-3") {
-        throw new Error("subscription sync failed");
-      }
-    });
+    mockSyncCalendarSubscription.mockImplementation(
+      async (subscription: any) => {
+        if (subscription.id === "sub-3") {
+          throw new Error("subscription sync failed");
+        }
+      },
+    );
 
     const syncPromise = service.syncAllActiveSubscriptions();
     await jest.advanceTimersByTimeAsync(1000);

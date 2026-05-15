@@ -1,11 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import { createLogger } from "@workspace/logger";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -53,11 +48,7 @@ import {
   DrawerTitle,
 } from "@workspace/ui/components/ui/drawer";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import {
-  Settings,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
+import { Settings, Loader2, ArrowLeft } from "lucide-react";
 import { useNumberedShortcuts, useIsMobile } from "@workspace/ui/hooks";
 
 const log = createLogger("command-palette");
@@ -108,7 +99,8 @@ export function CommandPalette({
       return extractLinkedAuthAccounts(await authClient.listAccounts());
     },
     enabled:
-      Boolean(session?.user?.id) && typeof authClient.listAccounts === "function",
+      Boolean(session?.user?.id) &&
+      typeof authClient.listAccounts === "function",
     staleTime: 5 * 60 * 1000,
   });
   const { setCurrentDate, setCurrentView: setCalendarView } =
@@ -190,9 +182,17 @@ export function CommandPalette({
   const [resettingEncryptionPassword, setResettingEncryptionPassword] =
     useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
-  const [localImageOverride, setLocalImageOverride] = useState<string | null | undefined>(undefined);
-  const accountImage = localImageOverride !== undefined ? localImageOverride : (session?.user?.image ?? null);
-  const linkedAccounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
+  const [localImageOverride, setLocalImageOverride] = useState<
+    string | null | undefined
+  >(undefined);
+  const accountImage =
+    localImageOverride !== undefined
+      ? localImageOverride
+      : (session?.user?.image ?? null);
+  const linkedAccounts = useMemo(
+    () => accountsQuery.data ?? [],
+    [accountsQuery.data],
+  );
   const { hasOAuthAccount, hasPasswordAccount } = useMemo(
     () => summarizeLinkedAuthAccounts(linkedAccounts),
     [linkedAccounts],
@@ -217,7 +217,9 @@ export function CommandPalette({
 
   // Add keyboard shortcuts for navigation items (Ctrl+1 through Ctrl+8) - always at top level
   useNumberedShortcuts(
-    NAVIGATION_ITEMS.filter((item) => item.parent === null).map((item) => () => goForward(item.id as PaletteView)),
+    NAVIGATION_ITEMS.filter((item) => item.parent === null).map(
+      (item) => () => goForward(item.id as PaletteView),
+    ),
     open && currentView === "main",
   );
 
@@ -333,7 +335,9 @@ export function CommandPalette({
         });
 
         if (result?.error) {
-          throw new Error(result.error.message || "Unable to set your password.");
+          throw new Error(
+            result.error.message || "Unable to set your password.",
+          );
         }
 
         await accountsQuery?.refetch?.();

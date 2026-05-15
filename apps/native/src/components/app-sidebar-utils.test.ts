@@ -161,7 +161,9 @@ describe("View switcher options", () => {
     const labels = SIDEBAR_VIEW_OPTIONS.map((o) => o.label);
     expect(labels).toEqual(["Day", "3 Day", "Week", "Month", "Agenda"]);
     // All labels must be non-empty strings
-    expect(labels.every((l) => typeof l === "string" && l.length > 0)).toBe(true);
+    expect(labels.every((l) => typeof l === "string" && l.length > 0)).toBe(
+      true,
+    );
   });
 
   it("provides an icon name for every view option", () => {

@@ -421,7 +421,9 @@ export function CalendarProvider({
   const getVisibleCalendars = useCallback(() => {
     return calendars.filter((cal) => {
       const localVisibility = localVisibilityState[cal.id];
-      return localVisibility !== undefined ? localVisibility : (cal.isVisible ?? true);
+      return localVisibility !== undefined
+        ? localVisibility
+        : (cal.isVisible ?? true);
     });
   }, [calendars, localVisibilityState]);
 

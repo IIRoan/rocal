@@ -132,7 +132,8 @@ export function createMailAccountRoutes(
           {
             body: bootstrapBodySchema,
             detail: {
-              summary: "Provision a mailbox for the authenticated Solace account",
+              summary:
+                "Provision a mailbox for the authenticated Solace account",
               description:
                 "Creates a mailbox for the current Solace user, registers the client-generated OpenPGP key, enables encryption at rest, and stores the encrypted vault backup metadata.",
             },

@@ -42,10 +42,14 @@ export class InviteApiService {
   }
 
   async revokeInvite(id: string): Promise<RevokeInviteResponse> {
-    return this.client.delete<RevokeInviteResponse>(`/api/invites/${encodeURIComponent(id)}`);
+    return this.client.delete<RevokeInviteResponse>(
+      `/api/invites/${encodeURIComponent(id)}`,
+    );
   }
 
-  async validateInviteToken(token: string): Promise<ValidateInviteTokenResponse> {
+  async validateInviteToken(
+    token: string,
+  ): Promise<ValidateInviteTokenResponse> {
     return this.client.get<ValidateInviteTokenResponse>(
       `/api/account/invite/validate?token=${encodeURIComponent(token)}`,
     );

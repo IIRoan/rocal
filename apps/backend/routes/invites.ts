@@ -111,7 +111,11 @@ export const inviteRoutes = new Elysia({
               from: authEmailFrom,
               to: invite.email,
               label: "invite",
-              message: buildInviteEmail({ inviterName, signupUrl, token: invite.token }),
+              message: buildInviteEmail({
+                inviterName,
+                signupUrl,
+                token: invite.token,
+              }),
               logger,
               isProduction: env.isProduction,
               mode: "best-effort",

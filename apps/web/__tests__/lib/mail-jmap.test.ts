@@ -21,8 +21,7 @@ describe("mail JMAP helpers", () => {
         apiUrl: "https://solacemailmail.solace.onl/jmap/",
         downloadUrl:
           "https://solacemailmail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
-        uploadUrl:
-          "https://solacemailmail.solace.onl/jmap/upload/{accountId}/",
+        uploadUrl: "https://solacemailmail.solace.onl/jmap/upload/{accountId}/",
         eventSourceUrl:
           "https://solacemailmail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
         accounts: {},
@@ -51,8 +50,7 @@ describe("mail JMAP helpers", () => {
         apiUrl: "https://solacemailmail.solace.onl/jmap/",
         downloadUrl:
           "https://solacemailmail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
-        uploadUrl:
-          "https://solacemailmail.solace.onl/jmap/upload/{accountId}/",
+        uploadUrl: "https://solacemailmail.solace.onl/jmap/upload/{accountId}/",
         eventSourceUrl:
           "https://solacemailmail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
         accounts: {},
@@ -68,7 +66,8 @@ describe("mail JMAP helpers", () => {
         apiUrl: "http://localhost:4001/api/mail/jmap/jmap/",
         downloadUrl:
           "http://localhost:4001/api/mail/jmap/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
-        uploadUrl: "http://localhost:4001/api/mail/jmap/jmap/upload/{accountId}/",
+        uploadUrl:
+          "http://localhost:4001/api/mail/jmap/jmap/upload/{accountId}/",
         eventSourceUrl:
           "http://localhost:4001/api/mail/jmap/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
       }),
@@ -202,27 +201,28 @@ describe("StalwartJmapClient", () => {
   it("discovers and normalizes the JMAP session through the backend proxy", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
-    >(async () =>
-      new Response(
-        JSON.stringify({
-          apiUrl: "https://mail.solace.onl/jmap/",
-          downloadUrl:
-            "https://mail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
-          uploadUrl: "https://mail.solace.onl/jmap/upload/{accountId}/",
-          eventSourceUrl:
-            "https://mail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
-          accounts: {},
-          primaryAccounts: {
-            "urn:ietf:params:jmap:mail": "b",
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            apiUrl: "https://mail.solace.onl/jmap/",
+            downloadUrl:
+              "https://mail.solace.onl/jmap/download/{accountId}/{blobId}/{name}?accept={type}",
+            uploadUrl: "https://mail.solace.onl/jmap/upload/{accountId}/",
+            eventSourceUrl:
+              "https://mail.solace.onl/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+            accounts: {},
+            primaryAccounts: {
+              "urn:ietf:params:jmap:mail": "b",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      ),
+        ),
     );
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
@@ -252,22 +252,23 @@ describe("StalwartJmapClient", () => {
   it("supports bearer tokens for proxied JMAP discovery", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
-    >(async () =>
-      new Response(
-        JSON.stringify({
-          apiUrl: "https://mail.solace.onl/jmap/",
-          accounts: {},
-          primaryAccounts: {
-            "urn:ietf:params:jmap:mail": "b",
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            apiUrl: "https://mail.solace.onl/jmap/",
+            accounts: {},
+            primaryAccounts: {
+              "urn:ietf:params:jmap:mail": "b",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      ),
+        ),
     );
     const client = new StalwartJmapClient({
       baseUrl: "http://localhost:4001/api/mail/jmap",
@@ -292,22 +293,23 @@ describe("StalwartJmapClient", () => {
   it("supports async access-token providers for proxied JMAP discovery", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
-    >(async () =>
-      new Response(
-        JSON.stringify({
-          apiUrl: "https://mail.solace.onl/jmap/",
-          accounts: {},
-          primaryAccounts: {
-            "urn:ietf:params:jmap:mail": "b",
+    >(
+      async () =>
+        new Response(
+          JSON.stringify({
+            apiUrl: "https://mail.solace.onl/jmap/",
+            accounts: {},
+            primaryAccounts: {
+              "urn:ietf:params:jmap:mail": "b",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      ),
+        ),
     );
     const getAccessToken = jest.fn(async () => "mail-access-token");
     const client = new StalwartJmapClient({

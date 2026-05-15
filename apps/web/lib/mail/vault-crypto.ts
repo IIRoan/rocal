@@ -82,7 +82,9 @@ async function deriveVaultKey(
   );
 }
 
-function createKdfParams(overrides?: Partial<MailVaultKdfParams>): MailVaultKdfParams {
+function createKdfParams(
+  overrides?: Partial<MailVaultKdfParams>,
+): MailVaultKdfParams {
   const cryptoRef = getCryptoRef();
   const salt = new Uint8Array(16);
   cryptoRef.getRandomValues(salt);

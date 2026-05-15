@@ -73,4 +73,3 @@ export const validateEventForm = (
 
   return null;
 };
-

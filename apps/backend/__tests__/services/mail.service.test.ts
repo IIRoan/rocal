@@ -66,7 +66,8 @@ function createMockAdminClient() {
 
 const mockMailOAuthConfig = {
   issuer: "https://api.solace.test/api/auth",
-  discoveryUrl: "https://api.solace.test/api/auth/.well-known/openid-configuration",
+  discoveryUrl:
+    "https://api.solace.test/api/auth/.well-known/openid-configuration",
   authorizationEndpoint: "https://api.solace.test/api/auth/oauth2/authorize",
   tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
   userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
@@ -108,30 +109,36 @@ describe("MailService", () => {
       displayName: "Alice Example",
     });
 
-    expect(mockPrisma.mailDirectoryEntry.findUnique).toHaveBeenNthCalledWith(1, {
-      where: { userId: "user-1" },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        stalwartAccountId: true,
-        stalwartPublicKeyId: true,
-        publicKeyFingerprint: true,
-        userId: true,
+    expect(mockPrisma.mailDirectoryEntry.findUnique).toHaveBeenNthCalledWith(
+      1,
+      {
+        where: { userId: "user-1" },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          stalwartAccountId: true,
+          stalwartPublicKeyId: true,
+          publicKeyFingerprint: true,
+          userId: true,
+        },
       },
-    });
-    expect(mockPrisma.mailDirectoryEntry.findUnique).toHaveBeenNthCalledWith(2, {
-      where: { email: "alice@solace.onl" },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        stalwartAccountId: true,
-        stalwartPublicKeyId: true,
-        publicKeyFingerprint: true,
-        userId: true,
+    );
+    expect(mockPrisma.mailDirectoryEntry.findUnique).toHaveBeenNthCalledWith(
+      2,
+      {
+        where: { email: "alice@solace.onl" },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          stalwartAccountId: true,
+          stalwartPublicKeyId: true,
+          publicKeyFingerprint: true,
+          userId: true,
+        },
       },
-    });
+    );
     expect(result).toEqual({
       email: "alice@solace.onl",
       displayName: "Alice Example",
@@ -308,8 +315,7 @@ describe("MailService", () => {
     );
 
     const createAccountCalls = mockAdminClient.createAccount.mock
-      .calls as unknown as Array<[{ secret: string }]>
-      ;
+      .calls as unknown as Array<[{ secret: string }]>;
     const generatedSecret = createAccountCalls[0]?.[0]?.secret;
     expect(generatedSecret).toBeTruthy();
     expect(generatedSecret?.length ?? 0).toBeGreaterThanOrEqual(60);

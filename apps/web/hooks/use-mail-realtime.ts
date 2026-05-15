@@ -57,7 +57,9 @@ export function useMailRealtime(input: {
     });
 
     if (typeof EventSource !== "function") {
-      return () => { closed = true; };
+      return () => {
+        closed = true;
+      };
     }
 
     try {
@@ -66,7 +68,9 @@ export function useMailRealtime(input: {
       });
     } catch (error) {
       log.warn("Failed to open mail realtime EventSource", error);
-      return () => { closed = true; };
+      return () => {
+        closed = true;
+      };
     }
 
     eventSource.addEventListener("open", () => {

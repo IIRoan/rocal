@@ -115,9 +115,7 @@ export function getVisiblePaletteNavigationItems<TItem>(
   return input.filteredItems;
 }
 
-export function getCommandPaletteListLength(
-  input: PaletteListLengthInput,
-) {
+export function getCommandPaletteListLength(input: PaletteListLengthInput) {
   if (input.isCommandMode) {
     return input.matchingCommandCount;
   }

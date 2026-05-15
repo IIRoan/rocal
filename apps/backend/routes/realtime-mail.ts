@@ -37,10 +37,12 @@ function scheduleWrite(
   });
 }
 
-export function createRealtimeMailRoutes(input: {
-  realtimeService?: MailRealtimeService;
-  mailSyncService?: MailSyncService;
-} = {}) {
+export function createRealtimeMailRoutes(
+  input: {
+    realtimeService?: MailRealtimeService;
+    mailSyncService?: MailSyncService;
+  } = {},
+) {
   const realtimeService = input.realtimeService ?? defaultMailRealtimeService;
   const mailSyncService = input.mailSyncService ?? defaultMailSyncService;
 
@@ -60,7 +62,8 @@ export function createRealtimeMailRoutes(input: {
           request: Request;
         }) => {
           const user = await resolveRouteUser(authenticatedUser, request);
-          const accountIds = await mailSyncService.listAuthorizedAccountIdsForUser(user.id);
+          const accountIds =
+            await mailSyncService.listAuthorizedAccountIdsForUser(user.id);
           const stream = new TransformStream<Uint8Array, Uint8Array>();
           const writer = stream.writable.getWriter();
           const subscriberId = randomUUID();
@@ -120,14 +123,19 @@ export function createRealtimeMailRoutes(input: {
               void (async () => {
                 for (const accountId of accountIds) {
                   try {
-                    const { hasChanges, changedTypes } = await mailSyncService.detectChanges({
-                      userId: user.id,
-                      accountId,
-                    });
+                    const { hasChanges, changedTypes } =
+                      await mailSyncService.detectChanges({
+                        userId: user.id,
+                        accountId,
+                      });
 
                     if (!hasChanges || closed) continue;
 
-                    logger.info("Mail poll detected changes", { userId: user.id, accountId, changedTypes });
+                    logger.info("Mail poll detected changes", {
+                      userId: user.id,
+                      accountId,
+                      changedTypes,
+                    });
                     scheduleWrite(
                       writer,
                       `event: mail.changed\ndata: ${JSON.stringify({
@@ -142,7 +150,8 @@ export function createRealtimeMailRoutes(input: {
                     logger.warn("Mail poll check failed", {
                       userId: user.id,
                       accountId,
-                      error: error instanceof Error ? error.message : String(error),
+                      error:
+                        error instanceof Error ? error.message : String(error),
                     });
                   }
                 }

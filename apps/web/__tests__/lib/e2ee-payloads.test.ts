@@ -25,14 +25,16 @@ import {
   attachEventEncryptionShadow,
 } from "../../lib/e2ee-payloads";
 
-const mockGetActiveE2eeSession =
-  getActiveE2eeSession as jest.MockedFunction<typeof getActiveE2eeSession>;
+const mockGetActiveE2eeSession = getActiveE2eeSession as jest.MockedFunction<
+  typeof getActiveE2eeSession
+>;
 const mockWaitForPendingE2eeBootstrap =
   waitForPendingE2eeBootstrap as jest.MockedFunction<
     typeof waitForPendingE2eeBootstrap
   >;
-const mockEncryptJsonPayload =
-  encryptJsonPayload as jest.MockedFunction<typeof encryptJsonPayload>;
+const mockEncryptJsonPayload = encryptJsonPayload as jest.MockedFunction<
+  typeof encryptJsonPayload
+>;
 const mockCreateBlindIndexTokens =
   createBlindIndexTokens as jest.MockedFunction<typeof createBlindIndexTokens>;
 
@@ -98,7 +100,9 @@ describe("e2ee payload helpers", () => {
       calendarId: "cal-1",
     };
 
-    const result = (await attachEventEncryptionShadow(request)) as typeof request & {
+    const result = (await attachEventEncryptionShadow(
+      request,
+    )) as typeof request & {
       encryptedContent?: string;
     };
 

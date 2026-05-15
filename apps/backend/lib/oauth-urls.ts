@@ -9,7 +9,9 @@ export function normalizePathForJoin(path: string): string {
     return "";
   }
 
-  return trimmed.startsWith("/") ? trimmed.replace(/\/+$/, "") : `/${trimmed.replace(/\/+$/, "")}`;
+  return trimmed.startsWith("/")
+    ? trimmed.replace(/\/+$/, "")
+    : `/${trimmed.replace(/\/+$/, "")}`;
 }
 
 export function getOAuthProviderCallbackUrl(

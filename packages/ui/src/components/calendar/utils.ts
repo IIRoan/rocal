@@ -7,9 +7,7 @@ import {
   isAfter,
 } from "date-fns";
 
-import type {
-  CalendarEvent,
-} from "./types";
+import type { CalendarEvent } from "./types";
 export {
   getColorSwatchValue,
   getEventColorClasses,

@@ -11,10 +11,14 @@ jest.mock("../../lib/prisma", () => ({
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
     calendar: {
-      findFirst: jest.fn(async (): Promise<any> => ({ id: "cal-1", icsShareEnabled: false })),
+      findFirst: jest.fn(
+        async (): Promise<any> => ({ id: "cal-1", icsShareEnabled: false }),
+      ),
     },
     userSettings: {
-      findUnique: jest.fn(async (): Promise<any> => ({ eventEncryptionMode: "hybrid" })),
+      findUnique: jest.fn(
+        async (): Promise<any> => ({ eventEncryptionMode: "hybrid" }),
+      ),
     },
     $queryRaw: jest.fn(async (): Promise<any> => []),
     $executeRaw: jest.fn(async (): Promise<any> => 1),
@@ -22,9 +26,11 @@ jest.mock("../../lib/prisma", () => ({
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -65,7 +71,9 @@ import { errorHandler } from "../../lib/errors";
 import { notificationsRoutes } from "../../routes/notifications";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   calendarEvent: {
     findFirst: jest.Mock<() => Promise<any>>;

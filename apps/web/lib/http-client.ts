@@ -3,7 +3,10 @@
  * This file provides a web-specific default instance for backwards compatibility.
  */
 export { HttpClient } from "@workspace/calendar-client";
-export type { HttpClientConfig, RequestOptions } from "@workspace/calendar-client";
+export type {
+  HttpClientConfig,
+  RequestOptions,
+} from "@workspace/calendar-client";
 
 import { HttpClient } from "@workspace/calendar-client";
 import { getApiBaseUrl } from "./api-url";

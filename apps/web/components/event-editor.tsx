@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
 import {
@@ -251,7 +245,9 @@ export function EventEditor({
     [calendars, eventCalendarId],
   );
   const enabledNotificationCount = useMemo(
-    () => eventNotifications.filter((notification) => notification.isEnabled).length,
+    () =>
+      eventNotifications.filter((notification) => notification.isEnabled)
+        .length,
     [eventNotifications],
   );
   const hasActiveEncryptionSession = useMemo(
@@ -273,9 +269,7 @@ export function EventEditor({
       selectedCalendar,
     ],
   );
-  const badgeItem = selectedEvent?.id
-    ? selectedEvent
-    : previewBadgeItem;
+  const badgeItem = selectedEvent?.id ? selectedEvent : previewBadgeItem;
   const dialogTitle = !selectedEvent?.id
     ? "Create Event"
     : isViewMode

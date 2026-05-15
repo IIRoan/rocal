@@ -226,7 +226,9 @@ export const calendarsRoutes = new Elysia({
           });
         },
         {
-          params: strictObject({ id: t.String({ description: "Calendar ID" }) }),
+          params: strictObject({
+            id: t.String({ description: "Calendar ID" }),
+          }),
           body: updateCalendarBodySchema,
           detail: {
             summary: "Update an existing calendar",

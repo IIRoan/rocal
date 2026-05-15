@@ -28,7 +28,9 @@ type ResolveEventPersistencePolicyInput = {
   calendarForceFullEncryption?: boolean;
 };
 
-function normalizeOptionalText(value: string | null | undefined): string | null {
+function normalizeOptionalText(
+  value: string | null | undefined,
+): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
@@ -68,8 +70,9 @@ export function resolveEventPersistencePolicy(
     };
   }
 
-  const effectiveMode: EventEncryptionMode =
-    input.calendarForceFullEncryption ? "full" : mode;
+  const effectiveMode: EventEncryptionMode = input.calendarForceFullEncryption
+    ? "full"
+    : mode;
 
   if (effectiveMode === "full") {
     return {

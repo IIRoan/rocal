@@ -89,22 +89,17 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
 
   async resolveDomainByName(domainName: string): Promise<StalwartDomainRecord> {
     const normalizedName = domainName.trim().toLowerCase();
-    const queryEnvelope = await this.postJmap([
-      ["x:Domain/query", {}, "c1"],
-    ]);
+    const queryEnvelope = await this.postJmap([["x:Domain/query", {}, "c1"]]);
     const queryResult = this.getMethodResult<{ ids?: string[] }>(
       queryEnvelope,
       "x:Domain/query",
     );
     const ids = Array.isArray(queryResult.ids) ? queryResult.ids : [];
 
-    const getEnvelope = await this.postJmap([
-      ["x:Domain/get", { ids }, "c1"],
-    ]);
-    const getResult = this.getMethodResult<{ list?: Array<{ id: string; name: string }> }>(
-      getEnvelope,
-      "x:Domain/get",
-    );
+    const getEnvelope = await this.postJmap([["x:Domain/get", { ids }, "c1"]]);
+    const getResult = this.getMethodResult<{
+      list?: Array<{ id: string; name: string }>;
+    }>(getEnvelope, "x:Domain/get");
 
     const domain = (getResult.list ?? []).find(
       (entry) => entry.name.trim().toLowerCase() === normalizedName,
@@ -175,7 +170,8 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       notCreated: notCreated ?? null,
     });
 
-    const accountId = created?.id ?? (await this.recoverExistingAccountId(input, notCreated));
+    const accountId =
+      created?.id ?? (await this.recoverExistingAccountId(input, notCreated));
 
     if (!accountId) {
       const reason = notCreated?.description || "Unknown error";
@@ -187,14 +183,17 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     const verifiedLocalPart = verifiedAccount.name.trim().toLowerCase();
 
     if (verifiedLocalPart !== requestedLocalPart) {
-      logger.error("Stalwart createAccount resolved to a different mailbox name", {
-        requestedLocalPart,
-        requestedDomainId: input.domainId,
-        returnedAccountId: accountId,
-        verifiedEmailAddress: verifiedAccount.emailAddress ?? null,
-        verifiedName: verifiedAccount.name,
-        verifiedDomainId: verifiedAccount.domainId,
-      });
+      logger.error(
+        "Stalwart createAccount resolved to a different mailbox name",
+        {
+          requestedLocalPart,
+          requestedDomainId: input.domainId,
+          returnedAccountId: accountId,
+          verifiedEmailAddress: verifiedAccount.emailAddress ?? null,
+          verifiedName: verifiedAccount.name,
+          verifiedDomainId: verifiedAccount.domainId,
+        },
+      );
       throw new Error(
         `Stalwart returned a mismatched mailbox after account creation. Requested local part '${requestedLocalPart}' but resolved '${verifiedAccount.name}'.`,
       );
@@ -236,7 +235,9 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     }
 
     const objectId = error.objectId?.id?.trim();
-    const propertyTargets = Array.isArray(error.properties) ? error.properties : [];
+    const propertyTargets = Array.isArray(error.properties)
+      ? error.properties
+      : [];
     const isEmailPrimaryKeyViolation =
       error.type === "primaryKeyViolation" && propertyTargets.includes("email");
 
@@ -244,13 +245,16 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       return null;
     }
 
-    logger.warn("Stalwart createAccount reported an existing remote mailbox; attempting recovery", {
-      requestedLocalPart: input.localPart,
-      requestedDomainId: input.domainId,
-      existingAccountId: objectId,
-      errorType: error.type,
-      properties: propertyTargets,
-    });
+    logger.warn(
+      "Stalwart createAccount reported an existing remote mailbox; attempting recovery",
+      {
+        requestedLocalPart: input.localPart,
+        requestedDomainId: input.domainId,
+        existingAccountId: objectId,
+        errorType: error.type,
+        properties: propertyTargets,
+      },
+    );
 
     return objectId;
   }

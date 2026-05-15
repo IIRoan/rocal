@@ -68,11 +68,9 @@ jest.mock("@workspace/ui/components/ui/sidebar", () => ({
 
 jest.mock("@workspace/ui/components/ui", () => ({
   PageLoadingOverlay: () => null,
-  AppLoadingState: ({
-    text,
-  }: {
-    text?: string;
-  }) => <div>{text ?? "Loading..."}</div>,
+  AppLoadingState: ({ text }: { text?: string }) => (
+    <div>{text ?? "Loading..."}</div>
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui/button", () => ({
@@ -197,7 +195,10 @@ jest.mock("../../components/mail/mail-command-palette", () => ({
 }));
 
 jest.mock("../../hooks/use-settings", () => ({
-  useSettings: () => ({ settings: { timeFormat: "24h" }, updateSettings: jest.fn() }),
+  useSettings: () => ({
+    settings: { timeFormat: "24h" },
+    updateSettings: jest.fn(),
+  }),
 }));
 
 jest.mock("../../components/mail/mail-sidebar", () => ({
@@ -768,7 +769,6 @@ describe("MailApp", () => {
     });
   });
 
-
   it("loads messages for the selected mailbox folder", async () => {
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages
@@ -1086,10 +1086,7 @@ describe("MailApp", () => {
       "Enter your encryption password to unlock your encrypted mailbox.",
     );
     expect(
-      container
-        .querySelector("#mailbox-password")
-        ?.getAttribute("placeholder"),
+      container.querySelector("#mailbox-password")?.getAttribute("placeholder"),
     ).toBe("Encryption password");
   });
 });
-

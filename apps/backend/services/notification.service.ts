@@ -237,7 +237,11 @@ export class NotificationService implements INotificationService {
     );
     const reminderMinutes =
       emailNotifications.length > 0
-        ? Math.min(...emailNotifications.map((notification) => notification.minutesBefore))
+        ? Math.min(
+            ...emailNotifications.map(
+              (notification) => notification.minutesBefore,
+            ),
+          )
         : null;
 
     await this.reconcileEventPersistenceAfterReminderChange(
@@ -375,7 +379,11 @@ export class NotificationService implements INotificationService {
       where: { eventId },
     });
 
-    await this.reconcileEventPersistenceAfterReminderChange(userId, event, null);
+    await this.reconcileEventPersistenceAfterReminderChange(
+      userId,
+      event,
+      null,
+    );
 
     return {
       success: true,

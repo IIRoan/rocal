@@ -25,7 +25,8 @@ jest.mock("next/image", () => ({
   }: React.ImgHTMLAttributes<HTMLImageElement> & {
     fill?: boolean;
     unoptimized?: boolean;
-  }) => require("react").createElement("img", { alt: props.alt ?? "", ...props }),
+  }) =>
+    require("react").createElement("img", { alt: props.alt ?? "", ...props }),
 }));
 
 jest.mock("next/link", () => ({
@@ -86,7 +87,9 @@ jest.mock("lucide-react", () => {
 });
 
 jest.mock("@workspace/ui/components/layout", () => ({
-  Logo: (props: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>Solace</div>,
+  Logo: (props: React.HTMLAttributes<HTMLDivElement>) => (
+    <div {...props}>Solace</div>
+  ),
   ThemeToggle: () => <button type="button">Theme</button>,
 }));
 
@@ -104,7 +107,9 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/input", () => ({
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} />
+  ),
 }));
 
 jest.mock("@workspace/ui/components/ui/label", () => ({
@@ -132,8 +137,9 @@ jest.mock("@/lib/api-url", () => ({
 }));
 
 jest.mock("@/lib/auth-navigation", () => ({
-  completeAuthNavigation: (...args: Parameters<typeof mockCompleteAuthNavigation>) =>
-    mockCompleteAuthNavigation(...args),
+  completeAuthNavigation: (
+    ...args: Parameters<typeof mockCompleteAuthNavigation>
+  ) => mockCompleteAuthNavigation(...args),
 }));
 
 jest.mock("@/lib/calendar-api-service", () => ({
@@ -207,9 +213,13 @@ const mockCheckEmailAvailability = jest.mocked(
 );
 const mockGetSignupConfig = jest.mocked(accountApiService.getSignupConfig);
 const mockGetAuthStatus = jest.mocked(accountApiService.getAuthStatus);
-const mockValidateInviteToken = jest.mocked(inviteApiService.validateInviteToken);
+const mockValidateInviteToken = jest.mocked(
+  inviteApiService.validateInviteToken,
+);
 const mockClaimInviteToken = jest.mocked(inviteApiService.claimInviteToken);
-const mockUpdateUserSettings = jest.mocked(calendarApiService.updateUserSettings);
+const mockUpdateUserSettings = jest.mocked(
+  calendarApiService.updateUserSettings,
+);
 const mockStorePendingAuthPassword = jest.mocked(storePendingAuthPassword);
 const mockClearAuthPasswords = jest.mocked(clearAuthPasswords);
 const mockSetEncPasswordCookie = jest.mocked(setEncPasswordCookie);
@@ -376,7 +386,9 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
     const submitButton = Array.from(container.querySelectorAll("button")).find(
       (element) => element.textContent?.includes("Send reset link"),
     );
@@ -409,7 +421,9 @@ describe("LoginForm", () => {
   it("stores the pending auth password after a successful email sign-in", async () => {
     await renderForm();
 
-    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
     const passwordInput = container.querySelector(
       "#password",
     ) as HTMLInputElement | null;
@@ -428,7 +442,9 @@ describe("LoginForm", () => {
       email: "roan@solace.onl",
       password: "secret-password",
     });
-    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith("secret-password");
+    expect(mockStorePendingAuthPassword).toHaveBeenCalledWith(
+      "secret-password",
+    );
     expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("secret-password");
   });
 
@@ -444,7 +460,9 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    const nameInput = container.querySelector("#name") as HTMLInputElement | null;
+    const nameInput = container.querySelector(
+      "#name",
+    ) as HTMLInputElement | null;
     const desiredEmailInput = container.querySelector(
       "#desired-email",
     ) as HTMLInputElement | null;
@@ -503,7 +521,9 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    const nameInput = container.querySelector("#name") as HTMLInputElement | null;
+    const nameInput = container.querySelector(
+      "#name",
+    ) as HTMLInputElement | null;
     const desiredEmailInput = container.querySelector(
       "#desired-email",
     ) as HTMLInputElement | null;
@@ -522,7 +542,9 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("That Solace email is already in use.");
+    expect(container.textContent).toContain(
+      "That Solace email is already in use.",
+    );
     expect(mockEmailSignUp).not.toHaveBeenCalled();
     expect(mockStorePendingAuthPassword).not.toHaveBeenCalled();
     expect(mockSetEncPasswordCookie).not.toHaveBeenCalled();
@@ -545,7 +567,9 @@ describe("LoginForm", () => {
       await Promise.resolve();
     });
 
-    const nameInput = container.querySelector("#name") as HTMLInputElement | null;
+    const nameInput = container.querySelector(
+      "#name",
+    ) as HTMLInputElement | null;
     const desiredEmailInput = container.querySelector(
       "#desired-email",
     ) as HTMLInputElement | null;
@@ -575,11 +599,15 @@ describe("LoginForm", () => {
   });
 
   it("clears cached auth secrets and shows an error when email auth throws", async () => {
-    mockEmailSignIn.mockRejectedValueOnce(new Error("Authentication failed hard."));
+    mockEmailSignIn.mockRejectedValueOnce(
+      new Error("Authentication failed hard."),
+    );
 
     await renderForm();
 
-    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
     const passwordInput = container.querySelector(
       "#password",
     ) as HTMLInputElement | null;
@@ -620,7 +648,9 @@ describe("LoginForm", () => {
 
     await renderForm();
 
-    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
     const passwordInput = container.querySelector(
       "#password",
     ) as HTMLInputElement | null;
@@ -656,7 +686,9 @@ describe("LoginForm", () => {
 
     await renderForm();
 
-    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
     const passwordInput = container.querySelector(
       "#password",
     ) as HTMLInputElement | null;
@@ -691,12 +723,14 @@ describe("LoginForm", () => {
         authenticated: true,
         hasPasskeys: true,
         requiresPasskeyStepUp: false,
-    });
+      });
     mockPasskeySignIn.mockResolvedValue({});
 
     await renderForm();
 
-    const emailInput = container.querySelector("#email") as HTMLInputElement | null;
+    const emailInput = container.querySelector(
+      "#email",
+    ) as HTMLInputElement | null;
     const passwordInput = container.querySelector(
       "#password",
     ) as HTMLInputElement | null;

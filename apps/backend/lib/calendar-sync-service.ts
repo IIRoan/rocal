@@ -38,7 +38,9 @@ export class CalendarSyncService {
     this.intervalId = setInterval(
       async () => {
         if (this.isSyncing) {
-          logger.warn("Skipping scheduled sync because a previous sync is still running");
+          logger.warn(
+            "Skipping scheduled sync because a previous sync is still running",
+          );
           return;
         }
 

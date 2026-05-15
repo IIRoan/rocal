@@ -17,13 +17,25 @@ import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 describe("getOrderedDayLabels", () => {
   it("returns Sun–Sat when weekStartDay is 0 (Sunday)", () => {
     expect(getOrderedDayLabels(0)).toEqual([
-      "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
     ]);
   });
 
   it("returns Mon–Sun when weekStartDay is 1 (Monday)", () => {
     expect(getOrderedDayLabels(1)).toEqual([
-      "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun",
     ]);
   });
 
@@ -134,8 +146,18 @@ describe("resolveEventDotColor", () => {
 
   it("works with all 12 known calendar colors", () => {
     const knownColors = [
-      "blue", "orange", "violet", "rose", "emerald", "red",
-      "cyan", "lime", "amber", "indigo", "pink", "teal",
+      "blue",
+      "orange",
+      "violet",
+      "rose",
+      "emerald",
+      "red",
+      "cyan",
+      "lime",
+      "amber",
+      "indigo",
+      "pink",
+      "teal",
     ] as const;
     for (const color of knownColors) {
       expect(resolveEventDotColor(color, theme)).toBe(

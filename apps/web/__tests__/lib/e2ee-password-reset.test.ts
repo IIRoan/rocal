@@ -52,15 +52,22 @@ const mockCreateBlindIndexTokens =
   createBlindIndexTokens as jest.MockedFunction<typeof createBlindIndexTokens>;
 const mockCreatePasswordEnvelope =
   createPasswordEnvelope as jest.MockedFunction<typeof createPasswordEnvelope>;
-const mockDecryptJsonPayload =
-  decryptJsonPayload as jest.MockedFunction<typeof decryptJsonPayload>;
-const mockEncryptJsonPayload =
-  encryptJsonPayload as jest.MockedFunction<typeof encryptJsonPayload>;
-const mockGetActiveE2eeSession =
-  getActiveE2eeSession as jest.MockedFunction<typeof getActiveE2eeSession>;
+const mockDecryptJsonPayload = decryptJsonPayload as jest.MockedFunction<
+  typeof decryptJsonPayload
+>;
+const mockEncryptJsonPayload = encryptJsonPayload as jest.MockedFunction<
+  typeof encryptJsonPayload
+>;
+const mockGetActiveE2eeSession = getActiveE2eeSession as jest.MockedFunction<
+  typeof getActiveE2eeSession
+>;
 const mockClearPendingAuthPassword =
-  clearPendingAuthPassword as jest.MockedFunction<typeof clearPendingAuthPassword>;
-const mockHttpPut = httpClient.put as jest.MockedFunction<typeof httpClient.put>;
+  clearPendingAuthPassword as jest.MockedFunction<
+    typeof clearPendingAuthPassword
+  >;
+const mockHttpPut = httpClient.put as jest.MockedFunction<
+  typeof httpClient.put
+>;
 
 describe("resetEncryptionPasswordForActiveSession", () => {
   beforeEach(() => {
@@ -174,7 +181,10 @@ describe("resetEncryptionPasswordForActiveSession", () => {
     mockGetActiveE2eeSession.mockReturnValue(null);
 
     await expect(
-      resetEncryptionPasswordForActiveSession("user-1", "correct horse battery staple"),
+      resetEncryptionPasswordForActiveSession(
+        "user-1",
+        "correct horse battery staple",
+      ),
     ).resolves.toBe(false);
 
     expect(mockGetResetSnapshot).not.toHaveBeenCalled();
@@ -182,7 +192,10 @@ describe("resetEncryptionPasswordForActiveSession", () => {
 
   it("rewrites encrypted shadows before storing a new password envelope", async () => {
     await expect(
-      resetEncryptionPasswordForActiveSession("user-1", "correct horse battery staple"),
+      resetEncryptionPasswordForActiveSession(
+        "user-1",
+        "correct horse battery staple",
+      ),
     ).resolves.toBe(true);
 
     expect(mockGetResetSnapshot).toHaveBeenCalled();

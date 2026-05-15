@@ -117,7 +117,16 @@ export function RecurrencePicker({
     return () => {
       cancelled = true;
     };
-  }, [frequency, interval, byDay, endCondition, count, until, eventStart, eventEnd]);
+  }, [
+    frequency,
+    interval,
+    byDay,
+    endCondition,
+    count,
+    until,
+    eventStart,
+    eventEnd,
+  ]);
 
   const handleFrequencyChange = (freq: RecurrenceFrequency | "none") => {
     setFrequency(freq);
@@ -440,8 +449,7 @@ function createStyles(theme: ThemeTokens) {
     sectionLabel: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
     frequencyChipText: {
@@ -450,8 +458,7 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
     },
     frequencyChipTextActive: {
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     intervalLabel: {
       fontSize: theme.typography.fontSize.sm.size,
@@ -464,8 +471,7 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
     },
     dayChipTextActive: {
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     endChipText: {
       fontSize: theme.typography.fontSize.sm.size,
@@ -473,8 +479,7 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
     },
     endChipTextActive: {
-      fontWeight: theme.typography.fontWeight
-        .medium as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
     previewDescription: {
       fontSize: theme.typography.fontSize.xs.size,
@@ -497,6 +502,11 @@ function createStyles(theme: ThemeTokens) {
   return { ...StyleSheet.create(view), ...StyleSheet.create(text) };
 }
 
-export { parseRRule, buildRRule, FREQUENCY_OPTIONS, WEEKDAYS } from "./recurrence-picker-utils";
+export {
+  parseRRule,
+  buildRRule,
+  FREQUENCY_OPTIONS,
+  WEEKDAYS,
+} from "./recurrence-picker-utils";
 export type { RecurrencePickerProps };
 export type { ParsedRule, EndCondition } from "./recurrence-picker-utils";

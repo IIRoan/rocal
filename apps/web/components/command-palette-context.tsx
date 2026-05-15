@@ -161,7 +161,9 @@ export function CommandPaletteProvider({
         open={isOpen}
         onOpenChange={closePalette}
         eventToEdit={eventToEdit}
-        onEventEdit={(event) => openEventEditor(event, { eventViewMode: "view" })}
+        onEventEdit={(event) =>
+          openEventEditor(event, { eventViewMode: "view" })
+        }
         initialView={initialView}
         eventEditorMode={eventEditorMode}
         popoverAnchorPosition={popoverAnchorPosition}

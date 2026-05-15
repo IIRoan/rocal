@@ -44,19 +44,23 @@ jest.mock("../../lib/prisma", () => ({
       create: jest.fn(async (): Promise<any> => null),
     },
     userSettings: {
-      findUnique: jest.fn(async (): Promise<any> => ({
-        timezone: "UTC",
-        eventEncryptionMode: "hybrid",
-        emailNotifications: true,
-      })),
+      findUnique: jest.fn(
+        async (): Promise<any> => ({
+          timezone: "UTC",
+          eventEncryptionMode: "hybrid",
+          emailNotifications: true,
+        }),
+      ),
     },
   },
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -87,7 +91,9 @@ import { eventsRoutes } from "../../routes/events";
 import { ALLOWED_CALENDAR_COLORS } from "../../lib/colors";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   calendarEvent: {
     findMany: jest.Mock<() => Promise<any>>;
@@ -114,9 +120,7 @@ const mockPrisma = prisma as unknown as {
 };
 
 function createApp() {
-  return new Elysia({ normalize: false })
-    .use(errorHandler)
-    .use(eventsRoutes);
+  return new Elysia({ normalize: false }).use(errorHandler).use(eventsRoutes);
 }
 
 async function readText(response: Response) {

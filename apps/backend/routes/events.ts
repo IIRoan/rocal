@@ -15,87 +15,89 @@ export const eventsRoutes = new Elysia({
 })
   .use(requireAuth)
   .guard(authenticatedRouteDetail("Events"), (app) =>
-    app.get(
-      "/search",
-      async ({
-        query,
-        authenticatedUser,
-        request,
-      }: {
-        query: {
-          q: string;
-          blindIndexTokens?: string;
-          limit?: number;
-          offset?: number;
-          startDate?: string;
-          endDate?: string;
-        };
-        authenticatedUser?: AuthenticatedUser;
-        request: Request;
-      }) => {
-        const user = await resolveRouteUser(authenticatedUser, request);
-        return eventService.search({
-          userId: user.id,
-          query: query.q,
-          blindIndexTokens: query.blindIndexTokens
-            ?.split(",")
-            .map((token) => token.trim())
-            .filter(Boolean),
-          limit: query.limit,
-          offset: query.offset,
-          startDate: query.startDate,
-          endDate: query.endDate,
-        });
-      },
-      {
-        query: strictObject({
-          q: t.String({
-            description: "Search query (min 2 characters)",
-            minLength: 2,
-          }),
-          limit: t.Optional(
-            t.Number({
-              description: "Max results to return (default 20, max 50)",
-              minimum: 1,
-              maximum: 50,
-            }),
-          ),
-          blindIndexTokens: t.Optional(
-            t.String({
-              description:
-                "Comma-separated blind-index tokens for encrypted event search.",
-            }),
-          ),
-          offset: t.Optional(
-            t.Number({
-              description: "Offset for pagination (default 0)",
-              minimum: 0,
-            }),
-          ),
-          startDate: t.Optional(
-            t.String({
-              description: "Filter events starting after this date (ISO 8601)",
-            }),
-          ),
-          endDate: t.Optional(
-            t.String({
-              description: "Filter events ending before this date (ISO 8601)",
-            }),
-          ),
-        }),
-        detail: {
-          summary: "Search events by text",
-          description:
-              "Full-text search across plaintext event fields with blind-index fallback for encrypted events.",
+    app
+      .get(
+        "/search",
+        async ({
+          query,
+          authenticatedUser,
+          request,
+        }: {
+          query: {
+            q: string;
+            blindIndexTokens?: string;
+            limit?: number;
+            offset?: number;
+            startDate?: string;
+            endDate?: string;
+          };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return eventService.search({
+            userId: user.id,
+            query: query.q,
+            blindIndexTokens: query.blindIndexTokens
+              ?.split(",")
+              .map((token) => token.trim())
+              .filter(Boolean),
+            limit: query.limit,
+            offset: query.offset,
+            startDate: query.startDate,
+            endDate: query.endDate,
+          });
         },
-      },
-    )
+        {
+          query: strictObject({
+            q: t.String({
+              description: "Search query (min 2 characters)",
+              minLength: 2,
+            }),
+            limit: t.Optional(
+              t.Number({
+                description: "Max results to return (default 20, max 50)",
+                minimum: 1,
+                maximum: 50,
+              }),
+            ),
+            blindIndexTokens: t.Optional(
+              t.String({
+                description:
+                  "Comma-separated blind-index tokens for encrypted event search.",
+              }),
+            ),
+            offset: t.Optional(
+              t.Number({
+                description: "Offset for pagination (default 0)",
+                minimum: 0,
+              }),
+            ),
+            startDate: t.Optional(
+              t.String({
+                description:
+                  "Filter events starting after this date (ISO 8601)",
+              }),
+            ),
+            endDate: t.Optional(
+              t.String({
+                description: "Filter events ending before this date (ISO 8601)",
+              }),
+            ),
+          }),
+          detail: {
+            summary: "Search events by text",
+            description:
+              "Full-text search across plaintext event fields with blind-index fallback for encrypted events.",
+          },
+        },
+      )
       .get(
         "/",
-      async ({
-        query: { start, end },
-        authenticatedUser,
-        request,
+        async ({
+          query: { start, end },
+          authenticatedUser,
+          request,
         }: {
           query: { start: string; end: string };
           authenticatedUser?: AuthenticatedUser;
@@ -167,7 +169,8 @@ export const eventsRoutes = new Elysia({
             description: t.Optional(
               t.String({
                 maxLength: 1000,
-                description: "Event description (optional, max 1000 characters)",
+                description:
+                  "Event description (optional, max 1000 characters)",
               }),
             ),
             start: t.String({
@@ -191,7 +194,8 @@ export const eventsRoutes = new Elysia({
             ),
             color: t.Optional(
               t.String({
-                description: "Event color (blue, orange, violet, rose, emerald)",
+                description:
+                  "Event color (blue, orange, violet, rose, emerald)",
               }),
             ),
             calendarId: t.String({
@@ -226,13 +230,15 @@ export const eventsRoutes = new Elysia({
             ),
             encryptedContent: t.Optional(
               t.String({
-                description: "Client-encrypted shadow copy of sensitive event content.",
+                description:
+                  "Client-encrypted shadow copy of sensitive event content.",
               }),
             ),
             blindIndexTokens: t.Optional(
               t.Array(
                 t.String({
-                  description: "Blind-index token hash for encrypted search rollout.",
+                  description:
+                    "Blind-index token hash for encrypted search rollout.",
                 }),
               ),
             ),
@@ -265,10 +271,7 @@ export const eventsRoutes = new Elysia({
           set: { headers: Record<string, string | number | undefined> };
         }) => {
           const user = await resolveRouteUser(authenticatedUser, request);
-          const result = await eventService.exportIcs(
-            user.id,
-            params.id,
-          );
+          const result = await eventService.exportIcs(user.id, params.id);
 
           set.headers["Content-Type"] = "text/calendar; charset=utf-8";
           set.headers["Content-Disposition"] =
@@ -389,7 +392,8 @@ export const eventsRoutes = new Elysia({
             ),
             color: t.Optional(
               t.String({
-                description: "Event color (blue, orange, violet, rose, emerald)",
+                description:
+                  "Event color (blue, orange, violet, rose, emerald)",
               }),
             ),
             calendarId: t.Optional(
@@ -424,13 +428,15 @@ export const eventsRoutes = new Elysia({
             ),
             encryptedContent: t.Optional(
               t.String({
-                description: "Client-encrypted shadow copy of sensitive event content.",
+                description:
+                  "Client-encrypted shadow copy of sensitive event content.",
               }),
             ),
             blindIndexTokens: t.Optional(
               t.Array(
                 t.String({
-                  description: "Blind-index token hash for encrypted search rollout.",
+                  description:
+                    "Blind-index token hash for encrypted search rollout.",
                 }),
               ),
             ),
@@ -523,4 +529,5 @@ export const eventsRoutes = new Elysia({
             description: "Move, delete, or duplicate multiple events at once",
           },
         },
-      ));
+      ),
+  );

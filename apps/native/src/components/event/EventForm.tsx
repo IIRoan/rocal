@@ -113,89 +113,88 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     }: EventFormProps,
     ref,
   ) {
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const scrollRef = useRef<ScrollView>(null);
-  const titleInputRef = useRef<TextInput>(null);
-  const locationInputRef = useRef<TextInput>(null);
-  const descriptionInputRef = useRef<TextInput>(null);
+    const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+    const scrollRef = useRef<ScrollView>(null);
+    const titleInputRef = useRef<TextInput>(null);
+    const locationInputRef = useRef<TextInput>(null);
+    const descriptionInputRef = useRef<TextInput>(null);
 
-  // ── Defaults ─────────────────────────────────────────────────────────────
+    // ── Defaults ─────────────────────────────────────────────────────────────
 
-  const defaultStart = useMemo(() => roundToNextHour(new Date()), []);
-  const defaultEnd = useMemo(
-    () => new Date(defaultStart.getTime() + 60 * 60 * 1000),
-    [defaultStart],
-  );
-  const defaultCalendarId = calendars[0]?.id ?? "";
+    const defaultStart = useMemo(() => roundToNextHour(new Date()), []);
+    const defaultEnd = useMemo(
+      () => new Date(defaultStart.getTime() + 60 * 60 * 1000),
+      [defaultStart],
+    );
+    const defaultCalendarId = calendars[0]?.id ?? "";
 
-  // ── Form state ───────────────────────────────────────────────────────────
+    // ── Form state ───────────────────────────────────────────────────────────
 
-  const [title, setTitle] = useState(initialValues?.title ?? "");
-  const [allDay, setAllDay] = useState(initialValues?.allDay ?? false);
-  const [start, setStart] = useState(
-    initialValues?.start ?? toLocalISOString(defaultStart),
-  );
-  const [end, setEnd] = useState(
-    initialValues?.end ?? toLocalISOString(defaultEnd),
-  );
-  const [calendarId, setCalendarId] = useState(
-    initialValues?.calendarId ?? defaultCalendarId,
-  );
-  const [location, setLocation] = useState(initialValues?.location ?? "");
-  const [description, setDescription] = useState(
-    initialValues?.description ?? "",
-  );
-  const [color, setColor] = useState<EventColor | undefined>(
-    initialValues?.color ?? undefined,
-  );
-  const [recurrence, setRecurrence] = useState<string | null>(
-    initialValues?.recurrence ?? null,
-  );
-  const [reminder, setReminder] = useState<number>(
-    initialValues?.reminder ?? 15,
-  );
+    const [title, setTitle] = useState(initialValues?.title ?? "");
+    const [allDay, setAllDay] = useState(initialValues?.allDay ?? false);
+    const [start, setStart] = useState(
+      initialValues?.start ?? toLocalISOString(defaultStart),
+    );
+    const [end, setEnd] = useState(
+      initialValues?.end ?? toLocalISOString(defaultEnd),
+    );
+    const [calendarId, setCalendarId] = useState(
+      initialValues?.calendarId ?? defaultCalendarId,
+    );
+    const [location, setLocation] = useState(initialValues?.location ?? "");
+    const [description, setDescription] = useState(
+      initialValues?.description ?? "",
+    );
+    const [color, setColor] = useState<EventColor | undefined>(
+      initialValues?.color ?? undefined,
+    );
+    const [recurrence, setRecurrence] = useState<string | null>(
+      initialValues?.recurrence ?? null,
+    );
+    const [reminder, setReminder] = useState<number>(
+      initialValues?.reminder ?? 15,
+    );
 
-  // ── UI state ─────────────────────────────────────────────────────────────
+    // ── UI state ─────────────────────────────────────────────────────────────
 
-  const [showCalendarPicker, setShowCalendarPicker] = useState(false);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [showLocation, setShowLocation] = useState(!!initialValues?.location);
-  const [showDescription, setShowDescription] = useState(
-    !!initialValues?.description,
-  );
-  const [showRecurring, setShowRecurring] = useState(
-    !!initialValues?.recurrence,
-  );
-  const [showReminder, setShowReminder] = useState(
-    (initialValues?.reminder ?? 0) > 0,
-  );
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+    const [showCalendarPicker, setShowCalendarPicker] = useState(false);
+    const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+    const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+    const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+    const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+    const [showLocation, setShowLocation] = useState(!!initialValues?.location);
+    const [showDescription, setShowDescription] = useState(
+      !!initialValues?.description,
+    );
+    const [showRecurring, setShowRecurring] = useState(
+      !!initialValues?.recurrence,
+    );
+    const [showReminder, setShowReminder] = useState(
+      (initialValues?.reminder ?? 0) > 0,
+    );
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [generalErrors, setGeneralErrors] = useState<string[]>([]);
 
-  // ── Derived values ───────────────────────────────────────────────────────
+    // ── Derived values ───────────────────────────────────────────────────────
 
-  const startDate = useMemo(() => new Date(start), [start]);
-  const endDate = useMemo(() => new Date(end), [end]);
-  const selectedCalendar = calendars.find((c) => c.id === calendarId);
-  const selectableCalendars = useMemo(
-    () => calendars.filter((c) => !(c as any).isSyncOnly),
-    [calendars],
-  );
+    const startDate = useMemo(() => new Date(start), [start]);
+    const endDate = useMemo(() => new Date(end), [end]);
+    const selectedCalendar = calendars.find((c) => c.id === calendarId);
+    const selectableCalendars = useMemo(
+      () => calendars.filter((c) => !(c as any).isSyncOnly),
+      [calendars],
+    );
 
-  const startTimeStr = useMemo(() => formatTime12(startDate), [startDate]);
-  const endTimeStr = useMemo(() => formatTime12(endDate), [endDate]);
+    const startTimeStr = useMemo(() => formatTime12(startDate), [startDate]);
+    const endTimeStr = useMemo(() => formatTime12(endDate), [endDate]);
 
-  // ── Scroll-to-input on focus ─────────────────────────────────────────────
-  // When a TextInput receives focus, measure its position relative to the
-  // ScrollView and scroll so it's visible near the top of the viewport.
+    // ── Scroll-to-input on focus ─────────────────────────────────────────────
+    // When a TextInput receives focus, measure its position relative to the
+    // ScrollView and scroll so it's visible near the top of the viewport.
 
-  const handleInputFocus = useCallback(
-    (ref: TextInput | null) => {
+    const handleInputFocus = useCallback((ref: TextInput | null) => {
       if (!ref || !scrollRef.current) return;
       const scrollNativeRef = scrollRef.current.getNativeScrollRef();
       if (!scrollNativeRef) return;
@@ -203,77 +202,107 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         scrollNativeRef,
         (_x: number, y: number) => {
           // Scroll so the input sits ~80px from the top
-          scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, y - 80),
+            animated: true,
+          });
         },
         () => undefined,
       );
-    },
-    [],
-  );
+    }, []);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+    // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleAllDayToggle = useCallback(
-    (value: boolean) => {
-      setAllDay(value);
-      if (value) {
-        const sd = start ? new Date(start) : defaultStart;
-        setStart(toLocalISOString(startOfDay(sd)));
-        setEnd(toLocalISOString(endOfDay(sd)));
+    const handleAllDayToggle = useCallback(
+      (value: boolean) => {
+        setAllDay(value);
+        if (value) {
+          const sd = start ? new Date(start) : defaultStart;
+          setStart(toLocalISOString(startOfDay(sd)));
+          setEnd(toLocalISOString(endOfDay(sd)));
+        }
+      },
+      [start, defaultStart],
+    );
+
+    const handleStartDateSelect = useCallback(
+      (date: Date) => {
+        const current = new Date(start);
+        date.setHours(current.getHours(), current.getMinutes(), 0, 0);
+        setStart(toLocalISOString(date));
+        if (date > new Date(end)) {
+          const newEnd = new Date(date);
+          const currentEnd = new Date(end);
+          newEnd.setHours(currentEnd.getHours(), currentEnd.getMinutes(), 0, 0);
+          setEnd(toLocalISOString(newEnd));
+        }
+        setShowStartDatePicker(false);
+      },
+      [start, end],
+    );
+
+    const handleEndDateSelect = useCallback(
+      (date: Date) => {
+        const current = new Date(end);
+        date.setHours(current.getHours(), current.getMinutes(), 0, 0);
+        setEnd(toLocalISOString(date));
+        setShowEndDatePicker(false);
+      },
+      [end],
+    );
+
+    const handleStartTimeSelect = useCallback(
+      (time: Date) => {
+        const current = new Date(start);
+        current.setHours(time.getHours(), time.getMinutes(), 0, 0);
+        setStart(toLocalISOString(current));
+        setShowStartTimePicker(false);
+      },
+      [start],
+    );
+
+    const handleEndTimeSelect = useCallback(
+      (time: Date) => {
+        const current = new Date(end);
+        current.setHours(time.getHours(), time.getMinutes(), 0, 0);
+        setEnd(toLocalISOString(current));
+        setShowEndTimePicker(false);
+      },
+      [end],
+    );
+
+    const handleSubmit = useCallback(() => {
+      Keyboard.dismiss();
+      const data = buildEventRequest({
+        title,
+        start,
+        end,
+        calendarId,
+        allDay,
+        location,
+        description,
+        color,
+        categoryId: undefined,
+        recurrence,
+        reminder,
+      });
+
+      const { fieldErrors: newFieldErrors, generalErrors: newGeneralErrors } =
+        validateForm(data);
+
+      if (
+        Object.keys(newFieldErrors).length > 0 ||
+        newGeneralErrors.length > 0
+      ) {
+        setFieldErrors(newFieldErrors);
+        setGeneralErrors(newGeneralErrors);
+        return;
       }
-    },
-    [start, defaultStart],
-  );
 
-  const handleStartDateSelect = useCallback(
-    (date: Date) => {
-      const current = new Date(start);
-      date.setHours(current.getHours(), current.getMinutes(), 0, 0);
-      setStart(toLocalISOString(date));
-      if (date > new Date(end)) {
-        const newEnd = new Date(date);
-        const currentEnd = new Date(end);
-        newEnd.setHours(currentEnd.getHours(), currentEnd.getMinutes(), 0, 0);
-        setEnd(toLocalISOString(newEnd));
-      }
-      setShowStartDatePicker(false);
-    },
-    [start, end],
-  );
-
-  const handleEndDateSelect = useCallback(
-    (date: Date) => {
-      const current = new Date(end);
-      date.setHours(current.getHours(), current.getMinutes(), 0, 0);
-      setEnd(toLocalISOString(date));
-      setShowEndDatePicker(false);
-    },
-    [end],
-  );
-
-  const handleStartTimeSelect = useCallback(
-    (time: Date) => {
-      const current = new Date(start);
-      current.setHours(time.getHours(), time.getMinutes(), 0, 0);
-      setStart(toLocalISOString(current));
-      setShowStartTimePicker(false);
-    },
-    [start],
-  );
-
-  const handleEndTimeSelect = useCallback(
-    (time: Date) => {
-      const current = new Date(end);
-      current.setHours(time.getHours(), time.getMinutes(), 0, 0);
-      setEnd(toLocalISOString(current));
-      setShowEndTimePicker(false);
-    },
-    [end],
-  );
-
-  const handleSubmit = useCallback(() => {
-    Keyboard.dismiss();
-    const data = buildEventRequest({
+      setFieldErrors({});
+      setGeneralErrors([]);
+      onSubmit(data);
+    }, [
       title,
       start,
       end,
@@ -282,62 +311,44 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
       location,
       description,
       color,
-      categoryId: undefined,
       recurrence,
       reminder,
-    });
+      onSubmit,
+    ]);
 
-    const { fieldErrors: newFieldErrors, generalErrors: newGeneralErrors } =
-      validateForm(data);
+    useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
 
-    if (
-      Object.keys(newFieldErrors).length > 0 ||
-      newGeneralErrors.length > 0
-    ) {
-      setFieldErrors(newFieldErrors);
-      setGeneralErrors(newGeneralErrors);
-      return;
-    }
+    const renderFieldError = (field: string) => {
+      const error = fieldErrors[field];
+      if (!error) return null;
+      return <Text style={styles.fieldError}>{error}</Text>;
+    };
 
-    setFieldErrors({});
-    setGeneralErrors([]);
-    onSubmit(data);
-  }, [
-    title, start, end, calendarId, allDay, location, description,
-    color, recurrence, reminder, onSubmit,
-  ]);
+    const isEditMode = !!initialValues?.title;
 
-  useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
+    // ── Render ───────────────────────────────────────────────────────────────
 
-  const renderFieldError = (field: string) => {
-    const error = fieldErrors[field];
-    if (!error) return null;
-    return <Text style={styles.fieldError}>{error}</Text>;
-  };
-
-  const isEditMode = !!initialValues?.title;
-
-  // ── Render ───────────────────────────────────────────────────────────────
-
-  return (
-    <>
-      <View style={styles.container}>
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-          overScrollMode="never"
-        >
-          <View style={styles.formInner}>
+    return (
+      <>
+        <View style={styles.container}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            overScrollMode="never"
+          >
+            <View style={styles.formInner}>
               {/* Server errors */}
               {serverErrors && serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
                   {serverErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>{err}</Text>
+                    <Text key={idx} style={styles.errorText}>
+                      {err}
+                    </Text>
                   ))}
                 </View>
               )}
@@ -346,7 +357,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               {generalErrors.length > 0 && (
                 <View style={styles.errorContainer}>
                   {generalErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>{err}</Text>
+                    <Text key={idx} style={styles.errorText}>
+                      {err}
+                    </Text>
                   ))}
                 </View>
               )}
@@ -354,7 +367,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               {/* ── Title ─────────────────────────────────────────── */}
               <TextInput
                 ref={titleInputRef}
-                style={[styles.titleInput, fieldErrors.title ? styles.inputError : null]}
+                style={[
+                  styles.titleInput,
+                  fieldErrors.title ? styles.inputError : null,
+                ]}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="Event title"
@@ -515,7 +531,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                           color={theme.colors.foreground}
                           style={{ marginRight: 8 }}
                         />
-                        <Text style={styles.dateButtonText}>{startTimeStr}</Text>
+                        <Text style={styles.dateButtonText}>
+                          {startTimeStr}
+                        </Text>
                       </Pressable>
 
                       <Text style={styles.arrowText}>→</Text>
@@ -545,7 +563,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                     <Text style={styles.allDayLabel}>All day</Text>
                     <Switch
                       value={allDay}
-                      onValueChange={(v) => { Keyboard.dismiss(); handleAllDayToggle(v); }}
+                      onValueChange={(v) => {
+                        Keyboard.dismiss();
+                        handleAllDayToggle(v);
+                      }}
                       trackColor={{
                         false: theme.colors.border,
                         true: theme.colors.primaryBase,
@@ -565,14 +586,20 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       icon="map-pin"
                       label="Location"
                       active={showLocation}
-                      onPress={() => { Keyboard.dismiss(); setShowLocation((v) => !v); }}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowLocation((v) => !v);
+                      }}
                       theme={theme}
                     />
                     <TogglePill
                       icon="file-text"
                       label="Description"
                       active={showDescription}
-                      onPress={() => { Keyboard.dismiss(); setShowDescription((v) => !v); }}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowDescription((v) => !v);
+                      }}
                       theme={theme}
                     />
                   </View>
@@ -581,14 +608,20 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       icon="rotate-ccw"
                       label="Repeat"
                       active={showRecurring}
-                      onPress={() => { Keyboard.dismiss(); setShowRecurring((v) => !v); }}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowRecurring((v) => !v);
+                      }}
                       theme={theme}
                     />
                     <TogglePill
                       icon="bell"
                       label="Reminder"
                       active={showReminder}
-                      onPress={() => { Keyboard.dismiss(); setShowReminder((v) => !v); }}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowReminder((v) => !v);
+                      }}
                       theme={theme}
                     />
                   </View>
@@ -596,7 +629,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
               </View>
 
               {/* ── Expandable fields ─────────────────────────────── */}
-              {(showLocation || showDescription || showRecurring || showReminder) && (
+              {(showLocation ||
+                showDescription ||
+                showRecurring ||
+                showReminder) && (
                 <View style={styles.expandableSection}>
                   {showLocation && (
                     <TextInput
@@ -634,7 +670,9 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                       multiline
                       numberOfLines={3}
                       textAlignVertical="top"
-                      onFocus={() => handleInputFocus(descriptionInputRef.current)}
+                      onFocus={() =>
+                        handleInputFocus(descriptionInputRef.current)
+                      }
                       accessibilityLabel="Event description"
                     />
                   )}
@@ -671,7 +709,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                                   backgroundColor: theme.colors.primaryBase,
                                 },
                               ]}
-                              onPress={() => { Keyboard.dismiss(); setReminder(mins); }}
+                              onPress={() => {
+                                Keyboard.dismiss();
+                                setReminder(mins);
+                              }}
                               accessibilityRole="button"
                               accessibilityLabel={`Reminder ${label}`}
                               accessibilityState={{ selected: isActive }}
@@ -696,107 +737,106 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                 </View>
               )}
             </View>
-        </ScrollView>
+          </ScrollView>
 
-        {actionsPlacement === "footer" ? (
-          <View
-            style={[
-              styles.footer,
-              { paddingBottom: Math.max(12, insets.bottom) },
-            ]}
-          >
-            {onCancel && (
-              <Pressable
-                style={styles.cancelButton}
-                onPress={onCancel}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel"
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-            )}
-            <View style={styles.footerSpacer} />
-            <Pressable
+          {actionsPlacement === "footer" ? (
+            <View
               style={[
-                styles.saveButton,
-                { backgroundColor: theme.colors.primaryBase },
-                isSubmitting && styles.saveButtonDisabled,
+                styles.footer,
+                { paddingBottom: Math.max(12, insets.bottom) },
               ]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-              accessibilityRole="button"
-              accessibilityLabel={isEditMode ? "Save event" : "Create event"}
             >
-              {isSubmitting ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.primaryForeground}
-                />
-              ) : (
-                <>
-                  <Feather
-                    name="save"
-                    size={14}
+              {onCancel && (
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={onCancel}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel"
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+              )}
+              <View style={styles.footerSpacer} />
+              <Pressable
+                style={[
+                  styles.saveButton,
+                  { backgroundColor: theme.colors.primaryBase },
+                  isSubmitting && styles.saveButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel={isEditMode ? "Save event" : "Create event"}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator
+                    size="small"
                     color={theme.colors.primaryForeground}
                   />
-                  <Text
-                    style={[
-                      styles.saveButtonText,
-                      { color: theme.colors.primaryForeground },
-                    ]}
-                  >
-                    {isEditMode ? "Save" : "Create"}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
+                ) : (
+                  <>
+                    <Feather
+                      name="save"
+                      size={14}
+                      color={theme.colors.primaryForeground}
+                    />
+                    <Text
+                      style={[
+                        styles.saveButtonText,
+                        { color: theme.colors.primaryForeground },
+                      ]}
+                    >
+                      {isEditMode ? "Save" : "Create"}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
 
-      {/* ── Modals (outside main layout) ──────────────────────── */}
-      <DatePickerModal
-        visible={showStartDatePicker}
-        onClose={() => setShowStartDatePicker(false)}
-        selectedDate={startDate}
-        onSelect={handleStartDateSelect}
-        title="Select start date"
-        theme={theme}
-        bottomInset={insets.bottom}
-      />
-      <DatePickerModal
-        visible={showEndDatePicker}
-        onClose={() => setShowEndDatePicker(false)}
-        selectedDate={endDate}
-        onSelect={handleEndDateSelect}
-        minDate={startDate}
-        title="Select end date"
-        theme={theme}
-        bottomInset={insets.bottom}
-      />
-      <TimePickerModal
-        visible={showStartTimePicker}
-        onClose={() => setShowStartTimePicker(false)}
-        selectedTime={startDate}
-        onSelect={handleStartTimeSelect}
-        title="Select start time"
-        theme={theme}
-        bottomInset={insets.bottom}
-      />
-      <TimePickerModal
-        visible={showEndTimePicker}
-        onClose={() => setShowEndTimePicker(false)}
-        selectedTime={endDate}
-        onSelect={handleEndTimeSelect}
-        title="Select end time"
-        theme={theme}
-        bottomInset={insets.bottom}
-      />
-    </>
-  );
+        {/* ── Modals (outside main layout) ──────────────────────── */}
+        <DatePickerModal
+          visible={showStartDatePicker}
+          onClose={() => setShowStartDatePicker(false)}
+          selectedDate={startDate}
+          onSelect={handleStartDateSelect}
+          title="Select start date"
+          theme={theme}
+          bottomInset={insets.bottom}
+        />
+        <DatePickerModal
+          visible={showEndDatePicker}
+          onClose={() => setShowEndDatePicker(false)}
+          selectedDate={endDate}
+          onSelect={handleEndDateSelect}
+          minDate={startDate}
+          title="Select end date"
+          theme={theme}
+          bottomInset={insets.bottom}
+        />
+        <TimePickerModal
+          visible={showStartTimePicker}
+          onClose={() => setShowStartTimePicker(false)}
+          selectedTime={startDate}
+          onSelect={handleStartTimeSelect}
+          title="Select start time"
+          theme={theme}
+          bottomInset={insets.bottom}
+        />
+        <TimePickerModal
+          visible={showEndTimePicker}
+          onClose={() => setShowEndTimePicker(false)}
+          selectedTime={endDate}
+          onSelect={handleEndTimeSelect}
+          title="Select end time"
+          theme={theme}
+          bottomInset={insets.bottom}
+        />
+      </>
+    );
   },
 );
-
 
 // ─── Time Picker Modal ───────────────────────────────────────────────────────
 // Refactored to use a plain ScrollView grid instead of FlatList. The FlatList
@@ -895,11 +935,12 @@ function TimePickerModal({
                   style={[
                     modalStyles.cell,
                     isSelected && { backgroundColor: theme.colors.primaryBase },
-                    !isSelected && isCurrent && {
-                      backgroundColor: theme.colors.primaryBase + "33",
-                      borderWidth: 2,
-                      borderColor: theme.colors.primaryBase,
-                    },
+                    !isSelected &&
+                      isCurrent && {
+                        backgroundColor: theme.colors.primaryBase + "33",
+                        borderWidth: 2,
+                        borderColor: theme.colors.primaryBase,
+                      },
                   ]}
                   onPress={() => onSelect(time)}
                 >
@@ -907,7 +948,8 @@ function TimePickerModal({
                     style={[
                       modalStyles.cellText,
                       isSelected && { color: theme.colors.primaryForeground },
-                      !isSelected && isCurrent && { color: theme.colors.primaryBase },
+                      !isSelected &&
+                        isCurrent && { color: theme.colors.primaryBase },
                     ]}
                   >
                     {formatTime12(time)}
@@ -1018,7 +1060,11 @@ function PickerSheet({
     >
       <View style={styles.overlay}>
         <Animated.View
-          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.42)" }, overlayStyle]}
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(0,0,0,0.42)" },
+            overlayStyle,
+          ]}
         />
         <Pressable
           style={StyleSheet.absoluteFill}
@@ -1075,7 +1121,8 @@ function createModalStyles(theme: ThemeTokens) {
     },
     title: {
       fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       textAlign: "center",
       marginBottom: 10,
@@ -1107,7 +1154,8 @@ function createModalStyles(theme: ThemeTokens) {
     },
     cellText: {
       fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
     },
   });
@@ -1211,14 +1259,17 @@ function TogglePill({
         <Feather
           name={icon}
           size={14}
-          color={active ? theme.colors.primaryBase : theme.colors.mutedForeground}
+          color={
+            active ? theme.colors.primaryBase : theme.colors.mutedForeground
+          }
         />
       </View>
       <Text
         style={{
           flex: 1,
           fontSize: theme.typography.fontSize.sm.size,
-          fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+          fontWeight: theme.typography.fontWeight
+            .medium as TextStyle["fontWeight"],
           color: active ? theme.colors.primaryBase : theme.colors.foreground,
         }}
       >
@@ -1235,7 +1286,11 @@ function TogglePill({
             justifyContent: "center",
           }}
         >
-          <Feather name="check" size={10} color={theme.colors.primaryForeground} />
+          <Feather
+            name="check"
+            size={10}
+            color={theme.colors.primaryForeground}
+          />
         </View>
       ) : null}
     </Pressable>
@@ -1296,7 +1351,11 @@ function CalendarGrid({
   const isDisabled = (day: number) => {
     if (!minDate) return false;
     const d = new Date(year, month, day);
-    const min = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+    const min = new Date(
+      minDate.getFullYear(),
+      minDate.getMonth(),
+      minDate.getDate(),
+    );
     return d < min;
   };
 
@@ -1317,30 +1376,43 @@ function CalendarGrid({
         }}
       >
         <Pressable onPress={prevMonth} hitSlop={12} style={{ padding: 8 }}>
-          <Feather name="chevron-left" size={18} color={theme.colors.foreground} />
+          <Feather
+            name="chevron-left"
+            size={18}
+            color={theme.colors.foreground}
+          />
         </Pressable>
         <Text
           style={{
             fontSize: theme.typography.fontSize.sm.size,
-            fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+            fontWeight: theme.typography.fontWeight
+              .semibold as TextStyle["fontWeight"],
             color: theme.colors.foreground,
           }}
         >
           {monthLabel}
         </Text>
         <Pressable onPress={nextMonth} hitSlop={12} style={{ padding: 8 }}>
-          <Feather name="chevron-right" size={18} color={theme.colors.foreground} />
+          <Feather
+            name="chevron-right"
+            size={18}
+            color={theme.colors.foreground}
+          />
         </Pressable>
       </View>
 
       <View style={{ flexDirection: "row" }}>
         {dayHeaders.map((d) => (
-          <View key={d} style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}>
+          <View
+            key={d}
+            style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}
+          >
             <Text
               style={{
                 fontSize: theme.typography.fontSize.xs.size,
                 color: theme.colors.mutedForeground,
-                fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+                fontWeight: theme.typography.fontWeight
+                  .medium as TextStyle["fontWeight"],
               }}
             >
               {d}
@@ -1352,7 +1424,8 @@ function CalendarGrid({
       {weeks.map((week, wi) => (
         <View key={wi} style={{ flexDirection: "row" }}>
           {week.map((day, di) => {
-            if (day === null) return <View key={`empty-${di}`} style={{ flex: 1 }} />;
+            if (day === null)
+              return <View key={`empty-${di}`} style={{ flex: 1 }} />;
             const selected = isSelected(day);
             const disabled = isDisabled(day);
             const todayDay = isToday(day);
@@ -1365,18 +1438,25 @@ function CalendarGrid({
                   justifyContent: "center",
                   paddingVertical: 8,
                   borderRadius: theme.borderRadius.full,
-                  backgroundColor: selected ? theme.colors.primaryBase : "transparent",
+                  backgroundColor: selected
+                    ? theme.colors.primaryBase
+                    : "transparent",
                   opacity: disabled ? 0.3 : 1,
                 }}
-                onPress={() => { if (!disabled) onSelect(new Date(year, month, day)); }}
+                onPress={() => {
+                  if (!disabled) onSelect(new Date(year, month, day));
+                }}
                 disabled={disabled}
               >
                 <Text
                   style={{
                     fontSize: theme.typography.fontSize.sm.size,
-                    fontWeight: selected || todayDay
-                      ? (theme.typography.fontWeight.semibold as TextStyle["fontWeight"])
-                      : (theme.typography.fontWeight.normal as TextStyle["fontWeight"]),
+                    fontWeight:
+                      selected || todayDay
+                        ? (theme.typography.fontWeight
+                            .semibold as TextStyle["fontWeight"])
+                        : (theme.typography.fontWeight
+                            .normal as TextStyle["fontWeight"]),
                     color: selected
                       ? theme.colors.primaryForeground
                       : todayDay
@@ -1431,7 +1511,8 @@ function createStyles(theme: ThemeTokens) {
     // Title
     titleInput: {
       fontSize: theme.typography.fontSize.lg.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       height: 48,
       borderWidth: 1,

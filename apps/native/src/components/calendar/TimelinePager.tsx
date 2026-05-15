@@ -378,7 +378,12 @@ export function TimelinePager({
               key={`all-day-column-${format(date, "yyyy-MM-dd")}`}
               style={styles.allDayColumn}
             >
-              <View style={[styles.allDayColumnStack, { minHeight: allDayMinHeight }]}>
+              <View
+                style={[
+                  styles.allDayColumnStack,
+                  { minHeight: allDayMinHeight },
+                ]}
+              >
                 {dateEvents.map((event) => {
                   const colors = resolveEventBlockColor(event.color, theme);
                   const dayLabel =
@@ -439,7 +444,10 @@ export function TimelinePager({
           {renderHeaderPage != null && (
             <View style={styles.headerRow}>
               <View style={styles.headerGutter} />
-              <View style={styles.headerViewport} onLayout={handleViewportLayout}>
+              <View
+                style={styles.headerViewport}
+                onLayout={handleViewportLayout}
+              >
                 <Animated.View
                   style={[
                     styles.pagesStrip,
@@ -494,7 +502,10 @@ export function TimelinePager({
                 ))}
               </View>
 
-              <View style={styles.columnsViewport} onLayout={handleViewportLayout}>
+              <View
+                style={styles.columnsViewport}
+                onLayout={handleViewportLayout}
+              >
                 <Animated.View
                   style={[
                     styles.pagesStrip,
@@ -628,7 +639,8 @@ function createStyles(theme: ThemeTokens) {
     hourSlot: {
       height: HOUR_HEIGHT,
     },
-    hourDivider: {      position: "absolute" as const,
+    hourDivider: {
+      position: "absolute" as const,
       top: 0,
       left: 0,
       right: 0,

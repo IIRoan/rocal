@@ -14,7 +14,9 @@ function normalizeStringArray(value: unknown): string[] {
   return [];
 }
 
-function normalizeAudienceClaim(audiences: string[]): string | string[] | undefined {
+function normalizeAudienceClaim(
+  audiences: string[],
+): string | string[] | undefined {
   if (audiences.length === 0) {
     return undefined;
   }
@@ -63,7 +65,8 @@ export function buildMailOauthAccessTokenClaims(input: {
 }): Record<string, unknown> {
   const resourceAudiences = normalizeStringArray(input.resource);
   const metadataAudiences = normalizeStringArray(input.metadata?.audiences);
-  const audiences = resourceAudiences.length > 0 ? resourceAudiences : metadataAudiences;
+  const audiences =
+    resourceAudiences.length > 0 ? resourceAudiences : metadataAudiences;
   const aud = normalizeAudienceClaim(audiences);
 
   return {
@@ -84,11 +87,14 @@ export function buildMailOauthUserInfoClaims(input: {
     typeof input.jwt.scope === "string" && input.jwt.scope.trim().length > 0
       ? input.jwt.scope
       : input.scopes.join(" ");
-  const audienceClaim = normalizeAudienceClaim(normalizeStringArray(input.jwt.aud));
+  const audienceClaim = normalizeAudienceClaim(
+    normalizeStringArray(input.jwt.aud),
+  );
   const authorizedParty =
     typeof input.jwt.azp === "string" && input.jwt.azp.trim().length > 0
       ? input.jwt.azp
-      : typeof input.jwt.client_id === "string" && input.jwt.client_id.trim().length > 0
+      : typeof input.jwt.client_id === "string" &&
+          input.jwt.client_id.trim().length > 0
         ? input.jwt.client_id
         : undefined;
   const issuer =

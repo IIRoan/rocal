@@ -151,8 +151,7 @@ function createStyles(theme: ThemeTokens) {
     },
     labelDefault: {
       color: theme.colors.mutedForeground,
-      fontWeight: theme.typography.fontWeight
-        .normal as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight.normal as TextStyle["fontWeight"],
     },
   } satisfies Record<string, TextStyle>;
 

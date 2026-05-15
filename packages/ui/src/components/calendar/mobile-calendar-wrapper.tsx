@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useMemo,
+  useEffect,
+  useCallback,
+} from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import {
   MobileEventCalendar,
@@ -39,7 +45,10 @@ interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
   onOpenAddEvent?: () => void;
-  getCachedEventsForRange?: (range: { start: Date; end: Date }) => CalendarEvent[] | undefined;
+  getCachedEventsForRange?: (range: {
+    start: Date;
+    end: Date;
+  }) => CalendarEvent[] | undefined;
   prefetchRange?: (range: { start: Date; end: Date }) => void;
 }
 
@@ -59,18 +68,27 @@ export function MobileCalendarWrapper({
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const isMobile = useIsMobile();
 
-  const { currentDate, setCurrentDate, currentView, setCurrentView } = useCalendarContext();
+  const { currentDate, setCurrentDate, currentView, setCurrentView } =
+    useCalendarContext();
 
   // Initialize context view from props on first render
   React.useEffect(() => {
-    if (currentView === "month" && props.initialView && props.initialView !== "month") {
+    if (
+      currentView === "month" &&
+      props.initialView &&
+      props.initialView !== "month"
+    ) {
       // Check sessionStorage first
       if (typeof window !== "undefined") {
         const savedViewData = sessionStorage.getItem("calendar-view-selection");
         if (savedViewData) {
           try {
             const parsedData = JSON.parse(savedViewData);
-            if (parsedData.expires && parsedData.expires > Date.now() && (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)) {
+            if (
+              parsedData.expires &&
+              parsedData.expires > Date.now() &&
+              (CALENDAR_VIEWS as readonly string[]).includes(parsedData.view)
+            ) {
               setCurrentView(parsedData.view as CalendarView);
               return;
             }
@@ -103,7 +121,10 @@ export function MobileCalendarWrapper({
       const expirationTime = new Date();
       expirationTime.setHours(expirationTime.getHours() + 1);
       const viewData = { view, expires: expirationTime.getTime() };
-      sessionStorage.setItem("calendar-view-selection", JSON.stringify(viewData));
+      sessionStorage.setItem(
+        "calendar-view-selection",
+        JSON.stringify(viewData),
+      );
     }
   };
   const handleCalendarViewChange = handleViewChange;
@@ -111,12 +132,23 @@ export function MobileCalendarWrapper({
   const handlePrevious = useCallback(() => {
     let newDate: Date;
     switch (currentView) {
-      case "day": newDate = subDays(currentDate, 1); break;
-      case "3day": newDate = subDays(currentDate, 3); break;
-      case "week": newDate = subWeeks(currentDate, 1); break;
-      case "month": newDate = subMonths(currentDate, 1); break;
-      case "agenda": newDate = subDays(currentDate, AgendaDaysToShow); break;
-      default: newDate = subWeeks(currentDate, 1);
+      case "day":
+        newDate = subDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = subDays(currentDate, 3);
+        break;
+      case "week":
+        newDate = subWeeks(currentDate, 1);
+        break;
+      case "month":
+        newDate = subMonths(currentDate, 1);
+        break;
+      case "agenda":
+        newDate = subDays(currentDate, AgendaDaysToShow);
+        break;
+      default:
+        newDate = subWeeks(currentDate, 1);
     }
     setCurrentDate(newDate);
   }, [currentDate, currentView, setCurrentDate]);
@@ -124,41 +156,76 @@ export function MobileCalendarWrapper({
   const handleNext = useCallback(() => {
     let newDate: Date;
     switch (currentView) {
-      case "day": newDate = addDays(currentDate, 1); break;
-      case "3day": newDate = addDays(currentDate, 3); break;
-      case "week": newDate = addWeeks(currentDate, 1); break;
-      case "month": newDate = addMonths(currentDate, 1); break;
-      case "agenda": newDate = addDays(currentDate, AgendaDaysToShow); break;
-      default: newDate = addWeeks(currentDate, 1);
+      case "day":
+        newDate = addDays(currentDate, 1);
+        break;
+      case "3day":
+        newDate = addDays(currentDate, 3);
+        break;
+      case "week":
+        newDate = addWeeks(currentDate, 1);
+        break;
+      case "month":
+        newDate = addMonths(currentDate, 1);
+        break;
+      case "agenda":
+        newDate = addDays(currentDate, AgendaDaysToShow);
+        break;
+      default:
+        newDate = addWeeks(currentDate, 1);
     }
     setCurrentDate(newDate);
   }, [currentDate, currentView, setCurrentDate]);
 
   // Date helpers for adjacent slides
-  const getNextDate = useCallback((date: Date) => {
-    switch (currentView) {
-      case "day": return addDays(date, 1);
-      case "3day": return addDays(date, 3);
-      case "week": return addWeeks(date, 1);
-      case "month": return addMonths(date, 1);
-      case "agenda": return addDays(date, AgendaDaysToShow);
-      default: return addWeeks(date, 1);
-    }
-  }, [currentView]);
+  const getNextDate = useCallback(
+    (date: Date) => {
+      switch (currentView) {
+        case "day":
+          return addDays(date, 1);
+        case "3day":
+          return addDays(date, 3);
+        case "week":
+          return addWeeks(date, 1);
+        case "month":
+          return addMonths(date, 1);
+        case "agenda":
+          return addDays(date, AgendaDaysToShow);
+        default:
+          return addWeeks(date, 1);
+      }
+    },
+    [currentView],
+  );
 
-  const getPrevDate = useCallback((date: Date) => {
-    switch (currentView) {
-      case "day": return subDays(date, 1);
-      case "3day": return subDays(date, 3);
-      case "week": return subWeeks(date, 1);
-      case "month": return subMonths(date, 1);
-      case "agenda": return subDays(date, AgendaDaysToShow);
-      default: return subWeeks(date, 1);
-    }
-  }, [currentView]);
+  const getPrevDate = useCallback(
+    (date: Date) => {
+      switch (currentView) {
+        case "day":
+          return subDays(date, 1);
+        case "3day":
+          return subDays(date, 3);
+        case "week":
+          return subWeeks(date, 1);
+        case "month":
+          return subMonths(date, 1);
+        case "agenda":
+          return subDays(date, AgendaDaysToShow);
+        default:
+          return subWeeks(date, 1);
+      }
+    },
+    [currentView],
+  );
 
-  const prevDate = useMemo(() => getPrevDate(currentDate), [currentDate, getPrevDate]);
-  const nextDate = useMemo(() => getNextDate(currentDate), [currentDate, getNextDate]);
+  const prevDate = useMemo(
+    () => getPrevDate(currentDate),
+    [currentDate, getPrevDate],
+  );
+  const nextDate = useMemo(
+    () => getNextDate(currentDate),
+    [currentDate, getNextDate],
+  );
 
   // Embla Carousel - 3 slides, start on center (index 1)
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -251,11 +318,23 @@ export function MobileCalendarWrapper({
       )}
 
       {/* Main Calendar Content - Embla Carousel */}
-      <div className={cn("flex-1 overflow-hidden relative w-full h-full", className)}>
-        <div className="overflow-hidden h-full" ref={emblaRef} style={{ touchAction: "pan-y" }}>
+      <div
+        className={cn(
+          "flex-1 overflow-hidden relative w-full h-full",
+          className,
+        )}
+      >
+        <div
+          className="overflow-hidden h-full"
+          ref={emblaRef}
+          style={{ touchAction: "pan-y" }}
+        >
           <div className="flex h-full">
             {/* Previous */}
-            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+            <div
+              className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
+              style={{ flex: "0 0 100%", touchAction: "pan-y" }}
+            >
               <MobileEventCalendar
                 {...props}
                 user={user}
@@ -266,7 +345,10 @@ export function MobileCalendarWrapper({
               />
             </div>
             {/* Current */}
-            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+            <div
+              className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
+              style={{ flex: "0 0 100%", touchAction: "pan-y" }}
+            >
               {children || (
                 <MobileEventCalendar
                   {...props}
@@ -279,7 +361,10 @@ export function MobileCalendarWrapper({
               )}
             </div>
             {/* Next */}
-            <div className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0" style={{ flex: "0 0 100%", touchAction: "pan-y" }}>
+            <div
+              className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
+              style={{ flex: "0 0 100%", touchAction: "pan-y" }}
+            >
               <MobileEventCalendar
                 {...props}
                 user={user}

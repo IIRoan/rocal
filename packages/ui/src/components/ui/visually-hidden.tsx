@@ -1,10 +1,7 @@
 import * as React from "react";
 import { cn } from "@workspace/ui/lib/utils";
 
-function VisuallyHidden({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
+function VisuallyHidden({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       className={cn(

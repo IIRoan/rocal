@@ -23,9 +23,24 @@ const palette = {
 };
 
 // Icon components as inline SVGs for email compatibility
-function CalendarIcon({ size = 16, color = palette.muted }: { size?: number; color?: string }) {
+function CalendarIcon({
+  size = 16,
+  color = palette.muted,
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
       <line x1="16" x2="16" y1="2" y2="6" />
       <line x1="8" x2="8" y1="2" y2="6" />
@@ -34,36 +49,96 @@ function CalendarIcon({ size = 16, color = palette.muted }: { size?: number; col
   );
 }
 
-function ClockIcon({ size = 16, color = palette.muted }: { size?: number; color?: string }) {
+function ClockIcon({
+  size = 16,
+  color = palette.muted,
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
     </svg>
   );
 }
 
-function MapPinIcon({ size = 16, color = palette.muted }: { size?: number; color?: string }) {
+function MapPinIcon({
+  size = 16,
+  color = palette.muted,
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
       <circle cx="12" cy="10" r="3" />
     </svg>
   );
 }
 
-function TagIcon({ size = 16, color = palette.muted }: { size?: number; color?: string }) {
+function TagIcon({
+  size = 16,
+  color = palette.muted,
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
       <path d="M7 7h.01" />
     </svg>
   );
 }
 
-function FileTextIcon({ size = 16, color = palette.muted }: { size?: number; color?: string }) {
+function FileTextIcon({
+  size = 16,
+  color = palette.muted,
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" x2="8" y1="13" y2="13" />
@@ -73,9 +148,24 @@ function FileTextIcon({ size = 16, color = palette.muted }: { size?: number; col
   );
 }
 
-function TimerIcon({ size = 16, color = palette.muted }: { size?: number; color?: string }) {
+function TimerIcon({
+  size = 16,
+  color = palette.muted,
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <line x1="10" x2="14" y1="2" y2="2" />
       <line x1="12" x2="15" y1="14" y2="11" />
       <circle cx="12" cy="14" r="8" />
@@ -164,7 +254,8 @@ export function EmailLayout({
               backgroundColor: palette.card,
               border: `1px solid ${palette.border}`,
               borderRadius: "16px",
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)",
+              boxShadow:
+                "0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)",
               overflow: "hidden",
             }}
           >
@@ -353,7 +444,7 @@ const iconMap = {
 
 export function EmailDetailRow({ icon, label, children }: EmailDetailRowProps) {
   const IconComponent = iconMap[icon];
-  
+
   return (
     <div style={{ display: "flex", gap: "12px", padding: "12px 0" }}>
       <div style={{ flexShrink: 0, width: "20px", paddingTop: "2px" }}>

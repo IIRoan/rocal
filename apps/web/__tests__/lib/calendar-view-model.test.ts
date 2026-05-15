@@ -34,7 +34,9 @@ function calendarFixture(overrides: Partial<Calendar> = {}): Calendar {
   };
 }
 
-function eventFixture(overrides: Partial<AppCalendarEvent> = {}): AppCalendarEvent {
+function eventFixture(
+  overrides: Partial<AppCalendarEvent> = {},
+): AppCalendarEvent {
   return {
     id: "event-1",
     title: "Planning",

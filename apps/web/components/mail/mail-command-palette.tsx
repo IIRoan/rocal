@@ -126,9 +126,12 @@ function LabelsView({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const isValidHex = (v: string) => /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
+  const isValidHex = (v: string) =>
+    /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
 
-  const colorPreview = isValidHex(newColor) ? newColor : (LABEL_COLORS.find((c) => c.value === newColor)?.hex ?? "#888");
+  const colorPreview = isValidHex(newColor)
+    ? newColor
+    : (LABEL_COLORS.find((c) => c.value === newColor)?.hex ?? "#888");
 
   const handleHexInput = (v: string) => {
     setHexInput(v);
@@ -165,9 +168,16 @@ function LabelsView({
   };
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+    <div
+      className="flex flex-col"
+      style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+    >
       <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
-        <button type="button" onClick={goBack} className="p-1 rounded hover:bg-muted/50 transition-colors">
+        <button
+          type="button"
+          onClick={goBack}
+          className="p-1 rounded hover:bg-muted/50 transition-colors"
+        >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium flex-1">Labels</span>
@@ -192,7 +202,10 @@ function LabelsView({
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Label name"
               disabled={saving}
-              onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); if (e.key === "Escape") setCreating(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreate();
+                if (e.key === "Escape") setCreating(false);
+              }}
               className="flex h-9 w-full rounded-md bg-input px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
             />
             <div className="flex gap-1.5 flex-wrap items-center">
@@ -207,7 +220,10 @@ function LabelsView({
                 />
               ))}
               <div className="flex items-center gap-1.5 ml-1">
-                <div className="h-5 w-5 rounded-full border border-border/50 shrink-0" style={{ backgroundColor: colorPreview }} />
+                <div
+                  className="h-5 w-5 rounded-full border border-border/50 shrink-0"
+                  style={{ backgroundColor: colorPreview }}
+                />
                 <input
                   type="text"
                   value={hexInput}
@@ -224,12 +240,19 @@ function LabelsView({
                 disabled={saving || !newName.trim()}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                {saving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Check className="h-3 w-3" />
+                )}
                 Create
               </button>
               <button
                 type="button"
-                onClick={() => { setCreating(false); setNewName(""); }}
+                onClick={() => {
+                  setCreating(false);
+                  setNewName("");
+                }}
                 className="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent/40"
               >
                 Cancel
@@ -238,18 +261,24 @@ function LabelsView({
           </div>
         ) : null}
         {labels.length === 0 && !creating ? (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">No labels yet.</div>
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No labels yet.
+          </div>
         ) : null}
         {labels.map((label) => {
           const displayColor = /^#/.test(label.color)
             ? label.color
-            : (LABEL_COLORS.find((c) => c.value === label.color)?.hex ?? "#888");
+            : (LABEL_COLORS.find((c) => c.value === label.color)?.hex ??
+              "#888");
           return (
             <div
               key={label.id}
               className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/50 group"
             >
-              <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: displayColor }} />
+              <div
+                className="h-3 w-3 rounded-full shrink-0"
+                style={{ backgroundColor: displayColor }}
+              />
               <span className="text-sm flex-1 truncate">{label.name}</span>
               {onDeleteLabel ? (
                 <button
@@ -311,7 +340,9 @@ export function MailCommandPalette({
       const next = { ...localSettings, [key]: value };
       setLocalSettings(next);
       try {
-        await updateSettings({ [key]: value } as Parameters<typeof updateSettings>[0]);
+        await updateSettings({ [key]: value } as Parameters<
+          typeof updateSettings
+        >[0]);
       } catch {
         setLocalSettings(localSettings);
       }
@@ -375,7 +406,9 @@ export function MailCommandPalette({
     try {
       await calendarApiService.deleteAccount();
       queryClient.clear();
-      try { await signOut(); } catch {}
+      try {
+        await signOut();
+      } catch {}
       onOpenChange(false);
       window.location.href = "/";
     } catch (err) {
@@ -386,11 +419,23 @@ export function MailCommandPalette({
   }, [onOpenChange, queryClient]);
 
   const handleChangePassword = useCallback(
-    async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
+    async ({
+      currentPassword,
+      newPassword,
+    }: {
+      currentPassword: string;
+      newPassword: string;
+    }) => {
       setChangingPassword(true);
       try {
-        const result = await authClient.changePassword({ currentPassword, newPassword });
-        if (result?.error) throw new Error(result.error.message || "Unable to update your password.");
+        const result = await authClient.changePassword({
+          currentPassword,
+          newPassword,
+        });
+        if (result?.error)
+          throw new Error(
+            result.error.message || "Unable to update your password.",
+          );
       } catch (error) {
         log.error("Failed to change password:", error);
         throw error;
@@ -406,7 +451,10 @@ export function MailCommandPalette({
       setSettingPassword(true);
       try {
         const result = await authClient.setPassword({ newPassword });
-        if (result?.error) throw new Error(result.error.message || "Unable to set your password.");
+        if (result?.error)
+          throw new Error(
+            result.error.message || "Unable to set your password.",
+          );
         await accountsQuery?.refetch?.();
       } catch (error) {
         log.error("Failed to set password:", error);
@@ -420,11 +468,18 @@ export function MailCommandPalette({
 
   const handleResetEncryptionPassword = useCallback(
     async ({ newPassword }: { newPassword: string }) => {
-      if (!session?.user?.id) throw new Error("Your session is unavailable. Please try again.");
+      if (!session?.user?.id)
+        throw new Error("Your session is unavailable. Please try again.");
       setResettingEncryptionPassword(true);
       try {
-        const stored = await resetEncryptionPasswordForActiveSession(session.user.id, newPassword);
-        if (!stored) throw new Error("Unlock your encrypted data on this device first, then try again.");
+        const stored = await resetEncryptionPasswordForActiveSession(
+          session.user.id,
+          newPassword,
+        );
+        if (!stored)
+          throw new Error(
+            "Unlock your encrypted data on this device first, then try again.",
+          );
       } catch (error) {
         log.error("Failed to reset encryption password:", error);
         throw error;
@@ -440,7 +495,10 @@ export function MailCommandPalette({
       setUpdatingProfile(true);
       try {
         const result = await authClient.updateUser({ image: imageUrl ?? null });
-        if (result?.error) throw new Error(result.error.message || "Unable to update your profile.");
+        if (result?.error)
+          throw new Error(
+            result.error.message || "Unable to update your profile.",
+          );
       } catch (error) {
         log.error("Failed to update profile:", error);
         throw error;
@@ -453,12 +511,42 @@ export function MailCommandPalette({
 
   const allItems = useMemo<PaletteItem[]>(
     () => [
-      { id: "compose", label: "Compose", icon: SquarePen, description: "Write a new message" },
-      { id: "mailboxes", label: "Mailboxes", icon: Inbox, description: "Create, edit, and delete mailboxes" },
-      { id: "labels", label: "Labels", icon: Tag, description: "Manage message labels" },
-      { id: "appearance", label: "Appearance", icon: Palette, description: "Theme and display" },
-      { id: "time-region", label: "Time & Region", icon: Globe, description: settings?.timezone ?? "Timezone, time format" },
-      { id: "account", label: "Account", icon: User, description: "Manage your account" },
+      {
+        id: "compose",
+        label: "Compose",
+        icon: SquarePen,
+        description: "Write a new message",
+      },
+      {
+        id: "mailboxes",
+        label: "Mailboxes",
+        icon: Inbox,
+        description: "Create, edit, and delete mailboxes",
+      },
+      {
+        id: "labels",
+        label: "Labels",
+        icon: Tag,
+        description: "Manage message labels",
+      },
+      {
+        id: "appearance",
+        label: "Appearance",
+        icon: Palette,
+        description: "Theme and display",
+      },
+      {
+        id: "time-region",
+        label: "Time & Region",
+        icon: Globe,
+        description: settings?.timezone ?? "Timezone, time format",
+      },
+      {
+        id: "account",
+        label: "Account",
+        icon: User,
+        description: "Manage your account",
+      },
     ],
     [settings?.timezone],
   );
@@ -495,7 +583,10 @@ export function MailCommandPalette({
       setSelectedIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter") {
       const item = items[selectedIndex];
-      if (item) { e.preventDefault(); handleSelect(item); }
+      if (item) {
+        e.preventDefault();
+        handleSelect(item);
+      }
     }
   };
 
@@ -504,7 +595,10 @@ export function MailCommandPalette({
       return (
         <div
           className="flex flex-col"
-          style={{ minHeight: "clamp(240px, 40svh, 360px)", maxHeight: "calc(100dvh - 200px)" }}
+          style={{
+            minHeight: "clamp(240px, 40svh, 360px)",
+            maxHeight: "calc(100dvh - 200px)",
+          }}
         >
           <div className="flex items-center gap-2 px-3 py-3 sm:py-2 border-b border-border/50 shrink-0">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -516,18 +610,27 @@ export function MailCommandPalette({
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedIndex(0);
+              }}
               className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 focus:outline-none rounded-none px-0 text-sm placeholder:text-muted-foreground/60"
             />
             {query && (
-              <button type="button" onClick={() => setQuery("")} className="p-1 rounded hover:bg-muted/50 transition-colors">
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="p-1 rounded hover:bg-muted/50 transition-colors"
+              >
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
           </div>
           <div className="flex-1 overflow-y-auto py-2">
             {items.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No results found.</div>
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                No results found.
+              </div>
             ) : (
               <div className="px-2">
                 {items.map((item, index) => (
@@ -540,7 +643,9 @@ export function MailCommandPalette({
                     <div className="flex items-center justify-center w-8 h-8 sm:w-6 sm:h-6 shrink-0">
                       <item.icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
                     </div>
-                    <span className="text-sm flex-1 truncate">{item.label}</span>
+                    <span className="text-sm flex-1 truncate">
+                      {item.label}
+                    </span>
                     <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
                       {item.description}
                     </span>
@@ -553,9 +658,13 @@ export function MailCommandPalette({
           <div className="px-3 py-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between shrink-0">
             <span />
             <span className="hidden sm:flex items-center gap-2">
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↑↓</kbd>{" "}
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                ↑↓
+              </kbd>{" "}
               to navigate
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">↵</kbd>{" "}
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
+                ↵
+              </kbd>{" "}
               to select
             </span>
           </div>
@@ -567,25 +676,44 @@ export function MailCommandPalette({
       const themeOptions = [
         { value: "light", icon: Sun, label: "Light", color: "text-amber-500" },
         { value: "dark", icon: Moon, label: "Dark", color: "text-slate-400" },
-        { value: "system", icon: Monitor, label: "System", color: "text-muted-foreground" },
+        {
+          value: "system",
+          icon: Monitor,
+          label: "System",
+          color: "text-muted-foreground",
+        },
       ];
       return (
-        <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+        >
           <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
-            <button type="button" onClick={goBack} className="p-1 rounded hover:bg-muted/50 transition-colors">
+            <button
+              type="button"
+              onClick={goBack}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Appearance</span>
           </div>
           <div className="flex-1 overflow-y-auto py-2 px-2">
             <div className="px-1 pb-1">
-              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Theme</span>
+              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
+                Theme
+              </span>
             </div>
             {themeOptions.map((item) => (
               <button
                 key={item.value}
                 type="button"
-                onClick={() => void updateSetting("theme", item.value as UserSettings["theme"])}
+                onClick={() =>
+                  void updateSetting(
+                    "theme",
+                    item.value as UserSettings["theme"],
+                  )
+                }
                 className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
               >
                 <div className="flex items-center justify-center w-6 h-6 shrink-0">
@@ -605,7 +733,10 @@ export function MailCommandPalette({
     if (currentView === "time-region" || currentView === "timezone") {
       if (!localSettings) return null;
       return (
-        <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+        >
           <TimeRegionSettings
             localSettings={localSettings}
             updateSetting={updateSetting}
@@ -620,7 +751,10 @@ export function MailCommandPalette({
     if (currentView === "notifications") {
       if (!localSettings) return null;
       return (
-        <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+        >
           <NotificationSettings
             localSettings={localSettings}
             updateSetting={updateSetting}
@@ -632,20 +766,32 @@ export function MailCommandPalette({
 
     if (currentView === "security") {
       return (
-        <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+        >
           <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
-            <button type="button" onClick={goBack} className="p-1 rounded hover:bg-muted/50 transition-colors">
+            <button
+              type="button"
+              onClick={goBack}
+              className="p-1 rounded hover:bg-muted/50 transition-colors"
+            >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Security</span>
           </div>
           <div className="flex-1 overflow-y-auto py-2 px-2">
             <div className="px-1 pb-1">
-              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Authentication</span>
+              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
+                Authentication
+              </span>
             </div>
             <button
               type="button"
-              onClick={() => { setPasskeyAddMode(false); goForward("passkeys"); }}
+              onClick={() => {
+                setPasskeyAddMode(false);
+                goForward("passkeys");
+              }}
               className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
             >
               <div className="flex items-center justify-center w-6 h-6 shrink-0">
@@ -653,12 +799,16 @@ export function MailCommandPalette({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Passkeys</div>
-                <div className="text-xs text-muted-foreground">Manage passwordless authentication</div>
+                <div className="text-xs text-muted-foreground">
+                  Manage passwordless authentication
+                </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
             </button>
             <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
-              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Images &amp; Privacy</span>
+              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
+                Images &amp; Privacy
+              </span>
             </div>
             <SettingToggleRow
               icon={EyeOff}
@@ -675,7 +825,9 @@ export function MailCommandPalette({
               onToggle={onToggleBlockTrackingPixels}
             />
             <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
-              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">Password</span>
+              <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
+                Password
+              </span>
             </div>
             <PasswordSection
               hasPasswordAccount={hasPasswordAccount}
@@ -694,7 +846,10 @@ export function MailCommandPalette({
 
     if (currentView === "passkeys") {
       return (
-        <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+        >
           <PasskeySettings
             open={open}
             onBack={goBack}
@@ -710,7 +865,10 @@ export function MailCommandPalette({
       currentView === "mailbox-edit"
     ) {
       return (
-        <div className="flex flex-col" style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}>
+        <div
+          className="flex flex-col"
+          style={{ minHeight: "240px", maxHeight: "calc(100dvh - 200px)" }}
+        >
           <MailboxManager
             mailboxes={mailboxes}
             currentView={currentView}
@@ -757,7 +915,14 @@ export function MailCommandPalette({
     }
 
     if (currentView === "labels") {
-      return <LabelsView goBack={goBack} labels={labels} onCreateLabel={onCreateLabel} onDeleteLabel={onDeleteLabel} />;
+      return (
+        <LabelsView
+          goBack={goBack}
+          labels={labels}
+          onCreateLabel={onCreateLabel}
+          onDeleteLabel={onDeleteLabel}
+        />
+      );
     }
 
     return null;

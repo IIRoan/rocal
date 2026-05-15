@@ -243,7 +243,11 @@ export function AppSidebar() {
 
         <GestureDetector gesture={closePanGesture}>
           <Animated.View
-            style={[styles.sidebar, sidebarAnimatedStyle, { width: SIDEBAR_WIDTH }]}
+            style={[
+              styles.sidebar,
+              sidebarAnimatedStyle,
+              { width: SIDEBAR_WIDTH },
+            ]}
           >
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
               <View style={styles.headerRow}>
@@ -354,7 +358,11 @@ export function AppSidebar() {
                       accessibilityRole="button"
                       accessibilityLabel="Create calendar"
                     >
-                      <Feather name="plus" size={14} color={theme.colors.mutedForeground} />
+                      <Feather
+                        name="plus"
+                        size={14}
+                        color={theme.colors.mutedForeground}
+                      />
                     </Pressable>
                     <Pressable
                       onPress={() => handleNavigate("/calendar-manage")}
@@ -376,24 +384,35 @@ export function AppSidebar() {
 
                 {calendarsLoading ? (
                   <View style={styles.loadingRow}>
-                    <ActivityIndicator size="small" color={theme.colors.primaryBase} />
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.primaryBase}
+                    />
                   </View>
                 ) : calendars.length === 0 ? (
-                  <Text style={styles.emptyText}>No calendars yet. Tap + to create one.</Text>
+                  <Text style={styles.emptyText}>
+                    No calendars yet. Tap + to create one.
+                  </Text>
                 ) : (
                   calendarSections.map((section) => (
                     <View key={section.key}>
                       {section.title ? (
-                        <Text style={styles.sectionSeparator}>{section.title}</Text>
+                        <Text style={styles.sectionSeparator}>
+                          {section.title}
+                        </Text>
                       ) : null}
                       {section.rows.map((row) => {
                         const calendar = calendarById.get(row.id);
-                        const isPending = pendingVisibilityCalendarId === row.id;
+                        const isPending =
+                          pendingVisibilityCalendarId === row.id;
 
                         return (
                           <Pressable
                             key={row.id}
-                            onPress={() => calendar && handleToggleCalendarVisibility(calendar)}
+                            onPress={() =>
+                              calendar &&
+                              handleToggleCalendarVisibility(calendar)
+                            }
                             style={({ pressed }) => [
                               styles.calendarRow,
                               !row.isVisible && styles.calendarRowHidden,
@@ -445,7 +464,6 @@ function createStyles(theme: ThemeTokens) {
   const borderSubtle = theme.colors.border + "66";
   const borderMedium = theme.colors.border + "99";
   const primaryTint = theme.colors.primaryBase + "1A";
-
 
   const view = {
     edgeZone: {

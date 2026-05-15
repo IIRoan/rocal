@@ -476,7 +476,8 @@ function buildEventLines(
   ];
 
   if (allDay) {
-    const timezone = normalizeIcsTimezone(event.timezone ?? calendarTimezone) || "UTC";
+    const timezone =
+      normalizeIcsTimezone(event.timezone ?? calendarTimezone) || "UTC";
     const startDateStamp = formatDateStampInTimeZone(start, timezone);
     const endExclusiveDateStamp = addDaysToDateStamp(
       formatDateStampInTimeZone(end, timezone),

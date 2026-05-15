@@ -17,6 +17,7 @@ This skill provides Tailwind CSS expertise for styling the JARVIS AI Assistant i
 **Risk Level**: LOW - Styling framework with minimal security surface
 
 **Primary Use Cases**:
+
 - Holographic UI panel styling
 - Responsive HUD layouts
 - Animation utilities for transitions
@@ -44,52 +45,52 @@ Follow this workflow for every styled component:
 
 ```typescript
 // tests/components/HUDPanel.test.ts
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
-import HUDPanel from '~/components/HUDPanel.vue'
+import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
+import HUDPanel from "~/components/HUDPanel.vue";
 
-describe('HUDPanel', () => {
-  it('renders with correct JARVIS theme classes', () => {
+describe("HUDPanel", () => {
+  it("renders with correct JARVIS theme classes", () => {
     const wrapper = mount(HUDPanel, {
-      props: { title: 'System Status' }
-    })
+      props: { title: "System Status" },
+    });
 
-    const panel = wrapper.find('[data-testid="hud-panel"]')
-    expect(panel.classes()).toContain('bg-jarvis-bg-panel/80')
-    expect(panel.classes()).toContain('border-jarvis-primary/30')
-    expect(panel.classes()).toContain('backdrop-blur-sm')
-  })
+    const panel = wrapper.find('[data-testid="hud-panel"]');
+    expect(panel.classes()).toContain("bg-jarvis-bg-panel/80");
+    expect(panel.classes()).toContain("border-jarvis-primary/30");
+    expect(panel.classes()).toContain("backdrop-blur-sm");
+  });
 
-  it('applies responsive grid layout', () => {
-    const wrapper = mount(HUDPanel)
-    const grid = wrapper.find('[data-testid="panel-grid"]')
+  it("applies responsive grid layout", () => {
+    const wrapper = mount(HUDPanel);
+    const grid = wrapper.find('[data-testid="panel-grid"]');
 
-    expect(grid.classes()).toContain('grid-cols-1')
-    expect(grid.classes()).toContain('md:grid-cols-2')
-    expect(grid.classes()).toContain('lg:grid-cols-3')
-  })
+    expect(grid.classes()).toContain("grid-cols-1");
+    expect(grid.classes()).toContain("md:grid-cols-2");
+    expect(grid.classes()).toContain("lg:grid-cols-3");
+  });
 
-  it('shows correct status indicator colors', async () => {
+  it("shows correct status indicator colors", async () => {
     const wrapper = mount(HUDPanel, {
-      props: { status: 'active' }
-    })
+      props: { status: "active" },
+    });
 
-    const indicator = wrapper.find('[data-testid="status-indicator"]')
-    expect(indicator.classes()).toContain('bg-jarvis-primary')
-    expect(indicator.classes()).toContain('animate-pulse')
+    const indicator = wrapper.find('[data-testid="status-indicator"]');
+    expect(indicator.classes()).toContain("bg-jarvis-primary");
+    expect(indicator.classes()).toContain("animate-pulse");
 
-    await wrapper.setProps({ status: 'error' })
-    expect(indicator.classes()).toContain('bg-jarvis-danger')
-  })
+    await wrapper.setProps({ status: "error" });
+    expect(indicator.classes()).toContain("bg-jarvis-danger");
+  });
 
-  it('maintains accessibility focus styles', () => {
-    const wrapper = mount(HUDPanel)
-    const button = wrapper.find('button')
+  it("maintains accessibility focus styles", () => {
+    const wrapper = mount(HUDPanel);
+    const button = wrapper.find("button");
 
-    expect(button.classes()).toContain('focus:ring-2')
-    expect(button.classes()).toContain('focus:outline-none')
-  })
-})
+    expect(button.classes()).toContain("focus:ring-2");
+    expect(button.classes()).toContain("focus:outline-none");
+  });
+});
 ```
 
 #### Step 2: Implement Minimum to Pass
@@ -107,10 +108,7 @@ describe('HUDPanel', () => {
     >
       <slot />
     </div>
-    <span
-      data-testid="status-indicator"
-      :class="statusClasses"
-    />
+    <span data-testid="status-indicator" :class="statusClasses" />
     <button class="focus:ring-2 focus:outline-none focus:ring-jarvis-primary">
       Action
     </button>
@@ -118,19 +116,19 @@ describe('HUDPanel', () => {
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from "vue";
 
 const props = defineProps<{
-  title?: string
-  status?: 'active' | 'warning' | 'error' | 'inactive'
-}>()
+  title?: string;
+  status?: "active" | "warning" | "error" | "inactive";
+}>();
 
 const statusClasses = computed(() => ({
-  'bg-jarvis-primary animate-pulse': props.status === 'active',
-  'bg-jarvis-warning': props.status === 'warning',
-  'bg-jarvis-danger': props.status === 'error',
-  'bg-gray-500': props.status === 'inactive'
-}))
+  "bg-jarvis-primary animate-pulse": props.status === "active",
+  "bg-jarvis-warning": props.status === "warning",
+  "bg-jarvis-danger": props.status === "error",
+  "bg-gray-500": props.status === "inactive",
+}));
 </script>
 ```
 
@@ -231,7 +229,7 @@ export default {
 <!-- Bad: @apply for single-use styles -->
 <style>
 .my-unique-element {
-  @apply p-4 m-2 text-white;  /* Just use utilities in template */
+  @apply p-4 m-2 text-white; /* Just use utilities in template */
 }
 </style>
 ```
@@ -304,11 +302,11 @@ keyframes: {
 
 ### 5.1 Recommended Versions
 
-| Package | Version | Notes |
-|---------|---------|-------|
-| tailwindcss | ^3.4.0 | Latest with JIT mode |
-| @nuxtjs/tailwindcss | ^6.0.0 | Nuxt integration |
-| tailwindcss-animate | ^1.0.0 | Animation utilities |
+| Package             | Version | Notes                |
+| ------------------- | ------- | -------------------- |
+| tailwindcss         | ^3.4.0  | Latest with JIT mode |
+| @nuxtjs/tailwindcss | ^6.0.0  | Nuxt integration     |
+| tailwindcss-animate | ^1.0.0  | Animation utilities  |
 
 ### 5.2 Configuration
 
@@ -316,53 +314,50 @@ keyframes: {
 // tailwind.config.js
 export default {
   content: [
-    './components/**/*.{vue,js,ts}',
-    './layouts/**/*.vue',
-    './pages/**/*.vue',
-    './composables/**/*.ts',
-    './plugins/**/*.ts'
+    "./components/**/*.{vue,js,ts}",
+    "./layouts/**/*.vue",
+    "./pages/**/*.vue",
+    "./composables/**/*.ts",
+    "./plugins/**/*.ts",
   ],
-  darkMode: 'class',
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
         jarvis: {
-          primary: '#00ff41',
-          secondary: '#0891b2',
-          warning: '#f59e0b',
-          danger: '#ef4444',
+          primary: "#00ff41",
+          secondary: "#0891b2",
+          warning: "#f59e0b",
+          danger: "#ef4444",
           bg: {
-            dark: '#0a0a0f',
-            panel: '#111827'
-          }
-        }
+            dark: "#0a0a0f",
+            panel: "#111827",
+          },
+        },
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'monospace'],
-        display: ['Orbitron', 'sans-serif']
+        mono: ["JetBrains Mono", "monospace"],
+        display: ["Orbitron", "sans-serif"],
       },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'scan': 'scan 2s linear infinite',
-        'glow': 'glow 2s ease-in-out infinite alternate'
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        scan: "scan 2s linear infinite",
+        glow: "glow 2s ease-in-out infinite alternate",
       },
       keyframes: {
         scan: {
-          '0%': { transform: 'translateY(-100%)' },
-          '100%': { transform: 'translateY(100%)' }
+          "0%": { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(100%)" },
         },
         glow: {
-          '0%': { boxShadow: '0 0 5px #00ff41' },
-          '100%': { boxShadow: '0 0 20px #00ff41' }
-        }
-      }
-    }
+          "0%": { boxShadow: "0 0 5px #00ff41" },
+          "100%": { boxShadow: "0 0 20px #00ff41" },
+        },
+      },
+    },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('tailwindcss-animate')
-  ]
-}
+  plugins: [require("@tailwindcss/forms"), require("tailwindcss-animate")],
+};
 ```
 
 ## 6. Implementation Patterns
@@ -371,7 +366,8 @@ export default {
 
 ```vue
 <template>
-  <div class="
+  <div
+    class="
     relative
     bg-jarvis-bg-panel/80
     border border-jarvis-primary/30
@@ -379,25 +375,30 @@ export default {
     p-4
     backdrop-blur-sm
     shadow-lg shadow-jarvis-primary/10
-  ">
+  "
+  >
     <!-- Scanline overlay -->
-    <div class="
+    <div
+      class="
       absolute inset-0
       bg-gradient-to-b from-transparent via-jarvis-primary/5 to-transparent
       animate-scan
       pointer-events-none
-    " />
+    "
+    />
 
     <!-- Content -->
     <div class="relative z-10">
-      <h3 class="
+      <h3
+        class="
         font-display
         text-jarvis-primary
         text-lg
         uppercase
         tracking-wider
         mb-2
-      ">
+      "
+      >
         {{ title }}
       </h3>
       <slot />
@@ -411,15 +412,17 @@ export default {
 ```vue
 <template>
   <div class="flex items-center gap-2">
-    <span :class="[
-      'w-2 h-2 rounded-full',
-      {
-        'bg-jarvis-primary animate-pulse': status === 'active',
-        'bg-jarvis-warning': status === 'warning',
-        'bg-jarvis-danger animate-ping': status === 'error',
-        'bg-gray-500': status === 'inactive'
-      }
-    ]" />
+    <span
+      :class="[
+        'w-2 h-2 rounded-full',
+        {
+          'bg-jarvis-primary animate-pulse': status === 'active',
+          'bg-jarvis-warning': status === 'warning',
+          'bg-jarvis-danger animate-ping': status === 'error',
+          'bg-gray-500': status === 'inactive',
+        },
+      ]"
+    />
     <span class="text-sm text-gray-300">{{ label }}</span>
   </div>
 </template>
@@ -429,18 +432,20 @@ export default {
 
 ```vue
 <template>
-  <button :class="[
-    'px-4 py-2 rounded font-medium transition-all duration-200',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-jarvis-bg-dark',
-    {
-      'bg-jarvis-primary text-black hover:bg-jarvis-primary/90 focus:ring-jarvis-primary':
-        variant === 'primary',
-      'bg-transparent border border-jarvis-secondary text-jarvis-secondary hover:bg-jarvis-secondary/10 focus:ring-jarvis-secondary':
-        variant === 'secondary',
-      'bg-jarvis-danger text-white hover:bg-jarvis-danger/90 focus:ring-jarvis-danger':
-        variant === 'danger'
-    }
-  ]">
+  <button
+    :class="[
+      'px-4 py-2 rounded font-medium transition-all duration-200',
+      'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-jarvis-bg-dark',
+      {
+        'bg-jarvis-primary text-black hover:bg-jarvis-primary/90 focus:ring-jarvis-primary':
+          variant === 'primary',
+        'bg-transparent border border-jarvis-secondary text-jarvis-secondary hover:bg-jarvis-secondary/10 focus:ring-jarvis-secondary':
+          variant === 'secondary',
+        'bg-jarvis-danger text-white hover:bg-jarvis-danger/90 focus:ring-jarvis-danger':
+          variant === 'danger',
+      },
+    ]"
+  >
     <slot />
   </button>
 </template>
@@ -540,4 +545,5 @@ Tailwind CSS provides utility-first styling for JARVIS:
 ---
 
 **References**:
+
 - `references/advanced-patterns.md` - Complex layout patterns

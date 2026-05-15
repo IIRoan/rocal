@@ -209,7 +209,8 @@ function createStyles(theme: ThemeTokens) {
     title: {
       fontSize: theme.typography.fontSize["2xl"].size,
       lineHeight: theme.typography.fontSize["2xl"].lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: theme.spacing["2"],
     },
@@ -222,7 +223,8 @@ function createStyles(theme: ThemeTokens) {
     primaryButtonText: {
       fontSize: theme.typography.fontSize.base.size,
       lineHeight: theme.typography.fontSize.base.lineHeight,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.primaryForeground,
     },
     secondaryButtonText: {

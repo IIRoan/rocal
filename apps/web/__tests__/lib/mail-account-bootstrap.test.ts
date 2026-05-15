@@ -111,9 +111,9 @@ describe("bootstrapMailboxForAccount", () => {
         },
       }),
     );
-    expect(
-      mockBootstrapAccountMailbox.mock.calls[0]?.[0],
-    ).not.toHaveProperty("password");
+    expect(mockBootstrapAccountMailbox.mock.calls[0]?.[0]).not.toHaveProperty(
+      "password",
+    );
     expect(putStoredMailVault).toHaveBeenCalledWith({
       email: "alice@solace.onl",
       vaultVersion: 1,

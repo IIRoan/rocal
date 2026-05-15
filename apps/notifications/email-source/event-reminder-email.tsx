@@ -78,8 +78,7 @@ export function EventReminderEmailTemplate() {
           padding: 0,
           backgroundColor: "#ffffff",
           color: "#1a1a1a",
-          fontFamily:
-            '"Helvetica Neue", Helvetica, Arial, sans-serif',
+          fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
           WebkitFontSmoothing: "antialiased",
         }}
       >
@@ -96,9 +95,18 @@ export function EventReminderEmailTemplate() {
           {"{{.TimeUntilEvent}}"} for {"{{.EventTitle}}"}.
         </div>
 
-        <div style={{ margin: "0 auto", maxWidth: "555px", padding: "48px 28px 40px" }}>
+        <div
+          style={{
+            margin: "0 auto",
+            maxWidth: "555px",
+            padding: "48px 28px 40px",
+          }}
+        >
           {/* Logo */}
-          <a href={"{{.CalendarUrl}}"} style={{ outline: "none", textDecoration: "none" }}>
+          <a
+            href={"{{.CalendarUrl}}"}
+            style={{ outline: "none", textDecoration: "none" }}
+          >
             <img
               src={"{{.LogoUrl}}"}
               alt="Solace"
@@ -142,7 +150,14 @@ export function EventReminderEmailTemplate() {
 
           {/* Details */}
           <div style={{ marginTop: "28px" }}>
-            <DetailBlock label="When" value={<>{"{{.EventDate}}"} {"·"} {"{{.EventTime}}"}</>} />
+            <DetailBlock
+              label="When"
+              value={
+                <>
+                  {"{{.EventDate}}"} {"·"} {"{{.EventTime}}"}
+                </>
+              }
+            />
 
             <GoTemplateTag>{"{{if .EventLocation}}"}</GoTemplateTag>
             <DetailBlock label="Where" value={"{{.EventLocation}}"} />
@@ -232,8 +247,8 @@ export function EventReminderEmailTemplate() {
               color: "#a8a8a8",
             }}
           >
-            This reminder was sent because email notifications are enabled
-            for your account.
+            This reminder was sent because email notifications are enabled for
+            your account.
           </p>
           <p
             className="email-footer"

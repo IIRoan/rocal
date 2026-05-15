@@ -37,7 +37,8 @@ describe("mail realtime service", () => {
 
   it("publishes events only to subscribers authorized for the account", () => {
     const service = new MailRealtimeService({
-      eventSourceUrl: "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+      eventSourceUrl:
+        "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
       adminToken: "token-1",
     });
     const accountOneEvents: MailChangedEvent[] = [];

@@ -449,9 +449,8 @@ export default function SettingsScreen() {
     VIEW_OPTIONS.find((o) => o.value === (settings?.defaultView ?? "month"))
       ?.label ?? "Month View";
   const timeFormatLabel =
-    TIME_FORMAT_OPTIONS.find(
-      (o) => o.value === (settings?.timeFormat ?? "12h"),
-    )?.label ?? "12h";
+    TIME_FORMAT_OPTIONS.find((o) => o.value === (settings?.timeFormat ?? "12h"))
+      ?.label ?? "12h";
   const weekStartLabel =
     WEEK_START_OPTIONS.find((o) => o.value === (settings?.weekStartDay ?? 0))
       ?.label ?? "Sunday";
@@ -583,16 +582,20 @@ export default function SettingsScreen() {
         );
       } else if (activePasswordSheet === "set-password") {
         setIsSettingPassword(true);
-        const result = await (authClient as typeof authClient & {
-          setPassword: (input: { newPassword: string }) => Promise<{
-            error?: { message?: string };
-          } | void>;
-        }).setPassword({
+        const result = await (
+          authClient as typeof authClient & {
+            setPassword: (input: { newPassword: string }) => Promise<{
+              error?: { message?: string };
+            } | void>;
+          }
+        ).setPassword({
           newPassword: newPasswordInput,
         });
 
         if (result?.error) {
-          throw new Error(result.error.message ?? "Unable to set your password.");
+          throw new Error(
+            result.error.message ?? "Unable to set your password.",
+          );
         }
 
         await accountsQuery?.refetch?.();
@@ -1009,13 +1012,13 @@ export default function SettingsScreen() {
                     ? isSettingPassword
                     : action.key === "reset-encryption-password"
                       ? isResettingEncryptionPassword
-                  : action.key === "change-profile-picture"
-                    ? isUpdatingProfilePicture
-                    : action.key === "reset-preferences"
-                      ? resetSettingsMutation.isPending
-                      : action.key === "delete-account"
-                        ? isDeletingAccount
-                        : isSigningOut
+                      : action.key === "change-profile-picture"
+                        ? isUpdatingProfilePicture
+                        : action.key === "reset-preferences"
+                          ? resetSettingsMutation.isPending
+                          : action.key === "delete-account"
+                            ? isDeletingAccount
+                            : isSigningOut
               }
             />
           ))}
@@ -1199,7 +1202,9 @@ export default function SettingsScreen() {
           }}
           error={passwordChangeError}
           isPending={
-            isChangingPassword || isSettingPassword || isResettingEncryptionPassword
+            isChangingPassword ||
+            isSettingPassword ||
+            isResettingEncryptionPassword
           }
           theme={theme}
         />
@@ -1448,7 +1453,9 @@ function SheetPickerOption({
         pressed && { opacity: 0.7 },
       ]}
       accessibilityRole={multiSelect ? "switch" : "menuitem"}
-      accessibilityState={multiSelect ? { checked: isSelected } : { selected: isSelected }}
+      accessibilityState={
+        multiSelect ? { checked: isSelected } : { selected: isSelected }
+      }
       accessibilityLabel={label}
     >
       {icon ? (
@@ -1469,9 +1476,7 @@ function SheetPickerOption({
       >
         {label}
       </Text>
-      {isSelected && (
-        <Feather name="check" size={16} color={activeColor} />
-      )}
+      {isSelected && <Feather name="check" size={16} color={activeColor} />}
     </Pressable>
   );
 }
@@ -1680,7 +1685,9 @@ function PasswordChangeCard({
         ) : null}
         <PasswordField
           label={
-            isResetEncryptionPassword ? "New encryption password" : "New password"
+            isResetEncryptionPassword
+              ? "New encryption password"
+              : "New password"
           }
           value={newPassword}
           onChangeText={onNewPasswordChange}
@@ -1875,7 +1882,10 @@ function ProfilePictureCard({
           accessibilityLabel="Save profile picture"
         >
           {isPending ? (
-            <ActivityIndicator size="small" color={theme.colors.primaryForeground} />
+            <ActivityIndicator
+              size="small"
+              color={theme.colors.primaryForeground}
+            />
           ) : (
             <Text
               style={{

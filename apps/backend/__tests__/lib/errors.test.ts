@@ -35,7 +35,10 @@ describe("errors", () => {
   it("stores extra properties on custom error classes", () => {
     const validationError = new ValidationError("Invalid timezone", "timezone");
     const databaseError = new DatabaseError("Write failed", new Error("cause"));
-    const notificationError = new NotificationError("Send failed", new Error("smtp"));
+    const notificationError = new NotificationError(
+      "Send failed",
+      new Error("smtp"),
+    );
 
     expect(validationError.name).toBe("ValidationError");
     expect(validationError.field).toBe("timezone");
@@ -157,9 +160,7 @@ describe("errors", () => {
       }),
     });
 
-    expect(
-      invokeOnError("UNKNOWN", new UnauthorizedError()),
-    ).toEqual({
+    expect(invokeOnError("UNKNOWN", new UnauthorizedError())).toEqual({
       set: { status: 401 },
       result: expect.objectContaining({
         error: "Unauthorized",
@@ -168,9 +169,7 @@ describe("errors", () => {
       }),
     });
 
-    expect(
-      invokeOnError("UNKNOWN", new ForbiddenError()),
-    ).toEqual({
+    expect(invokeOnError("UNKNOWN", new ForbiddenError())).toEqual({
       set: { status: 403 },
       result: expect.objectContaining({
         error: "Forbidden",

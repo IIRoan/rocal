@@ -613,8 +613,7 @@ export class EventService implements IEventService {
       const encryptionMode = normalizeEventEncryptionMode(
         userSettings?.eventEncryptionMode,
       );
-      const calendarForceFullEncryption =
-        calendar.forceFullEncryption === true;
+      const calendarForceFullEncryption = calendar.forceFullEncryption === true;
       const requiresFullEncryption =
         encryptionMode === "full" || calendarForceFullEncryption;
 
@@ -943,7 +942,9 @@ export class EventService implements IEventService {
         input.encryptedContent !== undefined
           ? input.encryptedContent
           : existingEvent.encryptedContent;
-      const hasEncryptedPayload = this.hasEncryptedPayload(finalEncryptedContent);
+      const hasEncryptedPayload = this.hasEncryptedPayload(
+        finalEncryptedContent,
+      );
       const sensitiveFieldsProvided =
         input.title !== undefined ||
         input.description !== undefined ||
@@ -978,7 +979,9 @@ export class EventService implements IEventService {
           ? input.location?.trim() || null
           : existingEvent.location;
       const finalReminderValue =
-        input.reminder !== undefined ? reminderValue ?? null : existingEvent.reminder;
+        input.reminder !== undefined
+          ? (reminderValue ?? null)
+          : existingEvent.reminder;
       const persistencePolicy = resolveEventPersistencePolicy({
         mode: encryptionMode,
         hasEncryptedPayload,

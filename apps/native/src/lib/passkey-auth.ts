@@ -30,9 +30,7 @@ interface StoredPasskeySummary {
   createdAt: Date | string;
 }
 
-export function getDefaultPasskeyName(
-  platformOS = "native",
-): string {
+export function getDefaultPasskeyName(platformOS = "native"): string {
   switch (platformOS) {
     case "ios":
       return "This Apple device";

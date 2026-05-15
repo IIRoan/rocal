@@ -100,7 +100,10 @@ function getValidationDetails(error: unknown) {
   }
 
   const issues = rawIssues
-    .filter((issue): issue is Record<string, unknown> => !!issue && typeof issue === "object")
+    .filter(
+      (issue): issue is Record<string, unknown> =>
+        !!issue && typeof issue === "object",
+    )
     .map((issue) => ({
       path: typeof issue.path === "string" ? issue.path : undefined,
       message:
@@ -109,8 +112,7 @@ function getValidationDetails(error: unknown) {
           : typeof issue.summary === "string"
             ? issue.summary
             : "Invalid value",
-      expected:
-        typeof issue.expected === "string" ? issue.expected : undefined,
+      expected: typeof issue.expected === "string" ? issue.expected : undefined,
       found: "found" in issue ? issue.found : undefined,
     }));
 

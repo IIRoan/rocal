@@ -15,18 +15,18 @@ This repository is a monorepo for a calendar application (Solace), containing a 
 
 ### Shared Packages
 
-| Package | Purpose |
-|---|---|
-| `@workspace/calendar-client` | Platform-agnostic HTTP client and typed API service for all backend endpoints. Accepts a configurable base URL and optional `E2eeProvider`. |
-| `@workspace/calendar-core` | Platform-agnostic React hooks, date utilities, validation logic, TypeScript types, and view model helpers. |
-| `@workspace/design-tokens` | Colors, spacing, typography, border radii, and shadows in platform-agnostic TypeScript. Consumed by Tailwind (web) and ThemeProvider (native). |
-| `@workspace/e2ee` | End-to-end encryption abstraction (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with a `CryptoProvider` interface for platform-specific crypto backends. |
-| `@workspace/calendar-ics` | ICS export and recurrence logic. |
-| `@workspace/ui` | Shared React UI components (web-focused, shadcn/ui based). |
-| `@workspace/mobile-ui` | Legacy cross-platform components using `react-native-web`, retained only for migration reference. |
-| `@workspace/logger` | Shared logging utility. |
-| `@workspace/eslint-config` | Shared ESLint configuration. |
-| `@workspace/typescript-config` | Shared TypeScript configuration. |
+| Package                        | Purpose                                                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@workspace/calendar-client`   | Platform-agnostic HTTP client and typed API service for all backend endpoints. Accepts a configurable base URL and optional `E2eeProvider`.           |
+| `@workspace/calendar-core`     | Platform-agnostic React hooks, date utilities, validation logic, TypeScript types, and view model helpers.                                            |
+| `@workspace/design-tokens`     | Colors, spacing, typography, border radii, and shadows in platform-agnostic TypeScript. Consumed by Tailwind (web) and ThemeProvider (native).        |
+| `@workspace/e2ee`              | End-to-end encryption abstraction (AES-GCM-256, RSA-OAEP-4096, HMAC-SHA-256) with a `CryptoProvider` interface for platform-specific crypto backends. |
+| `@workspace/calendar-ics`      | ICS export and recurrence logic.                                                                                                                      |
+| `@workspace/ui`                | Shared React UI components (web-focused, shadcn/ui based).                                                                                            |
+| `@workspace/mobile-ui`         | Legacy cross-platform components using `react-native-web`, retained only for migration reference.                                                     |
+| `@workspace/logger`            | Shared logging utility.                                                                                                                               |
+| `@workspace/eslint-config`     | Shared ESLint configuration.                                                                                                                          |
+| `@workspace/typescript-config` | Shared TypeScript configuration.                                                                                                                      |
 
 ### Native App Structure
 

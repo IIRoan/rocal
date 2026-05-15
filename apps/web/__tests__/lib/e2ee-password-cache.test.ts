@@ -1,11 +1,6 @@
 /** @jest-environment jsdom */
 
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-} from "@jest/globals";
+import { afterEach, describe, expect, it } from "@jest/globals";
 
 import {
   clearAuthPasswords,

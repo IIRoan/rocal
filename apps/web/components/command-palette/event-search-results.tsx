@@ -86,18 +86,12 @@ export function EventSearchResults({
               className={`w-2 h-2 rounded-full shrink-0 ${getColorClass(eventColor)}`}
             />
             <div className="flex-1 min-w-0">
-              <span className="text-sm truncate block">
-                {event.title}
-              </span>
+              <span className="text-sm truncate block">{event.title}</span>
               <span className="text-xs text-muted-foreground">
                 {dateStr} &middot; {timeStr}
               </span>
             </div>
-            <EncryptionStatusBadge
-              item={event}
-              asIcon
-              className="opacity-80"
-            />
+            <EncryptionStatusBadge item={event} asIcon className="opacity-80" />
             {event.location && (
               <MapPin className="h-3 w-3 text-muted-foreground/50 shrink-0" />
             )}

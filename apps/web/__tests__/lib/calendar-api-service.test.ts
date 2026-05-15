@@ -29,18 +29,26 @@ describe("CalendarApiService encryption wrappers", () => {
     };
     mockE2ee = {
       attachEventEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
-      attachCalendarEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
-      attachCategoryEncryptionShadow: jest.fn((req: any) => Promise.resolve(req)),
-      hydrateEncryptedEvent: jest.fn((event: any) => Promise.resolve({
-        ...event,
-        title: "Decrypted event",
-        description: "Hidden agenda",
-        location: "Room 7",
-      })),
+      attachCalendarEncryptionShadow: jest.fn((req: any) =>
+        Promise.resolve(req),
+      ),
+      attachCategoryEncryptionShadow: jest.fn((req: any) =>
+        Promise.resolve(req),
+      ),
+      hydrateEncryptedEvent: jest.fn((event: any) =>
+        Promise.resolve({
+          ...event,
+          title: "Decrypted event",
+          description: "Hidden agenda",
+          location: "Room 7",
+        }),
+      ),
       hydrateEncryptedEvents: jest.fn((events: any[]) =>
         Promise.all(events.map((e: any) => mockE2ee.hydrateEncryptedEvent(e))),
       ),
-      createBlindIndexTokens: jest.fn(() => Promise.resolve(["idx-1", "idx-2"])),
+      createBlindIndexTokens: jest.fn(() =>
+        Promise.resolve(["idx-1", "idx-2"]),
+      ),
     };
     service = new CalendarApiService(
       client as any,
@@ -179,7 +187,10 @@ describe("CalendarApiService encryption wrappers", () => {
         {
           id: "event-1",
           title: "",
-          encryptedContent: JSON.stringify({ iv: "iv", ciphertext: "ciphertext" }),
+          encryptedContent: JSON.stringify({
+            iv: "iv",
+            ciphertext: "ciphertext",
+          }),
           blindIndexTokens: ["idx-1"],
           encryptionState: "encrypted",
           start: new Date("2026-05-01T10:00:00.000Z"),

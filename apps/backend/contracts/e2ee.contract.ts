@@ -125,7 +125,9 @@ export type UpsertEncryptionPasswordInput = {
 export interface IE2eeService {
   getBootstrap(userId: string): Promise<E2eeBootstrapResult>;
   getResetSnapshot(userId: string): Promise<E2eeResetSnapshotResult>;
-  upsertDevice(input: UpsertEncryptionDeviceInput): Promise<EncryptionDeviceRecord>;
+  upsertDevice(
+    input: UpsertEncryptionDeviceInput,
+  ): Promise<EncryptionDeviceRecord>;
   upsertPasswordEnvelope(
     input: UpsertEncryptionPasswordInput,
   ): Promise<EncryptionPasswordRecord>;

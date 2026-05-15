@@ -17,15 +17,19 @@ jest.mock("../../lib/prisma", () => ({
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
     $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
-      callback((jest.requireMock("../../lib/prisma") as { prisma: any }).prisma),
+      callback(
+        (jest.requireMock("../../lib/prisma") as { prisma: any }).prisma,
+      ),
     ),
   },
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
-  ensureAuthenticatedUser: jest.fn(async (): Promise<any> => ({
-    id: "user-1",
-  })),
+  ensureAuthenticatedUser: jest.fn(
+    async (): Promise<any> => ({
+      id: "user-1",
+    }),
+  ),
 }));
 
 jest.mock("../../lib/auth", () => ({
@@ -47,7 +51,9 @@ import { accountPublicRoutes } from "../../routes/account-public";
 import { accountRoutes } from "../../routes/account";
 
 const mockEnsureAuthenticatedUser =
-  ensureAuthenticatedUser as jest.MockedFunction<typeof ensureAuthenticatedUser>;
+  ensureAuthenticatedUser as jest.MockedFunction<
+    typeof ensureAuthenticatedUser
+  >;
 const mockPrisma = prisma as unknown as {
   user: {
     findUnique: jest.Mock<() => Promise<any>>;
@@ -93,9 +99,7 @@ describe("accountRoutes", () => {
     mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce(null);
 
     const response = await createApp().handle(
-      new Request(
-        "http://localhost/account/email-availability?email=Roan",
-      ),
+      new Request("http://localhost/account/email-availability?email=Roan"),
     );
 
     expect(response.status).toBe(200);

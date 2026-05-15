@@ -17,18 +17,20 @@ function createMockPrisma() {
 
   const prisma = {
     user: {
-      findUnique: jest.fn<() => Promise<{ id: string } | null>>(
-        async () => ({ id: "user-1" }),
-      ),
+      findUnique: jest.fn<() => Promise<{ id: string } | null>>(async () => ({
+        id: "user-1",
+      })),
       delete: tx.user.delete,
     },
     mailDirectoryEntry: {
-      findUnique: jest.fn<() => Promise<{ id: string } | null>>(async () => null),
+      findUnique: jest.fn<() => Promise<{ id: string } | null>>(
+        async () => null,
+      ),
     },
     calendarSharing: tx.calendarSharing,
     notificationLog: tx.notificationLog,
-    $transaction: jest.fn(async (callback: (db: typeof tx) => Promise<unknown>) =>
-      callback(tx),
+    $transaction: jest.fn(
+      async (callback: (db: typeof tx) => Promise<unknown>) => callback(tx),
     ),
   };
 
@@ -64,7 +66,9 @@ describe("AccountService", () => {
       where: { email: "roan@solace.onl" },
       select: { id: true },
     });
-    expect(mockPrisma.prisma.mailDirectoryEntry.findUnique).toHaveBeenCalledWith({
+    expect(
+      mockPrisma.prisma.mailDirectoryEntry.findUnique,
+    ).toHaveBeenCalledWith({
       where: { email: "roan@solace.onl" },
       select: { id: true },
     });
@@ -85,7 +89,9 @@ describe("AccountService", () => {
     });
 
     expect(mockPrisma.prisma.user.findUnique).not.toHaveBeenCalled();
-    expect(mockPrisma.prisma.mailDirectoryEntry.findUnique).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.prisma.mailDirectoryEntry.findUnique,
+    ).not.toHaveBeenCalled();
     expect(result).toEqual({
       email: "not an email",
       localPart: "not an email",

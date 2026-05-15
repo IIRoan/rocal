@@ -21,12 +21,7 @@ import { isMultiDayEvent } from "./utils";
 import { CalendarEvent } from "./types";
 import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator";
 import { cn } from "../../lib/utils";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerShell,
-  DrawerTitle,
-} from "../ui/drawer";
+import { Drawer, DrawerContent, DrawerShell, DrawerTitle } from "../ui/drawer";
 import { resolveInlineColorValue } from "./utils";
 
 const CELL_HEIGHT = 60;
@@ -65,11 +60,14 @@ export function MobileThreeDayView({
   const [drawerEvents, setDrawerEvents] = useState<CalendarEvent[]>([]);
 
   // Show yesterday, today, tomorrow centered on currentDate
-  const days = useMemo(() => [
-    subDays(currentDate, 1),
-    new Date(currentDate),
-    addDays(currentDate, 1),
-  ], [currentDate]);
+  const days = useMemo(
+    () => [
+      subDays(currentDate, 1),
+      new Date(currentDate),
+      addDays(currentDate, 1),
+    ],
+    [currentDate],
+  );
 
   const hours = useMemo(() => {
     const dayStart = startOfDay(currentDate);
@@ -110,8 +108,12 @@ export function MobileThreeDayView({
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
-        const adjustedStart = isSameDay(day, eventStart) ? eventStart : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd) ? eventEnd : addHours(dayStart, 24);
+        const adjustedStart = isSameDay(day, eventStart)
+          ? eventStart
+          : dayStart;
+        const adjustedEnd = isSameDay(day, eventEnd)
+          ? eventEnd
+          : addHours(dayStart, 24);
 
         let columnIndex = 0;
         let placed = false;
@@ -146,10 +148,15 @@ export function MobileThreeDayView({
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
-        const adjustedStart = isSameDay(day, eventStart) ? eventStart : dayStart;
-        const adjustedEnd = isSameDay(day, eventEnd) ? eventEnd : addHours(dayStart, 24);
+        const adjustedStart = isSameDay(day, eventStart)
+          ? eventStart
+          : dayStart;
+        const adjustedEnd = isSameDay(day, eventEnd)
+          ? eventEnd
+          : addHours(dayStart, 24);
 
-        const startHour = getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
+        const startHour =
+          getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
         const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
 
         const top = startHour * CELL_HEIGHT;
@@ -157,15 +164,16 @@ export function MobileThreeDayView({
 
         const columnIndex = eventColumnMapping.get(event) ?? 0;
 
-        const overlappingCount = dayEvents.filter((other) => {
-          if (other.id === event.id) return false;
-          const oStart = new Date(other.start);
-          const oEnd = new Date(other.end);
-          return areIntervalsOverlapping(
-            { start: adjustedStart, end: adjustedEnd },
-            { start: oStart, end: oEnd },
-          );
-        }).length + 1;
+        const overlappingCount =
+          dayEvents.filter((other) => {
+            if (other.id === event.id) return false;
+            const oStart = new Date(other.start);
+            const oEnd = new Date(other.end);
+            return areIntervalsOverlapping(
+              { start: adjustedStart, end: adjustedEnd },
+              { start: oStart, end: oEnd },
+            );
+          }).length + 1;
 
         let width: number;
         let left: number;
@@ -183,7 +191,14 @@ export function MobileThreeDayView({
           left = columnIndex * (width + gap);
         }
 
-        positionedEvents.push({ event, top, height, left, width, zIndex: 10 + columnIndex });
+        positionedEvents.push({
+          event,
+          top,
+          height,
+          left,
+          width,
+          zIndex: 10 + columnIndex,
+        });
       });
 
       return positionedEvents;
@@ -204,9 +219,14 @@ export function MobileThreeDayView({
     );
   }, [days, events]);
 
-  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent, dayIndex: number) => {
+  const handleEventClick = (
+    event: CalendarEvent,
+    e: React.MouseEvent,
+    dayIndex: number,
+  ) => {
     e.stopPropagation();
-    const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 640;
+    const isMobileScreen =
+      typeof window !== "undefined" && window.innerWidth < 640;
 
     if (isMobileScreen) {
       const eventStart = new Date(event.start);
@@ -223,7 +243,9 @@ export function MobileThreeDayView({
           );
         })
         .map((pe) => pe.event!)
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        .sort(
+          (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+        );
 
       if (overlapping.length > 1) {
         setDrawerEvents(overlapping);
@@ -300,7 +322,9 @@ export function MobileThreeDayView({
                         key={i}
                         className="w-1 h-1 rounded-full"
                         style={{
-                          backgroundColor: resolveInlineColorValue(ev.color || "blue"),
+                          backgroundColor: resolveInlineColorValue(
+                            ev.color || "blue",
+                          ),
                         }}
                       />
                     ))}
@@ -358,7 +382,9 @@ export function MobileThreeDayView({
                       <DraggableEvent
                         event={positionedEvent.event}
                         view="week"
-                        onClick={(e) => handleEventClick(positionedEvent.event, e, dayIndex)}
+                        onClick={(e) =>
+                          handleEventClick(positionedEvent.event, e, dayIndex)
+                        }
                         showTime
                         height={positionedEvent.height}
                         timeFormat={timeFormat}
@@ -426,7 +452,11 @@ export function MobileThreeDayView({
 
       {/* Event selection drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerContent responsive responsiveHeight="70dvh" className="overflow-hidden">
+        <DrawerContent
+          responsive
+          responsiveHeight="70dvh"
+          className="overflow-hidden"
+        >
           <DrawerTitle className="sr-only">Select Event</DrawerTitle>
           <DrawerShell
             header={
@@ -456,7 +486,11 @@ export function MobileThreeDayView({
                     <div className="flex items-center justify-center w-6 h-6 shrink-0">
                       <div
                         className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: resolveInlineColorValue(event.color || "blue") }}
+                        style={{
+                          backgroundColor: resolveInlineColorValue(
+                            event.color || "blue",
+                          ),
+                        }}
                       />
                     </div>
                     <div className="flex-1 min-w-0">

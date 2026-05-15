@@ -26,7 +26,10 @@ describe("app route helpers", () => {
 
   it("supports cloning URLSearchParams inputs", () => {
     expect(
-      buildPathWithSearch(CALENDAR_HOME_PATH, new URLSearchParams("palette=settings")),
+      buildPathWithSearch(
+        CALENDAR_HOME_PATH,
+        new URLSearchParams("palette=settings"),
+      ),
     ).toBe("/calendar?palette=settings");
   });
 });

@@ -229,7 +229,6 @@ describe("computeRescheduledTimes", () => {
   });
 });
 
-
 // ─── findEventColumnIndex ────────────────────────────────────────────────────
 
 describe("findEventColumnIndex", () => {

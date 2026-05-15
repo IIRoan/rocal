@@ -53,8 +53,13 @@ function createMockPrisma() {
         calendarFixture(data),
       ),
       update: jest.fn(
-        async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
-          calendarFixture({ id: where.id, ...data }),
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Record<string, unknown>;
+        }) => calendarFixture({ id: where.id, ...data }),
       ),
       updateMany: jest.fn(async () => ({ count: 0 })),
       delete: jest.fn(async () => calendarFixture()),

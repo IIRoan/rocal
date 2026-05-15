@@ -69,7 +69,10 @@ function RouteTransitionRouteTracker({
 }
 
 function isPasskeyBridgeRoute(routeKey: string | null) {
-  return routeKey === PASSKEY_BRIDGE_ROUTE || routeKey?.startsWith(`${PASSKEY_BRIDGE_ROUTE}?`);
+  return (
+    routeKey === PASSKEY_BRIDGE_ROUTE ||
+    routeKey?.startsWith(`${PASSKEY_BRIDGE_ROUTE}?`)
+  );
 }
 
 export function RouteTransitionProvider({ children }: { children: ReactNode }) {

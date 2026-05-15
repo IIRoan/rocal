@@ -38,7 +38,6 @@ import { useCurrentTimeIndicator } from "../../hooks/use-current-time-indicator"
 import { StartHour, EndHour } from "./constants";
 import { cn } from "../../lib/utils";
 
-
 interface WeekViewProps {
   currentDate: Date;
   events: CalendarEvent[];
@@ -165,8 +164,7 @@ export const WeekView = React.memo(function WeekView({
       const dayStart = startOfDay(day);
 
       // Track columns for overlapping events
-      const columns: { event: CalendarEvent; start: Date; end: Date }[][] =
-        [];
+      const columns: { event: CalendarEvent; start: Date; end: Date }[][] = [];
       const eventColumnMapping: Map<CalendarEvent, number> = new Map();
 
       // First pass: assign events to columns
@@ -272,7 +270,14 @@ export const WeekView = React.memo(function WeekView({
           left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.34 : 0.67;
         } else if (overlappingColumns === 4) {
           width = 0.2475;
-          left = columnIndex === 0 ? 0 : columnIndex === 1 ? 0.255 : columnIndex === 2 ? 0.51 : 0.765;
+          left =
+            columnIndex === 0
+              ? 0
+              : columnIndex === 1
+                ? 0.255
+                : columnIndex === 2
+                  ? 0.51
+                  : 0.765;
         } else {
           // For 5+ events, guarantee no overflow
           const gap = 0.005;
@@ -322,7 +327,8 @@ export const WeekView = React.memo(function WeekView({
       (targetHour - StartHour) * WeekCellsHeight,
     );
 
-    const previousScrollBehavior = scrollContainerRef.current.style.scrollBehavior;
+    const previousScrollBehavior =
+      scrollContainerRef.current.style.scrollBehavior;
     scrollContainerRef.current.style.scrollBehavior = "auto";
     scrollContainerRef.current.scrollTop = scrollPosition;
     scrollContainerRef.current.style.scrollBehavior = previousScrollBehavior;
@@ -351,7 +357,7 @@ export const WeekView = React.memo(function WeekView({
                   "text-[11px] font-medium uppercase tracking-wider",
                   isToday(day)
                     ? "rounded-md bg-primary px-2 py-1 font-medium text-primary-foreground"
-                    : ""
+                    : "",
                 )}
               >
                 {format(day, "EEE")} {format(day, "d")}
@@ -377,7 +383,7 @@ export const WeekView = React.memo(function WeekView({
                   "text-[10px] font-medium uppercase",
                   isToday(day)
                     ? "rounded-md bg-primary px-1.5 py-0.5 font-medium text-primary-foreground"
-                    : ""
+                    : "",
                 )}
               >
                 {format(day, "E")[0]} {format(day, "d")}
@@ -391,13 +397,18 @@ export const WeekView = React.memo(function WeekView({
       <div className="grid w-full grid-cols-[3rem_repeat(7,minmax(0,1fr))] items-stretch border-b border-border/40 relative z-30 shrink-0">
         <div className="h-full flex flex-col bg-background">
           <div className="flex flex-1 flex-col items-center justify-center min-h-[24px]">
-            <span className="text-[9px] text-muted-foreground/40 leading-none">all-day</span>
+            <span className="text-[9px] text-muted-foreground/40 leading-none">
+              all-day
+            </span>
           </div>
         </div>
         {days.map((day, dayIndex) => {
           const dayEvents = allDayEventsByDay[dayIndex] ?? [];
           return (
-            <div key={`all-day-${day.toString()}`} className="shadow-sm h-full flex flex-col bg-background">
+            <div
+              key={`all-day-${day.toString()}`}
+              className="shadow-sm h-full flex flex-col bg-background"
+            >
               <div
                 className={cn(
                   "flex flex-1 flex-col justify-start p-0.5 gap-0.5",
@@ -423,10 +434,7 @@ export const WeekView = React.memo(function WeekView({
                   const shouldShowTitle = isFirstSegmentDay;
 
                   return (
-                    <div
-                      key={`allday-${event.id}`}
-                      className="w-full"
-                    >
+                    <div key={`allday-${event.id}`} className="w-full">
                       <EventItem
                         onClick={(e) => handleEventClick(event, e)}
                         event={event}
@@ -483,9 +491,7 @@ export const WeekView = React.memo(function WeekView({
           <div
             key={dayIndex}
             className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
-              isToday(day)
-                ? "bg-[var(--calendar-accent-bg)]/20"
-                : ""
+              isToday(day) ? "bg-[var(--calendar-accent-bg)]/20" : ""
             }`}
             data-today={isToday(day) || undefined}
           >
@@ -509,7 +515,9 @@ export const WeekView = React.memo(function WeekView({
                       <DraggableEvent
                         event={positionedEvent.event}
                         view="week"
-                        onClick={(e) => handleEventClick(positionedEvent.event, e)}
+                        onClick={(e) =>
+                          handleEventClick(positionedEvent.event, e)
+                        }
                         showTime
                         height={positionedEvent.height}
                         timeFormat={timeFormat}

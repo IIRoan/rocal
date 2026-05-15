@@ -52,4 +52,3 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
     </>
   );
 }
-

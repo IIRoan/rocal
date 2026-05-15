@@ -1,4 +1,7 @@
-import type { CalendarShareLinkResponse, DisableCalendarShareLinkResponse } from "@workspace/calendar-ics";
+import type {
+  CalendarShareLinkResponse,
+  DisableCalendarShareLinkResponse,
+} from "@workspace/calendar-ics";
 
 export type ShareLinkInput = {
   userId: string;
@@ -12,8 +15,12 @@ export type CreateShareLinkInput = ShareLinkInput & {
 
 export interface ICalendarSharingService {
   getShareLink(input: ShareLinkInput): Promise<CalendarShareLinkResponse>;
-  createShareLink(input: CreateShareLinkInput): Promise<CalendarShareLinkResponse>;
-  disableShareLink(input: ShareLinkInput): Promise<DisableCalendarShareLinkResponse>;
+  createShareLink(
+    input: CreateShareLinkInput,
+  ): Promise<CalendarShareLinkResponse>;
+  disableShareLink(
+    input: ShareLinkInput,
+  ): Promise<DisableCalendarShareLinkResponse>;
   getSharedCalendarIcs(
     token: string,
     sourceUrl: string,

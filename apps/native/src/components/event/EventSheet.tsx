@@ -136,7 +136,9 @@ export function EventSheet({
   const [viewMode, setViewMode] = useState<"view" | "edit">("view");
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [editScope, setEditScope] = useState<RecurrenceEditScope | undefined>();
-  const [editOccurrenceDate, setEditOccurrenceDate] = useState<string | undefined>();
+  const [editOccurrenceDate, setEditOccurrenceDate] = useState<
+    string | undefined
+  >();
   const [scopeModalVisible, setScopeModalVisible] = useState(false);
   const [scopeAction, setScopeAction] = useState<"edit" | "delete">("edit");
   const viewScrollAtTopRef = useRef(true);
@@ -146,9 +148,11 @@ export function EventSheet({
   const isCreate = mode?.type === "create";
   const isViewOrEdit = mode?.type === "view" || mode?.type === "edit";
   const eventId =
-    mode?.type === "view" ? mode.eventId
-    : mode?.type === "edit" ? mode.eventId
-    : undefined;
+    mode?.type === "view"
+      ? mode.eventId
+      : mode?.type === "edit"
+        ? mode.eventId
+        : undefined;
 
   // Reset internal state when mode changes
   useEffect(() => {
@@ -211,11 +215,19 @@ export function EventSheet({
   // ─── Mutations ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateEventRequest) => calendarApiService.createEvent(data),
+    mutationFn: (data: CreateEventRequest) =>
+      calendarApiService.createEvent(data),
     onMutate: async (data: CreateEventRequest) => {
       const tempId = generateOptimisticId();
-      const optimisticEvent = buildOptimisticEvent(data, user?.id ?? "", tempId);
-      createSnapshotRef.current = await optimisticallyInsertEvent(queryClient, optimisticEvent);
+      const optimisticEvent = buildOptimisticEvent(
+        data,
+        user?.id ?? "",
+        tempId,
+      );
+      createSnapshotRef.current = await optimisticallyInsertEvent(
+        queryClient,
+        optimisticEvent,
+      );
       setServerErrors([]);
       dismissSheet();
       return { tempId };
@@ -247,7 +259,9 @@ export function EventSheet({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventDetail(eventId) });
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventDetail(eventId),
+        });
       }
       setServerErrors([]);
       dismissSheet();
@@ -270,20 +284,29 @@ export function EventSheet({
       occurrenceDate?: string;
     }) => {
       if (scope) {
-        return calendarApiService.deleteRecurringEvent(eventId!, scope, occurrenceDate);
+        return calendarApiService.deleteRecurringEvent(
+          eventId!,
+          scope,
+          occurrenceDate,
+        );
       }
       return calendarApiService.deleteEvent(eventId!);
     },
     onMutate: async () => {
       if (eventId) {
-        deleteSnapshotRef.current = await optimisticallyRemoveEvent(queryClient, eventId);
+        deleteSnapshotRef.current = await optimisticallyRemoveEvent(
+          queryClient,
+          eventId,
+        );
         dismissSheet();
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       if (eventId) {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.eventDetail(eventId) });
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.eventDetail(eventId),
+        });
       }
     },
     onError: (err: unknown) => {
@@ -340,7 +363,11 @@ export function EventSheet({
     } else {
       Alert.alert("Delete event?", "This action cannot be undone.", [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate({}) },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteMutation.mutate({}),
+        },
       ]);
     }
   }, [isRecurring, deleteMutation]);
@@ -348,7 +375,9 @@ export function EventSheet({
   const handleScopeSelect = useCallback(
     (scope: RecurrenceEditScope & RecurrenceDeleteScope) => {
       setScopeModalVisible(false);
-      const occDate = event?.start ? new Date(event.start).toISOString() : undefined;
+      const occDate = event?.start
+        ? new Date(event.start).toISOString()
+        : undefined;
       if (scopeAction === "edit") {
         setEditScope(scope);
         setEditOccurrenceDate(occDate);
@@ -359,7 +388,8 @@ export function EventSheet({
           {
             text: "Delete",
             style: "destructive",
-            onPress: () => deleteMutation.mutate({ scope, occurrenceDate: occDate }),
+            onPress: () =>
+              deleteMutation.mutate({ scope, occurrenceDate: occDate }),
           },
         ]);
       }
@@ -379,7 +409,10 @@ export function EventSheet({
         if (!isNaN(h)) startDate.setHours(h, 0, 0, 0);
       }
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-      return { start: toLocalISOString(startDate), end: toLocalISOString(endDate) } satisfies Partial<CreateEventRequest>;
+      return {
+        start: toLocalISOString(startDate),
+        end: toLocalISOString(endDate),
+      } satisfies Partial<CreateEventRequest>;
     }
     return undefined;
   }, [isCreate, isViewOrEdit, mode, event]);
@@ -387,8 +420,15 @@ export function EventSheet({
   // ─── Derived ───────────────────────────────────────────────────────────
 
   const isLoading = calendarsLoading || (isViewOrEdit && eventLoading);
-  const isPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
-  const sheetTitle = isCreate ? "Create Event" : viewMode === "view" ? "Event Details" : "Edit Event";
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
+  const sheetTitle = isCreate
+    ? "Create Event"
+    : viewMode === "view"
+      ? "Event Details"
+      : "Edit Event";
   const isEditing = viewMode === "edit";
   const iconColor = theme.colors.mutedForeground;
   const iconBg = theme.colors.mutedForeground + "18";
@@ -428,11 +468,19 @@ export function EventSheet({
               accessibilityRole="button"
               accessibilityLabel="Close event drawer"
             >
-              <Feather name="x" size={18} color={theme.colors.mutedForeground} />
+              <Feather
+                name="x"
+                size={18}
+                color={theme.colors.mutedForeground}
+              />
             </Pressable>
           )}
 
-          <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={1}>
+          <Text
+            style={styles.headerTitle}
+            accessibilityRole="header"
+            numberOfLines={1}
+          >
             {sheetTitle}
           </Text>
 
@@ -471,7 +519,12 @@ export function EventSheet({
               accessibilityRole="button"
               accessibilityLabel="Edit event"
             >
-              <Text style={[styles.headerTextButtonLabel, { color: theme.colors.primaryBase }]}>
+              <Text
+                style={[
+                  styles.headerTextButtonLabel,
+                  { color: theme.colors.primaryBase },
+                ]}
+              >
                 Edit
               </Text>
             </Pressable>
@@ -513,8 +566,12 @@ export function EventSheet({
                 <View style={styles.sectionRow}>
                   <IconBox name="clock" color={iconColor} bg={iconBg} />
                   <View style={styles.viewRowContent}>
-                    <Text style={styles.viewText}>{formatEventDate(event)}</Text>
-                    <Text style={styles.viewSubtext}>{formatEventTime(event)}</Text>
+                    <Text style={styles.viewText}>
+                      {formatEventDate(event)}
+                    </Text>
+                    <Text style={styles.viewSubtext}>
+                      {formatEventTime(event)}
+                    </Text>
                   </View>
                 </View>
 
@@ -545,7 +602,9 @@ export function EventSheet({
                     <View style={styles.sectionDivider} />
                     <View style={styles.sectionRow}>
                       <IconBox name="bell" color={iconColor} bg={iconBg} />
-                      <Text style={styles.viewText}>{formatReminderLabel(event.reminder)}</Text>
+                      <Text style={styles.viewText}>
+                        {formatReminderLabel(event.reminder)}
+                      </Text>
                     </View>
                   </>
                 ) : null}
@@ -574,11 +633,15 @@ export function EventSheet({
               {/* Description */}
               {event.description ? (
                 <View style={styles.sectionCard}>
-                  <View style={[styles.sectionRow, { alignItems: "flex-start" }]}>
+                  <View
+                    style={[styles.sectionRow, { alignItems: "flex-start" }]}
+                  >
                     <View style={{ marginTop: 2 }}>
                       <IconBox name="file-text" color={iconColor} bg={iconBg} />
                     </View>
-                    <Text style={styles.viewDescription}>{event.description}</Text>
+                    <Text style={styles.viewDescription}>
+                      {event.description}
+                    </Text>
                   </View>
                 </View>
               ) : null}
@@ -592,7 +655,11 @@ export function EventSheet({
                   accessibilityRole="button"
                   accessibilityLabel="Delete event"
                 >
-                  <Feather name="trash-2" size={16} color={theme.colors.destructive} />
+                  <Feather
+                    name="trash-2"
+                    size={16}
+                    color={theme.colors.destructive}
+                  />
                   <Text style={styles.deleteText}>Delete event</Text>
                 </Pressable>
               ) : null}
@@ -601,7 +668,9 @@ export function EventSheet({
               {serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
                   {serverErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>{err}</Text>
+                    <Text key={idx} style={styles.errorText}>
+                      {err}
+                    </Text>
                   ))}
                 </View>
               )}
@@ -612,7 +681,9 @@ export function EventSheet({
           <View style={styles.editBody}>
             <EventForm
               ref={formRef}
-              key={isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`}
+              key={
+                isCreate ? "create" : `edit-${eventId}-${editScope ?? "none"}`
+              }
               calendars={calendars ?? []}
               serverErrors={serverErrors}
               isSubmitting={isPending}
@@ -632,10 +703,18 @@ export function EventSheet({
         animationType="fade"
         onRequestClose={() => setScopeModalVisible(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setScopeModalVisible(false)}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setScopeModalVisible(false)}
+        >
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+          >
             <Text style={styles.modalTitle}>
-              {scopeAction === "edit" ? "Edit recurring event" : "Delete recurring event"}
+              {scopeAction === "edit"
+                ? "Edit recurring event"
+                : "Delete recurring event"}
             </Text>
             {SCOPE_OPTIONS.map((option) => (
               <Pressable
@@ -662,7 +741,6 @@ export function EventSheet({
     </>
   );
 }
-
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -807,7 +885,8 @@ function createStyles(theme: ThemeTokens) {
     headerTitle: {
       flex: 1,
       fontSize: theme.typography.fontSize.base.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       textAlign: "center" as const,
       marginHorizontal: 8,
@@ -819,11 +898,13 @@ function createStyles(theme: ThemeTokens) {
     },
     headerPillActionText: {
       fontSize: theme.typography.fontSize.sm.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
     },
     viewEventTitle: {
       fontSize: theme.typography.fontSize.xl.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: 10,
       paddingHorizontal: 4,
@@ -862,7 +943,8 @@ function createStyles(theme: ThemeTokens) {
     },
     modalTitle: {
       fontSize: theme.typography.fontSize.lg.size,
-      fontWeight: theme.typography.fontWeight.semibold as TextStyle["fontWeight"],
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
       color: theme.colors.foreground,
       marginBottom: 12,
     },

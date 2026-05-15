@@ -30,7 +30,9 @@ function parseBlindIndexTokens(value: string | null): string[] {
   try {
     const parsed = JSON.parse(value);
     if (Array.isArray(parsed)) {
-      return parsed.filter((entry): entry is string => typeof entry === "string");
+      return parsed.filter(
+        (entry): entry is string => typeof entry === "string",
+      );
     }
   } catch {
     return [];
@@ -168,21 +170,23 @@ export class E2eeService implements IE2eeService {
         wrapping: DEFAULT_WRAP_ALGORITHM,
         passwordWrapping: DEFAULT_PASSWORD_WRAP_ALGORITHM,
       },
-      devices: devices.map((device): EncryptionDeviceRecord => ({
-        id: device.id,
-        userId: device.userId,
-        deviceId: device.deviceId,
-        deviceLabel: device.deviceLabel,
-        publicKey: device.publicKey,
-        publicKeyAlgorithm: device.publicKeyAlgorithm,
-        wrappedAccountKey: device.wrappedAccountKey,
-        wrappedSearchKey: device.wrappedSearchKey,
-        wrapAlgorithm: device.wrapAlgorithm,
-        keyVersion: device.keyVersion,
-        lastSeenAt: device.lastSeenAt,
-        createdAt: device.createdAt,
-        updatedAt: device.updatedAt,
-      })),
+      devices: devices.map(
+        (device): EncryptionDeviceRecord => ({
+          id: device.id,
+          userId: device.userId,
+          deviceId: device.deviceId,
+          deviceLabel: device.deviceLabel,
+          publicKey: device.publicKey,
+          publicKeyAlgorithm: device.publicKeyAlgorithm,
+          wrappedAccountKey: device.wrappedAccountKey,
+          wrappedSearchKey: device.wrappedSearchKey,
+          wrapAlgorithm: device.wrapAlgorithm,
+          keyVersion: device.keyVersion,
+          lastSeenAt: device.lastSeenAt,
+          createdAt: device.createdAt,
+          updatedAt: device.updatedAt,
+        }),
+      ),
       passwordEnvelope: passwordEnvelope
         ? {
             id: passwordEnvelope.id,
@@ -270,10 +274,7 @@ export class E2eeService implements IE2eeService {
     }
 
     if (keyVersion < 1) {
-      throw new ValidationError(
-        "Key version must be at least 1",
-        "keyVersion",
-      );
+      throw new ValidationError("Key version must be at least 1", "keyVersion");
     }
 
     const device = await this.prisma.userEncryptionDevice.upsert({
@@ -364,10 +365,7 @@ export class E2eeService implements IE2eeService {
     }
 
     if (keyVersion < 1) {
-      throw new ValidationError(
-        "Key version must be at least 1",
-        "keyVersion",
-      );
+      throw new ValidationError("Key version must be at least 1", "keyVersion");
     }
 
     const passwordEnvelope = await this.prisma.userEncryptionPassword.upsert({
