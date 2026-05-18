@@ -339,6 +339,7 @@ export class MailService implements IMailService {
       defaultDomain: string;
       discoveryBaseUrl: string;
       oauth: MailOAuthConfig;
+      vaultKeyMaterialEndpoint: string;
     },
   ) {}
 
@@ -348,6 +349,7 @@ export class MailService implements IMailService {
       discoveryBaseUrl: this.config.discoveryBaseUrl,
       signupEnabled: true,
       oauth: this.config.oauth,
+      vaultKeyMaterialEndpoint: this.config.vaultKeyMaterialEndpoint,
     };
   }
 

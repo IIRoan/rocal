@@ -45,7 +45,8 @@ export const accountPublicRoutes = new Elysia({
   )
   .get(
     "/auth-status",
-    async ({ request }) => {
+    async ({ request, set }) => {
+      set.headers["Cache-Control"] = "no-store, max-age=0";
       const session = await auth.api.getSession({
         headers: request.headers as Headers,
       });

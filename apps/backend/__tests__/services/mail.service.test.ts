@@ -72,6 +72,7 @@ const mockMailOAuthConfig = {
   tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
   userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
   jwksUri: "https://api.solace.test/api/auth/jwks",
+  mailTokenEndpoint: "https://api.solace.test/api/mail/oauth/access-token",
   clientId: "solace-mail-browser",
   redirectUri: "https://app.solace.test/mail/oauth/callback",
   scopes: ["openid", "email"],
@@ -90,6 +91,8 @@ describe("MailService", () => {
       defaultDomain: "solace.onl",
       discoveryBaseUrl: "http://192.168.2.213:8080",
       oauth: mockMailOAuthConfig,
+      vaultKeyMaterialEndpoint:
+        "https://api.solace.test/api/mail/vault-key-material",
     });
   });
 
@@ -99,6 +102,8 @@ describe("MailService", () => {
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
+      vaultKeyMaterialEndpoint:
+        "https://api.solace.test/api/mail/vault-key-material",
     });
   });
 

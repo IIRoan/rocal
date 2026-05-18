@@ -7,6 +7,7 @@ import {
   getSafeAuthCallbackUrl,
   resolveAuthRedirectTarget,
 } from "../../lib/api-url";
+import { HOME_PATH } from "../../lib/app-routes";
 
 const originalEnv = {
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
@@ -134,7 +135,7 @@ describe("api-url helpers", () => {
     expect(
       resolveAuthRedirectTarget("https://evil.test/phish", "http://[::1"),
     ).toEqual({
-      href: "/calendar",
+      href: HOME_PATH,
       external: false,
     });
   });

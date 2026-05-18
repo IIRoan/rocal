@@ -293,11 +293,40 @@ async function requestAuthorizationCode(
   });
 }
 
+/**
+ * Call the server-side session-exchange endpoint and parse the result.
+ * The browser sends its session cookie automatically via `credentials: "include"`.
+ */
+async function fetchMailTokenFromServer(
+  mailTokenEndpoint: string,
+): Promise<StoredMailOAuthTokens> {
+  const response = await fetch(mailTokenEndpoint, {
+    method: "GET",
+    credentials: "include",
+  });
+  const payload = (await response
+    .json()
+    .catch(() => null)) as MailOAuthTokenResponse | null;
+  if (!response.ok || !payload) {
+    throw new Error(
+      payload?.error_description ||
+        payload?.error ||
+        "Could not obtain a mail token from the server.",
+    );
+  }
+  return parseMailOAuthResponse(payload);
+}
+
 export function createMailOAuthTokenManager(config: MailOAuthConfig) {
   let tokens: StoredMailOAuthTokens | null = null;
   let inflight: Promise<string> | null = null;
 
   const mintFreshToken = async () => {
+    if (config.mailTokenEndpoint) {
+      tokens = await fetchMailTokenFromServer(config.mailTokenEndpoint);
+      return tokens.accessToken;
+    }
+
     const { code, codeVerifier } = await requestAuthorizationCode(config);
     tokens = await exchangeAuthorizationCode({
       config,
