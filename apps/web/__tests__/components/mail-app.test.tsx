@@ -403,6 +403,7 @@ describe("MailApp", () => {
       discoveryBaseUrl: "http://192.168.2.213:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
+      vaultKeyMaterialEndpoint: "https://api.solace.test/api/mail/vault-key-material",
     });
     mockApi.getAccountStatus.mockResolvedValue({
       email: "alice@solace.onl",
@@ -563,6 +564,7 @@ describe("MailApp", () => {
       displayName: "Alice Example",
       provisioned: false,
     });
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -648,64 +650,30 @@ describe("MailApp", () => {
     expect(mockToastError).not.toHaveBeenCalled();
   });
 
-  it("provisions and opens the mailbox when no cached password is available", async () => {
+  it("does not prompt for a mailbox password when automatic migration prerequisites are missing", async () => {
     mockApi.getAccountStatus.mockResolvedValueOnce({
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: false,
     });
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
 
     await renderApp();
 
     await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
+      expect(mockToastError).toHaveBeenCalledWith(
+        "This mailbox still needs a one-time password migration. Sign out and sign back in with your email password once to finish automatic unlocking.",
+      );
     });
-
-    setInputValue(
-      container.querySelector("#mailbox-password") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-
-    const setupButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Migrate mailbox",
-    );
-
-    await act(async () => {
-      setupButton?.click();
-      await Promise.resolve();
-    });
-
-    expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledWith(
-      expect.objectContaining({
-        publicKeyArmored: "public-key-armored",
-        fingerprint: "ABCD1234EF567890",
-        algorithm: "openpgp",
-      }),
-    );
-    expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
-    expect(container.textContent).toContain("Encrypted hello");
+    expect(container.textContent).not.toContain("One-time mailbox migration");
+    expect(mockApi.bootstrapAccountMailbox).not.toHaveBeenCalled();
   });
 
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+
     await renderApp();
-
-    await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
-    });
-
-    setInputValue(
-      container.querySelector("#mailbox-password") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-
-    const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Migrate mailbox",
-    );
-
-    await act(async () => {
-      signInButton?.click();
-      await Promise.resolve();
-    });
 
     expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
     expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
@@ -728,6 +696,7 @@ describe("MailApp", () => {
   });
 
   it("automatically opens a provisioned mailbox when the auth password is still cached", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
 
     await renderApp();
@@ -750,6 +719,7 @@ describe("MailApp", () => {
 
   it("shows the loading skeleton instead of the migration prompt while auto-opening with the cached auth password", async () => {
     let resolveUnlock: ((value: any) => void) | null = null;
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockUnlockEncryptedMailVault.mockImplementation(
       () =>
@@ -790,6 +760,8 @@ describe("MailApp", () => {
   });
 
   it("loads messages for the selected mailbox folder", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages
       .mockResolvedValueOnce({
@@ -822,21 +794,7 @@ describe("MailApp", () => {
     await renderApp();
 
     await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
-    });
-
-    setInputValue(
-      container.querySelector("#mailbox-password") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-
-    const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Migrate mailbox",
-    );
-
-    await act(async () => {
-      signInButton?.click();
-      await Promise.resolve();
+      expect(container.textContent).toContain("Inbox hello");
     });
 
     const junkButton = Array.from(container.querySelectorAll("button")).find(
@@ -860,6 +818,8 @@ describe("MailApp", () => {
   });
 
   it("sends plaintext mail without looking up recipient keys", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -878,21 +838,7 @@ describe("MailApp", () => {
     await renderApp();
 
     await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
-    });
-
-    setInputValue(
-      container.querySelector("#mailbox-password") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-
-    const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Migrate mailbox",
-    );
-
-    await act(async () => {
-      signInButton?.click();
-      await Promise.resolve();
+      expect(container.textContent).toContain("Encrypted hello");
     });
 
     const composeButton = Array.from(container.querySelectorAll("button")).find(
@@ -960,6 +906,8 @@ describe("MailApp", () => {
   });
 
   it("encrypts internal mail before sending it through the JMAP proxy", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
     mockJmapClient.getMailboxMessages.mockResolvedValue({
       messages: [
@@ -978,21 +926,7 @@ describe("MailApp", () => {
     await renderApp();
 
     await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
-    });
-
-    setInputValue(
-      container.querySelector("#mailbox-password") as HTMLInputElement,
-      "StrongMailboxPassword!42",
-    );
-
-    const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Migrate mailbox",
-    );
-
-    await act(async () => {
-      signInButton?.click();
-      await Promise.resolve();
+      expect(container.textContent).toContain("Encrypted hello");
     });
 
     const composeButton = Array.from(container.querySelectorAll("button")).find(
@@ -1069,6 +1003,7 @@ describe("MailApp", () => {
 
   it("auto-opens the mailbox when the encrypted cookie restores the password after mount", async () => {
     let resolveCookieInit: (() => void) | null = null;
+    mockApi.getVaultKeyMaterial.mockRejectedValue(new Error("no key"));
     mockInitEncPasswordFromCookie.mockImplementation(
       () =>
         new Promise<void>((resolve) => {
@@ -1087,10 +1022,6 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
-    await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
-    });
-
     await act(async () => {
       resolveCookieInit?.();
       await Promise.resolve();
@@ -1105,24 +1036,4 @@ describe("MailApp", () => {
     expect(container.textContent).toContain("Encrypted hello");
   });
 
-  it("uses encryption-password unlock copy when mail oauth mode is enabled", async () => {
-    mockApi.getConfig.mockResolvedValueOnce({
-      defaultDomain: "solace.onl",
-      discoveryBaseUrl: "http://192.168.2.213:8080",
-      signupEnabled: true,
-      oauth: mockMailOAuthConfig,
-    });
-
-    await renderApp();
-
-    await waitForExpectation(() => {
-      expect(container.textContent).toContain("One-time mailbox migration");
-    });
-    expect(container.textContent).toContain(
-      "Enter your old mailbox encryption password once to migrate to automatic unlocking. You won't need to do this again.",
-    );
-    expect(
-      container.querySelector("#mailbox-password")?.getAttribute("placeholder"),
-    ).toBe("Encryption password");
-  });
 });

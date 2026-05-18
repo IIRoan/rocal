@@ -23,16 +23,13 @@ const beforeHandleHook = requireAuth.event.beforeHandle![0]!.fn as (
 ) => void;
 
 describe("requireAuth", () => {
-  it("returns the existing user and session from context", async () => {
+  it("returns the existing authenticatedUser from context", async () => {
     await expect(
       deriveHook({
-        user: { id: "user-1", email: "user@example.com" },
-        session: { id: "session-1" },
+        authenticatedUser: { id: "user-1", email: "user@example.com" },
         request: new Request("http://localhost"),
       }),
     ).resolves.toEqual({
-      user: { id: "user-1", email: "user@example.com" },
-      session: { id: "session-1" },
       authenticatedUser: { id: "user-1", email: "user@example.com" },
     });
 
@@ -50,8 +47,6 @@ describe("requireAuth", () => {
         request: new Request("http://localhost"),
       }),
     ).resolves.toEqual({
-      user: { id: "user-2", email: "fallback@example.com" },
-      session: { id: "session-2" },
       authenticatedUser: { id: "user-2", email: "fallback@example.com" },
     });
   });
@@ -64,8 +59,6 @@ describe("requireAuth", () => {
         request: new Request("http://localhost"),
       }),
     ).resolves.toEqual({
-      user: null,
-      session: null,
       authenticatedUser: null,
     });
 
@@ -76,33 +69,34 @@ describe("requireAuth", () => {
         request: new Request("http://localhost"),
       }),
     ).resolves.toEqual({
-      user: null,
-      session: null,
       authenticatedUser: null,
     });
   });
 
   it("throws UnauthorizedError when beforeHandle receives no valid user", () => {
-    expect(() => beforeHandleHook({ user: null })).toThrow(UnauthorizedError);
-    expect(() => beforeHandleHook({ user: {} })).toThrow("Unauthorized access");
+    expect(() => beforeHandleHook({ authenticatedUser: null })).toThrow(
+      UnauthorizedError,
+    );
+    expect(() => beforeHandleHook({ authenticatedUser: {} })).toThrow(
+      "Unauthorized access",
+    );
   });
 
   it("allows requests with a valid user id", () => {
-    expect(() => beforeHandleHook({ user: { id: "user-1" } })).not.toThrow();
+    expect(() =>
+      beforeHandleHook({ authenticatedUser: { id: "user-1" } }),
+    ).not.toThrow();
   });
 
-  it("exposes authenticatedUser alongside the legacy auth context", async () => {
+  it("normalizes a legacy user context into authenticatedUser", async () => {
     const user = { id: "user-1", email: "user@example.com" };
 
     await expect(
       deriveHook({
         user,
-        session: { id: "session-1" },
         request: new Request("http://localhost"),
       }),
     ).resolves.toEqual({
-      user,
-      session: { id: "session-1" },
       authenticatedUser: user,
     });
   });

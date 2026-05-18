@@ -31,6 +31,8 @@ describe("mail oauth client helpers", () => {
           userinfoEndpoint:
             "https://cloudflared.roan.dev/api/auth/oauth2/userinfo",
           jwksUri: "https://cloudflared.roan.dev/api/auth/jwks",
+          mailTokenEndpoint:
+            "https://cloudflared.roan.dev/api/mail/oauth/exchange",
           clientId: "solace-mail-browser-dev",
           redirectUri: "https://cloudflared.roan.dev/mail/oauth/callback",
           scopes: ["openid", "profile", "email", "offline_access"],
