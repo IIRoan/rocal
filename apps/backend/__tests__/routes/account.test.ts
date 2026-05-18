@@ -45,6 +45,7 @@ jest.mock("../../lib/auth-guard", () => {
 });
 
 import { ensureAuthenticatedUser } from "../../lib/auth-utils";
+import { auth } from "../../lib/auth";
 import { errorHandler } from "../../lib/errors";
 import { prisma } from "../../lib/prisma";
 import { accountPublicRoutes } from "../../routes/account-public";
@@ -54,6 +55,7 @@ const mockEnsureAuthenticatedUser =
   ensureAuthenticatedUser as jest.MockedFunction<
     typeof ensureAuthenticatedUser
   >;
+const mockGetSession = jest.mocked(auth.api.getSession);
 const mockPrisma = prisma as unknown as {
   user: {
     findUnique: jest.Mock<() => Promise<any>>;
@@ -111,6 +113,22 @@ describe("accountRoutes", () => {
       available: true,
       code: "available",
       message: "That email address is available.",
+    });
+  });
+
+  it("returns an uncached unauthenticated auth-status response", async () => {
+    mockGetSession.mockResolvedValueOnce(undefined as never);
+
+    const response = await createApp().handle(
+      new Request("http://localhost/account/auth-status"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
+    await expect(readJson(response)).resolves.toEqual({
+      authenticated: false,
+      hasPasskeys: false,
+      requiresPasskeyStepUp: false,
     });
   });
 

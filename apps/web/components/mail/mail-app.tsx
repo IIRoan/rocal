@@ -15,11 +15,11 @@ import {
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
-import { MailSkeleton } from "@workspace/ui/components/ui/app-skeletons";
 import {
-  AppLoadingState,
-  PageLoadingOverlay,
-} from "@workspace/ui/components/ui";
+  MailSkeleton,
+  MailContentSkeleton,
+} from "@workspace/ui/components/ui/app-skeletons";
+import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useSettings } from "@/hooks/use-settings";
@@ -130,20 +130,10 @@ export function MailApp() {
     activeMailbox?.mailboxes.find(
       (m) => m.id === activeMailbox.selectedMailboxId,
     ) ?? null;
-  const mailboxIsProvisioned = mailboxStatus?.provisioned ?? false;
-  const mailboxUnlockTitle = mailboxIsProvisioned
-    ? "Open your mailbox"
-    : "Set up your mailbox";
-  const mailboxUnlockDescription = mailboxIsProvisioned
-    ? "Enter your encryption password to unlock your encrypted mailbox."
-    : "Enter your encryption password to create and unlock your encrypted mailbox.";
-  const mailboxButtonLabel = isBusy
-    ? mailboxIsProvisioned
-      ? "Opening…"
-      : "Setting up…"
-    : mailboxIsProvisioned
-      ? "Open mailbox"
-      : "Set up mailbox";
+  const mailboxUnlockTitle = "One-time mailbox migration";
+  const mailboxUnlockDescription =
+    "Enter your old mailbox encryption password once to migrate to automatic unlocking. You won't need to do this again.";
+  const mailboxButtonLabel = isBusy ? "Migrating…" : "Migrate mailbox";
 
   // On mobile: show reader pane when a message is selected
   const showReaderOnMobile = isMobile && Boolean(selectedMessageId);
@@ -383,19 +373,7 @@ export function MailApp() {
               </div>
             </div>
           ) : (
-            <AppLoadingState
-              variant="centered"
-              className="flex-1"
-              text={
-                isMailboxStatusLoading
-                  ? "Checking your workspace..."
-                  : !config
-                    ? "Loading your workspace..."
-                    : mailboxStatus?.provisioned
-                      ? "Opening your mailbox..."
-                      : "Setting up your mailbox..."
-              }
-            />
+            <MailContentSkeleton />
           )}
         </SidebarInset>
       </SidebarProvider>

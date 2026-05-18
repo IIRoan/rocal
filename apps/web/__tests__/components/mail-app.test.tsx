@@ -89,6 +89,7 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
 jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
   DashboardSkeleton: () => <div>Loading…</div>,
   MailSkeleton: () => <div>Loading…</div>,
+  MailContentSkeleton: () => <div>Loading…</div>,
 }));
 
 jest.mock("lucide-react", () => {
@@ -112,6 +113,7 @@ jest.mock("../../lib/mail/api-service", () => ({
     getAccountStatus: jest.fn(),
     bootstrapAccountMailbox: jest.fn(),
     getAccountVaultBackup: jest.fn(),
+    getVaultKeyMaterial: jest.fn(),
     getVaultBackup: jest.fn(),
     getRecipientKey: jest.fn(),
     upsertVaultBackup: jest.fn(),
@@ -311,6 +313,7 @@ const mockMailOAuthConfig = {
   tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
   userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
   jwksUri: "https://api.solace.test/api/auth/jwks",
+  mailTokenEndpoint: "https://api.solace.test/api/mail/oauth/access-token",
   clientId: "solace-mail-browser",
   redirectUri: "https://app.solace.test/mail/oauth/callback",
   scopes: ["openid", "email"],
@@ -405,6 +408,10 @@ describe("MailApp", () => {
       email: "alice@solace.onl",
       displayName: "Alice Example",
       provisioned: true,
+    });
+    mockApi.getVaultKeyMaterial.mockResolvedValue({
+      keyMaterial: "server-derived-key-material",
+      version: "v1",
     });
     mockApi.getRecipientKey.mockResolvedValue({
       email: "bob@solace.onl",
@@ -560,10 +567,12 @@ describe("MailApp", () => {
 
     await renderApp();
 
-    expect(mockWorkerClient.generateKeyPair).toHaveBeenCalledWith({
-      name: "Alice Example",
-      email: "alice@solace.onl",
-      privateKeyPassphrase: "StrongMailboxPassword!42",
+    await waitForExpectation(() => {
+      expect(mockWorkerClient.generateKeyPair).toHaveBeenCalledWith({
+        name: "Alice Example",
+        email: "alice@solace.onl",
+        privateKeyPassphrase: "StrongMailboxPassword!42",
+      });
     });
     expect(mockCreateEncryptedMailVault).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -572,6 +581,7 @@ describe("MailApp", () => {
         encryptedPrivateKeyArmored: "private-key-armored",
       }),
       "StrongMailboxPassword!42",
+      undefined,
     );
     expect(mockApi.bootstrapAccountMailbox).toHaveBeenCalledWith({
       publicKeyArmored: "public-key-armored",
@@ -647,7 +657,9 @@ describe("MailApp", () => {
 
     await renderApp();
 
-    expect(container.textContent).toContain("Set up your mailbox");
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
 
     setInputValue(
       container.querySelector("#mailbox-password") as HTMLInputElement,
@@ -655,7 +667,7 @@ describe("MailApp", () => {
     );
 
     const setupButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Set up mailbox",
+      (element) => element.textContent === "Migrate mailbox",
     );
 
     await act(async () => {
@@ -677,13 +689,17 @@ describe("MailApp", () => {
   it("signs in with JMAP credentials, unlocks the vault, and renders inbox messages", async () => {
     await renderApp();
 
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
+
     setInputValue(
       container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
     const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Open mailbox",
+      (element) => element.textContent === "Migrate mailbox",
     );
 
     await act(async () => {
@@ -716,21 +732,23 @@ describe("MailApp", () => {
 
     await renderApp();
 
-    expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
-    expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
-      "vault-b64",
-      "StrongMailboxPassword!42",
-      {
-        saltB64: "salt-b64",
-        memoryKiB: 65536,
-        iterations: 3,
-        parallelism: 4,
-      },
-    );
-    expect(container.textContent).toContain("Encrypted hello");
+    await waitForExpectation(() => {
+      expect(mockApi.getAccountVaultBackup).toHaveBeenCalled();
+      expect(mockUnlockEncryptedMailVault).toHaveBeenCalledWith(
+        "vault-b64",
+        "StrongMailboxPassword!42",
+        {
+          saltB64: "salt-b64",
+          memoryKiB: 65536,
+          iterations: 3,
+          parallelism: 4,
+        },
+      );
+      expect(container.textContent).toContain("Encrypted hello");
+    });
   });
 
-  it("shows an auto-open status instead of the mailbox login form while opening with the cached auth password", async () => {
+  it("shows the loading skeleton instead of the migration prompt while auto-opening with the cached auth password", async () => {
     let resolveUnlock: ((value: any) => void) | null = null;
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockUnlockEncryptedMailVault.mockImplementation(
@@ -746,8 +764,10 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Opening your mailbox");
-    expect(container.textContent).not.toContain("Open mailbox");
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Loading…");
+      expect(container.textContent).not.toContain("Migrate mailbox");
+    });
     await act(async () => {
       resolveUnlock?.({
         userId: "mail-user-1",
@@ -801,13 +821,17 @@ describe("MailApp", () => {
 
     await renderApp();
 
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
+
     setInputValue(
       container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
     const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Open mailbox",
+      (element) => element.textContent === "Migrate mailbox",
     );
 
     await act(async () => {
@@ -853,13 +877,17 @@ describe("MailApp", () => {
 
     await renderApp();
 
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
+
     setInputValue(
       container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
     const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Open mailbox",
+      (element) => element.textContent === "Migrate mailbox",
     );
 
     await act(async () => {
@@ -949,13 +977,17 @@ describe("MailApp", () => {
 
     await renderApp();
 
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
+
     setInputValue(
       container.querySelector("#mailbox-password") as HTMLInputElement,
       "StrongMailboxPassword!42",
     );
 
     const signInButton = Array.from(container.querySelectorAll("button")).find(
-      (element) => element.textContent === "Open mailbox",
+      (element) => element.textContent === "Migrate mailbox",
     );
 
     await act(async () => {
@@ -1055,8 +1087,9 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
-    // Before cookie init resolves: password field should still be visible
-    expect(container.textContent).toContain("Open mailbox");
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
 
     await act(async () => {
       resolveCookieInit?.();
@@ -1082,8 +1115,11 @@ describe("MailApp", () => {
 
     await renderApp();
 
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("One-time mailbox migration");
+    });
     expect(container.textContent).toContain(
-      "Enter your encryption password to unlock your encrypted mailbox.",
+      "Enter your old mailbox encryption password once to migrate to automatic unlocking. You won't need to do this again.",
     );
     expect(
       container.querySelector("#mailbox-password")?.getAttribute("placeholder"),

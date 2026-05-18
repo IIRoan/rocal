@@ -427,6 +427,60 @@ export function MailSkeleton({ className }: { className?: string }) {
   );
 }
 
+export function MailContentSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn("flex flex-1 min-h-0 overflow-hidden animate-fade-in", className)}
+    >
+      {/* Message list */}
+      <div className="hidden md:flex flex-col w-72 shrink-0 border-r border-border/40">
+        <div className="flex items-center gap-2 px-4 h-12 border-b border-border/40">
+          <Skeleton className="h-4 w-20" variant="shimmer" />
+          <Skeleton className="h-3.5 w-8 ml-auto rounded" variant="shimmer" />
+        </div>
+        <div className="flex-1 overflow-hidden divide-y divide-border/40">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="px-4 py-3 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-3.5 w-24" variant="shimmer" />
+                <Skeleton className="h-3 w-14 ml-auto" variant="shimmer" />
+              </div>
+              <Skeleton className="h-3.5 w-3/4" variant="wave" />
+              <Skeleton className="h-3 w-1/2" variant="shimmer" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Message reader */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border/40">
+          <Skeleton className="h-4 w-48" variant="shimmer" />
+          <div className="ml-auto flex gap-2">
+            <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
+            <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
+          </div>
+        </div>
+        <div className="flex-1 p-6 space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-2/3" variant="shimmer" />
+            <Skeleton className="h-3.5 w-40" variant="shimmer" />
+          </div>
+          <div className="space-y-2 pt-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className={`h-3.5 ${i % 4 === 3 ? "w-1/3" : i % 3 === 0 ? "w-full" : "w-5/6"}`}
+                variant="wave"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Form skeleton for generic forms
 export function FormSkeleton({
   fieldCount = 6,

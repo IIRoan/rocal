@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
+import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
@@ -751,9 +752,10 @@ export function HomePageClient() {
 
   useEffect(() => {
     if (!isPending && session?.user) {
-      router.replace(HOME_PATH, undefined, {
+      router.startRouteTransition({
         messageContext: "AUTH_FLOW",
       });
+      completeAuthNavigation(HOME_PATH);
     }
   }, [isPending, session?.user, router]);
 

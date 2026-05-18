@@ -155,7 +155,10 @@ const mailOauthProviderPlugin = isMailOauthEnabled
       loginPage: mailOauthLoginPageUrl,
       consentPage: mailOauthConsentPageUrl,
       allowDynamicClientRegistration: false,
-      disableJwtPlugin: true,
+      silenceWarnings: {
+        oauthAuthServerConfig: true,
+        openidConfig: true,
+      },
       advertisedMetadata: {
         scopes_supported: mailOauthScopes,
       },

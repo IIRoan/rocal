@@ -18,6 +18,7 @@
     "dev:frontend": "cd apps/web && bun run dev",
     "dev:backend": "cd apps/backend && bun run dev",
     "dev:native": "cd apps/native && bun run dev",
+    "cloudflared": "bun run ./scripts/cloudflared.mjs",
     "dev:notifications": "cd apps/notifications && bun run dev",
     "lint": "cd apps/backend && bun run lint && cd ../web && bun run lint && cd ../notifications && bun run lint",
     "typecheck": "cd apps/backend && bun run typecheck && cd ../web && bun run typecheck && cd ../notifications && bun run typecheck",

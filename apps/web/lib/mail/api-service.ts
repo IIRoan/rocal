@@ -115,6 +115,17 @@ export class MailDemoApiService {
     return parseJsonResponse<MailVaultBackupRecord>(response);
   }
 
+  async getVaultKeyMaterial(
+    vaultKeyMaterialEndpoint: string,
+  ): Promise<{ keyMaterial: string; version: string }> {
+    const response = await fetch(vaultKeyMaterialEndpoint, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    return parseJsonResponse<{ keyMaterial: string; version: string }>(response);
+  }
+
   async syncAccount(accountId: string): Promise<MailSyncResponse> {
     const response = await fetch(
       `${this.baseUrl}/api/mail/sync?accountId=${encodeURIComponent(accountId)}`,

@@ -94,6 +94,7 @@ describe("bootstrapMailboxForAccount", () => {
         vaultVersion: 1,
       }),
       "StrongMailboxPassword!42",
+      undefined,
     );
     expect(mockBootstrapAccountMailbox).toHaveBeenCalledWith(
       expect.objectContaining({

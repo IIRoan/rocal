@@ -4,6 +4,7 @@ import { useSession } from "@/lib/auth-client";
 import { useSearchParams } from "next/navigation";
 import { createLogger } from "@workspace/logger";
 import dynamic from "next/dynamic";
+import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import {
   FORCE_LOADING_DESIGN_PREVIEW,
@@ -303,10 +304,9 @@ export function CalendarShell({ children }: { children: ReactNode }) {
           ? `${window.location.pathname}${window.location.search}`
           : CALENDAR_HOME_PATH;
       const loginPath = "/login";
-      router.replace(
+      router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+      completeAuthNavigation(
         `${loginPath}?next=${encodeURIComponent(currentPath)}`,
-        undefined,
-        { messageContext: "AUTH_FLOW" },
       );
     }
   }, [isPending, session?.user, router]);

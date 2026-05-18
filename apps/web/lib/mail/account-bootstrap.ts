@@ -1,6 +1,6 @@
 import { authClient } from "../auth-client";
 import { mailDemoApiService } from "./api-service";
-import type { MailSignupResponse, UserKeyVault } from "./types";
+import type { MailSignupResponse, MailVaultKdfParams, UserKeyVault } from "./types";
 import { createEncryptedMailVault } from "./vault-crypto";
 import { putStoredMailVault } from "./vault-storage";
 import { mailCryptoWorkerClient } from "./worker-client";
@@ -85,9 +85,11 @@ async function waitForAuthenticatedUser(input: {
 
 export async function bootstrapMailboxForAccount(input: {
   email: string;
+  /** Vault passphrase — either a user-typed password or the server-derived key material. */
   password: string;
   displayName?: string | null;
   userId?: string;
+  kdfOverrides?: Partial<MailVaultKdfParams>;
 }): Promise<MailSignupResponse> {
   const authenticatedUser = await waitForAuthenticatedUser(input);
   const createdAt = new Date().toISOString();
@@ -112,7 +114,11 @@ export async function bootstrapMailboxForAccount(input: {
     vaultVersion: 1,
     createdAt,
   };
-  const encryptedVault = await createEncryptedMailVault(vault, input.password);
+  const encryptedVault = await createEncryptedMailVault(
+    vault,
+    input.password,
+    input.kdfOverrides,
+  );
 
   let provisionedMailbox: MailSignupResponse | null = null;
 

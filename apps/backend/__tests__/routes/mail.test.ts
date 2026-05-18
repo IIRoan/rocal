@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Elysia } from "elysia";
 
+jest.mock("../../lib/auth", () => ({
+  auth: { api: { getSession: jest.fn() } },
+}));
+
 const mockMailOAuthConfig = {
   issuer: "https://api.solace.test/api/auth",
   discoveryUrl:
@@ -9,6 +13,7 @@ const mockMailOAuthConfig = {
   tokenEndpoint: "https://api.solace.test/api/auth/oauth2/token",
   userinfoEndpoint: "https://api.solace.test/api/auth/oauth2/userinfo",
   jwksUri: "https://api.solace.test/api/auth/jwks",
+  mailTokenEndpoint: "https://api.solace.test/api/mail/oauth/access-token",
   clientId: "solace-mail-browser",
   redirectUri: "https://app.solace.test/mail/oauth/callback",
   scopes: ["openid", "email"],
@@ -21,6 +26,8 @@ const mockMailService = {
     discoveryBaseUrl: "http://localhost:8080",
     signupEnabled: true,
     oauth: mockMailOAuthConfig,
+    vaultKeyMaterialEndpoint:
+      "https://api.solace.test/api/mail/vault-key-material",
   })),
   getMailboxStatusForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
@@ -93,7 +100,10 @@ const mockMailService = {
 };
 
 import { errorHandler } from "../../lib/errors";
+import { auth } from "../../lib/auth";
 import { createMailRoutes } from "../../routes/mail";
+
+const mockGetSession = jest.mocked(auth.api.getSession);
 
 function createApp(options?: {
   jmapFetch?: (input: string, init?: RequestInit) => Promise<Response>;
@@ -111,6 +121,7 @@ async function readJson(response: Response) {
 describe("mailRoutes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetSession.mockResolvedValue(undefined as never);
   });
 
   it("proxies JMAP discovery through the backend", async () => {
@@ -309,7 +320,115 @@ describe("mailRoutes", () => {
       discoveryBaseUrl: "http://localhost:8080",
       signupEnabled: true,
       oauth: mockMailOAuthConfig,
+      vaultKeyMaterialEndpoint:
+        "https://api.solace.test/api/mail/vault-key-material",
     });
+  });
+
+  it("exchanges the authenticated session for a mail oauth token", async () => {
+    mockGetSession.mockResolvedValue({
+      session: {
+        id: "session-1",
+        userId: "user-1",
+      },
+    } as never);
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        const url = typeof input === "string" ? input : input.toString();
+
+        if (url.includes("/oauth2/authorize")) {
+          const authorizeUrl = new URL(url);
+          const state = authorizeUrl.searchParams.get("state");
+
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: `${mockMailOAuthConfig.redirectUri}?code=mail-code&state=${state}`,
+            },
+          });
+        }
+
+        expect(url).toContain("/oauth2/token");
+        expect(init?.method).toBe("POST");
+        return new Response(
+          JSON.stringify({
+            access_token: "mail-access-token",
+            refresh_token: "mail-refresh-token",
+            expires_in: 3600,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      });
+
+    try {
+      const response = await createApp().handle(
+        new Request("http://localhost/mail/oauth/access-token", {
+          headers: {
+            cookie: "better-auth.session_token=session-token",
+          },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(readJson(response)).resolves.toEqual({
+        access_token: "mail-access-token",
+        refresh_token: "mail-refresh-token",
+        expires_in: 3600,
+        expires_at: expect.any(Number),
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("rejects a mail oauth callback with a mismatched state parameter", async () => {
+    mockGetSession.mockResolvedValue({
+      session: {
+        id: "session-1",
+        userId: "user-1",
+      },
+    } as never);
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        const url = typeof input === "string" ? input : input.toString();
+
+        if (url.includes("/oauth2/authorize")) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: `${mockMailOAuthConfig.redirectUri}?code=mail-code&state=attacker-state`,
+            },
+          });
+        }
+
+        throw new Error("Token exchange should not be attempted on invalid state.");
+      });
+
+    try {
+      const response = await createApp().handle(
+        new Request("http://localhost/mail/oauth/access-token", {
+          headers: {
+            cookie: "better-auth.session_token=session-token",
+          },
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      await expect(readJson(response)).resolves.toEqual({
+        error: "mail_token_error",
+        message: "Invalid state parameter - possible CSRF attack.",
+        statusCode: 400,
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("returns internal recipient keys for compose encryption", async () => {

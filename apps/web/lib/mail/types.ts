@@ -12,6 +12,8 @@ export type MailOAuthConfig = {
   tokenEndpoint: string;
   userinfoEndpoint: string;
   jwksUri: string;
+  /** Server-side session-exchange endpoint; avoids the iframe OAuth flow when present. */
+  mailTokenEndpoint?: string;
   clientId: string;
   redirectUri: string;
   scopes: string[];
@@ -23,6 +25,8 @@ export type MailDemoConfig = {
   discoveryBaseUrl: string;
   signupEnabled: boolean;
   oauth: MailOAuthConfig;
+  /** Endpoint to fetch a server-derived per-user vault key material (session required). */
+  vaultKeyMaterialEndpoint?: string;
 };
 
 export type MailAccountStatus = {

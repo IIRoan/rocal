@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
+import { completeAuthNavigation } from "@/lib/auth-navigation";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
@@ -34,7 +35,8 @@ export function HomeAppClient() {
 
   useEffect(() => {
     if (!isPending && !session?.user) {
-      router.replace("/login", undefined, { messageContext: "AUTH_FLOW" });
+      router.startRouteTransition({ messageContext: "AUTH_FLOW" });
+      completeAuthNavigation("/login");
     }
   }, [isPending, session?.user, router]);
 
@@ -94,7 +96,7 @@ export function HomeAppClient() {
             type="button"
             onClick={() =>
               void signOut().then(() => {
-                window.location.href = "/login";
+                completeAuthNavigation("/login");
               })
             }
             className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
