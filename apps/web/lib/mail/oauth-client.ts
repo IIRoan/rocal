@@ -20,6 +20,7 @@ type MailOAuthTokenResponse = {
   id_token?: string;
   error?: string;
   error_description?: string;
+  message?: string;
 };
 
 type StoredMailOAuthTokens = {
@@ -82,6 +83,7 @@ function parseMailOAuthResponse(
   if (!payload.access_token) {
     throw new Error(
       payload.error_description ||
+        payload.message ||
         payload.error ||
         "The mail OAuth provider did not return an access token.",
     );
@@ -310,6 +312,7 @@ async function fetchMailTokenFromServer(
   if (!response.ok || !payload) {
     throw new Error(
       payload?.error_description ||
+        payload?.message ||
         payload?.error ||
         "Could not obtain a mail token from the server.",
     );

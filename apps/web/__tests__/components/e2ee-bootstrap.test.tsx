@@ -521,13 +521,36 @@ describe("E2eeBootstrap component", () => {
     expect(mockSetEncPasswordCookie).toHaveBeenCalledWith("new-strong-pw!");
   });
 
-  it("clears the cookie and auth passwords when the user is signed out", async () => {
+  it("does not clear cached passwords on an initial anonymous render", async () => {
     mockUseSession.mockReturnValue({
       data: null,
       isPending: false,
     });
 
     await renderComponent();
+
+    expect(mockClearEncPasswordCookie).not.toHaveBeenCalled();
+    expect(mockClearAuthPasswords).not.toHaveBeenCalled();
+  });
+
+  it("clears the cookie and auth passwords after a signed-in session ends", async () => {
+    await renderComponent();
+
+    mockUseSession.mockReturnValue({
+      data: null,
+      isPending: false,
+    });
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <E2eeBootstrap />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    await flushEffects();
 
     expect(mockClearEncPasswordCookie).toHaveBeenCalled();
     expect(mockClearAuthPasswords).toHaveBeenCalled();

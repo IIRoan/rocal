@@ -29,6 +29,11 @@ const mockMailService = {
     vaultKeyMaterialEndpoint:
       "https://api.solace.test/api/mail/vault-key-material",
   })),
+  issueAccessTokenForUser: jest.fn(async () => ({
+    access_token: "stalwart-access-token",
+    expires_in: 1800,
+    expires_at: 1779149999,
+  })),
   getMailboxStatusForUser: jest.fn(async () => ({
     email: "alice@solace.onl",
     displayName: "Alice Example",
@@ -325,110 +330,64 @@ describe("mailRoutes", () => {
     });
   });
 
-  it("exchanges the authenticated session for a mail oauth token", async () => {
+  it("exchanges the authenticated session for a backend-issued mail token", async () => {
     mockGetSession.mockResolvedValue({
       session: {
         id: "session-1",
         userId: "user-1",
       },
+      user: {
+        email: "alice@solace.onl",
+      },
     } as never);
-    const fetchSpy = jest
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input, init) => {
-        const url = typeof input === "string" ? input : input.toString();
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/oauth/access-token", {
+        headers: {
+          cookie: "better-auth.session_token=session-token",
+        },
+      }),
+    );
 
-        if (url.includes("/oauth2/authorize")) {
-          const authorizeUrl = new URL(url);
-          const state = authorizeUrl.searchParams.get("state");
-
-          return new Response(null, {
-            status: 302,
-            headers: {
-              location: `${mockMailOAuthConfig.redirectUri}?code=mail-code&state=${state}`,
-            },
-          });
-        }
-
-        expect(url).toContain("/oauth2/token");
-        expect(init?.method).toBe("POST");
-        return new Response(
-          JSON.stringify({
-            access_token: "mail-access-token",
-            refresh_token: "mail-refresh-token",
-            expires_in: 3600,
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      });
-
-    try {
-      const response = await createApp().handle(
-        new Request("http://localhost/mail/oauth/access-token", {
-          headers: {
-            cookie: "better-auth.session_token=session-token",
-          },
-        }),
-      );
-
-      expect(response.status).toBe(200);
-      await expect(readJson(response)).resolves.toEqual({
-        access_token: "mail-access-token",
-        refresh_token: "mail-refresh-token",
-        expires_in: 3600,
-        expires_at: expect.any(Number),
-      });
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
-    } finally {
-      fetchSpy.mockRestore();
-    }
+    expect(response.status).toBe(200);
+    expect(mockMailService.issueAccessTokenForUser).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+    await expect(readJson(response)).resolves.toEqual({
+      access_token: "stalwart-access-token",
+      expires_in: 1800,
+      expires_at: 1779149999,
+    });
   });
 
-  it("rejects a mail oauth callback with a mismatched state parameter", async () => {
+  it("returns a backend token error when the mail bridge rejects the session", async () => {
     mockGetSession.mockResolvedValue({
       session: {
         id: "session-1",
         userId: "user-1",
       },
+      user: {
+        email: "alice@solace.onl",
+      },
     } as never);
-    const fetchSpy = jest
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input) => {
-        const url = typeof input === "string" ? input : input.toString();
+    mockMailService.issueAccessTokenForUser.mockRejectedValueOnce(
+      new Error("Stalwart mailbox login was rejected."),
+    );
 
-        if (url.includes("/oauth2/authorize")) {
-          return new Response(null, {
-            status: 302,
-            headers: {
-              location: `${mockMailOAuthConfig.redirectUri}?code=mail-code&state=attacker-state`,
-            },
-          });
-        }
+    const response = await createApp().handle(
+      new Request("http://localhost/mail/oauth/access-token", {
+        headers: {
+          cookie: "better-auth.session_token=session-token",
+        },
+      }),
+    );
 
-        throw new Error("Token exchange should not be attempted on invalid state.");
-      });
-
-    try {
-      const response = await createApp().handle(
-        new Request("http://localhost/mail/oauth/access-token", {
-          headers: {
-            cookie: "better-auth.session_token=session-token",
-          },
-        }),
-      );
-
-      expect(response.status).toBe(400);
-      await expect(readJson(response)).resolves.toEqual({
-        error: "mail_token_error",
-        message: "Invalid state parameter - possible CSRF attack.",
-        statusCode: 400,
-      });
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      fetchSpy.mockRestore();
-    }
+    expect(response.status).toBe(400);
+    await expect(readJson(response)).resolves.toEqual({
+      error: "mail_token_error",
+      message: "Stalwart mailbox login was rejected.",
+      statusCode: 400,
+    });
   });
 
   it("returns internal recipient keys for compose encryption", async () => {

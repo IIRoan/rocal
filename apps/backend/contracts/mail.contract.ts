@@ -35,6 +35,17 @@ export type MailAccountStatusResult = {
   provisioned: boolean;
 };
 
+export type MailAccessTokenForUserInput = {
+  userId: string;
+  email: string;
+};
+
+export type MailAccessTokenResult = {
+  access_token: string;
+  expires_in: number;
+  expires_at: number;
+};
+
 export type MailSignupResult = {
   email: string;
   displayName: string | null;
@@ -104,6 +115,9 @@ export type UpsertMailVaultBackupForUserInput = {
 
 export interface IMailService {
   getConfig(): MailDemoConfig;
+  issueAccessTokenForUser(
+    input: MailAccessTokenForUserInput,
+  ): Promise<MailAccessTokenResult>;
   getMailboxStatusForUser(
     input: GetMailAccountStatusInput,
   ): Promise<MailAccountStatusResult>;

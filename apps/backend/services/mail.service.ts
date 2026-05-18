@@ -10,6 +10,8 @@ import {
 import { getOpenPgpPublicKeyFingerprint } from "../lib/mail-key-utils";
 import type {
   GetMailAccountStatusInput,
+  MailAccessTokenForUserInput,
+  MailAccessTokenResult,
   GetMailVaultBackupForUserInput,
   IMailService,
   MailAccountStatusResult,
@@ -24,6 +26,10 @@ import type {
   UpsertMailVaultBackupForUserInput,
 } from "../contracts/mail.contract";
 import type { StalwartAdminClientLike } from "../lib/stalwart-admin";
+import {
+  createMailBridgePkcePair,
+  deriveMailBridgeSecret,
+} from "../lib/mail-bridge-auth";
 
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const MIN_VAULT_MEMORY_KIB = 8192;
@@ -340,6 +346,8 @@ export class MailService implements IMailService {
       discoveryBaseUrl: string;
       oauth: MailOAuthConfig;
       vaultKeyMaterialEndpoint: string;
+      stalwartOauthClientId: string;
+      stalwartOauthRedirectUri: string;
     },
   ) {}
 
@@ -350,6 +358,56 @@ export class MailService implements IMailService {
       signupEnabled: true,
       oauth: this.config.oauth,
       vaultKeyMaterialEndpoint: this.config.vaultKeyMaterialEndpoint,
+    };
+  }
+
+  async issueAccessTokenForUser(
+    input: MailAccessTokenForUserInput,
+  ): Promise<MailAccessTokenResult> {
+    const normalizedEmail = normalizeEmailOrThrow(input.email);
+    const mailbox = await this.findOrAttachMailboxForUser({
+      userId: input.userId,
+      email: normalizedEmail,
+    });
+
+    if (!mailbox?.stalwartAccountId) {
+      throw new ValidationError(
+        "This Solace account does not have a provisioned mailbox yet.",
+        "email",
+      );
+    }
+
+    const bridgeSecret = await deriveMailBridgeSecret({
+      userId: input.userId,
+      email: mailbox.email,
+    });
+    const { codeVerifier, codeChallenge } = await createMailBridgePkcePair();
+
+    await this.adminClient.ensureOAuthClient({
+      clientId: this.config.stalwartOauthClientId,
+      redirectUri: this.config.stalwartOauthRedirectUri,
+      description: "Solace mail backend bridge",
+    });
+    await this.adminClient.setAccountPassword({
+      accountId: mailbox.stalwartAccountId,
+      secret: bridgeSecret,
+    });
+
+    const token = await this.adminClient.issueOAuthAccessToken({
+      accountName: mailbox.email,
+      accountSecret: bridgeSecret,
+      clientId: this.config.stalwartOauthClientId,
+      redirectUri: this.config.stalwartOauthRedirectUri,
+      codeVerifier,
+      codeChallenge,
+    });
+
+    const expiresIn = token.expires_in ?? 3600;
+    return {
+      access_token: token.access_token,
+      expires_in: expiresIn,
+      expires_at:
+        token.expires_at ?? Math.floor(Date.now() / 1000) + expiresIn,
     };
   }
 
