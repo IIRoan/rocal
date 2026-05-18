@@ -55,6 +55,7 @@ jest.mock("next-themes", () => ({
 jest.mock("@workspace/logger", () => ({
   createLogger: () => ({
     error: jest.fn(),
+    warn: jest.fn(),
   }),
 }));
 

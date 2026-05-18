@@ -516,7 +516,13 @@ export function LoginForm() {
   const finalizePasswordAuth = useCallback(
     async (submittedPassword: string) => {
       storePendingAuthPassword(submittedPassword);
-      void setEncPasswordCookie(submittedPassword);
+      try {
+        await setEncPasswordCookie(submittedPassword);
+      } catch (cookieError) {
+        log.warn("Failed to persist encrypted password cookie after auth", {
+          error: cookieError,
+        });
+      }
 
       const authStatus = await refreshAuthStatus();
       if (authStatus.requiresPasskeyStepUp) {

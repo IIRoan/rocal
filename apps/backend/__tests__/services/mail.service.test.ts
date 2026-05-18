@@ -4,6 +4,10 @@ jest.mock("../../lib/mail-key-utils", () => ({
   getOpenPgpPublicKeyFingerprint: jest.fn(async () => "ABCD1234EF567890"),
 }));
 
+process.env.MAIL_VAULT_HMAC_KEY = Buffer.from(
+  "0123456789abcdef0123456789abcdef",
+).toString("base64");
+
 import { MailService } from "../../services/mail.service";
 import {
   ConflictError,
@@ -61,6 +65,13 @@ function createMockAdminClient() {
     })),
     registerPublicKey: jest.fn(async () => ({ publicKeyId: "pk-1" })),
     enableEncryptionAtRest: jest.fn(async () => undefined),
+    setAccountPassword: jest.fn(async () => undefined),
+    ensureOAuthClient: jest.fn(async () => undefined),
+    issueOAuthAccessToken: jest.fn(async () => ({
+      access_token: "stalwart-access-token",
+      expires_in: 1800,
+      expires_at: 1779149999,
+    })),
   };
 }
 
@@ -93,6 +104,9 @@ describe("MailService", () => {
       oauth: mockMailOAuthConfig,
       vaultKeyMaterialEndpoint:
         "https://api.solace.test/api/mail/vault-key-material",
+      stalwartOauthClientId: "solace-mail-bridge",
+      stalwartOauthRedirectUri:
+        "https://api.solace.test/api/mail/oauth/stalwart/callback",
     });
   });
 
@@ -104,6 +118,48 @@ describe("MailService", () => {
       oauth: mockMailOAuthConfig,
       vaultKeyMaterialEndpoint:
         "https://api.solace.test/api/mail/vault-key-material",
+    });
+  });
+
+  it("issues a Stalwart-local access token for a provisioned mailbox", async () => {
+    mockPrisma.mailDirectoryEntry.findUnique.mockResolvedValueOnce({
+      id: "entry-1",
+      email: "alice@solace.onl",
+      displayName: "Alice Example",
+      stalwartAccountId: "acct-1",
+      stalwartPublicKeyId: "pk-1",
+      publicKeyFingerprint: "ABCD1234EF567890",
+      userId: "user-1",
+    });
+
+    const result = await service.issueAccessTokenForUser({
+      userId: "user-1",
+      email: "alice@solace.onl",
+    });
+
+    expect(mockAdminClient.ensureOAuthClient).toHaveBeenCalledWith({
+      clientId: "solace-mail-bridge",
+      redirectUri: "https://api.solace.test/api/mail/oauth/stalwart/callback",
+      description: "Solace mail backend bridge",
+    });
+    expect(mockAdminClient.setAccountPassword).toHaveBeenCalledWith({
+      accountId: "acct-1",
+      secret: expect.any(String),
+    });
+    expect(mockAdminClient.issueOAuthAccessToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountName: "alice@solace.onl",
+        accountSecret: expect.any(String),
+        clientId: "solace-mail-bridge",
+        redirectUri: "https://api.solace.test/api/mail/oauth/stalwart/callback",
+        codeVerifier: expect.any(String),
+        codeChallenge: expect.any(String),
+      }),
+    );
+    expect(result).toEqual({
+      access_token: "stalwart-access-token",
+      expires_in: 1800,
+      expires_at: 1779149999,
     });
   });
 
