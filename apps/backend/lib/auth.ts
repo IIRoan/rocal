@@ -26,6 +26,11 @@ import {
   buildMailOauthUserInfoClaims,
 } from "./mail-oauth-claims";
 import { runMailOauthClientSeedTasks } from "./mail-oauth-bootstrap";
+import {
+  buildManagedMailOauthClientState,
+  managedMailOauthClientNeedsUpdate,
+  type ManagedMailOauthClientInput,
+} from "./mail-oauth-managed-client";
 import { inviteService } from "./invite-service";
 
 const {
@@ -117,36 +122,6 @@ if (isMailOauthEnabled && mailOauthConfigurationErrors.length > 0) {
   throw new Error(mailOauthConfigurationErrors[0]!);
 }
 
-type PendingMailOauthClientSeed = {
-  clientId?: string;
-  clientSecret?: string;
-} | null;
-
-let pendingMailOauthClientSeed: PendingMailOauthClientSeed = null;
-let pendingMailOauthClientSeedLock: Promise<void> = Promise.resolve();
-
-async function withPendingMailOauthClientSeed<T>(
-  seed: PendingMailOauthClientSeed,
-  callback: () => Promise<T>,
-): Promise<T> {
-  const previousLock = pendingMailOauthClientSeedLock;
-  let releaseLock!: () => void;
-
-  pendingMailOauthClientSeedLock = new Promise<void>((resolve) => {
-    releaseLock = resolve;
-  });
-
-  await previousLock;
-  pendingMailOauthClientSeed = seed;
-
-  try {
-    return await callback();
-  } finally {
-    pendingMailOauthClientSeed = null;
-    releaseLock();
-  }
-}
-
 const mailOauthProviderPlugin = isMailOauthEnabled
   ? oauthProvider({
       scopes: mailOauthScopes,
@@ -176,10 +151,8 @@ const mailOauthProviderPlugin = isMailOauthEnabled
           jwt: jwt as Record<string, unknown>,
         }),
       pairwiseSecret: mailOauthPairwiseSecret || undefined,
-      generateClientId: () =>
-        pendingMailOauthClientSeed?.clientId || crypto.randomUUID(),
-      generateClientSecret: () =>
-        pendingMailOauthClientSeed?.clientSecret || crypto.randomUUID(),
+      generateClientId: () => crypto.randomUUID(),
+      generateClientSecret: () => crypto.randomUUID(),
     })
   : null;
 
@@ -504,28 +477,80 @@ export const auth = betterAuth({
 }) as any;
 
 async function findOAuthClientById(clientId: string) {
-  return prisma.$queryRaw<Array<{ client_id: string }>>`
-    SELECT "client_id"
-    FROM "oauth_client"
-    WHERE "client_id" = ${clientId}
-    LIMIT 1
-  `;
+  return prisma.oauthClient.findUnique({
+    where: { clientId },
+    select: {
+      clientId: true,
+      clientSecret: true,
+      name: true,
+      redirectUris: true,
+      postLogoutRedirectUris: true,
+      tokenEndpointAuthMethod: true,
+      grantTypes: true,
+      responseTypes: true,
+      type: true,
+      skipConsent: true,
+      enableEndSession: true,
+      metadata: true,
+    },
+  });
 }
 
-async function ensureManagedMailOAuthClient(input: {
-  clientId: string;
-  clientName: string;
-  redirectUris: string[];
-  clientSecret?: string;
-  postLogoutRedirectUris?: string[];
-  type: "web" | "user-agent-based";
-  tokenEndpointAuthMethod: "client_secret_basic" | "none";
-  enableEndSession?: boolean;
-}) {
+async function ensureManagedMailOAuthClient(input: ManagedMailOauthClientInput) {
   const existingClient = await findOAuthClientById(input.clientId);
+  const desiredClient = buildManagedMailOauthClientState({
+    client: input,
+    audiences: mailOauthValidAudiences,
+    issuer: mailOauthIssuer,
+  });
+  const isPublicClient = desiredClient.tokenEndpointAuthMethod === "none";
 
-  if (existingClient.length > 0) {
-    return existingClient[0];
+  if (!isPublicClient) {
+    throw new Error(
+      `Managed confidential mail OAuth client '${input.clientId}' is not supported during startup reconciliation.`,
+    );
+  }
+
+  const managedClientData = {
+    clientSecret: null,
+    disabled: false,
+    scopes: mailOauthScopes,
+    name: desiredClient.name,
+    redirectUris: desiredClient.redirectUris,
+    postLogoutRedirectUris: desiredClient.postLogoutRedirectUris,
+    tokenEndpointAuthMethod: desiredClient.tokenEndpointAuthMethod,
+    grantTypes: desiredClient.grantTypes,
+    responseTypes: desiredClient.responseTypes,
+    public: true,
+    type: desiredClient.type,
+    skipConsent: desiredClient.skipConsent,
+    enableEndSession: desiredClient.enableEndSession,
+    requirePKCE: true,
+    metadata: desiredClient.metadata,
+  } as const;
+
+  if (existingClient) {
+    if (
+      managedMailOauthClientNeedsUpdate({
+        existing: existingClient,
+        desired: desiredClient,
+      })
+    ) {
+      logger.info("Updating managed mail OAuth client", {
+        clientId: input.clientId,
+        redirectUris: input.redirectUris,
+        audiences: mailOauthValidAudiences,
+      });
+
+      await prisma.oauthClient.update({
+        where: { clientId: input.clientId },
+        data: managedClientData,
+      });
+
+      return findOAuthClientById(input.clientId);
+    }
+
+    return existingClient;
   }
 
   logger.info("Seeding managed mail OAuth client", {
@@ -534,36 +559,12 @@ async function ensureManagedMailOAuthClient(input: {
     audiences: mailOauthValidAudiences,
   });
 
-  return withPendingMailOauthClientSeed(
-    {
+  return prisma.oauthClient.create({
+    data: {
       clientId: input.clientId,
-      clientSecret: input.clientSecret,
+      ...managedClientData,
     },
-    () =>
-      auth.api.adminCreateOAuthClient({
-        body: {
-          redirect_uris: input.redirectUris,
-          scope: mailOauthScopes.join(" "),
-          client_name: input.clientName,
-          post_logout_redirect_uris:
-            input.postLogoutRedirectUris &&
-            input.postLogoutRedirectUris.length > 0
-              ? input.postLogoutRedirectUris
-              : undefined,
-          token_endpoint_auth_method: input.tokenEndpointAuthMethod,
-          grant_types: ["authorization_code", "refresh_token"],
-          response_types: ["code"],
-          type: input.type,
-          skip_consent: true,
-          enable_end_session: input.enableEndSession ?? false,
-          require_pkce: true,
-          metadata: {
-            audiences: mailOauthValidAudiences,
-            issuer: mailOauthIssuer,
-          },
-        },
-      }),
-  );
+  });
 }
 
 export async function ensureMailOAuthClients() {
