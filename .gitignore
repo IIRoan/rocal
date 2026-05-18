@@ -28,6 +28,7 @@ out/
 build
 dist
 apps/web/output
+apps/backend/generated/
 
 
 # Debug
@@ -36,4 +37,3 @@ npm-debug.log*
 # Misc
 .DS_Store
 *.pem
-

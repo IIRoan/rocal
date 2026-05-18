@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  Inbox,
   Plus,
   RefreshCcw,
   ArrowLeft,
@@ -14,7 +13,6 @@ import {
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
-import { Input } from "@workspace/ui/components/ui/input";
 import {
   MailSkeleton,
   MailContentSkeleton,
@@ -37,9 +35,6 @@ export function MailApp() {
     isBusy,
     mailboxStatus,
     isMailboxStatusLoading,
-    needsPasswordPrompt,
-    loginPassword,
-    setLoginPassword,
     activeMailbox,
     selectedMessage,
     selectedMessageId,
@@ -91,7 +86,6 @@ export function MailApp() {
     labels,
     handleSignOut,
     user,
-    mailboxEmail,
     accountEmail,
   } = useMailApp();
 
@@ -130,10 +124,6 @@ export function MailApp() {
     activeMailbox?.mailboxes.find(
       (m) => m.id === activeMailbox.selectedMailboxId,
     ) ?? null;
-  const mailboxUnlockTitle = "One-time mailbox migration";
-  const mailboxUnlockDescription =
-    "Enter your old mailbox encryption password once to migrate to automatic unlocking. You won't need to do this again.";
-  const mailboxButtonLabel = isBusy ? "Migrating…" : "Migrate mailbox";
 
   // On mobile: show reader pane when a message is selected
   const showReaderOnMobile = isMobile && Boolean(selectedMessageId);
@@ -340,37 +330,6 @@ export function MailApp() {
                   <PenSquare size={20} strokeWidth={2} />
                 </button>
               )}
-            </div>
-          ) : needsPasswordPrompt ? (
-            <div className="flex flex-1 items-center justify-center p-8">
-              <div className="w-full max-w-sm space-y-4">
-                <div>
-                  <h1 className="text-xl font-semibold">
-                    {mailboxUnlockTitle}
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {mailboxUnlockDescription}
-                  </p>
-                </div>
-                <Input
-                  id="mailbox-password"
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Encryption password"
-                  onKeyDown={(e) => e.key === "Enter" && void handleSignIn()}
-                  disabled={isBusy}
-                  autoFocus
-                />
-                <Button
-                  className="w-full"
-                  onClick={() => void handleSignIn()}
-                  disabled={isBusy || !loginPassword || !mailboxEmail}
-                >
-                  <Inbox size={15} />
-                  {mailboxButtonLabel}
-                </Button>
-              </div>
             </div>
           ) : (
             <MailContentSkeleton />

@@ -4,6 +4,7 @@
   "scripts": {
     "build": "prisma generate && bun build --compile --minify-whitespace --minify-syntax --target bun-linux-x64 --outfile server index.ts",
     "dev": "bun --watch index.ts",
+    "postinstall": "prisma generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "start": "./server",

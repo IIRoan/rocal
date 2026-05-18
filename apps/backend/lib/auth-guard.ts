@@ -7,21 +7,28 @@ import { getPasskeyStepUpStatus } from "./passkey-step-up";
 
 type AuthGuardContext = {
   request: Request;
+  authenticatedUser?: AuthenticatedUser | null;
   user?: AuthenticatedUser | null;
-  session?: unknown;
 };
 
 type AuthGuardBeforeHandleContext = {
-  user?: AuthenticatedUser | null;
+  authenticatedUser?: AuthenticatedUser | null;
 };
 
-// Auth guard plugin - preserve legacy user/session context and expose authenticatedUser for routes.
+// Auth guard plugin - expose a normalized authenticatedUser for routes.
 export const requireAuth = new Elysia({ name: "require-auth" })
   .derive(async (ctx: AuthGuardContext) => {
+    if (
+      hasUserId(ctx.authenticatedUser) &&
+      typeof ctx.authenticatedUser.id === "string"
+    ) {
+      return {
+        authenticatedUser: ctx.authenticatedUser,
+      };
+    }
+
     if (hasUserId(ctx.user) && typeof ctx.user.id === "string") {
       return {
-        user: ctx.user,
-        session: ctx.session,
         authenticatedUser: ctx.user,
       };
     }
@@ -33,8 +40,6 @@ export const requireAuth = new Elysia({ name: "require-auth" })
 
       if (hasUserId(authData?.user) && typeof authData.user.id === "string") {
         return {
-          user: authData.user,
-          session: authData.session,
           authenticatedUser: authData.user,
         };
       }
@@ -43,25 +48,31 @@ export const requireAuth = new Elysia({ name: "require-auth" })
     }
 
     return {
-      user: null,
-      session: null,
       authenticatedUser: null,
     };
   })
-  .onBeforeHandle(({ user }: AuthGuardBeforeHandleContext) => {
-    if (!user || typeof user !== "object" || !user.id) {
+  .onBeforeHandle(({ authenticatedUser }: AuthGuardBeforeHandleContext) => {
+    if (
+      !authenticatedUser ||
+      typeof authenticatedUser !== "object" ||
+      !authenticatedUser.id
+    ) {
       throw new UnauthorizedError();
     }
   })
-  .onBeforeHandle(async ({ request, user }: AuthGuardContext) => {
-    if (!user || typeof user !== "object" || !user.id) {
+  .onBeforeHandle(async ({ request, authenticatedUser }: AuthGuardContext) => {
+    if (
+      !authenticatedUser ||
+      typeof authenticatedUser !== "object" ||
+      !authenticatedUser.id
+    ) {
       return;
     }
 
     const stepUpStatus = await getPasskeyStepUpStatus({
       prisma,
       request,
-      userId: user.id,
+      userId: authenticatedUser.id,
     });
 
     if (stepUpStatus.requiresPasskeyStepUp) {

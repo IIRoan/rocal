@@ -59,6 +59,8 @@ const KEY_MATERIAL_KDF: Partial<MailVaultKdfParams> = {
   iterations: 1,
   parallelism: 1,
 };
+const MAILBOX_REAUTH_REQUIRED_MESSAGE =
+  "This mailbox still needs a one-time password migration. Sign out and sign back in with your email password once to finish automatic unlocking.";
 
 const PROTECTED_ROLES = new Set([
   "inbox",
@@ -304,7 +306,6 @@ export function useMailApp() {
   const [isMailboxStatusLoading, setIsMailboxStatusLoading] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [hasAttemptedAutoOpen, setHasAttemptedAutoOpen] = useState(false);
-  const [needsMigration, setNeedsMigration] = useState(false);
   const [activeMailbox, setActiveMailbox] = useState<ActiveMailboxState | null>(
     null,
   );
@@ -640,7 +641,6 @@ export function useMailApp() {
     async (passwordOverride?: string) => {
       if (!config || !mailboxStatus || !mailboxEmail) return;
       setIsBusy(true);
-      setNeedsMigration(false);
       try {
         let email = mailboxEmail.trim().toLowerCase();
 
@@ -657,17 +657,14 @@ export function useMailApp() {
 
         if (!mailboxStatus.provisioned) {
           // New user: fetch key material first (needed for bootstrap passphrase)
-          if (config.vaultKeyMaterialEndpoint) {
-            vaultKey = await mailDemoApiService
-              .getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
-              .then((r) => r.keyMaterial)
-              .catch(() => null);
-          }
+          vaultKey = await mailDemoApiService
+            .getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
+            .then((r) => r.keyMaterial)
+            .catch(() => null);
           const vaultPassphrase =
             vaultKey ?? passwordOverride ?? cachedAuthPassword ?? loginPassword;
           if (!vaultPassphrase) {
-            setNeedsMigration(true);
-            return;
+            throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
           }
           await bootstrapMailboxForAccount({
             email: accountEmail,
@@ -696,12 +693,10 @@ export function useMailApp() {
           // Provisioned: fetch key material + JMAP session + backup all in parallel
           const [keyResult, session, remoteBackup, localBackup] =
             await Promise.all([
-              config.vaultKeyMaterialEndpoint
-                ? mailDemoApiService
-                    .getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
-                    .then((r) => r.keyMaterial)
-                    .catch(() => null)
-                : Promise.resolve<string | null>(null),
+              mailDemoApiService
+                .getVaultKeyMaterial(config.vaultKeyMaterialEndpoint)
+                .then((r) => r.keyMaterial)
+                .catch(() => null),
               client.discoverSession(),
               mailDemoApiService.getAccountVaultBackup().catch(() => null),
               getStoredMailVault(email),
@@ -733,8 +728,7 @@ export function useMailApp() {
             const migrationPassword =
               passwordOverride ?? cachedAuthPassword ?? loginPassword;
             if (!migrationPassword) {
-              setNeedsMigration(true);
-              return;
+              throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
             }
             try {
               unlockedVault = await unlockEncryptedMailVault(
@@ -744,19 +738,14 @@ export function useMailApp() {
               );
               effectivePassphrase = migrationPassword;
             } catch {
-              setNeedsMigration(true);
-              toast.error(
-                "Incorrect encryption password. Please enter your old mailbox password.",
-              );
-              return;
+              throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
             }
           }
         } else {
           const password =
             passwordOverride ?? cachedAuthPassword ?? loginPassword;
           if (!password) {
-            setNeedsMigration(true);
-            return;
+            throw new Error(MAILBOX_REAUTH_REQUIRED_MESSAGE);
           }
           unlockedVault = await unlockEncryptedMailVault(
             backup.encryptedVaultB64,
@@ -1610,13 +1599,6 @@ export function useMailApp() {
       }
     : null;
 
-  const needsPasswordPrompt =
-    !activeMailbox &&
-    !isMailboxStatusLoading &&
-    !isBusy &&
-    mailboxStatus !== null &&
-    needsMigration;
-
   return {
     session,
     isSessionPending,
@@ -1624,9 +1606,6 @@ export function useMailApp() {
     isBusy,
     mailboxStatus,
     isMailboxStatusLoading,
-    needsPasswordPrompt,
-    loginPassword,
-    setLoginPassword,
     activeMailbox,
     selectedMessage,
     selectedMessageId,
