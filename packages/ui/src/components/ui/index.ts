@@ -105,6 +105,7 @@ export {
   ListSkeleton,
   FormSkeleton,
   MailSkeleton,
+  MailContentSkeleton,
 } from "./app-skeletons";
 export { AppLoadingState } from "./app-loading-state";
 export {

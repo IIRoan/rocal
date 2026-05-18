@@ -42,9 +42,29 @@ model User {
   encryptionDevices  UserEncryptionDevice[]
   encryptionPassword UserEncryptionPassword?
 
-  passkeys Passkey[]
+  passkeys    Passkey[]
+  sentInvites Invite[]  @relation("InviteSender")
 
   @@map("user")
+}
+
+model Invite {
+  id              String    @id @default(cuid())
+  token           String    @unique @default(cuid())
+  invitedById     String    @map("invited_by_id")
+  invitedBy       User      @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  email           String // external email of the person being invited
+  status          String    @default("pending") // pending, claimed, accepted, revoked
+  expiresAt       DateTime  @map("expires_at")
+  claimedForEmail String?   @map("claimed_for_email") // the Solace email chosen during sign-up
+  claimedAt       DateTime? @map("claimed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([invitedById])
+  @@index([email])
+  @@index([status])
+  @@map("invite")
 }
 
 model Session {

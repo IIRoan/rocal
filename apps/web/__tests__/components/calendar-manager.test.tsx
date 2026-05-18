@@ -16,6 +16,19 @@ jest.mock("../../components/calendar-data-provider", () => ({
   useSharedCalendarData: jest.fn(),
 }));
 
+jest.mock("../../components/command-palette/index", () => ({
+  PRESET_COLORS: ["blue", "red"],
+  resetCalendarForm: jest.fn(),
+  validateCalendarForm: jest.fn(() => ({})),
+  handleCalendarCreate: jest.fn(),
+  handleCalendarUpdate: jest.fn(),
+  handleCalendarDelete: jest.fn(),
+  SettingToggleRow: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  ToggleIndicator: () => <span />,
+}));
+
 jest.mock("../../lib/calendar-api-service", () => ({
   calendarApiService: {
     disableCalendarShareLink: jest.fn(),

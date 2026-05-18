@@ -232,6 +232,13 @@ export const env = {
 
   /** Optional pairwise subject secret for OIDC clients that request pairwise subjects. */
   mailOauthPairwiseSecret: process.env.MAIL_OAUTH_PAIRWISE_SECRET?.trim() || "",
+
+  /**
+   * 256-bit base64-encoded HMAC master key used to derive per-user vault key
+   * material server-side.  Treat as a permanent secret — rotating it makes all
+   * existing vaults unreadable without a password-based re-encryption.
+   */
+  mailVaultHmacKey: process.env.MAIL_VAULT_HMAC_KEY?.trim() || "",
 } as const;
 
 /** Extract the origin from a URL string, returning the input on failure. */

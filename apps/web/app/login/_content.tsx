@@ -324,18 +324,11 @@ export function LoginForm() {
 
   const redirectAfterAuth = useCallback(() => {
     const target = getRedirectTarget();
-    if (target.external) {
-      router.startRouteTransition({
-        messageContext: "AUTH_FLOW",
-        minimumVisibleMs: 120,
-      });
-      window.location.replace(target.href);
-      return;
-    }
-    router.replace(target.href, undefined, {
+    router.startRouteTransition({
       messageContext: "AUTH_FLOW",
       minimumVisibleMs: 120,
     });
+    completeAuthNavigation(target.href);
   }, [getRedirectTarget, router]);
 
   const redirectAfterCompletedAuth = useCallback(() => {
