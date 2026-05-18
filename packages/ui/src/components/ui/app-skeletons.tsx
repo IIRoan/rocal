@@ -355,44 +355,38 @@ export function MailSkeleton({ className }: { className?: string }) {
     >
       {/* Sidebar */}
       <div className="hidden md:flex w-56 flex-col border-r border-border bg-sidebar shrink-0">
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-7 w-7 rounded-full" variant="shimmer" />
-            <Skeleton className="h-4 w-24" variant="shimmer" />
-          </div>
+        <div className="flex items-center gap-2 px-4 h-12 border-b border-sidebar-border">
+          <Skeleton className="h-6 w-6 rounded-full" />
+          <Skeleton className="h-3.5 w-20" />
         </div>
-        <div className="flex-1 p-3 space-y-1">
+        <div className="flex-1 p-3 space-y-0.5">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 px-2 py-1.5 rounded"
-            >
-              <Skeleton className="h-3.5 w-3.5 rounded" variant="shimmer" />
-              <Skeleton className="h-3.5 flex-1" variant="wave" />
-              <Skeleton className="h-3.5 w-5 rounded" variant="shimmer" />
+            <div key={i} className="flex items-center gap-2 px-2 py-2 rounded">
+              <Skeleton className="h-3.5 w-3.5 rounded shrink-0" />
+              <Skeleton className="h-3.5 flex-1" />
             </div>
           ))}
         </div>
         <div className="p-3 border-t border-sidebar-border">
-          <Skeleton className="h-8 w-full rounded-md" variant="shimmer" />
+          <Skeleton className="h-8 w-full rounded-md" />
         </div>
       </div>
 
       {/* Message list */}
       <div className="flex flex-col w-72 shrink-0 border-r border-border">
-        <div className="flex items-center gap-2 px-4 h-12 border-b border-border/40">
-          <Skeleton className="h-4 w-20" variant="shimmer" />
-          <Skeleton className="h-3.5 w-8 ml-auto rounded" variant="shimmer" />
+        <div className="flex items-center px-4 h-12 border-b border-border/40">
+          <Skeleton className="h-3.5 w-16" />
+          <Skeleton className="h-3 w-6 ml-auto rounded" />
         </div>
-        <div className="flex-1 overflow-hidden divide-y divide-border/40">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="divide-y divide-border/40">
+          {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="px-4 py-3 space-y-1.5">
               <div className="flex items-center gap-2">
-                <Skeleton className="h-3.5 w-24" variant="shimmer" />
-                <Skeleton className="h-3 w-14 ml-auto" variant="shimmer" />
+                <Skeleton className="h-3.5 w-20" />
+                <Skeleton className="h-3 w-12 ml-auto" />
               </div>
-              <Skeleton className="h-3.5 w-3/4" variant="wave" />
-              <Skeleton className="h-3 w-1/2" variant="shimmer" />
+              <Skeleton className="h-3.5 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
             </div>
           ))}
         </div>
@@ -401,25 +395,21 @@ export function MailSkeleton({ className }: { className?: string }) {
       {/* Message reader */}
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex items-center gap-3 px-6 h-12 border-b border-border/40">
-          <Skeleton className="h-4 w-48" variant="shimmer" />
+          <Skeleton className="h-4 w-40" />
           <div className="ml-auto flex gap-2">
-            <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
-            <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
+            <Skeleton className="h-7 w-7 rounded" />
+            <Skeleton className="h-7 w-7 rounded" />
           </div>
         </div>
-        <div className="flex-1 p-6 space-y-4">
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-2/3" variant="shimmer" />
-            <Skeleton className="h-3.5 w-40" variant="shimmer" />
-          </div>
-          <div className="space-y-2 pt-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton
-                key={i}
-                className={`h-3.5 ${i % 4 === 3 ? "w-1/3" : i % 3 === 0 ? "w-full" : "w-5/6"}`}
-                variant="wave"
-              />
-            ))}
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-3.5 w-32" />
+          <div className="pt-2 space-y-2">
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-11/12" />
+            <Skeleton className="h-3.5 w-4/5" />
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-2/3" />
           </div>
         </div>
       </div>
@@ -430,23 +420,26 @@ export function MailSkeleton({ className }: { className?: string }) {
 export function MailContentSkeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("flex flex-1 min-h-0 overflow-hidden animate-fade-in", className)}
+      className={cn(
+        "flex flex-1 min-h-0 overflow-hidden animate-fade-in",
+        className,
+      )}
     >
       {/* Message list */}
       <div className="hidden md:flex flex-col w-72 shrink-0 border-r border-border/40">
-        <div className="flex items-center gap-2 px-4 h-12 border-b border-border/40">
-          <Skeleton className="h-4 w-20" variant="shimmer" />
-          <Skeleton className="h-3.5 w-8 ml-auto rounded" variant="shimmer" />
+        <div className="flex items-center px-4 h-12 border-b border-border/40">
+          <Skeleton className="h-3.5 w-16" />
+          <Skeleton className="h-3 w-6 ml-auto rounded" />
         </div>
-        <div className="flex-1 overflow-hidden divide-y divide-border/40">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="divide-y divide-border/40">
+          {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="px-4 py-3 space-y-1.5">
               <div className="flex items-center gap-2">
-                <Skeleton className="h-3.5 w-24" variant="shimmer" />
-                <Skeleton className="h-3 w-14 ml-auto" variant="shimmer" />
+                <Skeleton className="h-3.5 w-20" />
+                <Skeleton className="h-3 w-12 ml-auto" />
               </div>
-              <Skeleton className="h-3.5 w-3/4" variant="wave" />
-              <Skeleton className="h-3 w-1/2" variant="shimmer" />
+              <Skeleton className="h-3.5 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
             </div>
           ))}
         </div>
@@ -455,25 +448,19 @@ export function MailContentSkeleton({ className }: { className?: string }) {
       {/* Message reader */}
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex items-center gap-3 px-6 h-12 border-b border-border/40">
-          <Skeleton className="h-4 w-48" variant="shimmer" />
+          <Skeleton className="h-4 w-40" />
           <div className="ml-auto flex gap-2">
-            <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
-            <Skeleton className="h-7 w-7 rounded" variant="shimmer" />
+            <Skeleton className="h-7 w-7 rounded" />
+            <Skeleton className="h-7 w-7 rounded" />
           </div>
         </div>
-        <div className="flex-1 p-6 space-y-4">
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-2/3" variant="shimmer" />
-            <Skeleton className="h-3.5 w-40" variant="shimmer" />
-          </div>
-          <div className="space-y-2 pt-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton
-                key={i}
-                className={`h-3.5 ${i % 4 === 3 ? "w-1/3" : i % 3 === 0 ? "w-full" : "w-5/6"}`}
-                variant="wave"
-              />
-            ))}
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-3.5 w-32" />
+          <div className="pt-2 space-y-2">
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-11/12" />
+            <Skeleton className="h-3.5 w-4/5" />
           </div>
         </div>
       </div>

@@ -2,7 +2,6 @@
 
 import { Skeleton } from "../ui/skeleton";
 import { cn } from "../../lib/utils";
-import { addDays, startOfWeek, format } from "date-fns";
 import type { CalendarView } from "./types";
 
 interface CalendarSkeletonProps {
@@ -11,264 +10,131 @@ interface CalendarSkeletonProps {
   compactView?: boolean;
 }
 
+// Deterministic event pattern per cell index (no Math.random)
+const CELL_EVENT_WIDTHS: Record<number, string[]> = {
+  2: ["w-full"],
+  5: ["w-4/5", "w-3/5"],
+  8: ["w-full"],
+  11: ["w-3/4"],
+  14: ["w-full", "w-2/3"],
+  18: ["w-4/5"],
+  22: ["w-full", "w-1/2"],
+  26: ["w-3/4"],
+  30: ["w-full"],
+  33: ["w-3/5"],
+};
+
 export function CalendarSkeleton({
   view = "month",
   className,
   compactView = false,
 }: CalendarSkeletonProps) {
-  const today = new Date();
-  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
-  const daysOfWeek = Array.from({ length: 7 }, (_, i) =>
-    format(addDays(weekStart, i), "EEE"),
-  );
-
   if (view === "month") {
     return (
-      <div className={cn("space-y-4 animate-fade-in", className)}>
-        {/* Header skeleton - matches actual calendar header */}
-
-        {/* Calendar grid skeleton - matches actual structure */}
-        <div className="space-y-0 border border-border rounded-lg overflow-hidden">
-          {/* Days of week header */}
-          <div className="grid grid-cols-7 border-b border-border bg-muted/30">
-            {daysOfWeek.map((day, i) => (
-              <div
-                key={i}
-                className="p-2 text-center border-r border-border last:border-r-0"
-              >
-                <Skeleton className="h-4 w-8 mx-auto" variant="shimmer" />
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar cells with realistic event distribution */}
-          {Array.from({ length: 6 }).map((_, weekIndex) => (
+      <div className={cn("flex flex-col animate-fade-in", className)}>
+        <div className="grid grid-cols-7 border-b border-border/60 bg-muted/20">
+          {Array.from({ length: 7 }).map((_, i) => (
             <div
-              key={weekIndex}
-              className="grid grid-cols-7 border-b border-border last:border-b-0"
+              key={i}
+              className="py-2 px-3 border-r border-border/60 last:border-r-0"
             >
-              {Array.from({ length: 7 }).map((_, dayIndex) => {
-                const cellIndex = weekIndex * 7 + dayIndex;
-                const hasEvents = cellIndex % 3 === 0 || cellIndex % 5 === 0;
-                const eventCount = hasEvents
-                  ? Math.floor(Math.random() * 3) + 1
-                  : 0;
-
-                return (
-                  <div
-                    key={dayIndex}
-                    className="h-24 p-2 border-r border-border last:border-r-0 space-y-1"
-                    style={{
-                      animationDelay: `${(weekIndex * 7 + dayIndex) * 0.02}s`,
-                    }}
-                  >
-                    <Skeleton className="h-4 w-6" variant="shimmer" />
-                    {/* Realistic event skeletons */}
-                    {Array.from({ length: eventCount }).map((_, eventIndex) => (
-                      <Skeleton
-                        key={eventIndex}
-                        className={`h-4 ${eventIndex === 0 ? "w-full" : eventIndex === 1 ? "w-3/4" : "w-1/2"}`}
-                        variant="wave"
-                        style={{
-                          animationDelay: `${(weekIndex * 7 + dayIndex) * 0.02 + eventIndex * 0.1}s`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
+              <Skeleton className="h-3 w-7" />
             </div>
           ))}
         </div>
+        {Array.from({ length: 5 }).map((_, w) => (
+          <div
+            key={w}
+            className="grid grid-cols-7 border-b border-border/60 last:border-b-0 flex-1"
+          >
+            {Array.from({ length: 7 }).map((_, d) => {
+              const idx = w * 7 + d;
+              const eventWidths = CELL_EVENT_WIDTHS[idx] ?? [];
+              return (
+                <div
+                  key={d}
+                  className="p-2 border-r border-border/60 last:border-r-0 space-y-1 min-h-[5rem]"
+                >
+                  <Skeleton className="h-5 w-5 rounded-full" />
+                  {eventWidths.map((w, ei) => (
+                    <Skeleton key={ei} className={cn("h-4 rounded", w)} />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     );
   }
 
-  if (view === "week") {
+  if (view === "week" || view === "3day") {
+    const cols = view === "3day" ? 3 : 7;
     return (
-      <div className={cn("space-y-4 animate-fade-in", className)}>
-        {/* Header skeleton - matches week view header */}
-
-        {/* Week view skeleton - matches actual week grid */}
-        <div className="flex flex-col border border-border rounded-lg overflow-hidden">
-          {/* Days header with time zone indicator */}
-          <div className="grid grid-cols-8 border-b border-border bg-muted/30">
-            <div className="p-3 border-r border-border">
-              <Skeleton className="h-4 w-12" variant="shimmer" />
+      <div className={cn("flex flex-col h-full animate-fade-in", className)}>
+        <div
+          className="grid border-b border-border/60 bg-muted/20 shrink-0"
+          style={{ gridTemplateColumns: `4rem repeat(${cols}, 1fr)` }}
+        >
+          <div className="p-3 border-r border-border/60" />
+          {Array.from({ length: cols }).map((_, i) => (
+            <div
+              key={i}
+              className="p-3 text-center border-r border-border/60 last:border-r-0 space-y-1"
+            >
+              <Skeleton className="h-3 w-6 mx-auto" />
+              <Skeleton className="h-6 w-6 mx-auto rounded-full" />
             </div>
-            {daysOfWeek.map((day, i) => (
-              <div
-                key={i}
-                className="p-3 text-center border-r border-border last:border-r-0"
-              >
-                <Skeleton className="h-4 w-8 mx-auto mb-1" variant="shimmer" />
-                <Skeleton
-                  className="h-6 w-6 mx-auto rounded-full"
-                  variant="shimmer"
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Time slots - 24 hour format */}
-          <div className="flex-1 overflow-hidden">
-            {Array.from({ length: 24 }).map((_, hourIndex) => (
-              <div
-                key={hourIndex}
-                className={`grid grid-cols-8 border-b border-border last:border-b-0 ${compactView ? "min-h-[34px]" : "min-h-[40px]"}`}
-              >
-                <div className="p-2 border-r border-border bg-muted/10">
-                  <Skeleton className="h-4 w-12" variant="shimmer" />
-                </div>
-                {Array.from({ length: 7 }).map((_, dayIndex) => {
-                  const hasEvent =
-                    hourIndex >= 9 && hourIndex <= 17 && Math.random() > 0.85;
-                  return (
-                    <div
-                      key={dayIndex}
-                      className="p-1 border-r border-border last:border-r-0 relative"
-                    >
-                      {hasEvent && (
-                        <Skeleton
-                          className={`${compactView ? "h-9" : "h-12"} w-full rounded`}
-                          variant="wave"
-                          style={{
-                            animationDelay: `${hourIndex * 0.05 + dayIndex * 0.02}s`,
-                          }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
+        <Skeleton className="flex-1 rounded-none" variant="wave" />
       </div>
     );
   }
 
   if (view === "day") {
     return (
-      <div className={cn("space-y-4 animate-fade-in", className)}>
-        {/* Header skeleton - matches day view header */}
-
-        {/* Day view skeleton - matches single day layout */}
-        <div className="flex border border-border rounded-lg overflow-hidden">
-          {/* Time column */}
-          <div className="w-20 border-r border-border bg-muted/10">
-            {Array.from({ length: 24 }).map((_, hourIndex) => (
-              <div
-                key={hourIndex}
-                className={`${compactView ? "h-9" : "h-11"} p-2 border-b border-border last:border-b-0`}
-              >
-                <Skeleton className="h-4 w-12" variant="shimmer" />
-              </div>
-            ))}
-          </div>
-
-          {/* Day content */}
-          <div className="flex-1">
-            {/* Current time indicator placeholder */}
-            <div className="relative">
-              {Array.from({ length: 24 }).map((_, hourIndex) => {
-                const hasEvent =
-                  hourIndex >= 9 && hourIndex <= 17 && Math.random() > 0.8;
-                const eventLength = hasEvent
-                  ? Math.floor(Math.random() * 3) + 1
-                  : 0;
-
-                return (
-                  <div
-                    key={hourIndex}
-                    className={`${compactView ? "h-9" : "h-11"} p-2 border-b border-border last:border-b-0 relative`}
-                  >
-                    {hasEvent && (
-                      <Skeleton
-                        className={`w-4/5 rounded absolute left-2 top-2`}
-                        style={{ height: `${eventLength * 60}px` }}
-                        variant="wave"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Current time indicator skeleton */}
-              <div className="absolute left-0 top-32 w-full flex items-center z-10">
-                <Skeleton
-                  className="h-0.5 w-full bg-primary"
-                  variant="shimmer"
-                />
-                <Skeleton
-                  className="h-3 w-3 rounded-full bg-primary -ml-1.5"
-                  variant="shimmer"
-                />
-              </div>
+      <div className={cn("flex h-full animate-fade-in", className)}>
+        <div className="w-16 shrink-0 border-r border-border/60 bg-muted/10 space-y-0">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-start justify-end pr-2 pt-1"
+              style={{ height: `${compactView ? 36 : 48}px` }}
+            >
+              <Skeleton className="h-3 w-10" />
             </div>
-          </div>
+          ))}
         </div>
+        <Skeleton className="flex-1 rounded-none" variant="wave" />
       </div>
     );
   }
 
   if (view === "agenda") {
+    const AGENDA_PATTERN = [2, 1, 3, 1, 2, 1, 2] as const;
     return (
-      <div className={cn("space-y-4 animate-fade-in", className)}>
-        {/* Header skeleton - matches agenda view header */}
-
-        {/* Agenda items skeleton - matches actual agenda layout */}
-        <div className="space-y-6 px-4">
-          {Array.from({ length: 8 }).map((_, dayIndex) => {
-            const eventCount = Math.floor(Math.random() * 4) + 1;
-            return (
-              <div
-                key={dayIndex}
-                className="space-y-3 animate-slide-in"
-                style={{ animationDelay: `${dayIndex * 0.1}s` }}
-              >
-                {/* Date header */}
-                <div className="flex items-center gap-3 pb-2 border-b border-border">
-                  <Skeleton className="h-5 w-24" variant="shimmer" />
-                  <Skeleton className="h-1 flex-1" variant="shimmer" />
+      <div className={cn("space-y-5 p-4 animate-fade-in", className)}>
+        {AGENDA_PATTERN.map((count, di) => (
+          <div key={di} className="space-y-2">
+            <div className="flex items-center gap-3 pb-1 border-b border-border/50">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-px flex-1" />
+            </div>
+            <div className="space-y-2 pl-4">
+              {Array.from({ length: count }).map((_, ei) => (
+                <div
+                  key={ei}
+                  className="flex items-center gap-3 py-2 px-3 rounded-md border border-border/40"
+                >
+                  <Skeleton className="h-3 w-10 shrink-0" />
+                  <Skeleton className="h-3 w-3 rounded-full shrink-0" />
+                  <Skeleton className="h-4 flex-1" />
                 </div>
-
-                {/* Events for the day */}
-                <div className="space-y-3 pl-6">
-                  {Array.from({ length: eventCount }).map((_, eventIndex) => (
-                    <div
-                      key={eventIndex}
-                      className="flex items-start gap-4 p-3 rounded-lg border border-border animate-scale-in"
-                      style={{
-                        animationDelay: `${dayIndex * 0.1 + eventIndex * 0.05}s`,
-                      }}
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <Skeleton className="h-4 w-12" variant="wave" />
-                        <Skeleton className="h-2 w-8" variant="wave" />
-                      </div>
-                      <Skeleton
-                        className="h-3 w-3 rounded-full mt-0.5"
-                        variant="shimmer"
-                      />
-                      <div className="flex-1 space-y-1">
-                        <Skeleton className="h-4 w-full" variant="wave" />
-                        <Skeleton className="h-3 w-3/4" variant="wave" />
-                        {eventIndex % 3 === 0 && (
-                          <Skeleton className="h-3 w-1/2" variant="wave" />
-                        )}
-                      </div>
-                      <Skeleton
-                        className="h-6 w-16 rounded"
-                        variant="shimmer"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

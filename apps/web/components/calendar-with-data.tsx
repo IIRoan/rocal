@@ -4,7 +4,6 @@ import React from "react";
 import {
   EventCalendar,
   useCalendarContext,
-  CalendarSkeleton,
 } from "@workspace/ui/components/calendar";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
 import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
@@ -51,14 +50,11 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
 
   if (FORCE_LOADING_DESIGN_PREVIEW || isAllInitialLoading) {
     return (
-      <>
-        <CalendarSkeleton view={initialView} className={className} />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext={overlayContext}
-          enableCycling={true}
-        />
-      </>
+      <PageLoadingOverlay
+        isLoading={true}
+        messageContext={overlayContext}
+        enableCycling={true}
+      />
     );
   }
 

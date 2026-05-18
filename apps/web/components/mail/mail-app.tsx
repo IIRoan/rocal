@@ -13,10 +13,7 @@ import {
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
-import {
-  MailSkeleton,
-  MailContentSkeleton,
-} from "@workspace/ui/components/ui/app-skeletons";
+import { MailContentSkeleton } from "@workspace/ui/components/ui/app-skeletons";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
@@ -106,15 +103,12 @@ export function MailApp() {
 
   if (isSessionPending || !session?.user) {
     return (
-      <>
-        <MailSkeleton />
-        <PageLoadingOverlay
-          isLoading={true}
-          messageContext="PAGE_LOAD"
-          enableCycling
-          priority
-        />
-      </>
+      <PageLoadingOverlay
+        isLoading={true}
+        messageContext="PAGE_LOAD"
+        enableCycling
+        priority
+      />
     );
   }
 
