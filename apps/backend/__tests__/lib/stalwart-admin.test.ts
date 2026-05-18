@@ -134,7 +134,15 @@ describe("StalwartAdminClient", () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({
         methodResponses: [
-          ["x:AccountPassword/set", { updated: { singleton: null } }, "c1"],
+          [
+            "x:Account/set",
+            {
+              updated: {
+                "acct-1": null,
+              },
+            },
+            "c1",
+          ],
         ],
       }),
     );
@@ -194,12 +202,18 @@ describe("StalwartAdminClient", () => {
       String(fetcher.mock.calls[2]?.[1]?.body ?? "{}"),
     );
     expect(passwordBody.methodCalls[0]).toEqual([
-      "x:AccountPassword/set",
+      "x:Account/set",
       {
-        accountId: "acct-1",
         update: {
-          singleton: {
-            secret: "StrongPassw0rd!",
+          "acct-1": {
+            credentials: {
+              password: {
+                "@type": "Password",
+                allowedIps: {},
+                expiresAt: null,
+                secret: "StrongPassw0rd!",
+              },
+            },
           },
         },
       },
@@ -304,7 +318,15 @@ describe("StalwartAdminClient", () => {
     fetcher.mockResolvedValueOnce(
       jsonResponse({
         methodResponses: [
-          ["x:AccountPassword/set", { updated: { singleton: null } }, "c1"],
+          [
+            "x:Account/set",
+            {
+              updated: {
+                "acct-existing": null,
+              },
+            },
+            "c1",
+          ],
         ],
       }),
     );
@@ -317,6 +339,125 @@ describe("StalwartAdminClient", () => {
     });
 
     expect(account).toEqual({ accountId: "acct-existing" });
+  });
+
+  it("updates the inline password credential without dropping other credentials", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:Account/get",
+            {
+              list: [
+                {
+                  id: "acct-1",
+                  name: "alice",
+                  domainId: "domain-1",
+                  emailAddress: "alice@solace.onl",
+                  credentials: {
+                    password: {
+                      "@type": "Password",
+                      allowedIps: {},
+                      expiresAt: null,
+                      secret: "****",
+                    },
+                    api1: {
+                      "@type": "ApiKey",
+                      description: "existing-api-key",
+                      secret: "****",
+                    },
+                  },
+                },
+              ],
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        methodResponses: [
+          [
+            "x:Account/set",
+            {
+              updated: {
+                "acct-1": null,
+              },
+            },
+            "c1",
+          ],
+        ],
+      }),
+    );
+
+    await client.setAccountPassword({
+      accountId: "acct-1",
+      secret: "NewStrongPassw0rd!",
+    });
+
+    const body = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(body.methodCalls[0]).toEqual([
+      "x:Account/set",
+      {
+        update: {
+          "acct-1": {
+            credentials: {
+              password: {
+                "@type": "Password",
+                allowedIps: {},
+                expiresAt: null,
+                secret: "NewStrongPassw0rd!",
+              },
+              api1: {
+                "@type": "ApiKey",
+                description: "existing-api-key",
+                secret: "****",
+              },
+            },
+          },
+        },
+      },
+      "c1",
+    ]);
+  });
+
+  it("accepts Stalwart auth responses that return client_code", async () => {
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        type: "authenticated",
+        client_code: "client-code-1",
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      jsonResponse({
+        access_token: "access-token-1",
+        expires_in: 3600,
+      }),
+    );
+
+    await expect(
+      client.issueOAuthAccessToken({
+        accountName: "alice@solace.onl",
+        accountSecret: "StrongPassw0rd!",
+        clientId: "solace-mail-bridge",
+        redirectUri: "https://api.solace.test/api/mail/oauth/callback",
+        codeVerifier: "verifier-1",
+        codeChallenge: "challenge-1",
+      }),
+    ).resolves.toEqual({
+      access_token: "access-token-1",
+      expires_in: 3600,
+      expires_at: undefined,
+      refresh_token: undefined,
+    });
+
+    expect(fetcher.mock.calls[1]?.[0]).toBe(
+      "https://mail.solace.onl/auth/token",
+    );
+    expect(String(fetcher.mock.calls[1]?.[1]?.body ?? "")).toContain(
+      "code=client-code-1",
+    );
   });
 
   it("registers a public key for a target account", async () => {

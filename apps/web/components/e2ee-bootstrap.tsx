@@ -108,8 +108,6 @@ export function E2eeBootstrap() {
 
     if (!userId) {
       resetE2eeBootstrap();
-      clearAuthPasswords();
-      clearEncPasswordCookie();
       setMode("hidden");
       setPassword("");
       setConfirmPassword("");
@@ -117,6 +115,8 @@ export function E2eeBootstrap() {
       setIsEmailPasswordUser(false);
 
       if (previousUserId) {
+        clearAuthPasswords();
+        clearEncPasswordCookie();
         clearCalendarQueries(queryClient);
       }
 

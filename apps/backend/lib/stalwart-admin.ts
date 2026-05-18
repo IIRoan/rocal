@@ -21,6 +21,10 @@ export type StalwartAccountRecord = {
   accountId: string;
 };
 
+type StalwartCredentialRecord = Record<string, unknown> & {
+  "@type"?: string;
+};
+
 type StalwartSetError = {
   description?: string;
   type?: string;
@@ -53,6 +57,28 @@ export interface StalwartAdminClientLike {
     encryptOnAppend?: boolean;
     allowSpamTraining?: boolean;
   }): Promise<void>;
+  setAccountPassword(input: {
+    accountId: string;
+    secret: string;
+  }): Promise<void>;
+  ensureOAuthClient(input: {
+    clientId: string;
+    redirectUri: string;
+    description?: string | null;
+  }): Promise<void>;
+  issueOAuthAccessToken(input: {
+    accountName: string;
+    accountSecret: string;
+    clientId: string;
+    redirectUri: string;
+    codeVerifier: string;
+    codeChallenge: string;
+  }): Promise<{
+    access_token: string;
+    expires_in?: number;
+    expires_at?: number;
+    refresh_token?: string;
+  }>;
 }
 
 export interface StalwartJmapAdminClientLike extends StalwartAdminClientLike {
@@ -65,6 +91,14 @@ export interface StalwartJmapAdminClientLike extends StalwartAdminClientLike {
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
+}
+
+function toWritableCredential(
+  credential: StalwartCredentialRecord,
+): StalwartCredentialRecord {
+  const { credentialId: _credentialId, createdAt: _createdAt, ...rest } =
+    credential;
+  return rest;
 }
 
 export class StalwartAdminClient implements StalwartJmapAdminClientLike {
@@ -213,8 +247,9 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       );
     }
 
-    await this.setAccountPassword({
+    await this.updateAccountPasswordCredential({
       accountId,
+      existingCredentials: verifiedAccount.credentials,
       secret: input.secret,
     });
 
@@ -264,6 +299,7 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     name: string;
     domainId: string;
     emailAddress?: string;
+    credentials?: Record<string, StalwartCredentialRecord>;
   }> {
     const envelope = await this.postJmap([
       [
@@ -276,13 +312,14 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     ]);
 
     const result = this.getMethodResult<{
-      list?: Array<{
-        id: string;
-        name: string;
-        domainId: string;
-        emailAddress?: string;
-      }>;
-    }>(envelope, "x:Account/get");
+        list?: Array<{
+          id: string;
+          name: string;
+          domainId: string;
+          emailAddress?: string;
+          credentials?: Record<string, StalwartCredentialRecord>;
+        }>;
+      }>(envelope, "x:Account/get");
 
     const account = result.list?.[0];
     if (!account) {
@@ -294,18 +331,58 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
     return account;
   }
 
-  private async setAccountPassword(input: {
+  async setAccountPassword(input: {
     accountId: string;
     secret: string;
   }): Promise<void> {
+    const account = await this.getAccount(input.accountId);
+    await this.updateAccountPasswordCredential({
+      accountId: input.accountId,
+      existingCredentials: account.credentials,
+      secret: input.secret,
+    });
+  }
+
+  private async updateAccountPasswordCredential(input: {
+    accountId: string;
+    existingCredentials?: Record<string, StalwartCredentialRecord>;
+    secret: string;
+  }): Promise<void> {
+    const existingCredentials = Object.entries(input.existingCredentials ?? {});
+    const passwordEntry = existingCredentials.find(
+      ([, credential]) => credential?.["@type"] === "Password",
+    );
+    const nextCredentials = Object.fromEntries(
+      existingCredentials.filter(
+        ([, credential]) => credential?.["@type"] !== "Password",
+      ).map(([credentialId, credential]) => [
+        credentialId,
+        toWritableCredential(credential),
+      ]),
+    ) as Record<string, StalwartCredentialRecord>;
+    const passwordCredentialId = passwordEntry?.[0] ?? "password";
+    const passwordCredential = toWritableCredential(
+      (passwordEntry?.[1] ?? {}) as StalwartCredentialRecord,
+    );
+    nextCredentials[passwordCredentialId] = {
+      ...passwordCredential,
+      "@type": "Password",
+      secret: input.secret,
+      expiresAt: null,
+      allowedIps:
+        typeof passwordCredential.allowedIps === "object" &&
+        passwordCredential.allowedIps !== null
+          ? passwordCredential.allowedIps
+          : {},
+    };
+
     const envelope = await this.postJmap([
       [
-        "x:AccountPassword/set",
+        "x:Account/set",
         {
-          accountId: input.accountId,
           update: {
-            singleton: {
-              secret: input.secret,
+            [input.accountId]: {
+              credentials: nextCredentials,
             },
           },
         },
@@ -313,7 +390,200 @@ export class StalwartAdminClient implements StalwartJmapAdminClientLike {
       ],
     ]);
 
-    this.getMethodResult(envelope, "x:AccountPassword/set");
+    const result = this.getMethodResult<{
+      updated?: Record<string, null>;
+      notUpdated?: Record<string, StalwartSetError>;
+    }>(envelope, "x:Account/set");
+    const updateError = result.notUpdated?.[input.accountId];
+    if (updateError) {
+      throw new Error(
+        updateError.description || "Stalwart account password update failed.",
+      );
+    }
+    if (!(input.accountId in (result.updated ?? {}))) {
+      throw new Error("Stalwart account password update was not acknowledged.");
+    }
+  }
+
+  async ensureOAuthClient(input: {
+    clientId: string;
+    redirectUri: string;
+    description?: string | null;
+  }): Promise<void> {
+    const queryEnvelope = await this.postJmap([["x:OAuthClient/query", {}, "c1"]]);
+    const queryResult = this.getMethodResult<{ ids?: string[] }>(
+      queryEnvelope,
+      "x:OAuthClient/query",
+    );
+    const ids = Array.isArray(queryResult.ids) ? queryResult.ids : [];
+
+    if (ids.length > 0) {
+      const getEnvelope = await this.postJmap([
+        ["x:OAuthClient/get", { ids }, "c1"],
+      ]);
+      const getResult = this.getMethodResult<{
+        list?: Array<{
+          id: string;
+          clientId: string;
+          description?: string | null;
+          redirectUris?: string[];
+        }>;
+      }>(getEnvelope, "x:OAuthClient/get");
+      const existing = (getResult.list ?? []).find(
+        (entry) => entry.clientId === input.clientId,
+      );
+
+      if (existing) {
+        const redirectUris = Array.isArray(existing.redirectUris)
+          ? existing.redirectUris
+          : [];
+        const needsUpdate =
+          !redirectUris.includes(input.redirectUri) ||
+          (input.description ?? null) !== (existing.description ?? null);
+
+        if (!needsUpdate) {
+          return;
+        }
+
+        const nextRedirectUris = [...new Set([...redirectUris, input.redirectUri])];
+        const envelope = await this.postJmap([
+          [
+            "x:OAuthClient/set",
+            {
+              update: {
+                [existing.id]: {
+                  redirectUris: nextRedirectUris,
+                  description: input.description ?? null,
+                },
+              },
+            },
+            "c1",
+          ],
+        ]);
+        this.getMethodResult(envelope, "x:OAuthClient/set");
+        return;
+      }
+    }
+
+    const envelope = await this.postJmap([
+      [
+        "x:OAuthClient/set",
+        {
+          create: {
+            client1: {
+              clientId: input.clientId,
+              redirectUris: [input.redirectUri],
+              description: input.description ?? null,
+            },
+          },
+        },
+        "c1",
+      ],
+    ]);
+    this.getMethodResult(envelope, "x:OAuthClient/set");
+  }
+
+  async issueOAuthAccessToken(input: {
+    accountName: string;
+    accountSecret: string;
+    clientId: string;
+    redirectUri: string;
+    codeVerifier: string;
+    codeChallenge: string;
+  }): Promise<{
+    access_token: string;
+    expires_in?: number;
+    expires_at?: number;
+    refresh_token?: string;
+  }> {
+    const authResponse = await this.fetcher(`${this.baseUrl}/api/auth`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "authCode",
+        accountName: input.accountName,
+        accountSecret: input.accountSecret,
+        clientId: input.clientId,
+        redirectUri: input.redirectUri,
+        codeChallenge: input.codeChallenge,
+        codeChallengeMethod: "S256",
+      }),
+    });
+
+    type AuthCodeResponse =
+      | {
+          type: "authenticated";
+          clientCode?: string;
+          client_code?: string;
+        }
+      | { type: "failure" }
+      | { type: "mfaRequired" }
+      | Record<string, unknown>;
+
+    const authPayload = (await authResponse
+      .json()
+      .catch(() => null)) as AuthCodeResponse | null;
+
+    if (!authResponse.ok || !authPayload) {
+      throw new Error(
+        `Stalwart mailbox login failed with status ${authResponse.status}.`,
+      );
+    }
+
+    const clientCode =
+      authPayload.type === "authenticated"
+        ? typeof authPayload.clientCode === "string"
+          ? authPayload.clientCode
+          : typeof authPayload.client_code === "string"
+            ? authPayload.client_code
+            : null
+        : null;
+
+    if (!clientCode) {
+      throw new Error("Stalwart mailbox login was rejected.");
+    }
+
+    const tokenBody = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: input.clientId,
+      redirect_uri: input.redirectUri,
+      code: clientCode,
+      code_verifier: input.codeVerifier,
+    });
+    const tokenResponse = await this.fetcher(`${this.baseUrl}/auth/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: tokenBody.toString(),
+    });
+
+    const tokenPayload = (await tokenResponse
+      .json()
+      .catch(() => null)) as
+      | {
+          access_token?: string;
+          expires_in?: number;
+          expires_at?: number;
+          refresh_token?: string;
+          error?: string;
+        }
+      | null;
+
+    if (!tokenResponse.ok || !tokenPayload?.access_token) {
+      throw new Error(
+        tokenPayload?.error || "Stalwart mailbox token exchange failed.",
+      );
+    }
+
+    return {
+      access_token: tokenPayload.access_token,
+      expires_in: tokenPayload.expires_in,
+      expires_at: tokenPayload.expires_at,
+      refresh_token: tokenPayload.refresh_token,
+    };
   }
 
   async registerPublicKey(input: {
