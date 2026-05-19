@@ -673,6 +673,7 @@ export function MessageReader({
     useState<string | null>(null);
   const [showQuote, setShowQuote] = useState(false);
   const [showOwnMessages, setShowOwnMessages] = useState(false);
+  const [isConversationCollapsed, setIsConversationCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedWrapRef = useRef<HTMLDivElement>(null);
@@ -690,6 +691,7 @@ export function MessageReader({
     setAttachmentHoverPreviews({});
     setLoadingAttachmentPreviewKey(null);
     setShowQuote(false);
+    setIsConversationCollapsed(false);
   }, [message?.id]);
 
   const displayAttachments = useMemo<MailAttachment[]>(
@@ -1690,24 +1692,34 @@ export function MessageReader({
 
   const conversationStrip = (showConversation || isConversationLoading) && (
     <div className="shrink-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden">
-      {/* Strip header — same muted-bar pattern as quote toggle / toolbar */}
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/30 border-b border-border/40">
-        <div className="flex items-center gap-1.5">
-          <MessageSquare className="h-3 w-3 text-muted-foreground/70" strokeWidth={2} />
+      {/* Strip header */}
+      <div className={cn("flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/30", !isConversationCollapsed && "border-b border-border/40")}>
+        <button
+          type="button"
+          onClick={() => setIsConversationCollapsed((v) => !v)}
+          className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+        >
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 text-muted-foreground/70 transition-transform shrink-0",
+              isConversationCollapsed && "-rotate-90",
+            )}
+          />
+          <MessageSquare className="h-3 w-3 text-muted-foreground/70 shrink-0" strokeWidth={2} />
           <span className="text-[11px] font-medium text-muted-foreground">
             {isConversationLoading
               ? "Loading thread…"
               : `${orderedConversationMessages.length} messages in thread`}
           </span>
           {isConversationLoading && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
           )}
-        </div>
-        {ownMessageCount > 0 && (
+        </button>
+        {ownMessageCount > 0 && !isConversationCollapsed && (
           <button
             type="button"
             onClick={() => setShowOwnMessages((v) => !v)}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors shrink-0"
           >
             {showOwnMessages ? (
               <EyeOff className="h-3 w-3" />
@@ -1719,100 +1731,102 @@ export function MessageReader({
         )}
       </div>
 
-      {/* Message rows — scrollable if thread is long, auto-scrolled to latest */}
-      <div ref={conversationListRef} className="max-h-36 overflow-y-auto divide-y divide-border/30">
-        {visibleConversationMessages.map((threadMessage) => {
-          const threadSenderEmail = threadMessage.from?.[0]?.email ?? "";
-          const threadSenderName = threadMessage.from?.[0]?.name ?? undefined;
-          const threadBodies = extractMessageBodies(threadMessage);
-          let rawPreview: string;
-          if (threadBodies.html && !threadBodies.text) {
-            const { html: cleanedHtml } = splitHtmlQuote(threadBodies.html);
-            rawPreview = cleanedHtml.replace(/<[^>]+>/g, " ");
-          } else {
-            rawPreview = threadBodies.text ?? "";
-          }
-          const { body: previewBody } = splitPlaintextQuote(rawPreview);
-          const threadPreviewText = previewBody.replace(/\s+/g, " ").trim();
-          const isActive = threadMessage.id === (selectedMessageId ?? message.id);
-          const threadIsRead =
-            threadMessage.keywords?.["$seen"] === true ||
-            (accountEmail
-              ? threadMessage.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase()
-              : false);
-          const hasThreadActions =
-            onConversationMessageDelete ||
-            onConversationMessageMarkUnread ||
-            onConversationMessageMove;
+      {/* Message rows — collapsible */}
+      {!isConversationCollapsed && (
+        <div ref={conversationListRef} className="max-h-36 overflow-y-auto divide-y divide-border/30">
+          {visibleConversationMessages.map((threadMessage) => {
+            const threadSenderEmail = threadMessage.from?.[0]?.email ?? "";
+            const threadSenderName = threadMessage.from?.[0]?.name ?? undefined;
+            const threadBodies = extractMessageBodies(threadMessage);
+            let rawPreview: string;
+            if (threadBodies.html && !threadBodies.text) {
+              const { html: cleanedHtml } = splitHtmlQuote(threadBodies.html);
+              rawPreview = cleanedHtml.replace(/<[^>]+>/g, " ");
+            } else {
+              rawPreview = threadBodies.text ?? "";
+            }
+            const { body: previewBody } = splitPlaintextQuote(rawPreview);
+            const threadPreviewText = previewBody.replace(/\s+/g, " ").trim();
+            const isActive = threadMessage.id === (selectedMessageId ?? message.id);
+            const threadIsRead =
+              threadMessage.keywords?.["$seen"] === true ||
+              (accountEmail
+                ? threadMessage.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase()
+                : false);
+            const hasThreadActions =
+              onConversationMessageDelete ||
+              onConversationMessageMarkUnread ||
+              onConversationMessageMove;
 
-          return (
-            <div
-              key={threadMessage.id}
-              className={cn(
-                "group/thread-item relative flex w-full items-center gap-2 px-3 py-1.5 transition-colors",
-                isActive
-                  ? "bg-primary/5"
-                  : "hover:bg-accent/40",
-              )}
-            >
-              {/* Active left-border accent */}
-              {isActive && (
-                <div className="absolute left-0 inset-y-0 w-0.5 bg-primary rounded-r" />
-              )}
-
-              {/* Unread dot (pushes left of avatar) */}
-              {!threadIsRead ? (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-              ) : (
-                <span className="h-1.5 w-1.5 shrink-0" />
-              )}
-
-              {/* Clickable row */}
-              <button
-                type="button"
-                onClick={() => onSelectConversationMessage?.(threadMessage.id)}
-                className="flex flex-1 min-w-0 cursor-pointer items-center gap-2 text-left"
+            return (
+              <div
+                key={threadMessage.id}
+                className={cn(
+                  "group/thread-item relative flex w-full items-center gap-2 px-3 py-1.5 transition-colors",
+                  isActive
+                    ? "bg-primary/5"
+                    : "hover:bg-accent/40",
+                )}
               >
-                <SenderAvatar
-                  email={threadSenderEmail}
-                  name={threadSenderName}
-                  className="h-5 w-5 shrink-0 text-[9px]"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1.5 min-w-0">
-                    <span
-                      className={cn(
-                        "shrink-0 text-xs",
-                        threadIsRead
-                          ? "font-medium text-foreground/70"
-                          : "font-semibold text-foreground",
-                      )}
-                    >
-                      {threadSenderName || threadSenderEmail || "Unknown"}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {threadPreviewText || "(No body)"}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-muted-foreground shrink-0 text-[10px]">
-                  {formatMessageDate(threadMessage.receivedAt, timeFormat, timezone)}
-                </span>
-              </button>
+                {/* Active left-border accent */}
+                {isActive && (
+                  <div className="absolute left-0 inset-y-0 w-0.5 bg-primary rounded-r" />
+                )}
 
-              {/* Per-message actions */}
-              {hasThreadActions && (
-                <ConversationMessageMenu
-                  messageId={threadMessage.id}
-                  isRead={threadIsRead}
-                  onDelete={onConversationMessageDelete}
-                  onMarkUnread={onConversationMessageMarkUnread}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {/* Unread dot */}
+                {!threadIsRead ? (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                ) : (
+                  <span className="h-1.5 w-1.5 shrink-0" />
+                )}
+
+                {/* Clickable row */}
+                <button
+                  type="button"
+                  onClick={() => onSelectConversationMessage?.(threadMessage.id)}
+                  className="flex flex-1 min-w-0 cursor-pointer items-center gap-2 text-left"
+                >
+                  <SenderAvatar
+                    email={threadSenderEmail}
+                    name={threadSenderName}
+                    className="h-5 w-5 shrink-0 text-[9px]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span
+                        className={cn(
+                          "shrink-0 text-xs",
+                          threadIsRead
+                            ? "font-medium text-foreground/70"
+                            : "font-semibold text-foreground",
+                        )}
+                      >
+                        {threadSenderName || threadSenderEmail || "Unknown"}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                        {threadPreviewText || "(No body)"}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-muted-foreground shrink-0 text-[10px]">
+                    {formatMessageDate(threadMessage.receivedAt, timeFormat, timezone)}
+                  </span>
+                </button>
+
+                {/* Per-message actions */}
+                {hasThreadActions && (
+                  <ConversationMessageMenu
+                    messageId={threadMessage.id}
+                    isRead={threadIsRead}
+                    onDelete={onConversationMessageDelete}
+                    onMarkUnread={onConversationMessageMarkUnread}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
