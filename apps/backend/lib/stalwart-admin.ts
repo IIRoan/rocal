@@ -96,8 +96,9 @@ function normalizeBaseUrl(baseUrl: string): string {
 function toWritableCredential(
   credential: StalwartCredentialRecord,
 ): StalwartCredentialRecord {
-  const { credentialId: _credentialId, createdAt: _createdAt, ...rest } =
-    credential;
+  const rest = { ...credential };
+  delete rest.credentialId;
+  delete rest.createdAt;
   return rest;
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import PostalMime from "postal-mime";
+import PostalMime, { type Attachment as ParsedMailAttachment } from "postal-mime";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
@@ -19,12 +19,18 @@ import { createMailOAuthTokenManager } from "@/lib/mail/oauth-client";
 import {
   getPrimaryMailAccountId,
   StalwartJmapClient,
+  type JmapAttachmentInput,
 } from "@/lib/mail/jmap-client";
+import { getConversationForMessage } from "@/lib/mail/conversation-thread";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
   extractPgpMimeCiphertextBlobId,
 } from "@/lib/mail/message-security";
+import {
+  resolveAttachmentPreviewKind,
+  type MailAttachmentPreviewKind,
+} from "@/lib/mail/attachment-preview";
 import {
   unlockEncryptedMailVault,
   createEncryptedMailVault,
@@ -35,12 +41,14 @@ import {
 } from "@/lib/mail/vault-storage";
 import { mailCryptoWorkerClient } from "@/lib/mail/worker-client";
 import type {
+  JmapAttachment,
   JmapEmailMessage,
   JmapIdentity,
   JmapMailbox,
   JmapSession,
   LabelDef,
   MailAccountStatus,
+  MailAttachment,
   MailDecryptResult,
   MailDemoConfig,
   MailSignatureVerificationState,
@@ -83,6 +91,39 @@ export type ActiveMailboxState = {
   selectedMailboxId: string | null;
 };
 
+type MailAttachmentPreviewState = {
+  name: string;
+  type: string;
+} & (
+  | {
+      kind: "image" | "pdf";
+      url: string;
+    }
+  | {
+      kind: "text";
+      text: string;
+    }
+);
+
+type MailAttachmentHoverPreview = (
+  | {
+      kind: "image" | "pdf";
+      url: string;
+    }
+  | {
+      kind: "text";
+      text: string;
+    }
+) & {
+  type: string;
+};
+
+type MailReplyContext = {
+  threadId?: string | null;
+  inReplyTo?: string[];
+  references?: string[];
+};
+
 function resolveSignatureVerificationState(
   decrypted: Partial<
     Pick<
@@ -115,6 +156,156 @@ function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
 
 function normalizeEmailAddress(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function getAttachmentSize(
+  content: MailAttachment["content"],
+): number | null {
+  if (content == null) return null;
+  if (typeof content === "string") {
+    return new TextEncoder().encode(content).byteLength;
+  }
+  if (content instanceof ArrayBuffer) {
+    return content.byteLength;
+  }
+  if (ArrayBuffer.isView(content)) {
+    return content.byteLength;
+  }
+  return null;
+}
+
+function toAttachmentBlobPart(content: MailAttachment["content"]): BlobPart {
+  if (typeof content === "string" || content instanceof ArrayBuffer) {
+    return content;
+  }
+  if (ArrayBuffer.isView(content)) {
+    const copy = new Uint8Array(content.byteLength);
+    copy.set(
+      new Uint8Array(content.buffer, content.byteOffset, content.byteLength),
+    );
+    return copy.buffer;
+  }
+  throw new Error("Attachment content is unavailable.");
+}
+
+function toParsedMailAttachment(
+  attachment: ParsedMailAttachment,
+): MailAttachment {
+  return {
+    name: attachment.filename ?? "Attachment",
+    type: attachment.mimeType || "application/octet-stream",
+    size: getAttachmentSize(attachment.content),
+    content: attachment.content,
+  };
+}
+
+async function resolveAttachmentBlob(input: {
+  attachment: MailAttachment;
+  activeMailbox: ActiveMailboxState | null;
+}): Promise<{ blob: Blob; filename: string }> {
+  const filename = input.attachment.name?.trim() || "attachment";
+  const contentType = input.attachment.type ?? "application/octet-stream";
+
+  if (input.attachment.blobId) {
+    if (!input.activeMailbox) {
+      throw new Error("Mailbox connection is not ready.");
+    }
+    const blob = await input.activeMailbox.client.downloadBlob(
+      input.activeMailbox.session,
+      input.attachment.blobId,
+      filename,
+      contentType,
+    );
+    return { blob, filename };
+  }
+
+  if (input.attachment.content != null) {
+    return {
+      blob: new Blob([toAttachmentBlobPart(input.attachment.content)], {
+        type: contentType,
+      }),
+      filename,
+    };
+  }
+
+  throw new Error("Attachment content is unavailable.");
+}
+
+function buildAttachmentPreviewCacheKey(attachment: MailAttachment): string {
+  return [
+    attachment.blobId ?? "",
+    attachment.name?.trim() ?? "",
+    attachment.type ?? "",
+    attachment.size ?? "",
+  ].join("::");
+}
+
+function buildReplyContext(
+  message: Pick<JmapEmailMessage, "threadId" | "messageId" | "references">,
+): MailReplyContext {
+  const messageIds = (message.messageId ?? []).filter(Boolean);
+  const references = Array.from(
+    new Set([...(message.references ?? []).filter(Boolean), ...messageIds]),
+  );
+
+  return {
+    threadId: message.threadId ?? null,
+    inReplyTo: messageIds.length > 0 ? messageIds : undefined,
+    references: references.length > 0 ? references : undefined,
+  };
+}
+
+function createOptimisticReplyMessage(input: {
+  fromEmail: string;
+  to: string[];
+  subject: string;
+  textBody: string;
+  sentMailboxId?: string | null;
+  threadId?: string | null;
+  inReplyTo?: string[];
+  references?: string[];
+  attachments?: JmapAttachmentInput[];
+}): JmapEmailMessage {
+  const optimisticId = `sent-local-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+
+  return {
+    id: optimisticId,
+    threadId: input.threadId ?? undefined,
+    inReplyTo: input.inReplyTo,
+    references: input.references,
+    mailboxIds: input.sentMailboxId ? { [input.sentMailboxId]: true } : undefined,
+    from: [{ email: input.fromEmail }],
+    to: input.to.map((email) => ({ email })),
+    subject: input.subject,
+    receivedAt: new Date().toISOString(),
+    keywords: { $seen: true },
+    textBody: [{ partId: "text" }],
+    bodyValues: {
+      text: {
+        value: input.textBody,
+      },
+    },
+    attachments: input.attachments?.map((attachment) => ({
+      blobId: attachment.blobId,
+      name: attachment.name,
+      type: attachment.type,
+      size: attachment.size,
+    })),
+  };
+}
+
+async function buildTextAttachmentPreview(
+  blob: Blob,
+  type: string,
+): Promise<MailAttachmentHoverPreview> {
+  const text = (await blob.text()).slice(0, 5000);
+  return {
+    kind: "text",
+    text,
+    type,
+  };
 }
 
 function getEmailDomain(value: string): string | null {
@@ -291,6 +482,79 @@ function mergeMessagesForMailbox(
   return sortMessages([...nextMessages.values()]);
 }
 
+function sortMessagesByReceivedAt(
+  messages: JmapEmailMessage[],
+): JmapEmailMessage[] {
+  return [...messages].sort((left, right) => {
+    const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
+    const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
+    return leftTime - rightTime;
+  });
+}
+
+function mergeConversationSourceMessages(
+  ...messageSets: JmapEmailMessage[][]
+): JmapEmailMessage[] {
+  const byId = new Map<string, JmapEmailMessage>();
+
+  for (const messageSet of messageSets) {
+    for (const message of messageSet) {
+      byId.set(message.id, message);
+    }
+  }
+
+  return sortMessagesByReceivedAt([...byId.values()]);
+}
+
+function messagesLikelyMatch(
+  left: JmapEmailMessage,
+  right: JmapEmailMessage,
+): boolean {
+  const leftFrom = left.from?.[0]?.email ?? "";
+  const rightFrom = right.from?.[0]?.email ?? "";
+  const leftTo = (left.to ?? []).map((entry) => entry.email).join(",");
+  const rightTo = (right.to ?? []).map((entry) => entry.email).join(",");
+
+  // Must share sender, recipients, and subject
+  if (
+    leftFrom !== rightFrom ||
+    leftTo !== rightTo ||
+    (left.subject ?? "") !== (right.subject ?? "")
+  ) {
+    return false;
+  }
+
+  // If both have a threadId they must be in the same thread
+  if (left.threadId && right.threadId && left.threadId !== right.threadId) {
+    return false;
+  }
+
+  // Messages must be within 5 minutes of each other (handles clock drift
+  // between the optimistic Date.now() timestamp and server receipt time)
+  if (left.receivedAt && right.receivedAt) {
+    const diff = Math.abs(
+      new Date(left.receivedAt).getTime() -
+        new Date(right.receivedAt).getTime(),
+    );
+    if (diff > 5 * 60 * 1000) return false;
+  }
+
+  // Compare a normalised prefix of the text body (if both have one).
+  // Normalise CRLF→LF because the server follows RFC 2822 CRLF but the
+  // optimistic message is built from a JS template literal using \n.
+  const leftText = (left.bodyValues?.text?.value ?? "")
+    .replace(/\r\n/g, "\n")
+    .slice(0, 200)
+    .trim();
+  const rightText = (right.bodyValues?.text?.value ?? "")
+    .replace(/\r\n/g, "\n")
+    .slice(0, 200)
+    .trim();
+  if (leftText && rightText && leftText !== rightText) return false;
+
+  return true;
+}
+
 export function useMailApp() {
   const { data: session, isPending: isSessionPending } = useSession();
   const router = useSmoothRouter();
@@ -312,6 +576,13 @@ export function useMailApp() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     null,
   );
+  const [selectedConversationMessageId, setSelectedConversationMessageId] =
+    useState<string | null>(null);
+  const [relatedConversationMessages, setRelatedConversationMessages] =
+    useState<JmapEmailMessage[]>([]);
+  const [optimisticConversationMessages, setOptimisticConversationMessages] =
+    useState<JmapEmailMessage[]>([]);
+  const [isConversationLoading, setIsConversationLoading] = useState(false);
   const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
     string | null
   >(null);
@@ -323,9 +594,23 @@ export function useMailApp() {
     useState<string | null>(null);
   const [selectedMessageDecryptedHtml, setSelectedMessageDecryptedHtml] =
     useState<string | null>(null);
+  const [
+    selectedMessageDecryptedAttachments,
+    setSelectedMessageDecryptedAttachments,
+  ] = useState<MailAttachment[] | null>(null);
+  const [attachmentPreview, setAttachmentPreview] =
+    useState<MailAttachmentPreviewState | null>(null);
+  const attachmentPreviewUrlRef = useRef<string | null>(null);
+  const attachmentHoverPreviewCacheRef = useRef<
+    Map<string, MailAttachmentHoverPreview>
+  >(new Map());
+  const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
+  const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
+  const [composeReplyContext, setComposeReplyContext] =
+    useState<MailReplyContext | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   // Initialised synchronously from sessionStorage; updated async once the
@@ -357,6 +642,9 @@ export function useMailApp() {
   const accountDisplayName = session?.user?.name?.trim() ?? "";
   const accountUserId = session?.user?.id?.trim() ?? "";
   const mailboxEmail = mailboxStatus?.email ?? accountEmail;
+
+  // Keep the ref in sync on every render so stable callbacks always see the latest mailbox
+  activeMailboxRef.current = activeMailbox;
 
   // Init password from encrypted cookie (cross-tab / post-refresh)
   useEffect(() => {
@@ -458,13 +746,132 @@ export function useMailApp() {
   }, [activeMailbox, cachedAuthPassword, loginPassword]);
 
   // Decrypt selected message
-  const selectedMessage =
+  const selectedMailboxMessage =
     activeMailbox?.messages.find((m) => m.id === selectedMessageId) ?? null;
+  const conversationSourceMessages = useMemo(
+    () => {
+      const serverMessages = mergeConversationSourceMessages(
+        activeMailbox?.messages ?? [],
+        relatedConversationMessages,
+      );
+      const unmatchedOptimisticMessages = optimisticConversationMessages.filter(
+        (optimisticMessage) =>
+          !serverMessages.some((serverMessage) =>
+            messagesLikelyMatch(serverMessage, optimisticMessage),
+          ),
+      );
+      return mergeConversationSourceMessages(
+        serverMessages,
+        unmatchedOptimisticMessages,
+      );
+    },
+    [activeMailbox?.messages, relatedConversationMessages, optimisticConversationMessages],
+  );
+  const selectedConversationMessages = useMemo(() => {
+    const anchorMessageId = selectedConversationMessageId ?? selectedMessageId;
+    const conversation = getConversationForMessage(
+      conversationSourceMessages,
+      anchorMessageId,
+    );
+    if (conversation.length > 0) {
+      return conversation;
+    }
+    return selectedMailboxMessage ? [selectedMailboxMessage] : [];
+  }, [
+    conversationSourceMessages,
+    selectedConversationMessageId,
+    selectedMailboxMessage,
+    selectedMessageId,
+  ]);
+  const selectedConversationMessage =
+    selectedConversationMessages.find(
+      (message) => message.id === selectedConversationMessageId,
+    ) ?? null;
+  const selectedMessage =
+    selectedConversationMessage ?? selectedMailboxMessage ?? null;
+
+  const handleSelectMessageId = useCallback((messageId: string | null) => {
+    setSelectedMessageId(messageId);
+    setSelectedConversationMessageId(null);
+  }, []);
+
+  const handleSelectConversationMessageId = useCallback((messageId: string) => {
+    setSelectedConversationMessageId(messageId);
+  }, []);
+
+  const appendConversationMessage = useCallback(
+    (message: JmapEmailMessage) => {
+      setOptimisticConversationMessages((current) =>
+        mergeConversationSourceMessages(current, [message]),
+      );
+    },
+    [],
+  );
+
+  const loadConversationThread = useCallback(
+    async (threadId: string) => {
+      const mb = activeMailboxRef.current;
+      if (!mb) {
+        setRelatedConversationMessages([]);
+        setIsConversationLoading(false);
+        return;
+      }
+
+      setIsConversationLoading(true);
+      try {
+        const messages = await mb.client.getThreadMessages(mb.session, threadId);
+        setRelatedConversationMessages(messages);
+      } catch (error) {
+        log.warn("Failed to load thread messages", error);
+        setRelatedConversationMessages([]);
+      } finally {
+        setIsConversationLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setSelectedConversationMessageId(null);
+    setOptimisticConversationMessages([]);
+  }, [selectedMessageId]);
+
+  useEffect(() => {
+    if (
+      selectedConversationMessageId &&
+      !selectedConversationMessages.some(
+        (message) => message.id === selectedConversationMessageId,
+      )
+    ) {
+      setSelectedConversationMessageId(null);
+    }
+  }, [selectedConversationMessageId, selectedConversationMessages]);
+
+  useEffect(() => {
+    if (!selectedMessageId || !activeMailbox) {
+      setRelatedConversationMessages([]);
+      setIsConversationLoading(false);
+      return;
+    }
+
+    const selectedMsg = activeMailbox.messages.find(
+      (m) => m.id === selectedMessageId,
+    );
+    const threadId = selectedMsg?.threadId;
+
+    if (threadId) {
+      void loadConversationThread(threadId);
+    } else {
+      setRelatedConversationMessages([]);
+      setIsConversationLoading(false);
+    }
+  }, [selectedMessageId, activeMailbox, loadConversationThread]);
 
   useEffect(() => {
     if (!selectedMessage || !activeMailbox) {
       setSelectedMessagePlaintext(null);
       setSelectedMessageDecryptedHtml(null);
+      setSelectedMessageDecryptedAttachments(null);
       setSelectedMessageSignatureVerificationState("not_signed");
       setSelectedMessageDecryptError(null);
       return;
@@ -473,9 +880,15 @@ export function useMailApp() {
     if (encState !== "inline_pgp" && encState !== "pgp_mime") {
       setSelectedMessagePlaintext(null);
       setSelectedMessageDecryptedHtml(null);
+      setSelectedMessageDecryptedAttachments(null);
       setSelectedMessageSignatureVerificationState("not_signed");
       setSelectedMessageDecryptError(null);
       return;
+    }
+    if (encState === "pgp_mime") {
+      setSelectedMessageDecryptedAttachments([]);
+    } else {
+      setSelectedMessageDecryptedAttachments(null);
     }
     let cancelled = false;
     void (async () => {
@@ -528,12 +941,24 @@ export function useMailApp() {
         });
         if (cancelled) return;
         if (encState === "pgp_mime") {
-          const parsed = await PostalMime.parse(decrypted.plaintext);
+          const parsed = await PostalMime.parse(decrypted.plaintext, {
+            attachmentEncoding: "arraybuffer",
+          });
           setSelectedMessageDecryptedHtml(parsed.html ?? null);
           setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
+          setSelectedMessageDecryptedAttachments(
+            parsed.attachments
+              .filter(
+                (attachment) =>
+                  attachment.disposition === "attachment" &&
+                  !attachment.related,
+              )
+              .map(toParsedMailAttachment),
+          );
         } else {
           setSelectedMessageDecryptedHtml(null);
           setSelectedMessagePlaintext(decrypted.plaintext);
+          setSelectedMessageDecryptedAttachments(null);
         }
         setSelectedMessageSignatureVerificationState(
           resolveSignatureVerificationState(decrypted),
@@ -544,6 +969,9 @@ export function useMailApp() {
         log.warn("Failed to decrypt message", error);
         setSelectedMessagePlaintext(null);
         setSelectedMessageDecryptedHtml(null);
+        setSelectedMessageDecryptedAttachments(
+          encState === "pgp_mime" ? [] : null,
+        );
         setSelectedMessageSignatureVerificationState("not_signed");
         setSelectedMessageDecryptError(
           "Could not decrypt this message on this device.",
@@ -891,7 +1319,7 @@ export function useMailApp() {
         plaintext: composeBody,
         internalDomain,
       });
-      await activeMailbox.client.sendMessage(activeMailbox.session, {
+      const sendResult = await activeMailbox.client.sendMessage(activeMailbox.session, {
         draftsMailboxId,
         sentMailboxId,
         fromEmail: activeMailbox.email,
@@ -899,10 +1327,29 @@ export function useMailApp() {
         subject: composeSubject.trim(),
         textBody,
         identityId,
+        inReplyTo: composeReplyContext?.inReplyTo,
+        references: composeReplyContext?.references,
       });
+      const effectiveThreadId =
+        sendResult?.threadId ?? composeReplyContext?.threadId ?? null;
+      if (composeReplyContext) {
+        appendConversationMessage(
+          createOptimisticReplyMessage({
+            fromEmail: activeMailbox.email,
+            to: recipients,
+            subject: composeSubject.trim(),
+            textBody: composeBody,
+            sentMailboxId,
+            threadId: effectiveThreadId,
+            inReplyTo: composeReplyContext.inReplyTo,
+            references: composeReplyContext.references,
+          }),
+        );
+      }
       setComposeTo("");
       setComposeSubject("");
       setComposeBody("");
+      setComposeReplyContext(null);
       setIsComposeOpen(false);
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
       if (activeMailbox.selectedMailboxId) {
@@ -915,6 +1362,9 @@ export function useMailApp() {
         setActiveMailbox((cur) =>
           cur ? { ...cur, messages: refreshed } : cur,
         );
+        if (effectiveThreadId) {
+          void loadConversationThread(effectiveThreadId);
+        }
       }
     } catch (error) {
       log.error("Failed to send mail", error);
@@ -924,7 +1374,16 @@ export function useMailApp() {
     } finally {
       setIsBusy(false);
     }
-  }, [activeMailbox, composeTo, composeSubject, composeBody, config]);
+  }, [
+    appendConversationMessage,
+    activeMailbox,
+    composeTo,
+    composeSubject,
+    composeBody,
+    composeReplyContext,
+    config,
+    loadConversationThread,
+  ]);
 
   const handleDeleteMessage = useCallback(
     async (messageId?: string) => {
@@ -975,6 +1434,7 @@ export function useMailApp() {
     setComposeTo(sender);
     setComposeSubject(subject.startsWith("Re: ") ? subject : `Re: ${subject}`);
     setComposeBody(`\n\n---\nOn ${date}, ${sender} wrote:\n${body}`);
+    setComposeReplyContext(buildReplyContext(selectedMessage));
     setIsComposeOpen(true);
   }, [selectedMessage, selectedMessagePlaintext]);
 
@@ -989,8 +1449,255 @@ export function useMailApp() {
       subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`,
     );
     setComposeBody(`\n\n---\nForwarded message from ${sender}:\n${body}`);
+    setComposeReplyContext(null);
     setIsComposeOpen(true);
   }, [selectedMessage, selectedMessagePlaintext]);
+
+  const handleQuickReply = useCallback(
+    async (replyText: string, files: File[] = []) => {
+      if (!selectedMessage || !activeMailbox) return;
+      if (!replyText.trim()) {
+        toast.error("Enter a reply message.");
+        return;
+      }
+      const sender = selectedMessage.from?.[0]?.email ?? "";
+      const subject = selectedMessage.subject ?? "";
+      const { text } = extractMessageBodies(selectedMessage);
+      const body = selectedMessagePlaintext ?? text ?? "";
+      const date = selectedMessage.receivedAt
+        ? new Date(selectedMessage.receivedAt).toLocaleString()
+        : "";
+      setIsBusy(true);
+      try {
+        const recipients = [normalizeEmailAddress(sender)];
+        const draftsMailboxId = getPrimaryMailboxId(
+          activeMailbox.mailboxes,
+          "drafts",
+        );
+        const sentMailboxId = getPrimaryMailboxId(
+          activeMailbox.mailboxes,
+          "sent",
+        );
+        const identityId = activeMailbox.identities[0]?.id;
+        if (!draftsMailboxId || !identityId) {
+          throw new Error("Missing draft mailbox or sending identity.");
+        }
+        const internalDomain =
+          config?.defaultDomain.trim().toLowerCase() ??
+          getEmailDomain(activeMailbox.email);
+        const quotedBody = date
+          ? `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`
+          : "";
+        const { textBody, encrypted } = await resolveOutgoingMessageBody({
+          activeMailbox,
+          recipients,
+          plaintext: `${replyText}${quotedBody}`,
+          internalDomain,
+        });
+
+        // Upload any attached files and collect JMAP attachment inputs
+        const attachments =
+          files.length > 0
+            ? await Promise.all(
+                files.map((f) =>
+                  activeMailbox.client.uploadFile(activeMailbox.session, f),
+                ),
+              )
+            : undefined;
+
+        const replyContext = buildReplyContext(selectedMessage);
+        const sendResult = await activeMailbox.client.sendMessage(activeMailbox.session, {
+          draftsMailboxId,
+          sentMailboxId,
+          fromEmail: activeMailbox.email,
+          to: recipients,
+          subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
+          textBody,
+          identityId,
+          attachments,
+          inReplyTo: replyContext.inReplyTo,
+          references: replyContext.references,
+        });
+        const effectiveThreadId =
+          sendResult?.threadId ?? replyContext.threadId ?? null;
+        appendConversationMessage(
+          createOptimisticReplyMessage({
+            fromEmail: activeMailbox.email,
+            to: recipients,
+            subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
+            textBody: `${replyText}${quotedBody}`,
+            sentMailboxId,
+            threadId: effectiveThreadId,
+            inReplyTo: replyContext.inReplyTo,
+            references: replyContext.references,
+            attachments,
+          }),
+        );
+        if (effectiveThreadId) {
+          void loadConversationThread(effectiveThreadId);
+        }
+        toast(encrypted ? "Encrypted reply sent." : "Reply sent.");
+      } catch (error) {
+        log.error("Failed to send quick reply", error);
+        toast.error(
+          error instanceof Error ? error.message : "Could not send reply.",
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [
+      appendConversationMessage,
+      selectedMessage,
+      selectedMessagePlaintext,
+      activeMailbox,
+      config,
+      loadConversationThread,
+    ],
+  );
+
+  const handleDownloadAttachment = useCallback(
+    async (attachment: MailAttachment) => {
+      try {
+        const { blob, filename } = await resolveAttachmentBlob({
+          attachment,
+          activeMailbox,
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // Delay revoke so the browser has time to start the download
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      } catch (error) {
+        log.error("Failed to download attachment", error);
+        toast.error("Could not download the attachment.");
+      }
+    },
+    [activeMailbox],
+  );
+
+  const handlePreviewAttachment = useCallback(
+    async (attachment: MailAttachment) => {
+      try {
+        const previewKind = resolveAttachmentPreviewKind(attachment);
+        if (!previewKind) {
+          throw new Error("Preview is not available for this attachment.");
+        }
+        const { blob, filename } = await resolveAttachmentBlob({
+          attachment,
+          activeMailbox,
+        });
+        const normalizedType =
+          blob.type || attachment.type || "application/octet-stream";
+
+        if (previewKind === "text") {
+          const text = (await blob.text()).slice(0, 200000);
+          setAttachmentPreview((current) => {
+            if (current?.kind !== "text") {
+              if (current && "url" in current) {
+                URL.revokeObjectURL(current.url);
+              }
+              attachmentPreviewUrlRef.current = null;
+            }
+            return {
+              kind: "text",
+              name: filename,
+              type: normalizedType,
+              text,
+            };
+          });
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        setAttachmentPreview((current) => {
+          if (current && "url" in current) {
+            URL.revokeObjectURL(current.url);
+          }
+          attachmentPreviewUrlRef.current = url;
+          return {
+            kind: previewKind,
+            name: filename,
+            type: normalizedType,
+            url,
+          };
+        });
+      } catch (error) {
+        log.error("Failed to preview attachment", error);
+        toast.error("Could not preview the attachment.");
+      }
+    },
+    [activeMailbox],
+  );
+
+  const loadAttachmentHoverPreview = useCallback(
+    async (attachment: MailAttachment): Promise<MailAttachmentHoverPreview | null> => {
+      const previewKind = resolveAttachmentPreviewKind(attachment);
+      if (!previewKind) {
+        return null;
+      }
+
+      const cacheKey = buildAttachmentPreviewCacheKey(attachment);
+      const cached = attachmentHoverPreviewCacheRef.current.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const { blob } = await resolveAttachmentBlob({
+        attachment,
+        activeMailbox,
+      });
+      const normalizedType =
+        blob.type || attachment.type || "application/octet-stream";
+
+      let preview: MailAttachmentHoverPreview;
+      if (previewKind === "text") {
+        preview = await buildTextAttachmentPreview(blob, normalizedType);
+      } else {
+        const url = URL.createObjectURL(blob);
+        attachmentHoverPreviewUrlsRef.current.add(url);
+        preview = {
+          kind: previewKind,
+          url,
+          type: normalizedType,
+        };
+      }
+
+      attachmentHoverPreviewCacheRef.current.set(cacheKey, preview);
+      return preview;
+    },
+    [activeMailbox],
+  );
+
+  const closeAttachmentPreview = useCallback(() => {
+    setAttachmentPreview((current) => {
+      if (current && "url" in current) {
+        URL.revokeObjectURL(current.url);
+      }
+      attachmentPreviewUrlRef.current = null;
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    const hoverPreviewUrls = attachmentHoverPreviewUrlsRef.current;
+    const hoverPreviewCache = attachmentHoverPreviewCacheRef.current;
+    return () => {
+      if (attachmentPreviewUrlRef.current) {
+        URL.revokeObjectURL(attachmentPreviewUrlRef.current);
+        attachmentPreviewUrlRef.current = null;
+      }
+      for (const url of hoverPreviewUrls) {
+        URL.revokeObjectURL(url);
+      }
+      hoverPreviewUrls.clear();
+      hoverPreviewCache.clear();
+    };
+  }, []);
 
   const handleMoveMessage = useCallback(
     async (targetMailboxId: string, messageId?: string) => {
@@ -1027,6 +1734,18 @@ export function useMailApp() {
     },
     [activeMailbox, selectedMessageId],
   );
+
+  const handleUntrash = useCallback(async () => {
+    if (!activeMailbox || !selectedMessageId) return;
+    const inboxMailbox = activeMailbox.mailboxes.find(
+      (m) => m.role === "inbox" || m.role === "all",
+    );
+    if (!inboxMailbox) {
+      toast.error("Inbox mailbox not found.");
+      return;
+    }
+    await handleMoveMessage(inboxMailbox.id);
+  }, [activeMailbox, selectedMessageId, handleMoveMessage]);
 
   const handleReorderMailboxes = useCallback(
     async (reordered: JmapMailbox[]) => {
@@ -1609,9 +2328,14 @@ export function useMailApp() {
     activeMailbox,
     selectedMessage,
     selectedMessageId,
-    setSelectedMessageId,
+    setSelectedMessageId: handleSelectMessageId,
+    selectedConversationMessages,
+    isConversationLoading,
+    setSelectedConversationMessageId: handleSelectConversationMessageId,
     selectedMessagePlaintext,
     selectedMessageDecryptedHtml,
+    selectedMessageDecryptedAttachments,
+    attachmentPreview,
     selectedMessageSignatureVerificationState,
     selectedMessageDecryptError,
     composeTo,
@@ -1641,6 +2365,12 @@ export function useMailApp() {
     handleDeleteMessage,
     handleReply,
     handleForward,
+    handleQuickReply,
+    handlePreviewAttachment,
+    loadAttachmentHoverPreview,
+    handleDownloadAttachment,
+    closeAttachmentPreview,
+    handleUntrash,
     handleMoveMessage,
     handleCreateMailbox,
     handleDeleteMailbox,
@@ -1663,5 +2393,6 @@ export function useMailApp() {
     mailboxEmail,
     accountEmail,
     accountDisplayName,
+    conversationSourceMessages,
   };
 }

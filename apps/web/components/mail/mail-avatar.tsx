@@ -4,8 +4,8 @@ import { useState } from "react";
 import {
   Avatar,
   AvatarFallback,
-  AvatarImage,
 } from "@workspace/ui/components/ui/avatar";
+import { cn } from "@workspace/ui/lib/utils";
 
 const LOGO_DEV_TOKEN = "pk_OqzQzTPPQCare5_eo1QArg";
 
@@ -49,62 +49,100 @@ function paletteFor(seed: string) {
 }
 
 function getInitials(name?: string, email?: string): string {
-  const src = name?.trim() || email?.split("@")[0] || "?";
+  const src =
+    name?.trim() || email?.split("@")[0]?.trim() || email?.trim() || "?";
   const parts = src
-    .replace(/[^a-zA-Z\s]/g, " ")
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
   if (parts.length >= 2)
     return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-  return (parts[0]?.[0] ?? "?").toUpperCase();
+  const initial = parts[0]?.[0] ?? src.match(/[a-zA-Z0-9]/)?.[0] ?? "?";
+  return initial.toUpperCase();
+}
+
+function SenderAvatarContent({
+  email,
+  domain,
+  sources,
+  initials,
+  bg,
+  text,
+  className,
+}: {
+  email: string;
+  domain: string;
+  sources: string[];
+  initials: string;
+  bg: string;
+  text: string;
+  className?: string;
+}) {
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const currentSrc = sources[sourceIndex] ?? null;
+
+  return (
+    <Avatar className={cn("h-8 w-8 shrink-0", className)}>
+      <AvatarFallback
+        className={`${bg} ${text} text-[11px] font-semibold select-none`}
+      >
+        {initials}
+      </AvatarFallback>
+      {currentSrc && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={currentSrc}
+          src={currentSrc}
+          alt={`${domain || email} logo`}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover",
+            loadedSrc === currentSrc ? "block" : "hidden",
+          )}
+          onLoad={() => setLoadedSrc(currentSrc)}
+          onError={() => {
+            setLoadedSrc(null);
+            setSourceIndex((previous) => previous + 1);
+          }}
+        />
+      )}
+    </Avatar>
+  );
 }
 
 export function SenderAvatar({
   email,
   name,
+  className,
 }: {
   email: string;
   name?: string;
+  className?: string;
 }) {
   const domain = emailDomain(email);
   const isPersonal = !domain || PERSONAL_DOMAINS.has(domain);
-
   const sources = isPersonal
     ? []
     : [
         `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}`,
         `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
       ];
-
-  const [failedSources, setFailedSources] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const currentSrc =
-    sources.find((source) => !failedSources.has(source)) ?? null;
   const initials = getInitials(name, email);
   const [bg, text] = paletteFor(email || name || "?");
 
   return (
-    <Avatar className="h-8 w-8 shrink-0">
-      {currentSrc && (
-        <AvatarImage
-          src={currentSrc}
-          alt={domain}
-          onError={() =>
-            setFailedSources((previous) => {
-              const next = new Set(previous);
-              next.add(currentSrc);
-              return next;
-            })
-          }
-        />
-      )}
-      <AvatarFallback
-        className={`${bg} ${text} text-[11px] font-semibold select-none`}
-      >
-        {initials}
-      </AvatarFallback>
-    </Avatar>
+    <SenderAvatarContent
+      key={`${email}:${name ?? ""}`}
+      email={email}
+      domain={domain}
+      sources={sources}
+      initials={initials}
+      bg={bg}
+      text={text}
+      className={className}
+    />
   );
 }

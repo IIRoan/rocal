@@ -67,7 +67,8 @@ jest.mock("@workspace/ui/components/ui/sidebar", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui", () => ({
-  PageLoadingOverlay: () => null,
+  PageLoadingOverlay: ({ isLoading }: { isLoading?: boolean }) =>
+    isLoading ? <div>Loading…</div> : null,
   AppLoadingState: ({ text }: { text?: string }) => (
     <div>{text ?? "Loading..."}</div>
   ),
@@ -95,14 +96,19 @@ jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
 jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
+    ArrowLeft: Icon,
+    Ellipsis: Icon,
     Inbox: Icon,
     Loader2: Icon,
     Lock: Icon,
     MailPlus: Icon,
+    Pencil: Icon,
     Plus: Icon,
     RefreshCcw: Icon,
-    ShieldCheck: Icon,
+    RotateCcw: Icon,
     Send: Icon,
+    ShieldCheck: Icon,
+    SlidersHorizontal: Icon,
     UserRoundPlus: Icon,
   };
 });
@@ -151,6 +157,7 @@ const mockJmapClient = {
   getAccountSettings: jest.fn<() => Promise<any>>(),
   getMailboxes: jest.fn<() => Promise<any>>(),
   getMailboxMessages: jest.fn<() => Promise<any>>(),
+  getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
   sendMessage: jest.fn<() => Promise<any>>(),
   markAsRead: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
@@ -204,7 +211,7 @@ jest.mock("../../hooks/use-settings", () => ({
 }));
 
 jest.mock("../../components/mail/mail-sidebar", () => ({
-  MailSidebar: ({ activeMailbox, onSelectMailbox }: any) =>
+  MailSidebar: ({ activeMailbox, onSelectMailbox, onCompose }: any) =>
     activeMailbox ? (
       <nav>
         {activeMailbox.mailboxes.map((m: any) => (
@@ -212,6 +219,9 @@ jest.mock("../../components/mail/mail-sidebar", () => ({
             {m.name}
           </button>
         ))}
+        <button onClick={onCompose} aria-label="Compose">
+          Compose
+        </button>
       </nav>
     ) : null,
 }));
@@ -231,7 +241,35 @@ jest.mock("../../components/mail/message-list", () => ({
 }));
 
 jest.mock("../../components/mail/message-reader", () => ({
-  MessageReader: () => null,
+  MessageReader: ({
+    message,
+    conversationMessages = [],
+    onReply,
+    onSendReply,
+  }: any) =>
+    message ? (
+      <div>
+        <div>{message.subject}</div>
+        <ul data-testid="conversation-strip">
+          {conversationMessages.map((entry: any) => (
+            <li key={entry.id}>
+              {entry.from?.[0]?.email ?? "unknown"}|{entry.subject ?? ""}|
+              {entry.bodyValues?.text?.value ?? ""}
+            </li>
+          ))}
+        </ul>
+        <button type="button" aria-label="Reply" onClick={onReply}>
+          Reply
+        </button>
+        <button type="button" onClick={() => void onSendReply?.("Thanks!", [])}>
+          Send reply
+        </button>
+      </div>
+    ) : null,
+}));
+
+jest.mock("../../components/mail/attachment-preview-dialog", () => ({
+  AttachmentPreviewDialog: () => null,
 }));
 
 jest.mock("../../components/mail/compose-dialog", () => ({
@@ -537,6 +575,16 @@ describe("MailApp", () => {
       ],
       total: 1,
     });
+    mockJmapClient.getThreadMessages.mockResolvedValue([
+      {
+        id: "mail-1",
+        subject: "Encrypted hello",
+        from: [{ email: "bob@solace.onl", name: "Bob" }],
+        receivedAt: "2026-05-06T21:10:00.000Z",
+        textBody: [{ partId: "text" }],
+        bodyValues: { text: { value: "Hello Alice" } },
+      },
+    ]);
     mockJmapClient.getIdentities.mockResolvedValue([
       { id: "identity-1", email: "alice@solace.onl" },
     ]);
@@ -763,33 +811,40 @@ describe("MailApp", () => {
     mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
     mockJmapClient.getMailboxMessages.mockReset();
-    mockJmapClient.getMailboxMessages
-      .mockResolvedValueOnce({
-        messages: [
-          {
-            id: "mail-1",
-            subject: "Inbox hello",
-            from: [{ email: "bob@solace.onl", name: "Bob" }],
-            receivedAt: "2026-05-06T21:10:00.000Z",
-            textBody: [{ partId: "text" }],
-            bodyValues: { text: { value: "Inbox body" } },
-          },
-        ],
-        total: 1,
-      })
-      .mockResolvedValueOnce({
-        messages: [
-          {
-            id: "mail-2",
-            subject: "Junk hello",
-            from: [{ email: "spam@example.com", name: "Spammer" }],
-            receivedAt: "2026-05-06T21:11:00.000Z",
-            textBody: [{ partId: "text" }],
-            bodyValues: { text: { value: "Junk body" } },
-          },
-        ],
-        total: 1,
-      });
+    mockJmapClient.getMailboxMessages.mockImplementation(
+      async (...args: any[]) => {
+        const mailboxId = args[1] as string;
+        if (mailboxId === "junk-1") {
+          return {
+            messages: [
+              {
+                id: "mail-2",
+                subject: "Junk hello",
+                from: [{ email: "spam@example.com", name: "Spammer" }],
+                receivedAt: "2026-05-06T21:11:00.000Z",
+                textBody: [{ partId: "text" }],
+                bodyValues: { text: { value: "Junk body" } },
+              },
+            ],
+            total: 1,
+          };
+        }
+
+        return {
+          messages: [
+            {
+              id: "mail-1",
+              subject: "Inbox hello",
+              from: [{ email: "bob@solace.onl", name: "Bob" }],
+              receivedAt: "2026-05-06T21:10:00.000Z",
+              textBody: [{ partId: "text" }],
+              bodyValues: { text: { value: "Inbox body" } },
+            },
+          ],
+          total: 1,
+        };
+      },
+    );
 
     await renderApp();
 
@@ -806,8 +861,7 @@ describe("MailApp", () => {
       await Promise.resolve();
     });
 
-    expect(mockJmapClient.getMailboxMessages).toHaveBeenNthCalledWith(
-      2,
+    expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledWith(
       expect.objectContaining({
         apiUrl: "http://192.168.2.213:8080/jmap/",
       }),
@@ -841,9 +895,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const composeButton = Array.from(container.querySelectorAll("button")).find(
-      (el) => el.textContent?.includes("Compose"),
-    );
+    const composeButton = container.querySelector('[aria-label="Compose"]') as HTMLButtonElement | null;
     await act(async () => {
       composeButton?.click();
       await Promise.resolve();
@@ -884,7 +936,13 @@ describe("MailApp", () => {
     });
 
     await waitForExpectation(() => {
-      expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledTimes(2);
+      expect(mockJmapClient.getMailboxMessages).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiUrl: "http://192.168.2.213:8080/jmap/",
+        }),
+        "inbox-1",
+        expect.objectContaining({ limit: 20 }),
+      );
     });
 
     expect(mockApi.getRecipientKey).not.toHaveBeenCalled();
@@ -929,9 +987,7 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
-    const composeButton = Array.from(container.querySelectorAll("button")).find(
-      (el) => el.textContent?.includes("Compose"),
-    );
+    const composeButton = container.querySelector('[aria-label="Compose"]') as HTMLButtonElement | null;
     await act(async () => {
       composeButton?.click();
       await Promise.resolve();
@@ -994,6 +1050,134 @@ describe("MailApp", () => {
         identityId: "identity-1",
       },
     );
+  });
+
+  it("adds a sent quick reply into the active conversation immediately", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-1",
+          threadId: "thread-1",
+          messageId: ["<mail-1@example.com>"],
+          subject: "Encrypted hello",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          to: [{ email: "alice@solace.onl", name: "Alice" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Hello Alice" } },
+        },
+      ],
+      total: 1,
+    });
+    mockJmapClient.getThreadMessages.mockResolvedValue([
+      {
+        id: "mail-1",
+        threadId: "thread-1",
+        messageId: ["<mail-1@example.com>"],
+        subject: "Encrypted hello",
+        from: [{ email: "bob@solace.onl", name: "Bob" }],
+        to: [{ email: "alice@solace.onl", name: "Alice" }],
+        receivedAt: "2026-05-06T21:10:00.000Z",
+        textBody: [{ partId: "text" }],
+        bodyValues: { text: { value: "Hello Alice" } },
+      },
+    ]);
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const quickReplyButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Send reply",
+    );
+
+    await act(async () => {
+      quickReplyButton?.click();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("alice@solace.onl|Re: Encrypted hello|Thanks!");
+    });
+  });
+
+  it("adds a sent compose reply into the active conversation immediately", async () => {
+    mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
+    mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
+    mockJmapClient.getMailboxMessages.mockResolvedValue({
+      messages: [
+        {
+          id: "mail-1",
+          threadId: "thread-1",
+          messageId: ["<mail-1@example.com>"],
+          subject: "Encrypted hello",
+          from: [{ email: "bob@solace.onl", name: "Bob" }],
+          to: [{ email: "alice@solace.onl", name: "Alice" }],
+          receivedAt: "2026-05-06T21:10:00.000Z",
+          textBody: [{ partId: "text" }],
+          bodyValues: { text: { value: "Hello Alice" } },
+        },
+      ],
+      total: 1,
+    });
+    mockJmapClient.getThreadMessages.mockResolvedValue([
+      {
+        id: "mail-1",
+        threadId: "thread-1",
+        messageId: ["<mail-1@example.com>"],
+        subject: "Encrypted hello",
+        from: [{ email: "bob@solace.onl", name: "Bob" }],
+        to: [{ email: "alice@solace.onl", name: "Alice" }],
+        receivedAt: "2026-05-06T21:10:00.000Z",
+        textBody: [{ partId: "text" }],
+        bodyValues: { text: { value: "Hello Alice" } },
+      },
+    ]);
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const replyButton = container.querySelector(
+      'button[aria-label="Reply"]',
+    ) as HTMLButtonElement | null;
+
+    await act(async () => {
+      replyButton?.click();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      );
+
+      descriptor?.set?.call(textarea, "Compose reply body");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const sendButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Send message",
+    );
+
+    await act(async () => {
+      sendButton?.click();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain(
+        "alice@solace.onl|Re: Encrypted hello|Compose reply body",
+      );
+    });
   });
 
   it("calls initEncPasswordFromCookie on mount", async () => {

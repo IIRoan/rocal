@@ -194,6 +194,10 @@ async function proxyJmapRequest(input: {
   }
 
   const method = input.request.method.toUpperCase();
+  const requestBody =
+    method === "GET" || method === "HEAD"
+      ? undefined
+      : await input.request.arrayBuffer();
 
   let response: Response;
   try {
@@ -201,9 +205,7 @@ async function proxyJmapRequest(input: {
       method,
       headers,
       body:
-        method === "GET" || method === "HEAD"
-          ? undefined
-          : await input.request.text(),
+        requestBody && requestBody.byteLength > 0 ? requestBody : undefined,
       redirect: "follow",
     });
   } catch (err) {

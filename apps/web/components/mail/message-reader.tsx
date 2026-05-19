@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -17,6 +19,20 @@ import {
   Plus,
   X,
   MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Archive,
+  EllipsisVertical,
+  Paperclip,
+  Send,
+  Smile,
+  Download,
+  Eye,
+  Loader2,
+  Inbox,
+  EyeOff,
+  MessageSquare,
 } from "lucide-react";
 import {
   Popover,
@@ -30,19 +46,38 @@ import {
   DrawerTitle,
   DrawerClose,
 } from "@workspace/ui/components/ui/drawer";
-import { useIsMobile } from "@workspace/ui/hooks";
+import { Button } from "@workspace/ui/components/ui/button";
+import { Separator } from "@workspace/ui/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@workspace/ui/components/ui/collapsible";
+import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
+import { cn } from "@workspace/ui/lib/utils";
+import { toast } from "sonner";
 import { SenderAvatar } from "./mail-avatar";
-import type { JmapMailbox, LabelDef } from "@/lib/mail/types";
+import type {
+  JmapEmailMessage,
+  JmapMailbox,
+  LabelDef,
+  MailAttachment,
+  MailSignatureVerificationState,
+  MessageEncryptionState,
+} from "@/lib/mail/types";
 import {
   classifyMessageEncryption,
   extractMessageBodies,
 } from "@/lib/mail/message-security";
-import type {
-  JmapEmailMessage,
-  MailSignatureVerificationState,
-  MessageEncryptionState,
-} from "@/lib/mail/types";
-import { formatAddressFull } from "./mail-helpers";
+import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
+import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
+import { formatAddressFull, formatMessageDate } from "./mail-helpers";
+import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
 
 // ─── Security badge ───────────────────────────────────────────────────────────
 
@@ -378,12 +413,93 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ─── Per-message action menu (inside conversation strip) ────────────────────
+
+function ConversationMessageMenu({
+  messageId,
+  isRead,
+  onDelete,
+  onMarkUnread,
+}: {
+  messageId: string;
+  isRead: boolean;
+  onDelete?: (id: string) => void;
+  onMarkUnread?: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Message actions"
+          className={cn(
+            "shrink-0 flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground",
+          )}
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.25} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={4}
+        className="w-48 p-1 overflow-hidden rounded-lg border border-border shadow-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isRead && onMarkUnread && (
+          <button
+            type="button"
+            onClick={() => {
+              onMarkUnread(messageId);
+              setOpen(false);
+            }}
+            className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
+          >
+            <MailOpen className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+            Mark as unread
+          </button>
+        )}
+        {onDelete && (
+          <>
+            {isRead && onMarkUnread && (
+              <div className="mx-1 my-1 h-px bg-border/40" />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                onDelete(messageId);
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-destructive/80 hover:bg-destructive/10 transition-colors text-left"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+              Delete
+            </button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ─── Message reader ───────────────────────────────────────────────────────────
 
 export interface MessageReaderProps {
   message: JmapEmailMessage | null;
+  selectedMessageId?: string | null;
+  conversationMessages?: JmapEmailMessage[];
+  isConversationLoading?: boolean;
+  onSelectConversationMessage?: (id: string) => void;
   plaintext: string | null;
   decryptedHtml: string | null;
+  attachments?: MailAttachment[];
   signatureVerificationState: MailSignatureVerificationState;
   decryptError: string | null;
   accountEncryptedAtRest: boolean;
@@ -404,12 +520,59 @@ export interface MessageReaderProps {
   onDeleteLabel?: (labelId: string) => void;
   timeFormat?: "12h" | "24h";
   timezone?: string;
+  /** Close/deselect the current message */
+  onClose?: () => void;
+  /** Navigate to the previous message in the list */
+  onNavigatePrev?: () => void;
+  /** Navigate to the next message in the list */
+  onNavigateNext?: () => void;
+  /** Whether there is a previous message to navigate to */
+  hasPrev?: boolean;
+  /** Whether there is a next message to navigate to */
+  hasNext?: boolean;
+  /** Archive the current message (move to archive mailbox) */
+  onArchive?: () => void;
+  /** Directly send a reply without opening the compose dialog */
+  onSendReply?: (text: string, files: File[]) => Promise<void>;
+  /** Load a small hover preview for an attachment */
+  onLoadAttachmentPreview?: (attachment: MailAttachment) => Promise<
+    | {
+        kind: "image" | "pdf";
+        url: string;
+        type: string;
+      }
+    | {
+        kind: "text";
+        text: string;
+        type: string;
+      }
+    | null
+  >;
+  /** Preview an attachment in-browser */
+  onPreviewAttachment?: (attachment: MailAttachment) => void;
+  /** Download an attachment blob */
+  onDownloadAttachment?: (attachment: MailAttachment) => void;
+  /** Restore a message from trash/junk to inbox */
+  onUntrash?: () => void;
+  /** Delete a specific message within the conversation thread */
+  onConversationMessageDelete?: (id: string) => void;
+  /** Mark a specific message within the conversation thread as unread */
+  onConversationMessageMarkUnread?: (id: string) => void;
+  /** Move a specific message within the conversation thread to another mailbox */
+  onConversationMessageMove?: (id: string, mailboxId: string) => void;
+  /** The signed-in user's email address, used to identify own messages */
+  accountEmail?: string;
 }
 
 export function MessageReader({
   message,
+  selectedMessageId,
+  conversationMessages = [],
+  isConversationLoading = false,
+  onSelectConversationMessage,
   plaintext,
   decryptedHtml,
+  attachments,
   signatureVerificationState,
   decryptError,
   accountEncryptedAtRest,
@@ -430,16 +593,235 @@ export function MessageReader({
   onDeleteLabel,
   timeFormat,
   timezone,
+  onClose,
+  onNavigatePrev,
+  onNavigateNext,
+  hasPrev,
+  hasNext,
+  onArchive,
+  onSendReply,
+  onLoadAttachmentPreview,
+  onPreviewAttachment,
+  onDownloadAttachment,
+  onUntrash,
+  onConversationMessageDelete,
+  onConversationMessageMarkUnread,
+  onConversationMessageMove,
+  accountEmail,
 }: MessageReaderProps) {
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
   const [isSavingLabel, setIsSavingLabel] = useState(false);
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [morePopoverOpen, setMorePopoverOpen] = useState(false);
+  const [moveToExpanded, setMoveToExpanded] = useState(false);
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [isReplyExpanded, setIsReplyExpanded] = useState(false);
+  const [attachmentHoverPreviews, setAttachmentHoverPreviews] = useState<
+    Record<
+      string,
+      | {
+          kind: "image" | "pdf";
+          url: string;
+          type: string;
+        }
+      | {
+          kind: "text";
+          text: string;
+          type: string;
+        }
+      | null
+    >
+  >({});
+  const [loadingAttachmentPreviewKey, setLoadingAttachmentPreviewKey] =
+    useState<string | null>(null);
+  const [showQuote, setShowQuote] = useState(false);
+  const [showOwnMessages, setShowOwnMessages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const expandedWrapRef = useRef<HTMLDivElement>(null);
+  const replyHasInit = useRef(false);
+  const conversationListRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  const PLAINTEXT_COLLAPSE_THRESHOLD = 1200;
+  useEffect(() => {
+    setReplyText("");
+    setAttachedFiles([]);
+    setEmojiPickerOpen(false);
+    setIsSendingReply(false);
+    setIsReplyExpanded(false);
+    setAttachmentHoverPreviews({});
+    setLoadingAttachmentPreviewKey(null);
+    setShowQuote(false);
+  }, [message?.id]);
+
+  const displayAttachments = useMemo<MailAttachment[]>(
+    () => attachments ?? (message?.attachments ?? []),
+    [attachments, message?.attachments],
+  );
+
+  const handleLoadAttachmentHoverPreview = useCallback(
+    (attachment: MailAttachment, previewKey: string) => {
+      if (!onLoadAttachmentPreview || previewKey in attachmentHoverPreviews) {
+        return;
+      }
+
+      setLoadingAttachmentPreviewKey(previewKey);
+      void onLoadAttachmentPreview(attachment)
+        .then((preview) => {
+          setAttachmentHoverPreviews((current) => ({
+            ...current,
+            [previewKey]: preview,
+          }));
+        })
+        .catch(() => {
+          setAttachmentHoverPreviews((current) => ({
+            ...current,
+            [previewKey]: null,
+          }));
+        })
+        .finally(() => {
+          setLoadingAttachmentPreviewKey((current) =>
+            current === previewKey ? null : current,
+          );
+        });
+    },
+    [attachmentHoverPreviews, onLoadAttachmentPreview],
+  );
+
+  useEffect(() => {
+    if (!onLoadAttachmentPreview) {
+      return;
+    }
+
+    displayAttachments.forEach((attachment, idx) => {
+      const previewKind = resolveAttachmentPreviewKind(attachment);
+      if (!previewKind) {
+        return;
+      }
+      const name = attachment.name?.trim() || "Attachment";
+      const mimeType = attachment.type ?? "";
+      const previewKey = `${attachment.blobId ?? idx}:${name}:${mimeType}`;
+      if (!(previewKey in attachmentHoverPreviews)) {
+        handleLoadAttachmentHoverPreview(attachment, previewKey);
+      }
+    });
+  }, [
+    attachmentHoverPreviews,
+    displayAttachments,
+    handleLoadAttachmentHoverPreview,
+    onLoadAttachmentPreview,
+  ]);
+
+  const handleSendReply = useCallback(async () => {
+    if (onSendReply) {
+      if (!replyText.trim()) {
+        toast.error("Enter a reply message.");
+        return;
+      }
+      setIsSendingReply(true);
+      try {
+        await onSendReply(replyText, attachedFiles);
+        setReplyText("");
+        setAttachedFiles([]);
+      } finally {
+        setIsSendingReply(false);
+      }
+    } else {
+      onReply();
+      setReplyText("");
+    }
+  }, [replyText, attachedFiles, onSendReply, onReply]);
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      if (files.length) setAttachedFiles((prev) => [...prev, ...files]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [],
+  );
+
+  // ── GSAP reply bar expand/collapse ──────────────────────────────────────────
+  useGSAP(() => {
+    const wrap = expandedWrapRef.current;
+    if (!wrap) return;
+
+    if (!replyHasInit.current) {
+      replyHasInit.current = true;
+      if (isReplyExpanded) {
+        gsap.set(wrap, { height: "auto", autoAlpha: 1, overflow: "visible" });
+      } else {
+        gsap.set(wrap, { height: 0, autoAlpha: 0, overflow: "hidden" });
+      }
+      return;
+    }
+
+    gsap.killTweensOf(wrap);
+
+    if (prefersReducedMotion) {
+      gsap.set(
+        wrap,
+        isReplyExpanded
+          ? { height: "auto", autoAlpha: 1, overflow: "visible" }
+          : { height: 0, autoAlpha: 0, overflow: "hidden" },
+      );
+      return;
+    }
+
+    if (isReplyExpanded) {
+      gsap.set(wrap, { overflow: "hidden" });
+      gsap.to(wrap, {
+        height: "auto",
+        autoAlpha: 1,
+        duration: 0.28,
+        ease: "power2.out",
+        onComplete: () => {
+          gsap.set(wrap, { overflow: "visible" });
+          textareaRef.current?.focus();
+        },
+      });
+    } else {
+      gsap.set(wrap, { overflow: "hidden" });
+      gsap.to(wrap, {
+        autoAlpha: 0,
+        height: 0,
+        duration: 0.22,
+        ease: "power2.in",
+      });
+    }
+  }, { dependencies: [isReplyExpanded] });
+
+  // Auto-resize textarea to fit content — must be declared before early return
+  const autoResizeTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  // Derive display bodies before early return so hook order is stable.
+  const _earlyBodies = message ? extractMessageBodies(message) : null;
+  const _displayHtml = decryptedHtml ?? (_earlyBodies?.html || null);
+  const _displayText = plaintext ?? (_earlyBodies?.text || null);
+
+  // Split quoted reply chain from the body (so the new-message portion is shown
+  // by default, with an expand button for the historical chain).
+  const { body: plaintextBody, quote: plaintextQuote } = useMemo(
+    () => splitPlaintextQuote(_displayText ?? ""),
+    [_displayText],
+  );
+  const { html: cleanHtml, hasQuote: htmlHasQuote } = useMemo(
+    () => splitHtmlQuote(_displayHtml ?? ""),
+    [_displayHtml],
+  );
+
   if (!message) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -450,17 +832,22 @@ export function MessageReader({
     );
   }
 
+  const PLAINTEXT_COLLAPSE_THRESHOLD = 1200;
+
   const isFlagged = message?.keywords?.["$flagged"] === true;
   const messageLabels = labels.filter(
     (l) => message?.keywords?.[`label:${l.id}`] === true,
   );
 
   const messageState = classifyMessageEncryption(message);
-  const { text, html } = extractMessageBodies(message);
 
-  const displayHtml = decryptedHtml ?? (html || null);
-  const displayText = plaintext ?? (text || null);
+  const displayHtml = _displayHtml;
+  const displayText = _displayText;
   const isHtmlEmail = Boolean(displayHtml);
+  // If the HTML body has no detected quote markers but the plaintext body does
+  // (e.g. sent messages using "---\nOn..." separator that the server wraps in HTML),
+  // fall back to text rendering so the quote can be properly collapsed.
+  const renderAsHtml = isHtmlEmail && (htmlHasQuote || !plaintextQuote);
 
   const senderEmail = message.from?.[0]?.email ?? "";
 
@@ -472,16 +859,409 @@ export function MessageReader({
   );
 
   const senderName = message.from?.[0]?.name ?? undefined;
+  const orderedConversationMessages = conversationMessages.length
+    ? conversationMessages
+    : [message];
+  const showConversation = orderedConversationMessages.length > 1;
 
+  // Count own (sent) messages in the thread for the toggle label
+  const ownMessageCount = accountEmail
+    ? orderedConversationMessages.filter(
+        (m) => m.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase(),
+      ).length
+    : 0;
+  // Filter own messages out of the strip unless the user opted to show them
+  const visibleConversationMessages =
+    accountEmail && !showOwnMessages
+      ? orderedConversationMessages.filter(
+          (m) =>
+            m.from?.[0]?.email?.toLowerCase() !== accountEmail.toLowerCase(),
+        )
+      : orderedConversationMessages;
+
+  // Auto-scroll conversation list to bottom when messages load/change
+  useEffect(() => {
+    const el = conversationListRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [visibleConversationMessages.length]);
+
+  // Determine if we're in a special mailbox that needs restore actions
+  const currentMailboxRole = mailboxes
+    .find((m) => m.id === currentMailboxId)
+    ?.role?.toLowerCase();
+  const isInTrash = currentMailboxRole === "trash";
+  const isInJunk = currentMailboxRole === "junk" || currentMailboxRole === "spam";
+
+  // ── Label popover content (shared between mobile/desktop) ──────────────────
+  const labelPopoverContent = (
+    <PopoverContent
+      side={isMobile ? "top" : "bottom"}
+      align={isMobile ? "start" : "end"}
+      sideOffset={6}
+      className="w-56 p-0 overflow-hidden"
+    >
+      {labels.length > 0 && (
+        <div className="p-1 border-b border-border/40">
+          {labels.map((label) => {
+            const assigned =
+              message?.keywords?.[`label:${label.id}`] === true;
+            return (
+              <button
+                key={label.id}
+                type="button"
+                onClick={() => onSetLabel?.(label.id, !assigned)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
+                  style={{
+                    backgroundColor: label.color,
+                    boxShadow: assigned
+                      ? `0 0 0 1px ${label.color}`
+                      : undefined,
+                  }}
+                />
+                <span className="flex-1 truncate text-foreground/80">
+                  {label.name}
+                </span>
+                {assigned && (
+                  <Check
+                    className="h-3 w-3 text-foreground/50 shrink-0"
+                    strokeWidth={2.5}
+                  />
+                )}
+                {onDeleteLabel && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteLabel(label.id);
+                    }}
+                    className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
+                    aria-label={`Delete label ${label.name}`}
+                  >
+                    <X className="h-3 w-3" strokeWidth={2.5} />
+                  </button>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {onCreateLabel && (
+        <div className="p-2 space-y-1.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
+            New label
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="color"
+              value={newLabelColor}
+              onChange={(e) => setNewLabelColor(e.target.value)}
+              className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
+              title="Label color"
+            />
+            <input
+              type="text"
+              value={newLabelName}
+              onChange={(e) => setNewLabelName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newLabelName.trim()) {
+                  setIsSavingLabel(true);
+                  void onCreateLabel(
+                    newLabelName.trim(),
+                    newLabelColor,
+                  ).then(() => {
+                    setNewLabelName("");
+                    setIsSavingLabel(false);
+                  });
+                }
+              }}
+              placeholder="Label name…"
+              className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
+            />
+            <button
+              type="button"
+              disabled={!newLabelName.trim() || isSavingLabel}
+              onClick={() => {
+                if (!newLabelName.trim()) return;
+                setIsSavingLabel(true);
+                void onCreateLabel(
+                  newLabelName.trim(),
+                  newLabelColor,
+                ).then(() => {
+                  setNewLabelName("");
+                  setIsSavingLabel(false);
+                });
+              }}
+              className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
+              aria-label="Create label"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </button>
+          </div>
+        </div>
+      )}
+    </PopoverContent>
+  );
+
+  // ── Top toolbar ─────────────────────────────────────────────────────────────
+  const toolbar = (
+    <div className="shrink-0 flex items-center gap-0.5 px-3 py-1.5 border-b border-border/40">
+      {/* Left: close + separator + prev/next */}
+      <div className="flex items-center gap-0.5">
+        {onClose && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Close message"
+                onClick={onClose}
+              >
+                <X />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Close message</TooltipContent>
+          </Tooltip>
+        )}
+        <Separator orientation="vertical" className="h-4 mx-1" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Previous message"
+              disabled={!hasPrev}
+              onClick={onNavigatePrev}
+            >
+              <ChevronLeft />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Previous message</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Next message"
+              disabled={!hasNext}
+              onClick={onNavigateNext}
+            >
+              <ChevronRight />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Next message</TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* Right: archive, reply, delete */}
+      <div className="ml-auto flex items-center gap-0">
+        {onArchive && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Archive message"
+                disabled={isBusy}
+                onClick={onArchive}
+              >
+                <Archive />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Archive</TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Reply"
+              disabled={isBusy}
+              onClick={onReply}
+            >
+              <Reply />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Reply</TooltipContent>
+        </Tooltip>
+
+        {/* Delete — direct button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={isInTrash ? "Delete permanently" : "Move to trash"}
+              disabled={isBusy}
+              onClick={onDelete}
+            >
+              <Trash2 className="text-destructive" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{isInTrash ? "Delete permanently" : "Move to trash"}</TooltipContent>
+        </Tooltip>
+        {/* More actions panel */}
+        <Popover open={morePopoverOpen} onOpenChange={(o) => { setMorePopoverOpen(o); if (!o) setMoveToExpanded(false); }}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="More actions"
+                  disabled={isBusy}
+                >
+                  <EllipsisVertical />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent>More actions</TooltipContent>
+          </Tooltip>
+          <PopoverContent align="end" sideOffset={6} className="w-52 p-0 overflow-hidden rounded-lg border border-border shadow-md">
+            {/* Quick-action icon strip */}
+            <div className="flex border-b border-border/60">
+              <button
+                type="button"
+                onClick={() => { onForward(); setMorePopoverOpen(false); }}
+                disabled={isBusy}
+                className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
+              >
+                <Forward className="h-3.5 w-3.5" strokeWidth={2.25} />
+                Forward
+              </button>
+              <div className="w-px bg-border/60 self-stretch" />
+              {onToggleFlagged && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { onToggleFlagged(); setMorePopoverOpen(false); }}
+                    disabled={isBusy}
+                    className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
+                  >
+                    <Star
+                      className={cn(
+                        "h-3.5 w-3.5 transition-colors",
+                        isFlagged ? "fill-amber-400 text-amber-400" : "",
+                      )}
+                      strokeWidth={2.25}
+                    />
+                    {isFlagged ? "Unstar" : "Star"}
+                  </button>
+                  <div className="w-px bg-border/60 self-stretch" />
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => { onMarkAsUnread(); setMorePopoverOpen(false); }}
+                disabled={isBusy}
+                className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
+              >
+                <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+                Unread
+              </button>
+            </div>
+
+            {/* Restore — trash/junk only */}
+            {(isInTrash || isInJunk) && onUntrash && (
+              <button
+                type="button"
+                onClick={() => { onUntrash(); setMorePopoverOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/8 transition-colors"
+              >
+                <Inbox className="h-3.5 w-3.5 shrink-0" />
+                {isInTrash ? "Restore to inbox" : "Move to inbox"}
+              </button>
+            )}
+
+            {/* Move to */}
+            {otherMailboxes.length > 0 && (
+              <div className={(isInTrash || isInJunk) && onUntrash ? "border-t border-border/60" : ""}>
+                <button
+                  type="button"
+                  onClick={() => setMoveToExpanded((v) => !v)}
+                  disabled={isBusy}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
+                >
+                  <FolderInput className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+                  Move to
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200",
+                      moveToExpanded ? "rotate-180" : "",
+                    )}
+                    strokeWidth={2.5}
+                  />
+                </button>
+                {moveToExpanded && (
+                  <div className="border-t border-border/40 bg-muted/30">
+                    {otherMailboxes.map((mailbox, idx) => (
+                      <div key={mailbox.id}>
+                        {idx > 0 && <div className="mx-3 h-px bg-border/40" />}
+                        <button
+                          type="button"
+                          onClick={() => { onMove(mailbox.id); setMorePopoverOpen(false); setMoveToExpanded(false); }}
+                          className="w-full flex items-center gap-2 px-4 py-2 text-[13px] text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors text-left"
+                        >
+                          {mailbox.name}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Labels */}
+            {((onSetLabel && labels.length > 0) || onCreateLabel) && (
+              <div className={cn("border-t border-border/60")}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); setMorePopoverOpen(false); setTimeout(() => setLabelPopoverOpen(true), 80); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
+                >
+                  <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+                  Labels
+                </button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+
+  // ── Label popover (floats independently, triggered from toolbar dropdown) ───
+  const labelPopoverTrigger = ((onSetLabel && labels.length > 0) ||
+    onCreateLabel) && (
+    <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
+      <PopoverTrigger asChild>
+        {/* Invisible trigger — opened programmatically from the dropdown */}
+        <span
+          aria-hidden
+          className="absolute opacity-0 pointer-events-none"
+          style={{ top: 0, right: 0 }}
+        />
+      </PopoverTrigger>
+      {labelPopoverContent}
+    </Popover>
+  );
+
+  // ── Email header ─────────────────────────────────────────────────────────────
   const header = (
-    <div className="shrink-0 px-6 pt-5">
-      <div className="flex items-center gap-3 mb-3">
-        <SenderAvatar email={senderEmail} name={senderName} />
-        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold tracking-tight leading-tight flex-1">
+    <div className="shrink-0 px-4 py-3 relative flex flex-col gap-3">
+      {labelPopoverTrigger}
+
+      {/* Subject + date row */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="font-medium leading-none">
             {message.subject || "(No subject)"}
-          </h2>
-          <div className="flex items-center gap-0.5 shrink-0">
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             {onToggleFlagged && (
               <button
                 type="button"
@@ -491,7 +1271,12 @@ export function MessageReader({
                 className="inline-flex items-center justify-center h-7 w-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40 disabled:opacity-40"
               >
                 <Star
-                  className={`h-4 w-4 transition-colors ${isFlagged ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"}`}
+                  className={cn(
+                    "h-4 w-4 transition-colors",
+                    isFlagged
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-muted-foreground/40 hover:text-amber-400",
+                  )}
                   strokeWidth={2}
                 />
               </button>
@@ -504,24 +1289,9 @@ export function MessageReader({
             />
           </div>
         </div>
-      </div>
-      <div className="space-y-1 pb-2.5">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-[11px] font-semibold text-muted-foreground/50 dark:text-muted-foreground/70 uppercase tracking-wider w-10 shrink-0">
-            From
-          </span>
-          <CopyableAddress value={formatAddressFull(message.from)} />
-        </div>
-        {(message.to?.length ?? 0) > 0 && (
-          <MetaRow label="To" value={formatAddressFull(message.to)} />
-        )}
-        {(message.cc?.length ?? 0) > 0 && (
-          <MetaRow label="CC" value={formatAddressFull(message.cc)} />
-        )}
         {message.receivedAt && (
-          <MetaRow
-            label="Date"
-            value={new Date(message.receivedAt).toLocaleString(undefined, {
+          <div className="text-muted-foreground text-xs leading-none">
+            {new Date(message.receivedAt).toLocaleString(undefined, {
               dateStyle: "medium",
               timeStyle: "short",
               hour12:
@@ -532,11 +1302,192 @@ export function MessageReader({
                     : undefined,
               timeZone: timezone ?? undefined,
             } as Intl.DateTimeFormatOptions)}
-          />
+          </div>
         )}
       </div>
+
+      <Separator />
+
+      {/* Sender card: avatar + name/email + to/cc */}
+      <div className="flex gap-2">
+        <SenderAvatar email={senderEmail} name={senderName} />
+        <div className="flex h-full flex-col gap-1">
+          <div className="flex items-center gap-2">
+            {senderName && (
+              <>
+                <div className="text-xs">{senderName}</div>
+                <Separator orientation="vertical" className="h-3" />
+              </>
+            )}
+            <div className="text-muted-foreground text-xs">{senderEmail}</div>
+          </div>
+          {(message.to?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="text-muted-foreground text-xs">
+                To:{" "}
+                <span className="text-foreground">
+                  {message.to!.map((a) => a.name || a.email).join(", ")}
+                </span>
+              </div>
+            </div>
+          )}
+          {(message.cc?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="text-muted-foreground text-xs">
+                CC:{" "}
+                <span className="text-foreground">
+                  {message.cc!.map((a) => a.name || a.email).join(", ")}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Attachments */}
+      {displayAttachments.length > 0 && (
+        <Collapsible defaultOpen>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="group flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors py-0.5"
+            >
+              Attachments ({displayAttachments.length})
+              <ChevronDown
+                className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180"
+                strokeWidth={2}
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex flex-wrap gap-2 pt-1.5">
+              {displayAttachments.map((attachment, idx) => {
+                const name = attachment.name?.trim() || "Attachment";
+                const mimeType = attachment.type ?? "";
+                const previewKind = resolveAttachmentPreviewKind(attachment);
+                const previewKey = `${attachment.blobId ?? idx}:${name}:${mimeType}`;
+                const hoverPreview = attachmentHoverPreviews[previewKey];
+                const ext = mimeType.split("/")[1]?.toUpperCase() ?? "";
+                const canAccessAttachment = Boolean(
+                  (attachment.blobId || attachment.content != null) &&
+                    (onPreviewAttachment || onDownloadAttachment),
+                );
+                const canPreview = Boolean(
+                  canAccessAttachment &&
+                    onPreviewAttachment &&
+                    previewKind,
+                );
+                const canDownload = Boolean(
+                  (attachment.blobId || attachment.content != null) &&
+                    onDownloadAttachment,
+                );
+                const attachmentButton = (
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    type="button"
+                    onClick={
+                      canPreview
+                        ? () => onPreviewAttachment!(attachment)
+                        : canDownload
+                          ? () => onDownloadAttachment!(attachment)
+                          : undefined
+                    }
+                    onMouseEnter={() =>
+                      canPreview && onLoadAttachmentPreview
+                        ? handleLoadAttachmentHoverPreview(attachment, previewKey)
+                        : undefined
+                    }
+                    onFocus={() =>
+                      canPreview && onLoadAttachmentPreview
+                        ? handleLoadAttachmentHoverPreview(attachment, previewKey)
+                        : undefined
+                    }
+                    aria-label={`${canPreview ? "Preview" : "Download"} ${name}`}
+                    className={
+                      canPreview || canDownload
+                        ? "cursor-pointer"
+                        : "cursor-default"
+                    }
+                  >
+                    {canPreview ? <Eye /> : canDownload ? <Download /> : <Paperclip />}
+                    <span className="font-normal">{name}</span>
+                    {ext && (
+                      <span className="font-normal text-muted-foreground">
+                        {ext}
+                      </span>
+                    )}
+                  </Button>
+                );
+                return (
+                  <div key={idx} className="group/attachment relative flex items-center gap-1">
+                    {attachmentButton}
+                    {canPreview && onLoadAttachmentPreview && (
+                      <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[min(22rem,calc(100vw-2rem))] group-hover/attachment:block group-focus-within/attachment:block">
+                        <div className="bg-popover text-popover-foreground overflow-hidden rounded-md border border-border/60 shadow-md">
+                          {loadingAttachmentPreviewKey === previewKey ? (
+                            <div className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Loading preview
+                            </div>
+                          ) : hoverPreview?.kind === "image" ? (
+                            <div className="space-y-2 p-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={hoverPreview.url}
+                                alt={name}
+                                className="max-h-44 w-full rounded-md border border-border/60 object-contain"
+                              />
+                            </div>
+                          ) : hoverPreview?.kind === "text" ? (
+                            <div className="space-y-2 p-2">
+                              <div className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
+                                {previewKind === "text" ? "Text preview" : "Preview"}
+                              </div>
+                              <pre className="max-h-44 overflow-hidden whitespace-pre-wrap break-words rounded-md border border-border/60 bg-background px-3 py-2 font-mono text-xs leading-5">
+                                {hoverPreview.text}
+                              </pre>
+                            </div>
+                          ) : hoverPreview?.kind === "pdf" ? (
+                            <div className="space-y-2 p-2">
+                              <PdfAttachmentThumbnail url={hoverPreview.url} />
+                              <div className="text-muted-foreground text-xs">
+                                Open inline to scroll the full document.
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground px-3 py-2 text-sm">
+                              Preview unavailable.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {canPreview && canDownload && (
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        type="button"
+                        onClick={() => onDownloadAttachment!(attachment)}
+                        aria-label={`Download ${name}`}
+                        className="cursor-pointer px-1.5"
+                      >
+                        <Download />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Labels */}
       {messageLabels.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap pb-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {messageLabels.map((label) => (
             <span
               key={label.id}
@@ -551,11 +1502,11 @@ export function MessageReader({
           ))}
         </div>
       )}
-      {/* Action bar */}
-      {isMobile ? (
-        /* ── Mobile action bar: Reply + Forward + overflow "⋯" ── */
+
+      {/* Mobile overflow actions */}
+      {isMobile && (
         <>
-          <div className="flex items-center gap-1 py-1.5 border-t border-border/40">
+          <div className="flex items-center gap-1 pt-2 border-t border-border/40 mt-2">
             <button
               type="button"
               onClick={onReply}
@@ -588,7 +1539,6 @@ export function MessageReader({
             </button>
           </div>
 
-          {/* Mobile overflow drawer */}
           <Drawer open={moreActionsOpen} onOpenChange={setMoreActionsOpen}>
             <DrawerContent>
               <DrawerHeader>
@@ -665,120 +1615,7 @@ export function MessageReader({
                         Labels
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      side="top"
-                      align="start"
-                      sideOffset={6}
-                      className="w-56 p-0 overflow-hidden"
-                    >
-                      {labels.length > 0 && (
-                        <div className="p-1 border-b border-border/40">
-                          {labels.map((label) => {
-                            const assigned =
-                              message?.keywords?.[`label:${label.id}`] === true;
-                            return (
-                              <button
-                                key={label.id}
-                                type="button"
-                                onClick={() =>
-                                  onSetLabel?.(label.id, !assigned)
-                                }
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
-                              >
-                                <span
-                                  className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
-                                  style={{
-                                    backgroundColor: label.color,
-                                    boxShadow: assigned
-                                      ? `0 0 0 1px ${label.color}`
-                                      : undefined,
-                                  }}
-                                />
-                                <span className="flex-1 truncate text-foreground/80">
-                                  {label.name}
-                                </span>
-                                {assigned && (
-                                  <Check
-                                    className="h-3 w-3 text-foreground/50 shrink-0"
-                                    strokeWidth={2.5}
-                                  />
-                                )}
-                                {onDeleteLabel && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onDeleteLabel(label.id);
-                                    }}
-                                    className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
-                                    aria-label={`Delete label ${label.name}`}
-                                  >
-                                    <X className="h-3 w-3" strokeWidth={2.5} />
-                                  </button>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {onCreateLabel && (
-                        <div className="p-2 space-y-1.5">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
-                            New label
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="color"
-                              value={newLabelColor}
-                              onChange={(e) => setNewLabelColor(e.target.value)}
-                              className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
-                              title="Label color"
-                            />
-                            <input
-                              type="text"
-                              value={newLabelName}
-                              onChange={(e) => setNewLabelName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && newLabelName.trim()) {
-                                  setIsSavingLabel(true);
-                                  void onCreateLabel(
-                                    newLabelName.trim(),
-                                    newLabelColor,
-                                  ).then(() => {
-                                    setNewLabelName("");
-                                    setIsSavingLabel(false);
-                                  });
-                                }
-                              }}
-                              placeholder="Label name…"
-                              className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
-                            />
-                            <button
-                              type="button"
-                              disabled={!newLabelName.trim() || isSavingLabel}
-                              onClick={() => {
-                                if (!newLabelName.trim()) return;
-                                setIsSavingLabel(true);
-                                void onCreateLabel(
-                                  newLabelName.trim(),
-                                  newLabelColor,
-                                ).then(() => {
-                                  setNewLabelName("");
-                                  setIsSavingLabel(false);
-                                });
-                              }}
-                              className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
-                              aria-label="Create label"
-                            >
-                              <Plus
-                                className="h-3.5 w-3.5"
-                                strokeWidth={2.25}
-                              />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </PopoverContent>
+                    {labelPopoverContent}
                   </Popover>
                 )}
                 <button
@@ -805,202 +1642,8 @@ export function MessageReader({
             </DrawerContent>
           </Drawer>
         </>
-      ) : (
-        /* ── Desktop action bar: full inline buttons ── */
-        <div className="flex items-center gap-1 py-1.5 border-t border-border/40">
-          <button
-            type="button"
-            onClick={onReply}
-            disabled={isBusy}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-          >
-            <Reply className="h-3.5 w-3.5" strokeWidth={2.25} />
-            Reply
-          </button>
-          <button
-            type="button"
-            onClick={onForward}
-            disabled={isBusy}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-          >
-            <Forward className="h-3.5 w-3.5" strokeWidth={2.25} />
-            Forward
-          </button>
-          <button
-            type="button"
-            onClick={onMarkAsUnread}
-            disabled={isBusy}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-          >
-            <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
-            Mark unread
-          </button>
-          {otherMailboxes.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-                >
-                  <FolderInput className="h-3.5 w-3.5" strokeWidth={2.25} />
-                  Move
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="bottom"
-                align="start"
-                sideOffset={6}
-                className="w-48 p-1"
-              >
-                {otherMailboxes.map((mailbox) => (
-                  <button
-                    key={mailbox.id}
-                    type="button"
-                    onClick={() => onMove(mailbox.id)}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
-                  >
-                    {mailbox.name}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-          )}
-          <div className="flex-1" />
-          {(onSetLabel && labels.length > 0) || onCreateLabel ? (
-            <Popover open={labelPopoverOpen} onOpenChange={setLabelPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-                >
-                  <Tag className="h-3.5 w-3.5" strokeWidth={2.25} />
-                  Labels
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="bottom"
-                align="end"
-                sideOffset={6}
-                className="w-56 p-0 overflow-hidden"
-              >
-                {labels.length > 0 && (
-                  <div className="p-1 border-b border-border/40">
-                    {labels.map((label) => {
-                      const assigned =
-                        message?.keywords?.[`label:${label.id}`] === true;
-                      return (
-                        <button
-                          key={label.id}
-                          type="button"
-                          onClick={() => onSetLabel?.(label.id, !assigned)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
-                        >
-                          <span
-                            className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover transition-shadow"
-                            style={{
-                              backgroundColor: label.color,
-                              boxShadow: assigned
-                                ? `0 0 0 1px ${label.color}`
-                                : undefined,
-                            }}
-                          />
-                          <span className="flex-1 truncate text-foreground/80">
-                            {label.name}
-                          </span>
-                          {assigned && (
-                            <Check
-                              className="h-3 w-3 text-foreground/50 shrink-0"
-                              strokeWidth={2.5}
-                            />
-                          )}
-                          {onDeleteLabel && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteLabel(label.id);
-                              }}
-                              className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
-                              aria-label={`Delete label ${label.name}`}
-                            >
-                              <X className="h-3 w-3" strokeWidth={2.5} />
-                            </button>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {onCreateLabel && (
-                  <div className="p-2 space-y-1.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">
-                      New label
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="color"
-                        value={newLabelColor}
-                        onChange={(e) => setNewLabelColor(e.target.value)}
-                        className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
-                        title="Label color"
-                      />
-                      <input
-                        type="text"
-                        value={newLabelName}
-                        onChange={(e) => setNewLabelName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newLabelName.trim()) {
-                            setIsSavingLabel(true);
-                            void onCreateLabel(
-                              newLabelName.trim(),
-                              newLabelColor,
-                            ).then(() => {
-                              setNewLabelName("");
-                              setIsSavingLabel(false);
-                            });
-                          }
-                        }}
-                        placeholder="Label name…"
-                        className="flex-1 h-6 text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-1 focus:ring-ring/50 placeholder:text-muted-foreground/40"
-                      />
-                      <button
-                        type="button"
-                        disabled={!newLabelName.trim() || isSavingLabel}
-                        onClick={() => {
-                          if (!newLabelName.trim()) return;
-                          setIsSavingLabel(true);
-                          void onCreateLabel(
-                            newLabelName.trim(),
-                            newLabelColor,
-                          ).then(() => {
-                            setNewLabelName("");
-                            setIsSavingLabel(false);
-                          });
-                        }}
-                        className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
-                        aria-label="Create label"
-                      >
-                        <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
-          ) : null}
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={isBusy}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
-          >
-            <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
-            Delete
-          </button>
-        </div>
       )}
+
       {decryptError && (
         <div className="rounded-md border border-amber-200/60 bg-amber-50/60 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 mt-3">
           {decryptError}
@@ -1009,26 +1652,176 @@ export function MessageReader({
     </div>
   );
 
-  const bodyContent = isHtmlEmail ? (
-    <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg border border-border/50 overflow-hidden flex flex-col">
+  const conversationStrip = (showConversation || isConversationLoading) && (
+    <div className="shrink-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden">
+      {/* Strip header — same muted-bar pattern as quote toggle / toolbar */}
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/30 border-b border-border/40">
+        <div className="flex items-center gap-1.5">
+          <MessageSquare className="h-3 w-3 text-muted-foreground/70" strokeWidth={2} />
+          <span className="text-[11px] font-medium text-muted-foreground">
+            {isConversationLoading
+              ? "Loading thread…"
+              : `${orderedConversationMessages.length} messages in thread`}
+          </span>
+          {isConversationLoading && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        {ownMessageCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowOwnMessages((v) => !v)}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            {showOwnMessages ? (
+              <EyeOff className="h-3 w-3" />
+            ) : (
+              <Eye className="h-3 w-3" />
+            )}
+            {showOwnMessages ? "Hide mine" : `+${ownMessageCount} sent`}
+          </button>
+        )}
+      </div>
+
+      {/* Message rows — scrollable if thread is long, auto-scrolled to latest */}
+      <div ref={conversationListRef} className="max-h-36 overflow-y-auto divide-y divide-border/30">
+        {visibleConversationMessages.map((threadMessage) => {
+          const threadSenderEmail = threadMessage.from?.[0]?.email ?? "";
+          const threadSenderName = threadMessage.from?.[0]?.name ?? undefined;
+          const threadBodies = extractMessageBodies(threadMessage);
+          let rawPreview: string;
+          if (threadBodies.html && !threadBodies.text) {
+            const { html: cleanedHtml } = splitHtmlQuote(threadBodies.html);
+            rawPreview = cleanedHtml.replace(/<[^>]+>/g, " ");
+          } else {
+            rawPreview = threadBodies.text ?? "";
+          }
+          const { body: previewBody } = splitPlaintextQuote(rawPreview);
+          const threadPreviewText = previewBody.replace(/\s+/g, " ").trim();
+          const isActive = threadMessage.id === (selectedMessageId ?? message.id);
+          const threadIsRead =
+            threadMessage.keywords?.["$seen"] === true ||
+            (accountEmail
+              ? threadMessage.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase()
+              : false);
+          const hasThreadActions =
+            onConversationMessageDelete ||
+            onConversationMessageMarkUnread ||
+            onConversationMessageMove;
+
+          return (
+            <div
+              key={threadMessage.id}
+              className={cn(
+                "group/thread-item relative flex w-full items-center gap-2 px-3 py-1.5 transition-colors",
+                isActive
+                  ? "bg-primary/5"
+                  : "hover:bg-accent/40",
+              )}
+            >
+              {/* Active left-border accent */}
+              {isActive && (
+                <div className="absolute left-0 inset-y-0 w-0.5 bg-primary rounded-r" />
+              )}
+
+              {/* Unread dot (pushes left of avatar) */}
+              {!threadIsRead ? (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+              ) : (
+                <span className="h-1.5 w-1.5 shrink-0" />
+              )}
+
+              {/* Clickable row */}
+              <button
+                type="button"
+                onClick={() => onSelectConversationMessage?.(threadMessage.id)}
+                className="flex flex-1 min-w-0 cursor-pointer items-center gap-2 text-left"
+              >
+                <SenderAvatar
+                  email={threadSenderEmail}
+                  name={threadSenderName}
+                  className="h-5 w-5 shrink-0 text-[9px]"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-1.5 min-w-0">
+                    <span
+                      className={cn(
+                        "shrink-0 text-xs",
+                        threadIsRead
+                          ? "font-medium text-foreground/70"
+                          : "font-semibold text-foreground",
+                      )}
+                    >
+                      {threadSenderName || threadSenderEmail || "Unknown"}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                      {threadPreviewText || "(No body)"}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-muted-foreground shrink-0 text-[10px]">
+                  {formatMessageDate(threadMessage.receivedAt, timeFormat, timezone)}
+                </span>
+              </button>
+
+              {/* Per-message actions */}
+              {hasThreadActions && (
+                <ConversationMessageMenu
+                  messageId={threadMessage.id}
+                  isRead={threadIsRead}
+                  onDelete={onConversationMessageDelete}
+                  onMarkUnread={onConversationMessageMarkUnread}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const bodyContent = renderAsHtml ? (
+    <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
+      {blockRemoteImages && (
+        <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-border/30 text-[11px] text-muted-foreground bg-muted/30">
+          <Lock className="h-3 w-3 shrink-0" strokeWidth={2.25} />
+          Remote images are blocked
+        </div>
+      )}
       <HtmlEmailRenderer
-        html={displayHtml!}
+        html={showQuote ? displayHtml! : cleanHtml}
         blockRemoteImages={blockRemoteImages}
         blockTrackingPixels={blockTrackingPixels}
       />
+      {htmlHasQuote && (
+        <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
+          <button
+            type="button"
+            onClick={() => setShowQuote((v) => !v)}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1"
+          >
+            <span className="tracking-widest leading-none">···</span>
+            {showQuote ? "Hide quoted text" : "Show quoted text"}
+          </button>
+        </div>
+      )}
     </div>
   ) : (
-    <div className="flex-1 min-h-0 mx-4 mb-4 rounded-lg border border-border/50 overflow-y-auto bg-white [color-scheme:light]">
-      <div className="px-5 py-4">
+    <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 bg-white [color-scheme:light]">
         {displayText ? (
           <>
             <div className="text-sm leading-relaxed text-[#111] whitespace-pre-wrap">
-              {!isBodyExpanded &&
-              displayText.length > PLAINTEXT_COLLAPSE_THRESHOLD
-                ? displayText.slice(0, PLAINTEXT_COLLAPSE_THRESHOLD) + "…"
-                : displayText}
+              {(() => {
+                const activeText = showQuote ? displayText : plaintextBody;
+                if (!isBodyExpanded && activeText.length > PLAINTEXT_COLLAPSE_THRESHOLD) {
+                  return activeText.slice(0, PLAINTEXT_COLLAPSE_THRESHOLD) + "…";
+                }
+                return activeText;
+              })()}
             </div>
-            {displayText.length > PLAINTEXT_COLLAPSE_THRESHOLD && (
+            {/* Show more/less for long bodies */}
+            {(showQuote ? displayText : plaintextBody).length > PLAINTEXT_COLLAPSE_THRESHOLD && (
               <button
                 type="button"
                 onClick={() => setIsBodyExpanded((v) => !v)}
@@ -1036,7 +1829,7 @@ export function MessageReader({
               >
                 {isBodyExpanded
                   ? "Show less"
-                  : `Show more (${Math.round(displayText.length / 1000)}k chars)`}
+                  : `Show more (${Math.round((showQuote ? displayText : plaintextBody).length / 1000)}k chars)`}
               </button>
             )}
           </>
@@ -1044,19 +1837,215 @@ export function MessageReader({
           <span className="text-sm italic text-[#666]">No message body</span>
         )}
       </div>
+      {/* Quoted chain toggle — pinned outside the scroll, same style as HTML version */}
+      {plaintextQuote && (
+        <div className="shrink-0 border-t border-border/40 px-3 py-1.5 bg-muted/20">
+          <button
+            type="button"
+            onClick={() => setShowQuote((v) => !v)}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1"
+          >
+            <span className="tracking-widest leading-none">···</span>
+            {showQuote ? "Hide quoted text" : "Show quoted text"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Reply bar ────────────────────────────────────────────────────────────────
+  const COMMON_EMOJI = [
+    "😀","😂","😍","😭","😊","😅","😎","🤔","😤","🥺",
+    "😏","😴","🤗","😬","🥳","🤩","😇","😆","🙄","😡",
+    "👍","👎","👏","🙌","🤝","✌️","👋","🤞","💪","🖐️",
+    "❤️","💔","💯","🔥","✨","🎉","🎊","💡","⭐","🌟",
+    "😻","🐶","🐱","🌸","🌈","☀️","🌙","⚡","🌊","🍕",
+    "🎵","📷","💬","📩","🔔","📅","📎","🔗","💻","📱",
+  ];
+
+  const replyBar = (
+    <div className="shrink-0 px-3 pb-2">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFileSelect}
+        aria-hidden="true"
+      />
+
+      {/* Collapsed pill — only rendered when not expanded */}
+      {!isReplyExpanded && (
+        <button
+          type="button"
+          onClick={() => setIsReplyExpanded(true)}
+          className="w-full flex items-center gap-2 rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:border-ring/50 transition-colors text-left"
+          aria-label={`Reply to ${senderName || senderEmail}`}
+        >
+          <Reply className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            Reply to{" "}
+            <span className="font-medium text-foreground/70">
+              {senderName || senderEmail}
+            </span>
+            …
+          </span>
+        </button>
+      )}
+
+      {/* Expanded card wrapper — always in DOM; GSAP controls height/opacity */}
+      <div
+        ref={expandedWrapRef}
+        style={{ height: 0, overflow: "hidden" }}
+        onBlur={(e) => {
+          // Guard: don't collapse if emoji picker is open (it's a portal outside this container)
+          if (emojiPickerOpen) return;
+          // Collapse only if focus truly left this container
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            if (!replyText && attachedFiles.length === 0) {
+              setIsReplyExpanded(false);
+            }
+          }
+        }}
+      >
+        <div className="rounded-lg border border-input bg-background shadow-sm transition-colors focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.15)]">
+          {/* Card header */}
+          <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1">
+            <Reply className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              Reply to{" "}
+              <span className="font-medium text-foreground">
+                {senderName || senderEmail}
+              </span>
+            </span>
+          </div>
+          {/* Textarea — no browser outline; parent card provides focus ring */}
+          <textarea
+            ref={textareaRef}
+            value={replyText}
+            onChange={(e) => {
+              setReplyText(e.target.value);
+              autoResizeTextarea();
+            }}
+            onFocus={() => setIsReplyExpanded(true)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                void handleSendReply();
+              }
+            }}
+            placeholder="Write your reply…"
+            rows={3}
+            style={{ minHeight: "4.5rem" }}
+            className="w-full resize-none appearance-none bg-transparent px-3 py-1 text-sm border-0 border-none ring-0 outline-none focus:outline-none focus:ring-0 focus:border-0 [&:focus-visible]:outline-none placeholder:text-muted-foreground"
+            aria-label={`Reply to ${senderName || senderEmail}`}
+            disabled={isBusy || isSendingReply}
+          />
+          {/* Attached file chips */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
+              {attachedFiles.map((file, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                >
+                  <Paperclip className="h-3 w-3 shrink-0" />
+                  <span className="max-w-[120px] truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAttachedFiles((prev) =>
+                        prev.filter((_, i) => i !== idx),
+                      )
+                    }
+                    className="ml-0.5 rounded-sm hover:text-foreground transition-colors"
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Footer toolbar */}
+          <div className="flex items-center gap-0.5 px-2 pb-1.5 pt-0.5 border-t border-border/40">
+            <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  type="button"
+                  aria-label="Add emoji"
+                  disabled={isBusy || isSendingReply}
+                >
+                  <Smile />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="top"
+                align="start"
+                className="w-64 p-2"
+                onInteractOutside={() => setEmojiPickerOpen(false)}
+              >
+                <div className="grid grid-cols-10 gap-0.5">
+                  {COMMON_EMOJI.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="flex items-center justify-center rounded p-0.5 text-base hover:bg-accent transition-colors"
+                      onClick={() => {
+                        setReplyText((prev) => prev + emoji);
+                        setEmojiPickerOpen(false);
+                        textareaRef.current?.focus();
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              aria-label="Attach file"
+              disabled={isBusy || isSendingReply}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip />
+            </Button>
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button
+                size="sm"
+                type="button"
+                aria-label="Send reply"
+                disabled={
+                  isBusy ||
+                  isSendingReply ||
+                  (Boolean(onSendReply) && !replyText.trim())
+                }
+                onClick={() => void handleSendReply()}
+                className="h-7 gap-1.5 px-3 text-xs"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Send
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {toolbar}
       {header}
-      {isHtmlEmail && blockRemoteImages && (
-        <div className="shrink-0 flex items-center gap-2 px-6 py-1.5 border-t border-border/30 text-[11px] text-muted-foreground bg-muted/30">
-          <Lock className="h-3 w-3 shrink-0" strokeWidth={2.25} />
-          Remote images are blocked
-        </div>
-      )}
+      {conversationStrip}
       {bodyContent}
+      {replyBar}
     </div>
   );
 }

@@ -117,14 +117,24 @@ export type JmapBodyStructure = {
   subParts?: JmapBodyStructure[];
 };
 
-export type JmapAttachment = {
+export type MailAttachmentContent = ArrayBuffer | Uint8Array | string;
+
+export type MailAttachment = {
+  blobId?: string | null;
   name?: string | null;
   type?: string | null;
+  size?: number | null;
+  content?: MailAttachmentContent | null;
 };
+
+export type JmapAttachment = Omit<MailAttachment, "content">;
 
 export type JmapEmailMessage = {
   id: string;
   threadId?: string;
+  messageId?: string[];
+  inReplyTo?: string[];
+  references?: string[];
   mailboxIds?: Record<string, boolean>;
   subject?: string | null;
   from?: MailAddress[];

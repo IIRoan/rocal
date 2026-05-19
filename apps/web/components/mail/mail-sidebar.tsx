@@ -34,10 +34,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   GripVertical,
-  ChevronDown,
   ChevronRight,
-  CalendarDays,
-  Check,
   Settings2,
   EyeOff,
   Eye,
@@ -58,18 +55,12 @@ import {
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/ui/dropdown-menu";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/ui/tooltip";
 import { NavUser } from "@workspace/ui/components/navigation";
-import { Logo } from "@workspace/ui/components/layout";
+import { Logo, SidebarAppSwitcher } from "@workspace/ui/components/layout";
 import type { JmapMailbox } from "@/lib/mail/types";
 import type { ActiveMailboxState } from "@/hooks/use-mail-app";
 
@@ -338,71 +329,7 @@ export function MailSidebar({
           </>
         ) : (
           <div className="flex items-center justify-between">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 hover:bg-muted/50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                >
-                  <Logo
-                    width="26"
-                    height="26"
-                    className="text-primary shrink-0"
-                  />
-                  <div className="flex items-baseline gap-1.5">
-                    <span
-                      className="text-[15px] tracking-[-0.04em] text-foreground"
-                      style={{ fontWeight: 380 }}
-                    >
-                      solace
-                    </span>
-                    <span className="text-[12px] font-medium text-muted-foreground/55 tracking-[-0.01em]">
-                      mail
-                    </span>
-                  </div>
-                  <ChevronDown
-                    className="h-3 w-3 text-muted-foreground/40 shrink-0"
-                    strokeWidth={2.5}
-                  />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={6}
-                className="w-44"
-              >
-                <DropdownMenuItem asChild>
-                  <Link href="/calendar" className="flex items-center gap-2.5">
-                    <CalendarDays
-                      className="h-4 w-4 text-muted-foreground shrink-0"
-                      strokeWidth={2}
-                    />
-                    Calendar
-                    {activeApp === "calendar" ? (
-                      <Check
-                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
-                        strokeWidth={2.5}
-                      />
-                    ) : null}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/mail" className="flex items-center gap-2.5">
-                    <Mail
-                      className="h-4 w-4 text-muted-foreground shrink-0"
-                      strokeWidth={2}
-                    />
-                    Mail
-                    {activeApp === "mail" ? (
-                      <Check
-                        className="ml-auto h-3.5 w-3.5 text-primary shrink-0"
-                        strokeWidth={2.5}
-                      />
-                    ) : null}
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <SidebarAppSwitcher activeApp={activeApp} />
             <Button
               variant="ghost"
               size="icon"
