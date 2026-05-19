@@ -195,6 +195,42 @@ describe("mail JMAP helpers", () => {
       ],
     ]);
   });
+
+  it("includes thread metadata when building a reply", () => {
+    expect(
+      buildSendMessageMethodCalls({
+        draftsMailboxId: "drafts-1",
+        sentMailboxId: "sent-1",
+        fromEmail: "alice@solace.onl",
+        to: ["bob@example.com"],
+        subject: "Re: Hello",
+        textBody: "Hello from Solace Mail",
+        identityId: "identity-1",
+        inReplyTo: ["<message-1@example.com>"],
+        references: [
+          "<message-0@example.com>",
+          "<message-1@example.com>",
+        ],
+      }),
+    ).toEqual([
+      [
+        "Email/set",
+        {
+          create: {
+            draft1: expect.objectContaining({
+              inReplyTo: ["<message-1@example.com>"],
+              references: [
+                "<message-0@example.com>",
+                "<message-1@example.com>",
+              ],
+            }),
+          },
+        },
+        "c1",
+      ],
+      expect.any(Array),
+    ]);
+  });
 });
 
 describe("StalwartJmapClient", () => {
