@@ -137,9 +137,10 @@ function EventWrapper({
       className={cn(
         "group/ev relative flex h-full w-full overflow-hidden text-left transition-all duration-150 ease-out outline-none select-none",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "cursor-pointer",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
         "data-past-event:opacity-65",
-        "hover:brightness-[1.04] hover:shadow-sm hover:z-10",
+        "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-white/15 hover:z-10",
         "active:brightness-[0.97]",
         "touch-manipulation",
         compact

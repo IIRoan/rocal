@@ -2,6 +2,12 @@ import { PrismaClient, type Prisma } from "../generated/prisma";
 import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:prisma");
+const isDevelopment = process.env.NODE_ENV === "development";
+const prismaLogAllQueries = process.env.PRISMA_LOG_ALL_QUERIES === "true";
+const prismaSlowQueryThresholdMs = Number.parseInt(
+  process.env.PRISMA_SLOW_QUERY_THRESHOLD_MS ?? "150",
+  10,
+);
 
 type PrismaQueryEvent = {
   query: string;
@@ -11,6 +17,29 @@ type PrismaQueryEvent = {
 type PrismaLogEvent = {
   message: string;
 };
+
+function normalizeQueryForLog(query: string): string {
+  return query.replace(/\s+/g, " ").trim();
+}
+
+function shouldLogSlowQuery(duration: number): boolean {
+  return Number.isFinite(prismaSlowQueryThresholdMs)
+    ? duration >= prismaSlowQueryThresholdMs
+    : false;
+}
+
+function isTransientConnectionReset(message: string): boolean {
+  return /ConnectionReset|forcibly closed by the remote host/i.test(message);
+}
+
+const prismaLogLevels = [
+  ...(isDevelopment
+    ? ([{ emit: "event", level: "query" }] as const)
+    : ([] as const)),
+  { emit: "event", level: "error" },
+  { emit: "event", level: "info" },
+  { emit: "event", level: "warn" },
+] satisfies Prisma.LogDefinition[];
 
 type PrismaEventClient = PrismaClient & {
   $on(event: "query", callback: (event: PrismaQueryEvent) => void): void;
@@ -29,21 +58,34 @@ declare global {
 export const prisma =
   globalThis.__prisma ||
   new PrismaClient({
-    log: [
-      { emit: "event", level: "query" },
-      { emit: "event", level: "error" },
-      { emit: "event", level: "info" },
-      { emit: "event", level: "warn" },
-    ],
+    log: prismaLogLevels,
   });
 
 // Setup Prisma logging events
-if (process.env.NODE_ENV === "development") {
+if (isDevelopment) {
   const prismaWithEvents = prisma as unknown as PrismaEventClient;
   prismaWithEvents.$on("query", (e) => {
-    logger.debug(`prisma:query ${e.query} [${e.duration}ms]`);
+    if (!prismaLogAllQueries && !shouldLogSlowQuery(e.duration)) {
+      return;
+    }
+
+    const normalizedQuery = normalizeQueryForLog(e.query);
+
+    if (prismaLogAllQueries) {
+      logger.debug(`prisma:query ${normalizedQuery} [${e.duration}ms]`);
+      return;
+    }
+
+    logger.warn(`prisma:slow-query ${normalizedQuery} [${e.duration}ms]`);
   });
   prismaWithEvents.$on("error", (e) => {
+    if (isTransientConnectionReset(e.message)) {
+      logger.warn(
+        "Transient PostgreSQL connection reset detected; Prisma will reconnect automatically.",
+      );
+      return;
+    }
+
     logger.error(e.message);
   });
   prismaWithEvents.$on("warn", (e) => {
@@ -55,7 +97,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // In development, store the client globally to prevent hot reload issues
-if (process.env.NODE_ENV === "development") {
+if (isDevelopment) {
   globalThis.__prisma = prisma;
 }
 
