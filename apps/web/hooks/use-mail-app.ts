@@ -1388,19 +1388,10 @@ export function useMailApp() {
       setComposeReplyContext(null);
       setIsComposeOpen(false);
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
-      if (activeMailbox.selectedMailboxId) {
-        const { messages: refreshed } =
-          await activeMailbox.client.getMailboxMessages(
-            activeMailbox.session,
-            activeMailbox.selectedMailboxId,
-            { limit: 20 },
-          );
-        setActiveMailbox((cur) =>
-          cur ? { ...cur, messages: refreshed } : cur,
-        );
-        if (effectiveThreadId) {
-          void loadConversationThread(effectiveThreadId);
-        }
+      // Only reload the conversation thread for replies; let realtime sync
+      // update the inbox list so the sent draft never briefly flashes there.
+      if (effectiveThreadId) {
+        void loadConversationThread(effectiveThreadId);
       }
     } catch (error) {
       log.error("Failed to send mail", error);
