@@ -84,6 +84,34 @@ export function getPrimaryMailAccountId(
   );
 }
 
+export type JmapAttachmentInput = {
+  blobId: string;
+  name: string;
+  type: string;
+  size: number;
+};
+
+const EMAIL_GET_PROPERTIES = [
+  "id",
+  "threadId",
+  "messageId",
+  "inReplyTo",
+  "references",
+  "mailboxIds",
+  "from",
+  "to",
+  "cc",
+  "bcc",
+  "subject",
+  "receivedAt",
+  "keywords",
+  "bodyStructure",
+  "bodyValues",
+  "textBody",
+  "htmlBody",
+  "attachments",
+] as const;
+
 export function buildSendMessageMethodCalls(input: {
   draftsMailboxId: string;
   sentMailboxId?: string | null;
@@ -92,6 +120,9 @@ export function buildSendMessageMethodCalls(input: {
   subject: string;
   textBody: string;
   identityId: string;
+  attachments?: JmapAttachmentInput[];
+  inReplyTo?: string[];
+  references?: string[];
 }): JmapMethodCall[] {
   const submissionParams: Record<string, unknown> = {
     create: {
@@ -112,6 +143,24 @@ export function buildSendMessageMethodCalls(input: {
     };
   }
 
+  const hasAttachments = (input.attachments?.length ?? 0) > 0;
+
+  const bodyStructure: Record<string, unknown> = hasAttachments
+    ? {
+        type: "multipart/mixed",
+        subParts: [
+          { type: "text/plain", partId: "text" },
+          ...(input.attachments ?? []).map((a) => ({
+            type: a.type,
+            blobId: a.blobId,
+            name: a.name,
+            size: a.size,
+            disposition: "attachment",
+          })),
+        ],
+      }
+    : { type: "text/plain", partId: "text" };
+
   return [
     [
       "Email/set",
@@ -121,13 +170,14 @@ export function buildSendMessageMethodCalls(input: {
             mailboxIds: {
               [input.draftsMailboxId]: true,
             },
+            ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
+            ...(input.references?.length
+              ? { references: input.references }
+              : {}),
             from: [{ email: input.fromEmail }],
             to: input.to.map((email) => ({ email })),
             subject: input.subject,
-            bodyStructure: {
-              type: "text/plain",
-              partId: "text",
-            },
+            bodyStructure,
             bodyValues: {
               text: {
                 value: input.textBody,
@@ -316,23 +366,7 @@ export class StalwartJmapClient {
               name: "Email/query",
               path: "/ids",
             },
-            properties: [
-              "id",
-              "threadId",
-              "mailboxIds",
-              "from",
-              "to",
-              "cc",
-              "bcc",
-              "subject",
-              "receivedAt",
-              "keywords",
-              "bodyStructure",
-              "bodyValues",
-              "textBody",
-              "htmlBody",
-              "attachments",
-            ],
+            properties: EMAIL_GET_PROPERTIES,
             fetchTextBodyValues: true,
             fetchHTMLBodyValues: true,
             fetchAllBodyValues: true,
@@ -353,6 +387,100 @@ export class StalwartJmapClient {
     return { messages: result.list ?? [], total: queryResult.total ?? 0 };
   }
 
+  async getMessagesByIds(
+    session: JmapSession,
+    ids: string[],
+  ): Promise<JmapEmailMessage[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const accountId = this.requirePrimaryAccountId(session);
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/get",
+          {
+            accountId,
+            ids,
+            properties: EMAIL_GET_PROPERTIES,
+            fetchTextBodyValues: true,
+            fetchHTMLBodyValues: true,
+            fetchAllBodyValues: true,
+          },
+          "c1",
+        ],
+      ],
+    );
+    const result = this.getMethodResult<{ list?: JmapEmailMessage[] }>(
+      envelope,
+      "Email/get",
+    );
+    return result.list ?? [];
+  }
+
+  async getThreadMessages(
+    session: JmapSession,
+    threadId: string,
+  ): Promise<JmapEmailMessage[]> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const threadEnvelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Thread/get",
+          {
+            accountId,
+            ids: [threadId],
+          },
+          "c1",
+        ],
+      ],
+    );
+    const threadResult = this.getMethodResult<{
+      list?: Array<{ id: string; emailIds?: string[] }>;
+    }>(threadEnvelope, "Thread/get");
+    const emailIds = threadResult.list?.[0]?.emailIds ?? [];
+    return this.getMessagesByIds(session, emailIds);
+  }
+
+  async uploadFile(session: JmapSession, file: File): Promise<JmapAttachmentInput> {
+    const accountId = this.requirePrimaryAccountId(session);
+    if (!session.uploadUrl) {
+      throw new Error("No upload URL in JMAP session.");
+    }
+    const url = session.uploadUrl.replace(
+      "{accountId}",
+      encodeURIComponent(accountId),
+    );
+    const authorization = await this.getAuthorizationHeader();
+    const response = await this.fetcher(url, {
+      method: "POST",
+      headers: {
+        Authorization: authorization,
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+    if (!response.ok) {
+      throw new Error(`Blob upload failed with status ${response.status}.`);
+    }
+    const json = (await response.json()) as {
+      blobId: string;
+      size: number;
+      type: string;
+    };
+    return {
+      blobId: json.blobId,
+      name: file.name,
+      type: json.type || file.type || "application/octet-stream",
+      size: json.size ?? file.size,
+    };
+  }
+
   async sendMessage(
     session: JmapSession,
     input: {
@@ -363,9 +491,12 @@ export class StalwartJmapClient {
       subject: string;
       textBody: string;
       identityId: string;
+      attachments?: JmapAttachmentInput[];
+      inReplyTo?: string[];
+      references?: string[];
     },
-  ): Promise<void> {
-    await this.call(
+  ): Promise<{ emailId: string; threadId: string | null }> {
+    const envelope = await this.call(
       session,
       [
         "urn:ietf:params:jmap:core",
@@ -374,6 +505,14 @@ export class StalwartJmapClient {
       ],
       buildSendMessageMethodCalls(input),
     );
+    const setResult = this.getMethodResult<{
+      created?: Record<string, { id?: string; threadId?: string } | null>;
+    }>(envelope, "Email/set");
+    const created = setResult.created?.draft1;
+    return {
+      emailId: created?.id ?? "",
+      threadId: created?.threadId ?? null,
+    };
   }
 
   async moveToTrash(
@@ -666,6 +805,31 @@ export class StalwartJmapClient {
       throw new Error(`Blob download failed with status ${response.status}.`);
     }
     return response.text();
+  }
+
+  async downloadBlob(
+    session: JmapSession,
+    blobId: string,
+    name: string,
+    type: string,
+  ): Promise<Blob> {
+    const accountId = this.requirePrimaryAccountId(session);
+    if (!session.downloadUrl) {
+      throw new Error("No download URL in JMAP session.");
+    }
+    const url = session.downloadUrl
+      .replace("{accountId}", encodeURIComponent(accountId))
+      .replace("{blobId}", encodeURIComponent(blobId))
+      .replace("{name}", encodeURIComponent(name))
+      .replace("{type}", encodeURIComponent(type));
+    const authorization = await this.getAuthorizationHeader();
+    const response = await this.fetcher(url, {
+      headers: { Authorization: authorization },
+    });
+    if (!response.ok) {
+      throw new Error(`Blob download failed with status ${response.status}.`);
+    }
+    return response.blob();
   }
 
   private requirePrimaryAccountId(session: JmapSession): string {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
@@ -13,6 +13,8 @@ import {
   MoreHorizontal,
   Search,
   Star,
+  Paperclip,
+  MessageSquare,
 } from "lucide-react";
 import {
   ContextMenu,
@@ -26,25 +28,24 @@ import {
   ContextMenuTrigger,
 } from "@workspace/ui/components/ui/context-menu";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@workspace/ui/components/ui/popover";
 import { AppLoadingState } from "@workspace/ui/components/ui";
+import { cn } from "@workspace/ui/lib/utils";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
 import { SenderAvatar } from "./mail-avatar";
 import { filterMessages } from "@/lib/mail/message-filter";
+import { buildMailConversations } from "@/lib/mail/conversation-thread";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 
 interface MessageListProps {
   messages: JmapEmailMessage[];
+  /** Cross-mailbox messages (sent, etc.) used to augment thread grouping */
+  relatedMessages?: JmapEmailMessage[];
   selectedMessageId: string | null;
   onSelect: (id: string) => void;
   mailboxes?: JmapMailbox[];
@@ -66,8 +67,23 @@ interface MessageListProps {
   isLoadingMore?: boolean;
 }
 
+type MessageThreadRow = ReturnType<typeof buildMailConversations>[number];
+
+function formatThreadSenders(messages: JmapEmailMessage[]): string {
+  const uniqueSenders = messages
+    .map((message) => formatAddress(message.from))
+    .filter((sender, index, senders) => senders.indexOf(sender) === index);
+
+  if (uniqueSenders.length <= 2) {
+    return uniqueSenders.join(", ");
+  }
+
+  return `${uniqueSenders.slice(0, 2).join(", ")} +${uniqueSenders.length - 2}`;
+}
+
 export function MessageList({
   messages,
+  relatedMessages = [],
   selectedMessageId,
   onSelect,
   mailboxes,
@@ -91,6 +107,7 @@ export function MessageList({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBarVisible, setIsBarVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [bulkActionsOpen, setBulkActionsOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -101,11 +118,17 @@ export function MessageList({
       !MOVE_EXCLUDED_ROLES.has(m.role?.toLowerCase() ?? ""),
   );
 
-  const toggleSelect = (e: React.MouseEvent, id: string) => {
+  const toggleSelect = (e: React.MouseEvent, ids: string[]) => {
     e.stopPropagation();
     const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    const allSelected = ids.every((id) => next.has(id));
+    ids.forEach((id) => {
+      if (allSelected) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+    });
     setSelectedIds(next);
     if (next.size > 0) {
       setIsBarVisible(true);
@@ -152,6 +175,13 @@ export function MessageList({
   }, [hasMore, onLoadMore, isLoadingMore]);
 
   const visibleMessages = filterMessages(messages, searchQuery);
+  const threadRows = useMemo(() => {
+    // Merge primary messages with related cross-mailbox messages (e.g. Sent)
+    // so thread grouping reflects the full conversation, not just the current mailbox.
+    const seenIds = new Set(visibleMessages.map((m) => m.id));
+    const extras = relatedMessages.filter((m) => !seenIds.has(m.id));
+    return buildMailConversations([...visibleMessages, ...extras]);
+  }, [visibleMessages, relatedMessages]);
 
   if (messages.length === 0) {
     return (
@@ -199,76 +229,85 @@ export function MessageList({
               Select all
             </button>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <Popover open={bulkActionsOpen} onOpenChange={setBulkActionsOpen}>
+            <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors"
+                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                aria-label="Bulk actions"
               >
                 <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.25} />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side="bottom"
+            </PopoverTrigger>
+            <PopoverContent
               align="end"
-              sideOffset={4}
-              className="w-40"
+              sideOffset={6}
+              className="w-52 p-0 overflow-hidden rounded-lg border border-border shadow-md"
             >
-              <DropdownMenuItem
-                onClick={() => {
-                  onBulkMarkAsRead?.(bulkIds);
-                  clearSelection();
-                }}
-              >
-                <MailCheck className="h-3.5 w-3.5" strokeWidth={2.25} />
-                Mark as read
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  onBulkMarkAsUnread?.(bulkIds);
-                  clearSelection();
-                }}
-              >
-                <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
-                Mark as unread
-              </DropdownMenuItem>
+              <div className="flex border-b border-border/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onBulkMarkAsRead?.(bulkIds);
+                    clearSelection();
+                    setBulkActionsOpen(false);
+                  }}
+                  className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <MailCheck className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  Read
+                </button>
+                <div className="w-px self-stretch bg-border/60" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onBulkMarkAsUnread?.(bulkIds);
+                    clearSelection();
+                    setBulkActionsOpen(false);
+                  }}
+                  className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  Unread
+                </button>
+                <div className="w-px self-stretch bg-border/60" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onBulkDelete?.(bulkIds);
+                    clearSelection();
+                    setBulkActionsOpen(false);
+                  }}
+                  className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-destructive transition-colors hover:bg-accent"
+                >
+                  <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  Delete
+                </button>
+              </div>
               {moveTargets.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
+                <div className="p-1">
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Move to
+                  </div>
+                  {moveTargets.map((mailbox) => (
+                    <button
+                      key={mailbox.id}
+                      type="button"
+                      onClick={() => {
+                        onBulkMove?.(bulkIds, mailbox.id);
+                        clearSelection();
+                        setBulkActionsOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/50 hover:text-foreground"
+                    >
                       <FolderInput className="h-3.5 w-3.5" strokeWidth={2.25} />
-                      Move to
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-40">
-                      {moveTargets.map((mailbox) => (
-                        <DropdownMenuItem
-                          key={mailbox.id}
-                          onClick={() => {
-                            onBulkMove?.(bulkIds, mailbox.id);
-                            clearSelection();
-                          }}
-                        >
-                          {mailbox.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </>
+                      <span className="truncate">{mailbox.name}</span>
+                    </button>
+                  ))}
+                </div>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => {
-                  onBulkDelete?.(bulkIds);
-                  clearSelection();
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverContent>
+          </Popover>
         </div>
       )}
 
@@ -280,16 +319,38 @@ export function MessageList({
             </p>
           </div>
         ) : (
-          visibleMessages.map((message) => {
-            const isSelected = message.id === selectedMessageId;
-            const isChecked = selectedIds.has(message.id);
-            const isRead = message.keywords?.["$seen"] === true;
-            const isFlagged = message.keywords?.["$flagged"] === true;
+          threadRows.map((row) => {
+            const message = row.latestMessage;
+            const isSelected = row.messageIds.includes(selectedMessageId ?? "");
+            const selectedCount = row.messageIds.filter((id) =>
+              selectedIds.has(id),
+            ).length;
+            const isChecked = selectedCount === row.messageIds.length;
+            // Only count unread from primary mailbox messages (not sent/related extras)
+            // so own sent replies don't inflate the unread counter.
+            const primaryIds = new Set(messages.map((m) => m.id));
+            const primaryMessages = row.messages.filter((entry) =>
+              primaryIds.has(entry.id),
+            );
+            const unreadCount = primaryMessages.filter(
+              (entry) => !entry.keywords?.["$seen"],
+            ).length;
+            const isRead = unreadCount === 0;
+            const isFlagged = row.messages.some(
+              (entry) => entry.keywords?.["$flagged"] === true,
+            );
             const messageLabels = labels.filter(
               (l) => message.keywords?.[`label:${l.id}`] === true,
             );
+            const hasAttachments = row.messages.some(
+              (entry) => (entry.attachments?.length ?? 0) > 0,
+            );
+            const senderLabel =
+              row.messages.length > 1
+                ? formatThreadSenders(row.messages)
+                : formatAddress(message.from);
             return (
-              <ContextMenu key={message.id}>
+              <ContextMenu key={row.id}>
                 <ContextMenuTrigger asChild>
                   <button
                     type="button"
@@ -297,21 +358,21 @@ export function MessageList({
                     className={`group/row w-full px-3 py-2.5 text-left transition-colors data-[state=open]:bg-muted/60 data-[state=open]:ring-1 data-[state=open]:ring-inset data-[state=open]:ring-border/60 ${isChecked ? "bg-primary/5 dark:bg-primary/10" : isSelected ? "bg-muted/80 dark:bg-muted" : "hover:bg-muted/40 dark:hover:bg-muted/60"}`}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div
-                        className="relative shrink-0 cursor-pointer p-2 -m-2 rounded-full"
-                        onClick={(e) => toggleSelect(e, message.id)}
-                      >
-                        <SenderAvatar
-                          email={message.from?.[0]?.email ?? ""}
+                        <div
+                          className="relative shrink-0 cursor-pointer p-2 -m-2 rounded-full"
+                          onClick={(e) => toggleSelect(e, row.messageIds)}
+                        >
+                          <SenderAvatar
+                            email={message.from?.[0]?.email ?? ""}
                           name={message.from?.[0]?.name ?? undefined}
                         />
-                        <span
-                          className={`absolute inset-0 rounded-full flex items-center justify-center bg-background/80 transition-opacity ${isChecked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"}`}
-                        >
-                          {isChecked ? (
-                            <CheckSquare
-                              className="h-4 w-4 text-primary"
-                              strokeWidth={2.25}
+                          <span
+                            className={`absolute inset-0 rounded-full flex items-center justify-center bg-background/80 transition-opacity ${isChecked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"}`}
+                          >
+                            {selectedCount > 0 ? (
+                              <CheckSquare
+                                className="h-4 w-4 text-primary"
+                                strokeWidth={2.25}
                             />
                           ) : (
                             <Square
@@ -326,13 +387,42 @@ export function MessageList({
                           <span
                             className={`text-[13px] truncate ${isRead ? "font-medium text-foreground/70 dark:text-foreground/85" : "font-semibold text-foreground"}`}
                           >
-                            {formatAddress(message.from)}
+                            {senderLabel}
                           </span>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {!isRead && (
+                            {row.messages.length > 1 ? (
                               <span
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                                aria-label="Unread"
+                                className={cn(
+                                  "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                                  unreadCount > 0
+                                    ? "bg-primary/15 text-primary dark:bg-primary/20"
+                                    : "bg-muted text-muted-foreground",
+                                )}
+                                aria-label={
+                                  unreadCount > 0
+                                    ? `${unreadCount} unread of ${row.messages.length}`
+                                    : `${row.messages.length} messages in thread`
+                                }
+                              >
+                                <MessageSquare className="h-2.5 w-2.5" strokeWidth={2.25} />
+                                {unreadCount > 0 &&
+                                unreadCount < row.messages.length
+                                  ? `${unreadCount}/${row.messages.length}`
+                                  : row.messages.length}
+                              </span>
+                            ) : (
+                              !isRead && (
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                                  aria-label="Unread"
+                                />
+                              )
+                            )}
+                            {hasAttachments && (
+                              <Paperclip
+                                className="h-3 w-3 text-muted-foreground/70"
+                                strokeWidth={2}
+                                aria-label="Has attachments"
                               />
                             )}
                             <span className="text-[11px] text-muted-foreground/70 dark:text-muted-foreground/90">
@@ -395,13 +485,23 @@ export function MessageList({
                 <ContextMenuContent className="w-52">
                   {isRead ? (
                     <ContextMenuItem
-                      onClick={() => onMarkAsUnread?.(message.id)}
+                      onClick={() =>
+                        row.messageIds.length > 1
+                          ? onBulkMarkAsUnread?.(row.messageIds)
+                          : onMarkAsUnread?.(message.id)
+                      }
                     >
                       <MailOpen />
                       Mark as unread
                     </ContextMenuItem>
                   ) : (
-                    <ContextMenuItem onClick={() => onMarkAsRead?.(message.id)}>
+                    <ContextMenuItem
+                      onClick={() =>
+                        row.messageIds.length > 1
+                          ? onBulkMarkAsRead?.(row.messageIds)
+                          : onMarkAsRead?.(message.id)
+                      }
+                    >
                       <MailCheck />
                       Mark as read
                     </ContextMenuItem>
@@ -418,7 +518,11 @@ export function MessageList({
                           {moveTargets.map((mailbox) => (
                             <ContextMenuItem
                               key={mailbox.id}
-                              onClick={() => onMove?.(message.id, mailbox.id)}
+                              onClick={() =>
+                                row.messageIds.length > 1
+                                  ? onBulkMove?.(row.messageIds, mailbox.id)
+                                  : onMove?.(message.id, mailbox.id)
+                              }
                             >
                               {mailbox.name}
                             </ContextMenuItem>
@@ -432,7 +536,11 @@ export function MessageList({
 
                   <ContextMenuItem
                     variant="destructive"
-                    onClick={() => onDelete?.(message.id)}
+                    onClick={() =>
+                      row.messageIds.length > 1
+                        ? onBulkDelete?.(row.messageIds)
+                        : onDelete?.(message.id)
+                    }
                   >
                     <Trash2 />
                     Delete

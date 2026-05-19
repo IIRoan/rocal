@@ -220,9 +220,51 @@ describe("mailRoutes", () => {
       "http://stalwart.test/jmap/",
       expect.objectContaining({
         method: "POST",
-        body: requestBody,
+        body: expect.any(ArrayBuffer),
         headers: expect.any(Headers),
       }),
+    );
+    const forwardedRequest = proxyFetch.mock.calls[0]?.[1];
+    expect(forwardedRequest?.body).toBeInstanceOf(ArrayBuffer);
+    expect(
+      Buffer.from(forwardedRequest?.body as ArrayBuffer).toString("utf8"),
+    ).toBe(requestBody);
+  });
+
+  it("preserves binary upload bodies when proxying JMAP attachments", async () => {
+    const proxyFetch = jest.fn<
+      (input: string, init?: RequestInit) => Promise<Response>
+    >(async () => new Response(null, { status: 201 }));
+    const attachmentBytes = Uint8Array.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x80,
+    ]);
+
+    const response = await createApp({
+      jmapFetch: proxyFetch,
+      jmapUpstreamBaseUrl: "http://stalwart.test",
+    }).handle(
+      new Request("http://localhost/mail/jmap/jmap/upload/account-1/", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer mail-access-token",
+          "Content-Type": "image/png",
+        },
+        body: attachmentBytes,
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(proxyFetch).toHaveBeenCalledWith(
+      "http://stalwart.test/jmap/upload/account-1/",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(ArrayBuffer),
+        headers: expect.any(Headers),
+      }),
+    );
+    const forwardedRequest = proxyFetch.mock.calls[0]?.[1];
+    expect(new Uint8Array(forwardedRequest?.body as ArrayBuffer)).toEqual(
+      attachmentBytes,
     );
   });
 
