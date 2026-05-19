@@ -3,7 +3,10 @@ import { auth } from "./auth";
 import { ForbiddenError, UnauthorizedError } from "./errors";
 import { hasUserId, type AuthenticatedUser } from "./auth-utils";
 import { prisma } from "./prisma";
-import { getPasskeyStepUpStatus } from "./passkey-step-up";
+import {
+  getPasskeyStepUpStatus,
+  hasVerifiedPasskeyStepUp,
+} from "./passkey-step-up";
 
 type AuthGuardContext = {
   request: Request;
@@ -66,6 +69,10 @@ export const requireAuth = new Elysia({ name: "require-auth" })
       typeof authenticatedUser !== "object" ||
       !authenticatedUser.id
     ) {
+      return;
+    }
+
+    if (hasVerifiedPasskeyStepUp(request)) {
       return;
     }
 

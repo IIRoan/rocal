@@ -13,6 +13,12 @@ const CORE_MAIL_CAPABILITIES = [
   "urn:ietf:params:jmap:core",
   "urn:ietf:params:jmap:mail",
 ] as const;
+const MAIL_SYNC_CACHE_TTL_MS = 60_000;
+
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
 
 type JmapMailbox = {
   id: string;
@@ -83,6 +89,24 @@ type AuthorizedDirectoryEntry = {
   stalwartAccountId: string;
 };
 
+type MailSyncStateRecord = {
+  id: string;
+  directoryEntryId: string;
+  stalwartAccountId: string;
+  emailState: string;
+  mailboxState: string;
+  threadState: string | null;
+};
+
+const mailSyncStateSelect = {
+  id: true,
+  directoryEntryId: true,
+  stalwartAccountId: true,
+  emailState: true,
+  mailboxState: true,
+  threadState: true,
+} as const;
+
 function uniqueIds(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
@@ -116,10 +140,93 @@ function collectionResult<T>(input: {
 }
 
 export class MailSyncService {
+  private readonly authorizedDirectoryEntryCache = new Map<
+    string,
+    CacheEntry<AuthorizedDirectoryEntry>
+  >();
+  private readonly syncStateCache = new Map<
+    string,
+    CacheEntry<MailSyncStateRecord | null>
+  >();
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly jmapAdminClient: StalwartJmapAdminClientLike,
   ) {}
+
+  private readCached<T>(
+    cache: Map<string, CacheEntry<T>>,
+    key: string,
+  ): T | undefined {
+    const cached = cache.get(key);
+
+    if (!cached) {
+      return undefined;
+    }
+
+    if (cached.expiresAt <= Date.now()) {
+      cache.delete(key);
+      return undefined;
+    }
+
+    return cached.value;
+  }
+
+  private writeCached<T>(
+    cache: Map<string, CacheEntry<T>>,
+    key: string,
+    value: T,
+  ): T {
+    cache.set(key, {
+      value,
+      expiresAt: Date.now() + MAIL_SYNC_CACHE_TTL_MS,
+    });
+
+    return value;
+  }
+
+  private getAuthorizedDirectoryEntryCacheKey(
+    userId: string,
+    accountId: string,
+  ): string {
+    return `${userId}:${accountId}`;
+  }
+
+  private cacheAuthorizedDirectoryEntry(
+    userId: string,
+    entry: AuthorizedDirectoryEntry,
+  ): AuthorizedDirectoryEntry {
+    return this.writeCached(
+      this.authorizedDirectoryEntryCache,
+      this.getAuthorizedDirectoryEntryCacheKey(userId, entry.stalwartAccountId),
+      entry,
+    );
+  }
+
+  private async getSyncState(
+    directoryEntryId: string,
+  ): Promise<MailSyncStateRecord | null> {
+    const cached = this.readCached(this.syncStateCache, directoryEntryId);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const syncState = await this.prisma.mailJmapSyncState.findUnique({
+      where: { directoryEntryId },
+      select: mailSyncStateSelect,
+    });
+
+    return this.writeCached(this.syncStateCache, directoryEntryId, syncState);
+  }
+
+  private cacheSyncState(state: MailSyncStateRecord | null): void {
+    if (!state) {
+      return;
+    }
+
+    this.writeCached(this.syncStateCache, state.directoryEntryId, state);
+  }
 
   /**
    * Lightweight check for new JMAP state without advancing stored state or fetching records.
@@ -138,10 +245,7 @@ export class MailSyncService {
       input.userId,
       accountId,
     );
-    const syncState = await this.prisma.mailJmapSyncState.findUnique({
-      where: { directoryEntryId: directoryEntry.id },
-      select: { emailState: true, mailboxState: true, threadState: true },
-    });
+    const syncState = await this.getSyncState(directoryEntry.id);
 
     if (!syncState) {
       return { hasChanges: true, changedTypes: ["Email", "Mailbox"] };
@@ -189,13 +293,20 @@ export class MailSyncService {
   }
 
   async listAuthorizedAccountIdsForUser(userId: string): Promise<string[]> {
-    const entries = await this.prisma.mailDirectoryEntry.findMany({
+    const entry = await this.prisma.mailDirectoryEntry.findUnique({
       where: { userId },
-      select: { stalwartAccountId: true },
-      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        stalwartAccountId: true,
+      },
     });
 
-    return entries.map((entry) => entry.stalwartAccountId);
+    if (!entry) {
+      return [];
+    }
+
+    this.cacheAuthorizedDirectoryEntry(userId, entry);
+    return [entry.stalwartAccountId];
   }
 
   async syncForUser(input: {
@@ -212,19 +323,7 @@ export class MailSyncService {
       input.userId,
       accountId,
     );
-    const existingState = await this.prisma.mailJmapSyncState.findUnique({
-      where: {
-        directoryEntryId: directoryEntry.id,
-      },
-      select: {
-        id: true,
-        directoryEntryId: true,
-        stalwartAccountId: true,
-        emailState: true,
-        mailboxState: true,
-        threadState: true,
-      },
-    });
+    const existingState = await this.getSyncState(directoryEntry.id);
 
     if (!existingState) {
       const initialized = await this.initializeSyncState(directoryEntry);
@@ -246,7 +345,7 @@ export class MailSyncService {
       ),
     ]);
 
-    await this.prisma.mailJmapSyncState.update({
+    const updatedState = await this.prisma.mailJmapSyncState.update({
       where: { id: existingState.id },
       data: {
         emailState: emailChanges.newState,
@@ -254,7 +353,9 @@ export class MailSyncService {
         threadState: threadChanges.newState,
         lastSyncedAt: new Date(),
       },
+      select: mailSyncStateSelect,
     });
+    this.cacheSyncState(updatedState);
 
     const changedTypes = [
       ...(emailChanges.created.length ||
@@ -301,7 +402,7 @@ export class MailSyncService {
       this.getThreadState(directoryEntry.stalwartAccountId),
     ]);
 
-    await this.prisma.mailJmapSyncState.upsert({
+    const persistedState = await this.prisma.mailJmapSyncState.upsert({
       where: {
         directoryEntryId: directoryEntry.id,
       },
@@ -324,7 +425,9 @@ export class MailSyncService {
         threadState: threadResponse.state,
         lastSyncedAt: new Date(),
       },
+      select: mailSyncStateSelect,
     });
+    this.cacheSyncState(persistedState);
 
     return {
       accountId: directoryEntry.stalwartAccountId,
@@ -350,22 +453,34 @@ export class MailSyncService {
     userId: string,
     accountId: string,
   ): Promise<AuthorizedDirectoryEntry> {
-    const entry = await this.prisma.mailDirectoryEntry.findFirst({
+    const cached = this.readCached(
+      this.authorizedDirectoryEntryCache,
+      this.getAuthorizedDirectoryEntryCacheKey(userId, accountId),
+    );
+
+    if (cached) {
+      return cached;
+    }
+
+    const entry = await this.prisma.mailDirectoryEntry.findUnique({
       where: {
-        userId,
         stalwartAccountId: accountId,
       },
       select: {
         id: true,
+        userId: true,
         stalwartAccountId: true,
       },
     });
 
-    if (!entry) {
+    if (!entry || entry.userId !== userId) {
       throw new ForbiddenError("You are not authorized to sync that mailbox.");
     }
 
-    return entry;
+    return this.cacheAuthorizedDirectoryEntry(userId, {
+      id: entry.id,
+      stalwartAccountId: entry.stalwartAccountId,
+    });
   }
 
   private async fetchEmailChanges(
