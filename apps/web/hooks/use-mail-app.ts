@@ -607,8 +607,11 @@ export function useMailApp() {
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
   const [composeTo, setComposeTo] = useState("");
+  const [composeCc, setComposeCc] = useState("");
+  const [composeBcc, setComposeBcc] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
+  const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
   const [composeReplyContext, setComposeReplyContext] =
     useState<MailReplyContext | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -848,13 +851,15 @@ export function useMailApp() {
   }, [selectedConversationMessageId, selectedConversationMessages]);
 
   useEffect(() => {
-    if (!selectedMessageId || !activeMailbox) {
+    if (!selectedMessageId || !activeMailboxRef.current) {
       setRelatedConversationMessages([]);
       setIsConversationLoading(false);
       return;
     }
 
-    const selectedMsg = activeMailbox.messages.find(
+    // Use the ref so keyword/flag updates to activeMailbox don't re-trigger
+    // a full thread re-fetch (threadId never changes for a given message).
+    const selectedMsg = activeMailboxRef.current.messages.find(
       (m) => m.id === selectedMessageId,
     );
     const threadId = selectedMsg?.threadId;
@@ -865,10 +870,11 @@ export function useMailApp() {
       setRelatedConversationMessages([]);
       setIsConversationLoading(false);
     }
-  }, [selectedMessageId, activeMailbox, loadConversationThread]);
+  }, [selectedMessageId, loadConversationThread]);
 
   useEffect(() => {
-    if (!selectedMessage || !activeMailbox) {
+    const mailbox = activeMailboxRef.current;
+    if (!selectedMessage || !mailbox) {
       setSelectedMessagePlaintext(null);
       setSelectedMessageDecryptedHtml(null);
       setSelectedMessageDecryptedAttachments(null);
@@ -914,8 +920,8 @@ export function useMailApp() {
             );
             return;
           }
-          armoredMessage = await activeMailbox.client.getBlobAsText(
-            activeMailbox.session,
+          armoredMessage = await mailbox.client.getBlobAsText(
+            mailbox.session,
             blobId,
           );
         }
@@ -981,7 +987,11 @@ export function useMailApp() {
     return () => {
       cancelled = true;
     };
-  }, [activeMailbox, config, selectedMessage]);
+    // Only re-decrypt when the message identity or E2EE config changes.
+    // Keyword-only updates (flag/read) do not change encryption state, so we
+    // exclude activeMailbox and use activeMailboxRef.current inside the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMessage?.id, config]);
 
   // Auto-mark read when a message is opened
   useEffect(() => {
@@ -1295,7 +1305,16 @@ export function useMailApp() {
     }
     setIsBusy(true);
     try {
-      const recipients = [normalizeEmailAddress(composeTo)];
+      const parseAddressList = (raw: string): string[] =>
+        raw
+          .split(/[,;]+/)
+          .map((s) => normalizeEmailAddress(s))
+          .filter(Boolean);
+
+      const recipients = parseAddressList(composeTo);
+      const ccRecipients = composeCc.trim() ? parseAddressList(composeCc) : undefined;
+      const bccRecipients = composeBcc.trim() ? parseAddressList(composeBcc) : undefined;
+
       const draftsMailboxId = getPrimaryMailboxId(
         activeMailbox.mailboxes,
         "drafts",
@@ -1319,14 +1338,28 @@ export function useMailApp() {
         plaintext: composeBody,
         internalDomain,
       });
+
+      // Upload any file attachments before sending
+      let uploadedAttachments: import("@/lib/mail/jmap-client").JmapAttachmentInput[] | undefined;
+      if (composeAttachments.length > 0) {
+        uploadedAttachments = await Promise.all(
+          composeAttachments.map((file) =>
+            activeMailbox.client.uploadFile(activeMailbox.session, file),
+          ),
+        );
+      }
+
       const sendResult = await activeMailbox.client.sendMessage(activeMailbox.session, {
         draftsMailboxId,
         sentMailboxId,
         fromEmail: activeMailbox.email,
         to: recipients,
+        cc: ccRecipients,
+        bcc: bccRecipients,
         subject: composeSubject.trim(),
         textBody,
         identityId,
+        attachments: uploadedAttachments,
         inReplyTo: composeReplyContext?.inReplyTo,
         references: composeReplyContext?.references,
       });
@@ -1347,8 +1380,11 @@ export function useMailApp() {
         );
       }
       setComposeTo("");
+      setComposeCc("");
+      setComposeBcc("");
       setComposeSubject("");
       setComposeBody("");
+      setComposeAttachments([]);
       setComposeReplyContext(null);
       setIsComposeOpen(false);
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
@@ -1378,8 +1414,11 @@ export function useMailApp() {
     appendConversationMessage,
     activeMailbox,
     composeTo,
+    composeCc,
+    composeBcc,
     composeSubject,
     composeBody,
+    composeAttachments,
     composeReplyContext,
     config,
     loadConversationThread,
@@ -1589,7 +1628,7 @@ export function useMailApp() {
         }
         const { blob, filename } = await resolveAttachmentBlob({
           attachment,
-          activeMailbox,
+          activeMailbox: activeMailboxRef.current,
         });
         const normalizedType =
           blob.type || attachment.type || "application/octet-stream";
@@ -1631,7 +1670,8 @@ export function useMailApp() {
         toast.error("Could not preview the attachment.");
       }
     },
-    [activeMailbox],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const loadAttachmentHoverPreview = useCallback(
@@ -1649,7 +1689,7 @@ export function useMailApp() {
 
       const { blob } = await resolveAttachmentBlob({
         attachment,
-        activeMailbox,
+        activeMailbox: activeMailboxRef.current,
       });
       const normalizedType =
         blob.type || attachment.type || "application/octet-stream";
@@ -1670,7 +1710,8 @@ export function useMailApp() {
       attachmentHoverPreviewCacheRef.current.set(cacheKey, preview);
       return preview;
     },
-    [activeMailbox],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const closeAttachmentPreview = useCallback(() => {
@@ -2340,6 +2381,12 @@ export function useMailApp() {
     selectedMessageDecryptError,
     composeTo,
     setComposeTo,
+    composeCc,
+    setComposeCc,
+    composeBcc,
+    setComposeBcc,
+    composeAttachments,
+    setComposeAttachments,
     composeSubject,
     setComposeSubject,
     composeBody,

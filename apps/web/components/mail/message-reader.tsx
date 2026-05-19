@@ -489,6 +489,37 @@ function ConversationMessageMenu({
   );
 }
 
+// ─── Copy email button ────────────────────────────────────────────────────────
+
+function CopyEmailButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label={copied ? "Copied!" : `Copy ${value}`}
+      className={cn(
+        "inline-flex items-center justify-center h-4 w-4 rounded transition-all shrink-0",
+        copied
+          ? "text-green-500"
+          : "text-muted-foreground/30 hover:text-muted-foreground/70",
+      )}
+    >
+      {copied ? (
+        <Check className="h-3 w-3" strokeWidth={2.5} />
+      ) : (
+        <Copy className="h-3 w-3" strokeWidth={2} />
+      )}
+    </button>
+  );
+}
+
 // ─── Message reader ───────────────────────────────────────────────────────────
 
 export interface MessageReaderProps {
@@ -906,11 +937,18 @@ export function MessageReader({
             const assigned =
               message?.keywords?.[`label:${label.id}`] === true;
             return (
-              <button
+              <div
                 key={label.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => onSetLabel?.(label.id, !assigned)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSetLabel?.(label.id, !assigned);
+                  }
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left cursor-pointer select-none"
               >
                 <span
                   className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
@@ -943,7 +981,7 @@ export function MessageReader({
                     <X className="h-3 w-3" strokeWidth={2.5} />
                   </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
@@ -1007,7 +1045,7 @@ export function MessageReader({
 
   // ── Top toolbar ─────────────────────────────────────────────────────────────
   const toolbar = (
-    <div className="shrink-0 flex items-center gap-0.5 px-3 py-1.5 border-b border-border/40">
+    <div className="shrink-0 flex items-center gap-0.5 px-3 h-12 border-b border-border/40">
       {/* Left: close + separator + prev/next */}
       <div className="flex items-center gap-0.5">
         {onClose && (
@@ -1252,99 +1290,97 @@ export function MessageReader({
 
   // ── Email header ─────────────────────────────────────────────────────────────
   const header = (
-    <div className="shrink-0 px-4 py-3 relative flex flex-col gap-3">
+    <div className="shrink-0 px-4 py-3 relative flex flex-col gap-2.5">
       {labelPopoverTrigger}
 
-      {/* Subject + date row */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="font-medium leading-none">
-            {message.subject || "(No subject)"}
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {onToggleFlagged && (
-              <button
-                type="button"
-                onClick={onToggleFlagged}
-                disabled={isBusy}
-                aria-label={isFlagged ? "Unstar" : "Star"}
-                className="inline-flex items-center justify-center h-7 w-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40 disabled:opacity-40"
-              >
-                <Star
-                  className={cn(
-                    "h-4 w-4 transition-colors",
-                    isFlagged
-                      ? "fill-amber-400 text-amber-400"
-                      : "text-muted-foreground/40 hover:text-amber-400",
-                  )}
-                  strokeWidth={2}
-                />
-              </button>
-            )}
-            <MailSecurityBadge
-              messageState={messageState}
-              accountEncryptedAtRest={accountEncryptedAtRest}
-              signatureVerificationState={signatureVerificationState}
-              decryptionFailed={Boolean(decryptError)}
-            />
-          </div>
+      {/* Subject + action buttons */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-medium leading-snug">
+          {message.subject || "(No subject)"}
         </div>
-        {message.receivedAt && (
-          <div className="text-muted-foreground text-xs leading-none">
-            {new Date(message.receivedAt).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-              hour12:
-                timeFormat === "12h"
-                  ? true
-                  : timeFormat === "24h"
-                    ? false
-                    : undefined,
-              timeZone: timezone ?? undefined,
-            } as Intl.DateTimeFormatOptions)}
-          </div>
-        )}
+        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+          {onToggleFlagged && (
+            <button
+              type="button"
+              onClick={onToggleFlagged}
+              disabled={isBusy}
+              aria-label={isFlagged ? "Unstar" : "Star"}
+              className="inline-flex items-center justify-center h-7 w-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40 disabled:opacity-40"
+            >
+              <Star
+                className={cn(
+                  "h-4 w-4 transition-colors",
+                  isFlagged
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-muted-foreground/40 hover:text-amber-400",
+                )}
+                strokeWidth={2}
+              />
+            </button>
+          )}
+          <MailSecurityBadge
+            messageState={messageState}
+            accountEncryptedAtRest={accountEncryptedAtRest}
+            signatureVerificationState={signatureVerificationState}
+            decryptionFailed={Boolean(decryptError)}
+          />
+        </div>
       </div>
 
-      <Separator />
-
-      {/* Sender card: avatar + name/email + to/cc */}
-      <div className="flex gap-2">
+      {/* Sender row: avatar + name/email/to + date */}
+      <div className="flex items-start gap-2.5">
         <SenderAvatar email={senderEmail} name={senderName} />
-        <div className="flex h-full flex-col gap-1">
-          <div className="flex items-center gap-2">
-            {senderName && (
-              <>
-                <div className="text-xs">{senderName}</div>
-                <Separator orientation="vertical" className="h-3" />
-              </>
+        <div className="flex flex-1 min-w-0 flex-col gap-0.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0 group/sender">
+              {senderName && (
+                <span className="text-[13px] font-medium truncate">{senderName}</span>
+              )}
+              <span className="text-muted-foreground text-xs truncate">{`<${senderEmail}>`}</span>
+              <span className="opacity-0 group-hover/sender:opacity-100 transition-opacity">
+                <CopyEmailButton value={senderEmail} />
+              </span>
+            </div>
+            {message.receivedAt && (
+              <span className="text-muted-foreground text-[11px] shrink-0">
+                {new Date(message.receivedAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                  hour12:
+                    timeFormat === "12h"
+                      ? true
+                      : timeFormat === "24h"
+                        ? false
+                        : undefined,
+                  timeZone: timezone ?? undefined,
+                } as Intl.DateTimeFormatOptions)}
+              </span>
             )}
-            <div className="text-muted-foreground text-xs">{senderEmail}</div>
           </div>
           {(message.to?.length ?? 0) > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="text-muted-foreground text-xs">
-                To:{" "}
-                <span className="text-foreground">
-                  {message.to!.map((a) => a.name || a.email).join(", ")}
-                </span>
-              </div>
+            <div className="flex items-center gap-1 text-muted-foreground text-xs group/to">
+              <span>To:</span>
+              <span className="text-foreground/80">
+                {message.to!.map((a) => a.name || a.email).join(", ")}
+              </span>
+              <span className="opacity-0 group-hover/to:opacity-100 transition-opacity">
+                <CopyEmailButton value={message.to!.map((a) => a.email).join(", ")} />
+              </span>
             </div>
           )}
           {(message.cc?.length ?? 0) > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="text-muted-foreground text-xs">
-                CC:{" "}
-                <span className="text-foreground">
-                  {message.cc!.map((a) => a.name || a.email).join(", ")}
-                </span>
-              </div>
+            <div className="flex items-center gap-1 text-muted-foreground text-xs group/cc">
+              <span>CC:</span>
+              <span className="text-foreground/80">
+                {message.cc!.map((a) => a.name || a.email).join(", ")}
+              </span>
+              <span className="opacity-0 group-hover/cc:opacity-100 transition-opacity">
+                <CopyEmailButton value={message.cc!.map((a) => a.email).join(", ")} />
+              </span>
             </div>
           )}
         </div>
       </div>
-
-      <Separator />
 
       {/* Attachments */}
       {displayAttachments.length > 0 && (

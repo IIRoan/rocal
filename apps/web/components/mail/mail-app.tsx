@@ -46,6 +46,12 @@ export function MailApp() {
     selectedMessageDecryptError,
     composeTo,
     setComposeTo,
+    composeCc,
+    setComposeCc,
+    composeBcc,
+    setComposeBcc,
+    composeAttachments,
+    setComposeAttachments,
     composeSubject,
     setComposeSubject,
     composeBody,
@@ -448,11 +454,17 @@ export function MailApp() {
         onClose={() => setIsComposeOpen(false)}
         onSend={handleSendMessage}
         composeTo={composeTo}
+        composeCc={composeCc}
+        composeBcc={composeBcc}
         composeSubject={composeSubject}
         composeBody={composeBody}
+        composeAttachments={composeAttachments}
         setComposeTo={setComposeTo}
+        setComposeCc={setComposeCc}
+        setComposeBcc={setComposeBcc}
         setComposeSubject={setComposeSubject}
         setComposeBody={setComposeBody}
+        setComposeAttachments={setComposeAttachments}
         isBusy={isBusy}
       />
 
