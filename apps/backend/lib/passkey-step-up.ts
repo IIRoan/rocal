@@ -3,6 +3,14 @@ import { env } from "./env";
 
 export const PASSKEY_STEP_UP_COOKIE_NAME = "solace-passkey-step-up";
 const PASSKEY_STEP_UP_COOKIE_VALUE = "verified";
+const PASSKEY_PRESENCE_CACHE_TTL_MS = 60_000;
+
+type CachedPasskeyPresence = {
+  hasPasskeys: boolean;
+  expiresAt: number;
+};
+
+const passkeyPresenceCache = new Map<string, CachedPasskeyPresence>();
 
 type PasskeyStepUpCookieAttributes = ReturnType<
   typeof getPasskeyStepUpCookieAttributes
@@ -155,15 +163,71 @@ export function hasVerifiedPasskeyStepUp(request: Request): boolean {
   return cookies[PASSKEY_STEP_UP_COOKIE_NAME] === PASSKEY_STEP_UP_COOKIE_VALUE;
 }
 
+function readCachedPasskeyPresence(userId: string): boolean | undefined {
+  const cached = passkeyPresenceCache.get(userId);
+
+  if (!cached) {
+    return undefined;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    passkeyPresenceCache.delete(userId);
+    return undefined;
+  }
+
+  return cached.hasPasskeys;
+}
+
+function cachePasskeyPresence(userId: string, hasPasskeys: boolean): boolean {
+  if (!hasPasskeys) {
+    passkeyPresenceCache.delete(userId);
+    return false;
+  }
+
+  passkeyPresenceCache.set(userId, {
+    hasPasskeys: true,
+    expiresAt: Date.now() + PASSKEY_PRESENCE_CACHE_TTL_MS,
+  });
+
+  return true;
+}
+
+export function clearPasskeyPresenceCache(userId?: string): void {
+  if (userId) {
+    passkeyPresenceCache.delete(userId);
+    return;
+  }
+
+  passkeyPresenceCache.clear();
+}
+
+async function resolveHasPasskeys(input: {
+  prisma: PrismaClient;
+  userId: string;
+}): Promise<boolean> {
+  const cached = readCachedPasskeyPresence(input.userId);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const passkey = await input.prisma.passkey.findFirst({
+    where: { userId: input.userId },
+    select: { id: true },
+  });
+
+  return cachePasskeyPresence(input.userId, Boolean(passkey));
+}
+
 export async function getPasskeyStepUpStatus(input: {
   prisma: PrismaClient;
   request: Request;
   userId: string;
 }) {
-  const passkeyCount = await input.prisma.passkey.count({
-    where: { userId: input.userId },
+  const hasPasskeys = await resolveHasPasskeys({
+    prisma: input.prisma,
+    userId: input.userId,
   });
-  const hasPasskeys = passkeyCount > 0;
   const verified = hasVerifiedPasskeyStepUp(input.request);
 
   return {

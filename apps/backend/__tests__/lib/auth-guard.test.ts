@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("../../lib/auth", () => ({
   auth: {
@@ -8,21 +8,51 @@ jest.mock("../../lib/auth", () => ({
   },
 }));
 
+jest.mock("../../lib/prisma", () => ({
+  prisma: {},
+}));
+
+jest.mock("../../lib/passkey-step-up", () => ({
+  hasVerifiedPasskeyStepUp: jest.fn(() => false),
+  getPasskeyStepUpStatus: jest.fn(async () => ({
+    hasPasskeys: false,
+    isPasskeyStepUpVerified: false,
+    requiresPasskeyStepUp: false,
+  })),
+}));
+
 import { auth } from "../../lib/auth";
+import {
+  getPasskeyStepUpStatus,
+  hasVerifiedPasskeyStepUp,
+} from "../../lib/passkey-step-up";
 import { UnauthorizedError } from "../../lib/errors";
 import { requireAuth } from "../../lib/auth-guard";
 
 const mockGetSession = auth.api.getSession as unknown as jest.Mock<
   () => Promise<any>
 >;
+const mockHasVerifiedPasskeyStepUp =
+  hasVerifiedPasskeyStepUp as jest.MockedFunction<
+    typeof hasVerifiedPasskeyStepUp
+  >;
+const mockGetPasskeyStepUpStatus =
+  getPasskeyStepUpStatus as jest.MockedFunction<typeof getPasskeyStepUpStatus>;
 const deriveHook = requireAuth.event.transform![0]!.fn as (
   ctx: any,
 ) => Promise<any>;
 const beforeHandleHook = requireAuth.event.beforeHandle![0]!.fn as (
   ctx: any,
 ) => void;
+const passkeyBeforeHandleHook = requireAuth.event.beforeHandle![1]!.fn as (
+  ctx: any,
+) => Promise<void>;
 
 describe("requireAuth", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("returns the existing authenticatedUser from context", async () => {
     await expect(
       deriveHook({
@@ -86,6 +116,34 @@ describe("requireAuth", () => {
     expect(() =>
       beforeHandleHook({ authenticatedUser: { id: "user-1" } }),
     ).not.toThrow();
+  });
+
+  it("skips passkey database checks when the verification cookie is already present", async () => {
+    mockHasVerifiedPasskeyStepUp.mockReturnValueOnce(true);
+
+    await expect(
+      passkeyBeforeHandleHook({
+        request: new Request("http://localhost"),
+        authenticatedUser: { id: "user-1" },
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(mockGetPasskeyStepUpStatus).not.toHaveBeenCalled();
+  });
+
+  it("blocks access when passkey step-up is still required", async () => {
+    mockGetPasskeyStepUpStatus.mockResolvedValueOnce({
+      hasPasskeys: true,
+      isPasskeyStepUpVerified: false,
+      requiresPasskeyStepUp: true,
+    });
+
+    await expect(
+      passkeyBeforeHandleHook({
+        request: new Request("http://localhost"),
+        authenticatedUser: { id: "user-1" },
+      }),
+    ).rejects.toThrow("Passkey verification required.");
   });
 
   it("normalizes a legacy user context into authenticatedUser", async () => {

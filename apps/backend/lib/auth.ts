@@ -5,6 +5,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "@better-auth/core/api";
 import { oneTimeToken, openAPI, jwt } from "better-auth/plugins";
+import type { Jwk } from "better-auth/plugins/jwt";
 import { createLogger } from "@workspace/logger";
 import { prisma } from "./prisma";
 import { env, getMailOauthConfigurationErrors } from "./env";
@@ -66,6 +67,84 @@ const passkeyOrigin =
   process.env.PASSKEY_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || frontendUrl;
 
 const logger = createLogger("backend:auth");
+const JWKS_CACHE_TTL_MS = 60_000;
+
+type RawJwtJwkRecord = Awaited<ReturnType<typeof prisma.jwks.findMany>>[number];
+type JwtJwkCreateInput = Omit<Jwk, "id">;
+
+let cachedJwks:
+  | {
+      keys: Jwk[];
+      expiresAt: number;
+    }
+  | null = null;
+
+function normalizeJwk(record: RawJwtJwkRecord): Jwk {
+  const jwk: Jwk = {
+    id: record.id,
+    publicKey: record.publicKey,
+    privateKey: record.privateKey,
+    createdAt: record.createdAt,
+  };
+
+  if (record.expiresAt) {
+    jwk.expiresAt = record.expiresAt;
+  }
+
+  if (
+    record.alg === "EdDSA" ||
+    record.alg === "ES256" ||
+    record.alg === "ES512" ||
+    record.alg === "PS256" ||
+    record.alg === "RS256"
+  ) {
+    jwk.alg = record.alg;
+  }
+
+  if (
+    record.crv === "Ed25519" ||
+    record.crv === "P-256" ||
+    record.crv === "P-521"
+  ) {
+    jwk.crv = record.crv;
+  }
+
+  return jwk;
+}
+
+async function getCachedJwks(): Promise<Jwk[]> {
+  if (cachedJwks && cachedJwks.expiresAt > Date.now()) {
+    return cachedJwks.keys;
+  }
+
+  const keys = (await prisma.jwks.findMany({
+    orderBy: { createdAt: "desc" },
+  })).map(normalizeJwk);
+  cachedJwks = {
+    keys,
+    expiresAt: Date.now() + JWKS_CACHE_TTL_MS,
+  };
+
+  return keys;
+}
+
+async function createCachedJwk(
+  data: JwtJwkCreateInput,
+): Promise<Jwk> {
+  const created = await prisma.jwks.create({
+    data: {
+      publicKey: data.publicKey,
+      privateKey: data.privateKey,
+      createdAt: data.createdAt,
+      expiresAt: data.expiresAt ?? null,
+      alg: data.alg ?? null,
+      crv: data.crv ?? null,
+    },
+  });
+
+  cachedJwks = null;
+  return normalizeJwk(created);
+}
 
 // Extract root domain for rpID (e.g., "cal.roan.dev" -> "roan.dev")
 const getRpId = (url: string) => {
@@ -388,7 +467,12 @@ const authPlugins = [
     expiresIn: 3,
     storeToken: "hashed",
   }),
-  jwt(),
+  jwt({
+    adapter: {
+      getJwks: async () => getCachedJwks(),
+      createJwk: async (data) => createCachedJwk(data),
+    },
+  }),
   ...(mailOauthProviderPlugin ? [mailOauthProviderPlugin] : []),
 ];
 
