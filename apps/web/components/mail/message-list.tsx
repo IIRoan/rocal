@@ -355,45 +355,81 @@ export function MessageList({
                   <button
                     type="button"
                     onClick={() => onSelect(message.id)}
-                    className={`group/row w-full px-3 py-2.5 text-left transition-colors data-[state=open]:bg-muted/60 data-[state=open]:ring-1 data-[state=open]:ring-inset data-[state=open]:ring-border/60 ${isChecked ? "bg-primary/5 dark:bg-primary/10" : isSelected ? "bg-muted/80 dark:bg-muted" : "hover:bg-muted/40 dark:hover:bg-muted/60"}`}
+                    className={cn(
+                      "group/row relative w-full pl-[13px] pr-3 py-2.5 text-left transition-colors cursor-pointer",
+                      "data-[state=open]:bg-muted/60",
+                      isChecked
+                        ? "bg-primary/5 dark:bg-primary/10"
+                        : isSelected
+                          ? "bg-muted/70 dark:bg-muted/50"
+                          : "hover:bg-muted/40 dark:hover:bg-muted/50",
+                    )}
                   >
+                    {/* Left accent bar — always present to avoid layout shift */}
+                    <span
+                      className={cn(
+                        "absolute left-0 top-0 bottom-0 w-[3px] rounded-r transition-colors",
+                        isChecked
+                          ? "bg-primary"
+                          : isSelected
+                            ? "bg-border"
+                            : "bg-transparent",
+                      )}
+                    />
+
                     <div className="flex items-start gap-2.5">
-                        <div
-                          className="relative shrink-0 cursor-pointer p-2 -m-2 rounded-full"
-                          onClick={(e) => toggleSelect(e, row.messageIds)}
-                        >
-                          <SenderAvatar
-                            email={message.from?.[0]?.email ?? ""}
+                      {/* Avatar / checkbox toggle */}
+                      <div
+                        className="relative shrink-0 cursor-pointer rounded-full group/avatar"
+                        onClick={(e) => toggleSelect(e, row.messageIds)}
+                        title="Select"
+                      >
+                        <SenderAvatar
+                          email={message.from?.[0]?.email ?? ""}
                           name={message.from?.[0]?.name ?? undefined}
                         />
-                          <span
-                            className={`absolute inset-0 rounded-full flex items-center justify-center bg-background/80 transition-opacity ${isChecked ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"}`}
-                          >
-                            {selectedCount > 0 ? (
-                              <CheckSquare
-                                className="h-4 w-4 text-primary"
-                                strokeWidth={2.25}
+                        {/* Checkbox overlay — only visible on avatar hover or when checked */}
+                        <span
+                          className={cn(
+                            "absolute inset-0 rounded-full flex items-center justify-center transition-opacity",
+                            isChecked
+                              ? "opacity-100 bg-background/85"
+                              : "opacity-0 group-hover/avatar:opacity-100 bg-background/80",
+                          )}
+                        >
+                          {selectedCount > 0 ? (
+                            <CheckSquare
+                              className="h-4 w-4 text-primary"
+                              strokeWidth={2.25}
                             />
                           ) : (
                             <Square
-                              className="h-4 w-4 text-muted-foreground/60"
+                              className="h-4 w-4 text-muted-foreground/50"
                               strokeWidth={2.25}
                             />
                           )}
                         </span>
                       </div>
+
                       <div className="flex-1 min-w-0">
+                        {/* Top row: sender + meta */}
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <span
-                            className={`text-[13px] truncate ${isRead ? "font-medium text-foreground/70 dark:text-foreground/85" : "font-semibold text-foreground"}`}
+                            className={cn(
+                              "text-[13px] truncate",
+                              isRead
+                                ? "font-medium text-foreground/70 dark:text-foreground/85"
+                                : "font-semibold text-foreground",
+                            )}
                           >
                             {senderLabel}
                           </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* Thread count or unread dot */}
                             {row.messages.length > 1 ? (
                               <span
                                 className={cn(
-                                  "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                                  "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
                                   unreadCount > 0
                                     ? "bg-primary/15 text-primary dark:bg-primary/20"
                                     : "bg-muted text-muted-foreground",
@@ -404,7 +440,10 @@ export function MessageList({
                                     : `${row.messages.length} messages in thread`
                                 }
                               >
-                                <MessageSquare className="h-2.5 w-2.5" strokeWidth={2.25} />
+                                <MessageSquare
+                                  className="h-2.5 w-2.5"
+                                  strokeWidth={2.25}
+                                />
                                 {unreadCount > 0 &&
                                 unreadCount < row.messages.length
                                   ? `${unreadCount}/${row.messages.length}`
@@ -413,25 +452,26 @@ export function MessageList({
                             ) : (
                               !isRead && (
                                 <span
-                                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                                  className="h-1.5 w-1.5 rounded-full bg-primary shrink-0"
                                   aria-label="Unread"
                                 />
                               )
                             )}
                             {hasAttachments && (
                               <Paperclip
-                                className="h-3 w-3 text-muted-foreground/70"
+                                className="h-3 w-3 text-muted-foreground/60 shrink-0"
                                 strokeWidth={2}
                                 aria-label="Has attachments"
                               />
                             )}
-                            <span className="text-[11px] text-muted-foreground/70 dark:text-muted-foreground/90">
+                            <span className="text-[11px] text-muted-foreground/65 dark:text-muted-foreground/80 tabular-nums">
                               {formatMessageDate(
                                 message.receivedAt,
                                 timeFormat,
                                 timezone,
                               )}
                             </span>
+                            {/* Star — always slightly visible */}
                             <span
                               role="button"
                               tabIndex={0}
@@ -446,32 +486,56 @@ export function MessageList({
                                   onToggleFlagged?.(message.id);
                                 }
                               }}
-                              className={`transition-opacity cursor-pointer ${isFlagged ? "opacity-100" : "opacity-0 group-hover/row:opacity-60 hover:!opacity-100"}`}
+                              className={cn(
+                                "shrink-0 cursor-pointer transition-opacity",
+                                isFlagged
+                                  ? "opacity-100"
+                                  : "opacity-20 group-hover/row:opacity-60 hover:!opacity-100",
+                              )}
                               aria-label={isFlagged ? "Unstar" : "Star"}
                             >
                               <Star
-                                className={`h-3 w-3 ${isFlagged ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`}
+                                className={cn(
+                                  "h-3.5 w-3.5",
+                                  isFlagged
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-muted-foreground",
+                                )}
                                 strokeWidth={2}
                               />
                             </span>
                           </div>
                         </div>
+
+                        {/* Subject */}
                         <p
-                          className={`text-[13px] truncate ${isRead ? "text-foreground/50 dark:text-foreground/65" : "text-foreground/80 dark:text-foreground/90"}`}
+                          className={cn(
+                            "text-[12.5px] truncate leading-snug",
+                            isRead
+                              ? "text-foreground/50 dark:text-foreground/60"
+                              : "text-foreground/80 dark:text-foreground/90",
+                          )}
                         >
                           {message.subject || "(No subject)"}
                         </p>
+
+                        {/* Labels */}
                         {messageLabels.length > 0 && (
-                          <div className="flex items-center gap-1 mt-0.5">
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
                             {messageLabels.map((label) => (
                               <span
                                 key={label.id}
-                                className="inline-flex items-center rounded-sm px-1 text-[9px] font-semibold leading-[14px] tracking-wide uppercase"
+                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium leading-none border"
                                 style={{
-                                  backgroundColor: `${label.color}20`,
+                                  backgroundColor: `${label.color}18`,
                                   color: label.color,
+                                  borderColor: `${label.color}40`,
                                 }}
                               >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: label.color }}
+                                />
                                 {label.name}
                               </span>
                             ))}
@@ -504,6 +568,18 @@ export function MessageList({
                     >
                       <MailCheck />
                       Mark as read
+                    </ContextMenuItem>
+                  )}
+
+                  {onToggleFlagged && (
+                    <ContextMenuItem
+                      onClick={() => onToggleFlagged(message.id)}
+                    >
+                      <Star
+                        className={isFlagged ? "fill-amber-400 text-amber-400" : ""}
+                        strokeWidth={2}
+                      />
+                      {isFlagged ? "Remove star" : "Star"}
                     </ContextMenuItem>
                   )}
 

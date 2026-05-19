@@ -117,6 +117,8 @@ export function buildSendMessageMethodCalls(input: {
   sentMailboxId?: string | null;
   fromEmail: string;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   textBody: string;
   identityId: string;
@@ -176,6 +178,8 @@ export function buildSendMessageMethodCalls(input: {
               : {}),
             from: [{ email: input.fromEmail }],
             to: input.to.map((email) => ({ email })),
+            ...(input.cc?.length ? { cc: input.cc.map((email) => ({ email })) } : {}),
+            ...(input.bcc?.length ? { bcc: input.bcc.map((email) => ({ email })) } : {}),
             subject: input.subject,
             bodyStructure,
             bodyValues: {
@@ -488,6 +492,8 @@ export class StalwartJmapClient {
       sentMailboxId: string | null;
       fromEmail: string;
       to: string[];
+      cc?: string[];
+      bcc?: string[];
       subject: string;
       textBody: string;
       identityId: string;
