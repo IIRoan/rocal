@@ -147,7 +147,7 @@ export default function CalendarScreen() {
 
   // ─── Event transformation ──────────────────────────────────────────────────
 
-  const calendarList = calendars ?? [];
+  const calendarList = useMemo(() => calendars ?? [], [calendars]);
   const calendarMap = useMemo(
     () => createCalendarMap(calendarList),
     [calendarList],
@@ -202,27 +202,27 @@ export default function CalendarScreen() {
     const firstOfMonth = new Date(next.getFullYear(), next.getMonth(), 1);
     setCurrentDate(firstOfMonth);
     setSelectedDate(firstOfMonth);
-  }, [currentDate]);
+  }, [currentDate, setCurrentDate, setSelectedDate]);
 
   const handleNavigateBackward = useCallback(() => {
     const prev = navigateCalendarDate(currentDate, "month", -1);
     const firstOfMonth = new Date(prev.getFullYear(), prev.getMonth(), 1);
     setCurrentDate(firstOfMonth);
     setSelectedDate(firstOfMonth);
-  }, [currentDate]);
+  }, [currentDate, setCurrentDate, setSelectedDate]);
 
   const handleTodayPress = useCallback(() => {
     const now = new Date();
     setCurrentDate(now);
     setSelectedDate(now);
-  }, []);
+  }, [setCurrentDate, setSelectedDate]);
 
   // When a day is tapped in the month strip, select it and navigate
   const handleDayPress = useCallback((date: Date) => {
     setSelectedDate(date);
     setCurrentDate(date);
     setMonthStripExpanded(false);
-  }, []);
+  }, [setCurrentDate, setSelectedDate]);
 
   const handleMonthChange = useCallback((direction: 1 | -1) => {
     setCurrentDate((prev) => {
@@ -231,7 +231,7 @@ export default function CalendarScreen() {
       setSelectedDate(firstOfMonth);
       return firstOfMonth;
     });
-  }, []);
+  }, [setCurrentDate, setSelectedDate]);
 
   const handleToggleMonthStrip = useCallback(() => {
     setMonthStripExpanded((prev) => !prev);
@@ -263,14 +263,14 @@ export default function CalendarScreen() {
         return next;
       });
     },
-    [activeView],
+    [activeView, setCurrentDate, setSelectedDate],
   );
 
   const handleDetailSwipeCommit = useCallback(
     (direction: 1 | -1) => {
       setCurrentDate(navigateCalendarDate(selectedDate, activeView, direction));
     },
-    [activeView, selectedDate],
+    [activeView, selectedDate, setCurrentDate],
   );
 
   const handleEventDelete = useCallback(
