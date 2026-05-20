@@ -424,7 +424,7 @@ async function waitForExpectation(
 ) {
   const startedAt = Date.now();
 
-  while (true) {
+  const retry = async (): Promise<void> => {
     try {
       assertion();
       return;
@@ -436,8 +436,12 @@ async function waitForExpectation(
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
       });
+
+      return retry();
     }
-  }
+  };
+
+  return retry();
 }
 
 describe("MailApp", () => {
