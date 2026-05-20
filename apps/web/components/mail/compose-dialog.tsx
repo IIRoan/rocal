@@ -1,6 +1,6 @@
 "use client";
 
-import { Send, ArrowLeft, Paperclip, X, Minus } from "lucide-react";
+import { Send, ArrowLeft, Paperclip, X, Minus, Maximize2 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   Dialog,
@@ -22,6 +22,7 @@ export interface ComposeDialogProps {
   fromEmail: string;
   onClose: () => void;
   onSend: () => Promise<void>;
+  onExpand?: () => void;
   composeTo: string;
   composeCc: string;
   composeBcc: string;
@@ -43,10 +44,11 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function ComposeForm({
+export function ComposeForm({
   fromEmail,
   onClose,
   onSend,
+  onExpand,
   composeTo,
   composeCc,
   composeBcc,
@@ -66,7 +68,17 @@ function ComposeForm({
 }) {
   const [showCc, setShowCc] = useState(!!composeCc);
   const [showBcc, setShowBcc] = useState(!!composeBcc);
+  const [toTouched, setToTouched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isValidEmail = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  const toEmails = composeTo
+    .split(/[,;]/)
+    .flatMap((e) => (e.trim() ? [e.trim()] : []));
+  const toValid = toEmails.length > 0 && toEmails.every(isValidEmail);
+  const showToError = toTouched && composeTo.trim().length > 0 && !toValid;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -81,13 +93,7 @@ function ComposeForm({
   };
 
   return (
-    <div
-      className="flex flex-col"
-      style={{
-        minHeight: "clamp(400px, 60svh, 580px)",
-        maxHeight: "calc(100dvh - 160px)",
-      }}
-    >
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
         <button
@@ -97,12 +103,22 @@ function ComposeForm({
         >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
         </button>
-        <span className="text-sm font-medium flex-1">New message</span>
+        <span className="text-sm font-medium flex-1">New mail</span>
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            title="Open full editor"
+            className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <Maximize2 className="size-3.5" />
+          </button>
+        )}
         <Button
           size="sm"
           className="h-7 text-xs"
           onClick={() => void onSend()}
-          disabled={isBusy || !composeTo.trim() || !composeSubject.trim()}
+          disabled={isBusy || !toValid || !composeSubject.trim()}
         >
           <Send size={12} />
           {isBusy ? "Sending…" : "Send"}
@@ -120,14 +136,15 @@ function ComposeForm({
       </div>
 
       {/* To */}
-      <div className="flex items-center gap-3 px-4 h-10 border-b border-border/50 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+      <div className={`flex items-center gap-3 px-4 h-10 border-b shrink-0 transition-colors ${showToError ? "border-destructive/60" : "border-border/50"}`}>
+        <span className={`text-xs font-medium w-14 shrink-0 transition-colors ${showToError ? "text-destructive/70" : "text-muted-foreground/60"}`}>
           To
         </span>
         <input
           type="text"
           value={composeTo}
           onChange={(e) => setComposeTo(e.target.value)}
+          onBlur={() => setToTouched(true)}
           placeholder="recipient@example.com"
           disabled={isBusy}
           autoFocus
@@ -293,6 +310,7 @@ export function ComposeDialog({
   fromEmail,
   onClose,
   onSend,
+  onExpand,
   composeTo,
   composeCc,
   composeBcc,
@@ -322,6 +340,7 @@ export function ComposeDialog({
     fromEmail,
     onClose,
     onSend,
+    onExpand,
     composeTo,
     composeCc,
     composeBcc,
@@ -343,7 +362,7 @@ export function ComposeDialog({
         <DrawerContent className="max-h-[95svh]">
           <VisuallyHidden>
             <DrawerHeader>
-              <DrawerTitle>New message</DrawerTitle>
+              <DrawerTitle>New mail</DrawerTitle>
             </DrawerHeader>
           </VisuallyHidden>
           <div onKeyDown={handleKeyDown}>
@@ -360,11 +379,11 @@ export function ComposeDialog({
         variant="spotlight"
         showClose={false}
         aria-describedby={undefined}
-        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col"
+        className="overflow-hidden p-0 bg-popover border-border/50 shadow-2xl flex flex-col min-h-[360px] max-h-[min(620px,calc(83dvh-2rem))]"
         onKeyDown={handleKeyDown}
       >
         <VisuallyHidden>
-          <DialogTitle>New message</DialogTitle>
+          <DialogTitle>New mail</DialogTitle>
         </VisuallyHidden>
         <ComposeForm {...formProps} />
       </DialogContent>

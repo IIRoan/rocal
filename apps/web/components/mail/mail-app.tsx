@@ -18,7 +18,7 @@ import { useMailApp } from "@/hooks/use-mail-app";
 import { useSettings } from "@/hooks/use-settings";
 import { MailSidebar } from "./mail-sidebar";
 import { MailCommandPalette } from "./mail-command-palette";
-import { ComposeDialog } from "./compose-dialog";
+import { ComposeDialog, ComposeForm } from "./compose-dialog";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
@@ -58,6 +58,8 @@ export function MailApp() {
     setComposeBody,
     isComposeOpen,
     setIsComposeOpen,
+    isFullCompose,
+    setIsFullCompose,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,
@@ -327,83 +329,125 @@ export function MailApp() {
                   />
                 </div>
 
-                {/* Message reader — full screen on mobile when open */}
+                {/* Message reader / inline composer — full screen on mobile when open */}
                 <div
                   className={
                     isMobile
-                      ? showReaderOnMobile
-                        ? "flex flex-col w-full min-h-0 overflow-hidden"
+                      ? showReaderOnMobile || isFullCompose
+                        ? "flex flex-col w-full min-h-0 overflow-hidden relative"
                         : "hidden"
-                      : "flex-1 min-w-0 overflow-hidden"
+                      : "flex-1 min-w-0 overflow-hidden relative"
                   }
                 >
-                  <MessageReader
-                    message={selectedMessage}
-                    selectedMessageId={selectedMessage?.id ?? null}
-                    conversationMessages={selectedConversationMessages}
-                    isConversationLoading={isConversationLoading}
-                    onSelectConversationMessage={(id) =>
-                      setSelectedConversationMessageId(id)
-                    }
-                    plaintext={selectedMessagePlaintext}
-                    decryptedHtml={selectedMessageDecryptedHtml}
-                    attachments={selectedMessageDecryptedAttachments ?? undefined}
-                    signatureVerificationState={
-                      selectedMessageSignatureVerificationState
-                    }
-                    decryptError={selectedMessageDecryptError}
-                    accountEncryptedAtRest={
-                      activeMailbox.accountEncryptedAtRest
-                    }
-                    isBusy={isBusy}
-                    blockRemoteImages={blockRemoteImages}
-                    blockTrackingPixels={blockTrackingPixels}
-                    mailboxes={activeMailbox.mailboxes}
-                    currentMailboxId={activeMailbox.selectedMailboxId}
-                    onReply={handleReply}
-                    onForward={handleForward}
-                    onDelete={() => void handleDeleteMessage()}
-                    onMove={(targetId) => void handleMoveMessage(targetId)}
-                    onMarkAsUnread={() => void handleMarkAsUnread()}
-                    onToggleFlagged={() => void handleToggleFlagged()}
-                    onSetLabel={(labelId, assigned) =>
-                      selectedMessage
-                        ? void handleSetMessageLabel(
-                            selectedMessage.id,
-                            labelId,
-                            assigned,
-                          )
-                        : undefined
-                    }
-                    onCreateLabel={(name, color) =>
-                      handleCreateLabel(name, color)
-                    }
-                    onDeleteLabel={(id) => void handleDeleteLabel(id)}
-                    labels={labels}
-                    timeFormat={timeFormat}
-                    timezone={settings?.timezone}
-                    onClose={handleCloseMessage}
-                    onNavigatePrev={handleNavigatePrev}
-                    onNavigateNext={handleNavigateNext}
-                    hasPrev={hasPrev}
-                    hasNext={hasNext}
-                    onArchive={handleArchive}
-                    onSendReply={handleQuickReply}
-                    onLoadAttachmentPreview={loadAttachmentHoverPreview}
-                    onPreviewAttachment={handlePreviewAttachment}
-                    onDownloadAttachment={handleDownloadAttachment}
-                    onUntrash={handleUntrash}
-                    onConversationMessageDelete={(id) =>
-                      void handleDeleteMessage(id)
-                    }
-                    onConversationMessageMarkUnread={(id) =>
-                      void handleMarkAsUnread(id)
-                    }
-                    onConversationMessageMove={(id, mailboxId) =>
-                      void handleMoveMessage(mailboxId, id)
-                    }
-                    accountEmail={activeMailbox?.email ?? accountEmail}
-                  />
+                  {/* Message reader — hidden (but mounted) when full compose is active */}
+                  <div
+                    className="absolute inset-0 flex flex-col transition-all duration-200 ease-in-out"
+                    style={{
+                      opacity: isFullCompose ? 0 : 1,
+                      transform: isFullCompose ? "translateX(-16px)" : "translateX(0)",
+                      pointerEvents: isFullCompose ? "none" : "auto",
+                    }}
+                  >
+                    <MessageReader
+                      message={selectedMessage}
+                      selectedMessageId={selectedMessage?.id ?? null}
+                      conversationMessages={selectedConversationMessages}
+                      isConversationLoading={isConversationLoading}
+                      onSelectConversationMessage={(id) =>
+                        setSelectedConversationMessageId(id)
+                      }
+                      plaintext={selectedMessagePlaintext}
+                      decryptedHtml={selectedMessageDecryptedHtml}
+                      attachments={selectedMessageDecryptedAttachments ?? undefined}
+                      signatureVerificationState={
+                        selectedMessageSignatureVerificationState
+                      }
+                      decryptError={selectedMessageDecryptError}
+                      accountEncryptedAtRest={
+                        activeMailbox.accountEncryptedAtRest
+                      }
+                      isBusy={isBusy}
+                      blockRemoteImages={blockRemoteImages}
+                      blockTrackingPixels={blockTrackingPixels}
+                      mailboxes={activeMailbox.mailboxes}
+                      currentMailboxId={activeMailbox.selectedMailboxId}
+                      onReply={handleReply}
+                      onForward={handleForward}
+                      onDelete={() => void handleDeleteMessage()}
+                      onMove={(targetId) => void handleMoveMessage(targetId)}
+                      onMarkAsUnread={() => void handleMarkAsUnread()}
+                      onToggleFlagged={() => void handleToggleFlagged()}
+                      onSetLabel={(labelId, assigned) =>
+                        selectedMessage
+                          ? void handleSetMessageLabel(
+                              selectedMessage.id,
+                              labelId,
+                              assigned,
+                            )
+                          : undefined
+                      }
+                      onCreateLabel={(name, color) =>
+                        handleCreateLabel(name, color)
+                      }
+                      onDeleteLabel={(id) => void handleDeleteLabel(id)}
+                      labels={labels}
+                      timeFormat={timeFormat}
+                      timezone={settings?.timezone}
+                      onClose={handleCloseMessage}
+                      onNavigatePrev={handleNavigatePrev}
+                      onNavigateNext={handleNavigateNext}
+                      hasPrev={hasPrev}
+                      hasNext={hasNext}
+                      onArchive={handleArchive}
+                      onSendReply={handleQuickReply}
+                      onLoadAttachmentPreview={loadAttachmentHoverPreview}
+                      onPreviewAttachment={handlePreviewAttachment}
+                      onDownloadAttachment={handleDownloadAttachment}
+                      onUntrash={handleUntrash}
+                      onConversationMessageDelete={(id) =>
+                        void handleDeleteMessage(id)
+                      }
+                      onConversationMessageMarkUnread={(id) =>
+                        void handleMarkAsUnread(id)
+                      }
+                      onConversationMessageMove={(id, mailboxId) =>
+                        void handleMoveMessage(mailboxId, id)
+                      }
+                      accountEmail={activeMailbox?.email ?? accountEmail}
+                    />
+                  </div>
+
+                  {/* Full inline composer — slides in from right */}
+                  <div
+                    className="absolute inset-0 flex flex-col transition-all duration-200 ease-in-out"
+                    style={{
+                      opacity: isFullCompose ? 1 : 0,
+                      transform: isFullCompose ? "translateX(0)" : "translateX(16px)",
+                      pointerEvents: isFullCompose ? "auto" : "none",
+                    }}
+                  >
+                    <ComposeForm
+                      fromEmail={activeMailbox.email ?? accountEmail}
+                      onClose={() => setIsFullCompose(false)}
+                      onSend={async () => {
+                        await handleSendMessage();
+                        setIsFullCompose(false);
+                      }}
+                      composeTo={composeTo}
+                      composeCc={composeCc}
+                      composeBcc={composeBcc}
+                      composeSubject={composeSubject}
+                      composeBody={composeBody}
+                      composeAttachments={composeAttachments}
+                      setComposeTo={setComposeTo}
+                      setComposeCc={setComposeCc}
+                      setComposeBcc={setComposeBcc}
+                      setComposeSubject={setComposeSubject}
+                      setComposeBody={setComposeBody}
+                      setComposeAttachments={setComposeAttachments}
+                      isBusy={isBusy}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -453,6 +497,10 @@ export function MailApp() {
         fromEmail={activeMailbox?.email ?? accountEmail}
         onClose={() => setIsComposeOpen(false)}
         onSend={handleSendMessage}
+        onExpand={() => {
+          setIsComposeOpen(false);
+          setIsFullCompose(true);
+        }}
         composeTo={composeTo}
         composeCc={composeCc}
         composeBcc={composeBcc}

@@ -615,6 +615,7 @@ export function useMailApp() {
   const [composeReplyContext, setComposeReplyContext] =
     useState<MailReplyContext | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isFullCompose, setIsFullCompose] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   // Initialised synchronously from sessionStorage; updated async once the
   // encrypted cookie is decrypted (cross-tab / post-refresh case).
@@ -834,9 +835,16 @@ export function useMailApp() {
     [],
   );
 
+  const clearConversationThread = useCallback(() => {
+    setRelatedConversationMessages([]);
+    setIsConversationLoading(false);
+  }, []);
+
   useEffect(() => {
     setSelectedConversationMessageId(null);
     setOptimisticConversationMessages([]);
+    setRelatedConversationMessages([]);
+    setIsConversationLoading(false);
   }, [selectedMessageId]);
 
   useEffect(() => {
@@ -852,8 +860,7 @@ export function useMailApp() {
 
   useEffect(() => {
     if (!selectedMessageId || !activeMailboxRef.current) {
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
+      clearConversationThread();
       return;
     }
 
@@ -867,10 +874,9 @@ export function useMailApp() {
     if (threadId) {
       void loadConversationThread(threadId);
     } else {
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
+      clearConversationThread();
     }
-  }, [selectedMessageId, loadConversationThread]);
+  }, [selectedMessageId, loadConversationThread, clearConversationThread]);
 
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
@@ -1388,19 +1394,10 @@ export function useMailApp() {
       setComposeReplyContext(null);
       setIsComposeOpen(false);
       toast(encrypted ? "Encrypted message sent." : "Message sent.");
-      if (activeMailbox.selectedMailboxId) {
-        const { messages: refreshed } =
-          await activeMailbox.client.getMailboxMessages(
-            activeMailbox.session,
-            activeMailbox.selectedMailboxId,
-            { limit: 20 },
-          );
-        setActiveMailbox((cur) =>
-          cur ? { ...cur, messages: refreshed } : cur,
-        );
-        if (effectiveThreadId) {
-          void loadConversationThread(effectiveThreadId);
-        }
+      // Only reload the conversation thread for replies; let realtime sync
+      // update the inbox list so the sent draft never briefly flashes there.
+      if (effectiveThreadId) {
+        void loadConversationThread(effectiveThreadId);
       }
     } catch (error) {
       log.error("Failed to send mail", error);
@@ -2393,6 +2390,8 @@ export function useMailApp() {
     setComposeBody,
     isComposeOpen,
     setIsComposeOpen,
+    isFullCompose,
+    setIsFullCompose,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,
