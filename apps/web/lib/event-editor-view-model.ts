@@ -85,12 +85,12 @@ export function getEnabledEmailReminderMinutes(
   >,
 ) {
   return notifications
-    .filter(
-      (notification) =>
-        notification.isEnabled !== false &&
-        notification.notificationType === "email",
+    .flatMap((notification) =>
+      notification.isEnabled !== false &&
+      notification.notificationType === "email"
+        ? [notification.minutesBefore]
+        : [],
     )
-    .map((notification) => notification.minutesBefore)
     .sort((left, right) => left - right);
 }
 

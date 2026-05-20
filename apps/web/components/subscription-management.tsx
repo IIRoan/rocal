@@ -537,10 +537,10 @@ export function SubscriptionManagement({
                 onClick={onBack}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
-                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+                <ArrowLeft className="size-4 text-muted-foreground" />
               </button>
             )}
-            <Rss className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Rss className="size-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-medium">Subscriptions</span>
           </div>
 
@@ -555,23 +555,23 @@ export function SubscriptionManagement({
                 onClick={() => goToSubView("subscriptions-add-feed")}
                 className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
               >
-                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Plus className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-sm">Add External Feed</span>
-                <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
               </button>
               <button
                 type="button"
                 onClick={() => goToSubView("subscriptions-holidays")}
                 className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
               >
-                <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Globe className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-sm flex-1">Browse Holiday Calendars</span>
                 {publicHolidaySubscriptions.length > 0 && (
                   <span className="text-xs text-muted-foreground/70 shrink-0">
                     {publicHolidaySubscriptions.length} added
                   </span>
                 )}
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
               </button>
             </div>
 
@@ -587,8 +587,8 @@ export function SubscriptionManagement({
 
             {isLoadingSubscriptions ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-xs">Loading...</span>
+                <Loader2 className="size-4 animate-spin" />
+                <span className="text-xs">Loading…</span>
               </div>
             ) : readOnlyCalendars.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -606,7 +606,7 @@ export function SubscriptionManagement({
                     >
                       {/* Color swatch */}
                       <div
-                        className="h-3.5 w-3.5 rounded-sm shrink-0"
+                        className="size-3.5 rounded-sm shrink-0"
                         style={{
                           backgroundColor: getColorSwatchValue(
                             subscription.calendar.color,
@@ -624,9 +624,9 @@ export function SubscriptionManagement({
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           {isHoliday ? (
-                            <Globe className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                            <Globe className="size-3 text-muted-foreground/50 shrink-0" />
                           ) : (
-                            <Link2 className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                            <Link2 className="size-3 text-muted-foreground/50 shrink-0" />
                           )}
                           <span className="text-xs text-muted-foreground">
                             {isHoliday ? "Holiday" : "External feed"}
@@ -658,9 +658,9 @@ export function SubscriptionManagement({
                           className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
                         >
                           {isCalendarVisible(subscription.calendar.id) ? (
-                            <Eye className="h-3.5 w-3.5" />
+                            <Eye className="size-3.5" />
                           ) : (
-                            <EyeOff className="h-3.5 w-3.5" />
+                            <EyeOff className="size-3.5" />
                           )}
                         </button>
                         {!isHoliday && (
@@ -672,7 +672,7 @@ export function SubscriptionManagement({
                             className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
                           >
                             <RefreshCw
-                              className={`h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
+                              className={`size-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
                             />
                           </button>
                         )}
@@ -682,7 +682,7 @@ export function SubscriptionManagement({
                           title="Edit"
                           className="p-1 rounded hover:bg-muted/60 transition-colors text-muted-foreground"
                         >
-                          <ChevronRight className="h-3.5 w-3.5" />
+                          <ChevronRight className="size-3.5" />
                         </button>
                       </div>
                     </div>
@@ -703,9 +703,9 @@ export function SubscriptionManagement({
               onClick={goBackToMain}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
-            <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Link2 className="size-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-medium">Add External Feed</span>
           </div>
 
@@ -723,17 +723,17 @@ export function SubscriptionManagement({
                 onChange={(e) => {
                   setNewSubscription((v) => ({ ...v, name: e.target.value }));
                   if (validationErrors.name)
-                    setValidationErrors({
-                      ...validationErrors,
+                    setValidationErrors((prev) => ({
+                      ...prev,
                       name: undefined,
-                    });
+                    }));
                 }}
                 placeholder="e.g. Team Vacation Calendar"
                 className={`h-9 text-sm ${validationErrors.name ? "border-destructive" : ""}`}
               />
               {validationErrors.name && (
                 <p className="flex items-center gap-1 text-xs text-destructive">
-                  <AlertCircle className="h-3 w-3" />
+                  <AlertCircle className="size-3" />
                   {validationErrors.name}
                 </p>
               )}
@@ -752,17 +752,17 @@ export function SubscriptionManagement({
                 onChange={(e) => {
                   setNewSubscription((v) => ({ ...v, url: e.target.value }));
                   if (validationErrors.url)
-                    setValidationErrors({
-                      ...validationErrors,
+                    setValidationErrors((prev) => ({
+                      ...prev,
                       url: undefined,
-                    });
+                    }));
                 }}
                 placeholder="https://example.com/calendar.ics"
                 className={`h-9 text-sm ${validationErrors.url ? "border-destructive" : ""}`}
               />
               {validationErrors.url && (
                 <p className="flex items-center gap-1 text-xs text-destructive">
-                  <AlertCircle className="h-3 w-3" />
+                  <AlertCircle className="size-3" />
                   {validationErrors.url}
                 </p>
               )}
@@ -790,12 +790,12 @@ export function SubscriptionManagement({
               >
                 {createMutation.isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Adding...
+                    <Loader2 className="mr-2 size-3.5 animate-spin" />
+                    Adding…
                   </>
                 ) : (
                   <>
-                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    <Plus className="mr-2 size-3.5" />
                     Add Feed
                   </>
                 )}
@@ -814,15 +814,15 @@ export function SubscriptionManagement({
               onClick={goBackToMain}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
-            <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Globe className="size-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-medium">Holiday Calendars</span>
           </div>
 
           {/* Search bar */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
-            <Search className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+            <Search className="size-3.5 text-muted-foreground/50 shrink-0" />
             <Input
               value={holidaySearch}
               onChange={(e) => setHolidaySearch(e.target.value)}
@@ -836,7 +836,7 @@ export function SubscriptionManagement({
                 className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
                 <svg
-                  className="h-3.5 w-3.5"
+                  className="size-3.5"
                   viewBox="0 0 16 16"
                   fill="currentColor"
                 >
@@ -862,7 +862,7 @@ export function SubscriptionManagement({
                     className="flex items-center gap-3 px-4 py-2 hover:bg-accent/20 transition-colors"
                   >
                     <span
-                      className="h-3 w-3 rounded-full shrink-0"
+                      className="size-3 rounded-full shrink-0"
                       style={{
                         backgroundColor: getColorSwatchValue(
                           existingSub?.calendar.color ?? hc.defaultColor,
@@ -918,7 +918,7 @@ export function SubscriptionManagement({
               onClick={goBackToMain}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">
               {isHolidayCalendar ? "Holiday Calendar" : "External Calendar"}
@@ -952,16 +952,16 @@ export function SubscriptionManagement({
                   onChange={(e) => {
                     updateEditField("name", e.target.value);
                     if (editValidationErrors.name)
-                      setEditValidationErrors({
-                        ...editValidationErrors,
+                      setEditValidationErrors((prev) => ({
+                        ...prev,
                         name: undefined,
-                      });
+                      }));
                   }}
                   className={`h-8 text-sm ${editValidationErrors.name ? "border-destructive" : ""}`}
                 />
                 {editValidationErrors.name && (
                   <p className="flex items-center gap-1 text-xs text-destructive">
-                    <AlertCircle className="h-3 w-3" />
+                    <AlertCircle className="size-3" />
                     {editValidationErrors.name}
                   </p>
                 )}
@@ -977,12 +977,12 @@ export function SubscriptionManagement({
                       onClick={() => {
                         updateEditField("color", preset.value);
                         if (editValidationErrors.color)
-                          setEditValidationErrors({
-                            ...editValidationErrors,
+                          setEditValidationErrors((prev) => ({
+                            ...prev,
                             color: undefined,
-                          });
+                          }));
                       }}
-                      className={`h-6 w-6 rounded-full border-2 transition-all ${
+                      className={`size-6 rounded-full border-2 transition-all ${
                         editingColor === preset.value
                           ? "border-foreground scale-110"
                           : "border-transparent hover:scale-105"
@@ -997,7 +997,7 @@ export function SubscriptionManagement({
                 </div>
                 {editValidationErrors.color && (
                   <p className="flex items-center gap-1 text-xs text-destructive">
-                    <AlertCircle className="h-3 w-3" />
+                    <AlertCircle className="size-3" />
                     {editValidationErrors.color}
                   </p>
                 )}
@@ -1015,7 +1015,7 @@ export function SubscriptionManagement({
                   <div className="px-4 pb-4 border-t border-border/50 pt-3">
                     <div className="rounded-md border border-border/50 bg-muted/20 p-3 space-y-2">
                       <div className="flex items-start gap-2.5">
-                        <Globe className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <Globe className="size-4 text-muted-foreground shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="text-sm font-medium">
                             {holidayInfo?.countryName ||
@@ -1059,7 +1059,7 @@ export function SubscriptionManagement({
                     className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:opacity-60"
                   >
                     <RefreshCw
-                      className={`h-4 w-4 text-muted-foreground shrink-0 ${
+                      className={`size-4 text-muted-foreground shrink-0 ${
                         syncMutation.isPending ? "animate-spin" : ""
                       }`}
                     />
@@ -1079,7 +1079,7 @@ export function SubscriptionManagement({
                 {editingSubscriptionData?.lastErrorMessage && (
                   <div className="mx-4 mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
                     <p className="flex items-start gap-2 text-xs text-destructive">
-                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <AlertTriangle className="size-3.5 mt-0.5 shrink-0" />
                       <span className="break-words">
                         {editingSubscriptionData.lastErrorMessage}
                       </span>
@@ -1122,7 +1122,7 @@ export function SubscriptionManagement({
                       className="h-8 px-2"
                       title="Copy URL"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="size-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -1143,7 +1143,7 @@ export function SubscriptionManagement({
               disabled={loading || !editingSubscriptionData}
               className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
             >
-              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              <Trash2 className="mr-1.5 size-3.5" />
               Remove
             </Button>
             <Button
@@ -1155,8 +1155,8 @@ export function SubscriptionManagement({
             >
               {updateMutation.isPending ? (
                 <>
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Saving...
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  Saving…
                 </>
               ) : (
                 "Save"

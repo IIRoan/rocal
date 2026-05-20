@@ -212,7 +212,7 @@ export function CalendarManager({
             onClick={onBack}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Calendars</span>
         </div>
@@ -236,9 +236,9 @@ export function CalendarManager({
               }}
               className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
             >
-              <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Plus className="size-4 text-muted-foreground shrink-0" />
               <span className="text-sm">Create New Calendar</span>
-              <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+              <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
             </button>
 
             <button
@@ -246,9 +246,9 @@ export function CalendarManager({
               onClick={() => onGoToSubscriptions()}
               className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
             >
-              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Globe className="size-4 text-muted-foreground shrink-0" />
               <span className="text-sm">Public & External Feeds</span>
-              <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+              <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
             </button>
           </div>
 
@@ -283,7 +283,7 @@ export function CalendarManager({
                     className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                   >
                     <div
-                      className="h-3.5 w-3.5 rounded-sm shrink-0"
+                      className="size-3.5 rounded-sm shrink-0"
                       style={{
                         backgroundColor: getColorSwatchValue(calendar.color),
                       }}
@@ -305,7 +305,7 @@ export function CalendarManager({
                       asIcon
                       className="opacity-80"
                     />
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                    <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
                   </button>
                   <button
                     type="button"
@@ -315,12 +315,12 @@ export function CalendarManager({
                         ? `Hide ${calendar.name}`
                         : `Show ${calendar.name}`
                     }
-                    className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+                    className="shrink-0 size-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
                   >
                     {isVisible ? (
-                      <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+                      <Eye className="size-3.5" strokeWidth={2} />
                     ) : (
-                      <EyeOff className="h-3.5 w-3.5" strokeWidth={2} />
+                      <EyeOff className="size-3.5" strokeWidth={2} />
                     )}
                   </button>
                 </div>
@@ -347,7 +347,7 @@ export function CalendarManager({
                         className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                       >
                         <div
-                          className="h-3.5 w-3.5 rounded-sm shrink-0"
+                          className="size-3.5 rounded-sm shrink-0"
                           style={{
                             backgroundColor: getColorSwatchValue(
                               calendar.color,
@@ -367,7 +367,7 @@ export function CalendarManager({
                           asIcon
                           className="opacity-80"
                         />
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                        <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
                       </button>
                       <button
                         type="button"
@@ -379,12 +379,12 @@ export function CalendarManager({
                             ? `Hide ${calendar.name}`
                             : `Show ${calendar.name}`
                         }
-                        className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+                        className="shrink-0 size-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
                       >
                         {isVisible ? (
-                          <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+                          <Eye className="size-3.5" strokeWidth={2} />
                         ) : (
-                          <EyeOff className="h-3.5 w-3.5" strokeWidth={2} />
+                          <EyeOff className="size-3.5" strokeWidth={2} />
                         )}
                       </button>
                     </div>
@@ -413,7 +413,7 @@ export function CalendarManager({
                         className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0 rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                       >
                         <div
-                          className="h-3.5 w-3.5 rounded-sm shrink-0"
+                          className="size-3.5 rounded-sm shrink-0"
                           style={{
                             backgroundColor: getColorSwatchValue(
                               calendar.color,
@@ -433,7 +433,7 @@ export function CalendarManager({
                           asIcon
                           className="opacity-80"
                         />
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                        <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
                       </button>
                       <button
                         type="button"
@@ -445,12 +445,12 @@ export function CalendarManager({
                             ? `Hide ${calendar.name}`
                             : `Show ${calendar.name}`
                         }
-                        className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
+                        className="shrink-0 size-7 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent/40 transition-colors mr-1"
                       >
                         {isVisible ? (
-                          <Eye className="h-3.5 w-3.5" strokeWidth={2} />
+                          <Eye className="size-3.5" strokeWidth={2} />
                         ) : (
-                          <EyeOff className="h-3.5 w-3.5" strokeWidth={2} />
+                          <EyeOff className="size-3.5" strokeWidth={2} />
                         )}
                       </button>
                     </div>
@@ -473,7 +473,7 @@ export function CalendarManager({
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Create Calendar</span>
         </div>
@@ -493,10 +493,10 @@ export function CalendarManager({
                 onChange={(e) => {
                   setCalendarName(e.target.value);
                   if (calendarValidationErrors.name) {
-                    setCalendarValidationErrors({
-                      ...calendarValidationErrors,
+                    setCalendarValidationErrors((prev) => ({
+                      ...prev,
                       name: undefined,
-                    });
+                    }));
                   }
                 }}
                 placeholder="Calendar name"
@@ -519,13 +519,13 @@ export function CalendarManager({
                     onClick={() => {
                       setCalendarColor(preset.value);
                       if (calendarValidationErrors.color) {
-                        setCalendarValidationErrors({
-                          ...calendarValidationErrors,
+                        setCalendarValidationErrors((prev) => ({
+                          ...prev,
                           color: undefined,
-                        });
+                        }));
                       }
                     }}
-                    className={`h-6 w-6 rounded-full border-2 transition-all ${
+                    className={`size-6 rounded-full border-2 transition-all ${
                       calendarColor === preset.value
                         ? "border-foreground scale-110"
                         : "border-transparent hover:scale-105"
@@ -583,12 +583,12 @@ export function CalendarManager({
           >
             {calendarSaving ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                Creating...
+                <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                Creating…
               </>
             ) : (
               <>
-                <Save className="h-3.5 w-3.5 mr-1.5" />
+                <Save className="size-3.5 mr-1.5" />
                 Create
               </>
             )}
@@ -608,7 +608,7 @@ export function CalendarManager({
               onClick={() => goBack()}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Edit Calendar</span>
             {editingCalendar && (
@@ -635,10 +635,10 @@ export function CalendarManager({
                   onChange={(e) => {
                     setCalendarName(e.target.value);
                     if (calendarValidationErrors.name) {
-                      setCalendarValidationErrors({
-                        ...calendarValidationErrors,
+                      setCalendarValidationErrors((prev) => ({
+                        ...prev,
                         name: undefined,
-                      });
+                      }));
                     }
                   }}
                   placeholder="Calendar name"
@@ -661,13 +661,13 @@ export function CalendarManager({
                       onClick={() => {
                         setCalendarColor(preset.value);
                         if (calendarValidationErrors.color) {
-                          setCalendarValidationErrors({
-                            ...calendarValidationErrors,
+                          setCalendarValidationErrors((prev) => ({
+                            ...prev,
                             color: undefined,
-                          });
+                          }));
                         }
                       }}
-                      className={`h-6 w-6 rounded-full border-2 transition-all ${
+                      className={`size-6 rounded-full border-2 transition-all ${
                         calendarColor === preset.value
                           ? "border-foreground scale-110"
                           : "border-transparent hover:scale-105"
@@ -708,7 +708,7 @@ export function CalendarManager({
                 disabled={shareLinkLoading}
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none disabled:opacity-60"
               >
-                <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Link2 className="size-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm">ICS sharing</div>
                   <div className="text-xs text-muted-foreground">
@@ -720,7 +720,7 @@ export function CalendarManager({
 
               {shareLinkLoading ? (
                 <div className="px-3 py-2 text-xs text-muted-foreground">
-                  Updating sharing settings...
+                  Updating sharing settings…
                 </div>
               ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
                 <div className="px-3 pt-1 pb-2 space-y-2">
@@ -737,7 +737,7 @@ export function CalendarManager({
                       className="h-8 px-2"
                       title="Copy link"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="size-3.5" />
                     </Button>
                   </div>
                   <Button
@@ -747,7 +747,7 @@ export function CalendarManager({
                     className="h-7 text-xs text-muted-foreground hover:text-foreground -ml-1"
                     disabled={shareLinkLoading}
                   >
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                    <RefreshCw className="size-3.5 mr-1.5" />
                     Regenerate URL
                   </Button>
                 </div>
@@ -772,7 +772,7 @@ export function CalendarManager({
                 }}
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:bg-accent/50 focus:outline-none"
               >
-                <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                <ShieldCheck className="size-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm">Force full encryption</div>
                   <div className="text-xs text-muted-foreground">
@@ -783,7 +783,7 @@ export function CalendarManager({
               </button>
               {calendarForceFullEncryption && (
                 <div className="px-3 pt-1 pb-2 text-xs text-muted-foreground flex items-start gap-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                  <ShieldCheck className="size-3.5 mt-0.5 text-primary shrink-0" />
                   <span>
                     Reminders and ICS shares from this calendar won&apos;t
                     include event titles, descriptions, or locations.
@@ -811,9 +811,9 @@ export function CalendarManager({
                 className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 {calendarSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
                 ) : (
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  <Trash2 className="size-3.5 mr-1.5" />
                 )}
                 Delete
               </Button>
@@ -843,12 +843,12 @@ export function CalendarManager({
               >
                 {calendarSaving ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    Saving...
+                    <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                    Saving…
                   </>
                 ) : (
                   <>
-                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    <Save className="size-3.5 mr-1.5" />
                     Save
                   </>
                 )}
@@ -874,7 +874,7 @@ export function CalendarManager({
             <div className="px-5 pb-4">
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
                 <p className="text-sm flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                  <AlertTriangle className="size-4 mt-0.5 text-destructive shrink-0" />
                   The current URL stops working immediately. Everyone using it
                   must subscribe again with the new URL.
                 </p>
@@ -918,7 +918,7 @@ export function CalendarManager({
             <div className="px-5 pb-4 space-y-3">
               <div className="rounded-md border border-border/50 bg-muted/30 p-3">
                 <p className="text-sm flex items-start gap-2">
-                  <ShieldCheck className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                  <ShieldCheck className="size-4 mt-0.5 text-primary shrink-0" />
                   <span>
                     Existing encrypted events will have their plaintext shadows
                     removed. Reminders will still fire but won&apos;t include

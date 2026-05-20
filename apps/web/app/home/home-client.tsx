@@ -99,7 +99,7 @@ export function HomeAppClient() {
                 completeAuthNavigation("/login");
               })
             }
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
             aria-label="Sign out"
             title="Sign out"
           >

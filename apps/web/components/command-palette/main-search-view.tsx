@@ -13,7 +13,7 @@ type CommandPaletteMainSearchViewProps = {
 function SearchOnlyEmptyState({ debouncedQuery }: { debouncedQuery: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-2">
-      <Search className="h-8 w-8 text-muted-foreground/20" />
+      <Search className="size-8 text-muted-foreground/20" />
       <p className="text-sm text-muted-foreground">
         {debouncedQuery.trim().length >= 2
           ? `No events found for "${debouncedQuery}"`
@@ -26,7 +26,7 @@ function SearchOnlyEmptyState({ debouncedQuery }: { debouncedQuery: string }) {
 function SearchOnlyIntroState() {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-2">
-      <Search className="h-8 w-8 text-muted-foreground/20" />
+      <Search className="size-8 text-muted-foreground/20" />
       <p className="text-sm text-muted-foreground">
         Search across all your events by title, description, or location
       </p>
@@ -54,18 +54,18 @@ function NavigationResultButton({
       data-index={resultIndex}
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 px-2 py-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${
+      className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${
         isSelected ? "bg-accent/50" : "hover:bg-accent/50"
       }`}
     >
-      <div className="flex items-center justify-center w-8 h-8 sm:w-6 sm:h-6 shrink-0">
+      <div className="flex items-center justify-center size-8 sm:w-6 sm:h-6 shrink-0">
         <Icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
       <span className="text-sm flex-1 truncate">{label}</span>
       <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
         {description}
       </span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   );
 }
@@ -102,15 +102,15 @@ export function CommandPaletteMainSearchView({
         maxHeight: "calc(100dvh - 200px)",
       }}
     >
-      <div className="flex items-center gap-2 px-3 py-3 sm:py-2 border-b border-border/50">
+      <div className="flex items-center gap-2 p-3 sm:py-2 border-b border-border/50">
         {isCommandMode && !isSearchOnly ? (
           <span className="text-sm font-medium text-primary">Command</span>
         ) : isSearchOnly ? (
-          <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10 shrink-0">
-            <Search className="h-3.5 w-3.5 text-primary" />
+          <div className="flex items-center justify-center size-6 rounded-md bg-primary/10 shrink-0">
+            <Search className="size-3.5 text-primary" />
           </div>
         ) : (
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Search className="size-4 text-muted-foreground shrink-0" />
         )}
         <Input
           ref={searchInputRef}
@@ -138,7 +138,7 @@ export function CommandPaletteMainSearchView({
             className="p-1 h-auto"
           >
             <svg
-              className="h-4 w-4 text-muted-foreground"
+              className="size-4 text-muted-foreground"
               viewBox="0 0 16 16"
               fill="currentColor"
             >

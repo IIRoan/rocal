@@ -121,9 +121,10 @@ export const getSafeAuthCallbackUrl = (callbackUrl?: string | null) => {
         getApiBaseUrl(),
         process.env.NEXT_PUBLIC_APP_URL,
         process.env.NEXT_PUBLIC_API_URL,
-      ]
-        .map((value) => toOrigin(value))
-        .filter((value): value is string => Boolean(value)),
+      ].flatMap((value) => {
+        const origin = toOrigin(value);
+        return origin ? [origin] : [];
+      }),
     );
 
     if (!allowedOrigins.has(resolvedUrl.origin)) {

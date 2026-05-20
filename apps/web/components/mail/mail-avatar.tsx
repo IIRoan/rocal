@@ -84,7 +84,7 @@ function SenderAvatarContent({
   const currentSrc = sources[sourceIndex] ?? null;
 
   return (
-    <Avatar className={cn("h-8 w-8 shrink-0", className)}>
+    <Avatar className={cn("size-8 shrink-0", className)}>
       <AvatarFallback
         className={`${bg} ${text} text-[11px] font-semibold select-none`}
       >
@@ -99,7 +99,7 @@ function SenderAvatarContent({
           loading="lazy"
           referrerPolicy="no-referrer"
           className={cn(
-            "absolute inset-0 h-full w-full object-cover",
+            "absolute inset-0 size-full object-cover",
             loadedSrc === currentSrc ? "block" : "hidden",
           )}
           onLoad={() => setLoadedSrc(currentSrc)}

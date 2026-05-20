@@ -108,10 +108,10 @@ export function PasswordSection({
                 setMsg(null);
               }}
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
             >
-              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <Lock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <Lock className="size-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Change Password</div>
@@ -129,10 +129,10 @@ export function PasswordSection({
                 setMsg(null);
               }}
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
             >
-              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <Lock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <Lock className="size-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Set Email Password</div>
@@ -150,10 +150,10 @@ export function PasswordSection({
                 setMsg(null);
               }}
               disabled={isBusy}
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors disabled:opacity-60"
             >
-              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <RotateCcw className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <RotateCcw className="size-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Reset Encryption Password</div>
@@ -187,7 +187,6 @@ export function PasswordSection({
                 onChange={(e) => setCurrentPwd(e.target.value)}
                 autoComplete="current-password"
                 disabled={isBusy}
-                autoFocus
                 className="flex h-9 w-full rounded-md bg-input px-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
               />
             </label>
@@ -204,7 +203,6 @@ export function PasswordSection({
               onChange={(e) => setNewPwd(e.target.value)}
               autoComplete="new-password"
               disabled={isBusy}
-              autoFocus={activeForm !== "change"}
               className="flex h-9 w-full rounded-md bg-input px-3 text-sm outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
             />
           </label>
@@ -229,7 +227,7 @@ export function PasswordSection({
               disabled={isBusy}
               className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
             >
-              {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              {isBusy ? <Loader2 className="size-3 animate-spin" /> : null}
               {activeForm === "change"
                 ? "Update Password"
                 : activeForm === "set"

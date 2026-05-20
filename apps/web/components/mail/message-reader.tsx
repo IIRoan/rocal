@@ -218,10 +218,10 @@ function MailSecurityBadge({
         <button
           type="button"
           aria-label={meta.label}
-          className="inline-flex items-center justify-center shrink-0 h-7 w-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40"
+          className="inline-flex items-center justify-center shrink-0 size-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40"
         >
           <Icon
-            className={`h-4 w-4 ${meta.iconClassName}`}
+            className={`size-4 ${meta.iconClassName}`}
             aria-hidden
             strokeWidth={2.25}
           />
@@ -234,9 +234,9 @@ function MailSecurityBadge({
         className="w-72 p-0 overflow-hidden"
       >
         <div className="flex items-start gap-2.5 px-3 pt-3 pb-2 border-b border-border/50">
-          <div className="flex items-center justify-center h-7 w-7 rounded-md shrink-0 bg-muted/50">
+          <div className="flex items-center justify-center size-7 rounded-md shrink-0 bg-muted/50">
             <Icon
-              className={`h-4 w-4 ${meta.iconClassName}`}
+              className={`size-4 ${meta.iconClassName}`}
               strokeWidth={2.25}
               aria-hidden
             />
@@ -274,7 +274,7 @@ function MailSecurityBadge({
                     className="text-xs flex items-center gap-1.5"
                   >
                     <ShieldCheck
-                      className="h-3 w-3 text-primary shrink-0"
+                      className="size-3 text-primary shrink-0"
                       strokeWidth={2.25}
                       aria-hidden
                     />
@@ -296,7 +296,7 @@ function MailSecurityBadge({
                     className="text-xs flex items-center gap-1.5 text-muted-foreground"
                   >
                     <Lock
-                      className="h-3 w-3 opacity-40 shrink-0"
+                      className="size-3 opacity-40 shrink-0"
                       strokeWidth={2.25}
                       aria-hidden
                     />
@@ -386,12 +386,12 @@ function CopyableAddress({ value }: { value: string }) {
       <span className="text-sm break-all text-foreground/80 group-hover/copy:text-foreground transition-colors duration-150">
         {value}
       </span>
-      <span className="shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+      <span className="shrink-0 size-3.5 flex items-center justify-center">
         {copied ? (
-          <Check className="h-3 w-3 text-foreground/60" strokeWidth={2.5} />
+          <Check className="size-3 text-foreground/60" strokeWidth={2.5} />
         ) : (
           <Copy
-            className="h-3 w-3 text-transparent group-hover/copy:text-muted-foreground/50 transition-colors duration-150"
+            className="size-3 text-transparent group-hover/copy:text-muted-foreground/50 transition-colors duration-150"
             strokeWidth={2}
           />
         )}
@@ -441,10 +441,10 @@ function ConversationMessageMenu({
           onClick={(e) => e.stopPropagation()}
           aria-label="Message actions"
           className={cn(
-            "shrink-0 flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground",
+            "shrink-0 flex size-6 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground",
           )}
         >
-          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.25} />
+          <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -463,7 +463,7 @@ function ConversationMessageMenu({
             className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
           >
             <MailOpen
-              className="h-3.5 w-3.5 text-muted-foreground"
+              className="size-3.5 text-muted-foreground"
               strokeWidth={2}
             />
             Mark as unread
@@ -482,7 +482,7 @@ function ConversationMessageMenu({
               }}
               className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-destructive/80 hover:bg-destructive/10 transition-colors text-left"
             >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+              <Trash2 className="size-3.5" strokeWidth={2} />
               Delete
             </button>
           </>
@@ -508,16 +508,16 @@ function CopyEmailButton({ value }: { value: string }) {
       onClick={handleCopy}
       aria-label={copied ? "Copied!" : `Copy ${value}`}
       className={cn(
-        "inline-flex items-center justify-center h-4 w-4 rounded transition-all shrink-0",
+        "inline-flex items-center justify-center size-4 rounded transition-all shrink-0",
         copied
           ? "text-green-500"
           : "text-muted-foreground/30 hover:text-muted-foreground/70",
       )}
     >
       {copied ? (
-        <Check className="h-3 w-3" strokeWidth={2.5} />
+        <Check className="size-3" strokeWidth={2.5} />
       ) : (
-        <Copy className="h-3 w-3" strokeWidth={2} />
+        <Copy className="size-3" strokeWidth={2} />
       )}
     </button>
   );
@@ -960,7 +960,7 @@ export function MessageReader({
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left cursor-pointer select-none"
               >
                 <span
-                  className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
+                  className="size-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
                   style={{
                     backgroundColor: label.color,
                     boxShadow: assigned
@@ -973,7 +973,7 @@ export function MessageReader({
                 </span>
                 {assigned && (
                   <Check
-                    className="h-3 w-3 text-foreground/50 shrink-0"
+                    className="size-3 text-foreground/50 shrink-0"
                     strokeWidth={2.5}
                   />
                 )}
@@ -984,10 +984,10 @@ export function MessageReader({
                       e.stopPropagation();
                       onDeleteLabel(label.id);
                     }}
-                    className="ml-auto h-4 w-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
+                    className="ml-auto size-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
                     aria-label={`Delete label ${label.name}`}
                   >
-                    <X className="h-3 w-3" strokeWidth={2.5} />
+                    <X className="size-3" strokeWidth={2.5} />
                   </button>
                 )}
               </div>
@@ -1005,7 +1005,7 @@ export function MessageReader({
               type="color"
               value={newLabelColor}
               onChange={(e) => setNewLabelColor(e.target.value)}
-              className="h-6 w-6 rounded cursor-pointer border-0 p-0 bg-transparent"
+              className="size-6 rounded cursor-pointer border-0 p-0 bg-transparent"
               title="Label color"
             />
             <input
@@ -1039,10 +1039,10 @@ export function MessageReader({
                   },
                 );
               }}
-              className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
+              className="size-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
               aria-label="Create label"
             >
-              <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+              <Plus className="size-3.5" strokeWidth={2.25} />
             </button>
           </div>
         </div>
@@ -1190,7 +1190,7 @@ export function MessageReader({
                 disabled={isBusy}
                 className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
               >
-                <Forward className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <Forward className="size-3.5" strokeWidth={2.25} />
                 Forward
               </button>
               <div className="w-px bg-border/60 self-stretch" />
@@ -1207,7 +1207,7 @@ export function MessageReader({
                   >
                     <Star
                       className={cn(
-                        "h-3.5 w-3.5 transition-colors",
+                        "size-3.5 transition-colors",
                         isFlagged ? "fill-amber-400 text-amber-400" : "",
                       )}
                       strokeWidth={2.25}
@@ -1226,7 +1226,7 @@ export function MessageReader({
                 disabled={isBusy}
                 className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
               >
-                <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <MailOpen className="size-3.5" strokeWidth={2.25} />
                 Unread
               </button>
             </div>
@@ -1241,7 +1241,7 @@ export function MessageReader({
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/8 transition-colors"
               >
-                <Inbox className="h-3.5 w-3.5 shrink-0" />
+                <Inbox className="size-3.5 shrink-0" />
                 {isInTrash ? "Restore to inbox" : "Move to inbox"}
               </button>
             )}
@@ -1262,13 +1262,13 @@ export function MessageReader({
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
                 >
                   <FolderInput
-                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    className="size-3.5 shrink-0 text-muted-foreground"
                     strokeWidth={2}
                   />
                   Move to
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200",
+                      "size-4 ml-auto text-muted-foreground transition-transform duration-200",
                       moveToExpanded ? "rotate-180" : "",
                     )}
                     strokeWidth={2.5}
@@ -1310,7 +1310,7 @@ export function MessageReader({
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
                 >
                   <Tag
-                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    className="size-3.5 shrink-0 text-muted-foreground"
                     strokeWidth={2}
                   />
                   Labels
@@ -1356,11 +1356,11 @@ export function MessageReader({
               onClick={onToggleFlagged}
               disabled={isBusy}
               aria-label={isFlagged ? "Unstar" : "Star"}
-              className="inline-flex items-center justify-center h-7 w-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40 disabled:opacity-40"
+              className="inline-flex items-center justify-center size-7 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring/60 transition-colors hover:bg-accent/40 disabled:opacity-40"
             >
               <Star
                 className={cn(
-                  "h-4 w-4 transition-colors",
+                  "size-4 transition-colors",
                   isFlagged
                     ? "fill-amber-400 text-amber-400"
                     : "text-muted-foreground/40 hover:text-amber-400",
@@ -1449,7 +1449,7 @@ export function MessageReader({
             >
               Attachments ({displayAttachments.length})
               <ChevronDown
-                className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180"
+                className="size-3 transition-transform group-data-[state=open]:rotate-180"
                 strokeWidth={2}
               />
             </button>
@@ -1460,7 +1460,10 @@ export function MessageReader({
                 const name = attachment.name?.trim() || "Attachment";
                 const mimeType = attachment.type ?? "";
                 const previewKind = resolveAttachmentPreviewKind(attachment);
-                const previewKey = `${attachment.blobId ?? idx}:${name}:${mimeType}`;
+                const attachmentKey =
+                  attachment.blobId ??
+                  `${name}:${mimeType}:${attachment.size ?? "inline"}`;
+                const previewKey = `${attachmentKey}:${name}:${mimeType}`;
                 const hoverPreview = attachmentHoverPreviews[previewKey];
                 const ext = mimeType.split("/")[1]?.toUpperCase() ?? "";
                 const canAccessAttachment = Boolean(
@@ -1526,7 +1529,7 @@ export function MessageReader({
                 );
                 return (
                   <div
-                    key={idx}
+                    key={attachmentKey}
                     className="group/attachment relative flex items-center gap-1"
                   >
                     {attachmentButton}
@@ -1535,7 +1538,7 @@ export function MessageReader({
                         <div className="bg-popover text-popover-foreground overflow-hidden rounded-md border border-border/60 shadow-md">
                           {loadingAttachmentPreviewKey === previewKey ? (
                             <div className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm">
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="size-4 animate-spin" />
                               Loading preview
                             </div>
                           ) : hoverPreview?.kind === "image" ? (
@@ -1622,7 +1625,7 @@ export function MessageReader({
               aria-label="Reply"
               className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
             >
-              <Reply className="h-4 w-4" strokeWidth={2.25} />
+              <Reply className="size-4" strokeWidth={2.25} />
               Reply
             </button>
             <button
@@ -1632,7 +1635,7 @@ export function MessageReader({
               aria-label="Forward"
               className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
             >
-              <Forward className="h-4 w-4" strokeWidth={2.25} />
+              <Forward className="size-4" strokeWidth={2.25} />
               Forward
             </button>
             <div className="flex-1" />
@@ -1641,9 +1644,9 @@ export function MessageReader({
               onClick={() => setMoreActionsOpen(true)}
               disabled={isBusy}
               aria-label="More actions"
-              className="inline-flex items-center justify-center h-8 w-8 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
+              className="inline-flex items-center justify-center size-8 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
             >
-              <MoreHorizontal className="h-4 w-4" strokeWidth={2.25} />
+              <MoreHorizontal className="size-4" strokeWidth={2.25} />
             </button>
           </div>
 
@@ -1663,7 +1666,7 @@ export function MessageReader({
                   className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                 >
                   <MailOpen
-                    className="h-4 w-4 text-muted-foreground"
+                    className="size-4 text-muted-foreground"
                     strokeWidth={2}
                   />
                   Mark as unread
@@ -1677,7 +1680,7 @@ export function MessageReader({
                         className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                       >
                         <FolderInput
-                          className="h-4 w-4 text-muted-foreground"
+                          className="size-4 text-muted-foreground"
                           strokeWidth={2}
                         />
                         Move to…
@@ -1717,7 +1720,7 @@ export function MessageReader({
                         className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
                       >
                         <Tag
-                          className="h-4 w-4 text-muted-foreground"
+                          className="size-4 text-muted-foreground"
                           strokeWidth={2}
                         />
                         Labels
@@ -1735,7 +1738,7 @@ export function MessageReader({
                   disabled={isBusy}
                   className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-destructive/80 hover:bg-destructive/10 active:bg-destructive/20 transition-colors disabled:opacity-40"
                 >
-                  <Trash2 className="h-4 w-4" strokeWidth={2} />
+                  <Trash2 className="size-4" strokeWidth={2} />
                   Delete message
                 </button>
                 <DrawerClose asChild>
@@ -1776,12 +1779,12 @@ export function MessageReader({
         >
           <ChevronDown
             className={cn(
-              "h-3 w-3 text-muted-foreground transition-transform shrink-0 group-hover/thread-header:text-foreground",
+              "size-3 text-muted-foreground transition-transform shrink-0 group-hover/thread-header:text-foreground",
               isConversationCollapsed && "-rotate-90",
             )}
           />
           <MessageSquare
-            className="h-3 w-3 text-muted-foreground shrink-0 group-hover/thread-header:text-foreground"
+            className="size-3 text-muted-foreground shrink-0 group-hover/thread-header:text-foreground"
             strokeWidth={2}
           />
           <span className="text-[11px] font-medium text-foreground/70 group-hover/thread-header:text-foreground">
@@ -1795,9 +1798,9 @@ export function MessageReader({
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors shrink-0 cursor-pointer"
           >
             {showOwnMessages ? (
-              <EyeOff className="h-3 w-3" />
+              <EyeOff className="size-3" />
             ) : (
-              <Eye className="h-3 w-3" />
+              <Eye className="size-3" />
             )}
             {showOwnMessages ? "Hide your replies" : `+${ownMessageCount} sent`}
           </button>
@@ -1851,9 +1854,9 @@ export function MessageReader({
 
                 {/* Unread dot */}
                 {!threadIsRead ? (
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span className="size-1.5 shrink-0 rounded-full bg-primary" />
                 ) : (
-                  <span className="h-1.5 w-1.5 shrink-0" />
+                  <span className="size-1.5 shrink-0" />
                 )}
 
                 {/* Clickable row */}
@@ -1867,7 +1870,7 @@ export function MessageReader({
                   <SenderAvatar
                     email={threadSenderEmail}
                     name={threadSenderName}
-                    className="h-5 w-5 shrink-0 text-[9px]"
+                    className="size-5 shrink-0 text-[9px]"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-1.5 min-w-0">
@@ -1916,7 +1919,7 @@ export function MessageReader({
     <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
       {blockRemoteImages && (
         <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-border/30 text-[11px] text-muted-foreground bg-muted/30">
-          <Lock className="h-3 w-3 shrink-0" strokeWidth={2.25} />
+          <Lock className="size-3 shrink-0" strokeWidth={2.25} />
           Remote images are blocked
         </div>
       )}
@@ -2075,7 +2078,7 @@ export function MessageReader({
           className="w-full flex items-center gap-2 rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:border-ring/50 transition-colors text-left"
           aria-label={`Reply to ${senderName || senderEmail}`}
         >
-          <Reply className="h-3.5 w-3.5 shrink-0" />
+          <Reply className="size-3.5 shrink-0" />
           <span>
             Reply to{" "}
             <span className="font-medium text-foreground/70">
@@ -2104,7 +2107,7 @@ export function MessageReader({
         <div className="rounded-lg border border-input bg-background shadow-sm transition-colors focus-within:border-ring focus-within:shadow-[0_0_0_3px_hsl(var(--ring)/0.15)]">
           {/* Card header */}
           <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1">
-            <Reply className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <Reply className="size-3.5 shrink-0 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">
               Reply to{" "}
               <span className="font-medium text-foreground">
@@ -2137,24 +2140,24 @@ export function MessageReader({
           {/* Attached file chips */}
           {attachedFiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
-              {attachedFiles.map((file, idx) => (
+              {attachedFiles.map((file) => (
                 <span
-                  key={idx}
+                  key={`${file.name}-${file.size}-${file.lastModified}`}
                   className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
                 >
-                  <Paperclip className="h-3 w-3 shrink-0" />
+                  <Paperclip className="size-3 shrink-0" />
                   <span className="max-w-[120px] truncate">{file.name}</span>
                   <button
                     type="button"
                     onClick={() =>
                       setAttachedFiles((prev) =>
-                        prev.filter((_, i) => i !== idx),
+                        prev.filter((attachment) => attachment !== file),
                       )
                     }
                     className="ml-0.5 rounded-sm hover:text-foreground transition-colors"
                     aria-label={`Remove ${file.name}`}
                   >
-                    <X className="h-3 w-3" />
+                    <X className="size-3" />
                   </button>
                 </span>
               ))}
@@ -2221,7 +2224,7 @@ export function MessageReader({
                 onClick={() => void handleSendReply()}
                 className="h-7 gap-1.5 px-3 text-xs"
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="size-3.5" />
                 Send
               </Button>
             </div>
