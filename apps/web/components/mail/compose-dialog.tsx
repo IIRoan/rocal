@@ -76,8 +76,7 @@ export function ComposeForm({
 
   const toEmails = composeTo
     .split(/[,;]/)
-    .map((e) => e.trim())
-    .filter(Boolean);
+    .flatMap((e) => (e.trim() ? [e.trim()] : []));
   const toValid = toEmails.length > 0 && toEmails.every(isValidEmail);
   const showToError = toTouched && composeTo.trim().length > 0 && !toValid;
 
@@ -112,7 +111,7 @@ export function ComposeForm({
             title="Open full editor"
             className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
           >
-            <Maximize2 className="h-3.5 w-3.5" />
+            <Maximize2 className="size-3.5" />
           </button>
         )}
         <Button
