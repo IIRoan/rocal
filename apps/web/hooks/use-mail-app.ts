@@ -615,6 +615,7 @@ export function useMailApp() {
   const [composeReplyContext, setComposeReplyContext] =
     useState<MailReplyContext | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isFullCompose, setIsFullCompose] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   // Initialised synchronously from sessionStorage; updated async once the
   // encrypted cookie is decrypted (cross-tab / post-refresh case).
@@ -837,6 +838,8 @@ export function useMailApp() {
   useEffect(() => {
     setSelectedConversationMessageId(null);
     setOptimisticConversationMessages([]);
+    setRelatedConversationMessages([]);
+    setIsConversationLoading(false);
   }, [selectedMessageId]);
 
   useEffect(() => {
@@ -2384,6 +2387,8 @@ export function useMailApp() {
     setComposeBody,
     isComposeOpen,
     setIsComposeOpen,
+    isFullCompose,
+    setIsFullCompose,
     isPaletteOpen,
     setIsPaletteOpen,
     blockRemoteImages,
