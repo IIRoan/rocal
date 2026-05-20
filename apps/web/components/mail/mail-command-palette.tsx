@@ -600,7 +600,7 @@ export function MailCommandPalette({
             maxHeight: "calc(100dvh - 200px)",
           }}
         >
-          <div className="flex items-center gap-2 px-3 py-3 sm:py-2 border-b border-border/50 shrink-0">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
               type="text"
