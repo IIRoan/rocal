@@ -7,7 +7,7 @@ import {
 } from "@workspace/ui/components/ui/avatar";
 import { cn } from "@workspace/ui/lib/utils";
 
-const LOGO_DEV_TOKEN = "pk_OqzQzTPPQCare5_eo1QArg";
+const LOGO_DEV_TOKEN = process.env.NEXT_PUBLIC_LOGO_DEV_TOKEN;
 
 export const PERSONAL_DOMAINS = new Set([
   "gmail.com",
@@ -84,7 +84,7 @@ function SenderAvatarContent({
   const currentSrc = sources[sourceIndex] ?? null;
 
   return (
-    <Avatar className={cn("h-8 w-8 shrink-0", className)}>
+    <Avatar className={cn("size-8 shrink-0", className)}>
       <AvatarFallback
         className={`${bg} ${text} text-[11px] font-semibold select-none`}
       >
@@ -99,7 +99,7 @@ function SenderAvatarContent({
           loading="lazy"
           referrerPolicy="no-referrer"
           className={cn(
-            "absolute inset-0 h-full w-full object-cover",
+            "absolute inset-0 size-full object-cover",
             loadedSrc === currentSrc ? "block" : "hidden",
           )}
           onLoad={() => setLoadedSrc(currentSrc)}
@@ -127,7 +127,7 @@ export function SenderAvatar({
   const sources = isPersonal
     ? []
     : [
-        `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}`,
+        `https://img.logo.dev/${domain}${LOGO_DEV_TOKEN ? `?token=${LOGO_DEV_TOKEN}` : ""}`,
         `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
       ];
   const initials = getInitials(name, email);

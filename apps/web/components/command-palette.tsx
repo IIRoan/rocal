@@ -14,18 +14,16 @@ import { PasskeySettings } from "./passkey-settings";
 import { SubscriptionManagement } from "./subscription-management";
 import { EventEditor } from "./event-editor";
 import { CalendarManager } from "./calendar-manager";
-import {
-  AppearanceSettings,
-  NotificationSettings,
-  TimeRegionSettings,
-  CalendarDefaultsSettings,
-  AccountSettings,
-  SecuritySettings,
-  InviteSettings,
-  type PaletteView,
-  TransitionContainer,
-  NAVIGATION_ITEMS,
-} from "./command-palette/index";
+import { AppearanceSettings } from "./command-palette/appearance-settings";
+import { NotificationSettings } from "./command-palette/notification-settings";
+import { TimeRegionSettings } from "./command-palette/time-region-settings";
+import { CalendarDefaultsSettings } from "./command-palette/calendar-defaults-settings";
+import { AccountSettings } from "./command-palette/account-settings";
+import { SecuritySettings } from "./command-palette/security-settings";
+import { InviteSettings } from "./command-palette/invite-settings";
+import type { PaletteView } from "./command-palette/constants";
+import { TransitionContainer } from "./command-palette/transition-container";
+import { NAVIGATION_ITEMS } from "./command-palette/navigation-config";
 import { CommandPaletteMainSearchView } from "./command-palette/main-search-view";
 import { createDraftCalendarEvent } from "@/lib/calendar-event-drafts";
 import { parseWorkingDays } from "@/lib/calendar-view-model";
@@ -217,8 +215,8 @@ export function CommandPalette({
 
   // Add keyboard shortcuts for navigation items (Ctrl+1 through Ctrl+8) - always at top level
   useNumberedShortcuts(
-    NAVIGATION_ITEMS.filter((item) => item.parent === null).map(
-      (item) => () => goForward(item.id as PaletteView),
+    NAVIGATION_ITEMS.flatMap((item) =>
+      item.parent === null ? [() => goForward(item.id as PaletteView)] : [],
     ),
     open && currentView === "main",
   );
@@ -498,8 +496,8 @@ export function CommandPalette({
           </VisuallyHidden>
           <div className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Loading...</p>
+              <Loader2 className="size-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Loading…</p>
             </div>
           </div>
         </DialogContent>
@@ -755,13 +753,13 @@ export function CommandPalette({
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Settings</span>
         </div>
         <div className="flex-1 overflow-y-auto p-1">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
-            <Settings className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Settings className="size-4 text-muted-foreground shrink-0" />
             <span className="text-sm">This section is coming soon</span>
           </div>
         </div>

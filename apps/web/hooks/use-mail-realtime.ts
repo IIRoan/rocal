@@ -73,18 +73,21 @@ export function useMailRealtime(input: {
       };
     }
 
-    eventSource.addEventListener("open", () => {
+    const handleOpen = () => {
       log.info("Mail realtime connected");
-    });
+    };
 
-    eventSource.addEventListener("mail.changed", (event) => {
+    const handleMailChanged = (event: Event) => {
       const payload = JSON.parse(
         (event as MessageEvent<string>).data,
       ) as MailRealtimeEvent;
 
       if (payload.accountId !== input.accountId) return;
       scheduleDebouncedSync();
-    });
+    };
+
+    eventSource.addEventListener("open", handleOpen);
+    eventSource.addEventListener("mail.changed", handleMailChanged);
 
     eventSource.onerror = () => {
       if (!closed) {
@@ -98,6 +101,8 @@ export function useMailRealtime(input: {
         window.clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }
+      eventSource?.removeEventListener("open", handleOpen);
+      eventSource?.removeEventListener("mail.changed", handleMailChanged);
       eventSource?.close();
     };
   }, [input.accountId, input.debounceMs, input.enabled, runSync]);

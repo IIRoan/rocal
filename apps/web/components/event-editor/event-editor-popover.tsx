@@ -349,7 +349,12 @@ export function EventEditorPopover({
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-50" onClick={() => onOpenChange(false)} />
+      <button
+        type="button"
+        aria-label="Close event editor"
+        className="fixed inset-0 z-50 appearance-none"
+        onClick={() => onOpenChange(false)}
+      />
       <div
         ref={popoverRef}
         className="fixed z-50 w-[420px] bg-popover border border-border shadow-xl rounded-lg flex flex-col overflow-hidden"

@@ -100,7 +100,7 @@ export function buildMailConversations(
 
   return [...grouped.values()]
     .map((group) => {
-      const orderedMessages = [...group].sort(
+      const orderedMessages = Array.from(group).sort(
         (left, right) => getReceivedAtTime(left) - getReceivedAtTime(right),
       );
       const latestMessage = orderedMessages.reduce((latest, candidate) =>

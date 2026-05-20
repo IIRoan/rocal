@@ -3,6 +3,11 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import { authClient } from "../lib/auth-client";
+import { getAuthCapabilities } from "../lib/auth-capabilities";
+import { waitForSessionCookie } from "../lib/session-cookie";
+import { AuthProvider, useAuth } from "./AuthProvider";
+
 jest.mock("react-native", () => ({
   Platform: {
     OS: "ios",
@@ -55,11 +60,6 @@ jest.mock("../lib/session-cookie", () => ({
   getSessionCookie: jest.fn(() => "better-auth.session=token"),
   waitForSessionCookie: jest.fn(),
 }));
-
-import { authClient } from "../lib/auth-client";
-import { getAuthCapabilities } from "../lib/auth-capabilities";
-import { waitForSessionCookie } from "../lib/session-cookie";
-import { AuthProvider, useAuth } from "./AuthProvider";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

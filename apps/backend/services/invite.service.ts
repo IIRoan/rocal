@@ -20,15 +20,12 @@ import {
   NotFoundError,
   ValidationError,
 } from "../lib/errors";
+import { normalizeEmail } from "../lib/email-utils";
 
 const logger = createLogger("backend:invite-service");
 
 const INVITE_EXPIRY_DAYS = 7;
 const CLAIM_WINDOW_MINUTES = 15;
-
-function normalizeEmail(value: string): string {
-  return value.trim().toLowerCase();
-}
 
 function isInviteExpired(invite: { expiresAt: Date }): boolean {
   return new Date() > invite.expiresAt;

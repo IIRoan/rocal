@@ -9,6 +9,7 @@ jest.mock("../../lib/prisma", () => ({
     },
     eventNotification: {
       deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
+      createMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
     },
     calendar: {
       findFirst: jest.fn(
@@ -81,6 +82,7 @@ const mockPrisma = prisma as unknown as {
   };
   eventNotification: {
     deleteMany: jest.Mock<() => Promise<any>>;
+    createMany: jest.Mock<() => Promise<any>>;
   };
   calendar: {
     findFirst: jest.Mock<() => Promise<any>>;
@@ -441,7 +443,16 @@ describe("notificationsRoutes", () => {
         encryptionState: "shadow_write",
       }),
     });
-    expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.eventNotification.createMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.eventNotification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          eventId: "event-create",
+          notificationType: "email",
+          minutesBefore: 10,
+        }),
+      ],
+    });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
@@ -484,7 +495,9 @@ describe("notificationsRoutes", () => {
       notificationDateLocal: "2024-02-01T12:20:00",
       notificationTimezone: "UTC",
     });
-    mockPrisma.$executeRaw.mockRejectedValueOnce(new Error("insert failed"));
+    mockPrisma.eventNotification.createMany.mockRejectedValueOnce(
+      new Error("insert failed"),
+    );
 
     const response = await createApp().handle(
       new Request("http://localhost/notifications/event/event-update-error", {

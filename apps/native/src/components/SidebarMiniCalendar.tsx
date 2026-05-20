@@ -430,7 +430,7 @@ export function SidebarMiniCalendar({
         ))}
       </View>
     ),
-    [effectiveSelectedDate, onDayPress, styles, theme],
+    [effectiveSelectedDate, onDayPress, styles, theme, today],
   );
 
   return (

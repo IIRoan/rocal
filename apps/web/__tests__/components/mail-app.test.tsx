@@ -273,6 +273,33 @@ jest.mock("../../components/mail/attachment-preview-dialog", () => ({
 }));
 
 jest.mock("../../components/mail/compose-dialog", () => ({
+  ComposeForm: ({
+    composeTo,
+    composeSubject,
+    composeBody,
+    setComposeTo,
+    setComposeSubject,
+    setComposeBody,
+    onSend,
+  }: any) => (
+    <div>
+      <input
+        placeholder="Recipient"
+        value={composeTo}
+        onChange={(e: any) => setComposeTo(e.target.value)}
+      />
+      <input
+        placeholder="Subject"
+        value={composeSubject}
+        onChange={(e: any) => setComposeSubject(e.target.value)}
+      />
+      <textarea
+        value={composeBody}
+        onChange={(e: any) => setComposeBody(e.target.value)}
+      />
+      <button onClick={() => void onSend()}>Send message</button>
+    </div>
+  ),
   ComposeDialog: ({
     open,
     composeTo,
@@ -397,7 +424,7 @@ async function waitForExpectation(
 ) {
   const startedAt = Date.now();
 
-  while (true) {
+  const retry = async (): Promise<void> => {
     try {
       assertion();
       return;
@@ -409,8 +436,12 @@ async function waitForExpectation(
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
       });
+
+      return retry();
     }
-  }
+  };
+
+  return retry();
 }
 
 describe("MailApp", () => {
