@@ -15,7 +15,6 @@ import { CALENDAR_COLORS } from "./color-picker-utils";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const SWATCH_SIZE = 36;
-const COLUMNS = 6;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

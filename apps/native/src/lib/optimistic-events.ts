@@ -15,10 +15,10 @@ import type {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type CacheSnapshot = Array<{
+export type CacheSnapshot = {
   queryKey: readonly unknown[];
   data: EventsResponse | undefined;
-}>;
+}[];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

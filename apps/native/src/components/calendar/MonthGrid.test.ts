@@ -8,7 +8,7 @@ import {
   COMPACT_STRIP_WEEK_ROW_HEIGHT,
   COMPACT_STRIP_HEADER_ROW_HEIGHT,
 } from "./month-grid-utils";
-import { isSameDay, getDay, format } from "date-fns";
+import { isSameDay, getDay } from "date-fns";
 import { nativeLightTheme, nativeDarkTheme } from "@workspace/design-tokens";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 

@@ -2,10 +2,10 @@ import type { RecurrenceFrequency } from "@workspace/calendar-core";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const FREQUENCY_OPTIONS: ReadonlyArray<{
+export const FREQUENCY_OPTIONS: readonly {
   value: RecurrenceFrequency | "none";
   label: string;
-}> = [
+}[] = [
   { value: "none", label: "None" },
   { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
@@ -13,11 +13,11 @@ export const FREQUENCY_OPTIONS: ReadonlyArray<{
   { value: "yearly", label: "Yearly" },
 ];
 
-export const WEEKDAYS: ReadonlyArray<{
+export const WEEKDAYS: readonly {
   value: number;
   label: string;
   short: string;
-}> = [
+}[] = [
   { value: 0, label: "Sunday", short: "Su" },
   { value: 1, label: "Monday", short: "Mo" },
   { value: 2, label: "Tuesday", short: "Tu" },

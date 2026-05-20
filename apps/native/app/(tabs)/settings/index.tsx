@@ -25,7 +25,6 @@ import type {
   CalendarView,
   UserSettings,
   UpdateSettingsRequest,
-  getErrorMessage as getErrorMessageType,
   LinkedAuthAccountLike,
 } from "@workspace/calendar-core";
 import {
@@ -1257,74 +1256,6 @@ function SectionLabel({
 }
 
 /** A pressable row with icon, label, and a check mark when selected. */
-function SelectionRow({
-  icon,
-  label,
-  description,
-  isSelected,
-  onPress,
-  isPending,
-  theme,
-}: {
-  icon: FeatherIcon;
-  label: string;
-  description?: string;
-  isSelected: boolean;
-  onPress: () => void;
-  isPending: boolean;
-  theme: ThemeTokens;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row" as const,
-          alignItems: "center" as const,
-          gap: theme.spacing["3"],
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          borderRadius: theme.borderRadius.md,
-          marginHorizontal: theme.spacing["1"],
-        },
-        pressed && { backgroundColor: theme.colors.accent },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}
-      accessibilityLabel={label}
-    >
-      <Feather name={icon} size={16} color={theme.colors.mutedForeground} />
-      <Text
-        style={{
-          flex: 1,
-          fontSize: theme.typography.fontSize.sm.size,
-          lineHeight: theme.typography.fontSize.sm.lineHeight,
-          color: theme.colors.foreground,
-        }}
-      >
-        {label}
-      </Text>
-      {description ? (
-        <Text
-          style={{
-            fontSize: theme.typography.fontSize.xs.size,
-            lineHeight: theme.typography.fontSize.xs.lineHeight,
-            color: theme.colors.mutedForeground,
-          }}
-          numberOfLines={1}
-        >
-          {description}
-        </Text>
-      ) : null}
-      {isPending ? (
-        <ActivityIndicator size="small" />
-      ) : isSelected ? (
-        <Feather name="check" size={16} color={theme.colors.primaryBase} />
-      ) : null}
-    </Pressable>
-  );
-}
-
 function HintRow({ text, theme }: { text: string; theme: ThemeTokens }) {
   return (
     <View

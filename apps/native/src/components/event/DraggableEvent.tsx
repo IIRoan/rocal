@@ -12,8 +12,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "../../providers/ThemeProvider";
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
-import { HOUR_HEIGHT } from "../calendar/timeline-utils";
-import { resolveEventBlockColor } from "../calendar/timeline-utils";
+import { HOUR_HEIGHT , resolveEventBlockColor } from "../calendar/timeline-utils";
 import { formatTimeRange } from "./event-card-utils";
 import {
   LONG_PRESS_DURATION_MS,
