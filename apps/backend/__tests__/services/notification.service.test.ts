@@ -58,6 +58,7 @@ function createHarness(
     },
     eventNotification: {
       deleteMany: jest.fn<() => Promise<{ count: number }>>(),
+      createMany: jest.fn<() => Promise<{ count: number }>>(),
     },
     calendar: {
       findFirst: jest.fn<() => Promise<any>>(),
@@ -73,6 +74,7 @@ function createHarness(
   );
   prisma.calendarEvent.update.mockResolvedValue({ id: "event-1" });
   prisma.eventNotification.deleteMany.mockResolvedValue({ count: 1 });
+  prisma.eventNotification.createMany.mockResolvedValue({ count: 1 });
   prisma.calendar.findFirst.mockResolvedValue(
     options.calendar ?? {
       id: "cal-1",
@@ -159,7 +161,12 @@ describe("NotificationService encryption transitions", () => {
     expect(prisma.eventNotification.deleteMany).toHaveBeenCalledWith({
       where: { eventId: "event-1" },
     });
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ minutesBefore: 30 }),
+        expect.objectContaining({ minutesBefore: 60 }),
+      ]),
+    });
   });
 
   it("keeps plaintext events plaintext when multiple reminders are updated", async () => {
@@ -194,7 +201,12 @@ describe("NotificationService encryption transitions", () => {
         location: "Room 7",
       }),
     });
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.eventNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ minutesBefore: 15 }),
+        expect.objectContaining({ minutesBefore: 45 }),
+      ]),
+    });
   });
 
   it("keeps share-backed hybrid rows readable when only non-email notifications remain", async () => {

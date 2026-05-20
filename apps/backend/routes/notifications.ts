@@ -23,6 +23,8 @@ const RATE_LIMITS = {
 };
 
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000;
+let lastRateLimitCleanup = 0;
 
 type RateLimitContext = {
   request: Request;
@@ -44,8 +46,11 @@ function rateLimit(limit: { requests: number; windowMs: number }) {
     const now = Date.now();
     const windowStart = now - limit.windowMs;
 
-    for (const [k, v] of rateLimitStore.entries()) {
-      if (v.resetTime < windowStart) rateLimitStore.delete(k);
+    if (now - lastRateLimitCleanup > RATE_LIMIT_CLEANUP_INTERVAL_MS) {
+      for (const [k, v] of rateLimitStore.entries()) {
+        if (v.resetTime < now) rateLimitStore.delete(k);
+      }
+      lastRateLimitCleanup = now;
     }
 
     const current = rateLimitStore.get(key);

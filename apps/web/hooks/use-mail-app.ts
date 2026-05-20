@@ -1667,7 +1667,6 @@ export function useMailApp() {
         toast.error("Could not preview the attachment.");
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -1707,7 +1706,6 @@ export function useMailApp() {
       attachmentHoverPreviewCacheRef.current.set(cacheKey, preview);
       return preview;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 

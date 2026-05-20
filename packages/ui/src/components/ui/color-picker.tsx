@@ -6,6 +6,7 @@ import { Input } from "./input";
 import { Label } from "./label";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { cn } from "@workspace/ui/lib/utils";
+import { isHexColor, PRESET_COLOR_OPTIONS } from "@workspace/calendar-core";
 
 export interface PresetColorOption {
   value: string;
@@ -15,27 +16,9 @@ export interface PresetColorOption {
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
-  presetColors?: PresetColorOption[];
+  presetColors?: readonly PresetColorOption[];
   className?: string;
 }
-
-const DEFAULT_PRESET_COLORS: PresetColorOption[] = [
-  { value: "blue", label: "Blue" },
-  { value: "emerald", label: "Emerald" },
-  { value: "orange", label: "Orange" },
-  { value: "violet", label: "Violet" },
-  { value: "rose", label: "Rose" },
-  { value: "red", label: "Red" },
-  { value: "cyan", label: "Cyan" },
-  { value: "lime", label: "Lime" },
-  { value: "amber", label: "Amber" },
-  { value: "indigo", label: "Indigo" },
-  { value: "pink", label: "Pink" },
-  { value: "teal", label: "Teal" },
-];
-
-const isHexColor = (color: string): boolean =>
-  /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
 
 /**
  * Get CSS variable reference for a named color, or return hex as-is.
@@ -49,7 +32,7 @@ function getSwatchBackground(color: string): string {
 export function ColorPicker({
   value,
   onChange,
-  presetColors = DEFAULT_PRESET_COLORS,
+  presetColors = PRESET_COLOR_OPTIONS,
   className,
 }: ColorPickerProps) {
   const [customHex, setCustomHex] = React.useState("");

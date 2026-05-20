@@ -273,6 +273,33 @@ jest.mock("../../components/mail/attachment-preview-dialog", () => ({
 }));
 
 jest.mock("../../components/mail/compose-dialog", () => ({
+  ComposeForm: ({
+    composeTo,
+    composeSubject,
+    composeBody,
+    setComposeTo,
+    setComposeSubject,
+    setComposeBody,
+    onSend,
+  }: any) => (
+    <div>
+      <input
+        placeholder="Recipient"
+        value={composeTo}
+        onChange={(e: any) => setComposeTo(e.target.value)}
+      />
+      <input
+        placeholder="Subject"
+        value={composeSubject}
+        onChange={(e: any) => setComposeSubject(e.target.value)}
+      />
+      <textarea
+        value={composeBody}
+        onChange={(e: any) => setComposeBody(e.target.value)}
+      />
+      <button onClick={() => void onSend()}>Send message</button>
+    </div>
+  ),
   ComposeDialog: ({
     open,
     composeTo,

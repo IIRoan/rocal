@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeEmail } from "./email-utils";
 
 export const SOLACE_EMAIL_LOCAL_PART_PATTERN =
   /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
@@ -17,10 +18,6 @@ export type InvalidDesiredSolaceEmail = {
   domain: string;
   message: string;
 };
-
-export function normalizeEmail(value: string): string {
-  return value.trim().toLowerCase();
-}
 
 export function normalizeLocalPart(value: string): string {
   return value.trim().toLowerCase();

@@ -76,35 +76,19 @@ import {
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import {
+  isValidCalendarColor,
+  PRESET_COLOR_OPTIONS,
+} from "@workspace/calendar-core";
 
-const PRESET_COLORS = [
-  { value: "blue", label: "Blue" },
-  { value: "emerald", label: "Emerald" },
-  { value: "orange", label: "Orange" },
-  { value: "violet", label: "Violet" },
-  { value: "rose", label: "Rose" },
-  { value: "red", label: "Red" },
-  { value: "cyan", label: "Cyan" },
-  { value: "lime", label: "Lime" },
-  { value: "amber", label: "Amber" },
-  { value: "indigo", label: "Indigo" },
-  { value: "pink", label: "Pink" },
-  { value: "teal", label: "Teal" },
-];
-
-const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
+const PRESET_COLORS = PRESET_COLOR_OPTIONS;
 
 const calendarFormSchema = z.object({
   name: z.string().trim().min(1, "Calendar name is required").max(100),
   color: z
     .string()
     .trim()
-    .refine((value) => {
-      return (
-        ALLOWED_COLOR_VALUES.includes(value) ||
-        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)
-      );
-    }, "Please select a valid color"),
+    .refine(isValidCalendarColor, "Please select a valid color"),
 });
 
 interface CalendarManagementProps {
