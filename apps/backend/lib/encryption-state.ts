@@ -1,6 +1,7 @@
 import { t } from "elysia";
+import type { EncryptionState } from "@workspace/calendar-core";
 
-export type RowEncryptionState = "plaintext" | "shadow_write" | "encrypted";
+export type RowEncryptionState = EncryptionState;
 
 export const rowEncryptionStateSchema = t.Union(
   [t.Literal("plaintext"), t.Literal("shadow_write"), t.Literal("encrypted")],
