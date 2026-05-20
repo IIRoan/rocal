@@ -835,6 +835,11 @@ export function useMailApp() {
     [],
   );
 
+  const clearConversationThread = useCallback(() => {
+    setRelatedConversationMessages([]);
+    setIsConversationLoading(false);
+  }, []);
+
   useEffect(() => {
     setSelectedConversationMessageId(null);
     setOptimisticConversationMessages([]);
@@ -855,8 +860,7 @@ export function useMailApp() {
 
   useEffect(() => {
     if (!selectedMessageId || !activeMailboxRef.current) {
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
+      clearConversationThread();
       return;
     }
 
@@ -870,10 +874,9 @@ export function useMailApp() {
     if (threadId) {
       void loadConversationThread(threadId);
     } else {
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
+      clearConversationThread();
     }
-  }, [selectedMessageId, loadConversationThread]);
+  }, [selectedMessageId, loadConversationThread, clearConversationThread]);
 
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
