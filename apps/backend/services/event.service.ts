@@ -278,12 +278,14 @@ export class EventService implements IEventService {
       try {
         let recurrenceRule = recurringEvent.recurrence || "{}";
         const parsedRule = RecurrenceEngine.parseRecurrenceRule(recurrenceRule);
+        const titleLower = recurringEvent.title.toLowerCase();
+        const duration =
+          recurringEvent.end.getTime() - recurringEvent.start.getTime();
 
         // Fallback: infer weekday recurrence from title keywords when rule is empty
         if (
           !parsedRule &&
-          (recurringEvent.title.toLowerCase().includes("standup") ||
-            recurringEvent.title.toLowerCase().includes("daily"))
+          (titleLower.includes("standup") || titleLower.includes("daily"))
         ) {
           recurrenceRule = JSON.stringify({
             frequency: "daily",
@@ -311,8 +313,6 @@ export class EventService implements IEventService {
 
         for (const instance of instances) {
           if (!instance.isOriginal) {
-            const duration =
-              recurringEvent.end.getTime() - recurringEvent.start.getTime();
             recurringInstances.push({
               ...recurringEvent,
               id: `${recurringEvent.id}_${instance.date.toISOString()}`,

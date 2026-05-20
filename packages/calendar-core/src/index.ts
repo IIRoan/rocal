@@ -1,5 +1,7 @@
 export * from "./types";
+export * from "./color-utils";
 export * from "./date-utils";
+export * from "./event-utils";
 export * from "./view-model";
 export * from "./validation";
 export * from "./calendar-helpers";
