@@ -45,6 +45,7 @@
     "@react-email/components": "^0.4.0",
     "@react-email/render": "^1.1.4",
     "@types/ical": "^0.8.3",
+    "@workspace/calendar-core": "workspace:*",
     "@workspace/calendar-ics": "workspace:*",
     "@workspace/logger": "0.10.0",
     "@workspace/runtime": "workspace:*",

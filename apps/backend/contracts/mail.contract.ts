@@ -1,39 +1,16 @@
-export type MailVaultKdfParams = {
-  saltB64: string;
-  memoryKiB: number;
-  iterations: number;
-  parallelism: number;
-};
+import type {
+  MailAccountStatus as SharedMailAccountStatus,
+  MailDemoConfig,
+  MailDirectoryKey as SharedMailDirectoryKey,
+  MailOAuthConfig,
+  MailSignup as SharedMailSignup,
+  MailVaultBackup as SharedMailVaultBackup,
+  MailVaultKdfParams,
+} from "@workspace/calendar-core";
 
-export type MailOAuthConfig = {
-  issuer: string;
-  discoveryUrl: string;
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-  userinfoEndpoint: string;
-  jwksUri: string;
-  /** Session-exchange endpoint: POST this with session cookie to get a mail access token directly. */
-  mailTokenEndpoint: string;
-  clientId: string;
-  redirectUri: string;
-  scopes: string[];
-  audiences: string[];
-};
+export type { MailDemoConfig, MailOAuthConfig, MailVaultKdfParams };
 
-export type MailDemoConfig = {
-  defaultDomain: string;
-  discoveryBaseUrl: string;
-  signupEnabled: boolean;
-  oauth: MailOAuthConfig;
-  /** Endpoint to fetch a server-derived per-user vault key material (session required). */
-  vaultKeyMaterialEndpoint: string;
-};
-
-export type MailAccountStatusResult = {
-  email: string;
-  displayName: string | null;
-  provisioned: boolean;
-};
+export type MailAccountStatusResult = SharedMailAccountStatus;
 
 export type MailAccessTokenForUserInput = {
   userId: string;
@@ -46,30 +23,11 @@ export type MailAccessTokenResult = {
   expires_at: number;
 };
 
-export type MailSignupResult = {
-  email: string;
-  displayName: string | null;
-  stalwartAccountId: string;
-  stalwartPublicKeyId: string;
-  fingerprint: string;
-  encryptionAtRestEnabled: boolean;
-};
+export type MailSignupResult = SharedMailSignup;
 
-export type MailDirectoryKeyResult = {
-  email: string;
-  publicKeyArmored: string;
-  fingerprint: string;
-  source: string;
-  trust: string;
-};
+export type MailDirectoryKeyResult = SharedMailDirectoryKey;
 
-export type MailVaultBackupResult = {
-  email: string;
-  vaultVersion: number;
-  encryptedVaultB64: string;
-  kdf: string;
-  kdfParams: MailVaultKdfParams;
-};
+export type MailVaultBackupResult = SharedMailVaultBackup;
 
 export type MailBootstrapForUserInput = {
   userId: string;
@@ -96,13 +54,7 @@ export type GetMailVaultBackupForUserInput = {
   email: string;
 };
 
-export type UpsertMailVaultBackupInput = {
-  email: string;
-  vaultVersion: number;
-  encryptedVaultB64: string;
-  kdf: string;
-  kdfParams: MailVaultKdfParams;
-};
+export type UpsertMailVaultBackupInput = SharedMailVaultBackup;
 
 export type UpsertMailVaultBackupForUserInput = {
   userId: string;
