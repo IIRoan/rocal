@@ -32,7 +32,7 @@ describe("useDrawerViewport", () => {
   let container: HTMLDivElement;
   let root: Root;
   let listeners: Record<string, VisualViewportListener[]>;
-  let originalVisualViewport: VisualViewport | undefined;
+  let originalVisualViewport: VisualViewport | null | undefined;
   let originalRequestAnimationFrame: typeof globalThis.requestAnimationFrame;
   let originalCancelAnimationFrame: typeof globalThis.cancelAnimationFrame;
 
@@ -116,7 +116,7 @@ describe("useDrawerViewport", () => {
           height: number;
         }
       ).height = 560;
-      listeners.resize.forEach((listener) => listener());
+      listeners.resize?.forEach((listener) => listener());
     });
 
     expect(probe?.dataset.keyboardHeight).toBe("240");

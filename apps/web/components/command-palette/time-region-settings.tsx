@@ -63,7 +63,7 @@ export function TimeRegionSettings({
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Time & Region</span>
         </div>
@@ -78,7 +78,7 @@ export function TimeRegionSettings({
               onClick={() => goForward("timezone")}
               className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
             >
-              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Globe className="size-4 text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Timezone</div>
                 <div className="text-xs text-muted-foreground truncate">
@@ -87,7 +87,7 @@ export function TimeRegionSettings({
                   )?.label || localSettings.timezone}
                 </div>
               </div>
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+              <ChevronRight className="size-3.5 text-muted-foreground/40 shrink-0" />
             </button>
           </div>
 
@@ -106,10 +106,10 @@ export function TimeRegionSettings({
                 onClick={() => updateSetting("timeFormat", format.value)}
                 className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
               >
-                <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Clock className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-sm flex-1">{format.label}</span>
                 {localSettings.timeFormat === format.value && (
-                  <Check className="h-4 w-4 text-primary shrink-0" />
+                  <Check className="size-4 text-primary shrink-0" />
                 )}
               </button>
             ))}
@@ -128,13 +128,13 @@ export function TimeRegionSettings({
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Timezone</span>
         </div>
         {/* Search */}
         <div className="flex items-center gap-3 px-4 border-b border-border/50 shrink-0">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Search className="size-4 text-muted-foreground shrink-0" />
           <Input
             type="text"
             placeholder="Search timezones..."
@@ -160,7 +160,7 @@ export function TimeRegionSettings({
                   }
                   className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                 >
-                  <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Globe className="size-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm truncate">{tz.label}</div>
                     <div className="text-xs text-muted-foreground">
@@ -168,7 +168,7 @@ export function TimeRegionSettings({
                     </div>
                   </div>
                   {localSettings.timezone === tz.value && (
-                    <Check className="h-4 w-4 text-primary shrink-0" />
+                    <Check className="size-4 text-primary shrink-0" />
                   )}
                 </button>
               ))}
@@ -187,7 +187,7 @@ export function TimeRegionSettings({
                       onClick={() => handleTimezoneSelect(tz.value)}
                       className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-left hover:bg-accent/30 focus:bg-accent/50 focus:outline-none transition-colors"
                     >
-                      <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <Globe className="size-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm truncate">{tz.label}</div>
                         <div className="text-xs text-muted-foreground">
@@ -195,7 +195,7 @@ export function TimeRegionSettings({
                         </div>
                       </div>
                       {localSettings.timezone === tz.value && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <Check className="size-4 text-primary shrink-0" />
                       )}
                     </button>
                   ))}

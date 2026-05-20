@@ -2,6 +2,7 @@
 
 import { Send, ArrowLeft, Paperclip, X, Minus, Maximize2 } from "lucide-react";
 import { useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ export interface ComposeDialogProps {
   setComposeBcc: (v: string) => void;
   setComposeSubject: (v: string) => void;
   setComposeBody: (v: string) => void;
-  setComposeAttachments: (v: File[]) => void;
+  setComposeAttachments: Dispatch<SetStateAction<File[]>>;
   isBusy: boolean;
 }
 
@@ -83,13 +84,15 @@ export function ComposeForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length > 0) {
-      setComposeAttachments([...composeAttachments, ...files]);
+      setComposeAttachments((prev) => [...prev, ...files]);
     }
     e.target.value = "";
   };
 
-  const removeAttachment = (index: number) => {
-    setComposeAttachments(composeAttachments.filter((_, i) => i !== index));
+  const removeAttachment = (file: File) => {
+    setComposeAttachments((prev) =>
+      prev.filter((attachment) => attachment !== file),
+    );
   };
 
   return (
@@ -101,7 +104,7 @@ export function ComposeForm({
           onClick={onClose}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium flex-1">New mail</span>
         {onExpand && (
@@ -147,7 +150,6 @@ export function ComposeForm({
           onBlur={() => setToTouched(true)}
           placeholder="recipient@example.com"
           disabled={isBusy}
-          autoFocus
           autoComplete="off"
           className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
         />
@@ -185,7 +187,6 @@ export function ComposeForm({
             onChange={(e) => setComposeCc(e.target.value)}
             placeholder="cc@example.com"
             disabled={isBusy}
-            autoFocus
             autoComplete="off"
             className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
           />
@@ -194,7 +195,7 @@ export function ComposeForm({
             onClick={() => { setShowCc(false); setComposeCc(""); }}
             className="shrink-0 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
-            <Minus className="h-3 w-3" />
+            <Minus className="size-3" />
           </button>
         </div>
       )}
@@ -211,7 +212,6 @@ export function ComposeForm({
             onChange={(e) => setComposeBcc(e.target.value)}
             placeholder="bcc@example.com"
             disabled={isBusy}
-            autoFocus
             autoComplete="off"
             className="flex-1 h-8 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground/40"
           />
@@ -220,7 +220,7 @@ export function ComposeForm({
             onClick={() => { setShowBcc(false); setComposeBcc(""); }}
             className="shrink-0 p-0.5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
-            <Minus className="h-3 w-3" />
+            <Minus className="size-3" />
           </button>
         </div>
       )}
@@ -241,35 +241,39 @@ export function ComposeForm({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-2" onKeyDown={onKeyDown}>
+      <div
+        className="flex-1 overflow-y-auto px-4 pt-3 pb-2"
+        role="presentation"
+        onKeyDown={onKeyDown}
+      >
         <textarea
           value={composeBody}
           onChange={(e) => setComposeBody(e.target.value)}
           placeholder="Write your message…"
           disabled={isBusy}
-          className="w-full h-full min-h-32 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm resize-none placeholder:text-muted-foreground/40 leading-relaxed"
+          className="size-full min-h-32 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm resize-none placeholder:text-muted-foreground/40 leading-relaxed"
         />
       </div>
 
       {/* Attachment chips */}
       {composeAttachments.length > 0 && (
         <div className="px-4 pt-2 pb-1 flex flex-wrap gap-1.5 border-t border-border/50 shrink-0">
-          {composeAttachments.map((file, i) => (
+          {composeAttachments.map((file) => (
             <div
-              key={i}
+              key={`${file.name}-${file.size}-${file.lastModified}`}
               className="flex items-center gap-1 bg-muted/60 rounded px-2 py-1 text-xs max-w-[200px]"
             >
-              <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <Paperclip className="size-3 shrink-0 text-muted-foreground" />
               <span className="truncate text-foreground/80">{file.name}</span>
               <span className="text-muted-foreground/60 shrink-0">
                 {formatFileSize(file.size)}
               </span>
               <button
                 type="button"
-                onClick={() => removeAttachment(i)}
+                onClick={() => removeAttachment(file)}
                 className="shrink-0 ml-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
-                <X className="h-3 w-3" />
+                <X className="size-3" />
               </button>
             </div>
           ))}
@@ -293,7 +297,7 @@ export function ComposeForm({
             className="p-1.5 rounded hover:bg-muted/50 transition-colors text-muted-foreground/60 hover:text-muted-foreground disabled:opacity-40"
             aria-label="Attach files"
           >
-            <Paperclip className="h-4 w-4" />
+            <Paperclip className="size-4" />
           </button>
         </div>
         <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground/40">
@@ -365,7 +369,7 @@ export function ComposeDialog({
               <DrawerTitle>New mail</DrawerTitle>
             </DrawerHeader>
           </VisuallyHidden>
-          <div onKeyDown={handleKeyDown}>
+          <div role="presentation" onKeyDown={handleKeyDown}>
             <ComposeForm {...formProps} />
           </div>
         </DrawerContent>

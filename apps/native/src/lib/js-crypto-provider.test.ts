@@ -1,12 +1,12 @@
+import { createE2eeModule } from "@workspace/e2ee";
+import { createJsCryptoProvider } from "./js-crypto-provider";
+
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "00000000-0000-4000-8000-000000000000",
   getRandomValues: (buffer: Uint8Array) => {
     return globalThis.crypto.getRandomValues(buffer);
   },
 }));
-
-import { createE2eeModule } from "@workspace/e2ee";
-import { createJsCryptoProvider } from "./js-crypto-provider";
 
 describe("createJsCryptoProvider", () => {
   it("supports the shared E2EE password envelope flow", async () => {

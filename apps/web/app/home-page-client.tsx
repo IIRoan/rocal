@@ -66,6 +66,11 @@ const APRIL_GRID: (number | null)[] = [
   null,
 ];
 
+const APRIL_CELLS = APRIL_GRID.map((day, index) => ({
+  id: day === null ? `empty-${index}` : `day-${day}`,
+  day,
+}));
+
 const MINI_DOTS: Record<number, string[]> = {
   7: ["sky"],
   10: ["violet", "orange"],
@@ -78,6 +83,16 @@ const MINI_DOTS: Record<number, string[]> = {
   24: ["emerald"],
   28: ["sky"],
 };
+
+const WEEKDAY_LABELS = [
+  { id: "monday", label: "M" },
+  { id: "tuesday", label: "T" },
+  { id: "wednesday", label: "W" },
+  { id: "thursday", label: "T" },
+  { id: "friday", label: "F" },
+  { id: "saturday", label: "S" },
+  { id: "sunday", label: "S" },
+];
 
 const MONTH_EVENTS: Record<number, Array<{ label: string; color: string }>> = {
   7: [{ label: "Stand-up", color: "sky" }],
@@ -171,27 +186,27 @@ function MiniCalendar({ today }: { today: number }) {
           <span className="ml-0.5 text-muted-foreground">2026</span>
         </span>
         <div className="flex items-center text-muted-foreground">
-          <span className="flex h-6 w-6 items-center justify-center">
-            <ChevronLeft className="h-3.5 w-3.5" />
+          <span className="flex size-6 items-center justify-center">
+            <ChevronLeft className="size-3.5" />
           </span>
-          <span className="flex h-6 w-6 items-center justify-center">
-            <ChevronRight className="h-3.5 w-3.5" />
+          <span className="flex size-6 items-center justify-center">
+            <ChevronRight className="size-3.5" />
           </span>
         </div>
       </div>
       <div className="mb-0.5 grid grid-cols-7">
-        {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+        {WEEKDAY_LABELS.map(({ id, label }) => (
           <div
-            key={i}
+            key={id}
             className="flex h-6 items-center justify-center text-[10px] font-medium text-muted-foreground/50"
           >
-            {l}
+            {label}
           </div>
         ))}
       </div>
       <div className="grid grid-cols-7">
-        {APRIL_GRID.map((day, i) => {
-          if (day === null) return <div key={`n-${i}`} className="h-6" />;
+        {APRIL_CELLS.map(({ id, day }) => {
+          if (day === null) return <div key={id} className="h-6" />;
           const isCurrentDay = day === today;
           const isWeekDay = day >= 20 && day <= 26;
           const dots = MINI_DOTS[day] ?? [];
@@ -202,7 +217,7 @@ function MiniCalendar({ today }: { today: number }) {
             >
               <div
                 className={[
-                  "flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                  "flex size-5 items-center justify-center rounded-full text-[10px]",
                   isCurrentDay
                     ? "bg-primary/20 font-semibold text-primary"
                     : isWeekDay
@@ -217,7 +232,7 @@ function MiniCalendar({ today }: { today: number }) {
                   {dots.slice(0, 3).map((c, di) => (
                     <span
                       key={di}
-                      className="h-[4px] w-[4px] rounded-full"
+                      className="size-[4px] rounded-full"
                       style={{ backgroundColor: `var(--event-${c})` }}
                     />
                   ))}
@@ -275,7 +290,7 @@ function WeekGrid({ today }: { today: number }) {
               </span>
               <span
                 className={[
-                  "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium",
+                  "flex size-5 items-center justify-center rounded-full text-[10px] font-medium",
                   isToday
                     ? "bg-primary text-primary-foreground"
                     : "text-foreground",
@@ -315,16 +330,16 @@ function WeekGrid({ today }: { today: number }) {
           >
             <div className="absolute inset-x-0 h-px bg-red-500" />
             <div
-              className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
+              className="absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
               style={{ left: 0, top: 0 }}
             />
           </div>
-          {WEEK_EVENTS.map((ev, i) => {
+          {WEEK_EVENTS.map((ev) => {
             const colIndex = ev.day - 1;
             const showLabel = ev.end - ev.start >= 0.75;
             return (
               <div
-                key={i}
+                key={`${ev.day}-${ev.start}-${ev.end}-${ev.label}`}
                 className="absolute overflow-hidden rounded-[3px] border-l-2 px-1 py-[2px] text-[8px] font-medium leading-tight shadow-sm"
                 style={{
                   ...eventStyle(ev.color),
@@ -354,7 +369,7 @@ function DayGrid({ today }: { today: number }) {
         <span className="text-[8px] font-medium uppercase text-muted-foreground/60">
           Tue
         </span>
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+        <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
           {today}
         </span>
         <span className="ml-1 text-[9px] text-muted-foreground">
@@ -384,13 +399,13 @@ function DayGrid({ today }: { today: number }) {
           >
             <div className="absolute h-px bg-red-500 left-0 right-0" />
             <div
-              className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
+              className="absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500"
               style={{ left: 0, top: 0 }}
             />
           </div>
-          {DAY_EVENTS.map((ev, i) => (
+          {DAY_EVENTS.map((ev) => (
             <div
-              key={i}
+              key={`${ev.day}-${ev.start}-${ev.end}-${ev.label}`}
               className="absolute overflow-hidden rounded-[3px] border-l-2 px-1 py-[2px] text-[8px] font-medium leading-tight shadow-sm"
               style={{
                 ...eventStyle(ev.color),
@@ -443,7 +458,7 @@ function MonthGrid({ today }: { today: number }) {
                     <>
                       <div
                         className={[
-                          "mb-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                          "mb-0.5 inline-flex size-5 items-center justify-center rounded-full text-[10px]",
                           isToday
                             ? "bg-primary/20 font-semibold text-primary"
                             : "text-foreground",
@@ -496,11 +511,11 @@ function AppPreview() {
     <div className="w-full overflow-hidden rounded-2xl border bg-card/95 shadow-xl backdrop-blur-sm">
       {/* Window chrome */}
       <div className="flex shrink-0 items-center gap-1.5 border-b bg-muted/40 px-3.5 py-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-destructive/60" />
-        <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
-        <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
+        <span className="size-2.5 rounded-full bg-destructive/60" />
+        <span className="size-2.5 rounded-full bg-warning/70" />
+        <span className="size-2.5 rounded-full bg-success/70" />
         <div className="ml-auto flex items-center gap-1.5 rounded-md border border-border/40 bg-background/60 px-2 py-0.5 text-[10px] text-muted-foreground">
-          <Search className="h-3 w-3" />
+          <Search className="size-3" />
           <span>Search events…</span>
         </div>
       </div>
@@ -519,18 +534,18 @@ function AppPreview() {
               </span>
             </div>
             <div className="flex items-center gap-0.5 text-muted-foreground/40">
-              <span className="flex h-6 w-6 items-center justify-center">
-                <Search className="h-3 w-3" />
+              <span className="flex size-6 items-center justify-center">
+                <Search className="size-3" />
               </span>
-              <span className="flex h-6 w-6 items-center justify-center">
-                <PanelLeftClose className="h-3 w-3" />
+              <span className="flex size-6 items-center justify-center">
+                <PanelLeftClose className="size-3" />
               </span>
             </div>
           </div>
           <MiniCalendar today={today} />
           <div className="shrink-0 px-2.5 pb-3">
             <div className="flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-border/60 text-[12px] text-foreground/80">
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="size-3.5" />
               <span style={{ fontWeight: 470 }}>New event</span>
             </div>
           </div>
@@ -539,7 +554,7 @@ function AppPreview() {
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                 Calendars
               </span>
-              <Settings2 className="h-3 w-3 text-muted-foreground/40" />
+              <Settings2 className="size-3 text-muted-foreground/40" />
             </div>
             <div className="space-y-0.5">
               {CALENDARS.map((cal) => (
@@ -548,7 +563,7 @@ function AppPreview() {
                   className="flex h-7 items-center gap-2 rounded-lg px-2 text-[12px] font-medium text-foreground"
                 >
                   <span
-                    className="h-2 w-2 shrink-0 rounded-full"
+                    className="size-2 shrink-0 rounded-full"
                     style={{ backgroundColor: `var(--event-${cal.color})` }}
                   />
                   <span className="truncate">{cal.name}</span>
@@ -563,8 +578,8 @@ function AppPreview() {
           <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
             <div className="flex items-center gap-1">
               <div className="flex text-muted-foreground/70">
-                <ChevronLeft className="h-3.5 w-3.5" />
-                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronLeft className="size-3.5" />
+                <ChevronRight className="size-3.5" />
               </div>
               <span className="ml-1 text-[11px] font-medium text-foreground">
                 {rangeLabel}
@@ -633,7 +648,7 @@ function ThisWeekWidget() {
               </span>
               <span
                 className={[
-                  "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-medium",
+                  "flex size-7 items-center justify-center rounded-full text-[12px] font-medium",
                   isToday
                     ? "bg-primary text-primary-foreground"
                     : "text-foreground",
@@ -642,10 +657,10 @@ function ThisWeekWidget() {
                 {d.n}
               </span>
               <div className="flex h-[5px] items-center gap-[2px]">
-                {dots.slice(0, 2).map((c, i) => (
+                {dots.slice(0, 2).map((c) => (
                   <span
-                    key={i}
-                    className="h-[4px] w-[4px] rounded-full"
+                    key={`${d.n}-${c}`}
+                    className="size-[4px] rounded-full"
                     style={{ backgroundColor: `var(--event-${c})` }}
                   />
                 ))}
@@ -662,7 +677,7 @@ function ThisWeekWidget() {
               {ev.time}
             </span>
             <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              className="size-1.5 shrink-0 rounded-full"
               style={{ backgroundColor: `var(--event-${ev.color})` }}
             />
             <span className="text-[13px] font-medium text-foreground">
@@ -704,7 +719,7 @@ function HeroContent({
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             Solace is a calm, focused calendar built for shared schedules,
-            recurring events, and real notifications — no ads, no noise.
+            recurring events, and real notifications, with no ads and no noise.
           </p>
         </div>
 
@@ -716,7 +731,7 @@ function HeroContent({
           disabled={isExiting}
         >
           Get started
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <ArrowRight className="ml-2 size-4" />
         </Button>
 
         {/* Footer */}
@@ -838,6 +853,7 @@ export function HomePageClient() {
         src="/wallpaper02.jpg"
         alt=""
         fill
+        sizes="100vw"
         unoptimized
         priority
         className="pointer-events-none object-cover"
@@ -876,7 +892,7 @@ export function HomePageClient() {
             className="mb-8 text-sm leading-relaxed text-muted-foreground"
           >
             Solace is a calm, focused calendar built for shared schedules,
-            recurring events, and real notifications — no ads, no noise.
+            recurring events, and real notifications, with no ads and no noise.
           </p>
           <Button
             data-hero-cta
@@ -886,7 +902,7 @@ export function HomePageClient() {
             disabled={isExiting}
           >
             Get started
-            <ArrowRight className="ml-2 h-4 w-4" />
+            <ArrowRight className="ml-2 size-4" />
           </Button>
           <p
             data-hero-footer

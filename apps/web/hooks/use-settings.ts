@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, createContext, use } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
 import { useSession } from "@/lib/auth-client";
@@ -16,7 +16,7 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function useSettings() {
-  const context = useContext(SettingsContext);
+  const context = use(SettingsContext);
   if (!context) {
     throw new Error("useSettings must be used within a SettingsProvider");
   }

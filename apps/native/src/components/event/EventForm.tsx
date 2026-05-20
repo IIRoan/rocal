@@ -40,7 +40,6 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import type {
   Calendar,
   CreateEventRequest,
-  EventColor,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
@@ -147,9 +146,7 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const [description, setDescription] = useState(
       initialValues?.description ?? "",
     );
-    const [color, setColor] = useState<EventColor | undefined>(
-      initialValues?.color ?? undefined,
-    );
+    const color = initialValues?.color ?? undefined;
     const [recurrence, setRecurrence] = useState<string | null>(
       initialValues?.recurrence ?? null,
     );

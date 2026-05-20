@@ -218,7 +218,7 @@ export function PdfAttachmentThumbnail({ url }: { url: string }) {
       />
       {isLoading && (
         <div className="text-muted-foreground absolute inset-0 flex items-center justify-center gap-2 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="size-4 animate-spin" />
           Loading PDF
         </div>
       )}
@@ -298,24 +298,24 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
               onClick={() => setScale((current) => Math.max(0.6, current - 0.15))}
               disabled={isLoadingDocument || !pdfDocument}
               aria-label="Zoom out PDF"
             >
-              <Minus className="h-4 w-4" strokeWidth={2.25} />
+              <Minus className="size-4" strokeWidth={2.25} />
             </button>
             <div className="text-muted-foreground min-w-28 text-center text-xs font-medium">
               {Math.round(scale * 100)}% · {pageCount || "…"} pages
             </div>
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border/60 text-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
               onClick={() => setScale((current) => Math.min(2.4, current + 0.15))}
               disabled={isLoadingDocument || !pdfDocument}
               aria-label="Zoom in PDF"
             >
-              <Plus className="h-4 w-4" strokeWidth={2.25} />
+              <Plus className="size-4" strokeWidth={2.25} />
             </button>
           </div>
         </div>
@@ -324,12 +324,12 @@ function PdfAttachmentPreview({ preview }: { preview: Extract<MailAttachmentPrev
       <div className="bg-muted/20 min-h-0 flex-1 overflow-auto p-4">
         {isLoadingDocument ? (
           <div className="text-muted-foreground flex h-full min-h-64 items-center justify-center gap-2 rounded-lg border border-border/60 bg-background text-sm shadow-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
             Loading PDF preview
           </div>
         ) : pdfError ? (
           <div className="text-muted-foreground flex h-full min-h-64 flex-col items-center justify-center gap-2 rounded-lg border border-border/60 bg-background px-6 py-8 text-center shadow-sm">
-            <FileText className="h-6 w-6" />
+            <FileText className="size-6" />
             <p className="max-w-md text-sm">{pdfError}</p>
           </div>
         ) : pdfDocument ? (

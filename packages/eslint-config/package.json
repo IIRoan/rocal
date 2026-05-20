@@ -6,6 +6,7 @@
   "exports": {
     "./base": "./base.js",
     "./next-js": "./next.js",
+    "./react-doctor": "./react-doctor.js",
     "./react-internal": "./react-internal.js"
   },
   "devDependencies": {
@@ -17,6 +18,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-only-warn": "^1.1.0",
     "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-doctor": "^0.2.1",
     "eslint-plugin-react-hooks": "^5.1.0",
     "globals": "^15.15.0",
     "typescript": "^5.9.3",

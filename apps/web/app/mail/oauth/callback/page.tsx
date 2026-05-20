@@ -18,7 +18,7 @@ export default function MailOAuthCallbackPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-      Completing mail sign-in...
+      Completing mail sign-in…
     </main>
   );
 }

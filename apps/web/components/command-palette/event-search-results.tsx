@@ -41,11 +41,11 @@ export function EventSearchResults({
     return (
       <div className="px-2">
         <div className="flex items-center gap-1.5 px-2 pt-1 pb-1">
-          <Search className="h-3 w-3 text-primary/60" />
+          <Search className="size-3 text-primary/60" />
           <span className="text-xs font-medium text-primary/70 uppercase tracking-wide">
             Events
           </span>
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-1" />
+          <Loader2 className="size-3 animate-spin text-muted-foreground ml-1" />
         </div>
       </div>
     );
@@ -58,7 +58,7 @@ export function EventSearchResults({
   return (
     <div className="px-2">
       <div className="flex items-center gap-1.5 px-2 pt-1 pb-1">
-        <Search className="h-3 w-3 text-primary/60" />
+        <Search className="size-3 text-primary/60" />
         <span className="text-xs font-medium text-primary/70 uppercase tracking-wide">
           {events.length} event{events.length !== 1 ? "s" : ""}
         </span>
@@ -78,12 +78,12 @@ export function EventSearchResults({
             data-index={globalIndex}
             type="button"
             onClick={() => onSelect(event)}
-            className={`flex items-center gap-3 px-2 py-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
+            className={`flex items-center gap-3 p-2 w-full rounded-md text-left focus:outline-none transition-colors group ${
               isSelected ? "bg-accent/50" : "hover:bg-accent/50"
             }`}
           >
             <div
-              className={`w-2 h-2 rounded-full shrink-0 ${getColorClass(eventColor)}`}
+              className={`size-2 rounded-full shrink-0 ${getColorClass(eventColor)}`}
             />
             <div className="flex-1 min-w-0">
               <span className="text-sm truncate block">{event.title}</span>
@@ -93,9 +93,9 @@ export function EventSearchResults({
             </div>
             <EncryptionStatusBadge item={event} asIcon className="opacity-80" />
             {event.location && (
-              <MapPin className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+              <MapPin className="size-3 text-muted-foreground/50 shrink-0" />
             )}
-            <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CalendarIcon className="size-3.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         );
       })}

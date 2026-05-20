@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 
 export interface KeyboardShortcut {
   key: string;
@@ -92,12 +92,16 @@ export function useDropdownShortcuts(
   shortcuts: Array<{ key: string; action: () => void }>,
   enabled: boolean = true,
 ) {
-  const keyboardShortcuts: KeyboardShortcut[] = shortcuts.map((shortcut) => ({
-    ...shortcut,
-    ctrlKey: true, // This will match both Ctrl and Cmd
-    preventDefault: true,
-    stopPropagation: true,
-  }));
+  const keyboardShortcuts: KeyboardShortcut[] = useMemo(
+    () =>
+      shortcuts.map((shortcut) => ({
+        ...shortcut,
+        ctrlKey: true, // This will match both Ctrl and Cmd
+        preventDefault: true,
+        stopPropagation: true,
+      })),
+    [shortcuts],
+  );
 
   useKeyboardShortcuts(keyboardShortcuts, { enabled, ignoreInputs: true });
 }
@@ -109,15 +113,17 @@ export function useNumberedShortcuts(
   actions: Array<() => void>,
   enabled: boolean = true,
 ) {
-  const shortcuts: KeyboardShortcut[] = actions
-    .slice(0, 9)
-    .map((action, index) => ({
-      key: String(index + 1),
-      action,
-      ctrlKey: true,
-      preventDefault: true,
-      stopPropagation: true,
-    }));
+  const shortcuts: KeyboardShortcut[] = useMemo(
+    () =>
+      actions.slice(0, 9).map((action, index) => ({
+        key: String(index + 1),
+        action,
+        ctrlKey: true,
+        preventDefault: true,
+        stopPropagation: true,
+      })),
+    [actions],
+  );
 
   useKeyboardShortcuts(shortcuts, { enabled, ignoreInputs: true });
 }

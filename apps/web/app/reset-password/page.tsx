@@ -177,7 +177,7 @@ export default function ResetPasswordPage() {
               {submitting ? (
                 <>
                   <div
-                    className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
+                    className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"
                     aria-hidden="true"
                   />
                   <span>Updating password…</span>
@@ -185,7 +185,7 @@ export default function ResetPasswordPage() {
               ) : (
                 <>
                   <span>Update password</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="size-4" />
                 </>
               )}
             </Button>

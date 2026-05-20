@@ -70,9 +70,9 @@ interface MessageListProps {
 type MessageThreadRow = ReturnType<typeof buildMailConversations>[number];
 
 function formatThreadSenders(messages: JmapEmailMessage[]): string {
-  const uniqueSenders = messages
-    .map((message) => formatAddress(message.from))
-    .filter((sender, index, senders) => senders.indexOf(sender) === index);
+  const uniqueSenders = Array.from(
+    new Set(messages.map((message) => formatAddress(message.from))),
+  );
 
   if (uniqueSenders.length <= 2) {
     return uniqueSenders.join(", ");
@@ -196,7 +196,7 @@ export function MessageList({
       <div className="sticky top-0 z-20 px-3 py-2 border-b border-border/40 bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-2 rounded-md bg-muted/60 px-2.5 py-1.5 focus-within:bg-muted/80 transition-colors">
           <Search
-            className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
+            className="size-3.5 shrink-0 text-muted-foreground/60"
             strokeWidth={2}
           />
           <input
@@ -233,10 +233,10 @@ export function MessageList({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
                 aria-label="Bulk actions"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.25} />
+                <MoreHorizontal className="size-3.5" strokeWidth={2.25} />
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -254,7 +254,7 @@ export function MessageList({
                   }}
                   className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  <MailCheck className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  <MailCheck className="size-3.5" strokeWidth={2.25} />
                   Read
                 </button>
                 <div className="w-px self-stretch bg-border/60" />
@@ -267,7 +267,7 @@ export function MessageList({
                   }}
                   className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  <MailOpen className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  <MailOpen className="size-3.5" strokeWidth={2.25} />
                   Unread
                 </button>
                 <div className="w-px self-stretch bg-border/60" />
@@ -280,7 +280,7 @@ export function MessageList({
                   }}
                   className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-destructive transition-colors hover:bg-accent"
                 >
-                  <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  <Trash2 className="size-3.5" strokeWidth={2.25} />
                   Delete
                 </button>
               </div>
@@ -298,9 +298,9 @@ export function MessageList({
                         clearSelection();
                         setBulkActionsOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/50 hover:text-foreground"
+                      className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/50 hover:text-foreground"
                     >
-                      <FolderInput className="h-3.5 w-3.5" strokeWidth={2.25} />
+                      <FolderInput className="size-3.5" strokeWidth={2.25} />
                       <span className="truncate">{mailbox.name}</span>
                     </button>
                   ))}
@@ -352,9 +352,16 @@ export function MessageList({
             return (
               <ContextMenu key={row.id}>
                 <ContextMenuTrigger asChild>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onSelect(message.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelect(message.id);
+                      }
+                    }}
                     className={cn(
                       "group/row relative w-full pl-[13px] pr-3 py-2.5 text-left transition-colors cursor-pointer",
                       "data-[state=open]:bg-muted/60",
@@ -379,10 +386,12 @@ export function MessageList({
 
                     <div className="flex items-start gap-2.5">
                       {/* Avatar / checkbox toggle */}
-                      <div
+                      <button
+                        type="button"
                         className="relative shrink-0 cursor-pointer rounded-full group/avatar"
                         onClick={(e) => toggleSelect(e, row.messageIds)}
                         title="Select"
+                        aria-label="Select message"
                       >
                         <SenderAvatar
                           email={message.from?.[0]?.email ?? ""}
@@ -399,17 +408,17 @@ export function MessageList({
                         >
                           {selectedCount > 0 ? (
                             <CheckSquare
-                              className="h-4 w-4 text-primary"
+                              className="size-4 text-primary"
                               strokeWidth={2.25}
                             />
                           ) : (
                             <Square
-                              className="h-4 w-4 text-muted-foreground/50"
+                              className="size-4 text-muted-foreground/50"
                               strokeWidth={2.25}
                             />
                           )}
                         </span>
-                      </div>
+                      </button>
 
                       <div className="flex-1 min-w-0">
                         {/* Top row: sender + meta */}
@@ -441,7 +450,7 @@ export function MessageList({
                                 }
                               >
                                 <MessageSquare
-                                  className="h-2.5 w-2.5"
+                                  className="size-2.5"
                                   strokeWidth={2.25}
                                 />
                                 {unreadCount > 0 &&
@@ -452,14 +461,14 @@ export function MessageList({
                             ) : (
                               !isRead && (
                                 <span
-                                  className="h-1.5 w-1.5 rounded-full bg-primary shrink-0"
+                                  className="size-1.5 rounded-full bg-primary shrink-0"
                                   aria-label="Unread"
                                 />
                               )
                             )}
                             {hasAttachments && (
                               <Paperclip
-                                className="h-3 w-3 text-muted-foreground/60 shrink-0"
+                                className="size-3 text-muted-foreground/60 shrink-0"
                                 strokeWidth={2}
                                 aria-label="Has attachments"
                               />
@@ -496,7 +505,7 @@ export function MessageList({
                             >
                               <Star
                                 className={cn(
-                                  "h-3.5 w-3.5",
+                                  "size-3.5",
                                   isFlagged
                                     ? "fill-amber-400 text-amber-400"
                                     : "text-muted-foreground",
@@ -533,7 +542,7 @@ export function MessageList({
                                 }}
                               >
                                 <span
-                                  className="h-1.5 w-1.5 rounded-full shrink-0"
+                                  className="size-1.5 rounded-full shrink-0"
                                   style={{ backgroundColor: label.color }}
                                 />
                                 {label.name}
@@ -543,7 +552,7 @@ export function MessageList({
                         )}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </ContextMenuTrigger>
 
                 <ContextMenuContent className="w-52">

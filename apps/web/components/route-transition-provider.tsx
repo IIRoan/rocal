@@ -3,8 +3,8 @@
 import {
   Suspense,
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -364,7 +364,7 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
 }
 
 export function useRouteTransition() {
-  const context = useContext(RouteTransitionContext);
+  const context = use(RouteTransitionContext);
 
   if (!context) {
     throw new Error(

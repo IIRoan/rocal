@@ -4,7 +4,6 @@ import {
   optimisticallyInsertEvent,
   optimisticallyRemoveEvent,
   rollbackFromSnapshot,
-  type CacheSnapshot,
 } from "./optimistic-events";
 import type {
   CalendarEvent,

@@ -1,7 +1,3 @@
-jest.mock("expo-linking", () => ({
-  createURL: jest.fn((path: string) => `solace://${path.replace(/^\//, "")}`),
-}));
-
 import {
   buildPasskeyBridgeUrl,
   isPasskeyBridgeOriginSecure,
@@ -12,12 +8,16 @@ import {
 } from "./passkey-browser-bridge";
 import type { PasskeyRouteClient } from "./passkey-auth";
 
+jest.mock("expo-linking", () => ({
+  createURL: jest.fn((path: string) => `solace://${path.replace(/^\//, "")}`),
+}));
+
 function createNoopSubscription() {
   return { remove: jest.fn() };
 }
 
 function createRouteClient(
-  responses: Array<{ data: unknown; error: { message?: string } | null }>,
+  responses: { data: unknown; error: { message?: string } | null }[],
 ): PasskeyRouteClient & { $fetch: jest.Mock } {
   return {
     $fetch: jest.fn(async () => responses.shift()),

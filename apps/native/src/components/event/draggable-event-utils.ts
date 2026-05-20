@@ -1,5 +1,4 @@
 import type { DecoratedCalendarEvent } from "@workspace/calendar-core";
-import { HOUR_HEIGHT } from "../calendar/timeline-utils";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

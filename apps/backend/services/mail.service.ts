@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { createLogger } from "@workspace/logger";
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
 import {
@@ -30,10 +29,10 @@ import {
   createMailBridgePkcePair,
   deriveMailBridgeSecret,
 } from "../lib/mail-bridge-auth";
+import { normalizeEmail, normalizeEmailOrThrow } from "../lib/email-utils";
 
 const LOCAL_PART_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const MIN_VAULT_MEMORY_KIB = 8192;
-const emailSchema = z.string().email();
 const logger = createLogger("backend:mail-service");
 
 const linkedMailboxSelect = {
@@ -77,20 +76,6 @@ type DirectoryEntryOwnershipRecord = {
 function normalizeOptionalText(value?: string | null): string | null {
   const normalized = value?.trim() || "";
   return normalized.length > 0 ? normalized : null;
-}
-
-function normalizeEmail(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function normalizeEmailOrThrow(value: string, field: string = "email"): string {
-  const normalized = normalizeEmail(value);
-
-  if (!emailSchema.safeParse(normalized).success) {
-    throw new ValidationError("A valid email address is required.", field);
-  }
-
-  return normalized;
 }
 
 function parseMailboxEmail(value: string): {

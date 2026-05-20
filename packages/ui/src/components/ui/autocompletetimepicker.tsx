@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 import { Clock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "./button";
@@ -225,6 +225,7 @@ export function ShadcnAutocomleteTimePicker({
   const [open, setOpen] = useState(false);
   const [customTimeInput, setCustomTimeInput] = useState("");
   const isMobile = useIsMobile();
+  const timePickerContentId = useId();
   const { timeOptions, formatTime } = useAutocompleteTimepicker({
     is24Hour,
     locale,
@@ -288,6 +289,7 @@ export function ShadcnAutocomleteTimePicker({
     <button
       role="combobox"
       aria-expanded={open}
+      aria-controls={timePickerContentId}
       className={cn(
         "outline-none text-foreground font-semibold active:opacity-70 transition-opacity",
         className,
@@ -300,6 +302,7 @@ export function ShadcnAutocomleteTimePicker({
       variant={variant}
       role="combobox"
       aria-expanded={open}
+      aria-controls={timePickerContentId}
       className={cn(
         "w-full justify-start font-normal cursor-pointer",
         className,
@@ -315,6 +318,7 @@ export function ShadcnAutocomleteTimePicker({
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
         <DrawerContent
+          id={timePickerContentId}
           responsive
           responsiveHeight="300px"
           className="max-h-[300px]"
@@ -366,6 +370,7 @@ export function ShadcnAutocomleteTimePicker({
     <Drawer open={open} onOpenChange={setOpen} direction="bottom">
       <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
       <DrawerContent
+        id={timePickerContentId}
         responsive
         responsiveHeight="400px"
         className="max-h-[400px]"

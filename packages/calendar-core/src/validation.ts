@@ -4,23 +4,7 @@ import type {
   UpdateCategoryRequest,
   UpdateEventRequest,
 } from "./types";
-
-const ALLOWED_COLORS = [
-  "blue",
-  "orange",
-  "violet",
-  "rose",
-  "emerald",
-  "red",
-  "cyan",
-  "lime",
-  "amber",
-  "indigo",
-  "pink",
-  "teal",
-];
-
-const HEX_COLOR_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
 
 /**
  * Validates event data before submission.
@@ -65,10 +49,9 @@ export function validateEventData(
   }
 
   if ("color" in event && event.color) {
-    const isHex = HEX_COLOR_REGEX.test(event.color);
-    if (!ALLOWED_COLORS.includes(event.color) && !isHex) {
+    if (!isValidCalendarColor(event.color)) {
       errors.push(
-        `Color must be one of: ${ALLOWED_COLORS.join(", ")} or a valid hex color`,
+        `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color`,
       );
     }
   }
@@ -90,10 +73,9 @@ export function validateCategoryData(
   }
 
   if ("color" in category && category.color) {
-    const isHex = HEX_COLOR_REGEX.test(category.color);
-    if (!ALLOWED_COLORS.includes(category.color) && !isHex) {
+    if (!isValidCalendarColor(category.color)) {
       errors.push(
-        `Color must be one of: ${ALLOWED_COLORS.join(", ")} or a valid hex color`,
+        `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color`,
       );
     }
   }

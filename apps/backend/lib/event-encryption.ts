@@ -1,9 +1,11 @@
+import type {
+  EventEncryptionMode,
+} from "@workspace/calendar-core";
 import type { PrismaClient } from "../generated/prisma/index.js";
-
-export type EventEncryptionMode = "hybrid" | "full";
+import type { RowEncryptionState } from "./encryption-state";
 
 export type ResolvedEventPersistencePolicy = {
-  encryptionState: "plaintext" | "shadow_write" | "encrypted";
+  encryptionState: RowEncryptionState;
   title: string;
   description: string | null;
   location: string | null;

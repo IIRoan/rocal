@@ -1,3 +1,12 @@
+import {
+  CALENDAR_VIEWS as CORE_CALENDAR_VIEWS,
+  type Calendar as CoreCalendar,
+  type CalendarEvent as CoreCalendarEvent,
+  type CalendarView as CoreCalendarView,
+  type EncryptionState as CoreEncryptionState,
+  type EventColor as CoreEventColor,
+} from "@workspace/calendar-core";
+
 export interface User {
   id?: string;
   name: string;
@@ -5,68 +14,17 @@ export interface User {
   avatar?: string;
 }
 
-export type EncryptionState = "plaintext" | "shadow_write" | "encrypted";
+export type EncryptionState = CoreEncryptionState;
 
-export type CalendarView = "month" | "week" | "3day" | "day" | "agenda";
+export type CalendarView = CoreCalendarView;
 
-export const CALENDAR_VIEWS: readonly CalendarView[] = [
-  "month",
-  "week",
-  "3day",
-  "day",
-  "agenda",
-];
+export const CALENDAR_VIEWS: readonly CalendarView[] = CORE_CALENDAR_VIEWS;
 
-export interface Calendar {
-  id: string;
-  name: string;
-  encryptedName?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  forceFullEncryption?: boolean;
-  color: EventColor;
-  kind: "owned" | "subscribed" | "public_holiday";
-  isPublic: boolean;
-  isVisible: boolean;
-  isDefault: boolean;
-  isSyncOnly: boolean;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type Calendar = CoreCalendar;
 
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  encryptedContent?: string | null;
-  blindIndexTokens?: string[] | null;
-  encryptionState?: EncryptionState;
-  encryptionKeyVersion?: number;
-  start: Date;
-  end: Date;
-  timezone?: string | null;
-  allDay?: boolean;
+export interface CalendarEvent extends Omit<CoreCalendarEvent, "color"> {
   color?: EventColor;
   label?: string;
-  location?: string;
-  calendarId: string;
-  categoryId?: string;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  reminder?: number | null;
-  // Recurring event fields
-  recurrence?: string | null; // JSON string of recurrence rule
-  parentEventId?: string | null; // For recurring event instances
-  isRecurringInstance?: boolean; // Frontend helper field
-  // Sync fields for external calendar events
-  isSynced?: boolean;
-  externalId?: string | null;
-  subscriptionId?: string | null;
-  syncedAt?: Date | null;
-  // Preview event (ghost event shown in timeline while creating via popover)
   isPreview?: boolean;
 }
 
@@ -89,17 +47,4 @@ export interface CreateEventData {
   reminder?: number | null;
 }
 
-export type EventColor =
-  | "blue"
-  | "orange"
-  | "violet"
-  | "rose"
-  | "emerald"
-  | "red"
-  | "cyan"
-  | "lime"
-  | "amber"
-  | "indigo"
-  | "pink"
-  | "teal"
-  | string;
+export type EventColor = CoreEventColor;

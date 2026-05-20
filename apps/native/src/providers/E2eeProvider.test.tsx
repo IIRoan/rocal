@@ -3,8 +3,22 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import type {
+  E2eeBootstrapResponse,
+  E2eePasswordRecord,
+} from "@workspace/calendar-core";
+import * as SecureStore from "expo-secure-store";
+import { createE2eeModule } from "@workspace/e2ee";
+import {
+  createNativeCryptoProvider,
+  installCryptoPolyfill,
+} from "../lib/native-crypto-provider";
+import { useAuth } from "./AuthProvider";
+import { useTheme } from "./ThemeProvider";
+import { E2eeProvider, useE2ee } from "./E2eeProvider";
+
 jest.mock("react-native", () => {
-  const React = require("react");
+  const React = jest.requireActual<typeof import("react")>("react");
 
   return {
     ActivityIndicator: () => <div data-testid="activity-indicator" />,
@@ -106,20 +120,6 @@ jest.mock("@workspace/e2ee", () => ({
   createE2eeModule: jest.fn(),
   hydrateEncryptedEventWithoutSession: jest.fn((event) => event),
 }));
-
-import type {
-  E2eeBootstrapResponse,
-  E2eePasswordRecord,
-} from "@workspace/calendar-core";
-import * as SecureStore from "expo-secure-store";
-import { createE2eeModule } from "@workspace/e2ee";
-import {
-  createNativeCryptoProvider,
-  installCryptoPolyfill,
-} from "../lib/native-crypto-provider";
-import { useAuth } from "./AuthProvider";
-import { useTheme } from "./ThemeProvider";
-import { E2eeProvider, useE2ee } from "./E2eeProvider";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

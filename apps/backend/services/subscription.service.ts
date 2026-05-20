@@ -434,12 +434,21 @@ export class SubscriptionService implements ISubscriptionService {
 
     const createdEvents = [];
     const errors = [...parseResult.errors];
+    const existingEventsByUid = new Map(
+      (
+        await this.prisma.calendarEvent.findMany({
+          where: {
+            calendarId,
+            externalId: { in: parseResult.events.map((event) => event.uid) },
+            isSynced: false,
+          },
+        })
+      ).map((event) => [event.externalId!, event]),
+    );
 
     for (const parsedEvent of parseResult.events) {
       try {
-        const existingEvent = await this.prisma.calendarEvent.findFirst({
-          where: { calendarId, externalId: parsedEvent.uid, isSynced: false },
-        });
+        const existingEvent = existingEventsByUid.get(parsedEvent.uid);
 
         if (existingEvent) {
           errors.push(

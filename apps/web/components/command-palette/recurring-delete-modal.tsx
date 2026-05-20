@@ -32,7 +32,7 @@ export function RecurringDeleteModal({
       <DialogContent className="w-[calc(100dvw-1rem)] sm:w-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <AlertTriangle className="size-5 text-destructive" />
             Delete Recurring Event
           </DialogTitle>
         </DialogHeader>
@@ -66,7 +66,7 @@ export function RecurringDeleteModal({
                 disabled={loading}
                 className="w-full sm:w-auto"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="size-4 mr-2" />
                 {loading ? "Deleting..." : "Delete This Only"}
               </Button>
             )}
@@ -78,7 +78,7 @@ export function RecurringDeleteModal({
               disabled={loading}
               className="w-full sm:w-auto"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="size-4 mr-2" />
               {loading ? "Deleting..." : "Delete All"}
             </Button>
           </div>

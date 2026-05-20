@@ -30,26 +30,28 @@ export function MailViewer({ previews }: { previews: EmailPreview[] }) {
                 {cat}
               </p>
             </div>
-            {previews
-              .filter((p) => p.category === cat)
-              .map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setActiveId(p.id)}
-                  className={`w-full text-left px-4 py-3 flex flex-col gap-0.5 transition-colors border-l-2 ${
-                    activeId === p.id
-                      ? "bg-primary/8 border-primary"
-                      : "border-transparent hover:bg-muted/40 hover:border-border"
-                  }`}
-                >
-                  <span className="text-sm font-medium text-foreground">
-                    {p.label}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
-                    {p.description}
-                  </span>
-                </button>
-              ))}
+            {previews.flatMap((p) =>
+              p.category === cat
+                ? [
+                    <button
+                      key={p.id}
+                      onClick={() => setActiveId(p.id)}
+                      className={`w-full text-left px-4 py-3 flex flex-col gap-0.5 transition-colors border-l-2 ${
+                        activeId === p.id
+                          ? "bg-primary/8 border-primary"
+                          : "border-transparent hover:bg-muted/40 hover:border-border"
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-foreground">
+                        {p.label}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                        {p.description}
+                      </span>
+                    </button>,
+                  ]
+                : [],
+            )}
           </div>
         ))}
       </aside>

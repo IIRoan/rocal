@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, ReactNode } from "react";
+import { createContext, use, useEffect, ReactNode } from "react";
 import {
   useCalendarData,
   UseCalendarDataReturn,
@@ -12,7 +12,7 @@ const CalendarDataContext = createContext<UseCalendarDataReturn | undefined>(
 );
 
 export function useSharedCalendarData() {
-  const context = useContext(CalendarDataContext);
+  const context = use(CalendarDataContext);
   if (!context) {
     throw new Error(
       "useSharedCalendarData must be used within a CalendarDataProvider",

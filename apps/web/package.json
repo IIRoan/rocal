@@ -8,6 +8,7 @@
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "eslint .",
+    "lint:react-doctor": "eslint . --config eslint.react-doctor.config.js",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "test": "jest --config ./jest.config.cjs",

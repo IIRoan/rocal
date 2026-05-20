@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useReducer, type ChangeEvent } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import {
   getErrorMessage,
@@ -76,35 +76,19 @@ import {
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import {
+  isValidCalendarColor,
+  PRESET_COLOR_OPTIONS,
+} from "@workspace/calendar-core";
 
-const PRESET_COLORS = [
-  { value: "blue", label: "Blue" },
-  { value: "emerald", label: "Emerald" },
-  { value: "orange", label: "Orange" },
-  { value: "violet", label: "Violet" },
-  { value: "rose", label: "Rose" },
-  { value: "red", label: "Red" },
-  { value: "cyan", label: "Cyan" },
-  { value: "lime", label: "Lime" },
-  { value: "amber", label: "Amber" },
-  { value: "indigo", label: "Indigo" },
-  { value: "pink", label: "Pink" },
-  { value: "teal", label: "Teal" },
-];
-
-const ALLOWED_COLOR_VALUES = PRESET_COLORS.map((c) => c.value);
+const PRESET_COLORS = PRESET_COLOR_OPTIONS;
 
 const calendarFormSchema = z.object({
   name: z.string().trim().min(1, "Calendar name is required").max(100),
   color: z
     .string()
     .trim()
-    .refine((value) => {
-      return (
-        ALLOWED_COLOR_VALUES.includes(value) ||
-        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)
-      );
-    }, "Please select a valid color"),
+    .refine(isValidCalendarColor, "Please select a valid color"),
 });
 
 interface CalendarManagementProps {
@@ -112,7 +96,146 @@ interface CalendarManagementProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function CalendarManagement({
+interface CalendarFormDraft {
+  name: string;
+  color: string;
+  isDefault: boolean;
+}
+
+interface ValidationErrors {
+  name?: string;
+  color?: string;
+  general?: string;
+}
+
+interface PendingUnsubscribe {
+  subscriptionId: string;
+  calendarName: string;
+  action: string;
+}
+
+interface CalendarManagementState {
+  showCreateForm: boolean;
+  editingCalendar: Calendar | null;
+  deletingCalendar: Calendar | null;
+  deleteAction: CalendarDeleteAction;
+  targetCalendarId: string;
+  newCalendar: CalendarFormDraft;
+  showImportDialog: boolean;
+  importCalendarId: string;
+  importFile: File | null;
+  importResult: ImportICSResponse | null;
+  sharingCalendar: Calendar | null;
+  shareLinkInfo: CalendarShareLink | null;
+  shareLinkLoading: boolean;
+  showRegenerateConfirm: boolean;
+  showSubscriptionDialog: boolean;
+  subscriptionView: PaletteView;
+  pendingUnsubscribe: PendingUnsubscribe | null;
+  validationErrors: ValidationErrors;
+}
+
+type StateUpdater = (state: CalendarManagementState) => CalendarManagementState;
+type SetStateValue<T> = T | ((previous: T) => T);
+
+const initialNewCalendar: CalendarFormDraft = {
+  name: "",
+  color: "blue",
+  isDefault: false,
+};
+
+const initialCalendarManagementState: CalendarManagementState = {
+  showCreateForm: false,
+  editingCalendar: null,
+  deletingCalendar: null,
+  deleteAction: "delete_events",
+  targetCalendarId: "",
+  newCalendar: initialNewCalendar,
+  showImportDialog: false,
+  importCalendarId: "",
+  importFile: null,
+  importResult: null,
+  sharingCalendar: null,
+  shareLinkInfo: null,
+  shareLinkLoading: false,
+  showRegenerateConfirm: false,
+  showSubscriptionDialog: false,
+  subscriptionView: "subscriptions",
+  pendingUnsubscribe: null,
+  validationErrors: {},
+};
+
+function calendarManagementReducer(
+  state: CalendarManagementState,
+  updater: StateUpdater,
+) {
+  return updater(state);
+}
+
+function resolveStateValue<T>(value: SetStateValue<T>, previous: T): T {
+  return typeof value === "function"
+    ? (value as (previous: T) => T)(previous)
+    : value;
+}
+
+function useCalendarManagementState() {
+  const [state, dispatch] = useReducer(
+    calendarManagementReducer,
+    initialCalendarManagementState,
+  );
+
+  const setField = <K extends keyof CalendarManagementState>(
+    key: K,
+    value: SetStateValue<CalendarManagementState[K]>,
+  ) => {
+    dispatch((current) => ({
+      ...current,
+      [key]: resolveStateValue(value, current[key]),
+    }));
+  };
+
+  return {
+    state,
+    setShowCreateForm: (value: SetStateValue<boolean>) =>
+      setField("showCreateForm", value),
+    setEditingCalendar: (value: SetStateValue<Calendar | null>) =>
+      setField("editingCalendar", value),
+    setDeletingCalendar: (value: SetStateValue<Calendar | null>) =>
+      setField("deletingCalendar", value),
+    setDeleteAction: (value: SetStateValue<CalendarDeleteAction>) =>
+      setField("deleteAction", value),
+    setTargetCalendarId: (value: SetStateValue<string>) =>
+      setField("targetCalendarId", value),
+    setNewCalendar: (value: SetStateValue<CalendarFormDraft>) =>
+      setField("newCalendar", value),
+    setShowImportDialog: (value: SetStateValue<boolean>) =>
+      setField("showImportDialog", value),
+    setImportCalendarId: (value: SetStateValue<string>) =>
+      setField("importCalendarId", value),
+    setImportFile: (value: SetStateValue<File | null>) =>
+      setField("importFile", value),
+    setImportResult: (value: SetStateValue<ImportICSResponse | null>) =>
+      setField("importResult", value),
+    setSharingCalendar: (value: SetStateValue<Calendar | null>) =>
+      setField("sharingCalendar", value),
+    setShareLinkInfo: (value: SetStateValue<CalendarShareLink | null>) =>
+      setField("shareLinkInfo", value),
+    setShareLinkLoading: (value: SetStateValue<boolean>) =>
+      setField("shareLinkLoading", value),
+    setShowRegenerateConfirm: (value: SetStateValue<boolean>) =>
+      setField("showRegenerateConfirm", value),
+    setShowSubscriptionDialog: (value: SetStateValue<boolean>) =>
+      setField("showSubscriptionDialog", value),
+    setSubscriptionView: (value: SetStateValue<PaletteView>) =>
+      setField("subscriptionView", value),
+    setPendingUnsubscribe: (value: SetStateValue<PendingUnsubscribe | null>) =>
+      setField("pendingUnsubscribe", value),
+    setValidationErrors: (value: SetStateValue<ValidationErrors>) =>
+      setField("validationErrors", value),
+  };
+}
+
+function useCalendarManagementModel({
   open,
   onOpenChange,
 }: CalendarManagementProps) {
@@ -138,46 +261,46 @@ export function CalendarManagement({
     ]),
   );
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
-  const [deletingCalendar, setDeletingCalendar] = useState<Calendar | null>(
-    null,
-  );
-  const [deleteAction, setDeleteAction] =
-    useState<CalendarDeleteAction>("delete_events");
-  const [targetCalendarId, setTargetCalendarId] = useState<string>("");
-
-  const [newCalendar, setNewCalendar] = useState({
-    name: "",
-    color: "blue",
-    isDefault: false,
-  });
-
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importCalendarId, setImportCalendarId] = useState<string>("");
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importResult, setImportResult] = useState<ImportICSResponse | null>(
-    null,
-  );
-  const [sharingCalendar, setSharingCalendar] = useState<Calendar | null>(null);
-  const [shareLinkInfo, setShareLinkInfo] = useState<CalendarShareLink | null>(
-    null,
-  );
-  const [shareLinkLoading, setShareLinkLoading] = useState(false);
-  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
-  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
-  const [subscriptionView, setSubscriptionView] =
-    useState<PaletteView>("subscriptions");
-  const [pendingUnsubscribe, setPendingUnsubscribe] = useState<{
-    subscriptionId: string;
-    calendarName: string;
-    action: string;
-  } | null>(null);
-  const [validationErrors, setValidationErrors] = useState<{
-    name?: string;
-    color?: string;
-    general?: string;
-  }>({});
+  const {
+    state: {
+      showCreateForm,
+      editingCalendar,
+      deletingCalendar,
+      deleteAction,
+      targetCalendarId,
+      newCalendar,
+      showImportDialog,
+      importCalendarId,
+      importFile,
+      importResult,
+      sharingCalendar,
+      shareLinkInfo,
+      shareLinkLoading,
+      showRegenerateConfirm,
+      showSubscriptionDialog,
+      subscriptionView,
+      pendingUnsubscribe,
+      validationErrors,
+    },
+    setShowCreateForm,
+    setEditingCalendar,
+    setDeletingCalendar,
+    setDeleteAction,
+    setTargetCalendarId,
+    setNewCalendar,
+    setShowImportDialog,
+    setImportCalendarId,
+    setImportFile,
+    setImportResult,
+    setSharingCalendar,
+    setShareLinkInfo,
+    setShareLinkLoading,
+    setShowRegenerateConfirm,
+    setShowSubscriptionDialog,
+    setSubscriptionView,
+    setPendingUnsubscribe,
+    setValidationErrors,
+  } = useCalendarManagementState();
 
   // Mutations
   const deleteCalendarMutation = useMutation({
@@ -341,10 +464,13 @@ export function CalendarManagement({
     }
 
     // Check for duplicate names (excluding current calendar)
-    const existingNames = calendars
-      .filter((cal) => cal.id !== currentCalendarId)
-      .map((cal) => cal.name.toLowerCase());
-    if (existingNames.includes(name.trim().toLowerCase())) {
+    const normalizedName = name.trim().toLowerCase();
+    const nameExists = calendars.some(
+      (cal) =>
+        cal.id !== currentCalendarId &&
+        cal.name.toLowerCase() === normalizedName,
+    );
+    if (nameExists) {
       errors.name = "A calendar with this name already exists";
     }
 
@@ -545,792 +671,228 @@ export function CalendarManagement({
     await handleEnableShareLink(true);
   };
 
+  return {
+    managementDialogProps: {
+      open,
+      onOpenChange,
+      openCalendarManagement,
+      showCreateForm,
+      setShowCreateForm,
+      setShowSubscriptionDialog,
+      setShowImportDialog,
+      setImportResult,
+      newCalendar,
+      setNewCalendar,
+      validationErrors,
+      setValidationErrors,
+      loading,
+      onCreateCalendar: handleCreateCalendar,
+      ownedCalendars,
+      publicCalendars,
+      subscribedCalendars,
+      isCalendarVisible,
+      onToggleVisibility: handleToggleVisibility,
+      onSetDefault: handleSetDefault,
+      onOpenShareDialog: openShareDialog,
+      setEditingCalendar,
+      setDeletingCalendar,
+      onRemoveSubscribedCalendar: handleRemoveSubscribedCalendar,
+    },
+    overlayProps: {
+      editingCalendar,
+      setEditingCalendar,
+      validationErrors,
+      setValidationErrors,
+      loading,
+      onOpenShareDialog: openShareDialog,
+      onUpdateCalendar: handleUpdateCalendar,
+      deletingCalendar,
+      setDeletingCalendar,
+      deleteAction,
+      setDeleteAction,
+      targetCalendarId,
+      setTargetCalendarId,
+      availableTargetCalendars,
+      onDelete: handleDeleteCalendar,
+      showImportDialog,
+      setShowImportDialog,
+      importResult,
+      setImportResult,
+      importFile,
+      setImportFile,
+      importCalendarId,
+      setImportCalendarId,
+      calendars,
+      onFileSelect: handleFileSelect,
+      onImport: handleImportICS,
+      showSubscriptionDialog,
+      setShowSubscriptionDialog,
+      subscriptionView,
+      setSubscriptionView,
+      sharingCalendar,
+      setSharingCalendar,
+      setShareLinkInfo,
+      setShareLinkLoading,
+      setShowRegenerateConfirm,
+      shareLinkInfo,
+      shareLinkLoading,
+      onToggleShareLink: handleToggleShareLink,
+      onCopyShareLink: handleCopyShareLink,
+      showRegenerateConfirm,
+      onConfirmRegenerate: handleRegenerateShareLinkConfirmed,
+      pendingUnsubscribe,
+      setPendingUnsubscribe,
+      onRemoveSubscription: (subscriptionId: string) =>
+        deleteSubscriptionMutation.mutate(subscriptionId),
+    },
+  };
+}
+
+export function CalendarManagement(props: CalendarManagementProps) {
+  const { managementDialogProps, overlayProps } =
+    useCalendarManagementModel(props);
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[calc(90dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Calendars</DialogTitle>
-            <DialogDescription>
-              Create, edit, and organize your calendars
-            </DialogDescription>
-          </DialogHeader>
+      <CalendarManagementDialog {...managementDialogProps} />
+      <CalendarManagementOverlays {...overlayProps} />
+    </>
+  );
+}
 
-          <div className="space-y-4">
-            {/* Create New Calendar */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <span>Create New Calendar</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        onOpenChange(false);
-                        openCalendarManagement();
-                      }}
-                      title="Calendar Settings"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowSubscriptionDialog(true);
-                      }}
-                      title="Subscribe to external calendars"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Subscriptions
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowImportDialog(true);
-                        setImportResult(null);
-                      }}
-                      title="Import .ics file"
-                    >
-                      <Upload className="h-4 w-4 mr-1" />
-                      Import ICS
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowCreateForm(!showCreateForm);
-                        // Clear errors when opening/closing form
-                        setValidationErrors({});
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      New Calendar
-                    </Button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              {showCreateForm && (
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newCalendarName">Calendar Name</Label>
-                    <Input
-                      id="newCalendarName"
-                      value={newCalendar.name}
-                      onChange={(e) => {
-                        setNewCalendar({
-                          ...newCalendar,
-                          name: e.target.value,
-                        });
-                        // Clear name error when user starts typing
-                        if (validationErrors.name) {
-                          setValidationErrors({
-                            ...validationErrors,
-                            name: undefined,
-                          });
-                        }
-                      }}
-                      placeholder="Enter calendar name"
-                      className={
-                        validationErrors.name
-                          ? "border-destructive focus-visible:ring-destructive"
-                          : ""
-                      }
-                    />
-                    {validationErrors.name && (
-                      <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.name}
-                      </p>
-                    )}
-                  </div>
+function CalendarManagementOverlays({
+  editingCalendar,
+  setEditingCalendar,
+  validationErrors,
+  setValidationErrors,
+  loading,
+  onOpenShareDialog,
+  onUpdateCalendar,
+  deletingCalendar,
+  setDeletingCalendar,
+  deleteAction,
+  setDeleteAction,
+  targetCalendarId,
+  setTargetCalendarId,
+  availableTargetCalendars,
+  onDelete,
+  showImportDialog,
+  setShowImportDialog,
+  importResult,
+  setImportResult,
+  importFile,
+  setImportFile,
+  importCalendarId,
+  setImportCalendarId,
+  calendars,
+  onFileSelect,
+  onImport,
+  showSubscriptionDialog,
+  setShowSubscriptionDialog,
+  subscriptionView,
+  setSubscriptionView,
+  sharingCalendar,
+  setSharingCalendar,
+  setShareLinkInfo,
+  setShareLinkLoading,
+  setShowRegenerateConfirm,
+  shareLinkInfo,
+  shareLinkLoading,
+  onToggleShareLink,
+  onCopyShareLink,
+  showRegenerateConfirm,
+  onConfirmRegenerate,
+  pendingUnsubscribe,
+  setPendingUnsubscribe,
+  onRemoveSubscription,
+}: {
+  editingCalendar: Calendar | null;
+  setEditingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  validationErrors: ValidationErrors;
+  setValidationErrors: (value: SetStateValue<ValidationErrors>) => void;
+  loading: boolean;
+  onOpenShareDialog: (calendar: Calendar) => void;
+  onUpdateCalendar: (
+    calendar: Calendar,
+    updates: Partial<UpdateCalendarRequest>,
+  ) => Promise<boolean | undefined>;
+  deletingCalendar: Calendar | null;
+  setDeletingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  deleteAction: CalendarDeleteAction;
+  setDeleteAction: (value: SetStateValue<CalendarDeleteAction>) => void;
+  targetCalendarId: string;
+  setTargetCalendarId: (value: SetStateValue<string>) => void;
+  availableTargetCalendars: Calendar[];
+  onDelete: () => void;
+  showImportDialog: boolean;
+  setShowImportDialog: (value: SetStateValue<boolean>) => void;
+  importResult: ImportICSResponse | null;
+  setImportResult: (value: SetStateValue<ImportICSResponse | null>) => void;
+  importFile: File | null;
+  setImportFile: (value: SetStateValue<File | null>) => void;
+  importCalendarId: string;
+  setImportCalendarId: (value: SetStateValue<string>) => void;
+  calendars: Calendar[];
+  onFileSelect: (event: ChangeEvent<HTMLInputElement>) => void;
+  onImport: () => void;
+  showSubscriptionDialog: boolean;
+  setShowSubscriptionDialog: (value: SetStateValue<boolean>) => void;
+  subscriptionView: PaletteView;
+  setSubscriptionView: (value: SetStateValue<PaletteView>) => void;
+  sharingCalendar: Calendar | null;
+  setSharingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setShareLinkInfo: (value: SetStateValue<CalendarShareLink | null>) => void;
+  setShareLinkLoading: (value: SetStateValue<boolean>) => void;
+  setShowRegenerateConfirm: (value: SetStateValue<boolean>) => void;
+  shareLinkInfo: CalendarShareLink | null;
+  shareLinkLoading: boolean;
+  onToggleShareLink: (enabled: boolean) => Promise<void>;
+  onCopyShareLink: () => Promise<void>;
+  showRegenerateConfirm: boolean;
+  onConfirmRegenerate: () => Promise<void>;
+  pendingUnsubscribe: PendingUnsubscribe | null;
+  setPendingUnsubscribe: (value: SetStateValue<PendingUnsubscribe | null>) => void;
+  onRemoveSubscription: (subscriptionId: string) => void;
+}) {
+  return (
+    <>
+      <EditCalendarDialog
+        editingCalendar={editingCalendar}
+        setEditingCalendar={setEditingCalendar}
+        validationErrors={validationErrors}
+        setValidationErrors={setValidationErrors}
+        loading={loading}
+        onOpenShareDialog={onOpenShareDialog}
+        onUpdateCalendar={onUpdateCalendar}
+      />
 
-                  <div className="space-y-2">
-                    <Label>Color</Label>
-                    <ColorPicker
-                      value={newCalendar.color}
-                      onChange={(color) => {
-                        setNewCalendar({
-                          ...newCalendar,
-                          color,
-                        });
-                        // Clear color error when user selects a new color
-                        if (validationErrors.color) {
-                          setValidationErrors({
-                            ...validationErrors,
-                            color: undefined,
-                          });
-                        }
-                      }}
-                      presetColors={PRESET_COLORS}
-                    />
-                    {validationErrors.color && (
-                      <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.color}
-                      </p>
-                    )}
-                  </div>
+      <DeleteCalendarDialog
+        deletingCalendar={deletingCalendar}
+        setDeletingCalendar={setDeletingCalendar}
+        deleteAction={deleteAction}
+        setDeleteAction={setDeleteAction}
+        targetCalendarId={targetCalendarId}
+        setTargetCalendarId={setTargetCalendarId}
+        availableTargetCalendars={availableTargetCalendars}
+        loading={loading}
+        onDelete={onDelete}
+      />
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="newCalendarDefault"
-                      checked={newCalendar.isDefault}
-                      onCheckedChange={(checked) =>
-                        setNewCalendar({ ...newCalendar, isDefault: checked })
-                      }
-                    />
-                    <Label htmlFor="newCalendarDefault">
-                      Set as default calendar
-                    </Label>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleCreateCalendar} disabled={loading}>
-                      Create Calendar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowCreateForm(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-
-            {/* Existing Calendars */}
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Your Calendars</h3>
-              <div className="space-y-2">
-                {ownedCalendars.map((calendar) => (
-                  <Card key={calendar.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            className="w-4 h-4 rounded"
-                            style={{
-                              backgroundColor: getColorSwatchValue(
-                                calendar.color,
-                              ),
-                            }}
-                          />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">
-                                {calendar.name}
-                              </span>
-                              {calendar.isSyncOnly && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs bg-muted"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  Synced
-                                </Badge>
-                              )}
-                              {calendar.isDefault && (
-                                <Badge variant="outline" className="text-xs">
-                                  <Star className="h-3 w-3 mr-1" />
-                                  Default
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {calendar.isSyncOnly ? "Read-only \u00B7 " : ""}
-                              {isCalendarVisible(calendar.id)
-                                ? "Visible"
-                                : "Hidden"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleVisibility(calendar)}
-                            title={
-                              isCalendarVisible(calendar.id)
-                                ? "Hide calendar"
-                                : "Show calendar"
-                            }
-                          >
-                            {isCalendarVisible(calendar.id) ? (
-                              <Eye className="h-4 w-4" />
-                            ) : (
-                              <EyeOff className="h-4 w-4" />
-                            )}
-                          </Button>
-
-                          {!calendar.isSyncOnly && !calendar.isDefault && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleSetDefault(calendar)}
-                              title="Set as default calendar"
-                            >
-                              <Star className="h-4 w-4" />
-                            </Button>
-                          )}
-
-                          {!calendar.isSyncOnly && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openShareDialog(calendar)}
-                              title="Share calendar as ICS"
-                              className="h-8 px-2 text-xs"
-                            >
-                              <Share2 className="h-3.5 w-3.5 mr-1" />
-                              Share
-                            </Button>
-                          )}
-
-                          {!calendar.isSyncOnly && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingCalendar(calendar);
-                                setValidationErrors({});
-                              }}
-                              title="Edit calendar"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          )}
-
-                          {!calendar.isSyncOnly && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingCalendar(calendar)}
-                              title="Delete calendar"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            {publicCalendars.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold">Public Calendars</h3>
-                <div className="space-y-2">
-                  {publicCalendars.map((calendar) => (
-                    <Card key={calendar.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className="w-4 h-4 rounded"
-                              style={{
-                                backgroundColor: getColorSwatchValue(
-                                  calendar.color,
-                                ),
-                              }}
-                            />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {calendar.name}
-                                </span>
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs bg-primary/10 text-primary"
-                                >
-                                  <Globe className="h-3 w-3 mr-1" />
-                                  Public
-                                </Badge>
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                Read-only public holiday calendar ·{" "}
-                                {isCalendarVisible(calendar.id)
-                                  ? "Visible"
-                                  : "Hidden"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleVisibility(calendar)}
-                              title={
-                                isCalendarVisible(calendar.id)
-                                  ? "Hide calendar"
-                                  : "Show calendar"
-                              }
-                            >
-                              {isCalendarVisible(calendar.id) ? (
-                                <Eye className="h-4 w-4" />
-                              ) : (
-                                <EyeOff className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleRemoveSubscribedCalendar(calendar)
-                              }
-                              title="Remove public calendar"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {subscribedCalendars.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold">Subscribed Calendars</h3>
-                <div className="space-y-2">
-                  {subscribedCalendars.map((calendar) => (
-                    <Card key={calendar.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className="w-4 h-4 rounded"
-                              style={{
-                                backgroundColor: getColorSwatchValue(
-                                  calendar.color,
-                                ),
-                              }}
-                            />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {calendar.name}
-                                </span>
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs bg-muted"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  Subscribed
-                                </Badge>
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                Read-only external calendar ·{" "}
-                                {isCalendarVisible(calendar.id)
-                                  ? "Visible"
-                                  : "Hidden"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleVisibility(calendar)}
-                              title={
-                                isCalendarVisible(calendar.id)
-                                  ? "Hide calendar"
-                                  : "Show calendar"
-                              }
-                            >
-                              {isCalendarVisible(calendar.id) ? (
-                                <Eye className="h-4 w-4" />
-                              ) : (
-                                <EyeOff className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleRemoveSubscribedCalendar(calendar)
-                              }
-                              title="Remove subscribed calendar"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Calendar Dialog */}
-      <Dialog
-        open={!!editingCalendar}
-        onOpenChange={(open) => !open && setEditingCalendar(null)}
-      >
-        <DialogContent aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle>Edit Calendar</DialogTitle>
-          </DialogHeader>
-
-          {editingCalendar && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="editCalendarName">Calendar Name</Label>
-                <Input
-                  id="editCalendarName"
-                  value={editingCalendar.name}
-                  onChange={(e) => {
-                    setEditingCalendar({
-                      ...editingCalendar,
-                      name: e.target.value,
-                    });
-                    // Clear name error when user starts typing
-                    if (validationErrors.name) {
-                      setValidationErrors({
-                        ...validationErrors,
-                        name: undefined,
-                      });
-                    }
-                  }}
-                  className={
-                    validationErrors.name
-                      ? "border-destructive focus-visible:ring-destructive"
-                      : ""
-                  }
-                />
-                {validationErrors.name && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {validationErrors.name}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <ColorPicker
-                  value={editingCalendar.color}
-                  onChange={(color) => {
-                    setEditingCalendar({
-                      ...editingCalendar,
-                      color,
-                    });
-                    // Clear color error when user selects a new color
-                    if (validationErrors.color) {
-                      setValidationErrors({
-                        ...validationErrors,
-                        color: undefined,
-                      });
-                    }
-                  }}
-                  presetColors={PRESET_COLORS}
-                />
-                {validationErrors.color && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {validationErrors.color}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            {editingCalendar && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const selectedCalendar = editingCalendar;
-                  setEditingCalendar(null);
-                  void openShareDialog(selectedCalendar);
-                }}
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditingCalendar(null);
-                setValidationErrors({});
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (editingCalendar) {
-                  const success = await handleUpdateCalendar(editingCalendar, {
-                    name: editingCalendar.name,
-                    color: editingCalendar.color,
-                  });
-                  // Only close dialog on successful update
-                  if (success) {
-                    setEditingCalendar(null);
-                  }
-                }
-              }}
-              disabled={loading}
-            >
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Calendar Dialog */}
-      <Dialog
-        open={!!deletingCalendar}
-        onOpenChange={(open) => !open && setDeletingCalendar(null)}
-      >
-        <DialogContent aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Delete Calendar
-            </DialogTitle>
-            <DialogDescription>
-              You&apos;re about to delete &quot;{deletingCalendar?.name}&quot;.
-              What would you like to do with existing events?
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <RadioGroup
-              value={deleteAction}
-              onValueChange={(value) =>
-                setDeleteAction(value as CalendarDeleteAction)
-              }
-            >
-              <div className="space-y-3">
-                <div className="flex items-start space-x-3">
-                  <RadioGroupItem
-                    value="delete_events"
-                    id="delete_events"
-                    className="mt-1"
-                  />
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="delete_events"
-                      className="font-medium cursor-pointer"
-                    >
-                      Delete calendar and all events (default)
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Permanently delete the calendar and all its events
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <RadioGroupItem
-                    value="move_events"
-                    id="move_events"
-                    className="mt-1"
-                  />
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="move_events"
-                      className="font-medium cursor-pointer"
-                    >
-                      Move events to another calendar
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Select a calendar to move events to
-                    </p>
-                  </div>
-                </div>
-
-                {deleteAction === "move_events" && (
-                  <div className="ml-7">
-                    <Select
-                      value={targetCalendarId}
-                      onValueChange={setTargetCalendarId}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select target calendar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableTargetCalendars.map((cal) => (
-                          <SelectItem key={cal.id} value={cal.id}>
-                            {cal.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </RadioGroup>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingCalendar(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteCalendar}
-              disabled={
-                loading || (deleteAction === "move_events" && !targetCalendarId)
-              }
-            >
-              {loading ? "Deleting..." : "Delete Calendar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import ICS Dialog */}
-      <Dialog
+      <ImportIcsDialog
         open={showImportDialog}
-        onOpenChange={(open) => {
-          setShowImportDialog(open);
-          if (!open) {
-            setImportFile(null);
-            setImportCalendarId("");
-            setImportResult(null);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import Calendar (ICS)</DialogTitle>
-            <DialogDescription>
-              Import events from an .ics file into one of your calendars.
-            </DialogDescription>
-          </DialogHeader>
+        setOpen={setShowImportDialog}
+        importResult={importResult}
+        setImportResult={setImportResult}
+        importFile={importFile}
+        setImportFile={setImportFile}
+        importCalendarId={importCalendarId}
+        setImportCalendarId={setImportCalendarId}
+        calendars={calendars}
+        loading={loading}
+        onFileSelect={onFileSelect}
+        onImport={onImport}
+      />
 
-          {importResult ? (
-            <div className="space-y-4">
-              <div className="p-4 rounded-md bg-muted">
-                <h4 className="font-medium mb-2">Import Summary</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Total Events Found:</span>
-                    <span className="font-medium">
-                      {importResult.eventsTotal}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                    <span>Events Created:</span>
-                    <span className="font-medium">
-                      {importResult.eventsCreated}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {importResult.errors && importResult.errors.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-destructive flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Errors ({importResult.errors.length})
-                  </h4>
-                  <div className="max-h-40 overflow-y-auto text-xs space-y-1 p-2 border rounded-md bg-destructive/10">
-                    {importResult.errors.map((err, i) => (
-                      <div key={i} className="text-destructive">
-                        {err}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <DialogFooter>
-                <Button onClick={() => setShowImportDialog(false)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="importFile">Select .ics File</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="importFile"
-                    type="file"
-                    accept=".ics"
-                    onChange={handleFileSelect}
-                    className="cursor-pointer"
-                  />
-                </div>
-                {importFile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="importCalendar">Target Calendar</Label>
-                <Select
-                  value={importCalendarId}
-                  onValueChange={setImportCalendarId}
-                >
-                  <SelectTrigger id="importCalendar">
-                    <SelectValue placeholder="Select calendar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {calendars
-                      .filter((c) => !c.isSyncOnly)
-                      .map((cal) => (
-                        <SelectItem key={cal.id} value={cal.id}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{
-                                backgroundColor: getColorSwatchValue(cal.color),
-                              }}
-                            />
-                            {cal.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowImportDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleImportICS}
-                  disabled={loading || !importFile || !importCalendarId}
-                >
-                  {loading ? "Importing..." : "Import Events"}
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Subscription Management Dialog */}
       <SubscriptionManagement
         open={showSubscriptionDialog}
         onOpenChange={(open) => {
@@ -1348,188 +910,1171 @@ export function CalendarManagement({
         onNavigateTo={setSubscriptionView}
       />
 
-      {/* Share Calendar Dialog */}
-      <Dialog
-        open={!!sharingCalendar}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSharingCalendar(null);
-            setShareLinkInfo(null);
-            setShareLinkLoading(false);
-            setShowRegenerateConfirm(false);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Share Calendar as ICS</DialogTitle>
-            <DialogDescription>
-              Enable a public .ics subscription link for{" "}
-              <strong>{sharingCalendar?.name}</strong>.
-            </DialogDescription>
-          </DialogHeader>
+      <ShareCalendarDialog
+        sharingCalendar={sharingCalendar}
+        setSharingCalendar={setSharingCalendar}
+        setShareLinkInfo={setShareLinkInfo}
+        setShareLinkLoading={setShareLinkLoading}
+        setShowRegenerateConfirm={setShowRegenerateConfirm}
+        shareLinkInfo={shareLinkInfo}
+        shareLinkLoading={shareLinkLoading}
+        onToggleShareLink={onToggleShareLink}
+        onCopyShareLink={onCopyShareLink}
+      />
 
-          <div className="space-y-4">
-            <div className="rounded-lg border p-4 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">ICS Sharing</p>
-                  <p className="text-xs text-muted-foreground">
-                    Turn this on to generate a private URL that anyone with the
-                    link can subscribe to.
+      <RegenerateShareLinkDialog
+        open={showRegenerateConfirm}
+        setOpen={setShowRegenerateConfirm}
+        loading={shareLinkLoading}
+        onConfirm={onConfirmRegenerate}
+      />
+
+      <PendingUnsubscribeDialog
+        pendingUnsubscribe={pendingUnsubscribe}
+        setPendingUnsubscribe={setPendingUnsubscribe}
+        onRemove={onRemoveSubscription}
+      />
+    </>
+  );
+}
+
+function CalendarManagementDialog({
+  open,
+  onOpenChange,
+  openCalendarManagement,
+  showCreateForm,
+  setShowCreateForm,
+  setShowSubscriptionDialog,
+  setShowImportDialog,
+  setImportResult,
+  newCalendar,
+  setNewCalendar,
+  validationErrors,
+  setValidationErrors,
+  loading,
+  onCreateCalendar,
+  ownedCalendars,
+  publicCalendars,
+  subscribedCalendars,
+  isCalendarVisible,
+  onToggleVisibility,
+  onSetDefault,
+  onOpenShareDialog,
+  setEditingCalendar,
+  setDeletingCalendar,
+  onRemoveSubscribedCalendar,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  openCalendarManagement: () => void;
+  showCreateForm: boolean;
+  setShowCreateForm: (value: SetStateValue<boolean>) => void;
+  setShowSubscriptionDialog: (value: SetStateValue<boolean>) => void;
+  setShowImportDialog: (value: SetStateValue<boolean>) => void;
+  setImportResult: (value: SetStateValue<ImportICSResponse | null>) => void;
+  newCalendar: CalendarFormDraft;
+  setNewCalendar: (value: SetStateValue<CalendarFormDraft>) => void;
+  validationErrors: ValidationErrors;
+  setValidationErrors: (value: SetStateValue<ValidationErrors>) => void;
+  loading: boolean;
+  onCreateCalendar: () => Promise<void>;
+  ownedCalendars: Calendar[];
+  publicCalendars: Calendar[];
+  subscribedCalendars: Calendar[];
+  isCalendarVisible: (calendarId: string) => boolean;
+  onToggleVisibility: (calendar: Calendar) => void;
+  onSetDefault: (calendar: Calendar) => void;
+  onOpenShareDialog: (calendar: Calendar) => void;
+  setEditingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setDeletingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  onRemoveSubscribedCalendar: (calendar: Calendar) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[calc(90dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Manage Calendars</DialogTitle>
+          <DialogDescription>
+            Create, edit, and organize your calendars
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <CreateCalendarCard
+            onOpenSettings={() => {
+              onOpenChange(false);
+              openCalendarManagement();
+            }}
+            onOpenSubscriptions={() => setShowSubscriptionDialog(true)}
+            onOpenImport={() => {
+              setShowImportDialog(true);
+              setImportResult(null);
+            }}
+            showCreateForm={showCreateForm}
+            setShowCreateForm={setShowCreateForm}
+            newCalendar={newCalendar}
+            setNewCalendar={setNewCalendar}
+            validationErrors={validationErrors}
+            setValidationErrors={setValidationErrors}
+            loading={loading}
+            onCreateCalendar={onCreateCalendar}
+          />
+
+          <CalendarSection
+            title="Your Calendars"
+            calendars={ownedCalendars}
+            kind="owned"
+            isCalendarVisible={isCalendarVisible}
+            onToggleVisibility={onToggleVisibility}
+            onSetDefault={onSetDefault}
+            onOpenShareDialog={onOpenShareDialog}
+            setEditingCalendar={setEditingCalendar}
+            setDeletingCalendar={setDeletingCalendar}
+            setValidationErrors={setValidationErrors}
+            onRemoveSubscribedCalendar={onRemoveSubscribedCalendar}
+          />
+
+          {publicCalendars.length > 0 && (
+            <CalendarSection
+              title="Public Calendars"
+              calendars={publicCalendars}
+              kind="public"
+              isCalendarVisible={isCalendarVisible}
+              onToggleVisibility={onToggleVisibility}
+              onSetDefault={onSetDefault}
+              onOpenShareDialog={onOpenShareDialog}
+              setEditingCalendar={setEditingCalendar}
+              setDeletingCalendar={setDeletingCalendar}
+              setValidationErrors={setValidationErrors}
+              onRemoveSubscribedCalendar={onRemoveSubscribedCalendar}
+            />
+          )}
+
+          {subscribedCalendars.length > 0 && (
+            <CalendarSection
+              title="Subscribed Calendars"
+              calendars={subscribedCalendars}
+              kind="subscribed"
+              isCalendarVisible={isCalendarVisible}
+              onToggleVisibility={onToggleVisibility}
+              onSetDefault={onSetDefault}
+              onOpenShareDialog={onOpenShareDialog}
+              setEditingCalendar={setEditingCalendar}
+              setDeletingCalendar={setDeletingCalendar}
+              setValidationErrors={setValidationErrors}
+              onRemoveSubscribedCalendar={onRemoveSubscribedCalendar}
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateCalendarCard({
+  onOpenSettings,
+  onOpenSubscriptions,
+  onOpenImport,
+  showCreateForm,
+  setShowCreateForm,
+  newCalendar,
+  setNewCalendar,
+  validationErrors,
+  setValidationErrors,
+  loading,
+  onCreateCalendar,
+}: {
+  onOpenSettings: () => void;
+  onOpenSubscriptions: () => void;
+  onOpenImport: () => void;
+  showCreateForm: boolean;
+  setShowCreateForm: (value: SetStateValue<boolean>) => void;
+  newCalendar: CalendarFormDraft;
+  setNewCalendar: (value: SetStateValue<CalendarFormDraft>) => void;
+  validationErrors: ValidationErrors;
+  setValidationErrors: (value: SetStateValue<ValidationErrors>) => void;
+  loading: boolean;
+  onCreateCalendar: () => Promise<void>;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span>Create New Calendar</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenSettings}
+              title="Calendar Settings"
+            >
+              <Settings className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSubscriptions}
+              title="Subscribe to external calendars"
+            >
+              <ExternalLink className="mr-1 size-4" />
+              Subscriptions
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenImport}
+              title="Import .ics file"
+            >
+              <Upload className="mr-1 size-4" />
+              Import ICS
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowCreateForm((prev) => !prev);
+                setValidationErrors({});
+              }}
+            >
+              <Plus className="mr-1 size-4" />
+              New Calendar
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      {showCreateForm && (
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="newCalendarName">Calendar Name</Label>
+            <Input
+              id="newCalendarName"
+              value={newCalendar.name}
+              onChange={(e) => {
+                setNewCalendar((prev) => ({
+                  ...prev,
+                  name: e.target.value,
+                }));
+                if (validationErrors.name) {
+                  setValidationErrors((prev) => ({
+                    ...prev,
+                    name: undefined,
+                  }));
+                }
+              }}
+              placeholder="Enter calendar name"
+              className={
+                validationErrors.name
+                  ? "border-destructive focus-visible:ring-destructive"
+                  : ""
+              }
+            />
+            {validationErrors.name && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="size-3" />
+                {validationErrors.name}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <ColorPicker
+              value={newCalendar.color}
+              onChange={(color) => {
+                setNewCalendar((prev) => ({
+                  ...prev,
+                  color,
+                }));
+                if (validationErrors.color) {
+                  setValidationErrors((prev) => ({
+                    ...prev,
+                    color: undefined,
+                  }));
+                }
+              }}
+              presetColors={PRESET_COLORS}
+            />
+            {validationErrors.color && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="size-3" />
+                {validationErrors.color}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch
+              id="newCalendarDefault"
+              checked={newCalendar.isDefault}
+              onCheckedChange={(checked) =>
+                setNewCalendar((prev) => ({
+                  ...prev,
+                  isDefault: checked,
+                }))
+              }
+            />
+            <Label htmlFor="newCalendarDefault">Set as default calendar</Label>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={onCreateCalendar} disabled={loading}>
+              Create Calendar
+            </Button>
+            <Button variant="outline" onClick={() => setShowCreateForm(false)}>
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+type CalendarSectionKind = "owned" | "public" | "subscribed";
+
+function CalendarSection({
+  title,
+  calendars,
+  kind,
+  isCalendarVisible,
+  onToggleVisibility,
+  onSetDefault,
+  onOpenShareDialog,
+  setEditingCalendar,
+  setDeletingCalendar,
+  setValidationErrors,
+  onRemoveSubscribedCalendar,
+}: {
+  title: string;
+  calendars: Calendar[];
+  kind: CalendarSectionKind;
+  isCalendarVisible: (calendarId: string) => boolean;
+  onToggleVisibility: (calendar: Calendar) => void;
+  onSetDefault: (calendar: Calendar) => void;
+  onOpenShareDialog: (calendar: Calendar) => void;
+  setEditingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setDeletingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setValidationErrors: (value: SetStateValue<ValidationErrors>) => void;
+  onRemoveSubscribedCalendar: (calendar: Calendar) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-lg font-semibold">{title}</h3>
+      <div className="space-y-2">
+        {calendars.map((calendar) => (
+          <CalendarRow
+            key={calendar.id}
+            calendar={calendar}
+            kind={kind}
+            visible={isCalendarVisible(calendar.id)}
+            onToggleVisibility={onToggleVisibility}
+            onSetDefault={onSetDefault}
+            onOpenShareDialog={onOpenShareDialog}
+            setEditingCalendar={setEditingCalendar}
+            setDeletingCalendar={setDeletingCalendar}
+            setValidationErrors={setValidationErrors}
+            onRemoveSubscribedCalendar={onRemoveSubscribedCalendar}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CalendarRow({
+  calendar,
+  kind,
+  visible,
+  onToggleVisibility,
+  onSetDefault,
+  onOpenShareDialog,
+  setEditingCalendar,
+  setDeletingCalendar,
+  setValidationErrors,
+  onRemoveSubscribedCalendar,
+}: {
+  calendar: Calendar;
+  kind: CalendarSectionKind;
+  visible: boolean;
+  onToggleVisibility: (calendar: Calendar) => void;
+  onSetDefault: (calendar: Calendar) => void;
+  onOpenShareDialog: (calendar: Calendar) => void;
+  setEditingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setDeletingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setValidationErrors: (value: SetStateValue<ValidationErrors>) => void;
+  onRemoveSubscribedCalendar: (calendar: Calendar) => void;
+}) {
+  const readOnlyDescription =
+    kind === "public"
+      ? "Read-only public holiday calendar"
+      : "Read-only external calendar";
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="size-4 rounded"
+              style={{
+                backgroundColor: getColorSwatchValue(calendar.color),
+              }}
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{calendar.name}</span>
+                {kind === "owned" && calendar.isSyncOnly && (
+                  <Badge variant="secondary" className="text-xs bg-muted">
+                    <ExternalLink className="mr-1 size-3" />
+                    Synced
+                  </Badge>
+                )}
+                {kind === "owned" && calendar.isDefault && (
+                  <Badge variant="outline" className="text-xs">
+                    <Star className="mr-1 size-3" />
+                    Default
+                  </Badge>
+                )}
+                {kind === "public" && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-primary/10 text-primary"
+                  >
+                    <Globe className="mr-1 size-3" />
+                    Public
+                  </Badge>
+                )}
+                {kind === "subscribed" && (
+                  <Badge variant="secondary" className="text-xs bg-muted">
+                    <ExternalLink className="mr-1 size-3" />
+                    Subscribed
+                  </Badge>
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {kind === "owned" && calendar.isSyncOnly ? "Read-only · " : ""}
+                {kind !== "owned" ? `${readOnlyDescription} · ` : ""}
+                {visible ? "Visible" : "Hidden"}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onToggleVisibility(calendar)}
+              title={visible ? "Hide calendar" : "Show calendar"}
+            >
+              {visible ? (
+                <Eye className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )}
+            </Button>
+
+            {kind === "owned" && !calendar.isSyncOnly && !calendar.isDefault && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSetDefault(calendar)}
+                title="Set as default calendar"
+              >
+                <Star className="size-4" />
+              </Button>
+            )}
+
+            {kind === "owned" && !calendar.isSyncOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenShareDialog(calendar)}
+                title="Share calendar as ICS"
+                className="h-8 px-2 text-xs"
+              >
+                <Share2 className="mr-1 size-3.5" />
+                Share
+              </Button>
+            )}
+
+            {kind === "owned" && !calendar.isSyncOnly && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditingCalendar(calendar);
+                  setValidationErrors({});
+                }}
+                title="Edit calendar"
+              >
+                <Edit className="size-4" />
+              </Button>
+            )}
+
+            {kind === "owned" && !calendar.isSyncOnly && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeletingCalendar(calendar)}
+                title="Delete calendar"
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
+
+            {kind !== "owned" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRemoveSubscribedCalendar(calendar)}
+                title={
+                  kind === "public"
+                    ? "Remove public calendar"
+                    : "Remove subscribed calendar"
+                }
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DeleteCalendarDialog({
+  deletingCalendar,
+  setDeletingCalendar,
+  deleteAction,
+  setDeleteAction,
+  targetCalendarId,
+  setTargetCalendarId,
+  availableTargetCalendars,
+  loading,
+  onDelete,
+}: {
+  deletingCalendar: Calendar | null;
+  setDeletingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  deleteAction: CalendarDeleteAction;
+  setDeleteAction: (value: SetStateValue<CalendarDeleteAction>) => void;
+  targetCalendarId: string;
+  setTargetCalendarId: (value: SetStateValue<string>) => void;
+  availableTargetCalendars: Calendar[];
+  loading: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <Dialog
+      open={!!deletingCalendar}
+      onOpenChange={(open) => !open && setDeletingCalendar(null)}
+    >
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="size-5 text-destructive" />
+            Delete Calendar
+          </DialogTitle>
+          <DialogDescription>
+            You&apos;re about to delete &quot;{deletingCalendar?.name}&quot;. What
+            would you like to do with existing events?
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <RadioGroup
+            value={deleteAction}
+            onValueChange={(value) =>
+              setDeleteAction(value as CalendarDeleteAction)
+            }
+          >
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <RadioGroupItem
+                  value="delete_events"
+                  id="delete_events"
+                  className="mt-1"
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="delete_events"
+                    className="font-medium cursor-pointer"
+                  >
+                    Delete calendar and all events (default)
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Permanently delete the calendar and all its events
                   </p>
                 </div>
-                <Switch
-                  checked={!!shareLinkInfo?.enabled}
-                  onCheckedChange={(checked) => {
-                    void handleToggleShareLink(checked);
-                  }}
-                  disabled={shareLinkLoading}
-                />
               </div>
 
-              {shareLinkLoading ? (
-                <div className="text-sm text-muted-foreground">
-                  Updating share settings...
-                </div>
-              ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="shareLink">Subscription URL</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="shareLink"
-                        value={shareLinkInfo.shareUrl}
-                        readOnly
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCopyShareLink}
-                      >
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copy
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowRegenerateConfirm(true)}
-                    disabled={shareLinkLoading}
+              <div className="flex items-start gap-3">
+                <RadioGroupItem
+                  value="move_events"
+                  id="move_events"
+                  className="mt-1"
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="move_events"
+                    className="font-medium cursor-pointer"
                   >
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                    Regenerate URL
-                  </Button>
+                    Move events to another calendar
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Select a calendar to move events to
+                  </p>
                 </div>
-              ) : (
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Link2 className="h-4 w-4" />
-                  Sharing is currently off. Enable it to create a subscription
-                  link.
+              </div>
+
+              {deleteAction === "move_events" && (
+                <div className="ml-7">
+                  <Select
+                    value={targetCalendarId}
+                    onValueChange={setTargetCalendarId}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select target calendar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTargetCalendars.map((cal) => (
+                        <SelectItem key={cal.id} value={cal.id}>
+                          {cal.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>
+          </RadioGroup>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDeletingCalendar(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onDelete}
+            disabled={
+              loading || (deleteAction === "move_events" && !targetCalendarId)
+            }
+          >
+            {loading ? "Deleting…" : "Delete Calendar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImportIcsDialog({
+  open,
+  setOpen,
+  importResult,
+  setImportResult,
+  importFile,
+  setImportFile,
+  importCalendarId,
+  setImportCalendarId,
+  calendars,
+  loading,
+  onFileSelect,
+  onImport,
+}: {
+  open: boolean;
+  setOpen: (value: SetStateValue<boolean>) => void;
+  importResult: ImportICSResponse | null;
+  setImportResult: (value: SetStateValue<ImportICSResponse | null>) => void;
+  importFile: File | null;
+  setImportFile: (value: SetStateValue<File | null>) => void;
+  importCalendarId: string;
+  setImportCalendarId: (value: SetStateValue<string>) => void;
+  calendars: Calendar[];
+  loading: boolean;
+  onFileSelect: (event: ChangeEvent<HTMLInputElement>) => void;
+  onImport: () => void;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setImportFile(null);
+          setImportCalendarId("");
+          setImportResult(null);
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Import Calendar (ICS)</DialogTitle>
+          <DialogDescription>
+            Import events from an .ics file into one of your calendars.
+          </DialogDescription>
+        </DialogHeader>
+
+        {importResult ? (
+          <div className="space-y-4">
+            <div className="p-4 rounded-md bg-muted">
+              <h4 className="font-medium mb-2">Import Summary</h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Total Events Found:</span>
+                  <span className="font-medium">
+                    {importResult.eventsTotal}
+                  </span>
+                </div>
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <span>Events Created:</span>
+                  <span className="font-medium">
+                    {importResult.eventsCreated}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {importResult.errors && importResult.errors.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-destructive flex items-center gap-2">
+                  <AlertTriangle className="size-4" />
+                  Errors ({importResult.errors.length})
+                </h4>
+                <div className="max-h-40 overflow-y-auto text-xs space-y-1 p-2 border rounded-md bg-destructive/10">
+                  {importResult.errors.map((err) => (
+                    <div key={err} className="text-destructive">
+                      {err}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button onClick={() => setOpen(false)}>Close</Button>
+            </DialogFooter>
           </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="importFile">Select .ics File</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="importFile"
+                  type="file"
+                  accept=".ics"
+                  onChange={onFileSelect}
+                  className="cursor-pointer"
+                />
+              </div>
+              {importFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="size-4" />
+                  {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+                </div>
+              )}
+            </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSharingCalendar(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="space-y-2">
+              <Label htmlFor="importCalendar">Target Calendar</Label>
+              <Select
+                value={importCalendarId}
+                onValueChange={setImportCalendarId}
+              >
+                <SelectTrigger id="importCalendar">
+                  <SelectValue placeholder="Select calendar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {calendars.map((cal) =>
+                    cal.isSyncOnly ? null : (
+                      <SelectItem key={cal.id} value={cal.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="size-3 rounded-full"
+                            style={{
+                              backgroundColor: getColorSwatchValue(cal.color),
+                            }}
+                          />
+                          {cal.name}
+                        </div>
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <Dialog
-        open={showRegenerateConfirm}
-        onOpenChange={setShowRegenerateConfirm}
-      >
-        <DialogContent
-          showClose={false}
-          className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
-        >
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle>Regenerate sharing URL?</DialogTitle>
-            <DialogDescription>
-              This creates a new private ICS URL for this calendar.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-5 pb-4">
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-              <p className="text-sm flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
-                The current URL stops working immediately. Everyone using it
-                must subscribe again with the new URL.
-              </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={onImport}
+                disabled={loading || !importFile || !importCalendarId}
+              >
+                {loading ? "Importing…" : "Import Events"}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditCalendarDialog({
+  editingCalendar,
+  setEditingCalendar,
+  validationErrors,
+  setValidationErrors,
+  loading,
+  onOpenShareDialog,
+  onUpdateCalendar,
+}: {
+  editingCalendar: Calendar | null;
+  setEditingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  validationErrors: ValidationErrors;
+  setValidationErrors: (value: SetStateValue<ValidationErrors>) => void;
+  loading: boolean;
+  onOpenShareDialog: (calendar: Calendar) => void;
+  onUpdateCalendar: (
+    calendar: Calendar,
+    updates: Partial<UpdateCalendarRequest>,
+  ) => Promise<boolean | undefined>;
+}) {
+  return (
+    <Dialog
+      open={!!editingCalendar}
+      onOpenChange={(open) => !open && setEditingCalendar(null)}
+    >
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Edit Calendar</DialogTitle>
+        </DialogHeader>
+
+        {editingCalendar && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editCalendarName">Calendar Name</Label>
+              <Input
+                id="editCalendarName"
+                value={editingCalendar.name}
+                onChange={(e) => {
+                  setEditingCalendar((prev) =>
+                    prev ? { ...prev, name: e.target.value } : prev,
+                  );
+                  if (validationErrors.name) {
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      name: undefined,
+                    }));
+                  }
+                }}
+                className={
+                  validationErrors.name
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
+                }
+              />
+              {validationErrors.name && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="size-3" />
+                  {validationErrors.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <ColorPicker
+                value={editingCalendar.color}
+                onChange={(color) => {
+                  setEditingCalendar((prev) =>
+                    prev ? { ...prev, color } : prev,
+                  );
+                  if (validationErrors.color) {
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      color: undefined,
+                    }));
+                  }
+                }}
+                presetColors={PRESET_COLORS}
+              />
+              {validationErrors.color && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="size-3" />
+                  {validationErrors.color}
+                </p>
+              )}
             </div>
           </div>
-          <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowRegenerateConfirm(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                void handleRegenerateShareLinkConfirmed();
-              }}
-              disabled={shareLinkLoading}
-            >
-              Confirm Regenerate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
 
-      <Dialog
-        open={!!pendingUnsubscribe}
-        onOpenChange={(open) => !open && setPendingUnsubscribe(null)}
-      >
-        <DialogContent
-          showClose={false}
-          className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
-        >
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle>
-              {pendingUnsubscribe?.action === "remove"
-                ? "Remove calendar?"
-                : "Unsubscribe from calendar?"}
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to {pendingUnsubscribe?.action} &ldquo;
-              {pendingUnsubscribe?.calendarName}&rdquo;? The read-only calendar
-              and its synced events will be deleted.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+        <DialogFooter>
+          {editingCalendar && (
             <Button
-              size="sm"
               variant="outline"
-              onClick={() => setPendingUnsubscribe(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
               onClick={() => {
-                if (pendingUnsubscribe) {
-                  deleteSubscriptionMutation.mutate(
-                    pendingUnsubscribe.subscriptionId,
-                  );
-                }
-                setPendingUnsubscribe(null);
+                const selectedCalendar = editingCalendar;
+                setEditingCalendar(null);
+                void onOpenShareDialog(selectedCalendar);
               }}
             >
-              Remove
+              <Share2 className="mr-2 size-4" />
+              Share
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => {
+              setEditingCalendar(null);
+              setValidationErrors({});
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              if (editingCalendar) {
+                const success = await onUpdateCalendar(editingCalendar, {
+                  name: editingCalendar.name,
+                  color: editingCalendar.color,
+                });
+                if (success) {
+                  setEditingCalendar(null);
+                }
+              }
+            }}
+            disabled={loading}
+          >
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ShareCalendarDialog({
+  sharingCalendar,
+  setSharingCalendar,
+  setShareLinkInfo,
+  setShareLinkLoading,
+  setShowRegenerateConfirm,
+  shareLinkInfo,
+  shareLinkLoading,
+  onToggleShareLink,
+  onCopyShareLink,
+}: {
+  sharingCalendar: Calendar | null;
+  setSharingCalendar: (value: SetStateValue<Calendar | null>) => void;
+  setShareLinkInfo: (value: SetStateValue<CalendarShareLink | null>) => void;
+  setShareLinkLoading: (value: SetStateValue<boolean>) => void;
+  setShowRegenerateConfirm: (value: SetStateValue<boolean>) => void;
+  shareLinkInfo: CalendarShareLink | null;
+  shareLinkLoading: boolean;
+  onToggleShareLink: (enabled: boolean) => Promise<void>;
+  onCopyShareLink: () => Promise<void>;
+}) {
+  return (
+    <Dialog
+      open={!!sharingCalendar}
+      onOpenChange={(open) => {
+        if (!open) {
+          setSharingCalendar(null);
+          setShareLinkInfo(null);
+          setShareLinkLoading(false);
+          setShowRegenerateConfirm(false);
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Share Calendar as ICS</DialogTitle>
+          <DialogDescription>
+            Enable a public .ics subscription link for{" "}
+            <strong>{sharingCalendar?.name}</strong>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border p-4 space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">ICS Sharing</p>
+                <p className="text-xs text-muted-foreground">
+                  Turn this on to generate a private URL that anyone with the
+                  link can subscribe to.
+                </p>
+              </div>
+              <Switch
+                checked={!!shareLinkInfo?.enabled}
+                onCheckedChange={(checked) => {
+                  void onToggleShareLink(checked);
+                }}
+                disabled={shareLinkLoading}
+              />
+            </div>
+
+            {shareLinkLoading ? (
+              <div className="text-sm text-muted-foreground">
+                Updating share settings…
+              </div>
+            ) : shareLinkInfo?.enabled && shareLinkInfo.shareUrl ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="shareLink">Subscription URL</Label>
+                  <div className="flex items-center gap-2">
+                    <Input id="shareLink" value={shareLinkInfo.shareUrl} readOnly />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onCopyShareLink}
+                    >
+                      <Copy className="mr-1 size-4" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowRegenerateConfirm(true)}
+                  disabled={shareLinkLoading}
+                >
+                  <RefreshCw className="mr-1 size-4" />
+                  Regenerate URL
+                </Button>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <Link2 className="size-4" />
+                Sharing is currently off. Enable it to create a subscription
+                link.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setSharingCalendar(null)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RegenerateShareLinkDialog({
+  open,
+  setOpen,
+  loading,
+  onConfirm,
+}: {
+  open: boolean;
+  setOpen: (value: SetStateValue<boolean>) => void;
+  loading: boolean;
+  onConfirm: () => Promise<void>;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent
+        showClose={false}
+        className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+      >
+        <DialogHeader className="px-5 pt-5 pb-3">
+          <DialogTitle>Regenerate sharing URL?</DialogTitle>
+          <DialogDescription>
+            This creates a new private ICS URL for this calendar.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="px-5 pb-4">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              The current URL stops working immediately. Everyone using it must
+              subscribe again with the new URL.
+            </p>
+          </div>
+        </div>
+        <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              void onConfirm();
+            }}
+            disabled={loading}
+          >
+            Confirm Regenerate
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PendingUnsubscribeDialog({
+  pendingUnsubscribe,
+  setPendingUnsubscribe,
+  onRemove,
+}: {
+  pendingUnsubscribe: PendingUnsubscribe | null;
+  setPendingUnsubscribe: (value: SetStateValue<PendingUnsubscribe | null>) => void;
+  onRemove: (subscriptionId: string) => void;
+}) {
+  return (
+    <Dialog
+      open={!!pendingUnsubscribe}
+      onOpenChange={(open) => !open && setPendingUnsubscribe(null)}
+    >
+      <DialogContent
+        showClose={false}
+        className="max-w-md p-0 overflow-hidden bg-popover border-border/50 shadow-2xl"
+      >
+        <DialogHeader className="px-5 pt-5 pb-3">
+          <DialogTitle>
+            {pendingUnsubscribe?.action === "remove"
+              ? "Remove calendar?"
+              : "Unsubscribe from calendar?"}
+          </DialogTitle>
+          <DialogDescription>
+            Are you sure you want to {pendingUnsubscribe?.action} &ldquo;
+            {pendingUnsubscribe?.calendarName}&rdquo;? The read-only calendar
+            and its synced events will be deleted.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="px-5 py-4 border-t border-border/50 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPendingUnsubscribe(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              if (pendingUnsubscribe) {
+                onRemove(pendingUnsubscribe.subscriptionId);
+              }
+              setPendingUnsubscribe(null);
+            }}
+          >
+            Remove
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

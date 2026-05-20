@@ -22,7 +22,7 @@ export function NotificationSettings({
           onClick={() => goBack()}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium">Notifications</span>
       </div>
