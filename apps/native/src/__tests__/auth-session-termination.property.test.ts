@@ -7,8 +7,8 @@
  *
  * Validates: Requirements 5.4, 5.6
  */
-import { describe, it, expect, beforeEach } from "@jest/globals";
-import fc from "fast-check";
+import { describe, it, expect } from "@jest/globals";
+import * as fc from "fast-check";
 
 // ---------------------------------------------------------------------------
 // Minimal model of the auth state machine

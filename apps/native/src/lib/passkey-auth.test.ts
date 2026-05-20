@@ -1,4 +1,3 @@
-import type { Passkey } from "@better-auth/passkey/client";
 import {
   deleteStoredPasskey,
   formatStoredPasskeyDescription,
@@ -7,7 +6,7 @@ import {
 } from "./passkey-auth";
 
 function createRouteClient(
-  responses: Array<{ data: unknown; error: { message?: string } | null }>,
+  responses: { data: unknown; error: { message?: string } | null }[],
 ): PasskeyRouteClient & { $fetch: jest.Mock } {
   return {
     $fetch: jest.fn(async () => responses.shift()),
