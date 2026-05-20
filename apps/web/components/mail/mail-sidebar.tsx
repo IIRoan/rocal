@@ -265,7 +265,7 @@ export function MailSidebar({
   );
 
   const sorted = activeMailbox
-    ? [...activeMailbox.mailboxes].sort((a, b) => {
+    ? Array.from(activeMailbox.mailboxes).sort((a, b) => {
         if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
           return a.sortOrder - b.sortOrder;
         }

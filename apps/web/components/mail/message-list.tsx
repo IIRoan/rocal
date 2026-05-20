@@ -352,9 +352,16 @@ export function MessageList({
             return (
               <ContextMenu key={row.id}>
                 <ContextMenuTrigger asChild>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onSelect(message.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelect(message.id);
+                      }
+                    }}
                     className={cn(
                       "group/row relative w-full pl-[13px] pr-3 py-2.5 text-left transition-colors cursor-pointer",
                       "data-[state=open]:bg-muted/60",
@@ -545,7 +552,7 @@ export function MessageList({
                         )}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </ContextMenuTrigger>
 
                 <ContextMenuContent className="w-52">

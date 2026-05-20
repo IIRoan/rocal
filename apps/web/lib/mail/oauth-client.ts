@@ -33,9 +33,10 @@ export function appendMailOAuthResourceParams(
   params: URLSearchParams,
   audiences: string[],
 ): URLSearchParams {
-  for (const audience of audiences
-    .map((entry) => entry.trim())
-    .filter(Boolean)) {
+  for (const audience of audiences.flatMap((entry) => {
+    const trimmed = entry.trim();
+    return trimmed ? [trimmed] : [];
+  })) {
     params.append("resource", audience);
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   buildNativePasskeyCallbackURL,
@@ -99,17 +99,12 @@ export default function NativePasskeyBridgePage() {
 
   const isValidCallback = isValidNativePasskeyCallbackURL(callbackURL);
 
-  const title = useMemo(
-    () => (mode === "register" ? "Add a passkey" : "Continue with a passkey"),
-    [mode],
-  );
-  const description = useMemo(
-    () =>
-      mode === "register"
-        ? "Use your browser's passkey support, then we'll return you to the app."
-        : "Sign in with your passkey in the browser, then we'll return you to the app.",
-    [mode],
-  );
+  const title =
+    mode === "register" ? "Add a passkey" : "Continue with a passkey";
+  const description =
+    mode === "register"
+      ? "Use your browser's passkey support, then we'll return you to the app."
+      : "Sign in with your passkey in the browser, then we'll return you to the app.";
   const actionLabel = mode === "register" ? "Add passkey" : "Continue";
 
   const redirectToApp = useCallback(

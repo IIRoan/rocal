@@ -66,6 +66,11 @@ const APRIL_GRID: (number | null)[] = [
   null,
 ];
 
+const APRIL_CELLS = APRIL_GRID.map((day, index) => ({
+  id: day === null ? `empty-${index}` : `day-${day}`,
+  day,
+}));
+
 const MINI_DOTS: Record<number, string[]> = {
   7: ["sky"],
   10: ["violet", "orange"],
@@ -200,8 +205,8 @@ function MiniCalendar({ today }: { today: number }) {
         ))}
       </div>
       <div className="grid grid-cols-7">
-        {APRIL_GRID.map((day, i) => {
-          if (day === null) return <div key={`n-${i}`} className="h-6" />;
+        {APRIL_CELLS.map(({ id, day }) => {
+          if (day === null) return <div key={id} className="h-6" />;
           const isCurrentDay = day === today;
           const isWeekDay = day >= 20 && day <= 26;
           const dots = MINI_DOTS[day] ?? [];
