@@ -25,11 +25,14 @@ export const validateCalendarForm = (
   }
 
   // Check for duplicate names (case-insensitive)
-  const existingNames = calendars
-    .filter((cal) => (editingCalendar ? cal.id !== editingCalendar.id : true))
-    .map((cal) => cal.name.toLowerCase());
+  const normalizedCalendarName = calendarName.trim().toLowerCase();
+  const nameExists = calendars.some(
+    (cal) =>
+      (!editingCalendar || cal.id !== editingCalendar.id) &&
+      cal.name.toLowerCase() === normalizedCalendarName,
+  );
 
-  if (existingNames.includes(calendarName.trim().toLowerCase())) {
+  if (nameExists) {
     errors.name = "A calendar with this name already exists";
   }
 

@@ -498,8 +498,8 @@ export function CommandPalette({
           </VisuallyHidden>
           <div className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Loading...</p>
+              <Loader2 className="size-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Loading…</p>
             </div>
           </div>
         </DialogContent>
@@ -755,13 +755,13 @@ export function CommandPalette({
             onClick={() => goBack()}
             className="p-1 rounded hover:bg-muted/50 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            <ArrowLeft className="size-4 text-muted-foreground" />
           </button>
           <span className="text-sm font-medium">Settings</span>
         </div>
         <div className="flex-1 overflow-y-auto p-1">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-md opacity-50">
-            <Settings className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Settings className="size-4 text-muted-foreground shrink-0" />
             <span className="text-sm">This section is coming soon</span>
           </div>
         </div>

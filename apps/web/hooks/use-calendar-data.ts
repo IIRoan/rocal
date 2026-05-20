@@ -256,14 +256,18 @@ export function useCalendarData(
   const loadNotifications = useCallback(async (eventId: string) => {
     try {
       const response = await calendarApiService.getEventNotifications(eventId);
-      return response.data.notifications
-        .filter((n: ApiEventNotification) => n.notificationType === "email")
-        .map((n: ApiEventNotification) => ({
-          id: n.id,
-          notificationType: "email" as const,
-          minutesBefore: n.minutesBefore,
-          isEnabled: n.isEnabled,
-        }));
+      return response.data.notifications.flatMap((n: ApiEventNotification) =>
+        n.notificationType === "email"
+          ? [
+              {
+                id: n.id,
+                notificationType: "email" as const,
+                minutesBefore: n.minutesBefore,
+                isEnabled: n.isEnabled,
+              },
+            ]
+          : [],
+      );
     } catch (error) {
       log.error("Failed to load event notifications:", error);
       return [];
