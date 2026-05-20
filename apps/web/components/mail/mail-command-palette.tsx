@@ -178,7 +178,7 @@ function LabelsView({
           onClick={goBack}
           className="p-1 rounded hover:bg-muted/50 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
         <span className="text-sm font-medium flex-1">Labels</span>
         {onCreateLabel ? (
@@ -188,15 +188,14 @@ function LabelsView({
             className="p-1 rounded hover:bg-muted/50 transition-colors"
             aria-label="New label"
           >
-            <Plus className="h-4 w-4 text-muted-foreground" />
+            <Plus className="size-4 text-muted-foreground" />
           </button>
         ) : null}
       </div>
-      <div className="flex-1 overflow-y-auto py-2 px-2">
+      <div className="flex-1 overflow-y-auto p-2">
         {creating ? (
           <div className="mx-1 mb-2 rounded-lg border border-border/50 bg-muted/20 p-3 space-y-3">
             <input
-              autoFocus
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -215,13 +214,13 @@ function LabelsView({
                   type="button"
                   onClick={() => handlePresetClick(c.value)}
                   style={{ backgroundColor: c.hex }}
-                  className={`h-5 w-5 rounded-full transition-transform ${newColor === c.value ? "ring-2 ring-ring ring-offset-1 scale-110" : ""}`}
+                  className={`size-5 rounded-full transition-transform ${newColor === c.value ? "ring-2 ring-ring ring-offset-1 scale-110" : ""}`}
                   aria-label={c.value}
                 />
               ))}
               <div className="flex items-center gap-1.5 ml-1">
                 <div
-                  className="h-5 w-5 rounded-full border border-border/50 shrink-0"
+                  className="size-5 rounded-full border border-border/50 shrink-0"
                   style={{ backgroundColor: colorPreview }}
                 />
                 <input
@@ -241,9 +240,9 @@ function LabelsView({
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {saving ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="size-3 animate-spin" />
                 ) : (
-                  <Check className="h-3 w-3" />
+                  <Check className="size-3" />
                 )}
                 Create
               </button>
@@ -273,10 +272,10 @@ function LabelsView({
           return (
             <div
               key={label.id}
-              className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-accent/50 group"
+              className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/50 group"
             >
               <div
-                className="h-3 w-3 rounded-full shrink-0"
+                className="size-3 rounded-full shrink-0"
                 style={{ backgroundColor: displayColor }}
               />
               <span className="text-sm flex-1 truncate">{label.name}</span>
@@ -289,9 +288,9 @@ function LabelsView({
                   aria-label="Delete label"
                 >
                   {deletingId === label.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="size-3.5 animate-spin" />
                   ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="size-3.5" />
                   )}
                 </button>
               ) : null}
@@ -601,12 +600,11 @@ export function MailCommandPalette({
           }}
         >
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Search className="size-4 text-muted-foreground shrink-0" />
             <input
               type="text"
               placeholder="Search or jump to…"
               value={query}
-              autoFocus
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
@@ -622,7 +620,7 @@ export function MailCommandPalette({
                 onClick={() => setQuery("")}
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
-                <X className="h-4 w-4 text-muted-foreground" />
+                <X className="size-4 text-muted-foreground" />
               </button>
             )}
           </div>
@@ -638,9 +636,9 @@ export function MailCommandPalette({
                     key={item.id}
                     type="button"
                     onClick={() => handleSelect(item)}
-                    className={`flex items-center gap-3 px-2 py-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${index === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"}`}
+                    className={`flex items-center gap-3 p-2 sm:py-1.5 min-h-[44px] w-full rounded-md text-left focus:outline-none transition-colors group ${index === selectedIndex ? "bg-accent/50" : "hover:bg-accent/50"}`}
                   >
-                    <div className="flex items-center justify-center w-8 h-8 sm:w-6 sm:h-6 shrink-0">
+                    <div className="flex items-center justify-center size-8 sm:w-6 sm:h-6 shrink-0">
                       <item.icon className="h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm flex-1 truncate">
@@ -649,7 +647,7 @@ export function MailCommandPalette({
                     <span className="text-xs text-muted-foreground hidden sm:block group-hover:text-muted-foreground/70">
                       {item.description}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="size-4 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 ))}
               </div>
@@ -694,11 +692,11 @@ export function MailCommandPalette({
               onClick={goBack}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Appearance</span>
           </div>
-          <div className="flex-1 overflow-y-auto py-2 px-2">
+          <div className="flex-1 overflow-y-auto p-2">
             <div className="px-1 pb-1">
               <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
                 Theme
@@ -714,14 +712,14 @@ export function MailCommandPalette({
                     item.value as UserSettings["theme"],
                   )
                 }
-                className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
+                className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors"
               >
-                <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                  <item.icon className={`h-4 w-4 ${item.color}`} />
+                <div className="flex items-center justify-center size-6 shrink-0">
+                  <item.icon className={`size-4 ${item.color}`} />
                 </div>
                 <span className="text-sm flex-1">{item.label}</span>
                 {localSettings?.theme === item.value && (
-                  <Check className="h-4 w-4 text-primary shrink-0" />
+                  <Check className="size-4 text-primary shrink-0" />
                 )}
               </button>
             ))}
@@ -776,11 +774,11 @@ export function MailCommandPalette({
               onClick={goBack}
               className="p-1 rounded hover:bg-muted/50 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              <ArrowLeft className="size-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-medium">Security</span>
           </div>
-          <div className="flex-1 overflow-y-auto py-2 px-2">
+          <div className="flex-1 overflow-y-auto p-2">
             <div className="px-1 pb-1">
               <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">
                 Authentication
@@ -792,10 +790,10 @@ export function MailCommandPalette({
                 setPasskeyAddMode(false);
                 goForward("passkeys");
               }}
-              className="flex items-center gap-3 px-2 py-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
+              className="flex items-center gap-3 p-2 w-full rounded-md text-left hover:bg-accent/50 focus:bg-accent/50 focus:outline-none transition-colors group"
             >
-              <div className="flex items-center justify-center w-6 h-6 shrink-0">
-                <Shield className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center justify-center size-6 shrink-0">
+                <Shield className="size-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm">Passkeys</div>
@@ -803,7 +801,7 @@ export function MailCommandPalette({
                   Manage passwordless authentication
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+              <ChevronRight className="size-4 text-muted-foreground/40 shrink-0" />
             </button>
             <div className="px-1 pb-1 pt-3 border-t border-border/40 mt-1">
               <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase px-2">

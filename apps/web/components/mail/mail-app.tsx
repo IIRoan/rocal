@@ -195,7 +195,7 @@ export function MailApp() {
                       <button
                         type="button"
                         onClick={handleBack}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-foreground/70 hover:text-foreground hover:bg-accent/40 transition-colors"
+                        className="inline-flex items-center justify-center size-8 rounded-lg text-foreground/70 hover:text-foreground hover:bg-accent/40 transition-colors"
                         aria-label="Back to list"
                       >
                         <ArrowLeft size={17} strokeWidth={2} />
@@ -456,7 +456,7 @@ export function MailApp() {
                 <button
                   type="button"
                   onClick={() => setIsComposeOpen(true)}
-                  className="fixed bottom-6 right-5 z-30 flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
+                  className="fixed bottom-6 right-5 z-30 flex items-center justify-center size-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
                   aria-label="Compose"
                 >
                   <Pencil size={20} strokeWidth={2} />
