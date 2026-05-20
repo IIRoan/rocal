@@ -3,7 +3,6 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type TextStyle,
   type ViewStyle,

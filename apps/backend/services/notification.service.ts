@@ -261,6 +261,19 @@ export class NotificationService implements INotificationService {
       notificationTimezone: string;
       isEnabled: boolean;
     }> = [];
+    const notificationsToCreate: Array<{
+      id: string;
+      eventId: string;
+      notificationType: string;
+      minutesBefore: number;
+      notificationTime: Date;
+      notificationDateLocal: string;
+      notificationTimezone: string;
+      isEnabled: boolean;
+      isSent: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+    }> = [];
     const skippedConfigurations: Array<{
       notificationType: string;
       minutesBefore: number;
@@ -268,6 +281,7 @@ export class NotificationService implements INotificationService {
     }> = [];
 
     const now = new Date();
+    const createdAt = now;
     const eventIsInPast = event.start <= now;
 
     if (eventIsInPast) {
@@ -315,18 +329,19 @@ export class NotificationService implements INotificationService {
       }
 
       const notificationId = crypto.randomUUID();
-      await this.prisma.$executeRaw`
-        INSERT INTO public.event_notification (
-          id, event_id, notification_type, minutes_before,
-          notification_time, notification_date_local, notification_timezone,
-          is_enabled, is_sent, created_at, updated_at
-        ) VALUES (
-          ${notificationId}, ${eventId}, ${config.notificationType},
-          ${config.minutesBefore}, ${schedule.notificationTime},
-          ${schedule.notificationDateLocal}, ${schedule.notificationTimezone},
-          true, false, NOW(), NOW()
-        )
-      `;
+      notificationsToCreate.push({
+        id: notificationId,
+        eventId,
+        notificationType: config.notificationType,
+        minutesBefore: config.minutesBefore,
+        notificationTime: schedule.notificationTime,
+        notificationDateLocal: schedule.notificationDateLocal,
+        notificationTimezone: schedule.notificationTimezone,
+        isEnabled: true,
+        isSent: false,
+        createdAt,
+        updatedAt: createdAt,
+      });
       createdNotifications.push({
         id: notificationId,
         notificationType: config.notificationType,
@@ -335,6 +350,12 @@ export class NotificationService implements INotificationService {
         notificationDateLocal: schedule.notificationDateLocal,
         notificationTimezone: schedule.notificationTimezone,
         isEnabled: true,
+      });
+    }
+
+    if (notificationsToCreate.length > 0) {
+      await this.prisma.eventNotification.createMany({
+        data: notificationsToCreate,
       });
     }
 

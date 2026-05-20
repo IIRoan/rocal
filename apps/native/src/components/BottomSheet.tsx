@@ -15,8 +15,7 @@ import {
   View,
   useWindowDimensions,
   type ViewStyle,
-} from "react-native";
-import type { KeyboardEvent as RNKeyboardEvent } from "react-native";
+ KeyboardEvent as RNKeyboardEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,

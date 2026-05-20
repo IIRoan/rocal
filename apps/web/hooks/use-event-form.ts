@@ -46,13 +46,14 @@ function getFallbackNotifications(
 function getReminderFromNotifications(
   notifications: NotificationPayload[],
 ): number | null {
-  const reminderMinutes = notifications
-    .filter(
-      (notification) =>
-        notification.isEnabled && notification.notificationType === "email",
-    )
-    .map((notification) => Number(notification.minutesBefore) || 0)
-    .filter((minutes) => minutes > 0);
+  const reminderMinutes = notifications.flatMap((notification) => {
+    if (!notification.isEnabled || notification.notificationType !== "email") {
+      return [];
+    }
+
+    const minutes = Number(notification.minutesBefore) || 0;
+    return minutes > 0 ? [minutes] : [];
+  });
 
   return reminderMinutes.length > 0 ? Math.min(...reminderMinutes) : null;
 }
@@ -60,9 +61,9 @@ function getReminderFromNotifications(
 function getDuplicateNotificationTimes(
   notifications: EventNotification[],
 ): number[] {
-  const notificationTimes = notifications
-    .filter((notification) => notification.isEnabled)
-    .map((notification) => notification.minutesBefore);
+  const notificationTimes = notifications.flatMap((notification) =>
+    notification.isEnabled ? [notification.minutesBefore] : [],
+  );
 
   return notificationTimes.filter(
     (time, index) => notificationTimes.indexOf(time) !== index,
@@ -332,14 +333,18 @@ export function useEventForm({
             response.data &&
             response.data.notifications
           ) {
-            const emailNotifications = response.data.notifications
-              .filter((n) => n.notificationType === "email")
-              .map((n) => ({
-                id: n.id,
-                notificationType: "email" as const,
-                minutesBefore: n.minutesBefore,
-                isEnabled: n.isEnabled,
-              }));
+            const emailNotifications = response.data.notifications.flatMap((n) =>
+              n.notificationType === "email"
+                ? [
+                    {
+                      id: n.id,
+                      notificationType: "email" as const,
+                      minutesBefore: n.minutesBefore,
+                      isEnabled: n.isEnabled,
+                    },
+                  ]
+                : [],
+            );
             const notificationsToUse =
               emailNotifications.length > 0
                 ? emailNotifications

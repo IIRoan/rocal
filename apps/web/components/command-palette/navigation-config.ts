@@ -388,17 +388,5 @@ export interface PresetColor {
   label: string;
 }
 
-export const PRESET_COLORS: PresetColor[] = [
-  { value: "blue", label: "Blue" },
-  { value: "emerald", label: "Emerald" },
-  { value: "orange", label: "Orange" },
-  { value: "violet", label: "Violet" },
-  { value: "rose", label: "Rose" },
-  { value: "red", label: "Red" },
-  { value: "cyan", label: "Cyan" },
-  { value: "lime", label: "Lime" },
-  { value: "amber", label: "Amber" },
-  { value: "indigo", label: "Indigo" },
-  { value: "pink", label: "Pink" },
-  { value: "teal", label: "Teal" },
-];
+export const PRESET_COLORS: PresetColor[] = [...PRESET_COLOR_OPTIONS];
+import { PRESET_COLOR_OPTIONS } from "@workspace/calendar-core";
