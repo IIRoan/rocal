@@ -462,7 +462,10 @@ function ConversationMessageMenu({
             }}
             className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
           >
-            <MailOpen className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+            <MailOpen
+              className="h-3.5 w-3.5 text-muted-foreground"
+              strokeWidth={2}
+            />
             Mark as unread
           </button>
         )}
@@ -673,6 +676,7 @@ export function MessageReader({
     useState<string | null>(null);
   const [showQuote, setShowQuote] = useState(false);
   const [showOwnMessages, setShowOwnMessages] = useState(false);
+  const [isConversationCollapsed, setIsConversationCollapsed] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedWrapRef = useRef<HTMLDivElement>(null);
@@ -690,10 +694,11 @@ export function MessageReader({
     setAttachmentHoverPreviews({});
     setLoadingAttachmentPreviewKey(null);
     setShowQuote(false);
+    setIsConversationCollapsed(true);
   }, [message?.id]);
-
+
   const displayAttachments = useMemo<MailAttachment[]>(
-    () => attachments ?? (message?.attachments ?? []),
+    () => attachments ?? message?.attachments ?? [],
     [attachments, message?.attachments],
   );
 
@@ -780,54 +785,57 @@ export function MessageReader({
   );
 
   // ── GSAP reply bar expand/collapse ──────────────────────────────────────────
-  useGSAP(() => {
-    const wrap = expandedWrapRef.current;
-    if (!wrap) return;
+  useGSAP(
+    () => {
+      const wrap = expandedWrapRef.current;
+      if (!wrap) return;
 
-    if (!replyHasInit.current) {
-      replyHasInit.current = true;
-      if (isReplyExpanded) {
-        gsap.set(wrap, { height: "auto", autoAlpha: 1, overflow: "visible" });
-      } else {
-        gsap.set(wrap, { height: 0, autoAlpha: 0, overflow: "hidden" });
+      if (!replyHasInit.current) {
+        replyHasInit.current = true;
+        if (isReplyExpanded) {
+          gsap.set(wrap, { height: "auto", autoAlpha: 1, overflow: "visible" });
+        } else {
+          gsap.set(wrap, { height: 0, autoAlpha: 0, overflow: "hidden" });
+        }
+        return;
       }
-      return;
-    }
 
-    gsap.killTweensOf(wrap);
+      gsap.killTweensOf(wrap);
 
-    if (prefersReducedMotion) {
-      gsap.set(
-        wrap,
-        isReplyExpanded
-          ? { height: "auto", autoAlpha: 1, overflow: "visible" }
-          : { height: 0, autoAlpha: 0, overflow: "hidden" },
-      );
-      return;
-    }
+      if (prefersReducedMotion) {
+        gsap.set(
+          wrap,
+          isReplyExpanded
+            ? { height: "auto", autoAlpha: 1, overflow: "visible" }
+            : { height: 0, autoAlpha: 0, overflow: "hidden" },
+        );
+        return;
+      }
 
-    if (isReplyExpanded) {
-      gsap.set(wrap, { overflow: "hidden" });
-      gsap.to(wrap, {
-        height: "auto",
-        autoAlpha: 1,
-        duration: 0.28,
-        ease: "power2.out",
-        onComplete: () => {
-          gsap.set(wrap, { overflow: "visible" });
-          textareaRef.current?.focus();
-        },
-      });
-    } else {
-      gsap.set(wrap, { overflow: "hidden" });
-      gsap.to(wrap, {
-        autoAlpha: 0,
-        height: 0,
-        duration: 0.22,
-        ease: "power2.in",
-      });
-    }
-  }, { dependencies: [isReplyExpanded] });
+      if (isReplyExpanded) {
+        gsap.set(wrap, { overflow: "hidden" });
+        gsap.to(wrap, {
+          height: "auto",
+          autoAlpha: 1,
+          duration: 0.28,
+          ease: "power2.out",
+          onComplete: () => {
+            gsap.set(wrap, { overflow: "visible" });
+            textareaRef.current?.focus();
+          },
+        });
+      } else {
+        gsap.set(wrap, { overflow: "hidden" });
+        gsap.to(wrap, {
+          autoAlpha: 0,
+          height: 0,
+          duration: 0.22,
+          ease: "power2.in",
+        });
+      }
+    },
+    { dependencies: [isReplyExpanded] },
+  );
 
   // Auto-resize textarea to fit content — must be declared before early return
   const autoResizeTextarea = useCallback(() => {
@@ -852,6 +860,13 @@ export function MessageReader({
     () => splitHtmlQuote(_displayHtml ?? ""),
     [_displayHtml],
   );
+
+  // Auto-scroll conversation list to bottom when messages load/change.
+  // Must be above the early return to keep hook order consistent.
+  useEffect(() => {
+    const el = conversationListRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conversationMessages.length]);
 
   if (!message) {
     return (
@@ -910,18 +925,13 @@ export function MessageReader({
         )
       : orderedConversationMessages;
 
-  // Auto-scroll conversation list to bottom when messages load/change
-  useEffect(() => {
-    const el = conversationListRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [visibleConversationMessages.length]);
-
-  // Determine if we're in a special mailbox that needs restore actions
+  // Determine if we're in a special mailboxthat needs restore actions
   const currentMailboxRole = mailboxes
     .find((m) => m.id === currentMailboxId)
     ?.role?.toLowerCase();
   const isInTrash = currentMailboxRole === "trash";
-  const isInJunk = currentMailboxRole === "junk" || currentMailboxRole === "spam";
+  const isInJunk =
+    currentMailboxRole === "junk" || currentMailboxRole === "spam";
 
   // ── Label popover content (shared between mobile/desktop) ──────────────────
   const labelPopoverContent = (
@@ -934,8 +944,7 @@ export function MessageReader({
       {labels.length > 0 && (
         <div className="p-1 border-b border-border/40">
           {labels.map((label) => {
-            const assigned =
-              message?.keywords?.[`label:${label.id}`] === true;
+            const assigned = message?.keywords?.[`label:${label.id}`] === true;
             return (
               <div
                 key={label.id}
@@ -1006,13 +1015,12 @@ export function MessageReader({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newLabelName.trim()) {
                   setIsSavingLabel(true);
-                  void onCreateLabel(
-                    newLabelName.trim(),
-                    newLabelColor,
-                  ).then(() => {
-                    setNewLabelName("");
-                    setIsSavingLabel(false);
-                  });
+                  void onCreateLabel(newLabelName.trim(), newLabelColor).then(
+                    () => {
+                      setNewLabelName("");
+                      setIsSavingLabel(false);
+                    },
+                  );
                 }
               }}
               placeholder="Label name…"
@@ -1024,13 +1032,12 @@ export function MessageReader({
               onClick={() => {
                 if (!newLabelName.trim()) return;
                 setIsSavingLabel(true);
-                void onCreateLabel(
-                  newLabelName.trim(),
-                  newLabelColor,
-                ).then(() => {
-                  setNewLabelName("");
-                  setIsSavingLabel(false);
-                });
+                void onCreateLabel(newLabelName.trim(), newLabelColor).then(
+                  () => {
+                    setNewLabelName("");
+                    setIsSavingLabel(false);
+                  },
+                );
               }}
               className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-40 transition-colors"
               aria-label="Create label"
@@ -1140,10 +1147,18 @@ export function MessageReader({
               <Trash2 className="text-destructive" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{isInTrash ? "Delete permanently" : "Move to trash"}</TooltipContent>
+          <TooltipContent>
+            {isInTrash ? "Delete permanently" : "Move to trash"}
+          </TooltipContent>
         </Tooltip>
         {/* More actions panel */}
-        <Popover open={morePopoverOpen} onOpenChange={(o) => { setMorePopoverOpen(o); if (!o) setMoveToExpanded(false); }}>
+        <Popover
+          open={morePopoverOpen}
+          onOpenChange={(o) => {
+            setMorePopoverOpen(o);
+            if (!o) setMoveToExpanded(false);
+          }}
+        >
           <Tooltip>
             <TooltipTrigger asChild>
               <PopoverTrigger asChild>
@@ -1159,12 +1174,19 @@ export function MessageReader({
             </TooltipTrigger>
             <TooltipContent>More actions</TooltipContent>
           </Tooltip>
-          <PopoverContent align="end" sideOffset={6} className="w-52 p-0 overflow-hidden rounded-lg border border-border shadow-md">
+          <PopoverContent
+            align="end"
+            sideOffset={6}
+            className="w-52 p-0 overflow-hidden rounded-lg border border-border shadow-md"
+          >
             {/* Quick-action icon strip */}
             <div className="flex border-b border-border/60">
               <button
                 type="button"
-                onClick={() => { onForward(); setMorePopoverOpen(false); }}
+                onClick={() => {
+                  onForward();
+                  setMorePopoverOpen(false);
+                }}
                 disabled={isBusy}
                 className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
               >
@@ -1176,7 +1198,10 @@ export function MessageReader({
                 <>
                   <button
                     type="button"
-                    onClick={() => { onToggleFlagged(); setMorePopoverOpen(false); }}
+                    onClick={() => {
+                      onToggleFlagged();
+                      setMorePopoverOpen(false);
+                    }}
                     disabled={isBusy}
                     className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
                   >
@@ -1194,7 +1219,10 @@ export function MessageReader({
               )}
               <button
                 type="button"
-                onClick={() => { onMarkAsUnread(); setMorePopoverOpen(false); }}
+                onClick={() => {
+                  onMarkAsUnread();
+                  setMorePopoverOpen(false);
+                }}
                 disabled={isBusy}
                 className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
               >
@@ -1207,7 +1235,10 @@ export function MessageReader({
             {(isInTrash || isInJunk) && onUntrash && (
               <button
                 type="button"
-                onClick={() => { onUntrash(); setMorePopoverOpen(false); }}
+                onClick={() => {
+                  onUntrash();
+                  setMorePopoverOpen(false);
+                }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/8 transition-colors"
               >
                 <Inbox className="h-3.5 w-3.5 shrink-0" />
@@ -1217,14 +1248,23 @@ export function MessageReader({
 
             {/* Move to */}
             {otherMailboxes.length > 0 && (
-              <div className={(isInTrash || isInJunk) && onUntrash ? "border-t border-border/60" : ""}>
+              <div
+                className={
+                  (isInTrash || isInJunk) && onUntrash
+                    ? "border-t border-border/60"
+                    : ""
+                }
+              >
                 <button
                   type="button"
                   onClick={() => setMoveToExpanded((v) => !v)}
                   disabled={isBusy}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
                 >
-                  <FolderInput className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+                  <FolderInput
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    strokeWidth={2}
+                  />
                   Move to
                   <ChevronDown
                     className={cn(
@@ -1241,7 +1281,11 @@ export function MessageReader({
                         {idx > 0 && <div className="mx-3 h-px bg-border/40" />}
                         <button
                           type="button"
-                          onClick={() => { onMove(mailbox.id); setMorePopoverOpen(false); setMoveToExpanded(false); }}
+                          onClick={() => {
+                            onMove(mailbox.id);
+                            setMorePopoverOpen(false);
+                            setMoveToExpanded(false);
+                          }}
                           className="w-full flex items-center gap-2 px-4 py-2 text-[13px] text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors text-left"
                         >
                           {mailbox.name}
@@ -1258,10 +1302,17 @@ export function MessageReader({
               <div className={cn("border-t border-border/60")}>
                 <button
                   type="button"
-                  onMouseDown={(e) => { e.preventDefault(); setMorePopoverOpen(false); setTimeout(() => setLabelPopoverOpen(true), 80); }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setMorePopoverOpen(false);
+                    setTimeout(() => setLabelPopoverOpen(true), 80);
+                  }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
                 >
-                  <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+                  <Tag
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    strokeWidth={2}
+                  />
                   Labels
                 </button>
               </div>
@@ -1334,7 +1385,9 @@ export function MessageReader({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0 group/sender">
               {senderName && (
-                <span className="text-[13px] font-medium truncate">{senderName}</span>
+                <span className="text-[13px] font-medium truncate">
+                  {senderName}
+                </span>
               )}
               <span className="text-muted-foreground text-xs truncate">{`<${senderEmail}>`}</span>
               <span className="opacity-0 group-hover/sender:opacity-100 transition-opacity">
@@ -1364,7 +1417,9 @@ export function MessageReader({
                 {message.to!.map((a) => a.name || a.email).join(", ")}
               </span>
               <span className="opacity-0 group-hover/to:opacity-100 transition-opacity">
-                <CopyEmailButton value={message.to!.map((a) => a.email).join(", ")} />
+                <CopyEmailButton
+                  value={message.to!.map((a) => a.email).join(", ")}
+                />
               </span>
             </div>
           )}
@@ -1375,7 +1430,9 @@ export function MessageReader({
                 {message.cc!.map((a) => a.name || a.email).join(", ")}
               </span>
               <span className="opacity-0 group-hover/cc:opacity-100 transition-opacity">
-                <CopyEmailButton value={message.cc!.map((a) => a.email).join(", ")} />
+                <CopyEmailButton
+                  value={message.cc!.map((a) => a.email).join(", ")}
+                />
               </span>
             </div>
           )}
@@ -1408,16 +1465,14 @@ export function MessageReader({
                 const ext = mimeType.split("/")[1]?.toUpperCase() ?? "";
                 const canAccessAttachment = Boolean(
                   (attachment.blobId || attachment.content != null) &&
-                    (onPreviewAttachment || onDownloadAttachment),
+                  (onPreviewAttachment || onDownloadAttachment),
                 );
                 const canPreview = Boolean(
-                  canAccessAttachment &&
-                    onPreviewAttachment &&
-                    previewKind,
+                  canAccessAttachment && onPreviewAttachment && previewKind,
                 );
                 const canDownload = Boolean(
                   (attachment.blobId || attachment.content != null) &&
-                    onDownloadAttachment,
+                  onDownloadAttachment,
                 );
                 const attachmentButton = (
                   <Button
@@ -1433,12 +1488,18 @@ export function MessageReader({
                     }
                     onMouseEnter={() =>
                       canPreview && onLoadAttachmentPreview
-                        ? handleLoadAttachmentHoverPreview(attachment, previewKey)
+                        ? handleLoadAttachmentHoverPreview(
+                            attachment,
+                            previewKey,
+                          )
                         : undefined
                     }
                     onFocus={() =>
                       canPreview && onLoadAttachmentPreview
-                        ? handleLoadAttachmentHoverPreview(attachment, previewKey)
+                        ? handleLoadAttachmentHoverPreview(
+                            attachment,
+                            previewKey,
+                          )
                         : undefined
                     }
                     aria-label={`${canPreview ? "Preview" : "Download"} ${name}`}
@@ -1448,7 +1509,13 @@ export function MessageReader({
                         : "cursor-default"
                     }
                   >
-                    {canPreview ? <Eye /> : canDownload ? <Download /> : <Paperclip />}
+                    {canPreview ? (
+                      <Eye />
+                    ) : canDownload ? (
+                      <Download />
+                    ) : (
+                      <Paperclip />
+                    )}
                     <span className="font-normal">{name}</span>
                     {ext && (
                       <span className="font-normal text-muted-foreground">
@@ -1458,7 +1525,10 @@ export function MessageReader({
                   </Button>
                 );
                 return (
-                  <div key={idx} className="group/attachment relative flex items-center gap-1">
+                  <div
+                    key={idx}
+                    className="group/attachment relative flex items-center gap-1"
+                  >
                     {attachmentButton}
                     {canPreview && onLoadAttachmentPreview && (
                       <div className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-[min(22rem,calc(100vw-2rem))] group-hover/attachment:block group-focus-within/attachment:block">
@@ -1480,7 +1550,9 @@ export function MessageReader({
                           ) : hoverPreview?.kind === "text" ? (
                             <div className="space-y-2 p-2">
                               <div className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
-                                {previewKind === "text" ? "Text preview" : "Preview"}
+                                {previewKind === "text"
+                                  ? "Text preview"
+                                  : "Preview"}
                               </div>
                               <pre className="max-h-44 overflow-hidden whitespace-pre-wrap break-words rounded-md border border-border/60 bg-background px-3 py-2 font-mono text-xs leading-5">
                                 {hoverPreview.text}
@@ -1688,131 +1760,155 @@ export function MessageReader({
     </div>
   );
 
-  const conversationStrip = (showConversation || isConversationLoading) && (
+  const conversationStrip = showConversation && (
     <div className="shrink-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden">
-      {/* Strip header — same muted-bar pattern as quote toggle / toolbar */}
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/30 border-b border-border/40">
-        <div className="flex items-center gap-1.5">
-          <MessageSquare className="h-3 w-3 text-muted-foreground/70" strokeWidth={2} />
-          <span className="text-[11px] font-medium text-muted-foreground">
-            {isConversationLoading
-              ? "Loading thread…"
-              : `${orderedConversationMessages.length} messages in thread`}
+      {/* Strip header */}
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/40 transition-colors cursor-pointer",
+          !isConversationCollapsed && "border-b border-border/40",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setIsConversationCollapsed((v) => !v)}
+          className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer rounded hover:bg-accent/60 -mx-1 px-1 py-0.5 transition-colors group/thread-header"
+        >
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 text-muted-foreground transition-transform shrink-0 group-hover/thread-header:text-foreground",
+              isConversationCollapsed && "-rotate-90",
+            )}
+          />
+          <MessageSquare
+            className="h-3 w-3 text-muted-foreground shrink-0 group-hover/thread-header:text-foreground"
+            strokeWidth={2}
+          />
+          <span className="text-[11px] font-medium text-foreground/70 group-hover/thread-header:text-foreground">
+            {`${orderedConversationMessages.length} messages in thread`}
           </span>
-          {isConversationLoading && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          )}
-        </div>
-        {ownMessageCount > 0 && (
+        </button>
+        {ownMessageCount > 0 && !isConversationCollapsed && (
           <button
             type="button"
             onClick={() => setShowOwnMessages((v) => !v)}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors shrink-0 cursor-pointer"
           >
             {showOwnMessages ? (
               <EyeOff className="h-3 w-3" />
             ) : (
               <Eye className="h-3 w-3" />
             )}
-            {showOwnMessages ? "Hide mine" : `+${ownMessageCount} sent`}
+            {showOwnMessages ? "Hide your replies" : `+${ownMessageCount} sent`}
           </button>
         )}
       </div>
 
-      {/* Message rows — scrollable if thread is long, auto-scrolled to latest */}
-      <div ref={conversationListRef} className="max-h-36 overflow-y-auto divide-y divide-border/30">
-        {visibleConversationMessages.map((threadMessage) => {
-          const threadSenderEmail = threadMessage.from?.[0]?.email ?? "";
-          const threadSenderName = threadMessage.from?.[0]?.name ?? undefined;
-          const threadBodies = extractMessageBodies(threadMessage);
-          let rawPreview: string;
-          if (threadBodies.html && !threadBodies.text) {
-            const { html: cleanedHtml } = splitHtmlQuote(threadBodies.html);
-            rawPreview = cleanedHtml.replace(/<[^>]+>/g, " ");
-          } else {
-            rawPreview = threadBodies.text ?? "";
-          }
-          const { body: previewBody } = splitPlaintextQuote(rawPreview);
-          const threadPreviewText = previewBody.replace(/\s+/g, " ").trim();
-          const isActive = threadMessage.id === (selectedMessageId ?? message.id);
-          const threadIsRead =
-            threadMessage.keywords?.["$seen"] === true ||
-            (accountEmail
-              ? threadMessage.from?.[0]?.email?.toLowerCase() === accountEmail.toLowerCase()
-              : false);
-          const hasThreadActions =
-            onConversationMessageDelete ||
-            onConversationMessageMarkUnread ||
-            onConversationMessageMove;
+      {/* Message rows — collapsible */}
+      {!isConversationCollapsed && (
+        <div
+          ref={conversationListRef}
+          className="max-h-36 overflow-y-auto divide-y divide-border/30"
+        >
+          {visibleConversationMessages.map((threadMessage) => {
+            const threadSenderEmail = threadMessage.from?.[0]?.email ?? "";
+            const threadSenderName = threadMessage.from?.[0]?.name ?? undefined;
+            const threadBodies = extractMessageBodies(threadMessage);
+            let rawPreview: string;
+            if (threadBodies.html && !threadBodies.text) {
+              const { html: cleanedHtml } = splitHtmlQuote(threadBodies.html);
+              rawPreview = cleanedHtml.replace(/<[^>]+>/g, " ");
+            } else {
+              rawPreview = threadBodies.text ?? "";
+            }
+            const { body: previewBody } = splitPlaintextQuote(rawPreview);
+            const threadPreviewText = previewBody.replace(/\s+/g, " ").trim();
+            const isActive =
+              threadMessage.id === (selectedMessageId ?? message.id);
+            const threadIsRead =
+              threadMessage.keywords?.["$seen"] === true ||
+              (accountEmail
+                ? threadMessage.from?.[0]?.email?.toLowerCase() ===
+                  accountEmail.toLowerCase()
+                : false);
+            const hasThreadActions =
+              onConversationMessageDelete ||
+              onConversationMessageMarkUnread ||
+              onConversationMessageMove;
 
-          return (
-            <div
-              key={threadMessage.id}
-              className={cn(
-                "group/thread-item relative flex w-full items-center gap-2 px-3 py-1.5 transition-colors",
-                isActive
-                  ? "bg-primary/5"
-                  : "hover:bg-accent/40",
-              )}
-            >
-              {/* Active left-border accent */}
-              {isActive && (
-                <div className="absolute left-0 inset-y-0 w-0.5 bg-primary rounded-r" />
-              )}
-
-              {/* Unread dot (pushes left of avatar) */}
-              {!threadIsRead ? (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-              ) : (
-                <span className="h-1.5 w-1.5 shrink-0" />
-              )}
-
-              {/* Clickable row */}
-              <button
-                type="button"
-                onClick={() => onSelectConversationMessage?.(threadMessage.id)}
-                className="flex flex-1 min-w-0 cursor-pointer items-center gap-2 text-left"
+            return (
+              <div
+                key={threadMessage.id}
+                className={cn(
+                  "group/thread-item relative flex w-full items-center gap-2 px-3 py-1.5 transition-colors",
+                  isActive ? "bg-primary/5" : "hover:bg-accent/40",
+                )}
               >
-                <SenderAvatar
-                  email={threadSenderEmail}
-                  name={threadSenderName}
-                  className="h-5 w-5 shrink-0 text-[9px]"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1.5 min-w-0">
-                    <span
-                      className={cn(
-                        "shrink-0 text-xs",
-                        threadIsRead
-                          ? "font-medium text-foreground/70"
-                          : "font-semibold text-foreground",
-                      )}
-                    >
-                      {threadSenderName || threadSenderEmail || "Unknown"}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {threadPreviewText || "(No body)"}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-muted-foreground shrink-0 text-[10px]">
-                  {formatMessageDate(threadMessage.receivedAt, timeFormat, timezone)}
-                </span>
-              </button>
+                {/* Active left-border accent */}
+                {isActive && (
+                  <div className="absolute left-0 inset-y-0 w-0.5 bg-primary rounded-r" />
+                )}
 
-              {/* Per-message actions */}
-              {hasThreadActions && (
-                <ConversationMessageMenu
-                  messageId={threadMessage.id}
-                  isRead={threadIsRead}
-                  onDelete={onConversationMessageDelete}
-                  onMarkUnread={onConversationMessageMarkUnread}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {/* Unread dot */}
+                {!threadIsRead ? (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                ) : (
+                  <span className="h-1.5 w-1.5 shrink-0" />
+                )}
+
+                {/* Clickable row */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSelectConversationMessage?.(threadMessage.id)
+                  }
+                  className="flex flex-1 min-w-0 cursor-pointer items-center gap-2 text-left"
+                >
+                  <SenderAvatar
+                    email={threadSenderEmail}
+                    name={threadSenderName}
+                    className="h-5 w-5 shrink-0 text-[9px]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span
+                        className={cn(
+                          "shrink-0 text-xs",
+                          threadIsRead
+                            ? "font-medium text-foreground/70"
+                            : "font-semibold text-foreground",
+                        )}
+                      >
+                        {threadSenderName || threadSenderEmail || "Unknown"}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                        {threadPreviewText || "(No body)"}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-muted-foreground shrink-0 text-[10px]">
+                    {formatMessageDate(
+                      threadMessage.receivedAt,
+                      timeFormat,
+                      timezone,
+                    )}
+                  </span>
+                </button>
+
+                {/* Per-message actions */}
+                {hasThreadActions && (
+                  <ConversationMessageMenu
+                    messageId={threadMessage.id}
+                    isRead={threadIsRead}
+                    onDelete={onConversationMessageDelete}
+                    onMarkUnread={onConversationMessageMarkUnread}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
@@ -1850,14 +1946,20 @@ export function MessageReader({
             <div className="text-sm leading-relaxed text-[#111] whitespace-pre-wrap">
               {(() => {
                 const activeText = showQuote ? displayText : plaintextBody;
-                if (!isBodyExpanded && activeText.length > PLAINTEXT_COLLAPSE_THRESHOLD) {
-                  return activeText.slice(0, PLAINTEXT_COLLAPSE_THRESHOLD) + "…";
+                if (
+                  !isBodyExpanded &&
+                  activeText.length > PLAINTEXT_COLLAPSE_THRESHOLD
+                ) {
+                  return (
+                    activeText.slice(0, PLAINTEXT_COLLAPSE_THRESHOLD) + "…"
+                  );
                 }
                 return activeText;
               })()}
             </div>
             {/* Show more/less for long bodies */}
-            {(showQuote ? displayText : plaintextBody).length > PLAINTEXT_COLLAPSE_THRESHOLD && (
+            {(showQuote ? displayText : plaintextBody).length >
+              PLAINTEXT_COLLAPSE_THRESHOLD && (
               <button
                 type="button"
                 onClick={() => setIsBodyExpanded((v) => !v)}
@@ -1891,12 +1993,66 @@ export function MessageReader({
 
   // ── Reply bar ────────────────────────────────────────────────────────────────
   const COMMON_EMOJI = [
-    "😀","😂","😍","😭","😊","😅","😎","🤔","😤","🥺",
-    "😏","😴","🤗","😬","🥳","🤩","😇","😆","🙄","😡",
-    "👍","👎","👏","🙌","🤝","✌️","👋","🤞","💪","🖐️",
-    "❤️","💔","💯","🔥","✨","🎉","🎊","💡","⭐","🌟",
-    "😻","🐶","🐱","🌸","🌈","☀️","🌙","⚡","🌊","🍕",
-    "🎵","📷","💬","📩","🔔","📅","📎","🔗","💻","📱",
+    "😀",
+    "😂",
+    "😍",
+    "😭",
+    "😊",
+    "😅",
+    "😎",
+    "🤔",
+    "😤",
+    "🥺",
+    "😏",
+    "😴",
+    "🤗",
+    "😬",
+    "🥳",
+    "🤩",
+    "😇",
+    "😆",
+    "🙄",
+    "😡",
+    "👍",
+    "👎",
+    "👏",
+    "🙌",
+    "🤝",
+    "✌️",
+    "👋",
+    "🤞",
+    "💪",
+    "🖐️",
+    "❤️",
+    "💔",
+    "💯",
+    "🔥",
+    "✨",
+    "🎉",
+    "🎊",
+    "💡",
+    "⭐",
+    "🌟",
+    "😻",
+    "🐶",
+    "🐱",
+    "🌸",
+    "🌈",
+    "☀️",
+    "🌙",
+    "⚡",
+    "🌊",
+    "🍕",
+    "🎵",
+    "📷",
+    "💬",
+    "📩",
+    "🔔",
+    "📅",
+    "📎",
+    "🔗",
+    "💻",
+    "📱",
   ];
 
   const replyBar = (
