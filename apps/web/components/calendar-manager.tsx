@@ -12,16 +12,20 @@ import type { Calendar, CalendarShareLink } from "@/lib/types/calendar";
 import { toast } from "sonner";
 import {
   PRESET_COLORS,
+  type PresetColor,
+} from "./command-palette/navigation-config";
+import {
   resetCalendarForm,
   validateCalendarForm,
   handleCalendarCreate,
   handleCalendarUpdate,
   handleCalendarDelete,
+} from "./command-palette/calendar-utils";
+import {
   SettingToggleRow,
   ToggleIndicator,
-  type PaletteView,
-  type PresetColor,
-} from "./command-palette/index";
+} from "./command-palette/setting-toggle-row";
+import type { PaletteView } from "./command-palette/constants";
 import {
   EncryptionStatusBadge,
   getColorSwatchValue,

@@ -147,7 +147,7 @@ function getPrimaryMailboxId(
 }
 
 function sortMessages(messages: JmapEmailMessage[]): JmapEmailMessage[] {
-  return [...messages].sort((left, right) => {
+  return Array.from(messages).sort((left, right) => {
     const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
     const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
     return rightTime - leftTime;
@@ -446,7 +446,7 @@ function mergeMailboxes(
     byId.set(mailbox.id, mailbox);
   }
 
-  return [...byId.values()].sort((left, right) => {
+  return Array.from(byId.values()).sort((left, right) => {
     const leftOrder = left.sortOrder ?? Number.MAX_SAFE_INTEGER;
     const rightOrder = right.sortOrder ?? Number.MAX_SAFE_INTEGER;
     return leftOrder - rightOrder;
@@ -485,7 +485,7 @@ function mergeMessagesForMailbox(
 function sortMessagesByReceivedAt(
   messages: JmapEmailMessage[],
 ): JmapEmailMessage[] {
-  return [...messages].sort((left, right) => {
+  return Array.from(messages).sort((left, right) => {
     const leftTime = left.receivedAt ? Date.parse(left.receivedAt) : 0;
     const rightTime = right.receivedAt ? Date.parse(right.receivedAt) : 0;
     return leftTime - rightTime;
@@ -959,13 +959,11 @@ export function useMailApp() {
           setSelectedMessageDecryptedHtml(parsed.html ?? null);
           setSelectedMessagePlaintext(parsed.text ?? decrypted.plaintext);
           setSelectedMessageDecryptedAttachments(
-            parsed.attachments
-              .filter(
-                (attachment) =>
-                  attachment.disposition === "attachment" &&
-                  !attachment.related,
-              )
-              .map(toParsedMailAttachment),
+            parsed.attachments.flatMap((attachment) =>
+              attachment.disposition === "attachment" && !attachment.related
+                ? [toParsedMailAttachment(attachment)]
+                : [],
+            ),
           );
         } else {
           setSelectedMessageDecryptedHtml(null);
@@ -1312,10 +1310,10 @@ export function useMailApp() {
     setIsBusy(true);
     try {
       const parseAddressList = (raw: string): string[] =>
-        raw
-          .split(/[,;]+/)
-          .map((s) => normalizeEmailAddress(s))
-          .filter(Boolean);
+        raw.split(/[,;]+/).flatMap((s) => {
+          const normalized = normalizeEmailAddress(s);
+          return normalized ? [normalized] : [];
+        });
 
       const recipients = parseAddressList(composeTo);
       const ccRecipients = composeCc.trim() ? parseAddressList(composeCc) : undefined;

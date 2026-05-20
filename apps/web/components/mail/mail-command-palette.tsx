@@ -40,14 +40,12 @@ import {
   extractLinkedAuthAccounts,
   summarizeLinkedAuthAccounts,
 } from "@workspace/calendar-core";
-import {
-  AccountSettings,
-  NotificationSettings,
-  TimeRegionSettings,
-  TransitionContainer,
-  SettingToggleRow,
-  InviteSettings,
-} from "../command-palette/index";
+import { AccountSettings } from "../command-palette/account-settings";
+import { NotificationSettings } from "../command-palette/notification-settings";
+import { TimeRegionSettings } from "../command-palette/time-region-settings";
+import { TransitionContainer } from "../command-palette/transition-container";
+import { SettingToggleRow } from "../command-palette/setting-toggle-row";
+import { InviteSettings } from "../command-palette/invite-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";

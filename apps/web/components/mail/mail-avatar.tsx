@@ -7,7 +7,7 @@ import {
 } from "@workspace/ui/components/ui/avatar";
 import { cn } from "@workspace/ui/lib/utils";
 
-const LOGO_DEV_TOKEN = "pk_OqzQzTPPQCare5_eo1QArg";
+const LOGO_DEV_TOKEN = process.env.NEXT_PUBLIC_LOGO_DEV_TOKEN;
 
 export const PERSONAL_DOMAINS = new Set([
   "gmail.com",
@@ -127,7 +127,7 @@ export function SenderAvatar({
   const sources = isPersonal
     ? []
     : [
-        `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}`,
+        `https://img.logo.dev/${domain}${LOGO_DEV_TOKEN ? `?token=${LOGO_DEV_TOKEN}` : ""}`,
         `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
       ];
   const initials = getInitials(name, email);

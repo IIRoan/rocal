@@ -35,7 +35,8 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/ui/dialog";
 import { VisuallyHidden } from "@workspace/ui/components/ui/visually-hidden";
-import { PRESET_COLORS, type PaletteView } from "./command-palette/index";
+import { PRESET_COLORS } from "./command-palette/navigation-config";
+import type { PaletteView } from "./command-palette/constants";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
   Plus,
