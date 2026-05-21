@@ -10,16 +10,24 @@ const DEFAULT_CLOUDFLARED_CONFIG = join(homedir(), ".cloudflared", "config.yml")
 const STARTUP_GRACE_PERIOD_MS = 2_000;
 const log = createLogger("cloudflared");
 
-function fail(message) {
+function fail(message: string): never {
   log.error(message);
   process.exit(1);
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function ensureProcessStaysUp(proc, name) {
+type ManagedProcess = {
+  exited: Promise<number>;
+  kill(): void;
+};
+
+async function ensureProcessStaysUp(
+  proc: ManagedProcess,
+  name: string,
+): Promise<void> {
   const result = await Promise.race([
     proc.exited.then((code) => ({ type: "exited", code })),
     sleep(STARTUP_GRACE_PERIOD_MS).then(() => ({ type: "running" })),
@@ -75,7 +83,7 @@ await ensureProcessStaysUp(tunnelProc, "cloudflared");
 log.ok("Cloudflare tunnel is running.");
 
 let cleanedUp = false;
-const cleanup = () => {
+const cleanup = (): void => {
   if (cleanedUp) return;
   cleanedUp = true;
   tunnelProc.kill();
