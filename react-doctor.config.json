@@ -1,0 +1,9 @@
+{
+  "ignore": {
+    "files": [
+      "apps/native/**",
+      "apps/backend/**",
+      "apps/notifications/**"
+    ]
+  }
+}
