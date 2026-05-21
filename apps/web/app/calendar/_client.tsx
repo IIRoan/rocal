@@ -195,7 +195,12 @@ function SidebarWithContext() {
 
 function MobileLayoutContent() {
   const { data: session } = useSession();
-  const { openCalendarManagement, openEventEditor, openPalette } =
+  const {
+    openCalendarManagement,
+    openEventEditor,
+    openPalette,
+    openSearchPalette,
+  } =
     useCommandPaletteContext();
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
@@ -246,6 +251,7 @@ function MobileLayoutContent() {
         openPalette();
       }}
       onOpenCalendarManagement={openCalendarManagement}
+      onOpenSearch={openSearchPalette}
       onOpenAddEvent={openNewEventEditor}
       appSwitcher={<MobileAppSwitcher activeApp="calendar" />}
       initialView={initialView}

@@ -43,6 +43,7 @@ interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   onLogout?: () => void;
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
+  onOpenSearch?: () => void;
   onOpenAddEvent?: () => void;
   appSwitcher?: React.ReactNode;
   getCachedEventsForRange?: (range: {
@@ -57,6 +58,7 @@ export function MobileCalendarWrapper({
   onLogout,
   onOpenSettings,
   onOpenCalendarManagement,
+  onOpenSearch,
   onOpenAddEvent,
   appSwitcher,
   getCachedEventsForRange,
@@ -112,6 +114,10 @@ export function MobileCalendarWrapper({
   };
   const handleOpenSettings = () => {
     onOpenSettings?.();
+    setIsSidebarOpen(false);
+  };
+  const handleOpenSearch = () => {
+    onOpenSearch?.();
     setIsSidebarOpen(false);
   };
   const handleViewChange = (view: CalendarView) => {
@@ -416,7 +422,7 @@ export function MobileCalendarWrapper({
         <SheetContent
           side="left"
           showClose={false}
-          className="h-[100dvh] w-[85vw] max-w-[320px] rounded-none border-r border-border p-0 safe-area-inset-bottom"
+          className="h-[100dvh] w-[92vw] max-w-[360px] rounded-none border-r border-border p-0 safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>
@@ -430,6 +436,8 @@ export function MobileCalendarWrapper({
               onLogout={onLogout}
               onOpenSettings={handleOpenSettings}
               onOpenCalendarManagement={onOpenCalendarManagement}
+              onOpenSearch={handleOpenSearch}
+              onCreateEvent={handleOpenAddEvent}
               getCachedEventsForRange={getCachedEventsForRange}
               prefetchRange={prefetchRange}
               isMobile={true}
