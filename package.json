@@ -18,7 +18,7 @@
     "dev:frontend": "cd apps/web && bun run dev",
     "dev:backend": "cd apps/backend && bun run dev",
     "dev:native": "cd apps/native && bun run dev",
-    "cloudflared": "bun run ./scripts/cloudflared.mjs",
+    "cloudflared": "bun run ./scripts/cloudflared.ts",
     "dev:notifications": "cd apps/notifications && bun run dev",
     "lint": "cd apps/backend && bun run lint && cd ../web && bun run lint && cd ../notifications && bun run lint",
     "lint:react-doctor": "bun run --cwd apps/web lint:react-doctor && bun run --cwd packages/ui lint:react-doctor",
