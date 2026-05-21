@@ -132,11 +132,11 @@ export function MobileTopNav({
 
   return (
     <div
-      className={cn(
-        "sticky top-0 z-[100] border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden",
-        className,
-      )}
-    >
+        className={cn(
+          "sticky top-0 z-[45] border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden",
+          className,
+        )}
+      >
       <div className="safe-area-inset-top px-4 pb-3 pt-3">
         <div className="flex items-center gap-3">
           <Button
