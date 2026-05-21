@@ -3,6 +3,7 @@
 import * as React from "react";
 import { GearSixIcon } from "@phosphor-icons/react";
 import {
+  Check,
   Plus,
   Search,
   PanelLeftClose,
@@ -107,7 +108,8 @@ export function AppSidebar({
   activeApp = "calendar",
   ...props
 }: AppSidebarProps) {
-  const { calendars, isCalendarVisible } = useCalendarContext();
+  const { calendars, isCalendarVisible, toggleCalendarVisibility } =
+    useCalendarContext();
   const ownedCalendars = calendars.filter(
     (calendar) => calendar.kind === "owned",
   );
@@ -142,13 +144,15 @@ export function AppSidebar({
           </div>
           <div className="flex items-center gap-1">
             {onOpenSearch && (
-              <button
-                onClick={onOpenSearch}
-                aria-label="Search"
-                className="size-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors active:scale-90"
-              >
-                <Search size={18} strokeWidth={2} />
-              </button>
+              <SheetClose asChild>
+                <button
+                  onClick={onOpenSearch}
+                  aria-label="Search"
+                  className="size-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors active:scale-90"
+                >
+                  <Search size={18} strokeWidth={2} />
+                </button>
+              </SheetClose>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -171,21 +175,25 @@ export function AppSidebar({
                   </p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="gap-2.5 cursor-pointer"
-                  onClick={onOpenSettings}
-                >
-                  <GearSixIcon size={16} />
-                  Settings
-                </DropdownMenuItem>
+                <SheetClose asChild>
+                  <DropdownMenuItem
+                    className="gap-2.5 cursor-pointer"
+                    onClick={onOpenSettings}
+                  >
+                    <GearSixIcon size={16} />
+                    Settings
+                  </DropdownMenuItem>
+                </SheetClose>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="gap-2.5 text-destructive focus:text-destructive cursor-pointer"
-                  onClick={onLogout}
-                >
-                  <LogOut size={16} />
-                  Sign out
-                </DropdownMenuItem>
+                <SheetClose asChild>
+                  <DropdownMenuItem
+                    className="gap-2.5 text-destructive focus:text-destructive cursor-pointer"
+                    onClick={onLogout}
+                  >
+                    <LogOut size={16} />
+                    Sign out
+                  </DropdownMenuItem>
+                </SheetClose>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -195,15 +203,17 @@ export function AppSidebar({
         <div className="flex flex-1 flex-col gap-5 overflow-auto px-4 py-3">
           {/* New event CTA */}
           {onCreateEvent && (
-            <Button
-              onClick={onCreateEvent}
-              variant="outline"
-              className="h-10 w-full rounded-xl border-border/60 text-foreground/80 font-medium transition-colors active:scale-[0.98]"
-              style={{ fontWeight: 470 }}
-            >
-              <Plus size={17} strokeWidth={2} />
-              New event
-            </Button>
+            <SheetClose asChild>
+              <Button
+                onClick={onCreateEvent}
+                variant="outline"
+                className="h-10 w-full rounded-xl border-border/60 text-foreground/80 font-medium transition-colors active:scale-[0.98]"
+                style={{ fontWeight: 470 }}
+              >
+                <Plus size={17} strokeWidth={2} />
+                New event
+              </Button>
+            </SheetClose>
           )}
 
           {/* Mini calendar */}
@@ -221,25 +231,30 @@ export function AppSidebar({
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Calendars
               </span>
-              <button
-                onClick={onOpenCalendarManagement}
-                className="text-muted-foreground/50 hover:text-foreground transition-colors"
-                aria-label="Manage calendars"
-              >
-                <Settings2 size={14} strokeWidth={2.5} />
-              </button>
+              <SheetClose asChild>
+                <button
+                  onClick={onOpenCalendarManagement}
+                  className="text-muted-foreground/50 hover:text-foreground transition-colors"
+                  aria-label="Manage calendars"
+                >
+                  <Settings2 size={14} strokeWidth={2.5} />
+                </button>
+              </SheetClose>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               {ownedCalendars.map((calendar: CalendarData) => {
                 const isVisible = isCalendarVisible(calendar.id);
                 const calColor = getColorSwatchValue(calendar.color || "blue");
                 return (
-                  <div
+                  <button
                     key={calendar.id}
-                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl ${
+                    type="button"
+                    onClick={() => void toggleCalendarVisibility(calendar.id)}
+                    aria-pressed={isVisible}
+                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                       isVisible
                         ? "bg-muted/50 text-foreground"
-                        : "text-muted-foreground/50"
+                        : "text-muted-foreground/60 hover:bg-muted/30"
                     }`}
                   >
                     <span
@@ -249,10 +264,17 @@ export function AppSidebar({
                         opacity: isVisible ? 1 : 0.35,
                       }}
                     />
-                    <span className="text-sm font-medium truncate">
+                    <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                       {calendar.name}
                     </span>
-                  </div>
+                    {isVisible && (
+                      <Check
+                        size={14}
+                        strokeWidth={2.5}
+                        className="shrink-0 text-foreground/70"
+                      />
+                    )}
+                  </button>
                 );
               })}
 
@@ -267,12 +289,15 @@ export function AppSidebar({
                       calendar.color || "blue",
                     );
                     return (
-                      <div
+                      <button
                         key={calendar.id}
-                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl ${
+                        type="button"
+                        onClick={() => void toggleCalendarVisibility(calendar.id)}
+                        aria-pressed={isVisible}
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                           isVisible
                             ? "bg-muted/50 text-foreground"
-                            : "text-muted-foreground/50"
+                            : "text-muted-foreground/60 hover:bg-muted/30"
                         }`}
                       >
                         <span
@@ -282,10 +307,17 @@ export function AppSidebar({
                             opacity: isVisible ? 1 : 0.35,
                           }}
                         />
-                        <span className="text-sm font-medium truncate">
+                        <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                           {calendar.name}
                         </span>
-                      </div>
+                        {isVisible && (
+                          <Check
+                            size={14}
+                            strokeWidth={2.5}
+                            className="shrink-0 text-foreground/70"
+                          />
+                        )}
+                      </button>
                     );
                   })}
                 </>
@@ -302,12 +334,15 @@ export function AppSidebar({
                       calendar.color || "blue",
                     );
                     return (
-                      <div
+                      <button
                         key={calendar.id}
-                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl ${
+                        type="button"
+                        onClick={() => void toggleCalendarVisibility(calendar.id)}
+                        aria-pressed={isVisible}
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-colors ${
                           isVisible
                             ? "bg-muted/50 text-foreground"
-                            : "text-muted-foreground/50"
+                            : "text-muted-foreground/60 hover:bg-muted/30"
                         }`}
                       >
                         <span
@@ -317,10 +352,17 @@ export function AppSidebar({
                             opacity: isVisible ? 1 : 0.35,
                           }}
                         />
-                        <span className="text-sm font-medium truncate">
+                        <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                           {calendar.name}
                         </span>
-                      </div>
+                        {isVisible && (
+                          <Check
+                            size={14}
+                            strokeWidth={2.5}
+                            className="shrink-0 text-foreground/70"
+                          />
+                        )}
+                      </button>
                     );
                   })}
                 </>
