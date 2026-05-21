@@ -4,7 +4,7 @@ import expoConfig from "eslint-config-expo/flat.js";
 export default defineConfig([
   expoConfig,
   {
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.ts"],
     languageOptions: {
       globals: {
         Bun: "readonly",

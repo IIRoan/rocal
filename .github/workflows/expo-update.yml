@@ -9,7 +9,7 @@ on:
       - "packages/**"
       - "package.json"
       - "bun.lock"
-      - "babel.config.js"
+      - "babel.config.cts"
   pull_request:
     types:
       - opened
@@ -20,7 +20,7 @@ on:
       - "packages/**"
       - "package.json"
       - "bun.lock"
-      - "babel.config.js"
+      - "babel.config.cts"
 
 permissions:
   contents: read
