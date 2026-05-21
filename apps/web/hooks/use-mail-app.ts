@@ -1038,10 +1038,9 @@ export function useMailApp() {
         setActiveMailbox((cur) =>
           cur ? { ...cur, selectedMailboxId: mailboxId, messages } : cur,
         );
-        setSelectedMessageId((curId) => {
-          if (curId && messages.some((m) => m.id === curId)) return curId;
-          return messages[0]?.id ?? null;
-        });
+        setSelectedMessageId((curId) =>
+          curId && messages.some((m) => m.id === curId) ? curId : null,
+        );
       } catch (error) {
         log.error("Failed to load mailbox messages", error);
         toast.error(
@@ -1245,7 +1244,7 @@ export function useMailApp() {
           email,
           selectedMailboxId: initialMailboxId,
         });
-        setSelectedMessageId(messages[0]?.id ?? null);
+        setSelectedMessageId(null);
         setLoginPassword(effectivePassphrase);
       } catch (error) {
         log.error("Mail sign-in failed", error);
@@ -2145,7 +2144,7 @@ export function useMailApp() {
           selectedMessageId &&
           nextMessages.some((message) => message.id === selectedMessageId)
             ? selectedMessageId
-            : (nextMessages[0]?.id ?? null);
+            : null;
 
         return {
           ...current,

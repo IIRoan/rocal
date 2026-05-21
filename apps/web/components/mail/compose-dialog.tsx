@@ -71,6 +71,7 @@ export function ComposeForm({
   const [showBcc, setShowBcc] = useState(!!composeBcc);
   const [toTouched, setToTouched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const isValidEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -98,7 +99,11 @@ export function ComposeForm({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 h-12 border-b border-border/50 shrink-0">
+      <div
+        className={`flex items-center border-b border-border/50 shrink-0 ${
+          isMobile ? "h-11 gap-1.5 px-2.5" : "h-12 gap-2 px-3"
+        }`}
+      >
         <button
           type="button"
           onClick={onClose}
@@ -119,7 +124,7 @@ export function ComposeForm({
         )}
         <Button
           size="sm"
-          className="h-7 text-xs"
+          className={isMobile ? "h-7 px-2.5 text-xs" : "h-7 text-xs"}
           onClick={() => void onSend()}
           disabled={isBusy || !toValid || !composeSubject.trim()}
         >
@@ -129,8 +134,16 @@ export function ComposeForm({
       </div>
 
       {/* From (read-only) */}
-      <div className="flex items-center gap-3 px-4 h-10 border-b border-border/50 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+      <div
+        className={`flex items-center border-b border-border/50 shrink-0 ${
+          isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
+        }`}
+      >
+        <span
+          className={`shrink-0 text-xs font-medium text-muted-foreground/60 ${
+            isMobile ? "w-10" : "w-14"
+          }`}
+        >
           From
         </span>
         <span className="flex-1 text-sm text-muted-foreground truncate">
@@ -139,8 +152,16 @@ export function ComposeForm({
       </div>
 
       {/* To */}
-      <div className={`flex items-center gap-3 px-4 h-10 border-b shrink-0 transition-colors ${showToError ? "border-destructive/60" : "border-border/50"}`}>
-        <span className={`text-xs font-medium w-14 shrink-0 transition-colors ${showToError ? "text-destructive/70" : "text-muted-foreground/60"}`}>
+      <div
+        className={`flex items-center border-b shrink-0 transition-colors ${
+          isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
+        } ${showToError ? "border-destructive/60" : "border-border/50"}`}
+      >
+        <span
+          className={`shrink-0 text-xs font-medium transition-colors ${
+            isMobile ? "w-10" : "w-14"
+          } ${showToError ? "text-destructive/70" : "text-muted-foreground/60"}`}
+        >
           To
         </span>
         <input
@@ -177,8 +198,16 @@ export function ComposeForm({
 
       {/* CC (conditional) */}
       {showCc && (
-        <div className="flex items-center gap-3 px-4 h-10 border-b border-border/50 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+        <div
+          className={`flex items-center border-b border-border/50 shrink-0 ${
+            isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
+          }`}
+        >
+          <span
+            className={`shrink-0 text-xs font-medium text-muted-foreground/60 ${
+              isMobile ? "w-10" : "w-14"
+            }`}
+          >
             CC
           </span>
           <input
@@ -202,8 +231,16 @@ export function ComposeForm({
 
       {/* BCC (conditional) */}
       {showBcc && (
-        <div className="flex items-center gap-3 px-4 h-10 border-b border-border/50 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+        <div
+          className={`flex items-center border-b border-border/50 shrink-0 ${
+            isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
+          }`}
+        >
+          <span
+            className={`shrink-0 text-xs font-medium text-muted-foreground/60 ${
+              isMobile ? "w-10" : "w-14"
+            }`}
+          >
             BCC
           </span>
           <input
@@ -226,8 +263,16 @@ export function ComposeForm({
       )}
 
       {/* Subject */}
-      <div className="flex items-center gap-3 px-4 h-10 border-b border-border/50 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground/60 w-14 shrink-0">
+      <div
+        className={`flex items-center border-b border-border/50 shrink-0 ${
+          isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
+        }`}
+      >
+        <span
+          className={`shrink-0 text-xs font-medium text-muted-foreground/60 ${
+            isMobile ? "w-10" : "w-14"
+          }`}
+        >
           Subject
         </span>
         <input
@@ -242,7 +287,9 @@ export function ComposeForm({
 
       {/* Body */}
       <div
-        className="flex-1 overflow-y-auto px-4 pt-3 pb-2"
+        className={`flex-1 overflow-y-auto ${
+          isMobile ? "px-3 pb-1.5 pt-2" : "px-4 pb-2 pt-3"
+        }`}
         role="presentation"
         onKeyDown={onKeyDown}
       >
@@ -251,13 +298,19 @@ export function ComposeForm({
           onChange={(e) => setComposeBody(e.target.value)}
           placeholder="Write your message…"
           disabled={isBusy}
-          className="size-full min-h-32 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none text-sm resize-none placeholder:text-muted-foreground/40 leading-relaxed"
+          className={`size-full bg-transparent border-0 text-sm resize-none placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 ring-0 ${
+            isMobile ? "min-h-24 leading-normal" : "min-h-32 leading-relaxed"
+          }`}
         />
       </div>
 
       {/* Attachment chips */}
       {composeAttachments.length > 0 && (
-        <div className="px-4 pt-2 pb-1 flex flex-wrap gap-1.5 border-t border-border/50 shrink-0">
+        <div
+          className={`flex flex-wrap gap-1.5 border-t border-border/50 shrink-0 ${
+            isMobile ? "px-3 pb-1 pt-1.5" : "px-4 pb-1 pt-2"
+          }`}
+        >
           {composeAttachments.map((file) => (
             <div
               key={`${file.name}-${file.size}-${file.lastModified}`}
@@ -281,7 +334,11 @@ export function ComposeForm({
       )}
 
       {/* Footer toolbar */}
-      <div className="px-4 py-2 border-t border-border/50 flex items-center justify-between shrink-0">
+      <div
+        className={`flex items-center justify-between border-t border-border/50 shrink-0 ${
+          isMobile ? "px-3 py-1.5" : "px-4 py-2"
+        }`}
+      >
         <div className="flex items-center gap-1">
           <input
             ref={fileInputRef}
@@ -363,7 +420,7 @@ export function ComposeDialog({
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-        <DrawerContent className="max-h-[95svh]">
+        <DrawerContent className="max-h-[100svh] rounded-t-[1.25rem]">
           <VisuallyHidden>
             <DrawerHeader>
               <DrawerTitle>New mail</DrawerTitle>

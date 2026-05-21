@@ -33,6 +33,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { AppLoadingState } from "@workspace/ui/components/ui";
+import { useIsMobile } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "./mail-helpers";
@@ -111,6 +112,7 @@ export function MessageList({
   const barRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const moveTargets = (mailboxes ?? []).filter(
     (m) =>
@@ -192,8 +194,16 @@ export function MessageList({
   }
 
   return (
-    <div ref={scrollRef} className="flex flex-col h-full overflow-y-auto">
-      <div className="sticky top-0 z-20 px-3 py-2 border-b border-border/40 bg-background/95 backdrop-blur-sm">
+    <div
+      ref={scrollRef}
+      className="flex h-full flex-col overflow-y-auto pb-6 safe-area-inset-bottom"
+    >
+      <div
+        className={cn(
+          "sticky top-0 z-20 border-b border-border/40 bg-background/95 backdrop-blur-sm",
+          isMobile ? "px-2.5 py-1.5" : "px-3 py-2",
+        )}
+      >
         <div className="flex items-center gap-2 rounded-md bg-muted/60 px-2.5 py-1.5 focus-within:bg-muted/80 transition-colors">
           <Search
             className="size-3.5 shrink-0 text-muted-foreground/60"
@@ -363,7 +373,8 @@ export function MessageList({
                       }
                     }}
                     className={cn(
-                      "group/row relative w-full pl-[13px] pr-3 py-2.5 text-left transition-colors cursor-pointer",
+                      "group/row relative w-full text-left transition-colors cursor-pointer",
+                      isMobile ? "py-2 pl-3 pr-2.5" : "py-2.5 pl-[13px] pr-3",
                       "data-[state=open]:bg-muted/60",
                       isChecked
                         ? "bg-primary/5 dark:bg-primary/10"
@@ -384,7 +395,7 @@ export function MessageList({
                       )}
                     />
 
-                    <div className="flex items-start gap-2.5">
+                    <div className={cn("flex items-start", isMobile ? "gap-2" : "gap-2.5")}>
                       {/* Avatar / checkbox toggle */}
                       <button
                         type="button"
@@ -422,10 +433,16 @@ export function MessageList({
 
                       <div className="flex-1 min-w-0">
                         {/* Top row: sender + meta */}
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <div
+                          className={cn(
+                            "mb-0.5 flex items-center justify-between gap-2",
+                            isMobile ? "mb-0" : "",
+                          )}
+                        >
                           <span
                             className={cn(
-                              "text-[13px] truncate",
+                              "truncate",
+                              isMobile ? "text-[12.5px]" : "text-[13px]",
                               isRead
                                 ? "font-medium text-foreground/70 dark:text-foreground/85"
                                 : "font-semibold text-foreground",
@@ -517,12 +534,13 @@ export function MessageList({
                         </div>
 
                         {/* Subject */}
-                        <p
-                          className={cn(
-                            "text-[12.5px] truncate leading-snug",
-                            isRead
-                              ? "text-foreground/50 dark:text-foreground/60"
-                              : "text-foreground/80 dark:text-foreground/90",
+                          <p
+                            className={cn(
+                              "truncate leading-snug",
+                              isMobile ? "text-xs" : "text-[12.5px]",
+                              isRead
+                                ? "text-foreground/50 dark:text-foreground/60"
+                                : "text-foreground/80 dark:text-foreground/90",
                           )}
                         >
                           {message.subject || "(No subject)"}
@@ -530,7 +548,12 @@ export function MessageList({
 
                         {/* Labels */}
                         {messageLabels.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            <div
+                              className={cn(
+                                "mt-1 flex flex-wrap items-center gap-1",
+                                isMobile ? "mt-0.5" : "",
+                              )}
+                            >
                             {messageLabels.map((label) => (
                               <span
                                 key={label.id}

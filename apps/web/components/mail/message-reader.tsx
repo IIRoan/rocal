@@ -1051,7 +1051,34 @@ export function MessageReader({
   );
 
   // ── Top toolbar ─────────────────────────────────────────────────────────────
-  const toolbar = (
+  const toolbar = isMobile ? (
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/40 px-3">
+      {onClose && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Close message"
+          onClick={onClose}
+        >
+          <X />
+        </Button>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium leading-none">
+          {message.subject || "(No subject)"}
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="More actions"
+        disabled={isBusy}
+        onClick={() => setMoreActionsOpen(true)}
+      >
+        <EllipsisVertical />
+      </Button>
+    </div>
+  ) : (
     <div className="shrink-0 flex items-center gap-0.5 px-3 h-12 border-b border-border/40">
       {/* Left: close + separator + prev/next */}
       <div className="flex items-center gap-0.5">
@@ -1341,15 +1368,30 @@ export function MessageReader({
 
   // ── Email header ─────────────────────────────────────────────────────────────
   const header = (
-    <div className="shrink-0 px-4 py-3 relative flex flex-col gap-2.5">
+    <div
+      className={cn(
+        "relative shrink-0 flex flex-col",
+        isMobile ? "gap-1.5 px-3 py-2" : "gap-2.5 px-4 py-3",
+      )}
+    >
       {labelPopoverTrigger}
 
       {/* Subject + action buttons */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="font-medium leading-snug">
+      <div className={cn("flex items-start justify-between", isMobile ? "gap-1.5" : "gap-2")}>
+        <div
+          className={cn(
+            "font-medium leading-snug",
+            isMobile ? "pr-1 text-[13px]" : "",
+          )}
+        >
           {message.subject || "(No subject)"}
         </div>
-        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+        <div
+          className={cn(
+            "mt-0.5 flex shrink-0 items-center gap-1",
+            isMobile ? "mt-0" : "",
+          )}
+        >
           {onToggleFlagged && (
             <button
               type="button"
@@ -1379,23 +1421,44 @@ export function MessageReader({
       </div>
 
       {/* Sender row: avatar + name/email/to + date */}
-      <div className="flex items-start gap-2.5">
-        <SenderAvatar email={senderEmail} name={senderName} />
-        <div className="flex flex-1 min-w-0 flex-col gap-0.5">
+      <div className={cn("flex items-start", isMobile ? "gap-2" : "gap-2.5")}>
+        <SenderAvatar
+          email={senderEmail}
+          name={senderName}
+          className={isMobile ? "size-7 text-[10px]" : undefined}
+        />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0 group/sender">
+            <div
+              className={cn(
+                "min-w-0 group/sender",
+                isMobile ? "flex items-center gap-1" : "flex items-center gap-1.5",
+              )}
+            >
               {senderName && (
-                <span className="text-[13px] font-medium truncate">
+                <span className={cn("truncate font-medium", isMobile ? "text-xs" : "text-[13px]")}>
                   {senderName}
                 </span>
               )}
-              <span className="text-muted-foreground text-xs truncate">{`<${senderEmail}>`}</span>
-              <span className="opacity-0 group-hover/sender:opacity-100 transition-opacity">
-                <CopyEmailButton value={senderEmail} />
-              </span>
+              <span
+                className={cn(
+                  "truncate text-muted-foreground",
+                  isMobile ? "text-[11px]" : "text-xs",
+                )}
+              >{`<${senderEmail}>`}</span>
+              {!isMobile && (
+                <span className="opacity-0 transition-opacity group-hover/sender:opacity-100">
+                  <CopyEmailButton value={senderEmail} />
+                </span>
+              )}
             </div>
             {message.receivedAt && (
-              <span className="text-muted-foreground text-[11px] shrink-0">
+              <span
+                className={cn(
+                  "shrink-0 text-muted-foreground",
+                  isMobile ? "text-[10px]" : "text-[11px]",
+                )}
+              >
                 {new Date(message.receivedAt).toLocaleString(undefined, {
                   dateStyle: "medium",
                   timeStyle: "short",
@@ -1411,29 +1474,43 @@ export function MessageReader({
             )}
           </div>
           {(message.to?.length ?? 0) > 0 && (
-            <div className="flex items-center gap-1 text-muted-foreground text-xs group/to">
+            <div
+              className={cn(
+                "min-w-0 group/to text-muted-foreground",
+                isMobile ? "flex items-center gap-1 text-[11px]" : "flex items-center gap-1 text-xs",
+              )}
+            >
               <span>To:</span>
-              <span className="text-foreground/80">
+              <span className="truncate text-foreground/80">
                 {message.to!.map((a) => a.name || a.email).join(", ")}
               </span>
-              <span className="opacity-0 group-hover/to:opacity-100 transition-opacity">
-                <CopyEmailButton
-                  value={message.to!.map((a) => a.email).join(", ")}
-                />
-              </span>
+              {!isMobile && (
+                <span className="opacity-0 transition-opacity group-hover/to:opacity-100">
+                  <CopyEmailButton
+                    value={message.to!.map((a) => a.email).join(", ")}
+                  />
+                </span>
+              )}
             </div>
           )}
           {(message.cc?.length ?? 0) > 0 && (
-            <div className="flex items-center gap-1 text-muted-foreground text-xs group/cc">
+            <div
+              className={cn(
+                "min-w-0 group/cc text-muted-foreground",
+                isMobile ? "flex items-center gap-1 text-[11px]" : "flex items-center gap-1 text-xs",
+              )}
+            >
               <span>CC:</span>
-              <span className="text-foreground/80">
+              <span className="truncate text-foreground/80">
                 {message.cc!.map((a) => a.name || a.email).join(", ")}
               </span>
-              <span className="opacity-0 group-hover/cc:opacity-100 transition-opacity">
-                <CopyEmailButton
-                  value={message.cc!.map((a) => a.email).join(", ")}
-                />
-              </span>
+              {!isMobile && (
+                <span className="opacity-0 transition-opacity group-hover/cc:opacity-100">
+                  <CopyEmailButton
+                    value={message.cc!.map((a) => a.email).join(", ")}
+                  />
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -1445,7 +1522,10 @@ export function MessageReader({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="group flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors py-0.5"
+              className={cn(
+                "group flex items-center font-medium text-muted-foreground transition-colors hover:text-foreground",
+                isMobile ? "gap-1 py-0 text-[11px]" : "gap-1.5 py-0.5 text-[12px]",
+              )}
             >
               Attachments ({displayAttachments.length})
               <ChevronDown
@@ -1455,7 +1535,7 @@ export function MessageReader({
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="flex flex-wrap gap-2 pt-1.5">
+            <div className={cn("flex flex-wrap", isMobile ? "gap-1.5 pt-1" : "gap-2 pt-1.5")}>
               {displayAttachments.map((attachment, idx) => {
                 const name = attachment.name?.trim() || "Attachment";
                 const mimeType = attachment.type ?? "";
@@ -1506,11 +1586,12 @@ export function MessageReader({
                         : undefined
                     }
                     aria-label={`${canPreview ? "Preview" : "Download"} ${name}`}
-                    className={
+                    className={cn(
                       canPreview || canDownload
                         ? "cursor-pointer"
-                        : "cursor-default"
-                    }
+                        : "cursor-default",
+                      isMobile ? "h-5 gap-1 px-1.5 text-[10px]" : "",
+                    )}
                   >
                     {canPreview ? (
                       <Eye />
@@ -1583,7 +1664,10 @@ export function MessageReader({
                         type="button"
                         onClick={() => onDownloadAttachment!(attachment)}
                         aria-label={`Download ${name}`}
-                        className="cursor-pointer px-1.5"
+                        className={cn(
+                          "cursor-pointer px-1.5",
+                          isMobile ? "h-5 text-[10px]" : "",
+                        )}
                       >
                         <Download />
                       </Button>
@@ -1598,11 +1682,14 @@ export function MessageReader({
 
       {/* Labels */}
       {messageLabels.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className={cn("flex flex-wrap items-center", isMobile ? "gap-1" : "gap-1.5")}>
           {messageLabels.map((label) => (
             <span
               key={label.id}
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full font-medium",
+                isMobile ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[11px]",
+              )}
               style={{
                 backgroundColor: `${label.color}22`,
                 color: label.color,
@@ -1614,145 +1701,175 @@ export function MessageReader({
         </div>
       )}
 
-      {/* Mobile overflow actions */}
       {isMobile && (
-        <>
-          <div className="flex items-center gap-1 pt-2 border-t border-border/40 mt-2">
-            <button
-              type="button"
-              onClick={onReply}
-              disabled={isBusy}
-              aria-label="Reply"
-              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-            >
-              <Reply className="size-4" strokeWidth={2.25} />
-              Reply
-            </button>
-            <button
-              type="button"
-              onClick={onForward}
-              disabled={isBusy}
-              aria-label="Forward"
-              className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded text-[12px] font-medium text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-            >
-              <Forward className="size-4" strokeWidth={2.25} />
-              Forward
-            </button>
-            <div className="flex-1" />
-            <button
-              type="button"
-              onClick={() => setMoreActionsOpen(true)}
-              disabled={isBusy}
-              aria-label="More actions"
-              className="inline-flex items-center justify-center size-8 rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground transition-colors disabled:opacity-40"
-            >
-              <MoreHorizontal className="size-4" strokeWidth={2.25} />
-            </button>
-          </div>
-
-          <Drawer open={moreActionsOpen} onOpenChange={setMoreActionsOpen}>
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>Message actions</DrawerTitle>
-              </DrawerHeader>
-              <div className="px-4 pb-6 space-y-1 overflow-y-auto">
+        <Drawer open={moreActionsOpen} onOpenChange={setMoreActionsOpen}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Message actions</DrawerTitle>
+            </DrawerHeader>
+            <div className="flex flex-col gap-1 overflow-y-auto px-4 pb-6">
+              {hasPrev && onNavigatePrev && (
                 <button
                   type="button"
                   onClick={() => {
-                    onMarkAsUnread();
+                    onNavigatePrev();
                     setMoreActionsOpen(false);
                   }}
                   disabled={isBusy}
-                  className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
                 >
-                  <MailOpen
-                    className="size-4 text-muted-foreground"
-                    strokeWidth={2}
-                  />
-                  Mark as unread
+                  <ChevronLeft className="size-4 text-muted-foreground" />
+                  Previous message
                 </button>
-                {otherMailboxes.length > 0 && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        disabled={isBusy}
-                        className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
-                      >
-                        <FolderInput
-                          className="size-4 text-muted-foreground"
-                          strokeWidth={2}
-                        />
-                        Move to…
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      side="top"
-                      align="start"
-                      sideOffset={6}
-                      className="w-48 p-1"
+              )}
+              {hasNext && onNavigateNext && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigateNext();
+                    setMoreActionsOpen(false);
+                  }}
+                  disabled={isBusy}
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                >
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                  Next message
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onReply();
+                  setMoreActionsOpen(false);
+                }}
+                disabled={isBusy}
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+              >
+                <Reply className="size-4 text-muted-foreground" strokeWidth={2.25} />
+                Reply
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onForward();
+                  setMoreActionsOpen(false);
+                }}
+                disabled={isBusy}
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+              >
+                <Forward className="size-4 text-muted-foreground" strokeWidth={2.25} />
+                Forward
+              </button>
+              {onArchive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onArchive();
+                    setMoreActionsOpen(false);
+                  }}
+                  disabled={isBusy}
+                  className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                >
+                  <Archive className="size-4 text-muted-foreground" strokeWidth={2.25} />
+                  Archive
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onMarkAsUnread();
+                  setMoreActionsOpen(false);
+                }}
+                disabled={isBusy}
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+              >
+                <MailOpen
+                  className="size-4 text-muted-foreground"
+                  strokeWidth={2}
+                />
+                Mark as unread
+              </button>
+              {otherMailboxes.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
                     >
-                      {otherMailboxes.map((mailbox) => (
-                        <button
-                          key={mailbox.id}
-                          type="button"
-                          onClick={() => {
-                            onMove(mailbox.id);
-                            setMoreActionsOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
-                        >
-                          {mailbox.name}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                )}
-                {((onSetLabel && labels.length > 0) || onCreateLabel) && (
-                  <Popover
-                    open={labelPopoverOpen}
-                    onOpenChange={setLabelPopoverOpen}
+                      <FolderInput
+                        className="size-4 text-muted-foreground"
+                        strokeWidth={2}
+                      />
+                      Move to…
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="start"
+                    sideOffset={6}
+                    className="w-48 p-1"
                   >
-                    <PopoverTrigger asChild>
+                    {otherMailboxes.map((mailbox) => (
                       <button
+                        key={mailbox.id}
                         type="button"
-                        disabled={isBusy}
-                        className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-foreground/80 hover:bg-accent/40 active:bg-accent/60 transition-colors disabled:opacity-40"
+                        onClick={() => {
+                          onMove(mailbox.id);
+                          setMoreActionsOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-sm text-foreground/80 hover:bg-accent/50 transition-colors text-left"
                       >
-                        <Tag
-                          className="size-4 text-muted-foreground"
-                          strokeWidth={2}
-                        />
-                        Labels
+                        {mailbox.name}
                       </button>
-                    </PopoverTrigger>
-                    {labelPopoverContent}
-                  </Popover>
-                )}
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              )}
+              {((onSetLabel && labels.length > 0) || onCreateLabel) && (
+                <Popover
+                  open={labelPopoverOpen}
+                  onOpenChange={setLabelPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
+                    >
+                      <Tag
+                        className="size-4 text-muted-foreground"
+                        strokeWidth={2}
+                      />
+                      Labels
+                    </button>
+                  </PopoverTrigger>
+                  {labelPopoverContent}
+                </Popover>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete();
+                  setMoreActionsOpen(false);
+                }}
+                disabled={isBusy}
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-destructive/80 transition-colors hover:bg-destructive/10 active:bg-destructive/20 disabled:opacity-40"
+              >
+                <Trash2 className="size-4" strokeWidth={2} />
+                Delete message
+              </button>
+              <DrawerClose asChild>
                 <button
                   type="button"
-                  onClick={() => {
-                    onDelete();
-                    setMoreActionsOpen(false);
-                  }}
-                  disabled={isBusy}
-                  className="w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm text-destructive/80 hover:bg-destructive/10 active:bg-destructive/20 transition-colors disabled:opacity-40"
+                  className="mt-2 flex h-11 w-full items-center justify-center rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-accent/40"
                 >
-                  <Trash2 className="size-4" strokeWidth={2} />
-                  Delete message
+                  Cancel
                 </button>
-                <DrawerClose asChild>
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-center h-11 px-3 rounded-lg text-sm text-muted-foreground hover:bg-accent/40 transition-colors mt-2"
-                  >
-                    Cancel
-                  </button>
-                </DrawerClose>
-              </div>
-            </DrawerContent>
-          </Drawer>
-        </>
+              </DrawerClose>
+            </div>
+          </DrawerContent>
+        </Drawer>
       )}
 
       {decryptError && (
