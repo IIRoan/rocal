@@ -31,7 +31,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
   return (
     <>
       {/* Desktop Layout - Hidden on mobile */}
-      <div className="hidden md:flex h-screen">
+      <div className="hidden lg:flex h-screen">
         <SidebarProvider>
           <AppSidebar
             user={user}
@@ -46,7 +46,7 @@ export function MobileDashboard({ user, onLogout }: MobileDashboardProps) {
       </div>
 
       {/* Mobile Layout - Hidden on desktop */}
-      <div className="md:hidden h-screen">
+      <div className="lg:hidden h-screen">
         <MobileCalendarWrapper {...calendarProps} className="h-full" />
       </div>
     </>

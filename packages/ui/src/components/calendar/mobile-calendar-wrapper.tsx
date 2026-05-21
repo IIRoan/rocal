@@ -12,7 +12,6 @@ import {
   MobileEventCalendar,
   MobileEventCalendarProps,
 } from "./mobile-event-calendar";
-import { MobileBottomNav } from "../navigation/mobile-bottom-nav";
 import { MobileTopNav } from "../navigation/mobile-top-nav";
 import { SidebarCalendar } from "../navigation/sidebar-calendar";
 import { AppSidebar } from "../layout/app-sidebar";
@@ -45,6 +44,7 @@ interface MobileCalendarWrapperProps extends MobileEventCalendarProps {
   onOpenSettings?: () => void;
   onOpenCalendarManagement?: () => void;
   onOpenAddEvent?: () => void;
+  appSwitcher?: React.ReactNode;
   getCachedEventsForRange?: (range: {
     start: Date;
     end: Date;
@@ -58,6 +58,7 @@ export function MobileCalendarWrapper({
   onOpenSettings,
   onOpenCalendarManagement,
   onOpenAddEvent,
+  appSwitcher,
   getCachedEventsForRange,
   prefetchRange,
   children,
@@ -101,7 +102,6 @@ export function MobileCalendarWrapper({
     }
   }, []); // Only run once on mount
 
-  const handleDateChange = (date: Date) => setCurrentDate(date);
   const handleToday = () => setCurrentDate(new Date());
   const handleOpenSidebar = () => setIsSidebarOpen(true);
   const handleOpenQuickNav = () => setIsQuickNavOpen(true);
@@ -301,7 +301,7 @@ export function MobileCalendarWrapper({
 
   return (
     <div
-      className="relative flex flex-col h-dvh md:h-full overflow-hidden"
+      className="relative flex h-dvh flex-col overflow-hidden safe-area-inset-bottom lg:h-full"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -310,10 +310,15 @@ export function MobileCalendarWrapper({
         <MobileTopNav
           currentDate={currentDate}
           currentView={currentView}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onToday={handleToday}
+          onViewChange={handleViewChange}
           onOpenQuickNav={handleOpenQuickNav}
           onOpenSidebar={handleOpenSidebar}
           onOpenAddEvent={handleOpenAddEvent}
-          className="md:hidden"
+          appSwitcher={appSwitcher}
+          className="lg:hidden"
         />
       )}
 
@@ -332,7 +337,7 @@ export function MobileCalendarWrapper({
           <div className="flex h-full">
             {/* Previous */}
             <div
-              className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
+              className="min-w-0 h-full overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:pb-0"
               style={{ flex: "0 0 100%", touchAction: "pan-y" }}
             >
               <MobileEventCalendar
@@ -346,7 +351,7 @@ export function MobileCalendarWrapper({
             </div>
             {/* Current */}
             <div
-              className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
+              className="min-w-0 h-full overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:pb-0"
               style={{ flex: "0 0 100%", touchAction: "pan-y" }}
             >
               {children || (
@@ -362,7 +367,7 @@ export function MobileCalendarWrapper({
             </div>
             {/* Next */}
             <div
-              className="min-w-0 h-full overflow-y-auto pb-20 md:pb-0"
+              className="min-w-0 h-full overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:pb-0"
               style={{ flex: "0 0 100%", touchAction: "pan-y" }}
             >
               <MobileEventCalendar
@@ -377,16 +382,6 @@ export function MobileCalendarWrapper({
           </div>
         </div>
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav
-        currentDate={currentDate}
-        onDateChange={handleDateChange}
-        currentView={currentView}
-        onViewChange={handleViewChange}
-        onToday={handleToday}
-        className="md:hidden"
-      />
 
       {/* Mobile Quick Navigation Drawer */}
       <Drawer
@@ -421,7 +416,7 @@ export function MobileCalendarWrapper({
         <SheetContent
           side="left"
           showClose={false}
-          className="w-[85vw] max-w-[320px] h-[100dvh] p-0 border-r border-border rounded-none safe-area-inset-top safe-area-inset-bottom"
+          className="h-[100dvh] w-[85vw] max-w-[320px] rounded-none border-r border-border p-0 safe-area-inset-bottom"
         >
           <VisuallyHidden>
             <SheetTitle>Calendar Sidebar</SheetTitle>

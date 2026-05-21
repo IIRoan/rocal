@@ -11,6 +11,9 @@ import {
 } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 
+const mockToggleSidebar = jest.fn();
+const mockUseIsMobile = jest.fn(() => false);
+
 // jsdom does not implement matchMedia
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -64,6 +67,9 @@ jest.mock("@workspace/ui/components/ui/sidebar", () => ({
   SidebarInset: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  useSidebar: () => ({
+    toggleSidebar: mockToggleSidebar,
+  }),
 }));
 
 jest.mock("@workspace/ui/components/ui", () => ({
@@ -87,6 +93,10 @@ jest.mock("@workspace/ui/components/ui/button", () => ({
   ),
 }));
 
+jest.mock("@workspace/ui/hooks", () => ({
+  useIsMobile: () => mockUseIsMobile(),
+}));
+
 jest.mock("@workspace/ui/components/ui/app-skeletons", () => ({
   DashboardSkeleton: () => <div>Loading…</div>,
   MailSkeleton: () => <div>Loading…</div>,
@@ -102,6 +112,7 @@ jest.mock("lucide-react", () => {
     Loader2: Icon,
     Lock: Icon,
     MailPlus: Icon,
+    Menu: Icon,
     Pencil: Icon,
     Plus: Icon,
     RefreshCcw: Icon,
@@ -229,12 +240,18 @@ jest.mock("../../components/mail/mail-sidebar", () => ({
 jest.mock("../../components/mail/message-list", () => ({
   MessageList: ({
     messages,
+    onSelect,
   }: {
     messages: { id: string; subject?: string }[];
+    onSelect?: (id: string) => void;
   }) => (
     <ul>
       {messages.map((m) => (
-        <li key={m.id}>{m.subject}</li>
+        <li key={m.id}>
+          <button type="button" onClick={() => onSelect?.(m.id)}>
+            {m.subject}
+          </button>
+        </li>
       ))}
     </ul>
   ),
@@ -266,6 +283,10 @@ jest.mock("../../components/mail/message-reader", () => ({
         </button>
       </div>
     ) : null,
+}));
+
+jest.mock("../../components/mobile-app-switcher", () => ({
+  MobileAppSwitcher: () => <div>App switcher</div>,
 }));
 
 jest.mock("../../components/mail/attachment-preview-dialog", () => ({
@@ -302,6 +323,7 @@ jest.mock("../../components/mail/compose-dialog", () => ({
   ),
   ComposeDialog: ({
     open,
+    onExpand,
     composeTo,
     composeSubject,
     composeBody,
@@ -326,6 +348,9 @@ jest.mock("../../components/mail/compose-dialog", () => ({
           value={composeBody}
           onChange={(e: any) => setComposeBody(e.target.value)}
         />
+        {onExpand ? (
+          <button onClick={onExpand}>Expand compose</button>
+        ) : null}
         <button onClick={() => void onSend()}>Send message</button>
       </div>
     ) : null,
@@ -452,6 +477,8 @@ describe("MailApp", () => {
     root = createRoot(container);
     mockToast.mockReset();
     mockToastError.mockReset();
+    mockToggleSidebar.mockReset();
+    mockUseIsMobile.mockReturnValue(false);
 
     mockUseSession.mockReturnValue({
       data: {
@@ -792,8 +819,30 @@ describe("MailApp", () => {
           parallelism: 4,
         },
       );
+    });
+    expect(container.textContent).toContain("Encrypted hello");
+  });
+
+  it("does not auto-open the newest message on desktop", async () => {
+    await renderApp();
+
+    await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
     });
+
+    expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
+  });
+
+  it("does not auto-open the newest message on mobile", async () => {
+    mockUseIsMobile.mockReturnValue(true);
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
   });
 
   it("shows the loading skeleton instead of the migration prompt while auto-opening with the cached auth password", async () => {
@@ -994,6 +1043,72 @@ describe("MailApp", () => {
     );
   });
 
+  it("shows the mobile app switcher and opens mailbox navigation on mobile", async () => {
+    mockUseIsMobile.mockReturnValue(true);
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("App switcher");
+    });
+
+    const mailboxButton = container.querySelector(
+      'button[aria-label="Open mailboxes"]',
+    ) as HTMLButtonElement | null;
+    const composeButton = container.querySelector(
+      'button[aria-label="Compose message"]',
+    ) as HTMLButtonElement | null;
+
+    expect(mailboxButton).not.toBeNull();
+    expect(composeButton).not.toBeNull();
+
+    act(() => {
+      mailboxButton?.click();
+    });
+
+    expect(mockToggleSidebar).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      composeButton?.click();
+    });
+
+    await waitForExpectation(() => {
+      expect(container.querySelector('input[placeholder="Recipient"]')).not.toBe(
+        null,
+      );
+    });
+  });
+
+  it("hands mobile full compose to the composer instead of keeping the mobile chrome visible", async () => {
+    mockUseIsMobile.mockReturnValue(true);
+
+    await renderApp();
+
+    const composeButton = container.querySelector(
+      'button[aria-label="Compose message"]',
+    ) as HTMLButtonElement | null;
+
+    act(() => {
+      composeButton?.click();
+    });
+
+    const expandButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Expand compose",
+    );
+
+    act(() => {
+      expandButton?.click();
+    });
+
+    await waitForExpectation(() => {
+      expect(container.querySelector('input[placeholder="Recipient"]')).not.toBe(
+        null,
+      );
+    });
+
+    expect(container.textContent).not.toContain("App switcher");
+  });
+
   it("encrypts internal mail before sending it through the JMAP proxy", async () => {
     mockApi.getVaultKeyMaterial.mockRejectedValueOnce(new Error("no key"));
     mockPeekCachedAuthPassword.mockReturnValue("StrongMailboxPassword!42");
@@ -1122,6 +1237,15 @@ describe("MailApp", () => {
       expect(container.textContent).toContain("Encrypted hello");
     });
 
+    const messageButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Encrypted hello",
+    );
+
+    await act(async () => {
+      messageButton?.click();
+      await Promise.resolve();
+    });
+
     const quickReplyButton = Array.from(container.querySelectorAll("button")).find(
       (element) => element.textContent === "Send reply",
     );
@@ -1173,6 +1297,15 @@ describe("MailApp", () => {
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const messageButton = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent === "Encrypted hello",
+    );
+
+    await act(async () => {
+      messageButton?.click();
+      await Promise.resolve();
     });
 
     const replyButton = container.querySelector(

@@ -168,7 +168,7 @@ export function MobileBottomNav({
 
   return (
     <div
-      className={cn("fixed bottom-0 left-0 right-0 z-50 md:hidden", className)}
+      className={cn("fixed bottom-0 left-0 right-0 z-50 lg:hidden", className)}
     >
       <div className="relative">
         <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />

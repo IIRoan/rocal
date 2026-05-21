@@ -6,22 +6,169 @@ import {
   RotateCcw,
   ArrowLeft,
   Pencil,
+  Menu,
 } from "lucide-react";
 import {
   SidebarProvider,
   SidebarInset,
+  useSidebar,
 } from "@workspace/ui/components/ui/sidebar";
 import { Button } from "@workspace/ui/components/ui/button";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useSettings } from "@/hooks/use-settings";
+import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 import { MailSidebar } from "./mail-sidebar";
 import { MailCommandPalette } from "./mail-command-palette";
 import { ComposeDialog, ComposeForm } from "./compose-dialog";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { MessageList } from "./message-list";
 import { MessageReader } from "./message-reader";
+
+interface MobileMailHeaderProps {
+  selectedMailboxName: string;
+  mailboxMessageCount: number;
+  selectedMessageSubject: string | null;
+  mailboxEmail: string;
+  showReaderOnMobile: boolean;
+  isFullCompose: boolean;
+  isBusy: boolean;
+  isRefreshing: boolean;
+  onBack: () => void;
+  onOpenPalette: () => void;
+  onRefresh: () => void;
+  onCompose: () => void;
+}
+
+function MobileMailHeader({
+  selectedMailboxName,
+  mailboxMessageCount,
+  selectedMessageSubject,
+  mailboxEmail,
+  showReaderOnMobile,
+  isFullCompose,
+  isBusy,
+  isRefreshing,
+  onBack,
+  onOpenPalette,
+  onRefresh,
+  onCompose,
+}: MobileMailHeaderProps) {
+  const { toggleSidebar } = useSidebar();
+
+  return (
+    <header className="shrink-0 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="safe-area-inset-top px-4 pb-3 pt-3">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-9 rounded-xl text-muted-foreground"
+            onClick={toggleSidebar}
+            aria-label="Open mailboxes"
+          >
+            <Menu size={18} strokeWidth={2.25} />
+          </Button>
+
+          <div className="flex min-w-0 flex-1 justify-center">
+            <MobileAppSwitcher activeApp="mail" />
+          </div>
+
+          {isFullCompose ? (
+            <div className="size-9 shrink-0" aria-hidden />
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-9 rounded-xl text-muted-foreground"
+              onClick={onCompose}
+              aria-label="Compose message"
+            >
+              <Pencil size={18} strokeWidth={2.25} />
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-center gap-3">
+          {isFullCompose ? (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">
+                New message
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {mailboxEmail}
+              </p>
+            </div>
+          ) : showReaderOnMobile ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-9 rounded-xl text-muted-foreground"
+                onClick={onBack}
+                aria-label="Back to messages"
+              >
+                <ArrowLeft size={18} strokeWidth={2.25} />
+              </Button>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {selectedMessageSubject || "Message"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {selectedMailboxName}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {selectedMailboxName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {mailboxMessageCount}{" "}
+                  {mailboxMessageCount === 1 ? "message" : "messages"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-9 rounded-xl text-muted-foreground"
+                  onClick={onOpenPalette}
+                  aria-label="Open mail filters"
+                  title="Filter"
+                >
+                  <SlidersHorizontal size={16} strokeWidth={2.25} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-9 rounded-xl text-muted-foreground disabled:opacity-40"
+                  disabled={isRefreshing || isBusy}
+                  onClick={onRefresh}
+                  aria-label="Refresh mail"
+                  title="Refresh mail"
+                >
+                  <RotateCcw
+                    size={16}
+                    strokeWidth={2.25}
+                    className={
+                      isRefreshing ? "animate-spin" : "transition-transform"
+                    }
+                  />
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
 
 export function MailApp() {
   const {
@@ -186,69 +333,22 @@ export function MailApp() {
         />
         <SidebarInset>
           {activeMailbox ? (
-            <div className="flex h-full flex-col overflow-hidden">
-              {/* Mobile-only top header — adapts between list header and reader header */}
-              {isMobile && (
-                <header className="flex h-12 shrink-0 items-center border-b border-border/40 px-4 gap-3">
-                  {showReaderOnMobile ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleBack}
-                        className="inline-flex items-center justify-center size-8 rounded-lg text-foreground/70 hover:text-foreground hover:bg-accent/40 transition-colors"
-                        aria-label="Back to list"
-                      >
-                        <ArrowLeft size={17} strokeWidth={2} />
-                      </button>
-                      <h1 className="text-sm font-semibold flex-1 truncate">
-                        {selectedMessage?.subject || "Message"}
-                      </h1>
-                    </>
-                  ) : (
-                    <>
-                      <h1 className="text-sm font-semibold">
-                        {selectedMailbox?.name ?? "Inbox"}
-                      </h1>
-                      <span className="text-xs text-muted-foreground/60">
-                        {activeMailbox.messages.length}{" "}
-                        {activeMailbox.messages.length === 1
-                          ? "message"
-                          : "messages"}
-                      </span>
-                      <div className="ml-auto flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="rounded-[min(var(--radius-md),12px)]"
-                          onClick={() => setIsPaletteOpen(true)}
-                          aria-label="Filter"
-                          title="Filter"
-                        >
-                          <SlidersHorizontal size={15} strokeWidth={2} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="rounded-[min(var(--radius-md),12px)] disabled:opacity-40"
-                          disabled={isRefreshing || isBusy}
-                          onClick={() => void handleManualRefresh()}
-                          aria-label="Refresh mail"
-                          title="Refresh mail"
-                        >
-                          <RotateCcw
-                            size={15}
-                            strokeWidth={2}
-                            className={
-                              isRefreshing
-                                ? "animate-spin"
-                                : "transition-transform"
-                            }
-                          />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </header>
+            <div className="flex h-full flex-col overflow-hidden bg-background">
+              {isMobile && !showReaderOnMobile && !isFullCompose && (
+                <MobileMailHeader
+                  selectedMailboxName={selectedMailbox?.name ?? "Inbox"}
+                  mailboxMessageCount={activeMailbox.messages.length}
+                  selectedMessageSubject={selectedMessage?.subject ?? null}
+                  mailboxEmail={activeMailbox.email ?? accountEmail}
+                  showReaderOnMobile={showReaderOnMobile}
+                  isFullCompose={isFullCompose}
+                  isBusy={isBusy}
+                  isRefreshing={isRefreshing}
+                  onBack={handleBack}
+                  onOpenPalette={() => setIsPaletteOpen(true)}
+                  onRefresh={() => void handleManualRefresh()}
+                  onCompose={() => setIsComposeOpen(true)}
+                />
               )}
 
               <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -256,7 +356,7 @@ export function MailApp() {
                 <div
                   className={
                     isMobile
-                      ? showReaderOnMobile
+                      ? showReaderOnMobile || isFullCompose
                         ? "hidden"
                         : "flex flex-col w-full min-h-0"
                       : "w-72 shrink-0 border-r border-border/40 flex flex-col min-h-0"
@@ -451,17 +551,6 @@ export function MailApp() {
                 </div>
               </div>
 
-              {/* Mobile compose FAB — shown in list view */}
-              {isMobile && !showReaderOnMobile && (
-                <button
-                  type="button"
-                  onClick={() => setIsComposeOpen(true)}
-                  className="fixed bottom-6 right-5 z-30 flex items-center justify-center size-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
-                  aria-label="Compose"
-                >
-                  <Pencil size={20} strokeWidth={2} />
-                </button>
-              )}
             </div>
           ) : null}
         </SidebarInset>
