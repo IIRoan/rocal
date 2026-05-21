@@ -2,10 +2,28 @@
 
 import { createLogger } from "@workspace/logger";
 
+type SpawnedProcess = {
+  exited: Promise<number>;
+  kill(): void;
+};
+
+declare const Bun: {
+  spawn(
+    command: string[],
+    options: {
+      cwd: string;
+      env: NodeJS.ProcessEnv;
+      stdin: "inherit";
+      stdout: "inherit";
+      stderr: "inherit";
+    },
+  ): SpawnedProcess;
+};
+
 const DEFAULT_CLOUDFLARED_PUBLIC_URL = "https://cloudflared.roan.dev";
 const log = createLogger("native:dev");
 
-function normalizeUrl(value) {
+function normalizeUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
@@ -37,7 +55,7 @@ const expoProc = Bun.spawn(expoCommand, {
 });
 
 let cleanedUp = false;
-const cleanup = () => {
+const cleanup = (): void => {
   if (cleanedUp) return;
   cleanedUp = true;
   expoProc.kill();

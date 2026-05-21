@@ -1,7 +1,7 @@
 import { getAllowedNextDevOrigins } from "@workspace/runtime/next-dev";
+import type { NextConfig } from "next";
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+const nextConfig: NextConfig = {
   output: "export",
   allowedDevOrigins: getAllowedNextDevOrigins(),
   compiler: {
