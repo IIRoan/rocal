@@ -32,6 +32,7 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 import { CALENDAR_HOME_PATH } from "@/lib/app-routes";
 import { useEffect, useRef, Suspense, type ReactNode } from "react";
 import { useCalendarUrlSync } from "@/hooks/use-calendar-url-sync";
+import { MobileAppSwitcher } from "@/components/mobile-app-switcher";
 
 const log = createLogger("calendar");
 
@@ -246,6 +247,7 @@ function MobileLayoutContent() {
       }}
       onOpenCalendarManagement={openCalendarManagement}
       onOpenAddEvent={openNewEventEditor}
+      appSwitcher={<MobileAppSwitcher activeApp="calendar" />}
       initialView={initialView}
       events={transformedEvents}
       categories={calendarData.categories}
@@ -278,11 +280,11 @@ function MobileLayoutContent() {
 export function CalendarPageContent() {
   return (
     <>
-      <div className="md:hidden min-h-[100dvh] safe-area-inset-top safe-area-inset-bottom">
+      <div className="lg:hidden min-h-[100dvh] safe-area-inset-bottom">
         <MobileLayoutContent />
       </div>
 
-      <CalendarWithData className="hidden h-full min-h-screen md:flex md:flex-1" />
+      <CalendarWithData className="hidden h-full min-h-screen lg:flex lg:flex-1" />
     </>
   );
 }

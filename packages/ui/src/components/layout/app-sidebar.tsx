@@ -128,9 +128,9 @@ export function AppSidebar({
         .toUpperCase() || "GU";
 
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col h-[100dvh] w-full bg-background overflow-hidden overscroll-none">
+      <div className="flex h-full w-full flex-col overflow-hidden overscroll-none bg-background">
         {/* Header */}
-        <div className="flex items-center justify-between pt-safe-offset-5 pt-5 pb-3 px-5 shrink-0 border-b border-border/40">
+        <div className="safe-area-inset-top flex shrink-0 items-center justify-between border-b border-border/40 px-4 pb-2.5 pt-2.5">
           <div className="flex items-center gap-2.5">
             <LogoSvg className="size-7 text-primary" />
             <span
@@ -192,13 +192,13 @@ export function AppSidebar({
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-auto px-5 py-4 space-y-6">
+        <div className="flex flex-1 flex-col gap-5 overflow-auto px-4 py-3">
           {/* New event CTA */}
           {onCreateEvent && (
             <Button
               onClick={onCreateEvent}
               variant="outline"
-              className="w-full h-11 rounded-xl border-border/60 text-foreground/80 font-medium transition-colors active:scale-[0.98]"
+              className="h-10 w-full rounded-xl border-border/60 text-foreground/80 font-medium transition-colors active:scale-[0.98]"
               style={{ fontWeight: 470 }}
             >
               <Plus size={17} strokeWidth={2} />
@@ -217,7 +217,7 @@ export function AppSidebar({
 
           {/* Calendars */}
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Calendars
               </span>
