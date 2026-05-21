@@ -6,7 +6,7 @@ module.exports = {
   transform: {
     "^.+\\.(js|jsx|ts|tsx)$": [
       "babel-jest",
-      { configFile: require.resolve("../../babel.config.js") },
+      { configFile: require.resolve("../../babel.config.cts") },
     ],
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
