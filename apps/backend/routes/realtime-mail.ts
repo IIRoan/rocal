@@ -6,7 +6,10 @@ import { requireAuth } from "../lib/auth-guard";
 import { env } from "../lib/env";
 import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
-import { MailRealtimeService } from "../services/mail-realtime.service";
+import {
+  MailRealtimeService,
+  resolveChangedTypes,
+} from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
 
@@ -16,6 +19,7 @@ const encoder = new TextEncoder();
 export const defaultMailRealtimeService = new MailRealtimeService({
   eventSourceUrl: `${env.stalwartBaseUrl.replace(/\/+$/, "")}/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}`,
   adminToken: env.stalwartAdminToken,
+  syncProvider: defaultMailSyncService,
 });
 
 async function writeChunk(
@@ -130,19 +134,28 @@ export function createRealtimeMailRoutes(
                       });
 
                     if (!hasChanges || closed) continue;
+                    const sync = await mailSyncService.syncForUser({
+                      userId: user.id,
+                      accountId,
+                    });
+                    const resolvedChangedTypes = resolveChangedTypes(
+                      sync.changedTypes,
+                      changedTypes,
+                    );
 
                     logger.info("Mail poll detected changes", {
                       userId: user.id,
                       accountId,
-                      changedTypes,
+                      changedTypes: resolvedChangedTypes,
                     });
                     scheduleWrite(
                       writer,
                       `event: mail.changed\ndata: ${JSON.stringify({
                         type: "mail.changed",
                         accountId,
-                        changedTypes,
+                        changedTypes: resolvedChangedTypes,
                         receivedAt: new Date().toISOString(),
+                        sync,
                       })}\n\n`,
                       close,
                     );

@@ -1,10 +1,13 @@
 import { createLogger } from "@workspace/logger";
+import { z } from "zod";
+import type { MailSyncResult } from "./mail-sync.service";
 
 export type MailChangedEvent = {
   type: "mail.changed";
   accountId: string;
   changedTypes: string[];
   receivedAt: string;
+  sync?: MailSyncResult;
 };
 
 type StalwartStateChange = {
@@ -20,6 +23,17 @@ type SseFrame = {
 
 const logger = createLogger("backend:mail-realtime");
 const WATCHED_TYPES = new Set(["Email", "Mailbox", "Thread"]);
+const stalwartStateChangeSchema = z.object({
+  "@type": z.string().optional(),
+  changed: z.record(z.record(z.string())).optional(),
+});
+
+export function resolveChangedTypes(
+  syncChangedTypes: string[],
+  fallbackChangedTypes: string[],
+): string[] {
+  return syncChangedTypes.length > 0 ? syncChangedTypes : fallbackChangedTypes;
+}
 
 export function normalizeMailChangedEvents(
   payload: StalwartStateChange,
@@ -114,9 +128,21 @@ type MailRealtimeSubscriber = {
   onEvent: (event: MailChangedEvent) => void;
 };
 
+type MailRealtimeSyncProvider = {
+  syncKnownChangedAccounts: () => Promise<
+    Array<{
+      accountId: string;
+      changedTypes: string[];
+      sync: MailSyncResult;
+    }>
+  >;
+};
+
 export class MailRealtimeService {
   private readonly subscribers = new Map<string, MailRealtimeSubscriber>();
   private started = false;
+  private receiptPollId: ReturnType<typeof setInterval> | null = null;
+  private receiptPollRunning = false;
 
   constructor(
     private readonly input: {
@@ -124,21 +150,35 @@ export class MailRealtimeService {
       adminToken: string;
       fetcher?: typeof fetch;
       reconnectDelayMs?: number;
+      receiptPollIntervalMs?: number;
+      syncProvider?: MailRealtimeSyncProvider;
     },
   ) {}
 
   start(): void {
-    if (this.started || !this.input.adminToken.trim()) {
-      if (!this.input.adminToken.trim()) {
-        logger.warn(
-          "Mail realtime listener disabled because STALWART_ADMIN_TOKEN is missing.",
-        );
-      }
+    if (this.started) {
       return;
     }
 
     this.started = true;
+    this.startReceiptPolling();
+
+    if (!this.input.adminToken.trim()) {
+      logger.warn(
+        "Mail EventSource listener disabled because STALWART_ADMIN_TOKEN is missing; receipt-time JMAP polling remains active.",
+      );
+      return;
+    }
+
     void this.listenForever();
+  }
+
+  stop(): void {
+    if (this.receiptPollId) {
+      clearInterval(this.receiptPollId);
+      this.receiptPollId = null;
+    }
+    this.started = false;
   }
 
   subscribe(input: {
@@ -164,6 +204,46 @@ export class MailRealtimeService {
 
       subscriber.onEvent(event);
     }
+  }
+
+  private startReceiptPolling(): void {
+    if (!this.input.syncProvider || this.receiptPollId) {
+      return;
+    }
+
+    const intervalMs = this.input.receiptPollIntervalMs ?? 30_000;
+    const poll = () => {
+      if (this.receiptPollRunning) {
+        return;
+      }
+
+      this.receiptPollRunning = true;
+      void this.input
+        .syncProvider!.syncKnownChangedAccounts()
+        .then((results) => {
+          const receivedAt = new Date().toISOString();
+          for (const result of results) {
+            this.publish({
+              type: "mail.changed",
+              accountId: result.accountId,
+              changedTypes: result.changedTypes,
+              receivedAt,
+              sync: result.sync,
+            });
+          }
+        })
+        .catch((error) => {
+          logger.warn("Receipt-time mail polling failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+        .finally(() => {
+          this.receiptPollRunning = false;
+        });
+    };
+
+    poll();
+    this.receiptPollId = setInterval(poll, intervalMs);
   }
 
   private async listenForever(): Promise<void> {
@@ -211,7 +291,9 @@ export class MailRealtimeService {
         continue;
       }
 
-      const payload = JSON.parse(frame.data) as StalwartStateChange;
+      const payload = stalwartStateChangeSchema.parse(
+        JSON.parse(frame.data),
+      ) as StalwartStateChange;
       const events = normalizeMailChangedEvents(payload);
 
       for (const event of events) {

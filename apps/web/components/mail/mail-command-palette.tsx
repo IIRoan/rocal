@@ -8,15 +8,12 @@ import {
   ChevronRight,
   ArrowLeft,
   SquarePen,
-  User,
   EyeOff,
   ShieldOff,
   Sun,
   Moon,
   Monitor,
   Check,
-  Palette,
-  Globe,
   Shield,
   Inbox,
   Tag,
@@ -49,6 +46,7 @@ import { InviteSettings } from "../command-palette/invite-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PasskeySettings } from "@/components/passkey-settings";
 import { MailboxManager } from "./mailbox-manager";
+import { getBaseSettingsNavigationItems } from "../command-palette/base-navigation";
 import type { JmapMailbox } from "@/lib/mail/types";
 import type { LabelDef } from "@/lib/mail/types";
 import type { UserSettings } from "@/lib/types/calendar";
@@ -526,24 +524,14 @@ export function MailCommandPalette({
         icon: Tag,
         description: "Manage message labels",
       },
-      {
-        id: "appearance",
-        label: "Appearance",
-        icon: Palette,
-        description: "Theme and display",
-      },
-      {
-        id: "time-region",
-        label: "Time & Region",
-        icon: Globe,
-        description: settings?.timezone ?? "Timezone, time format",
-      },
-      {
-        id: "account",
-        label: "Account",
-        icon: User,
-        description: "Manage your account",
-      },
+      ...getBaseSettingsNavigationItems({
+        timezone: settings?.timezone,
+      }).map((item) => ({
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        description: item.description,
+      })),
     ],
     [settings?.timezone],
   );

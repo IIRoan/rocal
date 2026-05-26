@@ -68,6 +68,12 @@ export type EventColor =
 
 export type EncryptionState = "plaintext" | "shadow_write" | "encrypted";
 export type EventEncryptionMode = "hybrid" | "full";
+export type EventParticipantRole = "organizer" | "attendee";
+export type EventParticipantStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "tentative";
 
 export interface NameEncryptionShadowRequest {
   encryptedName?: string;
@@ -130,6 +136,27 @@ export interface CalendarEvent {
   externalId?: string | null;
   subscriptionId?: string | null;
   syncedAt?: Date | null;
+  participants?: EventParticipant[];
+}
+
+export interface EventParticipant {
+  id: string;
+  eventId: string;
+  userId?: string | null;
+  email: string;
+  displayName?: string | null;
+  image?: string | null;
+  role: EventParticipantRole;
+  status: EventParticipantStatus;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface EventParticipantInput {
+  email: string;
+  displayName?: string;
+  role?: EventParticipantRole;
+  status?: EventParticipantStatus;
 }
 
 export interface EventCategory {
@@ -176,6 +203,7 @@ export interface CreateEventRequest extends EventContentEncryptionShadowRequest 
   categoryId?: string;
   reminder?: number;
   recurrence?: string;
+  participants?: EventParticipantInput[];
 }
 
 export interface CreateCalendarRequest extends NameEncryptionShadowRequest {
@@ -213,6 +241,16 @@ export interface ApiError {
   message: string;
   statusCode: number;
   details?: unknown;
+}
+
+/** Type guard for API errors thrown by the calendar HTTP client. */
+export function isApiError(value: unknown): value is ApiError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ApiError).statusCode === "number" &&
+    typeof (value as ApiError).message === "string"
+  );
 }
 
 // ─── User Settings Types ─────────────────────────────────────────────────────

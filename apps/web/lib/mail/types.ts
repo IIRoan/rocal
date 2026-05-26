@@ -7,6 +7,7 @@ import type {
   MailVaultBackup as SharedMailVaultBackup,
   MailVaultKdfParams,
 } from "@workspace/calendar-core";
+import { z } from "zod";
 
 export type { MailDemoConfig, MailOAuthConfig, MailVaultKdfParams };
 
@@ -113,11 +114,21 @@ export type MailRealtimeEvent = {
   accountId: string;
   changedTypes: string[];
   receivedAt: string;
+  sync?: MailSyncResponse;
 };
 
 export type MailSyncThreadRecord = {
   id: string;
   emailIds: string[];
+};
+
+export type MailCalendarImportSummary = {
+  messagesScanned: number;
+  icsPartsFound: number;
+  eventsCreated: number;
+  eventsUpdated: number;
+  eventsDeleted: number;
+  errors: string[];
 };
 
 export type MailSyncCollection<T> = {
@@ -136,7 +147,113 @@ export type MailSyncResponse = {
   email: MailSyncCollection<JmapEmailMessage>;
   mailbox: MailSyncCollection<JmapMailbox>;
   thread: MailSyncCollection<MailSyncThreadRecord>;
+  calendarImport?: MailCalendarImportSummary;
 };
+
+const mailAddressSchema = z.object({
+  email: z.string(),
+  name: z.string().nullable().optional(),
+});
+
+const jmapBodyPartRefSchema = z.object({
+  partId: z.string().optional(),
+});
+
+const jmapBodyValueSchema = z.object({
+  value: z.string().optional(),
+  isTruncated: z.boolean().optional(),
+});
+
+const jmapBodyStructureSchema: z.ZodType<JmapBodyStructure> = z.lazy(() =>
+  z.object({
+    type: z.string().optional(),
+    blobId: z.string().optional(),
+    name: z.string().optional(),
+    subParts: z.array(jmapBodyStructureSchema).optional(),
+  }),
+);
+
+const jmapAttachmentSchema = z.object({
+  blobId: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  type: z.string().nullable().optional(),
+  size: z.number().nullable().optional(),
+});
+
+const jmapEmailMessageSchema = z.object({
+  id: z.string(),
+  threadId: z.string().optional(),
+  messageId: z.array(z.string()).optional(),
+  inReplyTo: z.array(z.string()).optional(),
+  references: z.array(z.string()).optional(),
+  mailboxIds: z.record(z.boolean()).optional(),
+  subject: z.string().nullable().optional(),
+  from: z.array(mailAddressSchema).optional(),
+  to: z.array(mailAddressSchema).optional(),
+  cc: z.array(mailAddressSchema).optional(),
+  bcc: z.array(mailAddressSchema).optional(),
+  receivedAt: z.string().optional(),
+  keywords: z.record(z.boolean()).optional(),
+  bodyStructure: jmapBodyStructureSchema.optional(),
+  bodyValues: z.record(jmapBodyValueSchema).optional(),
+  textBody: z.array(jmapBodyPartRefSchema).optional(),
+  htmlBody: z.array(jmapBodyPartRefSchema).optional(),
+  attachments: z.array(jmapAttachmentSchema).optional(),
+});
+
+const jmapMailboxSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
+});
+
+const mailSyncThreadRecordSchema = z.object({
+  id: z.string(),
+  emailIds: z.array(z.string()),
+});
+
+const mailCalendarImportSummarySchema = z.object({
+  messagesScanned: z.number(),
+  icsPartsFound: z.number(),
+  eventsCreated: z.number(),
+  eventsUpdated: z.number(),
+  eventsDeleted: z.number(),
+  errors: z.array(z.string()),
+});
+
+const mailSyncCollectionSchema = <T extends z.ZodTypeAny>(recordSchema: T) =>
+  z.object({
+    oldState: z.string().nullable(),
+    newState: z.string(),
+    created: z.array(z.string()),
+    updated: z.array(z.string()),
+    destroyed: z.array(z.string()),
+    records: z.array(recordSchema),
+  });
+
+export const mailSyncResponseSchema = z.object({
+  accountId: z.string(),
+  initialized: z.boolean(),
+  changedTypes: z.array(z.string()),
+  email: mailSyncCollectionSchema(jmapEmailMessageSchema),
+  mailbox: mailSyncCollectionSchema(jmapMailboxSchema),
+  thread: mailSyncCollectionSchema(mailSyncThreadRecordSchema),
+  calendarImport: mailCalendarImportSummarySchema.optional(),
+});
+
+export const mailRealtimeEventSchema = z.object({
+  type: z.literal("mail.changed"),
+  accountId: z.string(),
+  changedTypes: z.array(z.string()),
+  receivedAt: z.string(),
+  sync: mailSyncResponseSchema.optional(),
+});
+
+export function parseMailRealtimeEvent(value: unknown): MailRealtimeEvent {
+  return mailRealtimeEventSchema.parse(value) as MailRealtimeEvent;
+}
 
 export type MessageEncryptionState =
   | "plain"
