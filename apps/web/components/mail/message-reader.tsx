@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
@@ -34,6 +35,7 @@ import {
   EyeOff,
   MessageSquare,
   CalendarDays,
+  CalendarCheck,
   Clock,
   MapPin,
   ExternalLink,
@@ -70,6 +72,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@workspace/ui/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/ui/dropdown-menu";
 import { useIsMobile, usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
@@ -86,11 +95,16 @@ import {
   classifyMessageEncryption,
   extractMessageBodies,
 } from "@/lib/mail/message-security";
+import {
+  cleanInviteMailHtml,
+  cleanInviteMailText,
+} from "@/lib/mail/invite-boilerplate";
 import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import { formatAddressFull, formatMessageDate } from "./mail-helpers";
 import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
 import { extractLinkedCalendarEventId } from "@/lib/mail/calendar-event-link";
+import { extractMailCalendarInvite } from "@/lib/mail/calendar-invite";
 import { calendarApiService } from "@/lib/calendar-api-service";
 
 // Matches ENCRYPTED_EVENT_PLACEHOLDER_TITLE in @workspace/e2ee — kept local to
@@ -623,6 +637,8 @@ type LinkedCalendarEventState = {
   error: string | null;
 };
 
+type InvitationResponseStatus = "accepted" | "declined" | "tentative";
+
 export function MessageReader({
   message,
   selectedMessageId,
@@ -668,6 +684,7 @@ export function MessageReader({
   onConversationMessageMove,
   accountEmail,
 }: MessageReaderProps) {
+  const queryClient = useQueryClient();
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
   const [isSavingLabel, setIsSavingLabel] = useState(false);
@@ -714,8 +731,23 @@ export function MessageReader({
     () => (message ? extractLinkedCalendarEventId(message) : null),
     [message],
   );
+  const mailCalendarInvite = useMemo(
+    () =>
+      extractMailCalendarInvite({
+        message,
+        plaintext,
+        attachments,
+      }),
+    [attachments, message, plaintext],
+  );
+  const mailCalendarInviteUid = mailCalendarInvite?.uid ?? null;
   const [linkedCalendarEvent, setLinkedCalendarEvent] =
     useState<LinkedCalendarEventState | null>(null);
+  const [calendarInviteEvent, setCalendarInviteEvent] =
+    useState<LinkedCalendarEventState | null>(null);
+  const [inviteResponsePending, setInviteResponsePending] =
+    useState<InvitationResponseStatus | null>(null);
+  const [inviteDeclined, setInviteDeclined] = useState(false);
 
   useEffect(() => {
     setReplyText("");
@@ -727,6 +759,7 @@ export function MessageReader({
     setLoadingAttachmentPreviewKey(null);
     setShowQuote(false);
     setIsConversationCollapsed(true);
+    setInviteDeclined(false);
   }, [message?.id]);
 
   useEffect(() => {
@@ -775,6 +808,140 @@ export function MessageReader({
       cancelled = true;
     };
   }, [linkedCalendarEventId]);
+
+  useEffect(() => {
+    if (!mailCalendarInviteUid) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        // Check if we already have this event — if so, just refresh status
+        // without re-importing so we don't overwrite the user's RSVP response.
+        const existing = await calendarApiService.getInvitationByExternalId(
+          mailCalendarInviteUid,
+        );
+        if (cancelled) return;
+
+        if (existing) {
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: existing,
+            loading: false,
+            error: null,
+          });
+          return;
+        }
+
+        // Event not found yet — import from ICS then fetch.
+        const importSummary = mailCalendarInvite?.icsContent
+          ? await calendarApiService.importInvitationIcs(
+              mailCalendarInvite.icsContent,
+            )
+          : null;
+        if (cancelled) return;
+
+        const event = await calendarApiService.getInvitationByExternalId(
+          mailCalendarInviteUid,
+        );
+        if (cancelled) return;
+
+        setCalendarInviteEvent({
+          eventId: mailCalendarInviteUid,
+          event,
+          loading: false,
+          error:
+            !event && importSummary && importSummary.errors.length > 0
+              ? (importSummary.errors[0] ??
+                "Unable to import invitation details.")
+              : null,
+        });
+      } catch (error) {
+        if (cancelled) return;
+        setCalendarInviteEvent({
+          eventId: mailCalendarInviteUid,
+          event: null,
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Unable to load invitation details.",
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Only re-run when the invite UID changes (new mail opened), not on every
+    // mailCalendarInvite object reference change which would re-import and reset RSVP.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mailCalendarInviteUid]);
+
+  const currentCalendarInviteEvent = useMemo(() => {
+    if (!mailCalendarInviteUid) return null;
+    if (calendarInviteEvent?.eventId === mailCalendarInviteUid) {
+      return calendarInviteEvent;
+    }
+    return {
+      eventId: mailCalendarInviteUid,
+      event: null,
+      loading: true,
+      error: null,
+    };
+  }, [calendarInviteEvent, mailCalendarInviteUid]);
+  const calendarInviteResponseEventId =
+    currentCalendarInviteEvent?.event?.id ?? null;
+
+  const handleInvitationResponse = useCallback(
+    async (status: InvitationResponseStatus) => {
+      if (!calendarInviteResponseEventId || !mailCalendarInviteUid) return;
+
+      setInviteResponsePending(status);
+      try {
+        const result = await calendarApiService.respondToInvitation(
+          calendarInviteResponseEventId,
+          status,
+        );
+        // Sync the calendar grid in all cases
+        void queryClient.invalidateQueries({ queryKey: ["events"] });
+        if ("deleted" in result && result.deleted) {
+          // Event was declined and deleted — update local state to reflect this
+          setInviteDeclined(true);
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: null,
+            loading: false,
+            error: null,
+          });
+          toast.success("Invitation declined and removed from your calendar.");
+        } else {
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: result as CalendarEvent,
+            loading: false,
+            error: null,
+          });
+          toast.success(
+            status === "accepted"
+              ? "Invitation accepted."
+              : "Marked as tentative.",
+          );
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update invitation response.",
+        );
+      } finally {
+        setInviteResponsePending(null);
+      }
+    },
+    [calendarInviteResponseEventId, mailCalendarInviteUid, queryClient],
+  );
 
   const displayAttachments = useMemo<MailAttachment[]>(
     () => attachments ?? message?.attachments ?? [],
@@ -926,8 +1093,12 @@ export function MessageReader({
 
   // Derive display bodies before early return so hook order is stable.
   const _earlyBodies = message ? extractMessageBodies(message) : null;
-  const _displayHtml = decryptedHtml ?? (_earlyBodies?.html || null);
-  const _displayText = plaintext ?? (_earlyBodies?.text || null);
+  const _displayHtml = cleanInviteMailHtml(
+    decryptedHtml ?? (_earlyBodies?.html || ""),
+  );
+  const _displayText = cleanInviteMailText(
+    plaintext ?? (_earlyBodies?.text || ""),
+  );
 
   // Split quoted reply chain from the body (so the new-message portion is shown
   // by default, with an expand button for the historical chain).
@@ -1476,7 +1647,12 @@ export function MessageReader({
       {labelPopoverTrigger}
 
       {/* Subject + action buttons */}
-      <div className={cn("flex items-start justify-between", isMobile ? "gap-1.5" : "gap-2")}>
+      <div
+        className={cn(
+          "flex items-start justify-between",
+          isMobile ? "gap-1.5" : "gap-2",
+        )}
+      >
         <div
           className={cn(
             "font-medium leading-snug",
@@ -1531,11 +1707,18 @@ export function MessageReader({
             <div
               className={cn(
                 "min-w-0 group/sender",
-                isMobile ? "flex items-center gap-1" : "flex items-center gap-1.5",
+                isMobile
+                  ? "flex items-center gap-1"
+                  : "flex items-center gap-1.5",
               )}
             >
               {senderName && (
-                <span className={cn("truncate font-medium", isMobile ? "text-xs" : "text-[13px]")}>
+                <span
+                  className={cn(
+                    "truncate font-medium",
+                    isMobile ? "text-xs" : "text-[13px]",
+                  )}
+                >
                   {senderName}
                 </span>
               )}
@@ -1576,7 +1759,9 @@ export function MessageReader({
             <div
               className={cn(
                 "min-w-0 group/to text-muted-foreground",
-                isMobile ? "flex items-center gap-1 text-[11px]" : "flex items-center gap-1 text-xs",
+                isMobile
+                  ? "flex items-center gap-1 text-[11px]"
+                  : "flex items-center gap-1 text-xs",
               )}
             >
               <span>To:</span>
@@ -1596,7 +1781,9 @@ export function MessageReader({
             <div
               className={cn(
                 "min-w-0 group/cc text-muted-foreground",
-                isMobile ? "flex items-center gap-1 text-[11px]" : "flex items-center gap-1 text-xs",
+                isMobile
+                  ? "flex items-center gap-1 text-[11px]"
+                  : "flex items-center gap-1 text-xs",
               )}
             >
               <span>CC:</span>
@@ -1623,7 +1810,9 @@ export function MessageReader({
               type="button"
               className={cn(
                 "group flex items-center font-medium text-muted-foreground transition-colors hover:text-foreground",
-                isMobile ? "gap-1 py-0 text-[11px]" : "gap-1.5 py-0.5 text-[12px]",
+                isMobile
+                  ? "gap-1 py-0 text-[11px]"
+                  : "gap-1.5 py-0.5 text-[12px]",
               )}
             >
               Attachments ({displayAttachments.length})
@@ -1634,7 +1823,12 @@ export function MessageReader({
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className={cn("flex flex-wrap", isMobile ? "gap-1.5 pt-1" : "gap-2 pt-1.5")}>
+            <div
+              className={cn(
+                "flex flex-wrap",
+                isMobile ? "gap-1.5 pt-1" : "gap-2 pt-1.5",
+              )}
+            >
               {displayAttachments.map((attachment, idx) => {
                 const name = attachment.name?.trim() || "Attachment";
                 const mimeType = attachment.type ?? "";
@@ -1781,13 +1975,20 @@ export function MessageReader({
 
       {/* Labels */}
       {messageLabels.length > 0 && (
-        <div className={cn("flex flex-wrap items-center", isMobile ? "gap-1" : "gap-1.5")}>
+        <div
+          className={cn(
+            "flex flex-wrap items-center",
+            isMobile ? "gap-1" : "gap-1.5",
+          )}
+        >
           {messageLabels.map((label) => (
             <span
               key={label.id}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full font-medium",
-                isMobile ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[11px]",
+                isMobile
+                  ? "px-1.5 py-0.5 text-[10px]"
+                  : "px-2 py-0.5 text-[11px]",
               )}
               style={{
                 backgroundColor: `${label.color}22`,
@@ -1844,7 +2045,10 @@ export function MessageReader({
                 disabled={isBusy}
                 className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
               >
-                <Reply className="size-4 text-muted-foreground" strokeWidth={2.25} />
+                <Reply
+                  className="size-4 text-muted-foreground"
+                  strokeWidth={2.25}
+                />
                 Reply
               </button>
               <button
@@ -1856,7 +2060,10 @@ export function MessageReader({
                 disabled={isBusy}
                 className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
               >
-                <Forward className="size-4 text-muted-foreground" strokeWidth={2.25} />
+                <Forward
+                  className="size-4 text-muted-foreground"
+                  strokeWidth={2.25}
+                />
                 Forward
               </button>
               {onArchive && (
@@ -1869,7 +2076,10 @@ export function MessageReader({
                   disabled={isBusy}
                   className="flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/80 transition-colors hover:bg-accent/40 active:bg-accent/60 disabled:opacity-40"
                 >
-                  <Archive className="size-4 text-muted-foreground" strokeWidth={2.25} />
+                  <Archive
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={2.25}
+                  />
                   Archive
                 </button>
               )}
@@ -2146,7 +2356,8 @@ export function MessageReader({
               <div className="text-base font-semibold text-foreground">
                 {linkedCalendarEvent.loading ? (
                   "Loading event details..."
-                ) : linkedCalendarEvent.event?.encryptionState === "encrypted" &&
+                ) : linkedCalendarEvent.event?.encryptionState ===
+                    "encrypted" &&
                   linkedCalendarEvent.event?.title ===
                     ENCRYPTED_EVENT_PLACEHOLDER_TITLE ? (
                   <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -2167,12 +2378,7 @@ export function MessageReader({
                 )}
               </div>
             </div>
-            <Button
-              asChild
-              variant="secondary"
-              size="xs"
-              className="gap-1.5"
-            >
+            <Button asChild variant="secondary" size="xs" className="gap-1.5">
               <a
                 href={`/calendar?eventId=${encodeURIComponent(linkedCalendarEvent.eventId)}`}
               >
@@ -2197,23 +2403,22 @@ export function MessageReader({
                 <span>
                   {(() => {
                     const event = linkedCalendarEvent.event;
-                    const dateOptions: Intl.DateTimeFormatOptions =
-                      event.allDay
-                        ? {
-                            dateStyle: "full",
-                            timeZone: timezone ?? undefined,
-                          }
-                        : {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                            hour12:
-                              timeFormat === "12h"
-                                ? true
-                                : timeFormat === "24h"
-                                  ? false
-                                  : undefined,
-                            timeZone: timezone ?? undefined,
-                          };
+                    const dateOptions: Intl.DateTimeFormatOptions = event.allDay
+                      ? {
+                          dateStyle: "full",
+                          timeZone: timezone ?? undefined,
+                        }
+                      : {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          hour12:
+                            timeFormat === "12h"
+                              ? true
+                              : timeFormat === "24h"
+                                ? false
+                                : undefined,
+                          timeZone: timezone ?? undefined,
+                        };
                     return `${new Date(event.start).toLocaleString(undefined, dateOptions)} - ${new Date(event.end).toLocaleString(undefined, dateOptions)}`;
                   })()}
                 </span>
@@ -2240,6 +2445,207 @@ export function MessageReader({
       </div>
     </div>
   );
+
+  const invitationStatus =
+    currentCalendarInviteEvent?.event?.participants?.find(
+      (participant) =>
+        participant.userId === currentCalendarInviteEvent.event?.userId &&
+        participant.role !== "organizer",
+    )?.status;
+  const invitationRemovedFromCalendar = inviteDeclined;
+  const shouldShowCalendarInviteCard = mailCalendarInvite?.method === "REQUEST";
+  const isPending = !invitationStatus || invitationStatus === "pending";
+  const calendarInviteCard = shouldShowCalendarInviteCard &&
+    mailCalendarInvite && (
+      <div
+        className={cn(
+          "mx-4 mb-2 overflow-hidden rounded-lg border",
+          invitationRemovedFromCalendar
+            ? "border-border/40 bg-muted/20 opacity-60"
+            : "border-primary/20 bg-primary/5",
+        )}
+      >
+        {/* Event info */}
+        <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2.5">
+          <div className="min-w-0 flex-1">
+            <div
+              className={cn(
+                "text-sm font-semibold leading-snug",
+                invitationRemovedFromCalendar
+                  ? "text-muted-foreground"
+                  : "text-foreground",
+              )}
+            >
+              {mailCalendarInvite.title}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              {mailCalendarInvite.start && (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="size-3" />
+                  {mailCalendarInvite.start.toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    hour12:
+                      timeFormat === "12h"
+                        ? true
+                        : timeFormat === "24h"
+                          ? false
+                          : undefined,
+                    timeZone: timezone ?? undefined,
+                  })}
+                </span>
+              )}
+              {mailCalendarInvite.location && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="size-3 shrink-0" />
+                  <span className="max-w-[200px] truncate">
+                    {mailCalendarInvite.location}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+          {currentCalendarInviteEvent?.event &&
+            !invitationRemovedFromCalendar && (
+              <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                className="-mr-1.5 -mt-0.5 size-7 shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <a
+                  href={`/calendar?eventId=${encodeURIComponent(currentCalendarInviteEvent.event.id)}`}
+                >
+                  <ExternalLink className="size-3.5" />
+                </a>
+              </Button>
+            )}
+        </div>
+
+        {/* Action bar */}
+        <div
+          className={cn(
+            "flex items-center gap-2 border-t px-4 py-2",
+            invitationRemovedFromCalendar
+              ? "border-border/30"
+              : "border-primary/10",
+          )}
+        >
+          {currentCalendarInviteEvent?.loading ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Adding to calendar…
+            </span>
+          ) : currentCalendarInviteEvent?.error ? (
+            <span className="text-xs text-destructive">
+              {currentCalendarInviteEvent.error}
+            </span>
+          ) : inviteDeclined ? (
+            <span className="text-xs text-muted-foreground">
+              Declined — removed from your calendar
+            </span>
+          ) : !currentCalendarInviteEvent?.event ? (
+            <span className="text-xs text-muted-foreground">
+              Processing invite…
+            </span>
+          ) : isPending ? (
+            <>
+              <Button
+                size="xs"
+                disabled={inviteResponsePending !== null}
+                onClick={() => void handleInvitationResponse("accepted")}
+                className="gap-1"
+              >
+                {inviteResponsePending === "accepted" ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Check className="size-3" />
+                )}
+                Accept
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={inviteResponsePending !== null}
+                onClick={() => void handleInvitationResponse("tentative")}
+              >
+                {inviteResponsePending === "tentative" && (
+                  <Loader2 className="size-3 animate-spin" />
+                )}
+                Maybe
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={inviteResponsePending !== null}
+                onClick={() => void handleInvitationResponse("declined")}
+                className="text-muted-foreground"
+              >
+                {inviteResponsePending === "declined" && (
+                  <Loader2 className="size-3 animate-spin" />
+                )}
+                Decline
+              </Button>
+            </>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  disabled={inviteResponsePending !== null}
+                  className="gap-1.5"
+                >
+                  {inviteResponsePending !== null && (
+                    <Loader2 className="size-3 animate-spin" />
+                  )}
+                  {invitationStatus === "tentative" ? "Maybe" : "Accepted"}
+                  <ChevronDown className="size-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-28">
+                <DropdownMenuItem
+                  onClick={() => void handleInvitationResponse("accepted")}
+                  className={cn(
+                    invitationStatus === "accepted" && "font-medium",
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      "size-4",
+                      invitationStatus !== "accepted" && "opacity-0",
+                    )}
+                  />
+                  Accept
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => void handleInvitationResponse("tentative")}
+                  className={cn(
+                    invitationStatus === "tentative" && "font-medium",
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      "size-4",
+                      invitationStatus !== "tentative" && "opacity-0",
+                    )}
+                  />
+                  Maybe
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => void handleInvitationResponse("declined")}
+                >
+                  <Check className="size-4 opacity-0" />
+                  Decline
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+    );
 
   const bodyContent = renderAsHtml ? (
     <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
@@ -2565,6 +2971,7 @@ export function MessageReader({
       {toolbar}
       {header}
       {conversationStrip}
+      {calendarInviteCard}
       {linkedEventCard}
       {bodyContent}
       {replyBar}

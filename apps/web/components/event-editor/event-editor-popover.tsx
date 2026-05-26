@@ -6,7 +6,11 @@ import { gsap } from "@workspace/ui/lib/gsap";
 import { EventEditorBody } from "./event-editor-body";
 import { EventEditorFooter } from "./event-editor-footer";
 import { EventEditorDesktopHeader } from "./event-editor-header";
-import type { EventEditorBadgeItem, EventEditorFormState } from "./types";
+import type {
+  EventEditorBadgeItem,
+  EventEditorFormState,
+  EventEditorInvitationResponseStatus,
+} from "./types";
 import type { Calendar } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
 
@@ -15,13 +19,19 @@ type EventEditorPopoverProps = {
   badgeItem: EventEditorBadgeItem;
   calendars: Calendar[];
   dialogTitle: string;
+  canEditEvent: boolean;
   eventForm: EventEditorFormState;
   handleEventDelete: () => void;
   handleEventDownloadIcs: () => void;
   handleEventSave: () => void;
+  invitationResponsePending: EventEditorInvitationResponseStatus | null;
+  invitationStatus: EventEditorInvitationResponseStatus | null;
   isViewMode: boolean;
   leadingSlot: React.ReactNode;
   localSettings: UserSettings;
+  onInvitationResponse: (
+    status: EventEditorInvitationResponseStatus,
+  ) => void | Promise<void>;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   recurringModal: React.ReactNode;
@@ -34,15 +44,19 @@ type EventEditorPopoverProps = {
 export function EventEditorPopover({
   anchorPosition,
   badgeItem,
+  canEditEvent,
   calendars,
   dialogTitle,
   eventForm,
   handleEventDelete,
   handleEventDownloadIcs,
   handleEventSave,
+  invitationResponsePending,
+  invitationStatus,
   isViewMode,
   leadingSlot,
   localSettings,
+  onInvitationResponse,
   onOpenChange,
   open,
   recurringModal,
@@ -394,11 +408,15 @@ export function EventEditorPopover({
           desktop
         />
         <EventEditorFooter
+          canEditEvent={canEditEvent}
           isViewMode={isViewMode}
           eventForm={eventForm}
           handleEventSave={handleEventSave}
           handleEventDelete={handleEventDelete}
           handleEventDownloadIcs={handleEventDownloadIcs}
+          invitationResponsePending={invitationResponsePending}
+          invitationStatus={invitationStatus}
+          onInvitationResponse={onInvitationResponse}
           desktop
           onClose={() => onOpenChange(false)}
         />
