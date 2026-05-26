@@ -33,7 +33,13 @@ import {
   Inbox,
   EyeOff,
   MessageSquare,
+  CalendarDays,
+  Clock,
+  MapPin,
+  ExternalLink,
+  Code,
 } from "lucide-react";
+import type { CalendarEvent } from "@workspace/calendar-core";
 import {
   Popover,
   PopoverContent,
@@ -46,6 +52,12 @@ import {
   DrawerTitle,
   DrawerClose,
 } from "@workspace/ui/components/ui/drawer";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/ui/dialog";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Separator } from "@workspace/ui/components/ui/separator";
 import {
@@ -78,6 +90,12 @@ import { resolveAttachmentPreviewKind } from "@/lib/mail/attachment-preview";
 import { splitPlaintextQuote, splitHtmlQuote } from "@/lib/mail/quoted-text";
 import { formatAddressFull, formatMessageDate } from "./mail-helpers";
 import { PdfAttachmentThumbnail } from "./attachment-preview-dialog";
+import { extractLinkedCalendarEventId } from "@/lib/mail/calendar-event-link";
+import { calendarApiService } from "@/lib/calendar-api-service";
+
+// Matches ENCRYPTED_EVENT_PLACEHOLDER_TITLE in @workspace/e2ee — kept local to
+// avoid pulling in the crypto module (which uses TextEncoder) into test environments.
+const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
 
 // ─── Security badge ───────────────────────────────────────────────────────────
 
@@ -598,6 +616,13 @@ export interface MessageReaderProps {
   accountEmail?: string;
 }
 
+type LinkedCalendarEventState = {
+  eventId: string;
+  event: CalendarEvent | null;
+  loading: boolean;
+  error: string | null;
+};
+
 export function MessageReader({
   message,
   selectedMessageId,
@@ -677,6 +702,7 @@ export function MessageReader({
   const [showQuote, setShowQuote] = useState(false);
   const [showOwnMessages, setShowOwnMessages] = useState(false);
   const [isConversationCollapsed, setIsConversationCollapsed] = useState(true);
+  const [showRawHtmlDialog, setShowRawHtmlDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const expandedWrapRef = useRef<HTMLDivElement>(null);
@@ -684,6 +710,12 @@ export function MessageReader({
   const conversationListRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
+  const linkedCalendarEventId = useMemo(
+    () => (message ? extractLinkedCalendarEventId(message) : null),
+    [message],
+  );
+  const [linkedCalendarEvent, setLinkedCalendarEvent] =
+    useState<LinkedCalendarEventState | null>(null);
 
   useEffect(() => {
     setReplyText("");
@@ -696,6 +728,53 @@ export function MessageReader({
     setShowQuote(false);
     setIsConversationCollapsed(true);
   }, [message?.id]);
+
+  useEffect(() => {
+    if (!linkedCalendarEventId) {
+      setLinkedCalendarEvent(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLinkedCalendarEvent({
+      eventId: linkedCalendarEventId,
+      event: null,
+      loading: true,
+      error: null,
+    });
+
+    void calendarApiService
+      .getEvent(linkedCalendarEventId)
+      .then((event) => {
+        if (cancelled) {
+          return;
+        }
+        setLinkedCalendarEvent({
+          eventId: linkedCalendarEventId,
+          event,
+          loading: false,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setLinkedCalendarEvent({
+          eventId: linkedCalendarEventId,
+          event: null,
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Unable to load linked event details.",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedCalendarEventId]);
 
   const displayAttachments = useMemo<MailAttachment[]>(
     () => attachments ?? message?.attachments ?? [],
@@ -1341,6 +1420,26 @@ export function MessageReader({
                     strokeWidth={2}
                   />
                   Labels
+                </button>
+              </div>
+            )}
+
+            {/* View HTML source */}
+            {displayHtml && (
+              <div className="border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMorePopoverOpen(false);
+                    setShowRawHtmlDialog(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
+                >
+                  <Code
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                    strokeWidth={2}
+                  />
+                  View HTML source
                 </button>
               </div>
             )}
@@ -2032,6 +2131,116 @@ export function MessageReader({
     </div>
   );
 
+  const linkedEventCard = linkedCalendarEvent && (
+    <div className="mx-4 mb-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <CalendarDays className="size-4" strokeWidth={2.25} />
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">
+                Linked calendar event
+              </div>
+              <div className="text-base font-semibold text-foreground">
+                {linkedCalendarEvent.loading ? (
+                  "Loading event details..."
+                ) : linkedCalendarEvent.event?.encryptionState === "encrypted" &&
+                  linkedCalendarEvent.event?.title ===
+                    ENCRYPTED_EVENT_PLACEHOLDER_TITLE ? (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Lock className="size-3.5 shrink-0" />
+                    Encrypted – open in calendar to view
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    {linkedCalendarEvent.event?.encryptionState ===
+                      "encrypted" && (
+                      <Lock
+                        className="size-3.5 shrink-0 text-primary/60"
+                        strokeWidth={2.25}
+                      />
+                    )}
+                    {linkedCalendarEvent.event?.title || "Untitled event"}
+                  </span>
+                )}
+              </div>
+            </div>
+            <Button
+              asChild
+              variant="secondary"
+              size="xs"
+              className="gap-1.5"
+            >
+              <a
+                href={`/calendar?eventId=${encodeURIComponent(linkedCalendarEvent.eventId)}`}
+              >
+                Open in calendar
+                <ExternalLink className="size-3" />
+              </a>
+            </Button>
+          </div>
+          {linkedCalendarEvent.loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Fetching the latest event content from your calendar.
+            </div>
+          ) : linkedCalendarEvent.error ? (
+            <div className="text-sm text-destructive">
+              {linkedCalendarEvent.error}
+            </div>
+          ) : linkedCalendarEvent.event ? (
+            <div className="space-y-1.5 text-sm text-foreground/80">
+              <div className="flex items-center gap-2">
+                <Clock className="size-3.5 text-muted-foreground" />
+                <span>
+                  {(() => {
+                    const event = linkedCalendarEvent.event;
+                    const dateOptions: Intl.DateTimeFormatOptions =
+                      event.allDay
+                        ? {
+                            dateStyle: "full",
+                            timeZone: timezone ?? undefined,
+                          }
+                        : {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            hour12:
+                              timeFormat === "12h"
+                                ? true
+                                : timeFormat === "24h"
+                                  ? false
+                                  : undefined,
+                            timeZone: timezone ?? undefined,
+                          };
+                    return `${new Date(event.start).toLocaleString(undefined, dateOptions)} - ${new Date(event.end).toLocaleString(undefined, dateOptions)}`;
+                  })()}
+                </span>
+              </div>
+              {linkedCalendarEvent.event.location && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="size-3.5 text-muted-foreground" />
+                  <span>{linkedCalendarEvent.event.location}</span>
+                </div>
+              )}
+              {linkedCalendarEvent.event.calendar?.name && (
+                <div className="text-xs text-muted-foreground">
+                  Calendar: {linkedCalendarEvent.event.calendar.name}
+                </div>
+              )}
+              {linkedCalendarEvent.event.description && (
+                <div className="rounded-md border border-border/50 bg-background/60 px-3 py-2 text-sm leading-relaxed text-foreground/80">
+                  {linkedCalendarEvent.event.description}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+
   const bodyContent = renderAsHtml ? (
     <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
       {blockRemoteImages && (
@@ -2356,8 +2565,25 @@ export function MessageReader({
       {toolbar}
       {header}
       {conversationStrip}
+      {linkedEventCard}
       {bodyContent}
       {replyBar}
+      {/* Raw HTML source dialog */}
+      <Dialog open={showRawHtmlDialog} onOpenChange={setShowRawHtmlDialog}>
+        <DialogContent
+          className="flex flex-col w-[90vw] max-w-4xl max-h-[80vh]"
+          variant="center"
+        >
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border/60">
+            <DialogTitle className="text-base">HTML source</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
+            <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap break-all select-all">
+              {displayHtml}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

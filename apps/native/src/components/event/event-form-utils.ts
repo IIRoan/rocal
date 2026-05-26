@@ -52,6 +52,7 @@ export function mapErrorToField(error: string): string | null {
   if (lower.includes("location")) return "location";
   if (lower.includes("end time") || lower.includes("start")) return "end";
   if (lower.includes("color")) return "color";
+  if (lower.includes("participant")) return "participants";
   return null;
 }
 
@@ -71,6 +72,7 @@ export function buildEventRequest(fields: {
   categoryId?: string;
   recurrence?: string | null;
   reminder?: number;
+  participants?: CreateEventRequest["participants"];
 }): CreateEventRequest {
   return {
     title: fields.title.trim(),
@@ -87,6 +89,9 @@ export function buildEventRequest(fields: {
     ...(fields.recurrence ? { recurrence: fields.recurrence } : {}),
     ...(fields.reminder && fields.reminder > 0
       ? { reminder: fields.reminder }
+      : {}),
+    ...(fields.participants && fields.participants.length > 0
+      ? { participants: fields.participants }
       : {}),
   };
 }

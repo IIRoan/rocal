@@ -1,3 +1,5 @@
+import type { EventParticipantInput } from "@workspace/calendar-core";
+
 export type EventSearchInput = {
   userId: string;
   query: string;
@@ -31,6 +33,7 @@ export type EventCreateInput = {
   encryptedContent?: string;
   blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
+  participants?: EventParticipantInput[];
 };
 
 export type EventUpdateInput = {
@@ -51,6 +54,7 @@ export type EventUpdateInput = {
   encryptedContent?: string;
   blindIndexTokens?: string[];
   encryptionKeyVersion?: number;
+  participants?: EventParticipantInput[];
 };
 
 export type EventDeleteResult = {

@@ -52,7 +52,31 @@ jest.mock("../../lib/prisma", () => ({
         }),
       ),
     },
+    user: {
+      findUnique: jest.fn(
+        async (): Promise<any> => ({
+          id: "user-1",
+          email: "owner@example.com",
+          name: "Owner",
+        }),
+      ),
+      findMany: jest.fn(async (): Promise<any> => []),
+    },
+    eventParticipant: {
+      findMany: jest.fn(async (): Promise<any> => []),
+      upsert: jest.fn(async (): Promise<any> => null),
+      deleteMany: jest.fn(async (): Promise<any> => ({ count: 0 })),
+    },
   },
+}));
+
+jest.mock("../../lib/email-client", () => ({
+  resend: {
+    emails: {
+      send: jest.fn(async () => ({ data: { id: "email-1" } })),
+    },
+  },
+  authEmailFrom: "Solace <test@example.com>",
 }));
 
 jest.mock("../../lib/auth-utils", () => ({
@@ -116,6 +140,15 @@ const mockPrisma = prisma as unknown as {
   };
   userSettings: {
     findUnique: jest.Mock<() => Promise<any>>;
+  };
+  user: {
+    findUnique: jest.Mock<() => Promise<any>>;
+    findMany: jest.Mock<() => Promise<any>>;
+  };
+  eventParticipant: {
+    findMany: jest.Mock<() => Promise<any>>;
+    upsert: jest.Mock<() => Promise<any>>;
+    deleteMany: jest.Mock<() => Promise<any>>;
   };
 };
 
@@ -258,6 +291,55 @@ describe("eventsRoutes – color validation", () => {
       expect(mockPrisma.calendarEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ color: null }),
+        }),
+      );
+    });
+
+    it("accepts participants and syncs them through the event API", async () => {
+      mockPrisma.eventParticipant.upsert.mockClear();
+      mockPrisma.calendarEvent.create.mockResolvedValue({
+        id: "event-participants-1",
+        ...validEventBody,
+        color: null,
+        reminder: null,
+        recurrence: null,
+        encryptedContent: null,
+        blindIndexTokens: null,
+        encryptionState: "plaintext",
+        encryptionKeyVersion: 1,
+        userId: "user-1",
+        category: null,
+        calendar: ownedCalendar,
+        createdAt: new Date("2026-05-01T09:00:00.000Z"),
+        updatedAt: new Date("2026-05-01T09:00:00.000Z"),
+      });
+
+      const response = await createApp().handle(
+        new Request("http://localhost/events/", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...validEventBody,
+            participants: [
+              {
+                email: "teammate@example.com",
+                role: "attendee",
+                status: "pending",
+              },
+            ],
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.eventParticipant.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            eventId_email: {
+              eventId: "event-participants-1",
+              email: "teammate@example.com",
+            },
+          },
         }),
       );
     });

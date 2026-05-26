@@ -6,9 +6,12 @@ import type {
   CalendarEvent,
   Calendar,
 } from "@workspace/ui/components/calendar";
+import type { EventParticipant, EventParticipantInput } from "@workspace/calendar-core";
+import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
 import type { UserSettings } from "@/lib/types/calendar";
+import { isApiError } from "@/lib/types/calendar";
 import {
   formatTimeForInput,
   validateTime,
@@ -135,6 +138,7 @@ interface UseEventFormReturn {
   eventCalendarId: string;
   eventReminder: number | null;
   eventNotifications: EventNotification[];
+  eventParticipants: EventParticipantInput[];
   isRecurring: boolean;
   recurrenceRule: RecurrenceRule | null;
 
@@ -163,6 +167,7 @@ interface UseEventFormReturn {
   setEventCalendarId: (id: string) => void;
   setEventReminder: (reminder: number | null) => void;
   setEventNotifications: (notifications: EventNotification[]) => void;
+  setEventParticipants: (participants: EventParticipantInput[]) => void;
   setIsRecurring: (recurring: boolean) => void;
   setRecurrenceRule: (rule: RecurrenceRule | null) => void;
   setShowRecurringDeleteModal: (show: boolean) => void;
@@ -227,6 +232,9 @@ export function useEventForm({
   // Notification state
   const [eventNotifications, setEventNotificationsState] = useState<
     EventNotification[]
+  >([]);
+  const [eventParticipants, setEventParticipants] = useState<
+    EventParticipantInput[]
   >([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -300,17 +308,25 @@ export function useEventForm({
           "",
       );
       setEventNotifications(fallbackNotifications);
+      setEventParticipants(
+        (event.participants ?? []).map((participant: EventParticipant) => ({
+          email: participant.email,
+          displayName: participant.displayName ?? undefined,
+          role: participant.role,
+          status: participant.status,
+        })),
+      );
       setShowNotifications(fallbackNotifications.length > 0);
 
       // Handle recurring event data
       const hasRecurrence = !!event.recurrence;
       setIsRecurring(hasRecurrence);
       if (hasRecurrence && event.recurrence) {
-        try {
-          const parsedRule = JSON.parse(event.recurrence) as RecurrenceRule;
-          setRecurrenceRule(parsedRule);
-        } catch (error) {
-          log.error("Failed to parse recurrence rule:", error);
+        const parsedRule = RecurrenceEngine.parseRecurrenceRule(event.recurrence);
+        if (parsedRule) {
+          setRecurrenceRule(parsedRule as RecurrenceRule);
+        } else {
+          log.error("Failed to parse recurrence rule:", event.recurrence);
           setIsRecurring(false);
           setRecurrenceRule(null);
         }
@@ -362,6 +378,7 @@ export function useEventForm({
         }
       } else {
         setEventNotifications([]);
+        setEventParticipants([]);
         setShowNotifications(false);
       }
     },
@@ -535,7 +552,7 @@ export function useEventForm({
       );
       const calendarColor = selectedCalendar?.color || "blue";
 
-      const eventData: CalendarEvent = {
+      const eventData = {
         id: selectedEvent?.id || "",
         title: eventTitle.trim(),
         description: eventDescription.trim() || undefined,
@@ -552,6 +569,14 @@ export function useEventForm({
         reminder: undefined,
         recurrence:
           isRecurring && recurrenceRule ? JSON.stringify(recurrenceRule) : null,
+        participants: eventParticipants.map((participant) => ({
+          email: participant.email.trim().toLowerCase(),
+          displayName: participant.displayName?.trim() || undefined,
+          role: participant.role,
+          status: participant.status,
+        })),
+      } satisfies Omit<CalendarEvent, "participants"> & {
+        participants: EventParticipantInput[];
       };
 
       const notificationData = normalizeNotificationPayload(eventNotifications);
@@ -578,6 +603,7 @@ export function useEventForm({
             calendarId: eventData.calendarId,
             reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? null,
+            participants: eventData.participants,
           });
           savedEventId = persistedEvent?.id ?? selectedEvent.id;
           toast.success(`Event "${eventTitle}" updated`);
@@ -593,6 +619,7 @@ export function useEventForm({
             calendarId: eventData.calendarId,
             reminder: eventData.reminder ?? null,
             recurrence: eventData.recurrence ?? undefined,
+            participants: eventData.participants,
           });
           persistedEvent = newEvent;
           savedEventId = newEvent.id;
@@ -648,6 +675,10 @@ export function useEventForm({
             updatedAt: new Date(
               persistedEvent?.updatedAt ?? eventData.updatedAt,
             ),
+            participants:
+              persistedEvent?.participants ??
+              selectedEvent?.participants ??
+              [],
           };
 
           queryClient.setQueriesData<CalendarEvent[]>(
@@ -678,33 +709,40 @@ export function useEventForm({
           onClose();
           resetForm();
         }, 100);
-      } catch (error: any) {
+      } catch (error) {
         log.error("Failed to save event:", error);
 
         let errorMessage = "Failed to save event";
-        if (error.message?.includes("Network")) {
-          errorMessage =
-            "Network error - please check your connection and try again";
-        } else if (error.message?.includes("validation")) {
-          errorMessage = "Invalid event data - please check all fields";
-        } else if (error.statusCode === 422) {
-          if (
-            error.message?.includes("Duplicate notification") ||
-            error.message?.includes("duplicate")
-          ) {
+        if (isApiError(error)) {
+          if (error.message.includes("Network")) {
             errorMessage =
-              "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
-          } else {
-            errorMessage =
-              "Invalid data - please check all fields and try again";
+              "Network error - please check your connection and try again";
+          } else if (error.message.includes("validation")) {
+            errorMessage = "Invalid event data - please check all fields";
+          } else if (error.statusCode === 422) {
+            if (
+              error.message.includes("Duplicate notification") ||
+              error.message.includes("duplicate")
+            ) {
+              errorMessage =
+                "Cannot have multiple notifications for the same time. Please remove duplicate notification times.";
+            } else {
+              errorMessage =
+                "Invalid data - please check all fields and try again";
+            }
+          } else if (error.statusCode === 404) {
+            errorMessage = "Event not found - it may have been deleted";
+            setSelectedEvent(null);
+          } else if (error.statusCode === 403) {
+            errorMessage = "You don't have permission to save this event";
+          } else if (error.statusCode === 500) {
+            errorMessage = "Server error - please try again later";
           }
-        } else if (error.statusCode === 404) {
-          errorMessage = "Event not found - it may have been deleted";
-          setSelectedEvent(null);
-        } else if (error.statusCode === 403) {
-          errorMessage = "You don't have permission to save this event";
-        } else if (error.statusCode === 500) {
-          errorMessage = "Server error - please try again later";
+        } else if (error instanceof Error) {
+          if (error.message.includes("Network")) {
+            errorMessage =
+              "Network error - please check your connection and try again";
+          }
         }
 
         toast.error(errorMessage);
@@ -723,6 +761,7 @@ export function useEventForm({
       isRecurring,
       recurrenceRule,
       eventNotifications,
+      eventParticipants,
       eventDescription,
       eventLocation,
       calendars,
@@ -902,6 +941,7 @@ export function useEventForm({
     eventCalendarId,
     eventReminder,
     eventNotifications,
+    eventParticipants,
     isRecurring,
     recurrenceRule,
 
@@ -930,6 +970,7 @@ export function useEventForm({
     setEventCalendarId,
     setEventReminder,
     setEventNotifications,
+    setEventParticipants,
     setIsRecurring,
     setRecurrenceRule,
     setShowRecurringDeleteModal,

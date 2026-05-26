@@ -66,6 +66,21 @@ export interface ParsedIcsEvent {
   location?: string;
   recurrence?: IcsRecurrenceRule;
   timezone?: string;
+  participants?: IcsParticipant[];
+}
+
+export type IcsParticipantRole = "organizer" | "attendee";
+export type IcsParticipantStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "tentative";
+
+export interface IcsParticipant {
+  email: string;
+  displayName?: string;
+  role?: IcsParticipantRole;
+  status?: IcsParticipantStatus;
 }
 
 export interface IcsParseResult {
@@ -228,6 +243,7 @@ export interface IcsBuildEventInput {
   status?: "CONFIRMED" | "TENTATIVE" | "CANCELLED";
   sequence?: number;
   sourceUrl?: string;
+  participants?: IcsParticipant[];
 }
 
 const WEEKDAY_INDEX_TO_CODE = [
@@ -250,6 +266,15 @@ function escapeIcsText(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
     .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function escapeIcsParamValue(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, " ")
+    .replace(/"/g, '\\"')
     .replace(/,/g, "\\,")
     .replace(/;/g, "\\;");
 }
@@ -497,6 +522,47 @@ function buildEventLines(
 
   if (event.location?.trim()) {
     lines.push(`LOCATION:${escapeIcsText(event.location.trim())}`);
+  }
+
+  const organizer = event.participants?.find(
+    (participant) => participant.role === "organizer" && participant.email.trim(),
+  );
+  if (organizer) {
+    const organizerParams = organizer.displayName?.trim()
+      ? `;CN=${escapeIcsParamValue(organizer.displayName.trim())}`
+      : "";
+    lines.push(
+      `ORGANIZER${organizerParams}:mailto:${sanitizeIcsUri(organizer.email.trim())}`,
+    );
+  }
+
+  for (const participant of event.participants ?? []) {
+    const email = participant.email.trim();
+    if (!email || participant.role === "organizer") {
+      continue;
+    }
+
+    const attendeeParams: string[] = [];
+    if (participant.displayName?.trim()) {
+      attendeeParams.push(
+        `CN=${escapeIcsParamValue(participant.displayName.trim())}`,
+      );
+    }
+
+    if (participant.status === "accepted") {
+      attendeeParams.push("PARTSTAT=ACCEPTED");
+    } else if (participant.status === "declined") {
+      attendeeParams.push("PARTSTAT=DECLINED");
+    } else if (participant.status === "tentative") {
+      attendeeParams.push("PARTSTAT=TENTATIVE");
+    } else {
+      attendeeParams.push("PARTSTAT=NEEDS-ACTION");
+      attendeeParams.push("RSVP=TRUE");
+    }
+
+    lines.push(
+      `ATTENDEE${attendeeParams.length ? `;${attendeeParams.join(";")}` : ""}:mailto:${sanitizeIcsUri(email)}`,
+    );
   }
 
   if (event.status) {

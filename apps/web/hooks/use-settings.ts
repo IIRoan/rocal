@@ -1,6 +1,6 @@
-import { useState, useEffect, createContext, use } from "react";
+import { useEffect, createContext, use, useMemo } from "react";
 import { calendarApiService } from "@/lib/calendar-api-service";
-import type { UserSettings, UpdateSettingsRequest } from "@/lib/types/calendar";
+import type { UserSettings, UpdateSettingsRequest, ApiError } from "@/lib/types/calendar";
 import { useSession } from "@/lib/auth-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -24,11 +24,20 @@ export function useSettings() {
 }
 
 export function useSettingsState(): SettingsContextValue {
-  const { data: session, isPending: isSessionPending } = useSession();
+  const { data: session } = useSession();
   const queryClient = useQueryClient();
 
-  const settingsQuery = useQuery({
-    queryKey: ["settings"],
+  // Include the user ID in the key so each user gets their own cache entry.
+  // staleTime: Infinity means data is never re-fetched automatically, so
+  // scoping by userId prevents a logged-out user's settings from bleeding into
+  // the next user's session.
+  const settingsQueryKey = useMemo(
+    () => ["settings", session?.user?.id ?? null] as const,
+    [session?.user?.id],
+  );
+
+  const settingsQuery = useQuery<UserSettings, ApiError>({
+    queryKey: settingsQueryKey,
     queryFn: () => calendarApiService.getUserSettings(),
     enabled: !!session?.user,
     staleTime: Infinity, // Settings don't change often
@@ -39,7 +48,7 @@ export function useSettingsState(): SettingsContextValue {
     mutationFn: (updates: UpdateSettingsRequest) =>
       calendarApiService.updateUserSettings(updates),
     onSuccess: (newSettings: UserSettings) => {
-      queryClient.setQueryData(["settings"], newSettings);
+      queryClient.setQueryData<UserSettings>(settingsQueryKey, newSettings);
       applyTheme(newSettings.theme);
     },
   });
@@ -47,7 +56,7 @@ export function useSettingsState(): SettingsContextValue {
   const resetSettingsMutation = useMutation({
     mutationFn: () => calendarApiService.resetUserSettings(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      queryClient.invalidateQueries({ queryKey: settingsQueryKey });
     },
   });
 
@@ -74,9 +83,7 @@ export function useSettingsState(): SettingsContextValue {
   return {
     settings: settingsQuery.data || null,
     loading: settingsQuery.isLoading && !settingsQuery.isError, // Don't show loading on error
-    error: settingsQuery.error
-      ? (settingsQuery.error as any).message || "Failed to load settings"
-      : null,
+    error: settingsQuery.error?.message ?? null,
     updateSettings: async (updates) => {
       await updateSettingsMutation.mutateAsync(updates);
     },

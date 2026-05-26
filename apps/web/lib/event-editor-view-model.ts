@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import type {
   Calendar,
   CalendarEvent,
@@ -61,9 +62,18 @@ export function formatReminderMinutes(minutes: number): string {
   return `${Number.isInteger(weeks) ? weeks : weeks.toFixed(1)} week${weeks === 1 ? "" : "s"}`;
 }
 
-export function getEventDateDisplay(startDate: Date, endDate: Date) {
-  const startLabel = format(startDate, "EEEE, MMMM d, yyyy");
-  const endLabel = format(endDate, "EEEE, MMMM d, yyyy");
+export function getEventDateDisplay(
+  startDate: Date,
+  endDate: Date,
+  options?: { allDay?: boolean; timezone?: string },
+) {
+  const fmt = (date: Date, pattern: string) =>
+    options?.allDay
+      ? formatInTimeZone(date, options.timezone || "UTC", pattern)
+      : format(date, pattern);
+
+  const startLabel = fmt(startDate, "EEEE, MMMM d, yyyy");
+  const endLabel = fmt(endDate, "EEEE, MMMM d, yyyy");
 
   if (startLabel === endLabel) {
     return {
@@ -73,9 +83,9 @@ export function getEventDateDisplay(startDate: Date, endDate: Date) {
   }
 
   return {
-    endLabel: format(endDate, "EEE, MMM d, yyyy"),
+    endLabel: fmt(endDate, "EEE, MMM d, yyyy"),
     isSameDay: false,
-    startLabel: format(startDate, "EEE, MMM d"),
+    startLabel: fmt(startDate, "EEE, MMM d"),
   };
 }
 

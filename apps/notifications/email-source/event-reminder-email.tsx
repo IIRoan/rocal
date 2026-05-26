@@ -170,6 +170,10 @@ export function EventReminderEmailTemplate() {
             <GoTemplateTag>{"{{if .Duration}}"}</GoTemplateTag>
             <DetailBlock label="Duration" value={"{{.Duration}}"} />
             <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
+
+            <GoTemplateTag>{"{{if .EventID}}"}</GoTemplateTag>
+            <DetailBlock label="Event ID" value={"{{.EventID}}"} />
+            <GoTemplateTag>{"{{end}}"}</GoTemplateTag>
           </div>
 
           {/* Button */}

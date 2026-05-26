@@ -15,6 +15,7 @@ import {
   findNationalHolidayCalendarByUrl,
 } from "@workspace/calendar-ics";
 import {
+  areParsedEventParticipantsDifferent,
   parseICSFile,
   convertParsedEventToCalendarEvent,
   isEventModified,
@@ -22,6 +23,7 @@ import {
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
 import { ValidationError, NotFoundError } from "../lib/errors";
 import { createLogger } from "@workspace/logger";
+import { EventParticipantService } from "./event-participant.service";
 
 const logger = createLogger("backend:subscription-service");
 const CALENDAR_FETCH_TIMEOUT_MS = 10_000;
@@ -35,7 +37,12 @@ const CALENDAR_FETCH_HEADERS = {
 };
 
 export class SubscriptionService implements ISubscriptionService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly eventParticipantService: EventParticipantService = new EventParticipantService(
+      prisma,
+    ),
+  ) {}
 
   private async getUserTimezone(userId: string): Promise<string> {
     let userSettings = await this.prisma.userSettings.findUnique({
@@ -466,6 +473,13 @@ export class SubscriptionService implements ISubscriptionService {
         const createdEvent = await this.prisma.calendarEvent.create({
           data: eventData,
         });
+        const createdParticipants =
+          await this.eventParticipantService.syncParticipants({
+            eventId: createdEvent.id,
+            participants: parsedEvent.participants ?? [],
+            tx: this.prisma,
+          });
+        await createdParticipants.sendPendingInvitations();
         createdEvents.push(createdEvent);
       } catch (error) {
         errors.push(
@@ -544,6 +558,9 @@ export class SubscriptionService implements ISubscriptionService {
 
       const currentEvents = await this.prisma.calendarEvent.findMany({
         where: { subscriptionId: subscription.id, isSynced: true },
+        include: {
+          participants: true,
+        },
       });
 
       const currentEventsByUid = new Map(
@@ -564,26 +581,61 @@ export class SubscriptionService implements ISubscriptionService {
             subscription.calendarId,
             subscription.id,
           );
-          await this.prisma.calendarEvent.create({ data: eventData });
-          eventsAdded++;
-        } else if (isEventModified(existingEvent, parsedEvent)) {
-          await this.prisma.calendarEvent.update({
-            where: { id: existingEvent.id },
-            data: {
-              title: parsedEvent.title,
-              description: parsedEvent.description,
-              start: parsedEvent.start,
-              end: parsedEvent.end,
-              allDay: parsedEvent.allDay,
-              location: parsedEvent.location,
-              recurrence: parsedEvent.recurrence
-                ? JSON.stringify(parsedEvent.recurrence)
-                : null,
-              timezone: parsedEvent.timezone || "UTC",
-              syncedAt: new Date(),
-            },
+          const createdEvent = await this.prisma.calendarEvent.create({
+            data: eventData,
           });
-          eventsUpdated++;
+          const createdParticipants =
+            await this.eventParticipantService.syncParticipants({
+              eventId: createdEvent.id,
+              participants: parsedEvent.participants ?? [],
+              tx: this.prisma,
+            });
+          await createdParticipants.sendPendingInvitations();
+          eventsAdded++;
+        } else {
+          const eventChanged = isEventModified(existingEvent, parsedEvent);
+          const participantsChanged = areParsedEventParticipantsDifferent(
+            (existingEvent.participants ?? []).map((participant) => ({
+              email: participant.email,
+              displayName: participant.displayName,
+              role: participant.role,
+              status: participant.status,
+            })),
+            parsedEvent.participants,
+          );
+
+          if (eventChanged) {
+            await this.prisma.calendarEvent.update({
+              where: { id: existingEvent.id },
+              data: {
+                title: parsedEvent.title,
+                description: parsedEvent.description,
+                start: parsedEvent.start,
+                end: parsedEvent.end,
+                allDay: parsedEvent.allDay,
+                location: parsedEvent.location,
+                recurrence: parsedEvent.recurrence
+                  ? JSON.stringify(parsedEvent.recurrence)
+                  : null,
+                timezone: parsedEvent.timezone || "UTC",
+                syncedAt: new Date(),
+              },
+            });
+          }
+
+          if (participantsChanged) {
+            const updatedParticipants =
+              await this.eventParticipantService.syncParticipants({
+                eventId: existingEvent.id,
+                participants: parsedEvent.participants ?? [],
+                tx: this.prisma,
+              });
+            await updatedParticipants.sendPendingInvitations();
+          }
+
+          if (eventChanged || participantsChanged) {
+            eventsUpdated++;
+          }
         }
       }
 
