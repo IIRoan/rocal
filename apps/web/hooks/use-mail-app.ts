@@ -2113,6 +2113,7 @@ export function useMailApp() {
   const handleRealtimeSync = useCallback(
     (result: MailSyncResponse) => {
       let resolvedSelectedMessageId: string | null | undefined;
+      const calendarImport = result.calendarImport;
 
       setActiveMailbox((current) => {
         if (!current) {
@@ -2156,6 +2157,18 @@ export function useMailApp() {
 
       if (resolvedSelectedMessageId !== undefined) {
         setSelectedMessageId(resolvedSelectedMessageId);
+      }
+
+      const importedCount =
+        (calendarImport?.eventsCreated ?? 0) +
+        (calendarImport?.eventsUpdated ?? 0) +
+        (calendarImport?.eventsDeleted ?? 0);
+      if (importedCount > 0) {
+        toast.success(
+          importedCount === 1
+            ? "Calendar updated from an email invite."
+            : `Calendar updated from ${importedCount} email invite changes.`,
+        );
       }
     },
     [selectedMessageId],

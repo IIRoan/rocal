@@ -155,14 +155,17 @@ model EventParticipant {
   id        String        @id @default(cuid())
   eventId   String        @map("event_id")
   event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId    String        @map("user_id")
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String        @default("pending") // pending, accepted, declined
+  userId    String?       @map("user_id")
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String
+  displayName String?     @map("display_name")
+  status    String        @default("pending") // pending, accepted, declined, tentative
   role      String        @default("attendee") // organizer, attendee
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
-  @@unique([eventId, userId])
+  @@index([eventId, userId])
+  @@unique([eventId, email])
   @@map("event_participant")
 }
 

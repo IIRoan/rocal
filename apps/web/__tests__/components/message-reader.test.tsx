@@ -85,11 +85,14 @@ jest.mock("@workspace/ui/components/ui/drawer", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/button", () => ({
-  Button: ({ children, onClick, disabled, "aria-label": ariaLabel, ...rest }: any) => (
+  Button: ({ children, onClick, disabled, "aria-label": ariaLabel, asChild, ...rest }: any) =>
+    asChild ? (
+      children
+    ) : (
     <button onClick={onClick} disabled={disabled} aria-label={ariaLabel} {...rest}>
       {children}
     </button>
-  ),
+    ),
 }));
 
 jest.mock("@workspace/ui/components/ui/separator", () => ({
@@ -167,6 +170,10 @@ jest.mock("lucide-react", () => {
     Lock: Icon,
     Loader2: Icon,
     MailOpen: Icon,
+    CalendarDays: Icon,
+    Clock: Icon,
+    MapPin: Icon,
+    ExternalLink: Icon,
     MoreHorizontal: Icon,
     Paperclip: Icon,
     Pin: Icon,
@@ -204,9 +211,19 @@ jest.mock("../../lib/mail/message-security", () => ({
 jest.mock("../../components/mail/mail-helpers", () => ({
   formatAddressFull: (addresses: any[]) =>
     addresses?.map((a: any) => a.email).join(", ") ?? "",
+  formatMessageDate: (value: string) => value,
+}));
+
+jest.mock("../../lib/calendar-api-service", () => ({
+  calendarApiService: {
+    getEvent: jest.fn(),
+  },
 }));
 
 import { MessageReader, type MessageReaderProps } from "../../components/mail/message-reader";
+import { calendarApiService } from "../../lib/calendar-api-service";
+
+const mockCalendarApiService = jest.mocked(calendarApiService);
 
 const baseMessage = {
   id: "msg-1",
@@ -245,6 +262,20 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  mockCalendarApiService.getEvent.mockResolvedValue({
+    id: "event-1",
+    title: "Planning sync",
+    description: "Discuss launch details.",
+    start: new Date("2026-05-13T09:00:00Z"),
+    end: new Date("2026-05-13T10:00:00Z"),
+    allDay: false,
+    location: "Room 42",
+    calendarId: "cal-1",
+    calendar: { id: "cal-1", name: "Work" },
+    userId: "user-1",
+    createdAt: new Date("2026-05-01T00:00:00Z"),
+    updatedAt: new Date("2026-05-01T00:00:00Z"),
+  } as any);
 });
 
 afterEach(() => {
@@ -306,6 +337,42 @@ describe("MessageReader — email header", () => {
   it("renders (No subject) when subject is empty", () => {
     render({ message: { ...baseMessage, subject: null } as any });
     expect(container.textContent).toContain("(No subject)");
+  });
+});
+
+describe("MessageReader — linked calendar event", () => {
+  it("fetches and injects event details for Solace reminder mail", async () => {
+    await act(async () => {
+      root.render(
+        <MessageReader
+          {...defaultProps}
+          message={
+            {
+              ...baseMessage,
+              subject: "Reminder: Planning sync",
+              bodyValues: {
+                "1": {
+                  value:
+                    "Your event starts soon.\nEvent ID: event-1\nOpen it in Solace.",
+                },
+              },
+            } as any
+          }
+          plaintext={"Your event starts soon.\nEvent ID: event-1"}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.getEvent).toHaveBeenCalledWith("event-1");
+    expect(container.textContent).toContain("Linked calendar event");
+    expect(container.textContent).toContain("Planning sync");
+    expect(container.textContent).toContain("Room 42");
+    expect(container.textContent).toContain("Calendar: Work");
+    expect(container.textContent).toContain("Discuss launch details.");
+    expect(
+      container.querySelector('a[href="/calendar?eventId=event-1"]'),
+    ).not.toBeNull();
   });
 });
 

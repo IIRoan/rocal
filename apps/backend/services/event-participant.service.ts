@@ -1,0 +1,419 @@
+import { createLogger } from "@workspace/logger";
+import type {
+  EventParticipant,
+  EventParticipantInput,
+  EventParticipantRole,
+  EventParticipantStatus,
+} from "@workspace/calendar-core";
+import { buildIcsEventFile, type IcsBuildEventInput } from "@workspace/calendar-ics";
+import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
+import {
+  mapEventParticipant,
+  normalizeParticipantEmail,
+  normalizeParticipantRole,
+  normalizeParticipantStatus,
+  type EventParticipantRecord,
+  EVENT_PARTICIPANT_USER_SELECT,
+} from "../lib/event-participants";
+import { buildEventInvitationEmail, sendAuthEmail } from "../lib/auth-email";
+import { authEmailFrom, resend } from "../lib/email-client";
+import { env } from "../lib/env";
+
+const logger = createLogger("backend:event-participants");
+
+type ParticipantClient = PrismaClient | Prisma.TransactionClient;
+
+type ResolvedParticipant = {
+  email: string;
+  displayName: string;
+  userId: string | null;
+  role: EventParticipantRole;
+  status: EventParticipantStatus;
+};
+
+type SyncEventParticipantsInput = {
+  eventId: string;
+  participants: EventParticipantInput[];
+  ownerUserId?: string;
+  tx?: ParticipantClient;
+  sendInvitations?: boolean;
+  invitationEvent?: IcsBuildEventInput;
+  calendarName?: string;
+};
+
+type SyncEventParticipantsResult = {
+  changed: boolean;
+  participants: EventParticipant[];
+  /**
+   * Call this AFTER the surrounding database transaction has committed.
+   * Dispatching emails inside an uncommitted transaction risks sending
+   * invitations for events that never persisted.
+   */
+  sendPendingInvitations: () => Promise<void>;
+};
+
+/**
+ * Merges two participant inputs for the same email address.
+ * Organizer role wins over attendee; for attendees the incoming status
+ * takes priority so explicit updates are never lost. Organizers are always
+ * considered "accepted".
+ */
+function mergeParticipants(
+  existing: EventParticipantInput | undefined,
+  next: EventParticipantInput,
+): EventParticipantInput {
+  if (!existing) {
+    return next;
+  }
+
+  const role =
+    existing.role === "organizer" || next.role === "organizer"
+      ? "organizer"
+      : "attendee";
+  const status =
+    role === "organizer"
+      ? "accepted"
+      : next.status ?? existing.status ?? "pending";
+
+  return {
+    ...existing,
+    ...next,
+    displayName: next.displayName?.trim() || existing.displayName?.trim(),
+    role,
+    status,
+  };
+}
+
+export class EventParticipantService {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  private getClient(tx?: ParticipantClient) {
+    return tx ?? this.prisma;
+  }
+
+  private async resolveOwner(
+    client: ParticipantClient,
+    ownerUserId?: string,
+  ): Promise<{
+    id: string;
+    email: string;
+    name: string;
+  } | null> {
+    if (!ownerUserId) {
+      return null;
+    }
+
+    const owner = await client.user.findUnique({
+      where: { id: ownerUserId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+
+    if (!owner?.email?.trim()) {
+      return null;
+    }
+
+    return {
+      id: owner.id,
+      email: normalizeParticipantEmail(owner.email),
+      name: owner.name?.trim() || owner.email.trim(),
+    };
+  }
+
+  private async resolveParticipants(
+    client: ParticipantClient,
+    input: SyncEventParticipantsInput,
+  ): Promise<ResolvedParticipant[]> {
+    const owner = await this.resolveOwner(client, input.ownerUserId);
+    const deduped = new Map<string, EventParticipantInput>();
+
+    if (owner) {
+      deduped.set(owner.email, {
+        email: owner.email,
+        displayName: owner.name,
+        role: "organizer",
+        status: "accepted",
+      });
+    }
+
+    for (const participant of input.participants) {
+      const email = normalizeParticipantEmail(participant.email);
+      if (!email) {
+        continue;
+      }
+
+      const role =
+        owner && email === owner.email
+          ? "organizer"
+          : normalizeParticipantRole(participant.role);
+      const status = normalizeParticipantStatus(
+        participant.status,
+        role,
+      );
+
+      deduped.set(
+        email,
+        mergeParticipants(deduped.get(email), {
+          email,
+          displayName: participant.displayName?.trim() || undefined,
+          role,
+          status,
+        }),
+      );
+    }
+
+    const emails = [...deduped.keys()];
+    if (emails.length === 0) {
+      return [];
+    }
+    const users = await client.user.findMany({
+      where: { email: { in: emails } },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+    const userByEmail = new Map(
+      users.map((user) => [normalizeParticipantEmail(user.email), user]),
+    );
+
+    return emails.map((email) => {
+      const participant = deduped.get(email)!;
+      const matchedUser = userByEmail.get(email);
+      const role = normalizeParticipantRole(participant.role);
+
+      return {
+        email,
+        displayName:
+          participant.displayName?.trim() ||
+          matchedUser?.name?.trim() ||
+          email,
+        userId: matchedUser?.id ?? null,
+        role,
+        status:
+          role === "organizer"
+            ? "accepted"
+            : normalizeParticipantStatus(participant.status, role),
+      };
+    });
+  }
+
+  async syncParticipants(
+    input: SyncEventParticipantsInput,
+  ): Promise<SyncEventParticipantsResult> {
+    const client = this.getClient(input.tx);
+    const resolvedParticipants = await this.resolveParticipants(client, input);
+    if (!input.ownerUserId && resolvedParticipants.length === 0) {
+      return {
+        changed: false,
+        participants: [],
+        sendPendingInvitations: async () => {},
+      };
+    }
+    const nextByEmail = new Map(
+      resolvedParticipants.map((participant) => [participant.email, participant]),
+    );
+
+    const existing = await client.eventParticipant.findMany({
+      where: { eventId: input.eventId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    // Build a lookup keyed by the best available email, skipping entries
+    // that have neither a participant email nor a linked user email.
+    const existingByEmail = new Map(
+      existing
+        .map((participant) => {
+          const key =
+            normalizeParticipantEmail(participant.email) ||
+            normalizeParticipantEmail(participant.user?.email);
+          return key ? ([key, participant] as const) : null;
+        })
+        .filter((entry): entry is [string, (typeof existing)[0]] => entry !== null),
+    );
+
+    let changed = false;
+    const removedEmails = [...existingByEmail.keys()].filter(
+      (email) => !nextByEmail.has(email),
+    );
+    if (removedEmails.length > 0) {
+      await client.eventParticipant.deleteMany({
+        where: {
+          eventId: input.eventId,
+          email: { in: removedEmails },
+        },
+      });
+      changed = true;
+    }
+
+    for (const participant of resolvedParticipants) {
+      const existingParticipant = existingByEmail.get(participant.email);
+      if (
+        existingParticipant &&
+        existingParticipant.userId === participant.userId &&
+        existingParticipant.displayName === participant.displayName &&
+        existingParticipant.role === participant.role &&
+        existingParticipant.status === participant.status
+      ) {
+        continue;
+      }
+
+      await client.eventParticipant.upsert({
+        where: {
+          eventId_email: {
+            eventId: input.eventId,
+            email: participant.email,
+          },
+        },
+        create: {
+          eventId: input.eventId,
+          userId: participant.userId,
+          email: participant.email,
+          displayName: participant.displayName,
+          role: participant.role,
+          status: participant.status,
+        },
+        update: {
+          userId: participant.userId,
+          displayName: participant.displayName,
+          role: participant.role,
+          status: participant.status,
+        },
+      });
+      changed = true;
+    }
+
+    const finalParticipants = await client.eventParticipant.findMany({
+      where: { eventId: input.eventId },
+      include: {
+        user: {
+          select: EVENT_PARTICIPANT_USER_SELECT,
+        },
+      },
+    });
+
+    // Build the invitation-sending closure now (while we have the resolved data)
+    // but return it to the caller so emails are sent AFTER the DB transaction commits.
+    const sendPendingInvitations = await this.buildInvitationSender(
+      input,
+      resolvedParticipants,
+      existingByEmail,
+    );
+
+    return {
+      changed,
+      participants: finalParticipants.map((participant) =>
+        mapEventParticipant(participant as EventParticipantRecord),
+      ),
+      sendPendingInvitations,
+    };
+  }
+
+  /**
+   * Prepares a closure that sends email invitations to new attendees.
+   * Separating this from the DB writes ensures invitations are only dispatched
+   * after the caller's transaction has committed.
+   */
+  private async buildInvitationSender(
+    input: SyncEventParticipantsInput,
+    resolvedParticipants: ResolvedParticipant[],
+    existingByEmail: Map<string, unknown>,
+  ): Promise<() => Promise<void>> {
+    if (
+      !input.sendInvitations ||
+      !input.invitationEvent ||
+      resolvedParticipants.length === 0
+    ) {
+      return async () => {};
+    }
+
+    const client = this.getClient(input.tx);
+    const owner = await this.resolveOwner(client, input.ownerUserId);
+    const newInvitees = resolvedParticipants.filter(
+      (p) => p.role !== "organizer" && !existingByEmail.has(p.email),
+    );
+
+    if (!owner || newInvitees.length === 0) {
+      return async () => {};
+    }
+
+    const icsContent = buildIcsEventFile({
+      calendar: {
+        name: input.calendarName || "Solace",
+        timezone: input.invitationEvent.timezone || "UTC",
+        method: "REQUEST",
+      },
+      event: {
+        ...input.invitationEvent,
+        participants: resolvedParticipants.map((p) => ({
+          email: p.email,
+          displayName: p.displayName,
+          role: p.role,
+          status: p.status,
+        })),
+      },
+    });
+
+    return async () => {
+      for (const invitee of newInvitees) {
+        try {
+          await sendAuthEmail({
+            client: resend,
+            from: authEmailFrom,
+            to: invitee.email,
+            label: "event invitation",
+            message: {
+              ...buildEventInvitationEmail({
+                attendeeName: invitee.displayName,
+                inviterName: owner.name,
+                eventTitle: input.invitationEvent!.title,
+                eventDescription: input.invitationEvent!.description,
+                eventLocation: input.invitationEvent!.location,
+                start: input.invitationEvent!.start,
+                end: input.invitationEvent!.end,
+                allDay: !!input.invitationEvent!.allDay,
+                openUrl: new URL(
+                  `/calendar?eventId=${encodeURIComponent(input.eventId)}`,
+                  env.frontendUrl.replace(/\/+$/, "") + "/",
+                ).toString(),
+              }),
+              attachments: [
+                {
+                  filename: "invite.ics",
+                  content: icsContent,
+                  contentType: "text/calendar; method=REQUEST; charset=utf-8",
+                },
+              ],
+            },
+            logger,
+            isProduction: env.isProduction,
+            mode: "best-effort",
+            developmentFallbackContext: {
+              eventId: input.eventId,
+              inviteeEmail: invitee.email,
+            },
+          });
+        } catch (error) {
+          logger.warn("Failed to send event invitation", {
+            eventId: input.eventId,
+            inviteeEmail: invitee.email,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    };
+  }
+}

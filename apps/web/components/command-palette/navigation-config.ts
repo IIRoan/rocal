@@ -1,20 +1,19 @@
 import {
   CalendarIcon,
   Calendar,
-  Palette,
-  Globe,
-  Bell,
-  User,
-  Shield,
   Sun,
   Moon,
   Monitor,
+  Globe,
   Clock,
   Mail,
   Plus,
   Trash2,
   Users,
+  Shield,
 } from "lucide-react";
+import { PRESET_COLOR_OPTIONS } from "@workspace/calendar-core";
+import { BASE_SETTINGS_NAVIGATION_ITEMS } from "./base-navigation";
 
 // View labels for breadcrumb display
 export const VIEW_LABELS: Record<string, string> = {
@@ -132,40 +131,7 @@ export const NAVIGATION_ITEMS = [
     ],
     parent: null,
   },
-  {
-    id: "appearance",
-    label: "Appearance",
-    icon: Palette,
-    description: "Theme and layout settings",
-    targetView: "appearance",
-    keywords: [
-      "theme",
-      "dark mode",
-      "light mode",
-      "appearance",
-      "compact",
-      "view",
-    ],
-    parent: null,
-  },
-  {
-    id: "time-region",
-    label: "Time & Region",
-    icon: Globe,
-    description: "Timezone and format preferences",
-    targetView: "time-region",
-    keywords: ["timezone", "time format", "region", "12 hour", "24 hour"],
-    parent: null,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: Bell,
-    description: "Notification preferences",
-    targetView: "notifications",
-    keywords: ["notification", "email", "reminder", "alert"],
-    parent: null,
-  },
+  ...BASE_SETTINGS_NAVIGATION_ITEMS.slice(0, 3),
   {
     id: "calendar-defaults",
     label: "Calendar Defaults",
@@ -181,33 +147,7 @@ export const NAVIGATION_ITEMS = [
     ],
     parent: null,
   },
-  {
-    id: "account",
-    label: "Account",
-    icon: User,
-    description: "Reset preferences or delete your account",
-    targetView: "account",
-    keywords: ["account", "reset", "settings", "delete account"],
-    parent: null,
-  },
-  {
-    id: "security",
-    label: "Security",
-    icon: Shield,
-    description: "Security settings",
-    targetView: "security",
-    keywords: ["security", "passkey", "authentication", "password"],
-    parent: "account",
-  },
-  {
-    id: "invites",
-    label: "Invites",
-    icon: Users,
-    description: "Invite friends to join Solace",
-    targetView: "invites",
-    keywords: ["invite", "invitations", "friends", "share", "referral"],
-    parent: "account",
-  },
+  ...BASE_SETTINGS_NAVIGATION_ITEMS.slice(3),
 ];
 
 // Expanded search items that include sub-settings with parent info for breadcrumbs
@@ -389,4 +329,3 @@ export interface PresetColor {
 }
 
 export const PRESET_COLORS: PresetColor[] = [...PRESET_COLOR_OPTIONS];
-import { PRESET_COLOR_OPTIONS } from "@workspace/calendar-core";

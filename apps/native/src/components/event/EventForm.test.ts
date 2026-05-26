@@ -238,6 +238,33 @@ describe("buildEventRequest", () => {
       reminder: 10,
     });
   });
+
+  it("includes invited participants when provided", () => {
+    const result = buildEventRequest({
+      title: "Planning sync",
+      start: "2025-06-15T09:00",
+      end: "2025-06-15T10:00",
+      calendarId: "cal-1",
+      allDay: false,
+      location: "",
+      description: "",
+      participants: [
+        {
+          email: "teammate@example.com",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    });
+
+    expect(result.participants).toEqual([
+      {
+        email: "teammate@example.com",
+        role: "attendee",
+        status: "pending",
+      },
+    ]);
+  });
 });
 
 // ─── validateForm ────────────────────────────────────────────────────────────
@@ -262,6 +289,24 @@ describe("validateForm", () => {
       calendarId: "cal-1",
     });
     expect(fieldErrors.title).toBeDefined();
+  });
+
+  it("returns participant validation errors for invalid attendee emails", () => {
+    const { fieldErrors } = validateForm({
+      title: "Planning sync",
+      start: "2025-06-15T09:00",
+      end: "2025-06-15T10:00",
+      calendarId: "cal-1",
+      participants: [
+        {
+          email: "not-an-email",
+          role: "attendee",
+          status: "pending",
+        },
+      ],
+    });
+
+    expect(fieldErrors.participants).toBeDefined();
   });
 
   it("returns end error when end is before start", () => {

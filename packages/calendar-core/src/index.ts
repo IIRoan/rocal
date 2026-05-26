@@ -8,3 +8,4 @@ export * from "./validation";
 export * from "./calendar-helpers";
 export * from "./calendar-month-ranges";
 export * from "./auth-accounts";
+export { RecurrenceEngine } from "@workspace/calendar-ics/recurrence";

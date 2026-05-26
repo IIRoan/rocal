@@ -9,6 +9,38 @@ import { EventService } from "../services/event.service";
 
 const eventService = new EventService(prisma);
 
+const eventParticipantSchema = strictObject({
+  email: t.String({
+    minLength: 3,
+    maxLength: 320,
+    description: "Participant email address",
+  }),
+  displayName: t.Optional(
+    t.String({
+      maxLength: 120,
+      description: "Participant display name",
+    }),
+  ),
+  role: t.Optional(
+    t.Union([t.Literal("organizer"), t.Literal("attendee")], {
+      description: "Participant role",
+    }),
+  ),
+  status: t.Optional(
+    t.Union(
+      [
+        t.Literal("pending"),
+        t.Literal("accepted"),
+        t.Literal("declined"),
+        t.Literal("tentative"),
+      ],
+      {
+        description: "Participant status",
+      },
+    ),
+  ),
+});
+
 export const eventsRoutes = new Elysia({
   prefix: "/events",
   normalize: false,
@@ -152,6 +184,12 @@ export const eventsRoutes = new Elysia({
             encryptedContent?: string;
             blindIndexTokens?: string[];
             encryptionKeyVersion?: number;
+            participants?: Array<{
+              email: string;
+              displayName?: string;
+              role?: "organizer" | "attendee";
+              status?: "pending" | "accepted" | "declined" | "tentative";
+            }>;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -248,6 +286,11 @@ export const eventsRoutes = new Elysia({
                 description: "Client-managed encryption key version.",
               }),
             ),
+            participants: t.Optional(
+              t.Array(eventParticipantSchema, {
+                description: "Participants to keep in sync with this event",
+              }),
+            ),
           }),
           detail: {
             summary: "Create a new calendar event",
@@ -341,6 +384,12 @@ export const eventsRoutes = new Elysia({
             encryptedContent?: string;
             blindIndexTokens?: string[];
             encryptionKeyVersion?: number;
+            participants?: Array<{
+              email: string;
+              displayName?: string;
+              role?: "organizer" | "attendee";
+              status?: "pending" | "accepted" | "declined" | "tentative";
+            }>;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -444,6 +493,11 @@ export const eventsRoutes = new Elysia({
               t.Number({
                 minimum: 1,
                 description: "Client-managed encryption key version.",
+              }),
+            ),
+            participants: t.Optional(
+              t.Array(eventParticipantSchema, {
+                description: "Participants to keep in sync with this event",
               }),
             ),
           }),

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "../generated/prisma/index.js";
+import type { EventParticipantStatus } from "@workspace/calendar-core";
 import type {
   IEventService,
   EventSearchInput,
@@ -19,18 +20,31 @@ import {
   normalizeEventEncryptionMode,
   resolveEventPersistencePolicy,
 } from "../lib/event-encryption";
-import { buildIcsEventFile } from "@workspace/calendar-ics";
+import { buildIcsEventFile, type IcsBuildEventInput } from "@workspace/calendar-ics";
 import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 import { createLogger } from "@workspace/logger";
+import {
+  mapEventParticipant,
+  sortEventParticipants,
+  EVENT_PARTICIPANT_USER_SELECT,
+  type EventParticipantRecord,
+} from "../lib/event-participants";
+import { EventParticipantService } from "./event-participant.service";
 
 const logger = createLogger("backend:event-service");
 
 const INITIALIZED_USER_CACHE_LIMIT = 5000;
+const MAX_REMINDER_MINUTES = 43200; // 30 days
 
 export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly eventParticipantService: EventParticipantService = new EventParticipantService(
+      prisma,
+    ),
+  ) {}
 
   private hasEncryptedPayload(value?: string | null): boolean {
     return typeof value === "string" && value.trim().length > 0;
@@ -50,6 +64,98 @@ export class EventService implements IEventService {
     });
 
     return userSettings?.timezone || "UTC";
+  }
+
+  private async buildParticipantMap(eventIds: string[]) {
+    if (eventIds.length === 0) {
+      return new Map<string, ReturnType<typeof mapEventParticipant>[]>();
+    }
+
+    const participants: EventParticipantRecord[] = await this.prisma.eventParticipant.findMany({
+      where: {
+        eventId: { in: eventIds },
+      },
+      include: {
+        user: { select: EVENT_PARTICIPANT_USER_SELECT },
+      },
+    });
+
+    const participantMap = new Map<string, ReturnType<typeof mapEventParticipant>[]>();
+    for (const participant of participants) {
+      const eventParticipants = participantMap.get(participant.eventId) ?? [];
+      eventParticipants.push(
+        mapEventParticipant(participant as EventParticipantRecord),
+      );
+      participantMap.set(participant.eventId, eventParticipants);
+    }
+
+    for (const [eventId, eventParticipants] of participantMap) {
+      participantMap.set(eventId, sortEventParticipants(eventParticipants));
+    }
+
+    return participantMap;
+  }
+
+  private async attachParticipantsToSearchEvents(
+    events: Record<string, unknown>[],
+  ) {
+    const participantMap = await this.buildParticipantMap(
+      events
+        .map((event) =>
+          typeof event.id === "string" && event.id ? event.id : null,
+        )
+        .filter((eventId): eventId is string => eventId !== null),
+    );
+
+    return events.map((event) => ({
+      ...event,
+      participants:
+        typeof event.id === "string" ? participantMap.get(event.id) ?? [] : [],
+    }));
+  }
+
+  private buildInvitationEventPayload(input: {
+    eventId: string;
+    externalId?: string | null;
+    title: string;
+    description?: string | null;
+    start: Date;
+    end: Date;
+    allDay: boolean;
+    timezone: string;
+    location?: string | null;
+    recurrence?: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
+  }): IcsBuildEventInput {
+    const parsedRecurrence = input.recurrence
+      ? RecurrenceEngine.parseRecurrenceRule(input.recurrence)
+      : null;
+
+    return {
+      uid: input.externalId || `${input.eventId}@solace-calendar.local`,
+      title: input.title,
+      description: input.description ?? null,
+      start: input.start,
+      end: input.end,
+      allDay: input.allDay,
+      timezone: input.timezone,
+      location: input.location ?? null,
+      recurrence: parsedRecurrence
+        ? {
+            frequency: parsedRecurrence.frequency,
+            interval: parsedRecurrence.interval,
+            count: parsedRecurrence.count,
+            until: parsedRecurrence.until?.toISOString(),
+            timezone: parsedRecurrence.timezone,
+            byWeekDay: parsedRecurrence.byWeekDay,
+            byMonthDay: parsedRecurrence.byMonthDay,
+            byMonth: parsedRecurrence.byMonth,
+          }
+        : undefined,
+      createdAt: input.createdAt,
+      updatedAt: input.updatedAt,
+    };
   }
 
   async search(
@@ -154,7 +260,8 @@ export class EventService implements IEventService {
 
     const total = (countResult as { total: number }[])?.[0]?.total ?? 0;
 
-    const events = (results as Record<string, unknown>[]).map((row) => ({
+    const events = await this.attachParticipantsToSearchEvents(
+      (results as Record<string, unknown>[]).map((row) => ({
       id: row.id,
       title: row.title,
       description: row.description,
@@ -188,7 +295,8 @@ export class EventService implements IEventService {
         : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-    }));
+      })),
+    );
 
     return { events, total };
   }
@@ -257,6 +365,13 @@ export class EventService implements IEventService {
         include: {
           category: true,
           calendar: true,
+          participants: {
+            include: {
+              user: {
+                select: EVENT_PARTICIPANT_USER_SELECT,
+              },
+            },
+          },
         },
       }),
       this.prisma.calendarEvent.findMany({
@@ -269,6 +384,13 @@ export class EventService implements IEventService {
           category: true,
           calendar: true,
           recurrenceExceptions: true,
+          participants: {
+            include: {
+              user: {
+                select: EVENT_PARTICIPANT_USER_SELECT,
+              },
+            },
+          },
         },
       }),
     ]);
@@ -359,6 +481,13 @@ export class EventService implements IEventService {
         include: {
           category: true,
           calendar: true,
+          participants: {
+            include: {
+              user: {
+                select: EVENT_PARTICIPANT_USER_SELECT,
+              },
+            },
+          },
         },
       }),
       this.prisma.eventCategory.findMany({
@@ -380,7 +509,16 @@ export class EventService implements IEventService {
       ...regularEvents,
       ...recurringInstances,
       ...modifiedInstances,
-    ].sort((a, b) => a.start.getTime() - b.start.getTime());
+    ]
+      .map((event) => ({
+        ...event,
+        participants: sortEventParticipants(
+          (event.participants ?? []).map((participant) =>
+            mapEventParticipant(participant as EventParticipantRecord),
+          ),
+        ),
+      }))
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
 
     return {
       events,
@@ -394,6 +532,13 @@ export class EventService implements IEventService {
       const include = {
         category: true,
         calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: EVENT_PARTICIPANT_USER_SELECT,
+            },
+          },
+        },
       };
 
       let event = await this.prisma.calendarEvent.findFirst({
@@ -419,7 +564,14 @@ export class EventService implements IEventService {
         throw new ValidationError("Event not found or access denied");
       }
 
-      return event;
+      return {
+        ...event,
+        participants: sortEventParticipants(
+          (event.participants ?? []).map((participant) =>
+            mapEventParticipant(participant as EventParticipantRecord),
+          ),
+        ),
+      };
     } catch (error) {
       logger.error("Event fetch error:", error);
       throw error;
@@ -444,6 +596,7 @@ export class EventService implements IEventService {
         encryptedContent,
         blindIndexTokens,
         encryptionKeyVersion,
+        participants,
       } = input;
       let { reminder } = input;
 
@@ -589,10 +742,10 @@ export class EventService implements IEventService {
         if (
           isNaN(reminderValue) ||
           reminderValue < 0 ||
-          reminderValue > 43200
+          reminderValue > MAX_REMINDER_MINUTES
         ) {
           throw new ValidationError(
-            "Reminder must be a number between 0 and 43200 minutes",
+            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
             "reminder",
           );
         }
@@ -665,6 +818,31 @@ export class EventService implements IEventService {
         },
       });
 
+      const participantResult = await this.eventParticipantService.syncParticipants(
+        {
+          eventId: event.id,
+          participants: participants ?? [],
+          ownerUserId: userId,
+          sendInvitations: true,
+          calendarName: calendar.name,
+          invitationEvent: this.buildInvitationEventPayload({
+            eventId: event.id,
+            externalId: event.externalId,
+            title: title.trim(),
+            description: description?.trim() || null,
+            start: startDate,
+            end: endDate,
+            allDay: allDay || false,
+            timezone: eventTimezone,
+            location: location?.trim() || null,
+            recurrence: recurrence || null,
+            createdAt: event.createdAt,
+            updatedAt: event.updatedAt,
+          }),
+        },
+      );
+      await participantResult.sendPendingInvitations();
+
       try {
         if (reminder && reminder > 0) {
           if (userSettings?.emailNotifications !== false) {
@@ -716,7 +894,10 @@ export class EventService implements IEventService {
         logger.error("Failed to create notifications:", notificationError);
       }
 
-      return event;
+      return {
+        ...event,
+        participants: participantResult.participants,
+      };
     } catch (error) {
       logger.error("Event creation error:", error);
       throw error;
@@ -883,10 +1064,10 @@ export class EventService implements IEventService {
         if (
           isNaN(reminderValue) ||
           reminderValue < 0 ||
-          reminderValue > 43200
+          reminderValue > MAX_REMINDER_MINUTES
         ) {
           throw new ValidationError(
-            "Reminder must be a number between 0 and 43200 minutes",
+            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
             "reminder",
           );
         }
@@ -901,6 +1082,7 @@ export class EventService implements IEventService {
           },
           select: {
             id: true,
+            name: true,
             kind: true,
             isSyncOnly: true,
             icsShareEnabled: true,
@@ -1087,6 +1269,39 @@ export class EventService implements IEventService {
         },
       });
 
+      if (input.participants !== undefined) {
+        const participantResult = await this.eventParticipantService.syncParticipants({
+          eventId: updatedEvent.id,
+          participants: input.participants,
+          ownerUserId: userId,
+          sendInvitations: true,
+          calendarName: finalCalendar.name,
+          // If the event is encrypted and the plaintext title isn't available in this
+          // update, skip invitation emails (invitees would receive an empty-title ICS).
+          invitationEvent: nextTitle
+            ? this.buildInvitationEventPayload({
+                eventId: updatedEvent.id,
+                externalId: updatedEvent.externalId,
+                title: nextTitle,
+                description: nextDescription,
+                start: finalStartDate,
+                end: finalEndDate,
+                allDay:
+                  input.allDay !== undefined ? input.allDay : existingEvent.allDay,
+                timezone: eventTimezone,
+                location: nextLocation,
+                recurrence:
+                  input.recurrence !== undefined
+                    ? input.recurrence
+                    : existingEvent.recurrence,
+                createdAt: updatedEvent.createdAt,
+                updatedAt: updatedEvent.updatedAt,
+              })
+            : undefined,
+        });
+        await participantResult.sendPendingInvitations();
+      }
+
       // Update notifications if event time or reminder changed
       try {
         const timeChanged = startDate || endDate;
@@ -1174,7 +1389,12 @@ export class EventService implements IEventService {
         // Notification failure shouldn't fail the event update
       }
 
-      return updatedEvent;
+      const participantMap = await this.buildParticipantMap([updatedEvent.id]);
+
+      return {
+        ...updatedEvent,
+        participants: participantMap.get(updatedEvent.id) ?? [],
+      };
     } catch (error: unknown) {
       logger.error("Event update error:", error);
 
@@ -1267,6 +1487,20 @@ export class EventService implements IEventService {
         where: {
           id: { in: eventIds },
           userId,
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  image: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -1399,6 +1633,23 @@ export class EventService implements IEventService {
               },
             });
 
+            const duplicatedParticipants =
+              await this.eventParticipantService.syncParticipants({
+                eventId: duplicated.id,
+                participants: (event.participants ?? [])
+                  .filter((participant) => participant.role !== "organizer")
+                  .map((participant) => ({
+                    email: participant.email,
+                    displayName:
+                      participant.displayName ?? participant.user?.name ?? undefined,
+                    role: "attendee" as const,
+                    status: participant.status as EventParticipantStatus,
+                  })),
+                ownerUserId: userId,
+                tx: this.prisma,
+              });
+            await duplicatedParticipants.sendPendingInvitations();
+
             try {
               if (event.reminder && event.reminder > 0) {
                 const userSettings = await this.prisma.userSettings.findUnique({
@@ -1453,7 +1704,10 @@ export class EventService implements IEventService {
               );
             }
 
-            duplicatedEvents.push(duplicated);
+            duplicatedEvents.push({
+              ...duplicated,
+              participants: duplicatedParticipants.participants,
+            });
           }
 
           return {
@@ -1505,6 +1759,18 @@ export class EventService implements IEventService {
       },
       include: {
         calendar: true,
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+              },
+            },
+          },
+        },
       },
     });
 
