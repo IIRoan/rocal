@@ -14,14 +14,138 @@ import {
   normalizeEntityName,
 } from "../lib/entity-metadata";
 import { ensureUserCalendars } from "../lib/user-setup";
+import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
 
 const logger = createLogger("backend:calendar-service");
 
 export class CalendarService implements ICalendarService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly stalwartClient?: StalwartCalendarClientLike | null,
+  ) {}
+
+  private async getStalwartAccountId(userId: string): Promise<string | null> {
+    if (!this.stalwartClient) {
+      return null;
+    }
+
+    const mailbox = await this.prisma.mailDirectoryEntry.findUnique({
+      where: { userId },
+      select: { stalwartAccountId: true },
+    });
+
+    return mailbox?.stalwartAccountId ?? null;
+  }
+
+  private async syncStalwartCalendars(
+    userId: string,
+    accountId: string,
+  ): Promise<void> {
+    if (!this.stalwartClient) {
+      return;
+    }
+
+    let localCalendars = await this.prisma.calendar.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    });
+    let remoteCalendars = await this.stalwartClient.listCalendars(accountId);
+    const remoteByName = new Map(
+      remoteCalendars
+        .filter((calendar) => calendar.name?.trim())
+        .map((calendar) => [calendar.name!.trim().toLowerCase(), calendar]),
+    );
+
+    for (const calendar of localCalendars) {
+      if (
+        calendar.kind !== "owned" ||
+        calendar.isSyncOnly ||
+        calendar.stalwartCalendarId
+      ) {
+        continue;
+      }
+
+      const matchingRemote = remoteByName.get(
+        calendar.name.trim().toLowerCase(),
+      );
+      const remoteId =
+        matchingRemote?.id ??
+        (
+          await this.stalwartClient.createCalendar(accountId, {
+            name: calendar.name,
+            color: calendar.color,
+            isVisible: calendar.isVisible,
+            isDefault: calendar.isDefault,
+          })
+        ).id;
+
+      await this.prisma.calendar.update({
+        where: { id: calendar.id },
+        data: {
+          stalwartAccountId: accountId,
+          stalwartCalendarId: remoteId,
+          stalwartSyncedAt: new Date(),
+        },
+      });
+    }
+
+    localCalendars = await this.prisma.calendar.findMany({ where: { userId } });
+    remoteCalendars = await this.stalwartClient.listCalendars(accountId);
+    const localByRemoteId = new Map(
+      localCalendars
+        .filter((calendar) => calendar.stalwartCalendarId)
+        .map((calendar) => [calendar.stalwartCalendarId!, calendar]),
+    );
+    const localNames = new Set(
+      localCalendars.map((calendar) => calendar.name.trim().toLowerCase()),
+    );
+
+    for (const remote of remoteCalendars) {
+      const name = remote.name?.trim() || "Stalwart Calendar";
+      const existing = localByRemoteId.get(remote.id);
+      const data = {
+        name,
+        color: remote.color?.trim() || "#10b981",
+        isVisible: remote.isVisible ?? true,
+        isDefault: remote.isDefault ?? false,
+        stalwartAccountId: accountId,
+        stalwartCalendarId: remote.id,
+        stalwartSyncedAt: new Date(),
+      };
+
+      if (existing) {
+        await this.prisma.calendar.update({
+          where: { id: existing.id },
+          data,
+        });
+        continue;
+      }
+
+      const uniqueName = localNames.has(name.toLowerCase())
+        ? `${name} (${remote.id})`
+        : name;
+      localNames.add(uniqueName.toLowerCase());
+      await this.prisma.calendar.create({
+        data: {
+          ...data,
+          name: uniqueName,
+          kind: "owned",
+          isPublic: false,
+          isSyncOnly: false,
+          userId,
+        },
+      });
+    }
+  }
 
   async list(userId: string) {
-    await ensureUserCalendars(userId);
+    const stalwartAccountId = await this.getStalwartAccountId(userId);
+
+    if (stalwartAccountId) {
+      await this.syncStalwartCalendars(userId, stalwartAccountId);
+    } else {
+      await ensureUserCalendars(userId);
+    }
 
     const calendars = await this.prisma.calendar.findMany({
       where: { userId },
@@ -61,6 +185,22 @@ export class CalendarService implements ICalendarService {
       );
     }
 
+    const stalwartAccountId = await this.getStalwartAccountId(userId);
+    let stalwartCalendarId: string | null = null;
+
+    if (stalwartAccountId && this.stalwartClient) {
+      const remoteCalendar = await this.stalwartClient.createCalendar(
+        stalwartAccountId,
+        {
+          name: normalizedName,
+          color,
+          isVisible: true,
+          isDefault: isDefault || false,
+        },
+      );
+      stalwartCalendarId = remoteCalendar.id;
+    }
+
     if (isDefault) {
       await this.prisma.calendar.updateMany({
         where: { userId, isDefault: true },
@@ -83,6 +223,13 @@ export class CalendarService implements ICalendarService {
         isPublic: false,
         isVisible: true,
         isDefault: isDefault || false,
+        ...(stalwartAccountId && stalwartCalendarId
+          ? {
+              stalwartAccountId,
+              stalwartCalendarId,
+              stalwartSyncedAt: new Date(),
+            }
+          : {}),
         userId,
       },
     });
@@ -150,6 +297,38 @@ export class CalendarService implements ICalendarService {
       assertValidEntityColor(color);
     }
 
+    const stalwartAccountId = await this.getStalwartAccountId(userId);
+    let stalwartCalendarId = existingCalendar.stalwartCalendarId;
+
+    if (
+      stalwartAccountId &&
+      this.stalwartClient &&
+      existingCalendar.kind === "owned" &&
+      !existingCalendar.isSyncOnly
+    ) {
+      if (!stalwartCalendarId) {
+        stalwartCalendarId = (
+          await this.stalwartClient.createCalendar(stalwartAccountId, {
+            name: normalizedName ?? existingCalendar.name,
+            color: color ?? existingCalendar.color,
+            isVisible: isVisible ?? existingCalendar.isVisible,
+            isDefault: isDefault ?? existingCalendar.isDefault,
+          })
+        ).id;
+      } else {
+        await this.stalwartClient.updateCalendar(
+          stalwartAccountId,
+          stalwartCalendarId,
+          {
+            ...(normalizedName !== undefined ? { name: normalizedName } : {}),
+            ...(color !== undefined ? { color } : {}),
+            ...(isVisible !== undefined ? { isVisible } : {}),
+            ...(isDefault !== undefined ? { isDefault } : {}),
+          },
+        );
+      }
+    }
+
     const updateData: Prisma.CalendarUpdateInput = {};
 
     if (normalizedName !== undefined) updateData.name = normalizedName;
@@ -180,6 +359,12 @@ export class CalendarService implements ICalendarService {
 
     if (forceFullEncryption !== undefined) {
       updateData.forceFullEncryption = forceFullEncryption;
+    }
+
+    if (stalwartAccountId && stalwartCalendarId) {
+      updateData.stalwartAccountId = stalwartAccountId;
+      updateData.stalwartCalendarId = stalwartCalendarId;
+      updateData.stalwartSyncedAt = new Date();
     }
 
     updateData.updatedAt = new Date();
@@ -276,15 +461,81 @@ export class CalendarService implements ICalendarService {
           );
         }
 
+        if (
+          this.stalwartClient &&
+          existingCalendar.stalwartAccountId &&
+          existingCalendar.stalwartCalendarId &&
+          targetCalendar.stalwartCalendarId
+        ) {
+          const remoteEvents = await this.prisma.calendarEvent.findMany({
+            where: {
+              calendarId,
+              stalwartEventId: { not: null },
+            },
+            select: {
+              stalwartEventId: true,
+            },
+          });
+
+          for (const event of remoteEvents) {
+            if (!event.stalwartEventId) continue;
+            await this.stalwartClient.updateEvent({
+              accountId: existingCalendar.stalwartAccountId,
+              eventId: event.stalwartEventId,
+              patch: {
+                calendarIds: {
+                  [targetCalendar.stalwartCalendarId]: true,
+                },
+              },
+            });
+          }
+        }
+
         await this.prisma.calendarEvent.updateMany({
           where: { calendarId },
-          data: { calendarId: targetCalendarId, updatedAt: new Date() },
+          data: {
+            calendarId: targetCalendarId,
+            stalwartCalendarId: targetCalendar.stalwartCalendarId,
+            updatedAt: new Date(),
+          },
         });
+
+        if (
+          this.stalwartClient &&
+          existingCalendar.stalwartAccountId &&
+          existingCalendar.stalwartCalendarId
+        ) {
+          await this.stalwartClient.deleteCalendar(
+            existingCalendar.stalwartAccountId,
+            existingCalendar.stalwartCalendarId,
+          );
+        }
       } else {
+        if (
+          this.stalwartClient &&
+          existingCalendar.stalwartAccountId &&
+          existingCalendar.stalwartCalendarId
+        ) {
+          await this.stalwartClient.deleteCalendar(
+            existingCalendar.stalwartAccountId,
+            existingCalendar.stalwartCalendarId,
+            { removeEvents: true },
+          );
+        }
+
         await this.prisma.calendarEvent.deleteMany({
           where: { calendarId },
         });
       }
+    } else if (
+      this.stalwartClient &&
+      existingCalendar.stalwartAccountId &&
+      existingCalendar.stalwartCalendarId
+    ) {
+      await this.stalwartClient.deleteCalendar(
+        existingCalendar.stalwartAccountId,
+        existingCalendar.stalwartCalendarId,
+      );
     }
 
     if (existingCalendar.isDefault) {

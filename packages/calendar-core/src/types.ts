@@ -159,6 +159,37 @@ export interface EventParticipantInput {
   status?: EventParticipantStatus;
 }
 
+export function getCurrentUserInvitationStatus(
+  event: Pick<CalendarEvent, "userId" | "participants">,
+): EventParticipantStatus | null {
+  const participant = event.participants?.find(
+    (entry) => entry.userId === event.userId && entry.role !== "organizer",
+  );
+
+  return participant?.status ?? null;
+}
+
+export function isAwaitingUserInvitationResponse(
+  event: Pick<CalendarEvent, "userId" | "participants">,
+): boolean {
+  const status = getCurrentUserInvitationStatus(event);
+  return status === "pending" || status === "tentative";
+}
+
+export function canCurrentUserEditEvent(
+  event: Pick<CalendarEvent, "userId" | "participants">,
+): boolean {
+  const participant = event.participants?.find(
+    (entry) => entry.userId === event.userId,
+  );
+
+  if (!participant) {
+    return true;
+  }
+
+  return participant.role === "organizer";
+}
+
 export interface EventCategory {
   id: string;
   name: string;

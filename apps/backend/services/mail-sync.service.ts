@@ -72,6 +72,10 @@ type JmapChangesResponse = {
   destroyed?: string[];
 };
 
+type JmapQueryResponse = {
+  ids?: string[];
+};
+
 export type MailSyncCollection<T> = {
   oldState: string | null;
   newState: string;
@@ -399,7 +403,10 @@ export class MailSyncService {
     const existingState = await this.getSyncState(directoryEntry.id);
 
     if (!existingState) {
-      const initialized = await this.initializeSyncState(directoryEntry);
+      const initialized = await this.initializeSyncState(
+        directoryEntry,
+        input.userId,
+      );
       logger.info("Initialized mail sync state", {
         accountId,
         emailState: initialized.email.newState,
@@ -496,6 +503,7 @@ export class MailSyncService {
 
   private async initializeSyncState(
     directoryEntry: AuthorizedDirectoryEntry,
+    userId: string,
   ): Promise<MailSyncResult> {
     const [mailboxResponse, emailResponse, threadResponse] = await Promise.all([
       this.getMailboxes(directoryEntry.stalwartAccountId),
@@ -529,6 +537,14 @@ export class MailSyncService {
       select: mailSyncStateSelect,
     });
     this.cacheSyncState(persistedState);
+    const recentEmails = await this.getRecentEmails(
+      directoryEntry.stalwartAccountId,
+      50,
+    );
+    const calendarImport = await this.ingestCalendarEventsFromMail({
+      userId,
+      records: recentEmails,
+    });
 
     return {
       accountId: directoryEntry.stalwartAccountId,
@@ -547,7 +563,7 @@ export class MailSyncService {
         oldState: null,
         newState: threadResponse.state,
       }),
-      calendarImport: createEmptyMailCalendarImportSummary(),
+      calendarImport,
     };
   }
 
@@ -770,6 +786,19 @@ export class MailSyncService {
     );
 
     return response.list ?? [];
+  }
+
+  private async getRecentEmails(
+    accountId: string,
+    limit: number,
+  ): Promise<JmapEmail[]> {
+    const response = await this.callMethod<JmapQueryResponse>("Email/query", {
+      accountId,
+      sort: [{ property: "receivedAt", isAscending: false }],
+      limit,
+    });
+    const ids = response.ids ?? [];
+    return ids.length > 0 ? this.getEmails(accountId, ids) : [];
   }
 
   private async getThreads(

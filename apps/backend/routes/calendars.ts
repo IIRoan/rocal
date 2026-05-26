@@ -10,8 +10,12 @@ import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { CalendarService } from "../services/calendar.service";
+import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
 
-const calendarService = new CalendarService(prisma);
+const calendarService = new CalendarService(
+  prisma,
+  createStalwartCalendarClient(),
+);
 
 const createCalendarBodySchema = strictObject({
   name: t.String({

@@ -5,6 +5,7 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
 import { MapPinIcon } from "@phosphor-icons/react";
+import { isAwaitingUserInvitationResponse } from "@workspace/calendar-core";
 
 import {
   getBorderRadiusClasses,
@@ -95,6 +96,7 @@ function EventWrapper({
 
   const isEventInPast = isPast(displayEnd);
   const isPreview = !!(event as any).isPreview;
+  const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
   // Preview events get a distinct ghost/outline style
   if (isPreview) {
@@ -140,6 +142,7 @@ function EventWrapper({
         "cursor-pointer",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
         "data-past-event:opacity-65",
+        "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-transparent data-invitation-ghost:opacity-75",
         "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-white/15 hover:z-10",
         "active:brightness-[0.97]",
         "touch-manipulation",
@@ -153,6 +156,7 @@ function EventWrapper({
       style={getEventColorStyles(event.color)}
       data-dragging={isDragging || undefined}
       data-past-event={isEventInPast || undefined}
+      data-invitation-ghost={isInvitationGhost || undefined}
       onClick={onClick}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
@@ -365,6 +369,7 @@ export function EventItem({
       timezone,
     );
     const accentColor = resolveInlineColorValue(eventColor);
+    const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
     return (
       <button
@@ -373,10 +378,12 @@ export function EventItem({
           "hover:bg-muted/60 active:bg-muted/80",
           "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
           "data-past-event:opacity-55",
+          "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-muted/20 data-invitation-ghost:opacity-75",
           className,
         )}
         style={{ ["--ev-accent" as any]: accentColor }}
         data-past-event={isPast(new Date(event.end)) || undefined}
+        data-invitation-ghost={isInvitationGhost || undefined}
         data-event-id={event.id}
         onClick={onClick}
         onMouseDown={onMouseDown}

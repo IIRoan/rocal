@@ -20,6 +20,7 @@ export const defaultMailRealtimeService = new MailRealtimeService({
   eventSourceUrl: `${env.stalwartBaseUrl.replace(/\/+$/, "")}/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}`,
   adminToken: env.stalwartAdminToken,
   syncProvider: defaultMailSyncService,
+  receiptPollIntervalMs: 10_000,
 });
 
 async function writeChunk(
@@ -169,7 +170,7 @@ export function createRealtimeMailRoutes(
                   }
                 }
               })();
-            }, 30_000);
+            }, 10_000);
           }
 
           logger.info("Mail SSE client connected", {
