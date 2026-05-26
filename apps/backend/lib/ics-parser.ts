@@ -9,11 +9,54 @@ import { normalizeParticipantEmail } from "./event-participants";
 
 export type { IcsParseResult, ParsedIcsEvent };
 
+// Matches Google Calendar's visual separator lines e.g. -::~:~::~:~:~:~:~:~:~:~:~:~::~:~::-
+// Start and end with `-`; only `-`, `:`, `~` in between.
+const GOOGLE_INVITE_SEPARATOR_LINE = /^-[-:~]{10,}$/;
+// Pure editor boilerplate with no user-facing value
+const GOOGLE_INVITE_BOILERPLATE_LINES = [/^Please do not edit this section\./i];
+
+function cleanInviteDescriptionText(value?: string | null): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const cleaned = value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => {
+      const normalized = line.trim();
+      if (!normalized) {
+        return true;
+      }
+
+      if (GOOGLE_INVITE_SEPARATOR_LINE.test(normalized)) {
+        return false;
+      }
+
+      return !GOOGLE_INVITE_BOILERPLATE_LINES.some((pattern) =>
+        pattern.test(normalized),
+      );
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned || undefined;
+}
+
 export function parseICSFile(
   icsContent: string,
   userTimezone: string = "UTC",
 ): IcsParseResult {
-  return parseICSFileFromPackage(icsContent, userTimezone);
+  const result = parseICSFileFromPackage(icsContent, userTimezone);
+  return {
+    ...result,
+    events: result.events.map((event) => ({
+      ...event,
+      description: cleanInviteDescriptionText(event.description),
+    })),
+  };
 }
 
 export function convertParsedEventToCalendarEvent(
@@ -91,9 +134,11 @@ export function areParsedEventParticipantsDifferent(
       status:
         participant.role === "organizer"
           ? "accepted"
-          : participant.status ?? "pending",
+          : (participant.status ?? "pending"),
     }))
     .sort((left, right) => left.email.localeCompare(right.email));
 
-  return JSON.stringify(normalizedExisting) !== JSON.stringify(normalizedParsed);
+  return (
+    JSON.stringify(normalizedExisting) !== JSON.stringify(normalizedParsed)
+  );
 }

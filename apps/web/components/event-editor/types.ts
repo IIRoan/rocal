@@ -9,6 +9,10 @@ export type EventEditorFormState = ReturnType<typeof useEventForm>;
 export type EventEditorBadgeItem = ComponentProps<
   typeof EncryptionStatusBadge
 >["item"];
+export type EventEditorInvitationResponseStatus =
+  | "accepted"
+  | "declined"
+  | "tentative";
 
 export type EventEditorBodyProps = {
   calendars: Calendar[];
@@ -23,12 +27,18 @@ export type EventEditorBodyProps = {
 };
 
 export type EventEditorFooterProps = {
+  canEditEvent: boolean;
   desktop?: boolean;
   eventForm: EventEditorFormState;
   handleEventDelete: () => void;
   handleEventDownloadIcs: () => void;
   handleEventSave: () => void;
+  invitationResponsePending: EventEditorInvitationResponseStatus | null;
+  invitationStatus: EventEditorInvitationResponseStatus | null;
   isViewMode: boolean;
+  onInvitationResponse: (
+    status: EventEditorInvitationResponseStatus,
+  ) => void | Promise<void>;
   onBack?: () => void;
   onClose?: () => void;
 };

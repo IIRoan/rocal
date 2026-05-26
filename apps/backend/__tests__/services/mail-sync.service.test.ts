@@ -238,6 +238,138 @@ describe("MailSyncService", () => {
     expect(result.calendarImport).toBe(calendarImport);
   });
 
+  it("imports recent calendar invites when establishing the initial sync state", async () => {
+    const { prisma, jmapAdminClient } = createHarness();
+    const calendarImport = {
+      messagesScanned: 1,
+      icsPartsFound: 1,
+      eventsCreated: 1,
+      eventsUpdated: 0,
+      eventsDeleted: 0,
+      errors: [],
+    };
+    const mailCalendarIngestion = {
+      ingestFromEmails: jest.fn(async () => calendarImport),
+    };
+    const service = new MailSyncService(
+      prisma as never,
+      jmapAdminClient as never,
+      mailCalendarIngestion as never,
+    );
+    prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      id: "entry-1",
+      userId: "user-1",
+      stalwartAccountId: "acct-1",
+    });
+    prisma.mailJmapSyncState.findUnique.mockResolvedValue(null);
+    prisma.mailJmapSyncState.upsert.mockResolvedValue({
+      id: "sync-1",
+      directoryEntryId: "entry-1",
+      stalwartAccountId: "acct-1",
+      emailState: "email-state-1",
+      mailboxState: "mailbox-state-1",
+      threadState: "thread-state-1",
+    });
+    jmapAdminClient.callJmap.mockImplementation(
+      async ({
+        methodCalls,
+      }: {
+        methodCalls: Array<[string, Record<string, unknown>, string]>;
+      }) => {
+        const [methodName, params] = methodCalls[0]!;
+        if (methodName === "Mailbox/get") {
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  state: "mailbox-state-1",
+                  list: [],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+        if (methodName === "Thread/get") {
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  state: "thread-state-1",
+                  list: [],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+        if (methodName === "Email/query") {
+          return {
+            methodResponses: [
+              [
+                methodName,
+                {
+                  ids: ["email-1"],
+                },
+                "c1",
+              ],
+            ],
+          };
+        }
+        if (methodName === "Email/get" && Array.isArray(params.ids)) {
+          const ids = params.ids as string[];
+          return {
+            methodResponses: [
+              [
+                methodName,
+                ids.length === 0
+                  ? {
+                      state: "email-state-1",
+                      list: [],
+                    }
+                  : {
+                      state: "email-state-1",
+                      list: [
+                        {
+                          id: "email-1",
+                          subject: "Google invite",
+                          bodyValues: {
+                            calendar: { value: "BEGIN:VCALENDAR" },
+                          },
+                        },
+                      ],
+                    },
+                "c1",
+              ],
+            ],
+          };
+        }
+
+        throw new Error(`Unexpected JMAP method ${methodName}`);
+      },
+    );
+
+    const result = await service.syncForUser({
+      userId: "user-1",
+      accountId: "acct-1",
+    });
+
+    expect(mailCalendarIngestion.ingestFromEmails).toHaveBeenCalledWith({
+      userId: "user-1",
+      emails: [
+        {
+          id: "email-1",
+          subject: "Google invite",
+          bodyValues: { calendar: { value: "BEGIN:VCALENDAR" } },
+        },
+      ],
+    });
+    expect(result.initialized).toBe(true);
+    expect(result.calendarImport).toBe(calendarImport);
+  });
+
   it("syncs all known linked mail accounts for receipt-time calendar ingestion", async () => {
     const { prisma, jmapAdminClient } = createHarness();
     const calendarImport = {
