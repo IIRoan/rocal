@@ -322,11 +322,21 @@ export function MailCommandPalette({
   const [passkeyAddMode, setPasskeyAddMode] = useState(false);
 
   const { data: session, isPending: sessionLoading } = useSession();
+  const sessionUserId = session?.user?.id ?? null;
   const { settings, updateSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
 
   useEffect(() => {
-    if (settings) setLocalSettings(settings);
+    if (!settings) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLocalSettings(settings);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [settings]);
 
   const updateSetting = useCallback(
@@ -347,14 +357,13 @@ export function MailCommandPalette({
 
   const queryClient = useQueryClient();
   const accountsQuery = useQuery({
-    queryKey: ["auth", "accounts", session?.user?.id ?? null],
+    queryKey: ["auth", "accounts", sessionUserId],
     queryFn: async () => {
       if (typeof authClient.listAccounts !== "function") return [];
       return extractLinkedAuthAccounts(await authClient.listAccounts());
     },
     enabled:
-      Boolean(session?.user?.id) &&
-      typeof authClient.listAccounts === "function",
+      Boolean(sessionUserId) && typeof authClient.listAccounts === "function",
     staleTime: 5 * 60 * 1000,
   });
   const linkedAccounts = useMemo(
@@ -387,12 +396,27 @@ export function MailCommandPalette({
 
   useEffect(() => {
     if (!open) {
-      setNavHistory(["main"]);
-      setQuery("");
-      setSelectedIndex(0);
-      setPasskeyAddMode(false);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setNavHistory(["main"]);
+        setQuery("");
+        setSelectedIndex(0);
+        setPasskeyAddMode(false);
+      });
+      return () => {
+        cancelled = true;
+      };
     } else if (initialView) {
-      setNavHistory([initialView as MailPaletteView]);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setNavHistory([initialView as MailPaletteView]);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [open, initialView]);
 
@@ -463,12 +487,12 @@ export function MailCommandPalette({
 
   const handleResetEncryptionPassword = useCallback(
     async ({ newPassword }: { newPassword: string }) => {
-      if (!session?.user?.id)
+      if (!sessionUserId)
         throw new Error("Your session is unavailable. Please try again.");
       setResettingEncryptionPassword(true);
       try {
         const stored = await resetEncryptionPasswordForActiveSession(
-          session.user.id,
+          sessionUserId,
           newPassword,
         );
         if (!stored)
@@ -482,7 +506,7 @@ export function MailCommandPalette({
         setResettingEncryptionPassword(false);
       }
     },
-    [session?.user?.id],
+    [sessionUserId],
   );
 
   const handleUpdateProfile = useCallback(

@@ -90,7 +90,7 @@ export function buildEventRequest(fields: {
     ...(fields.reminder && fields.reminder > 0
       ? { reminder: fields.reminder }
       : {}),
-    ...(fields.participants && fields.participants.length > 0
+    ...(fields.participants !== undefined
       ? { participants: fields.participants }
       : {}),
   };

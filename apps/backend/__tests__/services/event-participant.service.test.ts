@@ -21,7 +21,9 @@ jest.mock("../../lib/email-client", () => ({
 import { sendAuthEmail } from "../../lib/auth-email";
 import { EventParticipantService } from "../../services/event-participant.service";
 
-const mockSendAuthEmail = sendAuthEmail as jest.MockedFunction<typeof sendAuthEmail>;
+const mockSendAuthEmail = sendAuthEmail as jest.MockedFunction<
+  typeof sendAuthEmail
+>;
 type MockUserRecord = {
   id: string;
   email: string;
@@ -201,7 +203,12 @@ describe("EventParticipantService", () => {
         status: "accepted",
         createdAt: new Date("2026-05-01T09:00:00.000Z"),
         updatedAt: new Date("2026-05-01T09:00:00.000Z"),
-        user: { id: "user-1", email: "owner@example.com", name: "Owner", image: null },
+        user: {
+          id: "user-1",
+          email: "owner@example.com",
+          name: "Owner",
+          image: null,
+        },
       },
       {
         id: "participant-attendee",
@@ -213,7 +220,12 @@ describe("EventParticipantService", () => {
         status: "pending",
         createdAt: new Date("2026-05-01T09:00:00.000Z"),
         updatedAt: new Date("2026-05-01T09:00:00.000Z"),
-        user: { id: "user-2", email: "removed@example.com", name: "Removed", image: null },
+        user: {
+          id: "user-2",
+          email: "removed@example.com",
+          name: "Removed",
+          image: null,
+        },
       },
     ];
 
@@ -221,7 +233,11 @@ describe("EventParticipantService", () => {
       user: {
         findUnique: jest
           .fn<(...args: unknown[]) => Promise<MockUserRecord | null>>()
-          .mockResolvedValue({ id: "user-1", email: "owner@example.com", name: "Owner" }),
+          .mockResolvedValue({
+            id: "user-1",
+            email: "owner@example.com",
+            name: "Owner",
+          }),
         findMany: jest
           .fn<(...args: unknown[]) => Promise<MockUserRecord[]>>()
           .mockResolvedValue([]),
@@ -253,6 +269,62 @@ describe("EventParticipantService", () => {
         }),
       }),
     );
+    expect(result.changed).toBe(true);
+  });
+
+  it("deletes stale participants when an event is updated to an empty attendee list", async () => {
+    const existingParticipants: MockParticipantRecord[] = [
+      {
+        id: "participant-attendee",
+        eventId: "event-1",
+        userId: "user-2",
+        email: "removed@example.com",
+        displayName: "Removed",
+        role: "attendee",
+        status: "pending",
+        createdAt: new Date("2026-05-01T09:00:00.000Z"),
+        updatedAt: new Date("2026-05-01T09:00:00.000Z"),
+        user: {
+          id: "user-2",
+          email: "removed@example.com",
+          name: "Removed",
+          image: null,
+        },
+      },
+    ];
+
+    const prisma = {
+      user: {
+        findUnique:
+          jest.fn<(...args: unknown[]) => Promise<MockUserRecord | null>>(),
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockUserRecord[]>>()
+          .mockResolvedValue([]),
+      },
+      eventParticipant: {
+        findMany: jest
+          .fn<(...args: unknown[]) => Promise<MockParticipantRecord[]>>()
+          .mockResolvedValueOnce(existingParticipants)
+          .mockResolvedValueOnce([]),
+        deleteMany: jest.fn(async () => ({ count: 1 })),
+        upsert: jest.fn(async () => null),
+      },
+    };
+
+    const service = new EventParticipantService(prisma as never);
+
+    const result = await service.syncParticipants({
+      eventId: "event-1",
+      participants: [],
+    });
+
+    expect(prisma.eventParticipant.deleteMany).toHaveBeenCalledWith({
+      where: {
+        eventId: "event-1",
+        email: { in: ["removed@example.com"] },
+      },
+    });
+    expect(result.participants).toEqual([]);
     expect(result.changed).toBe(true);
   });
 });

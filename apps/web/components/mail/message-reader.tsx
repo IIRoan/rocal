@@ -752,33 +752,55 @@ export function MessageReader({
   const [cancelProcessPending, setCancelProcessPending] = useState(false);
 
   useEffect(() => {
-    setReplyText("");
-    setAttachedFiles([]);
-    setEmojiPickerOpen(false);
-    setIsSendingReply(false);
-    setIsReplyExpanded(false);
-    setAttachmentHoverPreviews({});
-    setLoadingAttachmentPreviewKey(null);
-    setShowQuote(false);
-    setIsConversationCollapsed(true);
-    setInviteDeclined(false);
-    setInviteCancelled(false);
-    setCancelProcessPending(false);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setReplyText("");
+      setAttachedFiles([]);
+      setEmojiPickerOpen(false);
+      setIsSendingReply(false);
+      setIsReplyExpanded(false);
+      setAttachmentHoverPreviews({});
+      setLoadingAttachmentPreviewKey(null);
+      setShowQuote(false);
+      setIsConversationCollapsed(true);
+      setInviteDeclined(false);
+      setInviteCancelled(false);
+      setCancelProcessPending(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [message?.id]);
 
   useEffect(() => {
     if (!linkedCalendarEventId) {
-      setLinkedCalendarEvent(null);
-      return;
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setLinkedCalendarEvent(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
     let cancelled = false;
-    setLinkedCalendarEvent({
-      eventId: linkedCalendarEventId,
-      event: null,
-      loading: true,
-      error: null,
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLinkedCalendarEvent({
+          eventId: linkedCalendarEventId,
+          event: null,
+          loading: true,
+          error: null,
+        });
+      }
     });
+
+    if (cancelled) {
+      return;
+    }
 
     void calendarApiService
       .getEvent(linkedCalendarEventId)
@@ -922,7 +944,11 @@ export function MessageReader({
     // Only re-run when the invite identity changes, not on every
     // mailCalendarInvite object reference change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mailCalendarInvite?.icsContent, mailCalendarInvite?.method, mailCalendarInviteUid]);
+  }, [
+    mailCalendarInvite?.icsContent,
+    mailCalendarInvite?.method,
+    mailCalendarInviteUid,
+  ]);
 
   const currentCalendarInviteEvent = useMemo(() => {
     if (!mailCalendarInviteUid) return null;

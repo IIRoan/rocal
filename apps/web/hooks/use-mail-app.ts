@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import PostalMime, { type Attachment as ParsedMailAttachment } from "postal-mime";
+import PostalMime, {
+  type Attachment as ParsedMailAttachment,
+} from "postal-mime";
 import { createLogger } from "@workspace/logger";
 import { useSession, signOut } from "@/lib/auth-client";
 import { completeAuthNavigation } from "@/lib/auth-navigation";
@@ -158,9 +160,7 @@ function normalizeEmailAddress(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function getAttachmentSize(
-  content: MailAttachment["content"],
-): number | null {
+function getAttachmentSize(content: MailAttachment["content"]): number | null {
   if (content == null) return null;
   if (typeof content === "string") {
     return new TextEncoder().encode(content).byteLength;
@@ -275,7 +275,9 @@ function createOptimisticReplyMessage(input: {
     threadId: input.threadId ?? undefined,
     inReplyTo: input.inReplyTo,
     references: input.references,
-    mailboxIds: input.sentMailboxId ? { [input.sentMailboxId]: true } : undefined,
+    mailboxIds: input.sentMailboxId
+      ? { [input.sentMailboxId]: true }
+      : undefined,
     from: [{ email: input.fromEmail }],
     to: input.to.map((email) => ({ email })),
     subject: input.subject,
@@ -418,10 +420,7 @@ async function migrateVaultToKeyMaterial(input: {
       kdfParams: encrypted.kdfParams,
     });
   } catch (err) {
-    log.error(
-      "Background vault migration to server key material failed.",
-      err,
-    );
+    log.error("Background vault migration to server key material failed.", err);
   }
 }
 
@@ -569,7 +568,6 @@ export function useMailApp() {
   );
   const [isMailboxStatusLoading, setIsMailboxStatusLoading] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
-  const [hasAttemptedAutoOpen, setHasAttemptedAutoOpen] = useState(false);
   const [activeMailbox, setActiveMailbox] = useState<ActiveMailboxState | null>(
     null,
   );
@@ -606,6 +604,7 @@ export function useMailApp() {
   >(new Map());
   const attachmentHoverPreviewUrlsRef = useRef<Set<string>>(new Set());
   const activeMailboxRef = useRef<ActiveMailboxState | null>(null);
+  const hasAttemptedAutoOpenRef = useRef(false);
   const [composeTo, setComposeTo] = useState("");
   const [composeCc, setComposeCc] = useState("");
   const [composeBcc, setComposeBcc] = useState("");
@@ -647,8 +646,9 @@ export function useMailApp() {
   const accountUserId = session?.user?.id?.trim() ?? "";
   const mailboxEmail = mailboxStatus?.email ?? accountEmail;
 
-  // Keep the ref in sync on every render so stable callbacks always see the latest mailbox
-  activeMailboxRef.current = activeMailbox;
+  useEffect(() => {
+    activeMailboxRef.current = activeMailbox;
+  }, [activeMailbox]);
 
   // Init password from encrypted cookie (cross-tab / post-refresh)
   useEffect(() => {
@@ -668,9 +668,7 @@ export function useMailApp() {
       router.startRouteTransition({
         messageContext: "AUTH_FLOW",
       });
-      completeAuthNavigation(
-        `/login?next=${encodeURIComponent(currentPath)}`,
-      );
+      completeAuthNavigation(`/login?next=${encodeURIComponent(currentPath)}`);
     }
   }, [isSessionPending, session?.user, router]);
 
@@ -709,13 +707,21 @@ export function useMailApp() {
   useEffect(() => {
     let cancelled = false;
     if (!accountEmail || !accountUserId) {
-      setMailboxStatus(null);
-      setActiveMailbox(null);
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setMailboxStatus(null);
+        setActiveMailbox(null);
+        setIsMailboxStatusLoading(false);
+      });
       return () => {
         cancelled = true;
       };
     }
-    setIsMailboxStatusLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setIsMailboxStatusLoading(true);
+      }
+    });
     void mailDemoApiService
       .getAccountStatus()
       .then((status) => {
@@ -740,37 +746,38 @@ export function useMailApp() {
   }, [accountEmail, accountUserId]);
 
   useEffect(() => {
-    setHasAttemptedAutoOpen(false);
+    hasAttemptedAutoOpenRef.current = false;
   }, [accountUserId, mailboxStatus?.provisioned]);
 
   useEffect(() => {
     if (cachedAuthPassword && !activeMailbox && !loginPassword) {
-      setHasAttemptedAutoOpen(false);
+      hasAttemptedAutoOpenRef.current = false;
     }
   }, [activeMailbox, cachedAuthPassword, loginPassword]);
 
   // Decrypt selected message
   const selectedMailboxMessage =
     activeMailbox?.messages.find((m) => m.id === selectedMessageId) ?? null;
-  const conversationSourceMessages = useMemo(
-    () => {
-      const serverMessages = mergeConversationSourceMessages(
-        activeMailbox?.messages ?? [],
-        relatedConversationMessages,
-      );
-      const unmatchedOptimisticMessages = optimisticConversationMessages.filter(
-        (optimisticMessage) =>
-          !serverMessages.some((serverMessage) =>
-            messagesLikelyMatch(serverMessage, optimisticMessage),
-          ),
-      );
-      return mergeConversationSourceMessages(
-        serverMessages,
-        unmatchedOptimisticMessages,
-      );
-    },
-    [activeMailbox?.messages, relatedConversationMessages, optimisticConversationMessages],
-  );
+  const conversationSourceMessages = useMemo(() => {
+    const serverMessages = mergeConversationSourceMessages(
+      activeMailbox?.messages ?? [],
+      relatedConversationMessages,
+    );
+    const unmatchedOptimisticMessages = optimisticConversationMessages.filter(
+      (optimisticMessage) =>
+        !serverMessages.some((serverMessage) =>
+          messagesLikelyMatch(serverMessage, optimisticMessage),
+        ),
+    );
+    return mergeConversationSourceMessages(
+      serverMessages,
+      unmatchedOptimisticMessages,
+    );
+  }, [
+    activeMailbox?.messages,
+    relatedConversationMessages,
+    optimisticConversationMessages,
+  ]);
   const selectedConversationMessages = useMemo(() => {
     const anchorMessageId = selectedConversationMessageId ?? selectedMessageId;
     const conversation = getConversationForMessage(
@@ -803,37 +810,31 @@ export function useMailApp() {
     setSelectedConversationMessageId(messageId);
   }, []);
 
-  const appendConversationMessage = useCallback(
-    (message: JmapEmailMessage) => {
-      setOptimisticConversationMessages((current) =>
-        mergeConversationSourceMessages(current, [message]),
-      );
-    },
-    [],
-  );
+  const appendConversationMessage = useCallback((message: JmapEmailMessage) => {
+    setOptimisticConversationMessages((current) =>
+      mergeConversationSourceMessages(current, [message]),
+    );
+  }, []);
 
-  const loadConversationThread = useCallback(
-    async (threadId: string) => {
-      const mb = activeMailboxRef.current;
-      if (!mb) {
-        setRelatedConversationMessages([]);
-        setIsConversationLoading(false);
-        return;
-      }
+  const loadConversationThread = useCallback(async (threadId: string) => {
+    const mb = activeMailboxRef.current;
+    if (!mb) {
+      setRelatedConversationMessages([]);
+      setIsConversationLoading(false);
+      return;
+    }
 
-      setIsConversationLoading(true);
-      try {
-        const messages = await mb.client.getThreadMessages(mb.session, threadId);
-        setRelatedConversationMessages(messages);
-      } catch (error) {
-        log.warn("Failed to load thread messages", error);
-        setRelatedConversationMessages([]);
-      } finally {
-        setIsConversationLoading(false);
-      }
-    },
-    [],
-  );
+    setIsConversationLoading(true);
+    try {
+      const messages = await mb.client.getThreadMessages(mb.session, threadId);
+      setRelatedConversationMessages(messages);
+    } catch (error) {
+      log.warn("Failed to load thread messages", error);
+      setRelatedConversationMessages([]);
+    } finally {
+      setIsConversationLoading(false);
+    }
+  }, []);
 
   const clearConversationThread = useCallback(() => {
     setRelatedConversationMessages([]);
@@ -841,10 +842,17 @@ export function useMailApp() {
   }, []);
 
   useEffect(() => {
-    setSelectedConversationMessageId(null);
-    setOptimisticConversationMessages([]);
-    setRelatedConversationMessages([]);
-    setIsConversationLoading(false);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSelectedConversationMessageId(null);
+      setOptimisticConversationMessages([]);
+      setRelatedConversationMessages([]);
+      setIsConversationLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedMessageId]);
 
   useEffect(() => {
@@ -854,7 +862,15 @@ export function useMailApp() {
         (message) => message.id === selectedConversationMessageId,
       )
     ) {
-      setSelectedConversationMessageId(null);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setSelectedConversationMessageId(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [selectedConversationMessageId, selectedConversationMessages]);
 
@@ -881,28 +897,41 @@ export function useMailApp() {
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
     if (!selectedMessage || !mailbox) {
-      setSelectedMessagePlaintext(null);
-      setSelectedMessageDecryptedHtml(null);
-      setSelectedMessageDecryptedAttachments(null);
-      setSelectedMessageSignatureVerificationState("not_signed");
-      setSelectedMessageDecryptError(null);
-      return;
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setSelectedMessagePlaintext(null);
+        setSelectedMessageDecryptedHtml(null);
+        setSelectedMessageDecryptedAttachments(null);
+        setSelectedMessageSignatureVerificationState("not_signed");
+        setSelectedMessageDecryptError(null);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     const encState = classifyMessageEncryption(selectedMessage);
     if (encState !== "inline_pgp" && encState !== "pgp_mime") {
-      setSelectedMessagePlaintext(null);
-      setSelectedMessageDecryptedHtml(null);
-      setSelectedMessageDecryptedAttachments(null);
-      setSelectedMessageSignatureVerificationState("not_signed");
-      setSelectedMessageDecryptError(null);
-      return;
-    }
-    if (encState === "pgp_mime") {
-      setSelectedMessageDecryptedAttachments([]);
-    } else {
-      setSelectedMessageDecryptedAttachments(null);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setSelectedMessagePlaintext(null);
+        setSelectedMessageDecryptedHtml(null);
+        setSelectedMessageDecryptedAttachments(null);
+        setSelectedMessageSignatureVerificationState("not_signed");
+        setSelectedMessageDecryptError(null);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSelectedMessageDecryptedAttachments(
+        encState === "pgp_mime" ? [] : null,
+      );
+    });
     void (async () => {
       try {
         let armoredMessage: string;
@@ -1002,23 +1031,30 @@ export function useMailApp() {
     if (!selectedMessageId || !activeMailbox) return;
     const msg = activeMailbox.messages.find((m) => m.id === selectedMessageId);
     if (!msg || msg.keywords?.["$seen"]) return;
-    setActiveMailbox((cur) =>
-      cur
-        ? {
-            ...cur,
-            messages: cur.messages.map((m) =>
-              m.id === selectedMessageId
-                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
-                : m,
-            ),
-          }
-        : cur,
-    );
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setActiveMailbox((cur) =>
+        cur
+          ? {
+              ...cur,
+              messages: cur.messages.map((m) =>
+                m.id === selectedMessageId
+                  ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                  : m,
+              ),
+            }
+          : cur,
+      );
+    });
     activeMailbox.client
       .markAsRead(activeMailbox.session, selectedMessageId)
       .catch((err) => {
         log.error("Failed to mark message as read", err);
       });
+    return () => {
+      cancelled = true;
+    };
     // Only run when the selected message changes, not on every activeMailbox update
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMessageId]);
@@ -1279,15 +1315,14 @@ export function useMailApp() {
       isBusy ||
       activeMailbox ||
       !mailboxStatus ||
-      hasAttemptedAutoOpen
+      hasAttemptedAutoOpenRef.current
     )
       return;
-    setHasAttemptedAutoOpen(true);
+    hasAttemptedAutoOpenRef.current = true;
     void handleSignIn();
   }, [
     activeMailbox,
     config,
-    hasAttemptedAutoOpen,
     isBusy,
     isMailboxStatusLoading,
     isSessionPending,
@@ -1315,8 +1350,12 @@ export function useMailApp() {
         });
 
       const recipients = parseAddressList(composeTo);
-      const ccRecipients = composeCc.trim() ? parseAddressList(composeCc) : undefined;
-      const bccRecipients = composeBcc.trim() ? parseAddressList(composeBcc) : undefined;
+      const ccRecipients = composeCc.trim()
+        ? parseAddressList(composeCc)
+        : undefined;
+      const bccRecipients = composeBcc.trim()
+        ? parseAddressList(composeBcc)
+        : undefined;
 
       const draftsMailboxId = getPrimaryMailboxId(
         activeMailbox.mailboxes,
@@ -1343,7 +1382,9 @@ export function useMailApp() {
       });
 
       // Upload any file attachments before sending
-      let uploadedAttachments: import("@/lib/mail/jmap-client").JmapAttachmentInput[] | undefined;
+      let uploadedAttachments:
+        | import("@/lib/mail/jmap-client").JmapAttachmentInput[]
+        | undefined;
       if (composeAttachments.length > 0) {
         uploadedAttachments = await Promise.all(
           composeAttachments.map((file) =>
@@ -1352,20 +1393,23 @@ export function useMailApp() {
         );
       }
 
-      const sendResult = await activeMailbox.client.sendMessage(activeMailbox.session, {
-        draftsMailboxId,
-        sentMailboxId,
-        fromEmail: activeMailbox.email,
-        to: recipients,
-        cc: ccRecipients,
-        bcc: bccRecipients,
-        subject: composeSubject.trim(),
-        textBody,
-        identityId,
-        attachments: uploadedAttachments,
-        inReplyTo: composeReplyContext?.inReplyTo,
-        references: composeReplyContext?.references,
-      });
+      const sendResult = await activeMailbox.client.sendMessage(
+        activeMailbox.session,
+        {
+          draftsMailboxId,
+          sentMailboxId,
+          fromEmail: activeMailbox.email,
+          to: recipients,
+          cc: ccRecipients,
+          bcc: bccRecipients,
+          subject: composeSubject.trim(),
+          textBody,
+          identityId,
+          attachments: uploadedAttachments,
+          inReplyTo: composeReplyContext?.inReplyTo,
+          references: composeReplyContext?.references,
+        },
+      );
       const effectiveThreadId =
         sendResult?.threadId ?? composeReplyContext?.threadId ?? null;
       if (composeReplyContext) {
@@ -1539,18 +1583,21 @@ export function useMailApp() {
             : undefined;
 
         const replyContext = buildReplyContext(selectedMessage);
-        const sendResult = await activeMailbox.client.sendMessage(activeMailbox.session, {
-          draftsMailboxId,
-          sentMailboxId,
-          fromEmail: activeMailbox.email,
-          to: recipients,
-          subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
-          textBody,
-          identityId,
-          attachments,
-          inReplyTo: replyContext.inReplyTo,
-          references: replyContext.references,
-        });
+        const sendResult = await activeMailbox.client.sendMessage(
+          activeMailbox.session,
+          {
+            draftsMailboxId,
+            sentMailboxId,
+            fromEmail: activeMailbox.email,
+            to: recipients,
+            subject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
+            textBody,
+            identityId,
+            attachments,
+            inReplyTo: replyContext.inReplyTo,
+            references: replyContext.references,
+          },
+        );
         const effectiveThreadId =
           sendResult?.threadId ?? replyContext.threadId ?? null;
         appendConversationMessage(
@@ -1668,7 +1715,9 @@ export function useMailApp() {
   );
 
   const loadAttachmentHoverPreview = useCallback(
-    async (attachment: MailAttachment): Promise<MailAttachmentHoverPreview | null> => {
+    async (
+      attachment: MailAttachment,
+    ): Promise<MailAttachmentHoverPreview | null> => {
       const previewKind = resolveAttachmentPreviewKind(attachment);
       if (!previewKind) {
         return null;

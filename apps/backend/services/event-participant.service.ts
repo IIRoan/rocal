@@ -5,12 +5,15 @@ import type {
   EventParticipantRole,
   EventParticipantStatus,
 } from "@workspace/calendar-core";
-import { buildIcsEventFile, type IcsBuildEventInput } from "@workspace/calendar-ics";
+import {
+  buildIcsEventFile,
+  type IcsBuildEventInput,
+} from "@workspace/calendar-ics";
 import type { Prisma, PrismaClient } from "../generated/prisma/index.js";
 import {
   mapEventParticipant,
+  resolveParticipantInputs,
   normalizeParticipantEmail,
-  normalizeParticipantRole,
   normalizeParticipantStatus,
   type EventParticipantRecord,
   EVENT_PARTICIPANT_USER_SELECT,
@@ -51,38 +54,6 @@ type SyncEventParticipantsResult = {
    */
   sendPendingInvitations: () => Promise<void>;
 };
-
-/**
- * Merges two participant inputs for the same email address.
- * Organizer role wins over attendee; for attendees the incoming status
- * takes priority so explicit updates are never lost. Organizers are always
- * considered "accepted".
- */
-function mergeParticipants(
-  existing: EventParticipantInput | undefined,
-  next: EventParticipantInput,
-): EventParticipantInput {
-  if (!existing) {
-    return next;
-  }
-
-  const role =
-    existing.role === "organizer" || next.role === "organizer"
-      ? "organizer"
-      : "attendee";
-  const status =
-    role === "organizer"
-      ? "accepted"
-      : next.status ?? existing.status ?? "pending";
-
-  return {
-    ...existing,
-    ...next,
-    displayName: next.displayName?.trim() || existing.displayName?.trim(),
-    role,
-    status,
-  };
-}
 
 export class EventParticipantService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -128,44 +99,11 @@ export class EventParticipantService {
     input: SyncEventParticipantsInput,
   ): Promise<ResolvedParticipant[]> {
     const owner = await this.resolveOwner(client, input.ownerUserId);
-    const deduped = new Map<string, EventParticipantInput>();
-
-    if (owner) {
-      deduped.set(owner.email, {
-        email: owner.email,
-        displayName: owner.name,
-        role: "organizer",
-        status: "accepted",
-      });
-    }
-
-    for (const participant of input.participants) {
-      const email = normalizeParticipantEmail(participant.email);
-      if (!email) {
-        continue;
-      }
-
-      const role =
-        owner && email === owner.email
-          ? "organizer"
-          : normalizeParticipantRole(participant.role);
-      const status = normalizeParticipantStatus(
-        participant.status,
-        role,
-      );
-
-      deduped.set(
-        email,
-        mergeParticipants(deduped.get(email), {
-          email,
-          displayName: participant.displayName?.trim() || undefined,
-          role,
-          status,
-        }),
-      );
-    }
-
-    const emails = [...deduped.keys()];
+    const resolvedInputs = resolveParticipantInputs({
+      owner,
+      participants: input.participants,
+    });
+    const emails = resolvedInputs.map((participant) => participant.email);
     if (emails.length === 0) {
       return [];
     }
@@ -180,18 +118,19 @@ export class EventParticipantService {
     const userByEmail = new Map(
       users.map((user) => [normalizeParticipantEmail(user.email), user]),
     );
+    const participantByEmail = new Map(
+      resolvedInputs.map((participant) => [participant.email, participant]),
+    );
 
     return emails.map((email) => {
-      const participant = deduped.get(email)!;
+      const participant = participantByEmail.get(email)!;
       const matchedUser = userByEmail.get(email);
-      const role = normalizeParticipantRole(participant.role);
+      const role = participant.role === "organizer" ? "organizer" : "attendee";
 
       return {
         email,
         displayName:
-          participant.displayName?.trim() ||
-          matchedUser?.name?.trim() ||
-          email,
+          participant.displayName?.trim() || matchedUser?.name?.trim() || email,
         userId: matchedUser?.id ?? null,
         role,
         status:
@@ -207,15 +146,11 @@ export class EventParticipantService {
   ): Promise<SyncEventParticipantsResult> {
     const client = this.getClient(input.tx);
     const resolvedParticipants = await this.resolveParticipants(client, input);
-    if (!input.ownerUserId && resolvedParticipants.length === 0) {
-      return {
-        changed: false,
-        participants: [],
-        sendPendingInvitations: async () => {},
-      };
-    }
     const nextByEmail = new Map(
-      resolvedParticipants.map((participant) => [participant.email, participant]),
+      resolvedParticipants.map((participant) => [
+        participant.email,
+        participant,
+      ]),
     );
 
     const existing = await client.eventParticipant.findMany({
@@ -242,7 +177,9 @@ export class EventParticipantService {
             normalizeParticipantEmail(participant.user?.email);
           return key ? ([key, participant] as const) : null;
         })
-        .filter((entry): entry is [string, (typeof existing)[0]] => entry !== null),
+        .filter(
+          (entry): entry is [string, (typeof existing)[0]] => entry !== null,
+        ),
     );
 
     let changed = false;

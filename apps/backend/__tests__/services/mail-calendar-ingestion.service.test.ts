@@ -49,6 +49,15 @@ function createPrismaMock() {
         async () => null,
       ),
     },
+    user: {
+      findUnique: jest.fn(async () => null),
+      findMany: jest.fn(async () => []),
+    },
+    eventParticipant: {
+      findMany: jest.fn(async () => []),
+      deleteMany: jest.fn(async () => ({ count: 0 })),
+      upsert: jest.fn(async () => null),
+    },
     calendarEvent: {
       findMany: jest.fn<() => Promise<CalendarEvent[]>>(async () => []),
       create: jest.fn(async (input: unknown) => input),
@@ -324,6 +333,7 @@ describe("MailCalendarIngestionService", () => {
       syncParticipants: jest.fn(async () => ({
         changed: true,
         participants: [],
+        sendPendingInvitations: jest.fn(async () => undefined),
       })),
     };
     const service = new MailCalendarIngestionService(
@@ -500,6 +510,59 @@ describe("MailCalendarIngestionService", () => {
       eventId: "remote-event-1",
       sendSchedulingMessages: false,
     });
+  });
+
+  it("defers participant invitations until the full import batch succeeds", async () => {
+    const prisma = createPrismaMock();
+    const sendPendingInvitations = jest.fn(async () => undefined);
+    const eventParticipantService = {
+      syncParticipants: jest.fn(async () => ({
+        changed: true,
+        participants: [],
+        sendPendingInvitations,
+      })),
+    };
+    prisma.calendarEvent.create
+      .mockResolvedValueOnce({ id: "event-1" })
+      .mockRejectedValueOnce(new Error("db down"));
+    const service = new MailCalendarIngestionService(
+      prisma as never,
+      eventParticipantService as never,
+    );
+    const batchedIcs = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:invite-1@example.com",
+      "DTSTART:20260527T100000Z",
+      "DTEND:20260527T110000Z",
+      "SUMMARY:First invite",
+      "DESCRIPTION:Discuss roadmap",
+      "LOCATION:Amsterdam",
+      "ATTENDEE;CN=teammate;PARTSTAT=NEEDS-ACTION:mailto:teammate@example.com",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:invite-2@example.com",
+      "DTSTART:20260528T100000Z",
+      "DTEND:20260528T110000Z",
+      "SUMMARY:Second invite",
+      "DESCRIPTION:Discuss roadmap",
+      "LOCATION:Amsterdam",
+      "ATTENDEE;CN=teammate;PARTSTAT=NEEDS-ACTION:mailto:teammate@example.com",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const summary = await service.ingestIcsContent({
+      userId: "user-1",
+      icsContent: batchedIcs,
+      sourceId: "Batch import",
+    });
+
+    expect(summary.errors).toEqual(["Batch import: db down"]);
+    expect(eventParticipantService.syncParticipants).toHaveBeenCalledTimes(1);
+    expect(sendPendingInvitations).not.toHaveBeenCalled();
   });
 
   it("applies REPLY updates to existing Stalwart-backed invitations", async () => {

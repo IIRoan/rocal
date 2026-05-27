@@ -87,7 +87,7 @@ export function EventEditorPopover({
   React.useLayoutEffect(() => {
     if (!open || !anchorPosition) {
       if (!open) {
-        setPosition(null);
+        queueMicrotask(() => setPosition(null));
         positionRef.current = null;
       }
 
