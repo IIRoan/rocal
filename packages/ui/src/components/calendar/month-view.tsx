@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
+import { cn } from "../../lib/utils";
 import { useDidMount } from "rooks";
 import {
   addDays,
@@ -244,7 +246,14 @@ export function MonthView({
                                       )}{" "}
                                     </span>
                                   )}
-                                  {event.title}
+                                  <span
+                                    className={cn(
+                                      isCancelledCalendarEvent(event) &&
+                                        "line-through opacity-70",
+                                    )}
+                                  >
+                                    {event.title}
+                                  </span>
                                 </div>
                               </EventItem>
                             </div>

@@ -9,15 +9,16 @@ import { EventService } from "../services/event.service";
 import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 
+const stalwartClient = createStalwartCalendarClient();
 const eventService = new EventService(
   prisma,
   undefined,
-  createStalwartCalendarClient(),
+  stalwartClient,
 );
 const mailCalendarIngestionService = new MailCalendarIngestionService(
   prisma,
   undefined,
-  createStalwartCalendarClient(),
+  stalwartClient,
 );
 
 const eventParticipantSchema = strictObject({

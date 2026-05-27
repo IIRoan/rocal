@@ -53,6 +53,7 @@ function createPrismaMock() {
       findMany: jest.fn<() => Promise<CalendarEvent[]>>(async () => []),
       create: jest.fn(async (input: unknown) => input),
       update: jest.fn(async (input: unknown) => input),
+      updateMany: jest.fn(async () => ({ count: 0 })),
       deleteMany: jest.fn(async () => ({ count: 0 })),
     },
   };
@@ -123,6 +124,7 @@ function createExistingEvent(
     reminder: null,
     recurrence: null,
     parentEventId: null,
+    isCancelled: false,
     isSynced: false,
     externalId: "invite-1@example.com",
     subscriptionId: null,
@@ -256,9 +258,9 @@ describe("MailCalendarIngestionService", () => {
     });
   });
 
-  it("deletes matching events for CANCEL messages", async () => {
+  it("marks matching events as cancelled for CANCEL messages", async () => {
     const prisma = createPrismaMock();
-    prisma.calendarEvent.deleteMany.mockResolvedValueOnce({ count: 1 });
+    prisma.calendarEvent.updateMany.mockResolvedValueOnce({ count: 1 });
     const service = new MailCalendarIngestionService(prisma as never);
 
     const summary = await service.ingestFromEmails({
@@ -275,13 +277,17 @@ describe("MailCalendarIngestionService", () => {
       ],
     });
 
-    expect(summary.eventsDeleted).toBe(1);
-    expect(prisma.calendarEvent.deleteMany).toHaveBeenCalledWith({
+    expect(summary.eventsUpdated).toBe(1);
+    expect(summary.eventsDeleted).toBe(0);
+    expect(prisma.calendarEvent.updateMany).toHaveBeenCalledWith({
       where: {
         userId: "user-1",
         externalId: "invite-1@example.com",
         subscriptionId: null,
       },
+      data: expect.objectContaining({
+        isCancelled: true,
+      }),
     });
   });
 

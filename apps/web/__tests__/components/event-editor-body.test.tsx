@@ -28,6 +28,13 @@ jest.mock("@workspace/ui/components/ui/avatar", () => ({
     <span>{children}</span>
   ),
 }));
+jest.mock("@workspace/ui/components/ui/alert", () => ({
+  Alert: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDescription: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
 
 jest.mock("@workspace/ui/components/ui/calendar", () => ({
   Calendar: () => null,
@@ -216,5 +223,72 @@ describe("EventEditorBody", () => {
     expect(
       container.querySelector('div[aria-label="owner@example.com"]'),
     ).not.toBeNull();
+  });
+
+  it("shows a cancelled banner for cancelled events in view mode", async () => {
+    await act(async () => {
+      root.render(
+        <EventEditorBody
+          calendars={[
+            {
+              id: "cal-1",
+              name: "Primary",
+              color: "blue",
+              kind: "owned",
+              isPublic: false,
+              isVisible: true,
+              isDefault: true,
+              isSyncOnly: false,
+              userId: "user-1",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ]}
+          desktop={true}
+          isViewMode={true}
+          localSettings={{ timeFormat: "24h" } as any}
+          setShowDescription={() => {}}
+          setShowLocation={() => {}}
+          showDescription={true}
+          showLocation={true}
+          eventForm={
+            {
+              eventAllDay: false,
+              eventCalendarId: "cal-1",
+              eventDescription: "",
+              eventEndDate: new Date("2026-05-27T11:00:00.000Z"),
+              eventEndTime: "11:00",
+              eventLocation: "",
+              eventNotifications: [],
+              eventParticipants: [],
+              eventStartDate: new Date("2026-05-27T10:00:00.000Z"),
+              eventStartTime: "10:00",
+              eventTitle: "Planning sync",
+              eventViewMode: "view",
+              isRecurring: false,
+              notificationsLoading: false,
+              recurrenceRule: null,
+              selectedEvent: {
+                id: "event-1",
+                calendarId: "cal-1",
+                title: "Planning sync",
+                start: new Date("2026-05-27T10:00:00.000Z"),
+                end: new Date("2026-05-27T11:00:00.000Z"),
+                userId: "user-1",
+                isCancelled: true,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              showNotifications: false,
+            } as any
+          }
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Cancelled event");
+    expect(container.textContent).toContain(
+      "It stays on your calendar until you remove it.",
+    );
   });
 });

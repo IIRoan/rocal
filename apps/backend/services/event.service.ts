@@ -935,7 +935,16 @@ export class EventService implements IEventService {
       throw new ValidationError("External event id is required", "externalId");
     }
 
-    let event = await this.prisma.calendarEvent.findFirst({
+    const stalwartAccountId = await this.getStalwartAccountId(userId);
+    if (stalwartAccountId) {
+      await this.syncStalwartEventByUid({
+        userId,
+        accountId: stalwartAccountId,
+        uid: normalizedExternalId,
+      });
+    }
+
+    const event = await this.prisma.calendarEvent.findFirst({
       where: {
         userId,
         externalId: normalizedExternalId,
@@ -953,33 +962,6 @@ export class EventService implements IEventService {
         },
       },
     });
-
-    const stalwartAccountId = await this.getStalwartAccountId(userId);
-    if (stalwartAccountId) {
-      await this.syncStalwartEventByUid({
-        userId,
-        accountId: stalwartAccountId,
-        uid: normalizedExternalId,
-      });
-      event = await this.prisma.calendarEvent.findFirst({
-        where: {
-          userId,
-          externalId: normalizedExternalId,
-          subscriptionId: null,
-        },
-        include: {
-          category: true,
-          calendar: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
-      });
-    }
 
     if (!event) {
       return null;
@@ -1561,7 +1543,10 @@ export class EventService implements IEventService {
         );
       }
 
-      if (this.isAttendeeCopyForUser(userId, existingEvent.participants)) {
+      if (
+        this.isAttendeeCopyForUser(userId, existingEvent.participants) &&
+        !existingEvent.isCancelled
+      ) {
         throw new ValidationError(
           "Imported invitation events are read-only for attendees.",
         );
@@ -2154,7 +2139,10 @@ export class EventService implements IEventService {
         );
       }
 
-      if (this.isAttendeeCopyForUser(userId, existingEvent.participants)) {
+      if (
+        this.isAttendeeCopyForUser(userId, existingEvent.participants) &&
+        !existingEvent.isCancelled
+      ) {
         throw new ValidationError(
           "Imported invitation events are read-only for attendees.",
         );
@@ -2241,8 +2229,10 @@ export class EventService implements IEventService {
         );
       }
 
-      const attendeeEvents = events.filter((event) =>
-        this.isAttendeeCopyForUser(userId, event.participants),
+      const attendeeEvents = events.filter(
+        (event) =>
+          this.isAttendeeCopyForUser(userId, event.participants) &&
+          !event.isCancelled,
       );
       if (attendeeEvents.length > 0) {
         throw new ValidationError(

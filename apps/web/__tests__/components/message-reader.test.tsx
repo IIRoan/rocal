@@ -9,6 +9,10 @@ import {
   it,
   jest,
 } from "@jest/globals";
+import {
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
 
 // jsdom does not implement matchMedia
@@ -25,6 +29,8 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: jest.fn(),
   })),
 });
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Mock clipboard API
 Object.defineProperty(navigator, "clipboard", {
@@ -228,6 +234,7 @@ jest.mock("../../lib/calendar-api-service", () => ({
     getInvitationByExternalId: jest.fn(),
     importInvitationIcs: jest.fn(),
     respondToInvitation: jest.fn(),
+    deleteEvent: jest.fn(),
   },
 }));
 
@@ -271,11 +278,13 @@ const defaultProps: MessageReaderProps = {
 
 let container: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
 
 beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  queryClient = new QueryClient();
   mockCalendarApiService.getEvent.mockResolvedValue({
     id: "event-1",
     title: "Planning sync",
@@ -302,6 +311,11 @@ beforeEach(() => {
   mockCalendarApiService.respondToInvitation.mockResolvedValue({
     id: "event-1",
   } as any);
+  mockCalendarApiService.deleteEvent.mockResolvedValue({
+    success: true,
+    message: "Event deleted successfully",
+    deletedEventId: "event-1",
+  } as any);
 });
 
 afterEach(() => {
@@ -314,7 +328,11 @@ afterEach(() => {
 
 function render(props: Partial<MessageReaderProps> = {}) {
   act(() => {
-    root.render(<MessageReader {...defaultProps} {...props} />);
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <MessageReader {...defaultProps} {...props} />
+      </QueryClientProvider>,
+    );
   });
 }
 
@@ -370,22 +388,24 @@ describe("MessageReader — linked calendar event", () => {
   it("fetches and injects event details for Solace reminder mail", async () => {
     await act(async () => {
       root.render(
-        <MessageReader
-          {...defaultProps}
-          message={
-            {
-              ...baseMessage,
-              subject: "Reminder: Planning sync",
-              bodyValues: {
-                "1": {
-                  value:
-                    "Your event starts soon.\nEvent ID: event-1\nOpen it in Solace.",
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "Reminder: Planning sync",
+                bodyValues: {
+                  "1": {
+                    value:
+                      "Your event starts soon.\nEvent ID: event-1\nOpen it in Solace.",
+                  },
                 },
-              },
-            } as any
-          }
-          plaintext={"Your event starts soon.\nEvent ID: event-1"}
-        />,
+              } as any
+            }
+            plaintext={"Your event starts soon.\nEvent ID: event-1"}
+          />
+        </QueryClientProvider>,
       );
       await Promise.resolve();
     });
@@ -415,49 +435,53 @@ describe("MessageReader — linked calendar event", () => {
       "END:VCALENDAR",
     ].join("\r\n");
 
-    mockCalendarApiService.getInvitationByExternalId.mockResolvedValue({
-      id: "event-1",
-      title: "testinvite6",
-      description: null,
-      start: new Date("2026-05-27T15:00:00Z"),
-      end: new Date("2026-05-27T16:00:00Z"),
-      allDay: false,
-      location: "google event",
-      calendarId: "cal-1",
-      calendar: { id: "cal-1", name: "Work" },
-      userId: "user-1",
-      participants: [
-        {
-          userId: "user-1",
-          email: "bob@example.com",
-          role: "attendee",
-          status: "pending",
-        },
-      ],
-      createdAt: new Date("2026-05-01T00:00:00Z"),
-      updatedAt: new Date("2026-05-01T00:00:00Z"),
-    } as any);
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "event-1",
+        title: "testinvite6",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: "google event",
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        participants: [
+          {
+            userId: "user-1",
+            email: "bob@example.com",
+            role: "attendee",
+            status: "pending",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any);
 
     await act(async () => {
       root.render(
-        <MessageReader
-          {...defaultProps}
-          message={
-            {
-              ...baseMessage,
-              subject: "google event",
-              bodyValues: {},
-            } as any
-          }
-          plaintext={"Invitation from Google Calendar"}
-          attachments={[
-            {
-              name: "invite.ics",
-              type: "text/calendar; method=REQUEST",
-              content: icsContent,
-            },
-          ]}
-        />,
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "google event",
+                bodyValues: {},
+              } as any
+            }
+            plaintext={"Invitation from Google Calendar"}
+            attachments={[
+              {
+                name: "invite.ics",
+                type: "text/calendar; method=REQUEST",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
       );
       await Promise.resolve();
       await Promise.resolve();
@@ -469,11 +493,120 @@ describe("MessageReader — linked calendar event", () => {
     expect(
       mockCalendarApiService.getInvitationByExternalId,
     ).toHaveBeenCalledWith("google-event-1@example.com");
-    expect(container.textContent).toContain("Calendar invitation");
     expect(container.textContent).toContain("testinvite6");
     expect(
       container.querySelector('a[href="/calendar?eventId=event-1"]'),
     ).not.toBeNull();
+  });
+
+  it("auto-processes CANCEL invites for already accepted events", async () => {
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "METHOD:CANCEL",
+      "BEGIN:VEVENT",
+      "UID:google-event-1@example.com",
+      "DTSTART:20260527T150000Z",
+      "DTEND:20260527T160000Z",
+      "SUMMARY:testinvite6",
+      "LOCATION:google event",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce({
+        id: "event-1",
+        title: "testinvite6",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: "google event",
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        participants: [
+          {
+            userId: "user-1",
+            email: "bob@example.com",
+            role: "attendee",
+            status: "accepted",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any)
+      .mockResolvedValueOnce({
+        id: "event-1",
+        title: "testinvite6",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: "google event",
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        isCancelled: true,
+        participants: [
+          {
+            userId: "user-1",
+            email: "bob@example.com",
+            role: "attendee",
+            status: "accepted",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any);
+    mockCalendarApiService.importInvitationIcs.mockResolvedValueOnce({
+      messagesScanned: 1,
+      icsPartsFound: 1,
+      eventsCreated: 0,
+      eventsUpdated: 1,
+      eventsDeleted: 0,
+      errors: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "google event cancelled",
+                bodyValues: {},
+              } as any
+            }
+            plaintext={"Cancellation from Google Calendar"}
+            attachments={[
+              {
+                name: "cancel.ics",
+                type: "text/calendar; method=CANCEL",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
+      icsContent,
+    );
+    expect(
+      mockCalendarApiService.getInvitationByExternalId,
+    ).toHaveBeenNthCalledWith(1, "google-event-1@example.com");
+    expect(
+      mockCalendarApiService.getInvitationByExternalId,
+    ).toHaveBeenNthCalledWith(2, "google-event-1@example.com");
+    expect(container.textContent).toContain("Cancelled invitation");
+    expect(container.textContent).toContain("Remove from calendar");
   });
 });
 

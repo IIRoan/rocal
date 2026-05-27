@@ -1,8 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   NotificationManager,
   formatEventDescription,
 } from "@workspace/ui/components/calendar";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/ui/alert";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
   Avatar,
@@ -43,6 +49,7 @@ import {
   FileText,
   Mail,
   MapPin,
+  AlertTriangle,
   PenOff,
   RefreshCw,
   RotateCcw,
@@ -52,6 +59,7 @@ import {
   X,
 } from "lucide-react";
 import type { EventParticipantInput } from "@workspace/calendar-core";
+import { normalizeParticipantEmail } from "@workspace/calendar-core";
 
 import { RecurringEventForm } from "../command-palette/recurring-event-form";
 import { stopEventPropagation } from "@/lib/event-propagation";
@@ -164,10 +172,6 @@ function getParticipantInitials(
   );
 }
 
-function normalizeParticipantEmail(email: string) {
-  return email.trim().replace(/^mailto:/i, "").toLowerCase();
-}
-
 export function EventEditorBody({
   calendars,
   desktop,
@@ -252,8 +256,11 @@ export function EventEditorBody({
         }),
     [eventForm.eventParticipants, participantProfileByEmail],
   );
+  const isCancelledEvent = eventForm.selectedEvent
+    ? isCancelledCalendarEvent(eventForm.selectedEvent)
+    : false;
 
-  const addParticipant = () => {
+  const addParticipant = useCallback(() => {
     const email = normalizeParticipantEmail(participantDraft);
     if (!email) {
       setParticipantError("Enter an email address first.");
@@ -280,24 +287,52 @@ export function EventEditorBody({
         status: "pending",
       },
     ]);
-  };
+  }, [participantDraft, participantItems, eventForm]);
 
-  const removeParticipant = (email: string) => {
-    eventForm.setEventParticipants(
-      participantItems.filter((participant) => participant.email !== email),
-    );
-  };
+  const removeParticipant = useCallback(
+    (email: string) => {
+      eventForm.setEventParticipants(
+        participantItems.filter((participant) => participant.email !== email),
+      );
+    },
+    [participantItems, eventForm],
+  );
 
   return (
     <div className={bodyClass}>
       {isViewMode ? (
         <div className="py-1.5">
+          {isCancelledEvent && (
+            <div className="px-2 pb-2">
+              <Alert className="border-destructive/25 bg-destructive/[0.05]">
+                <AlertTriangle className="text-destructive" />
+                <AlertTitle className="text-destructive">
+                  Cancelled event
+                </AlertTitle>
+                <AlertDescription>
+                  <p>
+                    The organiser cancelled this event. It stays on your
+                    calendar until you remove it.
+                  </p>
+                  <p className="text-xs">
+                    You can still review the original details below.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
           <div className="px-2">
             <div className="flex items-center gap-3 p-2.5">
               <div className="flex items-center justify-center size-6 shrink-0">
                 <CalendarIcon className="size-4 text-muted-foreground" />
               </div>
-              <span className="text-sm font-medium truncate flex-1 min-w-0">
+              <span
+                className={
+                  isCancelledEvent
+                    ? "text-sm font-medium truncate flex-1 min-w-0 line-through text-muted-foreground"
+                    : "text-sm font-medium truncate flex-1 min-w-0"
+                }
+              >
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
               {eventForm.selectedEvent?.id &&

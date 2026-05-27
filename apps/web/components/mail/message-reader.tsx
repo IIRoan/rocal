@@ -748,6 +748,8 @@ export function MessageReader({
   const [inviteResponsePending, setInviteResponsePending] =
     useState<InvitationResponseStatus | null>(null);
   const [inviteDeclined, setInviteDeclined] = useState(false);
+  const [inviteCancelled, setInviteCancelled] = useState(false);
+  const [cancelProcessPending, setCancelProcessPending] = useState(false);
 
   useEffect(() => {
     setReplyText("");
@@ -760,6 +762,8 @@ export function MessageReader({
     setShowQuote(false);
     setIsConversationCollapsed(true);
     setInviteDeclined(false);
+    setInviteCancelled(false);
+    setCancelProcessPending(false);
   }, [message?.id]);
 
   useEffect(() => {
@@ -818,17 +822,57 @@ export function MessageReader({
 
     void (async () => {
       try {
-        // Check if we already have this event — if so, just refresh status
-        // without re-importing so we don't overwrite the user's RSVP response.
         const existing = await calendarApiService.getInvitationByExternalId(
           mailCalendarInviteUid,
         );
         if (cancelled) return;
 
+        if (mailCalendarInvite?.method === "CANCEL") {
+          const importSummary = mailCalendarInvite.icsContent
+            ? await calendarApiService.importInvitationIcs(
+                mailCalendarInvite.icsContent,
+              )
+            : null;
+          if (cancelled) return;
+
+          void queryClient.invalidateQueries({ queryKey: ["events"] });
+
+          const event = existing
+            ? await calendarApiService.getInvitationByExternalId(
+                mailCalendarInviteUid,
+              )
+            : null;
+          if (cancelled) return;
+
+          setInviteCancelled(false);
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event,
+            loading: false,
+            error:
+              !event && importSummary && importSummary.errors.length > 0
+                ? (importSummary.errors[0] ??
+                  "Unable to process cancellation details.")
+                : null,
+          });
+          return;
+        }
+
         if (existing) {
           setCalendarInviteEvent({
             eventId: mailCalendarInviteUid,
             event: existing,
+            loading: false,
+            error: null,
+          });
+          return;
+        }
+
+        // For CANCEL: event is not in calendar — nothing to import.
+        if (mailCalendarInvite?.method === "CANCEL") {
+          setCalendarInviteEvent({
+            eventId: mailCalendarInviteUid,
+            event: null,
             loading: false,
             error: null,
           });
@@ -875,10 +919,10 @@ export function MessageReader({
     return () => {
       cancelled = true;
     };
-    // Only re-run when the invite UID changes (new mail opened), not on every
-    // mailCalendarInvite object reference change which would re-import and reset RSVP.
+    // Only re-run when the invite identity changes, not on every
+    // mailCalendarInvite object reference change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mailCalendarInviteUid]);
+  }, [mailCalendarInvite?.icsContent, mailCalendarInvite?.method, mailCalendarInviteUid]);
 
   const currentCalendarInviteEvent = useMemo(() => {
     if (!mailCalendarInviteUid) return null;
@@ -893,6 +937,8 @@ export function MessageReader({
     };
   }, [calendarInviteEvent, mailCalendarInviteUid]);
   const calendarInviteResponseEventId =
+    currentCalendarInviteEvent?.event?.id ?? null;
+  const calendarCancellationEventId =
     currentCalendarInviteEvent?.event?.id ?? null;
 
   const handleInvitationResponse = useCallback(
@@ -942,6 +988,30 @@ export function MessageReader({
     },
     [calendarInviteResponseEventId, mailCalendarInviteUid, queryClient],
   );
+
+  const handleCancelRemove = useCallback(async () => {
+    if (!calendarCancellationEventId || !mailCalendarInviteUid) return;
+
+    setCancelProcessPending(true);
+    try {
+      await calendarApiService.deleteEvent(calendarCancellationEventId);
+      void queryClient.invalidateQueries({ queryKey: ["events"] });
+      setInviteCancelled(true);
+      setCalendarInviteEvent({
+        eventId: mailCalendarInviteUid,
+        event: null,
+        loading: false,
+        error: null,
+      });
+      toast.success("Cancelled event removed from your calendar.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to remove event.",
+      );
+    } finally {
+      setCancelProcessPending(false);
+    }
+  }, [calendarCancellationEventId, mailCalendarInviteUid, queryClient]);
 
   const displayAttachments = useMemo<MailAttachment[]>(
     () => attachments ?? message?.attachments ?? [],
@@ -2647,6 +2717,109 @@ export function MessageReader({
       </div>
     );
 
+  const shouldShowCalendarCancellationCard =
+    mailCalendarInvite?.method === "CANCEL";
+  const calendarCancellationCard = shouldShowCalendarCancellationCard &&
+    mailCalendarInvite && (
+      <div className="mx-4 mb-2 overflow-hidden rounded-xl border border-destructive/20 bg-card shadow-sm">
+        <div className="border-b border-destructive/10 bg-destructive/[0.06] px-4 py-3">
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <CalendarDays className="size-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold text-foreground">
+                  Cancelled invitation
+                </div>
+                <span className="inline-flex items-center rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                  Cancelled
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                The organiser sent a cancellation update for this event. Solace
+                keeps it visible until you remove it yourself.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-muted-foreground line-through leading-snug decoration-destructive/50">
+              {mailCalendarInvite.title}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {mailCalendarInvite.start && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-1">
+                  <Clock className="size-3" />
+                  <span className="line-through">
+                    {mailCalendarInvite.start.toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                      hour12:
+                        timeFormat === "12h"
+                          ? true
+                          : timeFormat === "24h"
+                            ? false
+                            : undefined,
+                      timeZone: timezone ?? undefined,
+                    })}
+                  </span>
+                </span>
+              )}
+              {mailCalendarInvite.location && (
+                <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted/60 px-2 py-1">
+                  <MapPin className="size-3 shrink-0" />
+                  <span className="max-w-[220px] truncate line-through">
+                    {mailCalendarInvite.location}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
+            {currentCalendarInviteEvent?.loading ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" />
+                Checking calendar…
+              </span>
+            ) : inviteCancelled ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-400">
+                <Check className="size-3" />
+                Removed from your calendar
+              </span>
+            ) : currentCalendarInviteEvent?.event ? (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  This cancelled copy is still on your calendar.
+                </span>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={cancelProcessPending}
+                  onClick={() => void handleCancelRemove()}
+                  className="ml-auto gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  {cancelProcessPending ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3" />
+                  )}
+                  Remove from calendar
+                </Button>
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                This cancellation was already applied in your calendar.
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+
   const bodyContent = renderAsHtml ? (
     <div className="flex-1 min-h-0 mx-4 mb-2 rounded-lg border border-border/50 overflow-hidden flex flex-col">
       {blockRemoteImages && (
@@ -2972,6 +3145,7 @@ export function MessageReader({
       {header}
       {conversationStrip}
       {calendarInviteCard}
+      {calendarCancellationCard}
       {linkedEventCard}
       {bodyContent}
       {replyBar}

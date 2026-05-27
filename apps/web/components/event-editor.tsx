@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { canCurrentUserEditEvent } from "@workspace/calendar-core";
-import { getCurrentUserInvitationStatus } from "@workspace/calendar-core";
+import {
+  canCurrentUserEditEvent,
+  getCurrentUserInvitationStatus,
+  isCancelledCalendarEvent,
+} from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
 import {
@@ -212,13 +215,6 @@ export function EventEditor({
     }
     void saveEvent(calendarData);
   }, [calendarData, saveEvent, selectedEvent]);
-  const handleEventDelete = useCallback(() => {
-    if (selectedEvent && !canCurrentUserEditEvent(selectedEvent)) {
-      toast.error("Imported invitation events are read-only for attendees.");
-      return;
-    }
-    void deleteEvent(calendarData);
-  }, [calendarData, deleteEvent, selectedEvent]);
   const handleRecurringDeleteThis = useCallback(
     () => deleteRecurringThis(calendarData),
     [calendarData, deleteRecurringThis],
@@ -291,6 +287,29 @@ export function EventEditor({
     () => (selectedEvent ? canCurrentUserEditEvent(selectedEvent) : true),
     [selectedEvent],
   );
+  const isCancelledSelectedEvent = useMemo(
+    () => (selectedEvent ? isCancelledCalendarEvent(selectedEvent) : false),
+    [selectedEvent],
+  );
+  const canDeleteSelectedEvent = useMemo(() => {
+    if (!selectedEvent?.id || selectedEvent.isSynced) {
+      return false;
+    }
+
+    return canEditSelectedEvent || isCancelledSelectedEvent;
+  }, [canEditSelectedEvent, isCancelledSelectedEvent, selectedEvent]);
+  const handleEventDelete = useCallback(() => {
+    if (selectedEvent && !canDeleteSelectedEvent) {
+      toast.error("Imported invitation events are read-only for attendees.");
+      return;
+    }
+    void deleteEvent(calendarData);
+  }, [
+    calendarData,
+    canDeleteSelectedEvent,
+    deleteEvent,
+    selectedEvent,
+  ]);
   const invitationStatus = useMemo(() => {
     if (!selectedEvent || canEditSelectedEvent) {
       return null;

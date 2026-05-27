@@ -777,7 +777,9 @@ export function useEventForm({
   );
 
   // Delete event
-  const handleEventDelete = useCallback(
+  const handleEventDelete = useCallback<
+    (calendarData: any) => Promise<void>
+  >(
     async (calendarData: any) => {
       if (!selectedEvent?.id) return;
 

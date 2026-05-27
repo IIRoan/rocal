@@ -52,6 +52,7 @@ function eventFixture(overrides: Record<string, unknown> = {}) {
     isPrivate: false,
     reminder: null,
     recurrence: null,
+    isCancelled: false,
     calendarId: "calendar-1",
     categoryId: null,
     userId: "user-1",
@@ -828,5 +829,46 @@ describe("EventService Stalwart integration", () => {
     expect(stalwartClient.listCalendars).not.toHaveBeenCalled();
     expect(prisma.calendar.create).not.toHaveBeenCalled();
     expect(prisma.calendar.update).not.toHaveBeenCalled();
+  });
+
+  it("allows attendees to delete cancelled invitation copies", async () => {
+    const prisma = {
+      calendarEvent: {
+        findFirst: jest.fn(async () =>
+          eventFixture({
+            isCancelled: true,
+            participants: [
+              {
+                id: "participant-self",
+                eventId: "event-1",
+                userId: "user-1",
+                email: "testingprod15@solace.onl",
+                displayName: "Test User",
+                role: "attendee",
+                status: "accepted",
+              },
+            ],
+          }),
+        ),
+        delete: jest.fn(async () => undefined),
+      },
+      eventNotification: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
+      notificationLog: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
+    };
+    const service = new EventService(prisma as never);
+
+    await expect(service.delete("user-1", "event-1")).resolves.toEqual(
+      expect.objectContaining({
+        success: true,
+        deletedEventId: "event-1",
+      }),
+    );
+    expect(prisma.calendarEvent.delete).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+    });
   });
 });
