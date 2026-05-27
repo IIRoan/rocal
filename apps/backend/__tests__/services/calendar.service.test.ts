@@ -323,4 +323,21 @@ describe("CalendarService", () => {
       where: { id: "calendar-1" },
     });
   });
+
+  it("lists local calendars without syncing remote Stalwart calendars", async () => {
+    const stalwartClient = createMockStalwartClient();
+    const localCalendar = calendarFixture({
+      stalwartAccountId: "acct-1",
+      stalwartCalendarId: "remote-cal-1",
+    });
+    mockPrisma.calendar.findMany.mockResolvedValueOnce([localCalendar] as never);
+    service = new CalendarService(mockPrisma as never, stalwartClient);
+
+    const result = await service.list("user-1");
+
+    expect(stalwartClient.listCalendars).not.toHaveBeenCalled();
+    expect(mockPrisma.calendar.create).not.toHaveBeenCalled();
+    expect(mockPrisma.calendar.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ calendars: [localCalendar] });
+  });
 });

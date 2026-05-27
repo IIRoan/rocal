@@ -172,63 +172,6 @@ export class EventService implements IEventService {
     return remote.id;
   }
 
-  private async syncStalwartCalendarsFromRemote(
-    userId: string,
-    accountId: string,
-  ): Promise<void> {
-    if (!this.stalwartClient) return;
-
-    const [remoteCalendars, localCalendars] = await Promise.all([
-      this.stalwartClient.listCalendars(accountId),
-      this.prisma.calendar.findMany({ where: { userId } }),
-    ]);
-    const localByRemoteId = new Map(
-      localCalendars
-        .filter((calendar) => calendar.stalwartCalendarId)
-        .map((calendar) => [calendar.stalwartCalendarId!, calendar]),
-    );
-    const localNames = new Set(
-      localCalendars.map((calendar) => calendar.name.trim().toLowerCase()),
-    );
-
-    for (const remote of remoteCalendars) {
-      const name = remote.name?.trim() || "Stalwart Calendar";
-      const existing = localByRemoteId.get(remote.id);
-      const data = {
-        name,
-        color: remote.color?.trim() || "#10b981",
-        isVisible: remote.isVisible ?? true,
-        isDefault: remote.isDefault ?? false,
-        stalwartAccountId: accountId,
-        stalwartCalendarId: remote.id,
-        stalwartSyncedAt: new Date(),
-      };
-
-      if (existing) {
-        await this.prisma.calendar.update({
-          where: { id: existing.id },
-          data,
-        });
-        continue;
-      }
-
-      const uniqueName = localNames.has(name.toLowerCase())
-        ? `${name} (${remote.id})`
-        : name;
-      localNames.add(uniqueName.toLowerCase());
-      await this.prisma.calendar.create({
-        data: {
-          ...data,
-          name: uniqueName,
-          kind: "owned",
-          isPublic: false,
-          isSyncOnly: false,
-          userId,
-        },
-      });
-    }
-  }
-
   private async syncStalwartEvents(input: {
     userId: string;
     accountId: string;
@@ -260,8 +203,6 @@ export class EventService implements IEventService {
     if (!this.stalwartClient || input.eventIds.length === 0) {
       return;
     }
-
-    await this.syncStalwartCalendarsFromRemote(input.userId, input.accountId);
 
     const remoteEvents = await this.stalwartClient.getEvents({
       accountId: input.accountId,
