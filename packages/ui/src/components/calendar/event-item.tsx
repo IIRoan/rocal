@@ -5,7 +5,10 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
 import { MapPinIcon } from "@phosphor-icons/react";
-import { isAwaitingUserInvitationResponse } from "@workspace/calendar-core";
+import {
+  isAwaitingUserInvitationResponse,
+  isCancelledCalendarEvent,
+} from "@workspace/calendar-core";
 
 import {
   getBorderRadiusClasses,
@@ -256,7 +259,14 @@ export function EventItem({
           {children || (
             <span className="truncate flex items-center gap-1">
               <EncryptionStatusBadge item={event} asIcon />
-              <span className="truncate">{event.title}</span>
+              <span
+                className={cn(
+                  "truncate",
+                  isCancelledCalendarEvent(event) && "line-through opacity-70",
+                )}
+              >
+                {event.title}
+              </span>
             </span>
           )}
         </EventWrapper>
@@ -320,7 +330,10 @@ export function EventItem({
               <div className="flex items-center gap-1 w-full min-w-0">
                 <EncryptionStatusBadge item={event} asIcon />
                 <span
-                  className="font-semibold flex-1 min-w-0 truncate tracking-tight"
+                  className={cn(
+                    "font-semibold flex-1 min-w-0 truncate tracking-tight",
+                    isCancelledCalendarEvent(event) && "line-through opacity-70",
+                  )}
                   title={event.title}
                 >
                   {event.title}
@@ -341,6 +354,7 @@ export function EventItem({
                 className={cn(
                   "flex-1 min-w-0 truncate whitespace-nowrap tracking-tight",
                   isCompact ? "font-medium" : "font-semibold",
+                  isCancelledCalendarEvent(event) && "line-through opacity-70",
                 )}
                 title={event.title}
               >
@@ -421,7 +435,12 @@ export function EventItem({
           <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0">
             <div className="flex items-center gap-1.5 min-w-0">
               <EncryptionStatusBadge item={event} asIcon />
-              <span className="truncate text-[15px] font-semibold leading-snug text-foreground tracking-tight group-data-past-event/ev:line-through">
+              <span
+                className={cn(
+                  "truncate text-[15px] font-semibold leading-snug text-foreground tracking-tight group-data-past-event/ev:line-through",
+                  isCancelledCalendarEvent(event) && "line-through opacity-70",
+                )}
+              >
                 {event.title}
               </span>
             </div>

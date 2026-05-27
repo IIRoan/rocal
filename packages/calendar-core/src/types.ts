@@ -131,6 +131,7 @@ export interface CalendarEvent {
   reminder?: number | null;
   recurrence?: string | null;
   parentEventId?: string | null;
+  isCancelled?: boolean;
   isRecurringInstance?: boolean;
   isSynced?: boolean;
   externalId?: string | null;
@@ -188,6 +189,12 @@ export function canCurrentUserEditEvent(
   }
 
   return participant.role === "organizer";
+}
+
+export function isCancelledCalendarEvent(
+  event: Pick<CalendarEvent, "isCancelled">,
+): boolean {
+  return event.isCancelled === true;
 }
 
 export interface EventCategory {

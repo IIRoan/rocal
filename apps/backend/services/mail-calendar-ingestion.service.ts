@@ -152,6 +152,7 @@ function toEventUpdateData(parsedEvent: ParsedIcsEvent) {
     location: parsedEvent.location ?? null,
     recurrence: recurrenceToJson(parsedEvent),
     timezone: parsedEvent.timezone || "UTC",
+    isCancelled: false,
     syncedAt: new Date(),
   };
 }
@@ -316,26 +317,6 @@ export class MailCalendarIngestionService {
     return mailbox?.stalwartAccountId ?? null;
   }
 
-  private async ensureRemoteCalendar(
-    accountId: string,
-    calendar: ImportTargetCalendar,
-  ): Promise<string | null> {
-    if (
-      !this.stalwartClient ||
-      calendar.isSyncOnly ||
-      calendar.kind !== "owned"
-    ) {
-      return null;
-    }
-
-    if (calendar.stalwartCalendarId) {
-      return calendar.stalwartCalendarId;
-    }
-
-    // Importing a mail invite should not provision a brand-new remote calendar.
-    return null;
-  }
-
   private buildRemoteEventPayload(
     calendarId: string,
     parsedEvent: ParsedIcsEvent,
@@ -356,50 +337,28 @@ export class MailCalendarIngestionService {
     });
   }
 
-  private async deleteCancelledEvents(
+  private async cancelEvents(
     userId: string,
     parsedEvents: ParsedIcsEvent[],
   ): Promise<number> {
-    let deleted = 0;
+    let updated = 0;
 
     for (const parsedEvent of parsedEvents) {
-      const existingEvents = await this.prisma.calendarEvent.findMany({
+      const result = await this.prisma.calendarEvent.updateMany({
         where: {
           userId,
           externalId: parsedEvent.uid,
           subscriptionId: null,
         },
-        select: {
-          stalwartAccountId: true,
-          stalwartEventId: true,
+        data: {
+          isCancelled: true,
+          syncedAt: new Date(),
         },
       });
-
-      for (const event of existingEvents) {
-        if (
-          this.stalwartClient &&
-          event.stalwartAccountId &&
-          event.stalwartEventId
-        ) {
-          await this.stalwartClient.deleteEvent({
-            accountId: event.stalwartAccountId,
-            eventId: event.stalwartEventId,
-            sendSchedulingMessages: false,
-          });
-        }
-      }
-
-      const result = await this.prisma.calendarEvent.deleteMany({
-        where: {
-          userId,
-          externalId: parsedEvent.uid,
-          subscriptionId: null,
-        },
-      });
-      deleted += result.count;
+      updated += result.count;
     }
 
-    return deleted;
+    return updated;
   }
 
   private async upsertEvents(
@@ -578,10 +537,7 @@ export class MailCalendarIngestionService {
     }
 
     const stalwartAccountId = await this.getStalwartAccountId(input.userId);
-    const stalwartCalendarId =
-      stalwartAccountId && this.stalwartClient
-        ? await this.ensureRemoteCalendar(stalwartAccountId, targetCalendar)
-        : targetCalendar.stalwartCalendarId;
+    const stalwartCalendarId = targetCalendar.stalwartCalendarId;
 
     for (const payload of input.payloadSources) {
       try {
@@ -598,7 +554,7 @@ export class MailCalendarIngestionService {
         }
 
         if (parseResult.method === "CANCEL") {
-          summary.eventsDeleted += await this.deleteCancelledEvents(
+          summary.eventsUpdated += await this.cancelEvents(
             input.userId,
             parseResult.events,
           );

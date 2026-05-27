@@ -188,6 +188,7 @@ model CalendarEvent {
   reminder             Int? // minutes before event to remind
   recurrence           String? // JSON string for recurrence rules (daily, weekly, monthly, etc.)
   parentEventId        String?               @map("parent_event_id") // For recurring event instances
+  isCancelled          Boolean               @default(false) @map("is_cancelled")
   // Sync fields for external calendar events
   isSynced             Boolean               @default(false) @map("is_synced") // Whether this event came from external calendar
   externalId           String?               @map("external_id") // UID from the .ics file

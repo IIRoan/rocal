@@ -1,3 +1,4 @@
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import { Button } from "@workspace/ui/components/ui/button";
 import {
   DropdownMenu,
@@ -29,7 +30,22 @@ export function EventEditorFooter({
   onBack,
   onClose,
 }: EventEditorFooterProps) {
+  const isCancelledEvent = eventForm.selectedEvent
+    ? isCancelledCalendarEvent(eventForm.selectedEvent)
+    : false;
+  const canDeleteEvent =
+    Boolean(eventForm.selectedEvent?.id) &&
+    !eventForm.selectedEvent.isSynced &&
+    (canEditEvent || isCancelledEvent);
+  const deleteLabel =
+    !canEditEvent && isCancelledEvent ? "Remove from calendar" : "Delete";
+
   const handleDelete = () => {
+    if (isCancelledEvent) {
+      handleEventDelete();
+      return;
+    }
+
     if (isRecurringEventDeleteCandidate(eventForm.selectedEvent)) {
       eventForm.setShowRecurringDeleteModal(true);
       return;
@@ -44,7 +60,7 @@ export function EventEditorFooter({
     eventTitle: eventForm.eventTitle,
   });
   const showInvitationActions =
-    Boolean(eventForm.selectedEvent?.id) && !canEditEvent;
+    Boolean(eventForm.selectedEvent?.id) && !canEditEvent && !isCancelledEvent;
   const invitationActions = showInvitationActions ? (
     <div className="flex items-center gap-2">
       {invitationStatus === null ? (
@@ -157,15 +173,14 @@ export function EventEditorFooter({
         {isViewMode ? (
           <>
             {eventForm.selectedEvent?.id &&
-              !eventForm.selectedEvent.isSynced &&
-              canEditEvent && (
+              canDeleteEvent && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleDelete}
                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
-                  <Trash2 className="size-4" /> Delete
+                  <Trash2 className="size-4" /> {deleteLabel}
                 </Button>
               )}
             {invitationActions}
@@ -184,7 +199,8 @@ export function EventEditorFooter({
             </Button>
             {eventForm.selectedEvent?.id &&
               !eventForm.selectedEvent.isSynced &&
-              canEditEvent && (
+              canEditEvent &&
+              !isCancelledEvent && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -229,16 +245,15 @@ export function EventEditorFooter({
       {isViewMode ? (
         <>
           {eventForm.selectedEvent?.id &&
-            !eventForm.selectedEvent.isSynced &&
-            canEditEvent && (
-              <Button
-                variant="outline"
-                onClick={handleDelete}
-                className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="size-4 mr-2" /> Delete
-              </Button>
-            )}
+          canDeleteEvent && (
+            <Button
+              variant="outline"
+              onClick={handleDelete}
+              className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-4 mr-2" /> {deleteLabel}
+            </Button>
+          )}
           {invitationActions}
           <div className="flex-1" />
           {eventForm.selectedEvent?.id && (
@@ -251,7 +266,8 @@ export function EventEditorFooter({
           </Button>
           {eventForm.selectedEvent?.id &&
             !eventForm.selectedEvent.isSynced &&
-            canEditEvent && (
+            canEditEvent &&
+            !isCancelledEvent && (
               <Button onClick={() => eventForm.setEventViewMode("edit")}>
                 <Edit3 className="size-4 mr-2" /> Edit
               </Button>
