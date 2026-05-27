@@ -7,7 +7,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@workspace/calendar-core": "*",
     "date-fns": "^4.1.0",
     "node-ical": "^0.26.0"
   },

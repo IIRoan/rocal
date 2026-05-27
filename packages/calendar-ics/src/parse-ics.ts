@@ -1,5 +1,4 @@
 import * as ical from "node-ical";
-import { normalizeParticipantEmail } from "@workspace/calendar-core";
 import {
   buildIcsExternalId,
   normalizeIcsTimezone,
@@ -83,6 +82,15 @@ const CALENDAR_TIMEZONE_KEYS = [
   "x-wr-timezone",
 ] as const;
 const DATE_TIME_PARTS_FORMATTER_CACHE = new Map<string, Intl.DateTimeFormat>();
+
+function normalizeParticipantEmail(email: string | null | undefined): string {
+  return (
+    email
+      ?.trim()
+      .replace(/^mailto:/i, "")
+      .toLowerCase() ?? ""
+  );
+}
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null;
@@ -197,7 +205,10 @@ function parseParticipantValue(
   }
 
   const displayName = getParameterValue(value, ["CN", "name"]);
-  const partStat = getParameterValue(value, ["PARTSTAT", "status"])?.toUpperCase();
+  const partStat = getParameterValue(value, [
+    "PARTSTAT",
+    "status",
+  ])?.toUpperCase();
   const roleParam = getParameterValue(value, ["ROLE"])?.toUpperCase();
   const role =
     fallbackRole === "organizer" || roleParam === "CHAIR"
@@ -223,7 +234,9 @@ function parseParticipantValue(
   };
 }
 
-function collectParticipants(event: IcsEventLike): IcsParticipant[] | undefined {
+function collectParticipants(
+  event: IcsEventLike,
+): IcsParticipant[] | undefined {
   const participantsByEmail = new Map<string, IcsParticipant>();
 
   const addParticipant = (participant: IcsParticipant | undefined) => {
@@ -247,7 +260,7 @@ function collectParticipants(event: IcsEventLike): IcsParticipant[] | undefined 
       status:
         existing.role === "organizer" || participant.role === "organizer"
           ? "accepted"
-          : participant.status ?? existing.status,
+          : (participant.status ?? existing.status),
       displayName: participant.displayName || existing.displayName,
     });
   };

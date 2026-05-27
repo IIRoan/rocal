@@ -143,6 +143,7 @@ export class MailRealtimeService {
   private started = false;
   private receiptPollId: ReturnType<typeof setInterval> | null = null;
   private receiptPollRunning = false;
+  private listenerAbortController: AbortController | null = null;
 
   constructor(
     private readonly input: {
@@ -161,6 +162,7 @@ export class MailRealtimeService {
     }
 
     this.started = true;
+    this.listenerAbortController = new AbortController();
     this.startReceiptPolling();
 
     if (!this.input.adminToken.trim()) {
@@ -174,11 +176,13 @@ export class MailRealtimeService {
   }
 
   stop(): void {
+    this.started = false;
     if (this.receiptPollId) {
       clearInterval(this.receiptPollId);
       this.receiptPollId = null;
     }
-    this.started = false;
+    this.listenerAbortController?.abort();
+    this.listenerAbortController = null;
   }
 
   subscribe(input: {
@@ -248,29 +252,47 @@ export class MailRealtimeService {
 
   private async listenForever(): Promise<void> {
     const reconnectDelayMs = this.input.reconnectDelayMs ?? 3000;
+    const signal = this.listenerAbortController?.signal;
 
-    while (true) {
+    while (this.started && !signal?.aborted) {
       try {
         logger.info("Connecting to Stalwart JMAP EventSource");
-        await this.consumeEventSource();
+        await this.consumeEventSource(signal);
+        if (!this.started || signal?.aborted) {
+          break;
+        }
         logger.warn(
           "Stalwart JMAP EventSource connection closed; reconnecting.",
         );
       } catch (error) {
+        if (signal?.aborted || !this.started) {
+          break;
+        }
         logger.error("Stalwart JMAP EventSource listener failed", {
           error,
         });
       }
 
-      await new Promise((resolve) => setTimeout(resolve, reconnectDelayMs));
+      await new Promise<void>((resolve) => {
+        const timeoutId = setTimeout(resolve, reconnectDelayMs);
+        signal?.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timeoutId);
+            resolve();
+          },
+          { once: true },
+        );
+      });
     }
   }
 
-  private async consumeEventSource(): Promise<void> {
+  private async consumeEventSource(signal?: AbortSignal): Promise<void> {
     const response = await (this.input.fetcher ?? fetch)(
       buildSseRequestUrl(this.input.eventSourceUrl),
       {
         method: "GET",
+        signal,
         headers: {
           Accept: "text/event-stream",
           Authorization: `Bearer ${this.input.adminToken}`,
@@ -287,6 +309,10 @@ export class MailRealtimeService {
     logger.info("Connected to Stalwart JMAP EventSource");
 
     for await (const frame of parseSseStream(response.body)) {
+      if (signal?.aborted || !this.started) {
+        return;
+      }
+
       if (frame.event !== "state" || !frame.data) {
         continue;
       }

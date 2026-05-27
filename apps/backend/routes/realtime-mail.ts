@@ -75,6 +75,7 @@ export function createRealtimeMailRoutes(
           let closed = false;
           let keepaliveId: ReturnType<typeof setInterval> | null = null;
           let pollId: ReturnType<typeof setInterval> | null = null;
+          let pollInFlight = false;
 
           const unsubscribe = realtimeService.subscribe({
             subscriberId,
@@ -124,7 +125,8 @@ export function createRealtimeMailRoutes(
           // Polling JMAP /changes with the user's accountId is the reliable delivery path.
           if (accountIds.length > 0) {
             pollId = setInterval(() => {
-              if (closed) return;
+              if (closed || pollInFlight) return;
+              pollInFlight = true;
               void (async () => {
                 for (const accountId of accountIds) {
                   try {
@@ -169,7 +171,9 @@ export function createRealtimeMailRoutes(
                     });
                   }
                 }
-              })();
+              })().finally(() => {
+                pollInFlight = false;
+              });
             }, 10_000);
           }
 
