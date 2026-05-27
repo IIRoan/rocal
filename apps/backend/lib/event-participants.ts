@@ -1,6 +1,7 @@
 import type { Prisma } from "../generated/prisma/index.js";
 import {
   type EventParticipant,
+  type EventParticipantInput,
   type EventParticipantRole,
   type EventParticipantStatus,
   normalizeParticipantEmail,
@@ -61,6 +62,80 @@ export function normalizeParticipantStatus(
   return role === "organizer" ? "accepted" : "pending";
 }
 
+export function mergeParticipantInput(
+  existing: EventParticipantInput | undefined,
+  next: EventParticipantInput,
+): EventParticipantInput {
+  if (!existing) {
+    return next;
+  }
+
+  const role =
+    existing.role === "organizer" || next.role === "organizer"
+      ? "organizer"
+      : "attendee";
+  const status =
+    role === "organizer"
+      ? "accepted"
+      : (next.status ?? existing.status ?? "pending");
+
+  return {
+    ...existing,
+    ...next,
+    displayName: next.displayName?.trim() || existing.displayName?.trim(),
+    role,
+    status,
+  };
+}
+
+export function resolveParticipantInputs(input: {
+  owner?:
+    | {
+        email: string;
+        name?: string | null;
+      }
+    | null
+    | undefined;
+  participants?: EventParticipantInput[] | null | undefined;
+}): EventParticipantInput[] {
+  const ownerEmail = normalizeParticipantEmail(input.owner?.email);
+  const deduped = new Map<string, EventParticipantInput>();
+
+  if (ownerEmail) {
+    deduped.set(ownerEmail, {
+      email: ownerEmail,
+      displayName: input.owner?.name?.trim() || ownerEmail,
+      role: "organizer",
+      status: "accepted",
+    });
+  }
+
+  for (const participant of input.participants ?? []) {
+    const email = normalizeParticipantEmail(participant.email);
+    if (!email) {
+      continue;
+    }
+
+    const role =
+      ownerEmail && email === ownerEmail
+        ? "organizer"
+        : normalizeParticipantRole(participant.role);
+    const status = normalizeParticipantStatus(participant.status, role);
+
+    deduped.set(
+      email,
+      mergeParticipantInput(deduped.get(email), {
+        email,
+        displayName: participant.displayName?.trim() || undefined,
+        role,
+        status,
+      }),
+    );
+  }
+
+  return [...deduped.values()];
+}
+
 export function mapEventParticipant(
   participant: EventParticipantRecord,
 ): EventParticipant {
@@ -76,9 +151,7 @@ export function mapEventParticipant(
     userId: participant.userId,
     email,
     displayName:
-      participant.displayName ??
-      participant.user?.name?.trim() ??
-      email,
+      participant.displayName ?? participant.user?.name?.trim() ?? email,
     image: participant.user?.image ?? null,
     role,
     status: normalizeParticipantStatus(participant.status, role),

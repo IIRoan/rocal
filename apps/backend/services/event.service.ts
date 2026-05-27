@@ -31,6 +31,7 @@ import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 import { createLogger } from "@workspace/logger";
 import {
   mapEventParticipant,
+  resolveParticipantInputs,
   sortEventParticipants,
   EVENT_PARTICIPANT_USER_SELECT,
   type EventParticipantRecord,
@@ -104,29 +105,15 @@ export class EventService implements IEventService {
       where: { id: userId },
       select: { email: true, name: true },
     });
-    const resolved = new Map<string, ResolvedStalwartParticipant>();
-
-    if (owner?.email?.trim()) {
-      resolved.set(owner.email.trim().toLowerCase(), {
-        email: owner.email.trim().toLowerCase(),
-        displayName: owner.name?.trim() || owner.email,
-        role: "organizer",
-        status: "accepted",
-      });
-    }
-
-    for (const participant of participants) {
-      const email = participant.email?.trim().toLowerCase();
-      if (!email) continue;
-      resolved.set(email, {
-        email,
-        displayName: participant.displayName?.trim() || email,
-        role: participant.role ?? "attendee",
-        status: participant.status ?? "pending",
-      });
-    }
-
-    return [...resolved.values()];
+    return resolveParticipantInputs({
+      owner: owner?.email?.trim()
+        ? {
+            email: owner.email,
+            name: owner.name,
+          }
+        : null,
+      participants,
+    });
   }
 
   private async ensureRemoteCalendar(input: {

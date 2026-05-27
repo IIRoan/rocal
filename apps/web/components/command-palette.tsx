@@ -87,8 +87,9 @@ export function CommandPalette({
   const { settings, loading, updateSettings, resetSettings } = useSettings();
   const queryClient = useQueryClient();
   const { data: session, isPending: sessionLoading } = useSession();
+  const sessionUserId = session?.user?.id ?? null;
   const accountsQuery = useQuery({
-    queryKey: ["auth", "accounts", session?.user?.id ?? null],
+    queryKey: ["auth", "accounts", sessionUserId],
     queryFn: async () => {
       if (typeof authClient.listAccounts !== "function") {
         return [];
@@ -97,8 +98,7 @@ export function CommandPalette({
       return extractLinkedAuthAccounts(await authClient.listAccounts());
     },
     enabled:
-      Boolean(session?.user?.id) &&
-      typeof authClient.listAccounts === "function",
+      Boolean(sessionUserId) && typeof authClient.listAccounts === "function",
     staleTime: 5 * 60 * 1000,
   });
   const { setCurrentDate, setCurrentView: setCalendarView } =
@@ -144,13 +144,11 @@ export function CommandPalette({
     string | undefined
   >(undefined);
 
-  // Clear subscriptionEditCalendarId when leaving subscription views
-  useEffect(() => {
-    const isSubscriptionView = currentView.startsWith("subscriptions");
-    if (!isSubscriptionView) {
-      setSubscriptionEditCalendarId(undefined);
-    }
-  }, [currentView]);
+  const activeSubscriptionEditCalendarId = currentView.startsWith(
+    "subscriptions",
+  )
+    ? subscriptionEditCalendarId
+    : undefined;
 
   const goForward = useCallback(
     (next: PaletteView, options?: { preservePasskeyAddMode?: boolean }) => {
@@ -197,19 +195,43 @@ export function CommandPalette({
   );
 
   useEffect(() => {
-    if (settings) setLocalSettings(settings);
+    if (!settings) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLocalSettings(settings);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [settings]);
 
   useEffect(() => {
     if (!open) {
-      setNavHistory(buildInitialHistory(initialView as PaletteView));
-      setSearchQuery("");
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setNavHistory(buildInitialHistory(initialView as PaletteView));
+        setSearchQuery("");
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [open, initialView]);
 
   useEffect(() => {
     if (open) {
-      setNavHistory(buildInitialHistory(initialView as PaletteView));
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setNavHistory(buildInitialHistory(initialView as PaletteView));
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [initialView, open]);
 
@@ -351,7 +373,7 @@ export function CommandPalette({
 
   const handleResetEncryptionPassword = useCallback(
     async ({ newPassword }: { newPassword: string }) => {
-      if (!session?.user?.id) {
+      if (!sessionUserId) {
         throw new Error("Your session is unavailable. Please try again.");
       }
 
@@ -359,7 +381,7 @@ export function CommandPalette({
 
       try {
         const stored = await resetEncryptionPasswordForActiveSession(
-          session.user.id,
+          sessionUserId,
           newPassword,
         );
 
@@ -375,7 +397,7 @@ export function CommandPalette({
         setResettingEncryptionPassword(false);
       }
     },
-    [session?.user?.id],
+    [sessionUserId],
   );
 
   const handleUpdateProfile = useCallback(
@@ -723,7 +745,7 @@ export function CommandPalette({
           onBack={goBack}
           currentView={currentView}
           onNavigateTo={goForward}
-          initialEditCalendarId={subscriptionEditCalendarId}
+          initialEditCalendarId={activeSubscriptionEditCalendarId}
         />
       );
     }

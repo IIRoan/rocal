@@ -265,6 +265,22 @@ describe("buildEventRequest", () => {
       },
     ]);
   });
+
+  it("preserves an explicitly empty participant list so updates can clear attendees", () => {
+    const result = buildEventRequest({
+      title: "Planning sync",
+      start: "2025-06-15T09:00",
+      end: "2025-06-15T10:00",
+      calendarId: "cal-1",
+      allDay: false,
+      location: "",
+      description: "",
+      participants: [],
+    });
+
+    expect(result).toHaveProperty("participants");
+    expect(result.participants).toEqual([]);
+  });
 });
 
 // ─── validateForm ────────────────────────────────────────────────────────────
