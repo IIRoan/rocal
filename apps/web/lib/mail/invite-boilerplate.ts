@@ -1,4 +1,4 @@
-const GOOGLE_INVITE_SEPARATOR_LINE = /^-[:~]{10,}$/;
+const GOOGLE_INVITE_SEPARATOR_LINE = /^-[-:~]{10,}$/;
 const GOOGLE_INVITE_BOILERPLATE_LINES = [
   /^Join with Google Meet:/i,
   /^Learn more about Meet at:/i,
@@ -48,7 +48,7 @@ export function cleanInviteMailHtml(html: string): string {
     return html;
   }
 
-  let cleaned = html.replace(/-[:~]{10,}/gi, "");
+  let cleaned = html.replace(/-[-:~]{10,}/gi, "");
   cleaned = cleaned.replace(/Join with Google Meet:[^<]*/gi, "");
   cleaned = cleaned.replace(/Learn more about Meet at:[^<]*/gi, "");
   cleaned = cleaned.replace(/Please do not edit this section\./gi, "");

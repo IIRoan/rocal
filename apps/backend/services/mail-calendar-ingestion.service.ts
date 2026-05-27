@@ -381,6 +381,7 @@ export class MailCalendarIngestionService {
     const existingByExternalId = new Map(
       existingEvents.map((event) => [event.externalId, event]),
     );
+    const pendingInvitationDispatchers: Array<() => Promise<void>> = [];
 
     let created = 0;
     let updated = 0;
@@ -446,7 +447,9 @@ export class MailCalendarIngestionService {
             participants: parsedEvent.participants ?? [],
             tx: this.prisma,
           });
-        await createdParticipants.sendPendingInvitations();
+        pendingInvitationDispatchers.push(
+          createdParticipants.sendPendingInvitations,
+        );
         created++;
         continue;
       }
@@ -461,7 +464,9 @@ export class MailCalendarIngestionService {
         parsedEvent.participants,
       );
 
-      if (isEventModified(existingEvent, parsedEvent)) {
+      const eventChanged = isEventModified(existingEvent, parsedEvent);
+
+      if (eventChanged) {
         await this.prisma.calendarEvent.update({
           where: { id: existingEvent.id },
           data: {
@@ -494,11 +499,17 @@ export class MailCalendarIngestionService {
             participants: parsedEvent.participants ?? [],
             tx: this.prisma,
           });
-        await updatedParticipants.sendPendingInvitations();
-        if (!isEventModified(existingEvent, parsedEvent)) {
+        pendingInvitationDispatchers.push(
+          updatedParticipants.sendPendingInvitations,
+        );
+        if (!eventChanged) {
           updated++;
         }
       }
+    }
+
+    for (const sendPendingInvitations of pendingInvitationDispatchers) {
+      await sendPendingInvitations();
     }
 
     return { created, updated };

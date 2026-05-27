@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
 import type {
   CalendarEvent,
   Calendar,
 } from "@workspace/ui/components/calendar";
-import type { EventParticipant, EventParticipantInput } from "@workspace/calendar-core";
+import type {
+  EventParticipant,
+  EventParticipantInput,
+} from "@workspace/calendar-core";
 import { RecurrenceEngine } from "@workspace/calendar-core";
 import type { RecurrenceRule } from "@/lib/types/calendar";
 import type { EventNotification } from "@workspace/ui/components/calendar";
@@ -198,7 +201,9 @@ export function useEventForm({
   const queryClient = useQueryClient();
   // Use ref to store calendars to avoid infinite loops
   const calendarsRef = useRef(calendars);
-  calendarsRef.current = calendars;
+  useEffect(() => {
+    calendarsRef.current = calendars;
+  }, [calendars]);
   // Event editor state
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
@@ -322,7 +327,9 @@ export function useEventForm({
       const hasRecurrence = !!event.recurrence;
       setIsRecurring(hasRecurrence);
       if (hasRecurrence && event.recurrence) {
-        const parsedRule = RecurrenceEngine.parseRecurrenceRule(event.recurrence);
+        const parsedRule = RecurrenceEngine.parseRecurrenceRule(
+          event.recurrence,
+        );
         if (parsedRule) {
           setRecurrenceRule(parsedRule as RecurrenceRule);
         } else {
@@ -349,17 +356,18 @@ export function useEventForm({
             response.data &&
             response.data.notifications
           ) {
-            const emailNotifications = response.data.notifications.flatMap((n) =>
-              n.notificationType === "email"
-                ? [
-                    {
-                      id: n.id,
-                      notificationType: "email" as const,
-                      minutesBefore: n.minutesBefore,
-                      isEnabled: n.isEnabled,
-                    },
-                  ]
-                : [],
+            const emailNotifications = response.data.notifications.flatMap(
+              (n) =>
+                n.notificationType === "email"
+                  ? [
+                      {
+                        id: n.id,
+                        notificationType: "email" as const,
+                        minutesBefore: n.minutesBefore,
+                        isEnabled: n.isEnabled,
+                      },
+                    ]
+                  : [],
             );
             const notificationsToUse =
               emailNotifications.length > 0
@@ -676,9 +684,7 @@ export function useEventForm({
               persistedEvent?.updatedAt ?? eventData.updatedAt,
             ),
             participants:
-              persistedEvent?.participants ??
-              selectedEvent?.participants ??
-              [],
+              persistedEvent?.participants ?? selectedEvent?.participants ?? [],
           };
 
           queryClient.setQueriesData<CalendarEvent[]>(
@@ -777,9 +783,7 @@ export function useEventForm({
   );
 
   // Delete event
-  const handleEventDelete = useCallback<
-    (calendarData: any) => Promise<void>
-  >(
+  const handleEventDelete = useCallback<(calendarData: any) => Promise<void>>(
     async (calendarData: any) => {
       if (!selectedEvent?.id) return;
 

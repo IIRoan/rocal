@@ -48,6 +48,54 @@ export class CalendarService implements ICalendarService {
     return { calendars };
   }
 
+  private async rollbackCreatedRemoteCalendar(
+    accountId: string,
+    calendarId: string,
+  ): Promise<void> {
+    if (!this.stalwartClient) {
+      return;
+    }
+
+    try {
+      await this.stalwartClient.deleteCalendar(accountId, calendarId);
+    } catch (error) {
+      logger.warn("Failed to roll back created Stalwart calendar", {
+        accountId,
+        calendarId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async rollbackUpdatedRemoteCalendar(input: {
+    accountId: string;
+    calendarId: string;
+    previous: {
+      name: string;
+      color: string;
+      isVisible: boolean;
+      isDefault: boolean;
+    };
+  }): Promise<void> {
+    if (!this.stalwartClient) {
+      return;
+    }
+
+    try {
+      await this.stalwartClient.updateCalendar(
+        input.accountId,
+        input.calendarId,
+        input.previous,
+      );
+    } catch (error) {
+      logger.warn("Failed to roll back updated Stalwart calendar", {
+        accountId: input.accountId,
+        calendarId: input.calendarId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   async create(input: CalendarCreateInput) {
     const {
       userId,
@@ -94,38 +142,53 @@ export class CalendarService implements ICalendarService {
       stalwartCalendarId = remoteCalendar.id;
     }
 
-    if (isDefault) {
-      await this.prisma.calendar.updateMany({
-        where: { userId, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (isDefault) {
+          await tx.calendar.updateMany({
+            where: { userId, isDefault: true },
+            data: { isDefault: false },
+          });
+        }
 
-    return this.prisma.calendar.create({
-      data: {
-        name: normalizedName,
-        ...buildEncryptedNameFields({
-          encryptedName,
-          blindIndexTokens,
-          encryptionState,
-          encryptionKeyVersion,
-        }),
-        ...(forceFullEncryption !== undefined ? { forceFullEncryption } : {}),
-        color,
-        kind: "owned",
-        isPublic: false,
-        isVisible: true,
-        isDefault: isDefault || false,
-        ...(stalwartAccountId && stalwartCalendarId
-          ? {
-              stalwartAccountId,
-              stalwartCalendarId,
-              stalwartSyncedAt: new Date(),
-            }
-          : {}),
-        userId,
-      },
-    });
+        return tx.calendar.create({
+          data: {
+            name: normalizedName,
+            ...buildEncryptedNameFields({
+              encryptedName,
+              blindIndexTokens,
+              encryptionState,
+              encryptionKeyVersion,
+            }),
+            ...(forceFullEncryption !== undefined
+              ? { forceFullEncryption }
+              : {}),
+            color,
+            kind: "owned",
+            isPublic: false,
+            isVisible: true,
+            isDefault: isDefault || false,
+            ...(stalwartAccountId && stalwartCalendarId
+              ? {
+                  stalwartAccountId,
+                  stalwartCalendarId,
+                  stalwartSyncedAt: new Date(),
+                }
+              : {}),
+            userId,
+          },
+        });
+      });
+    } catch (error) {
+      if (stalwartAccountId && stalwartCalendarId) {
+        await this.rollbackCreatedRemoteCalendar(
+          stalwartAccountId,
+          stalwartCalendarId,
+        );
+      }
+
+      throw error;
+    }
   }
 
   async update(input: CalendarUpdateInput) {
@@ -192,6 +255,8 @@ export class CalendarService implements ICalendarService {
 
     const stalwartAccountId = await this.getStalwartAccountId(userId);
     let stalwartCalendarId = existingCalendar.stalwartCalendarId;
+    let createdRemoteCalendarId: string | null = null;
+    let updatedExistingRemoteCalendar = false;
 
     if (
       stalwartAccountId &&
@@ -208,17 +273,23 @@ export class CalendarService implements ICalendarService {
             isDefault: isDefault ?? existingCalendar.isDefault,
           })
         ).id;
+        createdRemoteCalendarId = stalwartCalendarId;
       } else {
-        await this.stalwartClient.updateCalendar(
-          stalwartAccountId,
-          stalwartCalendarId,
-          {
-            ...(normalizedName !== undefined ? { name: normalizedName } : {}),
-            ...(color !== undefined ? { color } : {}),
-            ...(isVisible !== undefined ? { isVisible } : {}),
-            ...(isDefault !== undefined ? { isDefault } : {}),
-          },
-        );
+        const remotePatch = {
+          ...(normalizedName !== undefined ? { name: normalizedName } : {}),
+          ...(color !== undefined ? { color } : {}),
+          ...(isVisible !== undefined ? { isVisible } : {}),
+          ...(isDefault !== undefined ? { isDefault } : {}),
+        };
+
+        if (Object.keys(remotePatch).length > 0) {
+          await this.stalwartClient.updateCalendar(
+            stalwartAccountId,
+            stalwartCalendarId,
+            remotePatch,
+          );
+          updatedExistingRemoteCalendar = true;
+        }
       }
     }
 
@@ -238,12 +309,6 @@ export class CalendarService implements ICalendarService {
     );
     if (isDefault !== undefined) {
       updateData.isDefault = isDefault;
-      if (isDefault) {
-        await this.prisma.calendar.updateMany({
-          where: { userId, isDefault: true, id: { not: calendarId } },
-          data: { isDefault: false },
-        });
-      }
     }
 
     const enablingForceFullEncryption =
@@ -262,32 +327,67 @@ export class CalendarService implements ICalendarService {
 
     updateData.updatedAt = new Date();
 
-    const updatedCalendar = await this.prisma.calendar.update({
-      where: { id: calendarId },
-      data: updateData,
-    });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (isDefault) {
+          await tx.calendar.updateMany({
+            where: { userId, isDefault: true, id: { not: calendarId } },
+            data: { isDefault: false },
+          });
+        }
 
-    if (enablingForceFullEncryption) {
-      // Backfill: any event in this calendar that already has an encrypted
-      // payload should drop its plaintext shadows and become fully ciphertext.
-      // Events without an encryptedContent payload (legacy plaintext) are
-      // left untouched – they require a client-side re-encryption pass.
-      await this.prisma.calendarEvent.updateMany({
-        where: {
-          calendarId,
-          userId,
-          encryptedContent: { not: null },
-        },
-        data: {
-          title: "",
-          description: null,
-          location: null,
-          encryptionState: "encrypted",
-        },
+        const updatedCalendar = await tx.calendar.update({
+          where: { id: calendarId },
+          data: updateData,
+        });
+
+        if (enablingForceFullEncryption) {
+          // Backfill: any event in this calendar that already has an encrypted
+          // payload should drop its plaintext shadows and become fully ciphertext.
+          // Events without an encryptedContent payload (legacy plaintext) are
+          // left untouched – they require a client-side re-encryption pass.
+          await tx.calendarEvent.updateMany({
+            where: {
+              calendarId,
+              userId,
+              encryptedContent: { not: null },
+            },
+            data: {
+              title: "",
+              description: null,
+              location: null,
+              encryptionState: "encrypted",
+            },
+          });
+        }
+
+        return updatedCalendar;
       });
-    }
+    } catch (error) {
+      if (stalwartAccountId && createdRemoteCalendarId) {
+        await this.rollbackCreatedRemoteCalendar(
+          stalwartAccountId,
+          createdRemoteCalendarId,
+        );
+      } else if (
+        stalwartAccountId &&
+        updatedExistingRemoteCalendar &&
+        existingCalendar.stalwartCalendarId
+      ) {
+        await this.rollbackUpdatedRemoteCalendar({
+          accountId: stalwartAccountId,
+          calendarId: existingCalendar.stalwartCalendarId,
+          previous: {
+            name: existingCalendar.name,
+            color: existingCalendar.color,
+            isVisible: existingCalendar.isVisible,
+            isDefault: existingCalendar.isDefault,
+          },
+        });
+      }
 
-    return updatedCalendar;
+      throw error;
+    }
   }
 
   async delete(input: CalendarDeleteInput): Promise<CalendarDeleteResult> {
