@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useLayoutEffect, useMemo, useRef } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   addHours,
   areIntervalsOverlapping,
@@ -454,7 +455,14 @@ export const WeekView = React.memo(function WeekView({
                           )}
                           aria-hidden={!shouldShowTitle}
                         >
-                          {event.title}
+                          <span
+                            className={cn(
+                              isCancelledCalendarEvent(event) &&
+                                "line-through opacity-70",
+                            )}
+                          >
+                            {event.title}
+                          </span>
                         </div>
                       </EventItem>
                     </div>

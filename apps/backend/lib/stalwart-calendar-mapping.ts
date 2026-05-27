@@ -204,17 +204,13 @@ function isAllDayJsCalendarEvent(event: StalwartCalendarEventRecord): boolean {
   return false;
 }
 
-function mapFrequency(frequency: RecurrenceRule["frequency"]) {
-  return frequency;
-}
-
 function buildRecurrenceRule(recurrence?: string | null) {
   if (!recurrence) return undefined;
   const rule = RecurrenceEngine.parseRecurrenceRule(recurrence);
   if (!rule) return undefined;
 
   const jmapRule: Record<string, unknown> = {
-    frequency: mapFrequency(rule.frequency),
+    frequency: rule.frequency,
   };
   if (rule.interval && rule.interval !== 1) jmapRule.interval = rule.interval;
   if (rule.count) jmapRule.count = rule.count;

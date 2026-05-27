@@ -28,6 +28,7 @@ function createCalendarEvent(
     reminder: null,
     recurrence: null,
     parentEventId: null,
+    isCancelled: false,
     isSynced: false,
     externalId: null,
     subscriptionId: null,
