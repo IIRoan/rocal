@@ -359,6 +359,18 @@ describe("MailCalendarIngestionService", () => {
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
       stalwartAccountId: "acct-1",
     });
+    prisma.calendar.findFirst.mockResolvedValue({
+      id: "calendar-1",
+      name: "Personal",
+      color: "#10b981",
+      kind: "owned",
+      isVisible: true,
+      isDefault: true,
+      isSyncOnly: false,
+      forceFullEncryption: false,
+      stalwartAccountId: "acct-1",
+      stalwartCalendarId: "remote-cal-1",
+    });
     const service = new MailCalendarIngestionService(
       prisma as never,
       undefined,
@@ -381,12 +393,7 @@ describe("MailCalendarIngestionService", () => {
       ],
     });
 
-    expect(stalwartClient.createCalendar).toHaveBeenCalledWith("acct-1", {
-      name: "Personal",
-      color: "#10b981",
-      isVisible: true,
-      isDefault: true,
-    });
+    expect(stalwartClient.createCalendar).not.toHaveBeenCalled();
     expect(stalwartClient.createEvent).toHaveBeenCalledWith({
       accountId: "acct-1",
       event: expect.objectContaining({
@@ -406,11 +413,60 @@ describe("MailCalendarIngestionService", () => {
     });
   });
 
+  it("does not provision a new Stalwart calendar during mail invite imports", async () => {
+    const prisma = createPrismaMock();
+    const stalwartClient = createMockStalwartClient();
+    prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
+      stalwartAccountId: "acct-1",
+    });
+    const service = new MailCalendarIngestionService(
+      prisma as never,
+      undefined,
+      stalwartClient,
+    );
+
+    await service.ingestFromEmails({
+      userId: "user-1",
+      emails: [
+        {
+          id: "mail-1",
+          bodyValues: {
+            calendar: {
+              value: buildIcs({}),
+            },
+          },
+        },
+      ],
+    });
+
+    expect(stalwartClient.createCalendar).not.toHaveBeenCalled();
+    expect(stalwartClient.createEvent).not.toHaveBeenCalled();
+    expect(prisma.calendarEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        title: "Planning sync",
+        stalwartCalendarId: null,
+        stalwartEventId: null,
+      }),
+    });
+  });
+
   it("rolls back remote invitation events if local creation fails", async () => {
     const prisma = createPrismaMock();
     const stalwartClient = createMockStalwartClient();
     prisma.mailDirectoryEntry.findUnique.mockResolvedValue({
       stalwartAccountId: "acct-1",
+    });
+    prisma.calendar.findFirst.mockResolvedValue({
+      id: "calendar-1",
+      name: "Personal",
+      color: "#10b981",
+      kind: "owned",
+      isVisible: true,
+      isDefault: true,
+      isSyncOnly: false,
+      forceFullEncryption: false,
+      stalwartAccountId: "acct-1",
+      stalwartCalendarId: "remote-cal-1",
     });
     prisma.calendarEvent.create.mockRejectedValue(new Error("db down"));
     const service = new MailCalendarIngestionService(

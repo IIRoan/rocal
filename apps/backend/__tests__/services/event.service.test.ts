@@ -615,4 +615,218 @@ describe("EventService Stalwart integration", () => {
       }),
     );
   });
+
+  it("falls back to local RSVP updates when the linked Stalwart event id is missing", async () => {
+    const stalwartClient = createMockStalwartClient();
+    const participantService = createParticipantService();
+    const organizerParticipant = {
+      id: "participant-organizer",
+      eventId: "event-1",
+      userId: null,
+      email: "organizer@example.com",
+      displayName: "Organizer",
+      role: "organizer",
+      status: "accepted",
+      user: null,
+    };
+    const selfParticipant = {
+      id: "participant-self",
+      eventId: "event-1",
+      userId: "user-1",
+      email: "testingprod15@solace.onl",
+      displayName: "Test User",
+      role: "attendee",
+      status: "pending",
+      user: {
+        id: "user-1",
+        name: "Test User",
+        email: "testingprod15@solace.onl",
+        image: null,
+      },
+    };
+    const pendingEvent = eventFixture({
+      stalwartEventId: null,
+      participants: [organizerParticipant, selfParticipant],
+    });
+    const acceptedEvent = eventFixture({
+      stalwartEventId: null,
+      participants: [
+        organizerParticipant,
+        { ...selfParticipant, status: "accepted" },
+      ],
+    });
+    const prisma = {
+      user: {
+        findUnique: jest.fn(async () => ({
+          email: "testingprod15@solace.onl",
+        })),
+      },
+      calendarEvent: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(pendingEvent as never)
+          .mockResolvedValueOnce(acceptedEvent as never),
+      },
+      eventParticipant: {
+        update: jest.fn(async () => undefined),
+      },
+    };
+    const service = new EventService(
+      prisma as never,
+      participantService as never,
+      stalwartClient,
+    );
+
+    const result = await service.respondToInvitation({
+      userId: "user-1",
+      eventId: "event-1",
+      status: "accepted",
+    });
+
+    expect(prisma.eventParticipant.update).toHaveBeenCalledWith({
+      where: { id: "participant-self" },
+      data: { status: "accepted" },
+    });
+    expect(stalwartClient.updateEvent).not.toHaveBeenCalled();
+    expect(stalwartClient.deleteEvent).not.toHaveBeenCalled();
+    expect(participantService.syncParticipants).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "event-1",
+        participants: expect.arrayContaining([
+          expect.objectContaining({
+            email: "testingprod15@solace.onl",
+            status: "accepted",
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it("declines invitation locally when the linked Stalwart event id is missing", async () => {
+    const stalwartClient = createMockStalwartClient();
+    const organizerParticipant = {
+      id: "participant-organizer",
+      eventId: "event-1",
+      userId: null,
+      email: "organizer@example.com",
+      displayName: "Organizer",
+      role: "organizer",
+      status: "accepted",
+      user: null,
+    };
+    const selfParticipant = {
+      id: "participant-self",
+      eventId: "event-1",
+      userId: "user-1",
+      email: "testingprod15@solace.onl",
+      displayName: "Test User",
+      role: "attendee",
+      status: "pending",
+      user: {
+        id: "user-1",
+        name: "Test User",
+        email: "testingprod15@solace.onl",
+        image: null,
+      },
+    };
+    const prisma = {
+      user: {
+        findUnique: jest.fn(async () => ({
+          email: "testingprod15@solace.onl",
+        })),
+      },
+      calendarEvent: {
+        findFirst: jest.fn(async () =>
+          eventFixture({
+            stalwartEventId: null,
+            participants: [organizerParticipant, selfParticipant],
+          }),
+        ),
+        delete: jest.fn(async () => undefined),
+      },
+      eventParticipant: {
+        update: jest.fn(async () => undefined),
+      },
+      eventNotification: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
+      notificationLog: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
+    };
+    const service = new EventService(prisma as never, undefined, stalwartClient);
+
+    await expect(
+      service.respondToInvitation({
+        userId: "user-1",
+        eventId: "event-1",
+        status: "declined",
+      }),
+    ).resolves.toEqual({ deleted: true });
+
+    expect(prisma.eventParticipant.update).toHaveBeenCalledWith({
+      where: { id: "participant-self" },
+      data: { status: "declined" },
+    });
+    expect(stalwartClient.updateEvent).not.toHaveBeenCalled();
+    expect(stalwartClient.deleteEvent).not.toHaveBeenCalled();
+    expect(prisma.calendarEvent.delete).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+    });
+  });
+
+  it("ignores remote-only Stalwart invitation calendars during lookup", async () => {
+    const stalwartClient = createMockStalwartClient();
+    const prisma = {
+      mailDirectoryEntry: {
+        findUnique: jest.fn(async () => ({ stalwartAccountId: "acct-1" })),
+      },
+      calendar: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([] as never),
+        update: jest.fn(async () => undefined),
+        create: jest.fn(async () => undefined),
+      },
+      calendarEvent: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(null as never)
+          .mockResolvedValueOnce(null as never),
+      },
+    };
+    stalwartClient.listCalendars.mockResolvedValue([
+      {
+        id: "email",
+        name: null,
+        color: null,
+        isVisible: true,
+        isDefault: false,
+      },
+    ] as never);
+    stalwartClient.queryEventIds.mockResolvedValue(["remote-event-email"] as never);
+    stalwartClient.getEvents.mockResolvedValue([
+      {
+        id: "remote-event-email",
+        uid: "invite-1@example.com",
+        calendarIds: { email: true },
+        title: "Planning",
+        start: "2026-05-26T10:00:00",
+        duration: "PT1H",
+        timeZone: "UTC",
+      },
+    ] as never);
+    const service = new EventService(prisma as never, undefined, stalwartClient);
+
+    const result = await service.getInvitationByExternalId(
+      "user-1",
+      "invite-1@example.com",
+    );
+
+    expect(result).toBeNull();
+    expect(stalwartClient.listCalendars).not.toHaveBeenCalled();
+    expect(prisma.calendar.create).not.toHaveBeenCalled();
+    expect(prisma.calendar.update).not.toHaveBeenCalled();
+  });
 });

@@ -332,23 +332,8 @@ export class MailCalendarIngestionService {
       return calendar.stalwartCalendarId;
     }
 
-    const remote = await this.stalwartClient.createCalendar(accountId, {
-      name: calendar.name,
-      color: calendar.color,
-      isVisible: calendar.isVisible,
-      isDefault: calendar.isDefault,
-    });
-
-    await this.prisma.calendar.update({
-      where: { id: calendar.id },
-      data: {
-        stalwartAccountId: accountId,
-        stalwartCalendarId: remote.id,
-        stalwartSyncedAt: new Date(),
-      },
-    });
-
-    return remote.id;
+    // Importing a mail invite should not provision a brand-new remote calendar.
+    return null;
   }
 
   private buildRemoteEventPayload(
