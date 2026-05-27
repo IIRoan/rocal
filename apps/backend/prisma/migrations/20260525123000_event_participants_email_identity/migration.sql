@@ -5,8 +5,8 @@ ALTER COLUMN "user_id" DROP NOT NULL;
 
 UPDATE "event_participant" AS ep
 SET
-  "email" = u."email",
-  "display_name" = COALESCE(NULLIF(u."name", ''), u."email")
+  "email" = LOWER(BTRIM(u."email")),
+  "display_name" = COALESCE(NULLIF(BTRIM(u."name"), ''), LOWER(BTRIM(u."email")))
 FROM "user" AS u
 WHERE ep."user_id" = u."id";
 
