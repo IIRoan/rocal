@@ -10,21 +10,20 @@ import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
 import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 
 const stalwartClient = createStalwartCalendarClient();
-const eventService = new EventService(
-  prisma,
-  undefined,
-  stalwartClient,
-);
+const eventService = new EventService(prisma, undefined, stalwartClient);
 const mailCalendarIngestionService = new MailCalendarIngestionService(
   prisma,
   undefined,
   stalwartClient,
 );
+const PARTICIPANT_EMAIL_PATTERN =
+  "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$";
 
 const eventParticipantSchema = strictObject({
   email: t.String({
     minLength: 3,
     maxLength: 320,
+    pattern: PARTICIPANT_EMAIL_PATTERN,
     description: "Participant email address",
   }),
   displayName: t.Optional(

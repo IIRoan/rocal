@@ -153,4 +153,34 @@ describe("mail realtime service", () => {
       sync: syncPayload,
     });
   });
+
+  it("aborts the active EventSource listener when stopped", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    const fetcher = jest.fn(
+      async (_url: string, init?: RequestInit): Promise<Response> => {
+        capturedSignal = init?.signal as AbortSignal | undefined;
+        await new Promise<void>((resolve) => {
+          capturedSignal?.addEventListener("abort", () => resolve(), {
+            once: true,
+          });
+        });
+        throw new Error("aborted");
+      },
+    );
+    const service = new MailRealtimeService({
+      eventSourceUrl:
+        "https://mail.example.com/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}",
+      adminToken: "token-1",
+      fetcher: fetcher as unknown as typeof fetch,
+      reconnectDelayMs: 60_000,
+    });
+
+    service.start();
+    await Promise.resolve();
+    service.stop();
+    await Promise.resolve();
+
+    expect(fetcher).toHaveBeenCalled();
+    expect(capturedSignal?.aborted).toBe(true);
+  });
 });
