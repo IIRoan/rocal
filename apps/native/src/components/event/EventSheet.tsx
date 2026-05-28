@@ -735,8 +735,8 @@ export function EventSheet({
               {/* Errors */}
               {serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
-                  {serverErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>
+                  {serverErrors.map((err) => (
+                    <Text key={err} style={styles.errorText}>
                       {err}
                     </Text>
                   ))}
