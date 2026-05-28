@@ -5,6 +5,8 @@
  * Handles exact notification time calculations, validation, and date rounding.
  */
 
+import { errorMessage } from "./errors";
+
 export interface NotificationConfig {
   notificationType: "email" | "browser";
   minutesBefore: number;
@@ -110,7 +112,7 @@ export class NotificationCalculator {
       return {
         notificationTime: new Date(),
         isValid: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage(error),
       };
     }
   }

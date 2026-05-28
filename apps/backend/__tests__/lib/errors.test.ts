@@ -21,6 +21,8 @@ import {
   UnauthorizedError,
   ValidationError,
   errorHandler,
+  errorMessage,
+  errorString,
 } from "../../lib/errors";
 
 const onErrorHook = errorHandler.event.error![0]!.fn as (ctx: any) => unknown;
@@ -244,5 +246,32 @@ describe("errors", () => {
         statusCode: 500,
       }),
     });
+  });
+});
+
+describe("errorMessage / errorString helpers", () => {
+  it("returns the message of an Error instance", () => {
+    expect(errorMessage(new Error("boom"))).toBe("boom");
+    expect(errorString(new Error("boom"))).toBe("boom");
+  });
+
+  it("returns string values directly", () => {
+    expect(errorMessage("oops")).toBe("oops");
+  });
+
+  it("falls back to the default for non-Error, non-string values", () => {
+    expect(errorMessage(null)).toBe("Unknown error");
+    expect(errorMessage(undefined)).toBe("Unknown error");
+    expect(errorMessage(42)).toBe("Unknown error");
+  });
+
+  it("respects a custom fallback", () => {
+    expect(errorMessage(null, "boom")).toBe("boom");
+  });
+
+  it("errorString stringifies non-Error values", () => {
+    expect(errorString(42)).toBe("42");
+    expect(errorString(null)).toBe("null");
+    expect(errorString({ a: 1 })).toBe("[object Object]");
   });
 });
