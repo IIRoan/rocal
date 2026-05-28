@@ -25,6 +25,19 @@ export const EVENT_PARTICIPANT_INCLUDE = {
   },
 } as const;
 
+/** Standard include for calendar events with category, calendar, and participants. */
+export const EVENT_WITH_RELATIONS_INCLUDE = {
+  category: true,
+  calendar: true,
+  ...EVENT_PARTICIPANT_INCLUDE,
+} as const;
+
+/** Like EVENT_WITH_RELATIONS_INCLUDE but also loads recurrence exceptions. */
+export const EVENT_WITH_RECURRENCE_INCLUDE = {
+  ...EVENT_WITH_RELATIONS_INCLUDE,
+  recurrenceExceptions: true,
+} as const;
+
 export type EventParticipantRecord = Prisma.EventParticipantGetPayload<{
   include: {
     user: {
@@ -176,4 +189,16 @@ export function sortEventParticipants(participants: EventParticipant[]) {
       sensitivity: "base",
     });
   });
+}
+
+/**
+ * Map and sort participants on any event-shaped object.
+ * Replaces the repeated `sortEventParticipants((event.participants ?? []).map(...))` pattern.
+ */
+export function mapAndSortParticipants(
+  event: { participants?: EventParticipantRecord[] | null },
+): EventParticipant[] {
+  return sortEventParticipants(
+    (event.participants ?? []).map((p) => mapEventParticipant(p)),
+  );
 }
