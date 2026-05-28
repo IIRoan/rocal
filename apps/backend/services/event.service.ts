@@ -15,6 +15,17 @@ import type {
   EventIcsExportResult,
 } from "../contracts/event.contract";
 import { ValidationError } from "../lib/errors";
+import {
+  assertCalendarWritable,
+  findUserCalendarOrThrow,
+} from "../lib/calendar-access";
+import {
+  validateEventDescriptionLength,
+  validateEventLocationLength,
+  validateEventReminderMinutes,
+  validateEventTitleLength,
+} from "../lib/event-constraints";
+import { MS_PER_DAY, MS_PER_MINUTE } from "../lib/time-constants";
 import { ensureUserCalendars } from "../lib/user-setup";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
@@ -51,7 +62,6 @@ import {
 const logger = createLogger("backend:event-service");
 
 const INITIALIZED_USER_CACHE_LIMIT = 5000;
-const MAX_REMINDER_MINUTES = 43200; // 30 days
 
 export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
@@ -1232,65 +1242,30 @@ export class EventService implements IEventService {
         }
       }
 
-      if (title.trim().length > 255) {
-        throw new ValidationError(
-          "Title cannot exceed 255 characters",
-          "title",
-        );
+      if (title.trim().length > 0) {
+        validateEventTitleLength(title);
       }
 
-      if (description && description.length > 1000) {
-        throw new ValidationError(
-          "Description cannot exceed 1000 characters",
-          "description",
-        );
-      }
-
-      if (location && location.length > 255) {
-        throw new ValidationError(
-          "Location cannot exceed 255 characters",
-          "location",
-        );
-      }
+      validateEventDescriptionLength(description);
+      validateEventLocationLength(location);
 
       if (!calendarId) {
         throw new ValidationError("Calendar ID is required", "calendarId");
       }
 
-      const calendar = await this.prisma.calendar.findFirst({
-        where: {
-          id: calendarId,
-          userId,
-        },
-      });
+      const calendar = await findUserCalendarOrThrow(
+        this.prisma,
+        userId,
+        calendarId,
+      );
 
-      if (!calendar) {
-        throw new ValidationError(
-          "Invalid calendar or calendar does not belong to user",
-          "calendarId",
-        );
-      }
-
-      if (calendar.kind !== "owned" || calendar.isSyncOnly) {
-        throw new ValidationError(
-          "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
-          "calendarId",
-        );
-      }
+      assertCalendarWritable(
+        calendar,
+        "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
+      );
 
       if (reminder !== undefined && reminder !== null) {
-        const reminderValue = Number(reminder);
-        if (
-          isNaN(reminderValue) ||
-          reminderValue < 0 ||
-          reminderValue > MAX_REMINDER_MINUTES
-        ) {
-          throw new ValidationError(
-            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
-            "reminder",
-          );
-        }
-        reminder = reminderValue;
+        reminder = validateEventReminderMinutes(reminder) as typeof reminder;
       }
 
       const userSettings = await this.prisma.userSettings.findUnique({
@@ -1587,34 +1562,15 @@ export class EventService implements IEventService {
             "title",
           );
         }
-        if (input.title.trim().length > 255) {
-          throw new ValidationError(
-            "Title cannot exceed 255 characters",
-            "title",
-          );
-        }
+        validateEventTitleLength(input.title);
       }
 
-      if (
-        input.description !== undefined &&
-        input.description &&
-        input.description.length > 1000
-      ) {
-        throw new ValidationError(
-          "Description cannot exceed 1000 characters",
-          "description",
-        );
+      if (input.description !== undefined) {
+        validateEventDescriptionLength(input.description);
       }
 
-      if (
-        input.location !== undefined &&
-        input.location &&
-        input.location.length > 255
-      ) {
-        throw new ValidationError(
-          "Location cannot exceed 255 characters",
-          "location",
-        );
+      if (input.location !== undefined) {
+        validateEventLocationLength(input.location);
       }
 
       if (input.color !== undefined && input.color) {
@@ -1628,26 +1584,15 @@ export class EventService implements IEventService {
 
       let targetCalendar = null;
       if (input.calendarId !== undefined) {
-        targetCalendar = await this.prisma.calendar.findFirst({
-          where: {
-            id: input.calendarId,
-            userId,
-          },
-        });
-
-        if (!targetCalendar) {
-          throw new ValidationError(
-            "Invalid calendar or calendar does not belong to user",
-            "calendarId",
-          );
-        }
-
-        if (targetCalendar.kind !== "owned" || targetCalendar.isSyncOnly) {
-          throw new ValidationError(
-            "Cannot move events to a read-only calendar.",
-            "calendarId",
-          );
-        }
+        targetCalendar = await findUserCalendarOrThrow(
+          this.prisma,
+          userId,
+          input.calendarId,
+        );
+        assertCalendarWritable(
+          targetCalendar,
+          "Cannot move events to a read-only calendar.",
+        );
       }
 
       if (input.categoryId !== undefined && input.categoryId) {
@@ -1669,17 +1614,7 @@ export class EventService implements IEventService {
 
       let reminderValue: number | null | undefined = input.reminder;
       if (input.reminder !== undefined && input.reminder !== null) {
-        reminderValue = Number(input.reminder);
-        if (
-          isNaN(reminderValue) ||
-          reminderValue < 0 ||
-          reminderValue > MAX_REMINDER_MINUTES
-        ) {
-          throw new ValidationError(
-            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
-            "reminder",
-          );
-        }
+        reminderValue = validateEventReminderMinutes(input.reminder);
       }
 
       const finalCalendar =
@@ -2547,7 +2482,7 @@ export class EventService implements IEventService {
     if (recurrenceInstanceDate) {
       const durationMs = Math.max(
         event.end.getTime() - event.start.getTime(),
-        event.allDay ? 24 * 60 * 60 * 1000 : 60 * 1000,
+        event.allDay ? MS_PER_DAY : MS_PER_MINUTE,
       );
 
       exportedEvent = {

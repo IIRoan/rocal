@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { createLogger } from "@workspace/logger";
+import { getErrorMessage as getErrorMessageCore } from "@workspace/calendar-core";
 import { authClient } from "@/lib/auth-client";
 import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -14,21 +15,7 @@ import { Label } from "@workspace/ui/components/ui/label";
 const log = createLogger("reset-password");
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string" &&
-    error.message.trim()
-  ) {
-    return error.message;
-  }
-
-  return "Unable to reset your password.";
+  return getErrorMessageCore(error, "Unable to reset your password.");
 }
 
 export default function ResetPasswordPage() {
