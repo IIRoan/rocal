@@ -45,7 +45,7 @@ type ReadOnlyCalendarEntry = {
 export default function CalendarManageScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { push, back } = useRouter();
   const queryClient = useQueryClient();
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
@@ -199,29 +199,29 @@ export default function CalendarManageScreen() {
 
   const handleCalendarPress = useCallback(
     (calendar: Calendar) => {
-      router.push(`/calendar-manage/edit/${calendar.id}`);
+      push(`/calendar-manage/edit/${calendar.id}`);
     },
-    [router],
+    [push],
   );
 
   const handleReadOnlyPress = useCallback(
     (subscription: CalendarSubscription) => {
-      router.push(`/subscription/edit/${subscription.id}`);
+      push(`/subscription/edit/${subscription.id}`);
     },
-    [router],
+    [push],
   );
 
   const handleCreate = useCallback(() => {
-    router.push("/calendar-manage/create");
-  }, [router]);
+    push("/calendar-manage/create");
+  }, [push]);
 
   const handleOpenSubscriptions = useCallback(() => {
-    router.push("/subscription");
-  }, [router]);
+    push("/subscription");
+  }, [push]);
 
   const handleAddOrImport = useCallback(() => {
-    router.push("/subscription/create");
-  }, [router]);
+    push("/subscription/create");
+  }, [push]);
 
   const handleSetDefault = useCallback(
     (calendarId: string) => {
@@ -262,7 +262,7 @@ export default function CalendarManageScreen() {
         <Text style={styles.errorText}>{errorMessage}</Text>
         <Pressable
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >

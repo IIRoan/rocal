@@ -111,6 +111,7 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 // Matches ENCRYPTED_EVENT_PLACEHOLDER_TITLE in @workspace/e2ee — kept local to
 // avoid pulling in the crypto module (which uses TextEncoder) into test environments.
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+const EMPTY_ARRAY: never[] = [];
 
 // ─── Security badge ───────────────────────────────────────────────────────────
 
@@ -643,7 +644,7 @@ type InvitationResponseStatus = "accepted" | "declined" | "tentative";
 export function MessageReader({
   message,
   selectedMessageId,
-  conversationMessages = [],
+  conversationMessages = EMPTY_ARRAY,
   isConversationLoading = false,
   onSelectConversationMessage,
   plaintext,
@@ -657,7 +658,7 @@ export function MessageReader({
   blockTrackingPixels,
   mailboxes,
   currentMailboxId,
-  labels = [],
+  labels = EMPTY_ARRAY,
   onReply,
   onForward,
   onDelete,
@@ -1293,10 +1294,9 @@ export function MessageReader({
           {labels.map((label) => {
             const assigned = message?.keywords?.[`label:${label.id}`] === true;
             return (
-              <div
+              <button
+                type="button"
                 key={label.id}
-                role="button"
-                tabIndex={0}
                 onClick={() => onSetLabel?.(label.id, !assigned)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -1337,7 +1337,7 @@ export function MessageReader({
                     <X className="size-3" strokeWidth={2.5} />
                   </button>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -1354,11 +1354,13 @@ export function MessageReader({
               onChange={(e) => setNewLabelColor(e.target.value)}
               className="size-6 rounded cursor-pointer border-0 p-0 bg-transparent"
               title="Label color"
+              aria-label="Label color"
             />
             <input
               type="text"
               value={newLabelName}
               onChange={(e) => setNewLabelName(e.target.value)}
+              aria-label="New label name"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newLabelName.trim()) {
                   setIsSavingLabel(true);
@@ -2639,7 +2641,7 @@ export function MessageReader({
             </span>
           ) : inviteDeclined ? (
             <span className="text-xs text-muted-foreground">
-              Declined — removed from your calendar
+              Declined, removed from your calendar
             </span>
           ) : !currentCalendarInviteEvent?.event ? (
             <span className="text-xs text-muted-foreground">
@@ -2999,6 +3001,7 @@ export function MessageReader({
         multiple
         className="hidden"
         onChange={handleFileSelect}
+        tabIndex={-1}
         aria-hidden="true"
       />
 
