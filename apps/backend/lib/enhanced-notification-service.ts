@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "./prisma";
+import { MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from "./time-constants";
 import {
   NotificationCalculator,
   type NotificationConfig,
@@ -23,6 +24,12 @@ import type {
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import { createLogger } from "@workspace/logger";
+import { errorMessage } from "./errors";
+import {
+  isRetryableError,
+  isRetryableDatabaseError,
+  isRetryableUpdateError,
+} from "./error-classification";
 // Conditional import to avoid Next.js build issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let EventReminderEmail: ((...args: any[]) => React.JSX.Element) | undefined;
@@ -218,7 +225,7 @@ export class EnhancedNotificationService {
             notificationId: "system",
             eventId: "system",
             userId: "system",
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: errorMessage(error),
             timestamp: new Date(),
             retryCount: 0,
           });
@@ -246,7 +253,7 @@ export class EnhancedNotificationService {
               notificationId: "system",
               eventId: "system",
               userId: "system",
-              error: error instanceof Error ? error.message : "Unknown error",
+              error: errorMessage(error),
               timestamp: new Date(),
               retryCount: 0,
             });
@@ -329,8 +336,7 @@ export class EnhancedNotificationService {
    */
   private async logCriticalSystemError(error: unknown): Promise<void> {
     try {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       await this.executeWithDatabaseRetry(async () => {
         return await prisma.notificationLog.create({
@@ -339,7 +345,7 @@ export class EnhancedNotificationService {
             userId: "system",
             notificationType: "system",
             minutesBefore: 0,
-            status: `critical_error: ${errorMessage}`,
+            status: `critical_error: ${message}`,
             sentAt: new Date(),
           },
         });
@@ -551,11 +557,10 @@ export class EnhancedNotificationService {
               `${config.minutesBefore}min before at ${schedule.notificationDateLocal} ${schedule.notificationTimezone}`,
           );
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+          const message = errorMessage(error);
           skipped.push({
             config,
-            reason: errorMessage,
+            reason: message,
           });
 
           logger.error(
@@ -605,7 +610,7 @@ export class EnhancedNotificationService {
         lastError = error instanceof Error ? error : new Error("Unknown error");
 
         // Check if this is a retryable error (database connection, deadlock, etc.)
-        if (this.isRetryableUpdateError(error) && attempt < maxRetries) {
+        if (isRetryableUpdateError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
           logger.warn(
             `⚠️ Update attempt ${attempt} failed for event ${eventId}, retrying in ${delay}ms: ${lastError.message}`,
@@ -765,11 +770,10 @@ export class EnhancedNotificationService {
                     `${config.minutesBefore}min before at ${schedule.notificationDateLocal} ${schedule.notificationTimezone}`,
                 );
               } catch (error) {
-                const errorMessage =
-                  error instanceof Error ? error.message : "Unknown error";
+                const message = errorMessage(error);
                 skipped.push({
                   config,
-                  reason: errorMessage,
+                  reason: message,
                 });
 
                 logger.error(
@@ -1025,16 +1029,15 @@ export class EnhancedNotificationService {
           failedThisRun++;
           this.failedCount++;
 
-          const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+          const message = errorMessage(error);
 
           // Enhanced error handling with better categorization
-          const shouldRetry = this.shouldRetryError(error);
+          const shouldRetry = isRetryableError(error);
           const retryAfterMinutes = this.calculateRetryDelay(error);
 
           await this.handleNotificationFailure(notification, {
             success: false,
-            error: errorMessage,
+            error: message,
             shouldRetry,
             retryAfterMinutes,
           });
@@ -1072,12 +1075,11 @@ export class EnhancedNotificationService {
       }
     } catch (error) {
       this.failedCount++;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       logger.error(
         "❌ Critical error in background notification processing:",
-        errorMessage,
+        message,
       );
 
       // Enhanced system error logging with recovery information
@@ -1085,7 +1087,7 @@ export class EnhancedNotificationService {
         notificationId: "system",
         eventId: "system",
         userId: "system",
-        error: `Background processing failed: ${errorMessage}`,
+        error: `Background processing failed: ${message}`,
         timestamp: new Date(),
         retryCount: 0,
       });
@@ -1158,14 +1160,13 @@ export class EnhancedNotificationService {
       await this.sendNotification(notification);
       return { success: true, shouldRetry: false };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      const shouldRetry = this.shouldRetryError(error);
+      const message = errorMessage(error);
+      const shouldRetry = isRetryableError(error);
       const retryAfterMinutes = this.calculateRetryDelay(error);
 
       return {
         success: false,
-        error: errorMessage,
+        error: message,
         shouldRetry,
         retryAfterMinutes,
       };
@@ -1195,7 +1196,7 @@ export class EnhancedNotificationService {
       retryCount,
       nextRetryAt:
         result.shouldRetry && retryCount <= maxRetries
-          ? new Date(Date.now() + (result.retryAfterMinutes || 5) * 60 * 1000)
+          ? new Date(Date.now() + (result.retryAfterMinutes || 5) * MS_PER_MINUTE)
           : undefined,
     });
 
@@ -1218,7 +1219,7 @@ export class EnhancedNotificationService {
     // Schedule retry if appropriate
     if (result.shouldRetry && retryCount <= maxRetries) {
       const nextRetryAt = new Date(
-        Date.now() + (result.retryAfterMinutes || 5) * 60 * 1000,
+        Date.now() + (result.retryAfterMinutes || 5) * MS_PER_MINUTE,
       );
 
       this.retryQueue.set(notification.id, {
@@ -1342,14 +1343,14 @@ export class EnhancedNotificationService {
         const updatedRetryInfo = { ...retryInfo };
         updatedRetryInfo.retryCount++;
         updatedRetryInfo.lastError =
-          error instanceof Error ? error.message : "Unknown error";
+          errorMessage(error);
 
         // Use smarter retry logic based on error type
         const shouldContinueRetrying =
-          this.shouldRetryError(error) && updatedRetryInfo.retryCount <= 3;
+          isRetryableError(error) && updatedRetryInfo.retryCount <= 3;
 
         if (shouldContinueRetrying) {
-          const retryDelay = this.calculateRetryDelay(error) * 60 * 1000; // Convert to milliseconds
+          const retryDelay = this.calculateRetryDelay(error) * MS_PER_MINUTE; // Convert to milliseconds
           updatedRetryInfo.nextRetryAt = new Date(Date.now() + retryDelay);
           this.retryQueue.set(notificationId, updatedRetryInfo);
 
@@ -1424,64 +1425,6 @@ export class EnhancedNotificationService {
       logger.error("Failed to log permanent failure:", error);
       // Don't throw - this is just for logging
     }
-  }
-
-  /**
-   * Determine if an error should trigger a retry
-   * @param error - The error that occurred
-   * @returns Whether the error is retryable
-   */
-  private shouldRetryError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const errorMessage = error.message.toLowerCase();
-
-    // Retryable errors (transient failures)
-    const retryableErrors = [
-      "network",
-      "timeout",
-      "connection",
-      "temporary",
-      "rate limit",
-      "service unavailable",
-      "internal server error",
-      "bad gateway",
-      "gateway timeout",
-      "econnreset",
-      "enotfound",
-      "etimedout",
-    ];
-
-    // Non-retryable errors (permanent failures)
-    const nonRetryableErrors = [
-      "invalid email",
-      "authentication failed",
-      "unauthorized",
-      "forbidden",
-      "not found",
-      "bad request",
-      "validation",
-      "malformed",
-    ];
-
-    // Check for non-retryable errors first
-    for (const nonRetryable of nonRetryableErrors) {
-      if (errorMessage.includes(nonRetryable)) {
-        return false;
-      }
-    }
-
-    // Check for retryable errors
-    for (const retryable of retryableErrors) {
-      if (errorMessage.includes(retryable)) {
-        return true;
-      }
-    }
-
-    // Default to retryable for unknown errors (conservative approach)
-    return true;
   }
 
   /**
@@ -1607,12 +1550,11 @@ export class EnhancedNotificationService {
         `✅ Successfully sent ${notification.notificationType} notification for event "${event.title}"`,
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       logger.error(
         `❌ Failed to send notification for event "${event.title}":`,
-        errorMessage,
+        message,
       );
 
       // Log the failed notification (but don't mark as sent so it can be retried)
@@ -1622,7 +1564,7 @@ export class EnhancedNotificationService {
         notification.notificationType,
         notification.minutesBefore,
         "failed",
-        errorMessage,
+        message,
       );
 
       throw error;
@@ -1764,7 +1706,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       logger.error("Failed to generate email content:", error);
       throw new Error(
-        `Email content generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Email content generation failed: ${errorMessage(error)}`,
       );
     }
   }
@@ -1992,7 +1934,7 @@ export class EnhancedNotificationService {
     event: CalendarEvent,
   ): Error {
     const originalMessage =
-      error instanceof Error ? error.message : "Unknown error";
+      errorMessage(error);
     const errorLower = originalMessage.toLowerCase();
 
     // Categorize errors for better handling
@@ -2056,7 +1998,7 @@ export class EnhancedNotificationService {
           error instanceof Error ? error : new Error("Unknown database error");
 
         // Check if this is a retryable database error
-        if (this.isRetryableDatabaseError(error) && attempt < maxRetries) {
+        if (isRetryableDatabaseError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
           logger.warn(
             `⚠️ Database operation attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message}`,
@@ -2077,124 +2019,6 @@ export class EnhancedNotificationService {
       lastError ||
       new Error("Database operation failed after all retry attempts")
     );
-  }
-
-  /**
-   * Check if a database error is retryable
-   * @param error - The error to check
-   * @returns Whether the error should trigger a retry
-   */
-  private isRetryableDatabaseError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const errorMessage = error.message.toLowerCase();
-    const errorCode = (error as { code?: string }).code;
-
-    // Retryable database errors
-    const retryableErrors = [
-      "connection",
-      "timeout",
-      "deadlock",
-      "lock",
-      "busy",
-      "network",
-      "econnreset",
-      "enotfound",
-      "etimedout",
-      "server has gone away",
-      "lost connection",
-      "connection refused",
-      "too many connections",
-      "connection pool",
-      "transaction",
-    ];
-
-    // Retryable error codes (Prisma/PostgreSQL specific)
-    const retryableErrorCodes = [
-      "P1001", // Can't reach database server
-      "P1002", // Database server timeout
-      "P1008", // Operations timed out
-      "P1017", // Server has closed the connection
-      "P2024", // Timed out fetching a new connection
-      "P2034", // Transaction failed due to a write conflict
-      "40001", // Serialization failure
-      "40P01", // Deadlock detected
-      "53300", // Too many connections
-      "08000", // Connection exception
-      "08003", // Connection does not exist
-      "08006", // Connection failure
-    ];
-
-    // Check error codes first
-    if (errorCode && retryableErrorCodes.includes(errorCode)) {
-      return true;
-    }
-
-    // Check error message
-    for (const retryableError of retryableErrors) {
-      if (errorMessage.includes(retryableError)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if an update error is retryable (for concurrent update handling)
-   * @param error - The error to check
-   * @returns Whether the error should trigger a retry
-   */
-  private isRetryableUpdateError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const errorMessage = error.message.toLowerCase();
-    const errorCode = (error as { code?: string }).code;
-
-    // Retryable update errors (concurrent access, deadlocks, etc.)
-    const retryableUpdateErrors = [
-      "deadlock",
-      "lock",
-      "conflict",
-      "concurrent",
-      "serialization",
-      "unique constraint",
-      "foreign key constraint",
-      "transaction",
-      "could not serialize",
-      "update conflict",
-      "version mismatch",
-    ];
-
-    // Retryable update error codes
-    const retryableUpdateErrorCodes = [
-      "P2002", // Unique constraint failed
-      "P2003", // Foreign key constraint failed
-      "P2034", // Transaction failed due to a write conflict
-      "40001", // Serialization failure
-      "40P01", // Deadlock detected
-      "23505", // Unique violation
-      "23503", // Foreign key violation
-    ];
-
-    // Check error codes first
-    if (errorCode && retryableUpdateErrorCodes.includes(errorCode)) {
-      return true;
-    }
-
-    // Check error message
-    for (const retryableError of retryableUpdateErrors) {
-      if (errorMessage.includes(retryableError)) {
-        return true;
-      }
-    }
-
-    // Also check if it's a general database error
-    return this.isRetryableDatabaseError(error);
   }
 
   /**
@@ -2306,7 +2130,7 @@ export class EnhancedNotificationService {
                   isEnabled: true,
                 } as NotificationConfig,
                 reason:
-                  error instanceof Error ? error.message : "Unknown error",
+                  errorMessage(error),
               },
             ],
           };
@@ -2753,7 +2577,7 @@ export class EnhancedNotificationService {
   }> {
     const startTime = Date.now();
     const retentionCutoff = new Date(
-      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+      Date.now() - retentionDays * MS_PER_DAY,
     );
 
     logger.info(
@@ -2787,7 +2611,7 @@ export class EnhancedNotificationService {
             // Only delete notifications for events that have already ended
             event: {
               end: {
-                lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Events ended more than 7 days ago
+                lt: new Date(Date.now() - 7 * MS_PER_DAY), // Events ended more than 7 days ago
               },
             },
           },
@@ -2850,12 +2674,11 @@ export class EnhancedNotificationService {
       };
     } catch (error) {
       const cleanupDuration = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       logger.error(
         `❌ Cleanup failed after ${cleanupDuration}ms:`,
-        errorMessage,
+        message,
       );
 
       // Log cleanup failure
@@ -2865,7 +2688,7 @@ export class EnhancedNotificationService {
         cleanupDuration,
         retentionDays,
         retentionCutoff,
-        error: errorMessage,
+        error: message,
       });
 
       throw new Error(`Notification cleanup failed: ${errorMessage}`);
@@ -2908,7 +2731,7 @@ export class EnhancedNotificationService {
         } catch (error) {
           logger.warn(
             `⚠️ Failed to analyze table ${table}:`,
-            error instanceof Error ? error.message : "Unknown error",
+            errorMessage(error),
           );
         }
       }
@@ -2932,7 +2755,7 @@ export class EnhancedNotificationService {
           } catch (error) {
             logger.warn(
               `⚠️ Failed to reindex ${index}:`,
-              error instanceof Error ? error.message : "Unknown error",
+              errorMessage(error),
             );
           }
         }
@@ -2951,7 +2774,7 @@ export class EnhancedNotificationService {
           } catch (error) {
             logger.warn(
               `⚠️ Failed to vacuum table ${table}:`,
-              error instanceof Error ? error.message : "Unknown error",
+              errorMessage(error),
             );
           }
         }
@@ -2962,7 +2785,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       logger.error(
         "❌ Database maintenance failed:",
-        error instanceof Error ? error.message : "Unknown error",
+        errorMessage(error),
       );
       return maintenanceResults;
     }
@@ -3057,7 +2880,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       logger.error(
         "Failed to log cleanup statistics:",
-        error instanceof Error ? error.message : "Unknown error",
+        errorMessage(error),
       );
       // Don't throw here as logging failure shouldn't break cleanup
     }
@@ -3078,7 +2901,7 @@ export class EnhancedNotificationService {
       clearInterval(this.cleanupTimer);
     }
 
-    const intervalMs = intervalHours * 60 * 60 * 1000;
+    const intervalMs = intervalHours * MS_PER_HOUR;
 
     logger.info(
       `⏰ Scheduling automatic cleanup every ${intervalHours} hours with ${retentionDays} day retention`,
@@ -3095,7 +2918,7 @@ export class EnhancedNotificationService {
       } catch (error) {
         logger.error(
           "❌ Scheduled cleanup failed:",
-          error instanceof Error ? error.message : "Unknown error",
+          errorMessage(error),
         );
       }
     }, intervalMs);
@@ -3108,7 +2931,7 @@ export class EnhancedNotificationService {
       } catch (error) {
         logger.error(
           "❌ Initial cleanup failed:",
-          error instanceof Error ? error.message : "Unknown error",
+          errorMessage(error),
         );
       }
     }, 30000); // 30 seconds delay
@@ -3144,7 +2967,7 @@ export class EnhancedNotificationService {
       // Note: We can't get exact next run time from setInterval,
       // but we could track this if needed
       nextRunEstimate: this.cleanupTimer
-        ? new Date(Date.now() + 24 * 60 * 60 * 1000) // Estimate based on 24h default
+        ? new Date(Date.now() + MS_PER_DAY) // Estimate based on 24h default
         : undefined,
       lastCleanupStats: this.lastCleanupStats,
     };
@@ -3282,7 +3105,7 @@ export class EnhancedNotificationService {
       logger.error("Failed to get cleanup metrics:", error);
       throw new Error(
         `Failed to retrieve cleanup metrics: ${
-          error instanceof Error ? error.message : "Unknown error"
+          errorMessage(error)
         }`,
       );
     }
@@ -3319,7 +3142,7 @@ export class EnhancedNotificationService {
       });
 
       // Get recent notification logs (last 24 hours)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const oneDayAgo = new Date(Date.now() - MS_PER_DAY);
       const recentLogs = await prisma.notificationLog.groupBy({
         by: ["status"],
         where: {
@@ -3425,7 +3248,7 @@ export class EnhancedNotificationService {
         return {
           config,
           isValid: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: errorMessage(error),
         };
       }
     });

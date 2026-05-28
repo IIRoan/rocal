@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getErrorMessage } from "@workspace/calendar-core";
 import { Lock, RotateCcw, Loader2 } from "lucide-react";
 
 interface PasswordSectionProps {
@@ -80,7 +81,7 @@ export function PasswordSection({
     } catch (err) {
       setMsg({
         kind: "error",
-        text: err instanceof Error ? err.message : "Something went wrong.",
+        text: getErrorMessage(err, "Something went wrong."),
       });
     }
   };

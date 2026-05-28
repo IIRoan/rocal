@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { getErrorMessage } from "@workspace/calendar-core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -110,6 +111,7 @@ import { calendarApiService } from "@/lib/calendar-api-service";
 // Matches ENCRYPTED_EVENT_PLACEHOLDER_TITLE in @workspace/e2ee — kept local to
 // avoid pulling in the crypto module (which uses TextEncoder) into test environments.
 const ENCRYPTED_EVENT_PLACEHOLDER_TITLE = "Encrypted event";
+const EMPTY_ARRAY: never[] = [];
 
 // ─── Security badge ───────────────────────────────────────────────────────────
 
@@ -642,7 +644,7 @@ type InvitationResponseStatus = "accepted" | "declined" | "tentative";
 export function MessageReader({
   message,
   selectedMessageId,
-  conversationMessages = [],
+  conversationMessages = EMPTY_ARRAY,
   isConversationLoading = false,
   onSelectConversationMessage,
   plaintext,
@@ -656,7 +658,7 @@ export function MessageReader({
   blockTrackingPixels,
   mailboxes,
   currentMailboxId,
-  labels = [],
+  labels = EMPTY_ARRAY,
   onReply,
   onForward,
   onDelete,
@@ -1032,7 +1034,7 @@ export function MessageReader({
       toast.success("Cancelled event removed from your calendar.");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to remove event.",
+        getErrorMessage(error, "Failed to remove event."),
       );
     } finally {
       setCancelProcessPending(false);
@@ -1292,37 +1294,31 @@ export function MessageReader({
           {labels.map((label) => {
             const assigned = message?.keywords?.[`label:${label.id}`] === true;
             return (
-              <div
-                key={label.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onSetLabel?.(label.id, !assigned)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSetLabel?.(label.id, !assigned);
-                  }
-                }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors text-left cursor-pointer select-none"
-              >
-                <span
-                  className="size-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
-                  style={{
-                    backgroundColor: label.color,
-                    boxShadow: assigned
-                      ? `0 0 0 1px ${label.color}`
-                      : undefined,
-                  }}
-                />
-                <span className="flex-1 truncate text-foreground/80">
-                  {label.name}
-                </span>
-                {assigned && (
-                  <Check
-                    className="size-3 text-foreground/50 shrink-0"
-                    strokeWidth={2.5}
+              <div key={label.id} className="flex items-center rounded hover:bg-accent/50 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => onSetLabel?.(label.id, !assigned)}
+                  className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm text-left cursor-pointer select-none min-w-0"
+                >
+                  <span
+                    className="size-2.5 rounded-full shrink-0 ring-1 ring-offset-1 ring-offset-popover"
+                    style={{
+                      backgroundColor: label.color,
+                      boxShadow: assigned
+                        ? `0 0 0 1px ${label.color}`
+                        : undefined,
+                    }}
                   />
-                )}
+                  <span className="flex-1 truncate text-foreground/80">
+                    {label.name}
+                  </span>
+                  {assigned && (
+                    <Check
+                      className="size-3 text-foreground/50 shrink-0"
+                      strokeWidth={2.5}
+                    />
+                  )}
+                </button>
                 {onDeleteLabel && (
                   <button
                     type="button"
@@ -1330,7 +1326,7 @@ export function MessageReader({
                       e.stopPropagation();
                       onDeleteLabel(label.id);
                     }}
-                    className="ml-auto size-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors"
+                    className="mr-1 size-4 flex items-center justify-center rounded text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
                     aria-label={`Delete label ${label.name}`}
                   >
                     <X className="size-3" strokeWidth={2.5} />
@@ -1353,11 +1349,13 @@ export function MessageReader({
               onChange={(e) => setNewLabelColor(e.target.value)}
               className="size-6 rounded cursor-pointer border-0 p-0 bg-transparent"
               title="Label color"
+              aria-label="Label color"
             />
             <input
               type="text"
               value={newLabelName}
               onChange={(e) => setNewLabelName(e.target.value)}
+              aria-label="New label name"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newLabelName.trim()) {
                   setIsSavingLabel(true);
@@ -2638,7 +2636,7 @@ export function MessageReader({
             </span>
           ) : inviteDeclined ? (
             <span className="text-xs text-muted-foreground">
-              Declined — removed from your calendar
+              Declined, removed from your calendar
             </span>
           ) : !currentCalendarInviteEvent?.event ? (
             <span className="text-xs text-muted-foreground">
@@ -2998,6 +2996,7 @@ export function MessageReader({
         multiple
         className="hidden"
         onChange={handleFileSelect}
+        tabIndex={-1}
         aria-hidden="true"
       />
 

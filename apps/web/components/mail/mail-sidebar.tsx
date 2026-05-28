@@ -82,7 +82,7 @@ const PROTECTED_ROLES = new Set([
   "spam",
 ]);
 
-export function getMailboxIcon(role: string | null | undefined): LucideIcon {
+function getMailboxIcon(role: string | null | undefined): LucideIcon {
   switch (role?.toLowerCase()) {
     case "inbox":
       return Inbox;

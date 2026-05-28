@@ -46,6 +46,12 @@
       ],
       "@workspace/design-tokens/*": [
         "../../packages/design-tokens/src/*"
+      ],
+      "@workspace/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@workspace/ui/*": [
+        "../../packages/ui/src/*"
       ]
     },
     "plugins": [

@@ -11,6 +11,7 @@ import {
   buildStalwartMailBridgeRedirectUri,
   getStalwartMailBridgeClientId,
 } from "../lib/mail-bridge-auth";
+import { errorMessage } from "../lib/errors";
 
 type JmapProxyFetcher = (
   input: string,
@@ -210,7 +211,7 @@ async function proxyJmapRequest(input: {
     });
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Unknown network error";
+      errorMessage(err, "Unknown network error");
     logger.error("JMAP proxy upstream request failed", {
       upstreamUrl,
       method,
@@ -308,7 +309,7 @@ export function createMailRoutes(
           });
         } catch (err) {
           const message =
-            err instanceof Error ? err.message : "Could not issue mail token.";
+            errorMessage(err, "Could not issue mail token.");
           set.status = 400;
           return {
             error: "mail_token_error",
@@ -343,7 +344,7 @@ export function createMailRoutes(
           return { keyMaterial, version: "v1" };
         } catch (err) {
           const message =
-            err instanceof Error ? err.message : "Could not derive vault key material.";
+            errorMessage(err, "Could not derive vault key material.");
           set.status = 500;
           return { error: "vault_key_error", message, statusCode: 500 };
         }
