@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useEffect, useRef, useState } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   addHours,
   areIntervalsOverlapping,
@@ -476,7 +477,13 @@ export function MobileWeekView({
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">
+                          <div
+                            className={cn(
+                              "text-sm font-medium truncate",
+                              isCancelledCalendarEvent(event) &&
+                                "line-through opacity-70",
+                            )}
+                          >
                             {event.title || "Untitled Event"}
                           </div>
                           <div className="text-xs text-muted-foreground">

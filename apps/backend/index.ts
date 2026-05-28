@@ -451,6 +451,7 @@ const calendarSyncService = CalendarSyncService.getInstance();
 
 const shutdown = () => {
   calendarSyncService.stop();
+  defaultMailRealtimeService.stop();
 };
 
 process.on("SIGINT", shutdown);

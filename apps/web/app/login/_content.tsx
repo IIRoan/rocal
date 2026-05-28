@@ -180,8 +180,11 @@ export function LoginForm() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [isPasskeySupported, setIsPasskeySupported] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isPasskeySupported] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.PublicKeyCredential !== "undefined",
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [overlayFading, setOverlayFading] = useState(false);
@@ -223,6 +226,7 @@ export function LoginForm() {
   const router = useSmoothRouter();
   const searchParams = useSearchParams();
   const { theme: currentTheme } = useTheme();
+  const isCheckingSession = isPending;
   const nextPath = searchParams.get("next");
   const callbackUrl =
     searchParams.get("callbackURL") || searchParams.get("callbackUrl");
@@ -259,11 +263,19 @@ export function LoginForm() {
   useEffect(() => {
     if (!isSignUp) return;
     const trimmed = desiredEmail.trim().toLowerCase();
-    setEmailAvailability(null);
     if (emailCheckTimerRef.current) clearTimeout(emailCheckTimerRef.current);
-    if (!trimmed) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setEmailAvailability(null);
+      setEmailChecking(Boolean(trimmed));
+    });
+    if (!trimmed) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
-    setEmailChecking(true);
     emailCheckTimerRef.current = setTimeout(async () => {
       try {
         const result = await accountApiService.checkEmailAvailability(trimmed);
@@ -280,6 +292,7 @@ export function LoginForm() {
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
+      cancelled = true;
       if (emailCheckTimerRef.current) clearTimeout(emailCheckTimerRef.current);
     };
   }, [desiredEmail, isSignUp]);
@@ -288,12 +301,20 @@ export function LoginForm() {
   useEffect(() => {
     if (!isSignUp) return;
     const trimmed = inviteToken.trim();
-    setInviteValidation(null);
     if (inviteValidateTimerRef.current)
       clearTimeout(inviteValidateTimerRef.current);
-    if (!trimmed) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setInviteValidation(null);
+      setInviteValidating(Boolean(trimmed));
+    });
+    if (!trimmed) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
-    setInviteValidating(true);
     inviteValidateTimerRef.current = setTimeout(async () => {
       try {
         const result = await inviteApiService.validateInviteToken(trimmed);
@@ -317,6 +338,7 @@ export function LoginForm() {
     }, FIELD_VALIDATION_DEBOUNCE_MS);
 
     return () => {
+      cancelled = true;
       if (inviteValidateTimerRef.current)
         clearTimeout(inviteValidateTimerRef.current);
     };
@@ -401,24 +423,33 @@ export function LoginForm() {
 
   useEffect(() => {
     if (!isPending) {
-      setIsCheckingSession(false);
-      void handleSessionRedirect();
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          void handleSessionRedirect();
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [session, isPending, handleSessionRedirect]);
 
   useEffect(() => {
     if (!isPending && !isCheckingSession && !session?.user) {
-      setOverlayFading(true);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setOverlayFading(true);
+        }
+      });
       const t = setTimeout(() => setOverlayVisible(false), 300);
-      return () => clearTimeout(t);
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
     }
   }, [isPending, isCheckingSession, session?.user]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.PublicKeyCredential) {
-      setIsPasskeySupported(true);
-    }
-  }, []);
 
   // Pre-fill invite token from ?invite= URL param and load signup domain
   useEffect(() => {
@@ -426,8 +457,11 @@ export function LoginForm() {
 
     const urlToken = searchParams.get("invite");
     if (urlToken) {
-      setInviteToken(urlToken.trim());
-      setAuthMode("sign-up");
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setInviteToken(urlToken.trim());
+        setAuthMode("sign-up");
+      });
     }
 
     void accountApiService
@@ -719,7 +753,7 @@ export function LoginForm() {
   useEffect(() => {
     if (!requiresPasskeyStepUp) {
       hasAutoPromptedStepUpRef.current = false;
-      setShouldAutoPromptPasskey(false);
+      queueMicrotask(() => setShouldAutoPromptPasskey(false));
       return;
     }
 

@@ -9,6 +9,10 @@ import {
   it,
   jest,
 } from "@jest/globals";
+import {
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
 
 // jsdom does not implement matchMedia
@@ -25,6 +29,8 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: jest.fn(),
   })),
 });
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Mock clipboard API
 Object.defineProperty(navigator, "clipboard", {
@@ -85,20 +91,31 @@ jest.mock("@workspace/ui/components/ui/drawer", () => ({
 }));
 
 jest.mock("@workspace/ui/components/ui/button", () => ({
-  Button: ({ children, onClick, disabled, "aria-label": ariaLabel, ...rest }: any) => (
-    <button onClick={onClick} disabled={disabled} aria-label={ariaLabel} {...rest}>
-      {children}
-    </button>
-  ),
+  Button: ({
+    children,
+    onClick,
+    disabled,
+    "aria-label": ariaLabel,
+    asChild,
+    ...rest
+  }: any) =>
+    asChild ? (
+      children
+    ) : (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        {...rest}
+      >
+        {children}
+      </button>
+    ),
 }));
 
 jest.mock("@workspace/ui/components/ui/separator", () => ({
   Separator: ({ className, orientation }: any) => (
-    <hr
-      className={className}
-      data-orientation={orientation}
-      aria-hidden
-    />
+    <hr className={className} data-orientation={orientation} aria-hidden />
   ),
 }));
 
@@ -167,6 +184,10 @@ jest.mock("lucide-react", () => {
     Lock: Icon,
     Loader2: Icon,
     MailOpen: Icon,
+    CalendarDays: Icon,
+    Clock: Icon,
+    MapPin: Icon,
+    ExternalLink: Icon,
     MoreHorizontal: Icon,
     Paperclip: Icon,
     Pin: Icon,
@@ -204,9 +225,26 @@ jest.mock("../../lib/mail/message-security", () => ({
 jest.mock("../../components/mail/mail-helpers", () => ({
   formatAddressFull: (addresses: any[]) =>
     addresses?.map((a: any) => a.email).join(", ") ?? "",
+  formatMessageDate: (value: string) => value,
 }));
 
-import { MessageReader, type MessageReaderProps } from "../../components/mail/message-reader";
+jest.mock("../../lib/calendar-api-service", () => ({
+  calendarApiService: {
+    getEvent: jest.fn(),
+    getInvitationByExternalId: jest.fn(),
+    importInvitationIcs: jest.fn(),
+    respondToInvitation: jest.fn(),
+    deleteEvent: jest.fn(),
+  },
+}));
+
+import {
+  MessageReader,
+  type MessageReaderProps,
+} from "../../components/mail/message-reader";
+import { calendarApiService } from "../../lib/calendar-api-service";
+
+const mockCalendarApiService = jest.mocked(calendarApiService);
 
 const baseMessage = {
   id: "msg-1",
@@ -240,11 +278,44 @@ const defaultProps: MessageReaderProps = {
 
 let container: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
 
 beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  queryClient = new QueryClient();
+  mockCalendarApiService.getEvent.mockResolvedValue({
+    id: "event-1",
+    title: "Planning sync",
+    description: "Discuss launch details.",
+    start: new Date("2026-05-13T09:00:00Z"),
+    end: new Date("2026-05-13T10:00:00Z"),
+    allDay: false,
+    location: "Room 42",
+    calendarId: "cal-1",
+    calendar: { id: "cal-1", name: "Work" },
+    userId: "user-1",
+    createdAt: new Date("2026-05-01T00:00:00Z"),
+    updatedAt: new Date("2026-05-01T00:00:00Z"),
+  } as any);
+  mockCalendarApiService.getInvitationByExternalId.mockResolvedValue(null);
+  mockCalendarApiService.importInvitationIcs.mockResolvedValue({
+    messagesScanned: 1,
+    icsPartsFound: 1,
+    eventsCreated: 1,
+    eventsUpdated: 0,
+    eventsDeleted: 0,
+    errors: [],
+  });
+  mockCalendarApiService.respondToInvitation.mockResolvedValue({
+    id: "event-1",
+  } as any);
+  mockCalendarApiService.deleteEvent.mockResolvedValue({
+    success: true,
+    message: "Event deleted successfully",
+    deletedEventId: "event-1",
+  } as any);
 });
 
 afterEach(() => {
@@ -258,7 +329,9 @@ afterEach(() => {
 function render(props: Partial<MessageReaderProps> = {}) {
   act(() => {
     root.render(
-      <MessageReader {...defaultProps} {...props} />,
+      <QueryClientProvider client={queryClient}>
+        <MessageReader {...defaultProps} {...props} />
+      </QueryClientProvider>,
     );
   });
 }
@@ -278,7 +351,9 @@ describe("MessageReader — email header", () => {
 
   it("renders sender avatar", () => {
     render();
-    expect(container.querySelector("[data-testid='sender-avatar']")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='sender-avatar']"),
+    ).not.toBeNull();
   });
 
   it("renders From address", () => {
@@ -309,6 +384,232 @@ describe("MessageReader — email header", () => {
   });
 });
 
+describe("MessageReader — linked calendar event", () => {
+  it("fetches and injects event details for Solace reminder mail", async () => {
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "Reminder: Planning sync",
+                bodyValues: {
+                  "1": {
+                    value:
+                      "Your event starts soon.\nEvent ID: event-1\nOpen it in Solace.",
+                  },
+                },
+              } as any
+            }
+            plaintext={"Your event starts soon.\nEvent ID: event-1"}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.getEvent).toHaveBeenCalledWith("event-1");
+    expect(container.textContent).toContain("Linked calendar event");
+    expect(container.textContent).toContain("Planning sync");
+    expect(container.textContent).toContain("Room 42");
+    expect(container.textContent).toContain("Calendar: Work");
+    expect(container.textContent).toContain("Discuss launch details.");
+    expect(
+      container.querySelector('a[href="/calendar?eventId=event-1"]'),
+    ).not.toBeNull();
+  });
+
+  it("extracts and imports decrypted ICS attachments for invitation mail", async () => {
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:google-event-1@example.com",
+      "DTSTART:20260527T150000Z",
+      "DTEND:20260527T160000Z",
+      "SUMMARY:testinvite6",
+      "LOCATION:google event",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "event-1",
+        title: "testinvite6",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: "google event",
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        participants: [
+          {
+            userId: "user-1",
+            email: "bob@example.com",
+            role: "attendee",
+            status: "pending",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "google event",
+                bodyValues: {},
+              } as any
+            }
+            plaintext={"Invitation from Google Calendar"}
+            attachments={[
+              {
+                name: "invite.ics",
+                type: "text/calendar; method=REQUEST",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
+      icsContent,
+    );
+    expect(
+      mockCalendarApiService.getInvitationByExternalId,
+    ).toHaveBeenCalledWith("google-event-1@example.com");
+    expect(container.textContent).toContain("testinvite6");
+    expect(
+      container.querySelector('a[href="/calendar?eventId=event-1"]'),
+    ).not.toBeNull();
+  });
+
+  it("auto-processes CANCEL invites for already accepted events", async () => {
+    const icsContent = [
+      "BEGIN:VCALENDAR",
+      "METHOD:CANCEL",
+      "BEGIN:VEVENT",
+      "UID:google-event-1@example.com",
+      "DTSTART:20260527T150000Z",
+      "DTEND:20260527T160000Z",
+      "SUMMARY:testinvite6",
+      "LOCATION:google event",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    mockCalendarApiService.getInvitationByExternalId
+      .mockResolvedValueOnce({
+        id: "event-1",
+        title: "testinvite6",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: "google event",
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        participants: [
+          {
+            userId: "user-1",
+            email: "bob@example.com",
+            role: "attendee",
+            status: "accepted",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any)
+      .mockResolvedValueOnce({
+        id: "event-1",
+        title: "testinvite6",
+        description: null,
+        start: new Date("2026-05-27T15:00:00Z"),
+        end: new Date("2026-05-27T16:00:00Z"),
+        allDay: false,
+        location: "google event",
+        calendarId: "cal-1",
+        calendar: { id: "cal-1", name: "Work" },
+        userId: "user-1",
+        isCancelled: true,
+        participants: [
+          {
+            userId: "user-1",
+            email: "bob@example.com",
+            role: "attendee",
+            status: "accepted",
+          },
+        ],
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        updatedAt: new Date("2026-05-01T00:00:00Z"),
+      } as any);
+    mockCalendarApiService.importInvitationIcs.mockResolvedValueOnce({
+      messagesScanned: 1,
+      icsPartsFound: 1,
+      eventsCreated: 0,
+      eventsUpdated: 1,
+      eventsDeleted: 0,
+      errors: [],
+    });
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MessageReader
+            {...defaultProps}
+            message={
+              {
+                ...baseMessage,
+                subject: "google event cancelled",
+                bodyValues: {},
+              } as any
+            }
+            plaintext={"Cancellation from Google Calendar"}
+            attachments={[
+              {
+                name: "cancel.ics",
+                type: "text/calendar; method=CANCEL",
+                content: icsContent,
+              },
+            ]}
+          />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCalendarApiService.importInvitationIcs).toHaveBeenCalledWith(
+      icsContent,
+    );
+    expect(
+      mockCalendarApiService.getInvitationByExternalId,
+    ).toHaveBeenNthCalledWith(1, "google-event-1@example.com");
+    expect(
+      mockCalendarApiService.getInvitationByExternalId,
+    ).toHaveBeenNthCalledWith(2, "google-event-1@example.com");
+    expect(container.textContent).toContain("Cancelled invitation");
+    expect(container.textContent).toContain("Remove from calendar");
+  });
+});
+
 describe("MessageReader — toolbar navigation", () => {
   it("renders Previous message button", () => {
     render({ hasPrev: true, onNavigatePrev: jest.fn() });
@@ -325,28 +626,40 @@ describe("MessageReader — toolbar navigation", () => {
   it("calls onNavigatePrev when Previous button is clicked", () => {
     const onNavigatePrev = jest.fn();
     render({ hasPrev: true, onNavigatePrev });
-    const btn = container.querySelector("[aria-label='Previous message']") as HTMLButtonElement;
-    act(() => { btn.click(); });
+    const btn = container.querySelector(
+      "[aria-label='Previous message']",
+    ) as HTMLButtonElement;
+    act(() => {
+      btn.click();
+    });
     expect(onNavigatePrev).toHaveBeenCalledTimes(1);
   });
 
   it("calls onNavigateNext when Next button is clicked", () => {
     const onNavigateNext = jest.fn();
     render({ hasNext: true, onNavigateNext });
-    const btn = container.querySelector("[aria-label='Next message']") as HTMLButtonElement;
-    act(() => { btn.click(); });
+    const btn = container.querySelector(
+      "[aria-label='Next message']",
+    ) as HTMLButtonElement;
+    act(() => {
+      btn.click();
+    });
     expect(onNavigateNext).toHaveBeenCalledTimes(1);
   });
 
   it("disables Previous button when hasPrev is false", () => {
     render({ hasPrev: false, onNavigatePrev: jest.fn() });
-    const btn = container.querySelector("[aria-label='Previous message']") as HTMLButtonElement;
+    const btn = container.querySelector(
+      "[aria-label='Previous message']",
+    ) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
   it("disables Next button when hasNext is false", () => {
     render({ hasNext: false, onNavigateNext: jest.fn() });
-    const btn = container.querySelector("[aria-label='Next message']") as HTMLButtonElement;
+    const btn = container.querySelector(
+      "[aria-label='Next message']",
+    ) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 });
@@ -361,8 +674,12 @@ describe("MessageReader — close button", () => {
   it("calls onClose when Close button is clicked", () => {
     const onClose = jest.fn();
     render({ onClose });
-    const btn = container.querySelector("[aria-label='Close message']") as HTMLButtonElement;
-    act(() => { btn.click(); });
+    const btn = container.querySelector(
+      "[aria-label='Close message']",
+    ) as HTMLButtonElement;
+    act(() => {
+      btn.click();
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -382,14 +699,20 @@ describe("MessageReader — archive button", () => {
   it("calls onArchive when Archive button is clicked", () => {
     const onArchive = jest.fn();
     render({ onArchive });
-    const btn = container.querySelector("[aria-label='Archive message']") as HTMLButtonElement;
-    act(() => { btn.click(); });
+    const btn = container.querySelector(
+      "[aria-label='Archive message']",
+    ) as HTMLButtonElement;
+    act(() => {
+      btn.click();
+    });
     expect(onArchive).toHaveBeenCalledTimes(1);
   });
 
   it("does not render Archive button when onArchive is not provided", () => {
     render({ onArchive: undefined });
-    expect(container.querySelector("[aria-label='Archive message']")).toBeNull();
+    expect(
+      container.querySelector("[aria-label='Archive message']"),
+    ).toBeNull();
   });
 });
 
@@ -403,8 +726,12 @@ describe("MessageReader — reply button in toolbar", () => {
   it("calls onReply when Reply button is clicked", () => {
     const onReply = jest.fn();
     render({ onReply });
-    const btn = container.querySelector("[aria-label='Reply']") as HTMLButtonElement;
-    act(() => { btn.click(); });
+    const btn = container.querySelector(
+      "[aria-label='Reply']",
+    ) as HTMLButtonElement;
+    act(() => {
+      btn.click();
+    });
     expect(onReply).toHaveBeenCalledTimes(1);
   });
 });
@@ -419,9 +746,13 @@ describe("MessageReader — delete dropdown", () => {
   it("calls onDelete when 'Move to trash' button is clicked", () => {
     const onDelete = jest.fn();
     render({ onDelete });
-    const btn = container.querySelector("[aria-label='Move to trash']") as HTMLButtonElement;
+    const btn = container.querySelector(
+      "[aria-label='Move to trash']",
+    ) as HTMLButtonElement;
     expect(btn).not.toBeNull();
-    act(() => { btn.click(); });
+    act(() => {
+      btn.click();
+    });
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });
@@ -440,7 +771,9 @@ describe("MessageReader — more actions dropdown", () => {
       container.querySelectorAll("button"),
     ).filter((b) => b.textContent?.includes("Forward"));
     expect(forwardButtons.length).toBeGreaterThan(0);
-    act(() => { forwardButtons[0].click(); });
+    act(() => {
+      forwardButtons[0].click();
+    });
     expect(onForward).toHaveBeenCalledTimes(1);
   });
 
@@ -448,10 +781,14 @@ describe("MessageReader — more actions dropdown", () => {
     const onMarkAsUnread = jest.fn();
     render({ onMarkAsUnread });
     const buttons = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.textContent?.includes("Unread") || b.textContent?.includes("Mark as unread"),
+      (b) =>
+        b.textContent?.includes("Unread") ||
+        b.textContent?.includes("Mark as unread"),
     );
     expect(buttons.length).toBeGreaterThan(0);
-    act(() => { buttons[0].click(); });
+    act(() => {
+      buttons[0].click();
+    });
     expect(onMarkAsUnread).toHaveBeenCalledTimes(1);
   });
 
@@ -464,16 +801,22 @@ describe("MessageReader — more actions dropdown", () => {
       currentMailboxId: "inbox",
     });
     // Open the "More actions" popover
-    const moreBtn = container.querySelector('[aria-label="More actions"]') as HTMLElement | null;
+    const moreBtn = container.querySelector(
+      '[aria-label="More actions"]',
+    ) as HTMLElement | null;
     expect(moreBtn).not.toBeNull();
-    act(() => { moreBtn!.click(); });
+    act(() => {
+      moreBtn!.click();
+    });
 
     // Expand the "Move to" section
     const moveToBtn = Array.from(document.body.querySelectorAll("button")).find(
       (b) => b.textContent?.includes("Move to"),
     ) as HTMLElement | undefined;
     expect(moveToBtn).toBeDefined();
-    act(() => { moveToBtn!.click(); });
+    act(() => {
+      moveToBtn!.click();
+    });
 
     expect(document.body.textContent).toContain("Archive");
   });
@@ -630,7 +973,9 @@ describe("MessageReader — reply bar", () => {
       "button[aria-label*='Reply to']",
     ) as HTMLButtonElement | null;
     if (pillBtn) {
-      act(() => { pillBtn.click(); });
+      act(() => {
+        pillBtn.click();
+      });
     }
   }
 
@@ -644,21 +989,27 @@ describe("MessageReader — reply bar", () => {
   it("renders reply textarea after expanding the reply bar", () => {
     render();
     expandReplyBar();
-    const textarea = container.querySelector("textarea[aria-label*='Reply to']") as HTMLTextAreaElement;
+    const textarea = container.querySelector(
+      "textarea[aria-label*='Reply to']",
+    ) as HTMLTextAreaElement;
     expect(textarea).not.toBeNull();
   });
 
   it("shows sender name in reply bar aria-label", () => {
     render();
     expandReplyBar();
-    const textarea = container.querySelector("textarea[aria-label*='Alice Smith']") as HTMLTextAreaElement;
+    const textarea = container.querySelector(
+      "textarea[aria-label*='Alice Smith']",
+    ) as HTMLTextAreaElement;
     expect(textarea).not.toBeNull();
   });
 
   it("accepts text input in reply bar", () => {
     render();
     expandReplyBar();
-    const textarea = container.querySelector("textarea[aria-label*='Reply to']") as HTMLTextAreaElement;
+    const textarea = container.querySelector(
+      "textarea[aria-label*='Reply to']",
+    ) as HTMLTextAreaElement;
     act(() => {
       textarea.value = "Hello there";
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -670,9 +1021,17 @@ describe("MessageReader — reply bar", () => {
     const onReply = jest.fn();
     render({ onReply });
     expandReplyBar();
-    const textarea = container.querySelector("textarea[aria-label*='Reply to']") as HTMLTextAreaElement;
+    const textarea = container.querySelector(
+      "textarea[aria-label*='Reply to']",
+    ) as HTMLTextAreaElement;
     act(() => {
-      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          ctrlKey: true,
+          bubbles: true,
+        }),
+      );
     });
     expect(onReply).toHaveBeenCalledTimes(1);
   });
@@ -681,9 +1040,13 @@ describe("MessageReader — reply bar", () => {
     const onReply = jest.fn();
     render({ onReply });
     expandReplyBar();
-    const textarea = container.querySelector("textarea[aria-label*='Reply to']") as HTMLTextAreaElement;
+    const textarea = container.querySelector(
+      "textarea[aria-label*='Reply to']",
+    ) as HTMLTextAreaElement;
     act(() => {
-      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
     });
     expect(onReply).not.toHaveBeenCalled();
   });
@@ -695,7 +1058,9 @@ describe("MessageReader — reply bar", () => {
     const sendBtn = container.querySelector(
       "[aria-label='Send reply']",
     ) as HTMLButtonElement;
-    act(() => { sendBtn.click(); });
+    act(() => {
+      sendBtn.click();
+    });
     expect(onReply).toHaveBeenCalledTimes(1);
   });
 
@@ -769,7 +1134,10 @@ describe("MessageReader — message body", () => {
   });
 
   it("renders 'No message body' when body is empty", () => {
-    render({ plaintext: null, message: { ...baseMessage, bodyValues: {} } as any });
+    render({
+      plaintext: null,
+      message: { ...baseMessage, bodyValues: {} } as any,
+    });
     expect(container.textContent).toContain("No message body");
   });
 });
@@ -809,11 +1177,13 @@ describe("MessageReader — untrash / restore", () => {
       currentMailboxId: "trash",
       onUntrash,
     });
-    const btn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent?.includes("Restore to inbox"),
+    const btn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Restore to inbox"),
     ) as HTMLButtonElement;
     expect(btn).not.toBeUndefined();
-    act(() => { btn.click(); });
+    act(() => {
+      btn.click();
+    });
     expect(onUntrash).toHaveBeenCalledTimes(1);
   });
 

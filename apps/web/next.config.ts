@@ -4,6 +4,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "export",
   allowedDevOrigins: getAllowedNextDevOrigins(),
+  experimental: {
+    turbopackFileSystemCacheForDev: false,
+  },
   compiler: {
     removeConsole:
       process.env.NODE_ENV === "production"

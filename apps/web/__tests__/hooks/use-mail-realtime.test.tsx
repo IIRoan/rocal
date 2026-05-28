@@ -224,4 +224,65 @@ describe("useMailRealtime", () => {
     // Should NOT trigger a sync because the accountId does not match
     expect(mockApi.syncAccount).toHaveBeenCalledTimes(1);
   });
+
+  it("applies server-provided sync payloads without a second fetch", async () => {
+    const onSync = jest.fn<(result: unknown) => void>();
+    const pushedSync = {
+      accountId: "acct-1",
+      initialized: false,
+      changedTypes: ["Email"],
+      email: {
+        oldState: "email-old",
+        newState: "email-new",
+        created: ["email-1"],
+        updated: [],
+        destroyed: [],
+        records: [{ id: "email-1", subject: "Event reminder" }],
+      },
+      mailbox: {
+        oldState: "mailbox-old",
+        newState: "mailbox-new",
+        created: [],
+        updated: [],
+        destroyed: [],
+        records: [],
+      },
+      thread: {
+        oldState: "thread-old",
+        newState: "thread-new",
+        created: [],
+        updated: [],
+        destroyed: [],
+        records: [],
+      },
+    };
+
+    await act(async () => {
+      root.render(<HookHarness accountId="acct-1" onSync={onSync} />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockApi.syncAccount).toHaveBeenCalledTimes(1);
+    const source = MockEventSource.instances[0];
+
+    await act(async () => {
+      source.emit(
+        "mail.changed",
+        JSON.stringify({
+          type: "mail.changed",
+          accountId: "acct-1",
+          changedTypes: ["Email"],
+          receivedAt: "2026-05-13T09:00:00.000Z",
+          sync: pushedSync,
+        }),
+      );
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(mockApi.syncAccount).toHaveBeenCalledTimes(1);
+    expect(onSync).toHaveBeenLastCalledWith(pushedSync);
+  });
 });

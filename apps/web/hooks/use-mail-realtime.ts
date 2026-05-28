@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
 import { getApiBaseUrl } from "@/lib/api-url";
 import { mailDemoApiService } from "@/lib/mail/api-service";
-import type { MailRealtimeEvent, MailSyncResponse } from "@/lib/mail/types";
+import {
+  parseMailRealtimeEvent,
+  type MailSyncResponse,
+} from "@/lib/mail/types";
 
 const log = createLogger("mail-realtime");
 
@@ -78,11 +81,28 @@ export function useMailRealtime(input: {
     };
 
     const handleMailChanged = (event: Event) => {
-      const payload = JSON.parse(
-        (event as MessageEvent<string>).data,
-      ) as MailRealtimeEvent;
+      let payload;
+
+      try {
+        payload = parseMailRealtimeEvent(
+          JSON.parse((event as MessageEvent<string>).data),
+        );
+      } catch (error) {
+        log.warn("Ignoring invalid realtime mail payload", error);
+        return;
+      }
 
       if (payload.accountId !== input.accountId) return;
+      if (payload.sync) {
+        if (debounceTimerRef.current !== null) {
+          window.clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        void Promise.resolve(onSyncRef.current(payload.sync)).catch((error) => {
+          log.warn("Realtime mail sync apply failed", error);
+        });
+        return;
+      }
       scheduleDebouncedSync();
     };
 

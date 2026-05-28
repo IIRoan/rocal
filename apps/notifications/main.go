@@ -44,16 +44,16 @@ type EmailContent struct {
 }
 
 type EventData struct {
-	Title         string
-	Start         time.Time
-	End           time.Time
-	AllDay        bool
+	Title           string
+	Start           time.Time
+	End             time.Time
+	AllDay          bool
 	EncryptionState string
-	Location      string
-	CalendarName  string
-	Description   string
-	CategoryName  string
-	CategoryColor string
+	Location        string
+	CalendarName    string
+	Description     string
+	CategoryName    string
+	CategoryColor   string
 }
 
 type UserData struct {
@@ -470,6 +470,7 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 	}
 
 	templateData := templates.EmailTemplateData{
+		EventID:        eventID,
 		EventTitle:     eventTitle,
 		EventDate:      formattedDetails.EventDate,
 		EventTime:      formattedDetails.EventTime,
@@ -484,8 +485,8 @@ func (ns *NotificationServer) generateEmailContent(event EventData, user UserDat
 		UserName:       user.Name,
 		UserEmail:      user.Email,
 		UserTheme:      "light",
-		EventUrl:       buildFrontendURL("/dashboard", map[string]string{"eventId": eventID}),
-		CalendarUrl:    buildFrontendURL("/dashboard", nil),
+		EventUrl:       buildFrontendURL("/calendar", map[string]string{"eventId": eventID}),
+		CalendarUrl:    buildFrontendURL("/calendar", nil),
 		SettingsUrl:    buildFrontendURL("/settings", nil),
 		PrivacyUrl:     buildFrontendURL("/privacy", nil),
 		LogoUrl:        "https://solace.onl/favicon-192x192.png",

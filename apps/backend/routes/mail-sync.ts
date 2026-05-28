@@ -7,10 +7,17 @@ import { authenticatedRouteDetail } from "../lib/openapi";
 import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { MailSyncService } from "../services/mail-sync.service";
+import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
+import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 
 export const defaultMailSyncService = new MailSyncService(
   prisma,
   createStalwartAdminClient(),
+  new MailCalendarIngestionService(
+    prisma,
+    undefined,
+    createStalwartCalendarClient(),
+  ),
 );
 
 const syncQuerySchema = strictObject({

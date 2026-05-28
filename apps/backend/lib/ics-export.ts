@@ -1,9 +1,15 @@
 import type { CalendarEvent } from "../generated/prisma/index.js";
 import type {
   IcsBuildEventInput,
+  IcsParticipant,
   IcsRecurrenceRule,
 } from "@workspace/calendar-ics";
 import { RecurrenceEngine } from "./recurrence";
+import {
+  mapEventParticipant,
+  sortEventParticipants,
+  type EventParticipantRecord,
+} from "./event-participants";
 
 function toIcsRecurrenceRule(
   recurrenceRaw?: string | null,
@@ -29,7 +35,11 @@ function toIcsRecurrenceRule(
   };
 }
 
-export function toIcsBuildEvent(event: CalendarEvent): IcsBuildEventInput {
+export function toIcsBuildEvent(
+  event: CalendarEvent & {
+    participants?: EventParticipantRecord[];
+  },
+): IcsBuildEventInput {
   return {
     uid: event.externalId || `${event.id}@solace-calendar.local`,
     title: event.title,
@@ -42,6 +52,18 @@ export function toIcsBuildEvent(event: CalendarEvent): IcsBuildEventInput {
     recurrence: toIcsRecurrenceRule(event.recurrence),
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
+    participants: event.participants?.length
+      ? sortEventParticipants(
+          event.participants.map((participant) =>
+            mapEventParticipant(participant),
+          ),
+        ).map<IcsParticipant>((participant) => ({
+          email: participant.email,
+          displayName: participant.displayName ?? undefined,
+          role: participant.role,
+          status: participant.status,
+        }))
+      : undefined,
   };
 }
 

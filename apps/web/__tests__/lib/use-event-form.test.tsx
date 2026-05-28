@@ -269,6 +269,7 @@ describe("useEventForm reminder hydration", () => {
       allDay: false,
       location: undefined,
       calendarId: "cal-1",
+      participants: [],
       reminder: 30,
       recurrence: null,
     });
@@ -337,6 +338,7 @@ describe("useEventForm reminder hydration", () => {
       allDay: false,
       location: undefined,
       calendarId: "cal-1",
+      participants: [],
       reminder: null,
       recurrence: null,
     });
@@ -406,6 +408,7 @@ describe("useEventForm reminder hydration", () => {
       allDay: false,
       location: undefined,
       calendarId: "cal-1",
+      participants: [],
       reminder: null,
       recurrence: null,
     });

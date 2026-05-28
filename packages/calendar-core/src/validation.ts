@@ -1,10 +1,57 @@
 import type {
   CreateCategoryRequest,
   CreateEventRequest,
+  EventParticipantInput,
   UpdateCategoryRequest,
   UpdateEventRequest,
 } from "./types";
 import { CALENDAR_COLORS, isValidCalendarColor } from "./color-utils";
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+
+export function normalizeParticipantEmail(
+  email: string | null | undefined,
+): string {
+  return email?.trim().replace(/^mailto:/i, "").toLowerCase() ?? "";
+}
+
+function validateParticipants(
+  participants: EventParticipantInput[] | undefined,
+): string[] {
+  if (!participants) {
+    return [];
+  }
+
+  const errors: string[] = [];
+  const seenEmails = new Set<string>();
+
+  participants.forEach((participant, index) => {
+    const email = normalizeParticipantEmail(participant.email);
+    const label = `Participant ${index + 1}`;
+
+    if (!email) {
+      errors.push(`${label} email is required`);
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      errors.push(`${label} must use a valid email address`);
+    }
+
+    if (participant.displayName && participant.displayName.length > 120) {
+      errors.push(`${label} name cannot exceed 120 characters`);
+    }
+
+    if (seenEmails.has(email)) {
+      errors.push(`${label} duplicates another participant email`);
+      return;
+    }
+
+    seenEmails.add(email);
+  });
+
+  return errors;
+}
 
 /**
  * Validates event data before submission.
@@ -54,6 +101,10 @@ export function validateEventData(
         `Color must be one of: ${CALENDAR_COLORS.join(", ")} or a valid hex color`,
       );
     }
+  }
+
+  if ("participants" in event) {
+    errors.push(...validateParticipants(event.participants));
   }
 
   return errors;

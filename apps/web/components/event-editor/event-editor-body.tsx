@@ -1,9 +1,20 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   NotificationManager,
   formatEventDescription,
 } from "@workspace/ui/components/calendar";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/ui/alert";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/ui/avatar";
 import { Calendar as CalendarUI } from "@workspace/ui/components/ui/calendar";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Checkbox } from "@workspace/ui/components/ui/checkbox";
@@ -36,12 +47,19 @@ import {
   Clock,
   CloudDownload,
   FileText,
+  Mail,
   MapPin,
+  AlertTriangle,
   PenOff,
   RefreshCw,
   RotateCcw,
   Server,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
+import type { EventParticipantInput } from "@workspace/calendar-core";
+import { normalizeParticipantEmail } from "@workspace/calendar-core";
 
 import { RecurringEventForm } from "../command-palette/recurring-event-form";
 import { stopEventPropagation } from "@/lib/event-propagation";
@@ -124,6 +142,36 @@ function SyncedEventInfoBadge() {
   );
 }
 
+function formatParticipantStatus(status?: string) {
+  switch (status) {
+    case "accepted":
+      return "Accepted";
+    case "declined":
+      return "Declined";
+    case "tentative":
+      return "Tentative";
+    default:
+      return "Invited";
+  }
+}
+
+function getParticipantInitials(
+  participant: Pick<EventParticipantInput, "displayName" | "email"> & {
+    image?: string | null;
+  },
+) {
+  const label = participant.displayName?.trim() || participant.email.trim();
+  const segments = label
+    .replace(/@.*$/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  return (
+    segments.map((segment) => segment[0]?.toUpperCase() ?? "").join("") || "P"
+  );
+}
+
 export function EventEditorBody({
   calendars,
   desktop,
@@ -135,6 +183,8 @@ export function EventEditorBody({
   showDescription,
   showLocation,
 }: EventEditorBodyProps) {
+  const [participantDraft, setParticipantDraft] = useState("");
+  const [participantError, setParticipantError] = useState<string | null>(null);
   const selectedCalendar = useMemo(
     () =>
       calendars.find((calendar) => calendar.id === eventForm.eventCalendarId),
@@ -149,8 +199,17 @@ export function EventEditorBody({
     [eventForm.eventNotifications],
   );
   const eventDateDisplay = useMemo(
-    () => getEventDateDisplay(eventForm.eventStartDate, eventForm.eventEndDate),
-    [eventForm.eventEndDate, eventForm.eventStartDate],
+    () =>
+      getEventDateDisplay(eventForm.eventStartDate, eventForm.eventEndDate, {
+        allDay: eventForm.eventAllDay,
+        timezone: eventForm.selectedEvent?.timezone || "UTC",
+      }),
+    [
+      eventForm.eventEndDate,
+      eventForm.eventStartDate,
+      eventForm.eventAllDay,
+      eventForm.selectedEvent?.timezone,
+    ],
   );
   const recurrenceSummary = useMemo(
     () =>
@@ -162,17 +221,118 @@ export function EventEditorBody({
   const bodyClass = desktop
     ? "px-3 py-2 space-y-3 flex-1 overflow-y-auto min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
     : "p-4 space-y-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar";
+  const participantProfileByEmail = useMemo(
+    () =>
+      new Map(
+        (eventForm.selectedEvent?.participants ?? []).map((participant) => [
+          participant.email,
+          participant,
+        ]),
+      ),
+    [eventForm.selectedEvent?.participants],
+  );
+
+  const participantItems = useMemo(
+    () =>
+      [...(eventForm.eventParticipants ?? [])]
+        .map((participant) => ({
+          ...participant,
+          image:
+            participantProfileByEmail.get(participant.email)?.image ?? null,
+        }))
+        .sort((left, right) => {
+          const roleDiff =
+            (left.role === "organizer" ? 0 : 1) -
+            (right.role === "organizer" ? 0 : 1);
+          if (roleDiff !== 0) {
+            return roleDiff;
+          }
+
+          return (left.displayName || left.email).localeCompare(
+            right.displayName || right.email,
+            undefined,
+            { sensitivity: "base" },
+          );
+        }),
+    [eventForm.eventParticipants, participantProfileByEmail],
+  );
+  const isCancelledEvent = eventForm.selectedEvent
+    ? isCancelledCalendarEvent(eventForm.selectedEvent)
+    : false;
+
+  const addParticipant = useCallback(() => {
+    const email = normalizeParticipantEmail(participantDraft);
+    if (!email) {
+      setParticipantError("Enter an email address first.");
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+      setParticipantError("Enter a valid email address.");
+      return;
+    }
+
+    if (participantItems.some((participant) => participant.email === email)) {
+      setParticipantError("That participant is already invited.");
+      return;
+    }
+
+    setParticipantError(null);
+    setParticipantDraft("");
+    eventForm.setEventParticipants([
+      ...participantItems,
+      {
+        email,
+        role: "attendee",
+        status: "pending",
+      },
+    ]);
+  }, [participantDraft, participantItems, eventForm]);
+
+  const removeParticipant = useCallback(
+    (email: string) => {
+      eventForm.setEventParticipants(
+        participantItems.filter((participant) => participant.email !== email),
+      );
+    },
+    [participantItems, eventForm],
+  );
 
   return (
     <div className={bodyClass}>
       {isViewMode ? (
         <div className="py-1.5">
+          {isCancelledEvent && (
+            <div className="px-2 pb-2">
+              <Alert className="border-destructive/25 bg-destructive/[0.05]">
+                <AlertTriangle className="text-destructive" />
+                <AlertTitle className="text-destructive">
+                  Cancelled event
+                </AlertTitle>
+                <AlertDescription>
+                  <p>
+                    The organiser cancelled this event. It stays on your
+                    calendar until you remove it.
+                  </p>
+                  <p className="text-xs">
+                    You can still review the original details below.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
           <div className="px-2">
             <div className="flex items-center gap-3 p-2.5">
               <div className="flex items-center justify-center size-6 shrink-0">
                 <CalendarIcon className="size-4 text-muted-foreground" />
               </div>
-              <span className="text-sm font-medium truncate flex-1 min-w-0">
+              <span
+                className={
+                  isCancelledEvent
+                    ? "text-sm font-medium truncate flex-1 min-w-0 line-through text-muted-foreground"
+                    : "text-sm font-medium truncate flex-1 min-w-0"
+                }
+              >
                 {eventForm.eventTitle || "Untitled Event"}
               </span>
               {eventForm.selectedEvent?.id &&
@@ -283,6 +443,40 @@ export function EventEditorBody({
                   <RotateCcw className="size-4 text-muted-foreground" />
                 </div>
                 <span className="text-sm">{recurrenceSummary}</span>
+              </div>
+            )}
+
+            {participantItems.length > 0 && (
+              <div className="flex items-start gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors">
+                <div className="flex items-center justify-center size-6 shrink-0 mt-0.5">
+                  <Users className="size-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-2">
+                  {participantItems.map((participant) => (
+                    <div
+                      key={participant.email}
+                      className="flex items-center gap-3 min-w-0"
+                    >
+                      <Avatar className="size-8 border border-border/60">
+                        <AvatarImage src={participant.image ?? undefined} alt={participant.email} />
+                        <AvatarFallback className="text-[11px]">
+                          {getParticipantInitials(participant)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm truncate">
+                          {participant.displayName || participant.email}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {participant.role === "organizer"
+                            ? "Organizer"
+                            : formatParticipantStatus(participant.status)}
+                          {participant.displayName ? ` · ${participant.email}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -655,6 +849,99 @@ export function EventEditorBody({
                   </div>
                 </div>
               )}
+
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="size-4 text-muted-foreground" />
+                    <Label className="text-sm">Participants</Label>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    New invites are sent by email
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    value={participantDraft}
+                    onChange={(event) => {
+                      setParticipantDraft(event.target.value);
+                      if (participantError) {
+                        setParticipantError(null);
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addParticipant();
+                      }
+                    }}
+                    placeholder="Add attendee by email"
+                    className={`${desktop ? "h-9 text-sm" : "h-10"}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={addParticipant}
+                  >
+                    <UserPlus className="size-4" />
+                  </Button>
+                </div>
+
+                {participantError && (
+                  <p className="text-xs text-destructive">{participantError}</p>
+                )}
+
+                {participantItems.length > 0 ? (
+                  <div className="rounded-lg border divide-y">
+                    {participantItems.map((participant) => (
+                      <div
+                        key={participant.email}
+                        className="flex items-center gap-3 px-3 py-2.5"
+                      >
+                        <Avatar className="size-9 border border-border/60">
+                          <AvatarImage src={participant.image ?? undefined} alt={participant.email} />
+                          <AvatarFallback className="text-[11px]">
+                            {getParticipantInitials(participant)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm truncate">
+                            {participant.displayName || participant.email}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {participant.role === "organizer" ? (
+                              "Organizer"
+                            ) : (
+                              <>
+                                <Mail className="inline size-3 mr-1" />
+                                {participant.email}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {participant.role !== "organizer" && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 shrink-0"
+                            onClick={() => removeParticipant(participant.email)}
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                    Attendees you add here will appear across Solace and receive
+                    an email invitation.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

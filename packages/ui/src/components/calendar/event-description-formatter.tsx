@@ -1,11 +1,23 @@
 import React from "react";
 
+// Google Calendar separator lines e.g. -::~:~::~:~:~:~:~:~:~:~::~:~::-
+// They start and end with `-` and contain only `:` and `~` in between.
+const GOOGLE_SEPARATOR_LINE = /^-[-:~]{10,}$/;
+// Pure editor instruction — not meaningful to the event viewer
+const EDITOR_BOILERPLATE_LINE = /^Please do not edit this section\.$/i;
+
 export const formatEventDescription = (description: string) => {
   // Remove lines of underscores/dashes (typically 20+ characters)
   const cleanedDescription = description.replace(/_{20,}|[-_]{20,}/g, "");
 
-  // Split into lines and filter out empty lines
-  const lines = cleanedDescription.split("\n").filter((line) => line.trim());
+  // Split into lines, strip Google boilerplate, filter out empty lines
+  const lines = cleanedDescription.split("\n").filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (GOOGLE_SEPARATOR_LINE.test(trimmed)) return false;
+    if (EDITOR_BOILERPLATE_LINE.test(trimmed)) return false;
+    return true;
+  });
 
   return lines.map((line, index) => {
     // Handle Teams meeting format: "Text<URL>"
