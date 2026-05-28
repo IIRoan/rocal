@@ -4,7 +4,7 @@ import type { CalendarColor, ThemeTokens } from "@workspace/design-tokens";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const DAYS_IN_GRID = 42; // 6 rows × 7 columns
+const DAYS_IN_GRID = 42; // 6 rows × 7 columns
 export const MAX_DOTS = 3;
 
 export const KNOWN_CALENDAR_COLORS: ReadonlySet<string> =
@@ -25,7 +25,7 @@ export const KNOWN_CALENDAR_COLORS: ReadonlySet<string> =
 
 // ─── Day-of-week header labels ──────────────────────────────────────────────
 
-export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

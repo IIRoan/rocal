@@ -16,7 +16,6 @@
   "dependencies": {
     "@react-email/render": "^1.4.0",
     "@workspace/logger": "workspace:*",
-    "@workspace/ui": "workspace:*",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
