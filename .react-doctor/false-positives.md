@@ -26,3 +26,11 @@ Patterns that fire diagnostics but are safe to suppress.
   cva-built helper) with the component itself. Splitting these defeats the
   reason callers import from a single file and is an upstream convention we
   intentionally follow.
+
+## react-doctor/only-export-components — encryption-status companion re-exports
+
+- **File**: `packages/ui/src/components/calendar/encryption-status.tsx:12–17`
+- **Why FP**: The file re-exports utility types and helpers from its companion
+  module `./encryption-status-utils` so callers have a single import surface.
+  This is the canonical colocation pattern for a component and its associated
+  utilities.

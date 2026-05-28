@@ -147,7 +147,7 @@ export function EncryptionStatusBadge({
                     className="text-xs flex items-center gap-1.5"
                   >
                     <ShieldCheck
-                      className="h-3 w-3 text-primary shrink-0"
+                      className="size-3 text-primary shrink-0"
                       strokeWidth={2.25}
                       aria-hidden
                     />
@@ -169,7 +169,7 @@ export function EncryptionStatusBadge({
                     className="text-xs flex items-center gap-1.5 text-muted-foreground"
                   >
                     <Lock
-                      className="h-3 w-3 opacity-40 shrink-0"
+                      className="size-3 opacity-40 shrink-0"
                       strokeWidth={2.25}
                       aria-hidden
                     />
