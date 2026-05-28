@@ -30,6 +30,10 @@ import {
   resolveCalendarSwatchColor,
   sortSubscriptions,
 } from "../../src/lib/subscription-utils";
+import {
+  SectionHeader,
+  EmptyCard,
+} from "../../src/components/ui/list-components";
 
 type ReadOnlyCalendarEntry = {
   subscription: CalendarSubscription;
@@ -41,7 +45,7 @@ type ReadOnlyCalendarEntry = {
 export default function CalendarManageScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { push, back } = useRouter();
   const queryClient = useQueryClient();
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
@@ -195,29 +199,29 @@ export default function CalendarManageScreen() {
 
   const handleCalendarPress = useCallback(
     (calendar: Calendar) => {
-      router.push(`/calendar-manage/edit/${calendar.id}`);
+      push(`/calendar-manage/edit/${calendar.id}`);
     },
-    [router],
+    [push],
   );
 
   const handleReadOnlyPress = useCallback(
     (subscription: CalendarSubscription) => {
-      router.push(`/subscription/edit/${subscription.id}`);
+      push(`/subscription/edit/${subscription.id}`);
     },
-    [router],
+    [push],
   );
 
   const handleCreate = useCallback(() => {
-    router.push("/calendar-manage/create");
-  }, [router]);
+    push("/calendar-manage/create");
+  }, [push]);
 
   const handleOpenSubscriptions = useCallback(() => {
-    router.push("/subscription");
-  }, [router]);
+    push("/subscription");
+  }, [push]);
 
   const handleAddOrImport = useCallback(() => {
-    router.push("/subscription/create");
-  }, [router]);
+    push("/subscription/create");
+  }, [push]);
 
   const handleSetDefault = useCallback(
     (calendarId: string) => {
@@ -258,7 +262,7 @@ export default function CalendarManageScreen() {
         <Text style={styles.errorText}>{errorMessage}</Text>
         <Pressable
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
@@ -383,58 +387,6 @@ export default function CalendarManageScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function SectionHeader({
-  title,
-  count,
-  actionLabel,
-  onAction,
-  theme,
-}: {
-  title: string;
-  count: number;
-  actionLabel?: string;
-  onAction?: () => void;
-  theme: ThemeTokens;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionTitleWrap}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionCount}>{count}</Text>
-      </View>
-      {actionLabel && onAction ? (
-        <Pressable onPress={onAction}>
-          <Text style={styles.sectionAction}>{actionLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function EmptyCard({
-  icon,
-  title,
-  text,
-  theme,
-}: {
-  icon: React.ComponentProps<typeof Feather>["name"];
-  title: string;
-  text: string;
-  theme: ThemeTokens;
-}) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-
-  return (
-    <View style={styles.emptyCard}>
-      <Feather name={icon} size={18} color={theme.colors.mutedForeground} />
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
   );
 }
 
@@ -702,25 +654,6 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       justifyContent: "center" as const,
     },
-    sectionHeader: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-      paddingTop: theme.spacing["1"],
-    },
-    sectionTitleWrap: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["2"],
-    },
-    emptyCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.card,
-      padding: theme.spacing["4"],
-      gap: theme.spacing["2"],
-    },
     rowCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -810,24 +743,6 @@ function createStyles(theme: ThemeTokens) {
       color: theme.colors.foreground,
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
     },
-    sectionTitle: {
-      fontSize: theme.typography.fontSize.base.size,
-      lineHeight: theme.typography.fontSize.base.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight
-        .semibold as TextStyle["fontWeight"],
-    },
-    sectionCount: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    sectionAction: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
-      color: theme.colors.primaryBase,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
     rowTitle: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
@@ -842,17 +757,6 @@ function createStyles(theme: ThemeTokens) {
     loadingInlineText: {
       fontSize: theme.typography.fontSize.sm.size,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.mutedForeground,
-    },
-    emptyTitle: {
-      fontSize: theme.typography.fontSize.sm.size,
-      lineHeight: theme.typography.fontSize.sm.lineHeight,
-      color: theme.colors.foreground,
-      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
-    },
-    emptyText: {
-      fontSize: theme.typography.fontSize.xs.size,
-      lineHeight: theme.typography.fontSize.xs.lineHeight,
       color: theme.colors.mutedForeground,
     },
     loadingText: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { getErrorMessage } from "@workspace/calendar-core";
 import { toast } from "sonner";
 import PostalMime, {
   type Attachment as ParsedMailAttachment,
@@ -1080,7 +1081,7 @@ export function useMailApp() {
       } catch (error) {
         log.error("Failed to load mailbox messages", error);
         toast.error(
-          error instanceof Error ? error.message : "Could not load messages.",
+          getErrorMessage(error, "Could not load messages."),
         );
       } finally {
         setIsBusy(false);
@@ -1443,7 +1444,7 @@ export function useMailApp() {
     } catch (error) {
       log.error("Failed to send mail", error);
       toast.error(
-        error instanceof Error ? error.message : "Could not send the message.",
+        getErrorMessage(error, "Could not send the message."),
       );
     } finally {
       setIsBusy(false);
@@ -1620,7 +1621,7 @@ export function useMailApp() {
       } catch (error) {
         log.error("Failed to send quick reply", error);
         toast.error(
-          error instanceof Error ? error.message : "Could not send reply.",
+          getErrorMessage(error, "Could not send reply."),
         );
       } finally {
         setIsBusy(false);
@@ -2234,7 +2235,7 @@ export function useMailApp() {
     } catch (error) {
       log.error("Manual refresh failed", error);
       toast.error(
-        error instanceof Error ? error.message : "Could not refresh mail.",
+        getErrorMessage(error, "Could not refresh mail."),
       );
     } finally {
       setIsRefreshing(false);

@@ -21,7 +21,7 @@ import {
   isEventModified,
 } from "../lib/ics-parser";
 import { ALLOWED_CALENDAR_COLORS, isValidCalendarColor } from "../lib/colors";
-import { ValidationError, NotFoundError } from "../lib/errors";
+import { ValidationError, NotFoundError , errorMessage} from "../lib/errors";
 import { createLogger } from "@workspace/logger";
 import { EventParticipantService } from "./event-participant.service";
 
@@ -263,7 +263,7 @@ export class SubscriptionService implements ISubscriptionService {
       }
     } catch (error) {
       throw new ValidationError(
-        `Unable to fetch or parse calendar from URL: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Unable to fetch or parse calendar from URL: ${errorMessage(error)}`,
         "url",
       );
     }
@@ -483,7 +483,7 @@ export class SubscriptionService implements ISubscriptionService {
         createdEvents.push(createdEvent);
       } catch (error) {
         errors.push(
-          `Failed to create event "${parsedEvent.title}": ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Failed to create event "${parsedEvent.title}": ${errorMessage(error)}`,
         );
       }
     }
@@ -681,14 +681,13 @@ export class SubscriptionService implements ISubscriptionService {
         errors: parseResult.errors.length > 0 ? parseResult.errors : undefined,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       await this.prisma.calendarSyncLog.update({
         where: { id: syncLog.id },
         data: {
           status: "error",
-          errorMessage,
+          errorMessage: message,
           completedAt: new Date(),
           syncDurationMs: Date.now() - startTime,
         },
@@ -699,7 +698,7 @@ export class SubscriptionService implements ISubscriptionService {
         data: {
           lastSyncAt: new Date(),
           lastSyncStatus: "error",
-          lastErrorMessage: errorMessage,
+          lastErrorMessage: message,
         },
       });
 

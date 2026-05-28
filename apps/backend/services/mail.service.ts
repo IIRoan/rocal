@@ -4,8 +4,7 @@ import {
   ConflictError,
   NotFoundError,
   UpstreamServiceError,
-  ValidationError,
-} from "../lib/errors";
+  ValidationError, errorString} from "../lib/errors";
 import { getOpenPgpPublicKeyFingerprint } from "../lib/mail-key-utils";
 import type {
   GetMailAccountStatusInput,
@@ -315,7 +314,7 @@ function normalizeMailPersistenceError(error: unknown): never {
     );
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorString(error);
   throw new UpstreamServiceError(
     `Mailbox directory persistence failed: ${message}`,
     500,

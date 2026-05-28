@@ -1,6 +1,7 @@
 import { createLogger } from "@workspace/logger";
 import { z } from "zod";
 import type { MailSyncResult } from "./mail-sync.service";
+import { errorString } from "../lib/errors";
 
 export type MailChangedEvent = {
   type: "mail.changed";
@@ -238,7 +239,7 @@ export class MailRealtimeService {
         })
         .catch((error) => {
           logger.warn("Receipt-time mail polling failed", {
-            error: error instanceof Error ? error.message : String(error),
+            error: errorString(error),
           });
         })
         .finally(() => {

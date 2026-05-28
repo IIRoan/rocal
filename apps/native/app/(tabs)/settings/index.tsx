@@ -50,6 +50,13 @@ import {
   resolvePasskeyBridgeBaseUrl,
 } from "../../../src/lib/passkey-browser-bridge";
 import { QUERY_KEYS } from "../../../src/lib/query-keys";
+import {
+  THEME_OPTIONS,
+  VIEW_OPTIONS,
+  WEEK_START_OPTIONS,
+  TIME_FORMAT_OPTIONS,
+  WEEKDAY_OPTIONS,
+} from "../../../src/lib/settings-options";
 import { getSettingsAccountActions } from "../../../src/lib/settings-screen-utils";
 import { ScreenHeader } from "../../../src/components/ScreenHeader";
 import { BottomSheet } from "../../../src/components/BottomSheet";
@@ -59,48 +66,6 @@ import { BottomSheet } from "../../../src/components/BottomSheet";
 type FeatherIcon = React.ComponentProps<typeof Feather>["name"];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const THEME_OPTIONS: {
-  label: string;
-  value: ThemePreference;
-  icon: FeatherIcon;
-}[] = [
-  { label: "Light", value: "light", icon: "sun" },
-  { label: "Dark", value: "dark", icon: "moon" },
-  { label: "System", value: "system", icon: "monitor" },
-];
-
-const VIEW_OPTIONS: {
-  label: string;
-  value: CalendarView;
-  icon: FeatherIcon;
-}[] = [
-  { label: "Month View", value: "month", icon: "grid" },
-  { label: "Week View", value: "week", icon: "columns" },
-  { label: "Day View", value: "day", icon: "square" },
-  { label: "3-Day View", value: "3day", icon: "sidebar" },
-  { label: "Agenda View", value: "agenda", icon: "list" },
-];
-
-const WEEK_START_OPTIONS: { label: string; value: number }[] = [
-  { label: "Sunday", value: 0 },
-  { label: "Monday", value: 1 },
-];
-
-const TIME_FORMAT_OPTIONS: { label: string; value: "12h" | "24h" }[] = [
-  { label: "12 Hour (1:00 PM)", value: "12h" },
-  { label: "24 Hour (13:00)", value: "24h" },
-];
-
-const WEEKDAY_OPTIONS: { label: string; value: number }[] = [
-  { label: "Sunday", value: 0 },
-  { label: "Monday", value: 1 },
-  { label: "Tuesday", value: 2 },
-  { label: "Wednesday", value: 3 },
-  { label: "Thursday", value: 4 },
-  { label: "Friday", value: 5 },
-  { label: "Saturday", value: 6 },
-];
 
 const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
 
@@ -169,7 +134,7 @@ export default function SettingsScreen() {
   const { theme, themePreference, setThemePreference } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const { push } = useRouter();
   const { user, signOut, registerPasskey, deletePasskey } = useAuth();
   const { resetEncryptionPassword } = useE2ee();
   const passkeysQuery = authClient.useListPasskeys();
@@ -864,7 +829,7 @@ export default function SettingsScreen() {
               settings?.timezone ??
               Intl.DateTimeFormat().resolvedOptions().timeZone
             }
-            onPress={() => router.push(SETTINGS_TIMEZONE_ROUTE)}
+            onPress={() => push(SETTINGS_TIMEZONE_ROUTE)}
             theme={theme}
           />
         </View>
@@ -1428,22 +1393,21 @@ function AccountInfoCard({
   const displayEmail = email?.trim() || null;
   const title = displayName ?? displayEmail ?? "Solace account";
   const initial = title.charAt(0).toUpperCase() || "S";
+  const cardStyle = {
+    flexDirection: "row" as const,
+    gap: theme.spacing["3"],
+    paddingHorizontal: theme.spacing["3"],
+    paddingVertical: theme.spacing["3"],
+    marginHorizontal: theme.spacing["1"],
+    marginBottom: theme.spacing["1"],
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.muted + "30",
+  };
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        gap: theme.spacing["3"],
-        paddingHorizontal: theme.spacing["3"],
-        paddingVertical: theme.spacing["3"],
-        marginHorizontal: theme.spacing["1"],
-        marginBottom: theme.spacing["1"],
-        borderRadius: theme.borderRadius.lg,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.muted + "30",
-      }}
-    >
+    <View style={cardStyle}>
       {/* Avatar */}
       {imageUrl && !imgError ? (
         <ImageNative
@@ -1730,6 +1694,17 @@ function ProfilePictureCard({
   isPending: boolean;
   theme: ThemeTokens;
 }) {
+  const urlInputStyle = {
+    height: 44,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.muted + "50",
+    paddingHorizontal: theme.spacing["3"],
+    fontSize: theme.typography.fontSize.sm.size,
+    color: theme.colors.foreground,
+  };
+
   return (
     <View
       style={{
@@ -1782,16 +1757,7 @@ function ProfilePictureCard({
           autoCorrect={false}
           keyboardType="url"
           editable={!isPending}
-          style={{
-            height: 44,
-            borderRadius: theme.borderRadius.lg,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.muted + "50",
-            paddingHorizontal: theme.spacing["3"],
-            fontSize: theme.typography.fontSize.sm.size,
-            color: theme.colors.foreground,
-          }}
+          style={urlInputStyle}
         />
       </View>
 
@@ -1875,6 +1841,17 @@ function PasswordField({
   autoComplete: "password" | "new-password";
   theme: ThemeTokens;
 }) {
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: theme.colors.input,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing["3"],
+    paddingVertical: theme.spacing["3"],
+    fontSize: theme.typography.fontSize.base.size,
+    color: theme.colors.foreground,
+    backgroundColor: theme.colors.background,
+  };
+
   return (
     <View>
       <Text
@@ -1899,16 +1876,7 @@ function PasswordField({
         }
         placeholder={label}
         placeholderTextColor={theme.colors.mutedForeground}
-        style={{
-          borderWidth: 1,
-          borderColor: theme.colors.input,
-          borderRadius: theme.borderRadius.md,
-          paddingHorizontal: theme.spacing["3"],
-          paddingVertical: theme.spacing["3"],
-          fontSize: theme.typography.fontSize.base.size,
-          color: theme.colors.foreground,
-          backgroundColor: theme.colors.background,
-        }}
+        style={inputStyle}
       />
     </View>
   );

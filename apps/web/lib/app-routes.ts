@@ -1,7 +1,6 @@
 export const HOME_PATH = "/home";
 export const CALENDAR_HOME_PATH = "/calendar";
 export const MAIL_HOME_PATH = "/mail";
-export const LEGACY_DASHBOARD_PATH = "/dashboard";
 
 export type RouteSearchParamValue = string | string[] | null | undefined;
 export type RouteSearchParams = Record<string, RouteSearchParamValue>;
