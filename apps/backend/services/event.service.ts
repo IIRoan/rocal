@@ -24,6 +24,7 @@ import {
   validateEventLocationLength,
   validateEventReminderMinutes,
   validateEventTitleLength,
+  validateOptionalEventFields,
 } from "../lib/event-constraints";
 import { MS_PER_DAY, MS_PER_MINUTE } from "../lib/time-constants";
 import { ensureUserCalendars } from "../lib/user-setup";
@@ -1481,23 +1482,19 @@ export class EventService implements IEventService {
         throw new ValidationError("End time must be after start time", "end");
       }
 
-      if (input.title !== undefined) {
-        if (!input.title?.trim()) {
-          throw new ValidationError(
-            "Title is required and cannot be empty",
-            "title",
-          );
-        }
-        validateEventTitleLength(input.title);
+      if (input.title !== undefined && !input.title?.trim()) {
+        throw new ValidationError(
+          "Title is required and cannot be empty",
+          "title",
+        );
       }
 
-      if (input.description !== undefined) {
-        validateEventDescriptionLength(input.description);
-      }
-
-      if (input.location !== undefined) {
-        validateEventLocationLength(input.location);
-      }
+      const reminderValue = validateOptionalEventFields({
+        title: input.title,
+        description: input.description,
+        location: input.location,
+        reminder: input.reminder,
+      });
 
       if (input.color !== undefined && input.color) {
         if (!isValidCalendarColor(input.color)) {
@@ -1536,11 +1533,6 @@ export class EventService implements IEventService {
             "categoryId",
           );
         }
-      }
-
-      let reminderValue: number | null | undefined = input.reminder;
-      if (input.reminder !== undefined && input.reminder !== null) {
-        reminderValue = validateEventReminderMinutes(input.reminder);
       }
 
       const finalCalendar =
