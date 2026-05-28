@@ -383,6 +383,7 @@ export function AccountSettings({
     >
       <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border/50 px-4">
         <button
+          type="button"
           onClick={goBack}
           className="rounded p-1 transition-colors hover:bg-muted/50"
         >
@@ -456,6 +457,7 @@ export function AccountSettings({
                     value={avatarUrl}
                     onChange={(e) => setAvatarUrl(e.target.value)}
                     placeholder="https://example.com/avatar.png"
+                    aria-label="Avatar URL"
                     disabled={updatingProfile}
                     className="flex h-9 w-full rounded-md bg-input pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
                   />

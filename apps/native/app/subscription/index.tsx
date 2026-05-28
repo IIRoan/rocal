@@ -39,7 +39,7 @@ type ReadOnlyCalendarEntry = {
 export default function SubscriptionListScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const router = useRouter();
+  const { push } = useRouter();
   const queryClient = useQueryClient();
 
   const {
@@ -76,27 +76,21 @@ export default function SubscriptionListScreen() {
 
   const holidayCalendars = useMemo(
     () =>
-      sortedSubscriptions
-        .filter(
-          (subscription) => getSubscriptionType(subscription) === "holiday",
-        )
-        .map((subscription) => ({
-          subscription,
-          calendar: calendarById.get(subscription.calendar.id),
-        })),
+      sortedSubscriptions.flatMap((subscription) =>
+        getSubscriptionType(subscription) === "holiday"
+          ? [{ subscription, calendar: calendarById.get(subscription.calendar.id) }]
+          : [],
+      ),
     [calendarById, sortedSubscriptions],
   );
 
   const externalFeeds = useMemo(
     () =>
-      sortedSubscriptions
-        .filter(
-          (subscription) => getSubscriptionType(subscription) === "external",
-        )
-        .map((subscription) => ({
-          subscription,
-          calendar: calendarById.get(subscription.calendar.id),
-        })),
+      sortedSubscriptions.flatMap((subscription) =>
+        getSubscriptionType(subscription) === "external"
+          ? [{ subscription, calendar: calendarById.get(subscription.calendar.id) }]
+          : [],
+      ),
     [calendarById, sortedSubscriptions],
   );
 
@@ -158,14 +152,14 @@ export default function SubscriptionListScreen() {
   });
 
   const handleOpenCreate = useCallback(() => {
-    router.push("/subscription/create");
-  }, [router]);
+    push("/subscription/create");
+  }, [push]);
 
   const handleOpenEdit = useCallback(
     (subscription: CalendarSubscription) => {
-      router.push(`/subscription/edit/${subscription.id}`);
+      push(`/subscription/edit/${subscription.id}`);
     },
-    [router],
+    [push],
   );
 
   const handleToggleVisibility = useCallback(
