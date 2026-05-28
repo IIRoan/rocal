@@ -10,6 +10,7 @@ import type {
   RecurringDeleteResult,
 } from "../contracts/recurring.contract";
 import { ValidationError } from "../lib/errors";
+import { MS_PER_DAY } from "../lib/time-constants";
 import { RecurrenceEngine, type RecurrenceRule } from "../lib/recurrence";
 import {
   buildRecurringEventCreateData,
@@ -65,7 +66,7 @@ export class RecurringService implements IRecurringService {
       const startDate = new Date(eventStart);
       const endDate = new Date(eventEnd);
       const previewEndDate = new Date(
-        startDate.getTime() + previewDays * 24 * 60 * 60 * 1000,
+        startDate.getTime() + previewDays * MS_PER_DAY,
       );
 
       const rule = parseRecurringRuleInput(recurrenceRule);

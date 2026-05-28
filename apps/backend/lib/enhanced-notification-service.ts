@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "./prisma";
+import { MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE } from "./time-constants";
 import {
   NotificationCalculator,
   type NotificationConfig,
@@ -1195,7 +1196,7 @@ export class EnhancedNotificationService {
       retryCount,
       nextRetryAt:
         result.shouldRetry && retryCount <= maxRetries
-          ? new Date(Date.now() + (result.retryAfterMinutes || 5) * 60 * 1000)
+          ? new Date(Date.now() + (result.retryAfterMinutes || 5) * MS_PER_MINUTE)
           : undefined,
     });
 
@@ -1218,7 +1219,7 @@ export class EnhancedNotificationService {
     // Schedule retry if appropriate
     if (result.shouldRetry && retryCount <= maxRetries) {
       const nextRetryAt = new Date(
-        Date.now() + (result.retryAfterMinutes || 5) * 60 * 1000,
+        Date.now() + (result.retryAfterMinutes || 5) * MS_PER_MINUTE,
       );
 
       this.retryQueue.set(notification.id, {
@@ -1349,7 +1350,7 @@ export class EnhancedNotificationService {
           this.shouldRetryError(error) && updatedRetryInfo.retryCount <= 3;
 
         if (shouldContinueRetrying) {
-          const retryDelay = this.calculateRetryDelay(error) * 60 * 1000; // Convert to milliseconds
+          const retryDelay = this.calculateRetryDelay(error) * MS_PER_MINUTE; // Convert to milliseconds
           updatedRetryInfo.nextRetryAt = new Date(Date.now() + retryDelay);
           this.retryQueue.set(notificationId, updatedRetryInfo);
 
@@ -2753,7 +2754,7 @@ export class EnhancedNotificationService {
   }> {
     const startTime = Date.now();
     const retentionCutoff = new Date(
-      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+      Date.now() - retentionDays * MS_PER_DAY,
     );
 
     logger.info(
@@ -2787,7 +2788,7 @@ export class EnhancedNotificationService {
             // Only delete notifications for events that have already ended
             event: {
               end: {
-                lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Events ended more than 7 days ago
+                lt: new Date(Date.now() - 7 * MS_PER_DAY), // Events ended more than 7 days ago
               },
             },
           },
@@ -3078,7 +3079,7 @@ export class EnhancedNotificationService {
       clearInterval(this.cleanupTimer);
     }
 
-    const intervalMs = intervalHours * 60 * 60 * 1000;
+    const intervalMs = intervalHours * MS_PER_HOUR;
 
     logger.info(
       `⏰ Scheduling automatic cleanup every ${intervalHours} hours with ${retentionDays} day retention`,
@@ -3144,7 +3145,7 @@ export class EnhancedNotificationService {
       // Note: We can't get exact next run time from setInterval,
       // but we could track this if needed
       nextRunEstimate: this.cleanupTimer
-        ? new Date(Date.now() + 24 * 60 * 60 * 1000) // Estimate based on 24h default
+        ? new Date(Date.now() + MS_PER_DAY) // Estimate based on 24h default
         : undefined,
       lastCleanupStats: this.lastCleanupStats,
     };
@@ -3319,7 +3320,7 @@ export class EnhancedNotificationService {
       });
 
       // Get recent notification logs (last 24 hours)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const oneDayAgo = new Date(Date.now() - MS_PER_DAY);
       const recentLogs = await prisma.notificationLog.groupBy({
         by: ["status"],
         where: {

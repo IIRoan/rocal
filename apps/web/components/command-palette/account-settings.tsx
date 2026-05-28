@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { gsap, useGSAP } from "@workspace/ui/lib/gsap";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
+import { getErrorMessage as getErrorMessageCore } from "@workspace/calendar-core";
 
 interface ChangePasswordValues {
   currentPassword: string;
@@ -62,17 +63,7 @@ type SectionMessage =
   | null;
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof (error as { message: unknown }).message === "string"
-  )
-    return (
-      (error as { message: string }).message.trim() || "Something went wrong."
-    );
-  return "Something went wrong.";
+  return getErrorMessageCore(error, "Something went wrong.");
 }
 
 function AnimatedCollapse({

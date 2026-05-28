@@ -4,8 +4,7 @@ import type {
 } from "../contracts/recurring.contract";
 import { ValidationError } from "./errors";
 import { RecurrenceEngine, type RecurrenceRule } from "./recurrence";
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
+import { MS_PER_DAY as DAY_IN_MS } from "./time-constants";
 
 type RecurringEventSnapshot = {
   title: string;
