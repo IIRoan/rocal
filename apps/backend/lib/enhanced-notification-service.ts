@@ -24,6 +24,7 @@ import type {
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import { createLogger } from "@workspace/logger";
+import { errorMessage } from "./errors";
 // Conditional import to avoid Next.js build issues
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let EventReminderEmail: ((...args: any[]) => React.JSX.Element) | undefined;
@@ -219,7 +220,7 @@ export class EnhancedNotificationService {
             notificationId: "system",
             eventId: "system",
             userId: "system",
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: errorMessage(error),
             timestamp: new Date(),
             retryCount: 0,
           });
@@ -247,7 +248,7 @@ export class EnhancedNotificationService {
               notificationId: "system",
               eventId: "system",
               userId: "system",
-              error: error instanceof Error ? error.message : "Unknown error",
+              error: errorMessage(error),
               timestamp: new Date(),
               retryCount: 0,
             });
@@ -330,8 +331,7 @@ export class EnhancedNotificationService {
    */
   private async logCriticalSystemError(error: unknown): Promise<void> {
     try {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       await this.executeWithDatabaseRetry(async () => {
         return await prisma.notificationLog.create({
@@ -340,7 +340,7 @@ export class EnhancedNotificationService {
             userId: "system",
             notificationType: "system",
             minutesBefore: 0,
-            status: `critical_error: ${errorMessage}`,
+            status: `critical_error: ${message}`,
             sentAt: new Date(),
           },
         });
@@ -552,11 +552,10 @@ export class EnhancedNotificationService {
               `${config.minutesBefore}min before at ${schedule.notificationDateLocal} ${schedule.notificationTimezone}`,
           );
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+          const message = errorMessage(error);
           skipped.push({
             config,
-            reason: errorMessage,
+            reason: message,
           });
 
           logger.error(
@@ -766,11 +765,10 @@ export class EnhancedNotificationService {
                     `${config.minutesBefore}min before at ${schedule.notificationDateLocal} ${schedule.notificationTimezone}`,
                 );
               } catch (error) {
-                const errorMessage =
-                  error instanceof Error ? error.message : "Unknown error";
+                const message = errorMessage(error);
                 skipped.push({
                   config,
-                  reason: errorMessage,
+                  reason: message,
                 });
 
                 logger.error(
@@ -1026,8 +1024,7 @@ export class EnhancedNotificationService {
           failedThisRun++;
           this.failedCount++;
 
-          const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+          const message = errorMessage(error);
 
           // Enhanced error handling with better categorization
           const shouldRetry = this.shouldRetryError(error);
@@ -1035,7 +1032,7 @@ export class EnhancedNotificationService {
 
           await this.handleNotificationFailure(notification, {
             success: false,
-            error: errorMessage,
+            error: message,
             shouldRetry,
             retryAfterMinutes,
           });
@@ -1073,12 +1070,11 @@ export class EnhancedNotificationService {
       }
     } catch (error) {
       this.failedCount++;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       logger.error(
         "❌ Critical error in background notification processing:",
-        errorMessage,
+        message,
       );
 
       // Enhanced system error logging with recovery information
@@ -1086,7 +1082,7 @@ export class EnhancedNotificationService {
         notificationId: "system",
         eventId: "system",
         userId: "system",
-        error: `Background processing failed: ${errorMessage}`,
+        error: `Background processing failed: ${message}`,
         timestamp: new Date(),
         retryCount: 0,
       });
@@ -1159,14 +1155,13 @@ export class EnhancedNotificationService {
       await this.sendNotification(notification);
       return { success: true, shouldRetry: false };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
       const shouldRetry = this.shouldRetryError(error);
       const retryAfterMinutes = this.calculateRetryDelay(error);
 
       return {
         success: false,
-        error: errorMessage,
+        error: message,
         shouldRetry,
         retryAfterMinutes,
       };
@@ -1343,7 +1338,7 @@ export class EnhancedNotificationService {
         const updatedRetryInfo = { ...retryInfo };
         updatedRetryInfo.retryCount++;
         updatedRetryInfo.lastError =
-          error instanceof Error ? error.message : "Unknown error";
+          errorMessage(error);
 
         // Use smarter retry logic based on error type
         const shouldContinueRetrying =
@@ -1608,12 +1603,11 @@ export class EnhancedNotificationService {
         `✅ Successfully sent ${notification.notificationType} notification for event "${event.title}"`,
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       logger.error(
         `❌ Failed to send notification for event "${event.title}":`,
-        errorMessage,
+        message,
       );
 
       // Log the failed notification (but don't mark as sent so it can be retried)
@@ -1623,7 +1617,7 @@ export class EnhancedNotificationService {
         notification.notificationType,
         notification.minutesBefore,
         "failed",
-        errorMessage,
+        message,
       );
 
       throw error;
@@ -1765,7 +1759,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       logger.error("Failed to generate email content:", error);
       throw new Error(
-        `Email content generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Email content generation failed: ${errorMessage(error)}`,
       );
     }
   }
@@ -1993,7 +1987,7 @@ export class EnhancedNotificationService {
     event: CalendarEvent,
   ): Error {
     const originalMessage =
-      error instanceof Error ? error.message : "Unknown error";
+      errorMessage(error);
     const errorLower = originalMessage.toLowerCase();
 
     // Categorize errors for better handling
@@ -2307,7 +2301,7 @@ export class EnhancedNotificationService {
                   isEnabled: true,
                 } as NotificationConfig,
                 reason:
-                  error instanceof Error ? error.message : "Unknown error",
+                  errorMessage(error),
               },
             ],
           };
@@ -2851,12 +2845,11 @@ export class EnhancedNotificationService {
       };
     } catch (error) {
       const cleanupDuration = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = errorMessage(error);
 
       logger.error(
         `❌ Cleanup failed after ${cleanupDuration}ms:`,
-        errorMessage,
+        message,
       );
 
       // Log cleanup failure
@@ -2866,7 +2859,7 @@ export class EnhancedNotificationService {
         cleanupDuration,
         retentionDays,
         retentionCutoff,
-        error: errorMessage,
+        error: message,
       });
 
       throw new Error(`Notification cleanup failed: ${errorMessage}`);
@@ -2909,7 +2902,7 @@ export class EnhancedNotificationService {
         } catch (error) {
           logger.warn(
             `⚠️ Failed to analyze table ${table}:`,
-            error instanceof Error ? error.message : "Unknown error",
+            errorMessage(error),
           );
         }
       }
@@ -2933,7 +2926,7 @@ export class EnhancedNotificationService {
           } catch (error) {
             logger.warn(
               `⚠️ Failed to reindex ${index}:`,
-              error instanceof Error ? error.message : "Unknown error",
+              errorMessage(error),
             );
           }
         }
@@ -2952,7 +2945,7 @@ export class EnhancedNotificationService {
           } catch (error) {
             logger.warn(
               `⚠️ Failed to vacuum table ${table}:`,
-              error instanceof Error ? error.message : "Unknown error",
+              errorMessage(error),
             );
           }
         }
@@ -2963,7 +2956,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       logger.error(
         "❌ Database maintenance failed:",
-        error instanceof Error ? error.message : "Unknown error",
+        errorMessage(error),
       );
       return maintenanceResults;
     }
@@ -3058,7 +3051,7 @@ export class EnhancedNotificationService {
     } catch (error) {
       logger.error(
         "Failed to log cleanup statistics:",
-        error instanceof Error ? error.message : "Unknown error",
+        errorMessage(error),
       );
       // Don't throw here as logging failure shouldn't break cleanup
     }
@@ -3096,7 +3089,7 @@ export class EnhancedNotificationService {
       } catch (error) {
         logger.error(
           "❌ Scheduled cleanup failed:",
-          error instanceof Error ? error.message : "Unknown error",
+          errorMessage(error),
         );
       }
     }, intervalMs);
@@ -3109,7 +3102,7 @@ export class EnhancedNotificationService {
       } catch (error) {
         logger.error(
           "❌ Initial cleanup failed:",
-          error instanceof Error ? error.message : "Unknown error",
+          errorMessage(error),
         );
       }
     }, 30000); // 30 seconds delay
@@ -3283,7 +3276,7 @@ export class EnhancedNotificationService {
       logger.error("Failed to get cleanup metrics:", error);
       throw new Error(
         `Failed to retrieve cleanup metrics: ${
-          error instanceof Error ? error.message : "Unknown error"
+          errorMessage(error)
         }`,
       );
     }
@@ -3426,7 +3419,7 @@ export class EnhancedNotificationService {
         return {
           config,
           isValid: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: errorMessage(error),
         };
       }
     });

@@ -3,6 +3,25 @@ import { createLogger } from "@workspace/logger";
 
 const logger = createLogger("backend:errors");
 
+/**
+ * Extract a human-readable message from an unknown error value.
+ * Returns `fallback` (default "Unknown error") when the value is not an Error.
+ */
+export function errorMessage(error: unknown, fallback = "Unknown error"): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string" && error.length > 0) return error;
+  return fallback;
+}
+
+/**
+ * Like {@link errorMessage} but uses `String(error)` as the fallback so any
+ * non-Error value is still serialized. Use for diagnostic/log payloads where
+ * preserving the original value matters.
+ */
+export function errorString(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // Custom error types
 export class ValidationError extends Error {
   constructor(

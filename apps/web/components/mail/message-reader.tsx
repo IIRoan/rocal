@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { getErrorMessage } from "@workspace/calendar-core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -1032,7 +1033,7 @@ export function MessageReader({
       toast.success("Cancelled event removed from your calendar.");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to remove event.",
+        getErrorMessage(error, "Failed to remove event."),
       );
     } finally {
       setCancelProcessPending(false);

@@ -14,7 +14,7 @@ import type {
   EventBulkResult,
   EventIcsExportResult,
 } from "../contracts/event.contract";
-import { ValidationError } from "../lib/errors";
+import { ValidationError, errorString} from "../lib/errors";
 import {
   assertCalendarWritable,
   findUserCalendarOrThrow,
@@ -1386,8 +1386,8 @@ export class EventService implements IEventService {
           } catch (cleanupError) {
             logger.error("Failed to clean up remote event after local DB create failure", {
               stalwartEventId,
-              originalError: error instanceof Error ? error.message : String(error),
-              cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              originalError: errorString(error),
+              cleanupError: errorString(cleanupError),
             });
           }
         }

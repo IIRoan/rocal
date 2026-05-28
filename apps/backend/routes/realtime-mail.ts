@@ -12,6 +12,7 @@ import {
 } from "../services/mail-realtime.service";
 import type { MailSyncService } from "../services/mail-sync.service";
 import { defaultMailSyncService } from "./mail-sync";
+import { errorString } from "../lib/errors";
 
 const logger = createLogger("backend:mail-sse");
 const encoder = new TextEncoder();
@@ -167,7 +168,7 @@ export function createRealtimeMailRoutes(
                       userId: user.id,
                       accountId,
                       error:
-                        error instanceof Error ? error.message : String(error),
+                        errorString(error),
                     });
                   }
                 }
