@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 
 import type { CalendarEvent } from "../../generated/prisma/index.js";
 import {
+  areParsedEventParticipantsDifferent,
   convertParsedEventToCalendarEvent,
   isEventModified,
   parseICSFile,
@@ -217,6 +218,47 @@ describe("ics-parser", () => {
         recurrence: { frequency: "weekly", interval: 1 },
         timezone: "Europe/Amsterdam",
       }),
+    ).toBe(true);
+  });
+
+  it("detects no participant change when normalized lists match regardless of order", () => {
+    expect(
+      areParsedEventParticipantsDifferent(
+        [
+          {
+            email: "bob@example.com",
+            displayName: null,
+            role: "attendee",
+            status: "pending",
+          },
+          {
+            email: "alice@example.com",
+            displayName: "Alice",
+            role: "organizer",
+            status: "accepted",
+          },
+        ],
+        [
+          { email: "alice@example.com", displayName: "Alice", role: "organizer" },
+          { email: "bob@example.com", role: "attendee", status: "pending" },
+        ],
+      ),
+    ).toBe(false);
+  });
+
+  it("detects a participant change when emails differ", () => {
+    expect(
+      areParsedEventParticipantsDifferent(
+        [
+          {
+            email: "alice@example.com",
+            displayName: null,
+            role: "attendee",
+            status: "pending",
+          },
+        ],
+        [{ email: "bob@example.com", role: "attendee" }],
+      ),
     ).toBe(true);
   });
 });
