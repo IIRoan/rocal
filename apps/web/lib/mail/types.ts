@@ -233,7 +233,7 @@ const mailSyncCollectionSchema = <T extends z.ZodTypeAny>(recordSchema: T) =>
     records: z.array(recordSchema),
   });
 
-export const mailSyncResponseSchema = z.object({
+const mailSyncResponseSchema = z.object({
   accountId: z.string(),
   initialized: z.boolean(),
   changedTypes: z.array(z.string()),
@@ -243,7 +243,7 @@ export const mailSyncResponseSchema = z.object({
   calendarImport: mailCalendarImportSummarySchema.optional(),
 });
 
-export const mailRealtimeEventSchema = z.object({
+const mailRealtimeEventSchema = z.object({
   type: z.literal("mail.changed"),
   accountId: z.string(),
   changedTypes: z.array(z.string()),
