@@ -4,7 +4,7 @@ import { getThreeDayDates } from "./timeline-utils";
 
 // ─── View Labels ─────────────────────────────────────────────────────────────
 
-export const VIEW_LABELS: Record<CalendarView, string> = {
+const VIEW_LABELS: Record<CalendarView, string> = {
   month: "Month",
   week: "Week",
   day: "Day",
