@@ -14,7 +14,19 @@ import type {
   EventBulkResult,
   EventIcsExportResult,
 } from "../contracts/event.contract";
-import { ValidationError } from "../lib/errors";
+import { ValidationError, errorString} from "../lib/errors";
+import {
+  assertCalendarWritable,
+  findUserCalendarOrThrow,
+} from "../lib/calendar-access";
+import {
+  validateEventDescriptionLength,
+  validateEventLocationLength,
+  validateEventReminderMinutes,
+  validateEventTitleLength,
+  validateOptionalEventFields,
+} from "../lib/event-constraints";
+import { MS_PER_DAY, MS_PER_MINUTE } from "../lib/time-constants";
 import { ensureUserCalendars } from "../lib/user-setup";
 import { RecurrenceEngine } from "../lib/recurrence";
 import { NotificationCalculator } from "../lib/notification-calculator";
@@ -31,9 +43,12 @@ import { toIcsBuildEvent, toSafeIcsFilename } from "../lib/ics-export";
 import { createLogger } from "@workspace/logger";
 import {
   mapEventParticipant,
+  mapAndSortParticipants,
   resolveParticipantInputs,
   sortEventParticipants,
   EVENT_PARTICIPANT_USER_SELECT,
+  EVENT_WITH_RELATIONS_INCLUDE,
+  EVENT_WITH_RECURRENCE_INCLUDE,
   type EventParticipantRecord,
 } from "../lib/event-participants";
 import { EventParticipantService } from "./event-participant.service";
@@ -51,7 +66,6 @@ import {
 const logger = createLogger("backend:event-service");
 
 const INITIALIZED_USER_CACHE_LIMIT = 5000;
-const MAX_REMINDER_MINUTES = 43200; // 30 days
 
 export class EventService implements IEventService {
   private readonly initializedUsers = new Set<string>();
@@ -670,17 +684,7 @@ export class EventService implements IEventService {
             },
           ],
         },
-        include: {
-          category: true,
-          calendar: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
+        include: EVENT_WITH_RELATIONS_INCLUDE,
       }),
       this.prisma.calendarEvent.findMany({
         where: {
@@ -688,18 +692,7 @@ export class EventService implements IEventService {
           recurrence: { not: null },
           parentEventId: null,
         },
-        include: {
-          category: true,
-          calendar: true,
-          recurrenceExceptions: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
+        include: EVENT_WITH_RECURRENCE_INCLUDE,
       }),
     ]);
 
@@ -786,17 +779,7 @@ export class EventService implements IEventService {
           parentEventId: { not: null },
           start: { gte: startDate, lte: endDate },
         },
-        include: {
-          category: true,
-          calendar: true,
-          participants: {
-            include: {
-              user: {
-                select: EVENT_PARTICIPANT_USER_SELECT,
-              },
-            },
-          },
-        },
+        include: EVENT_WITH_RELATIONS_INCLUDE,
       }),
       this.prisma.eventCategory.findMany({
         where: {
@@ -820,11 +803,7 @@ export class EventService implements IEventService {
     ]
       .map((event) => ({
         ...event,
-        participants: sortEventParticipants(
-          (event.participants ?? []).map((participant) =>
-            mapEventParticipant(participant as EventParticipantRecord),
-          ),
-        ),
+        participants: mapAndSortParticipants(event),
       }))
       .filter(
         (event) =>
@@ -901,11 +880,7 @@ export class EventService implements IEventService {
 
       return {
         ...event,
-        participants: sortEventParticipants(
-          (event.participants ?? []).map((participant) =>
-            mapEventParticipant(participant as EventParticipantRecord),
-          ),
-        ),
+        participants: mapAndSortParticipants(event),
       };
     } catch (error) {
       logger.error("Event fetch error:", error);
@@ -937,17 +912,7 @@ export class EventService implements IEventService {
         externalId: normalizedExternalId,
         subscriptionId: null,
       },
-      include: {
-        category: true,
-        calendar: true,
-        participants: {
-          include: {
-            user: {
-              select: EVENT_PARTICIPANT_USER_SELECT,
-            },
-          },
-        },
-      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
     });
 
     if (!event) {
@@ -956,11 +921,7 @@ export class EventService implements IEventService {
 
     return {
       ...event,
-      participants: sortEventParticipants(
-        (event.participants ?? []).map((participant) =>
-          mapEventParticipant(participant as EventParticipantRecord),
-        ),
-      ),
+      participants: mapAndSortParticipants(event),
     };
   }
 
@@ -981,17 +942,7 @@ export class EventService implements IEventService {
         userId: input.userId,
         subscriptionId: null,
       },
-      include: {
-        category: true,
-        calendar: true,
-        participants: {
-          include: {
-            user: {
-              select: EVENT_PARTICIPANT_USER_SELECT,
-            },
-          },
-        },
-      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
     });
 
     if (!event) {
@@ -1092,17 +1043,7 @@ export class EventService implements IEventService {
         id: input.eventId,
         userId: input.userId,
       },
-      include: {
-        category: true,
-        calendar: true,
-        participants: {
-          include: {
-            user: {
-              select: EVENT_PARTICIPANT_USER_SELECT,
-            },
-          },
-        },
-      },
+      include: EVENT_WITH_RELATIONS_INCLUDE,
     });
 
     if (!updatedEvent) {
@@ -1111,11 +1052,7 @@ export class EventService implements IEventService {
 
     return {
       ...updatedEvent,
-      participants: sortEventParticipants(
-        (updatedEvent.participants ?? []).map((participant) =>
-          mapEventParticipant(participant as EventParticipantRecord),
-        ),
-      ),
+      participants: mapAndSortParticipants(updatedEvent),
     };
   }
 
@@ -1232,65 +1169,30 @@ export class EventService implements IEventService {
         }
       }
 
-      if (title.trim().length > 255) {
-        throw new ValidationError(
-          "Title cannot exceed 255 characters",
-          "title",
-        );
+      if (title.trim().length > 0) {
+        validateEventTitleLength(title);
       }
 
-      if (description && description.length > 1000) {
-        throw new ValidationError(
-          "Description cannot exceed 1000 characters",
-          "description",
-        );
-      }
-
-      if (location && location.length > 255) {
-        throw new ValidationError(
-          "Location cannot exceed 255 characters",
-          "location",
-        );
-      }
+      validateEventDescriptionLength(description);
+      validateEventLocationLength(location);
 
       if (!calendarId) {
         throw new ValidationError("Calendar ID is required", "calendarId");
       }
 
-      const calendar = await this.prisma.calendar.findFirst({
-        where: {
-          id: calendarId,
-          userId,
-        },
-      });
+      const calendar = await findUserCalendarOrThrow(
+        this.prisma,
+        userId,
+        calendarId,
+      );
 
-      if (!calendar) {
-        throw new ValidationError(
-          "Invalid calendar or calendar does not belong to user",
-          "calendarId",
-        );
-      }
-
-      if (calendar.kind !== "owned" || calendar.isSyncOnly) {
-        throw new ValidationError(
-          "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
-          "calendarId",
-        );
-      }
+      assertCalendarWritable(
+        calendar,
+        "Cannot create events in a read-only calendar. This calendar is managed by a subscription or public feed.",
+      );
 
       if (reminder !== undefined && reminder !== null) {
-        const reminderValue = Number(reminder);
-        if (
-          isNaN(reminderValue) ||
-          reminderValue < 0 ||
-          reminderValue > MAX_REMINDER_MINUTES
-        ) {
-          throw new ValidationError(
-            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
-            "reminder",
-          );
-        }
-        reminder = reminderValue;
+        reminder = validateEventReminderMinutes(reminder) as typeof reminder;
       }
 
       const userSettings = await this.prisma.userSettings.findUnique({
@@ -1411,8 +1313,8 @@ export class EventService implements IEventService {
           } catch (cleanupError) {
             logger.error("Failed to clean up remote event after local DB create failure", {
               stalwartEventId,
-              originalError: error instanceof Error ? error.message : String(error),
-              cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              originalError: errorString(error),
+              cleanupError: errorString(cleanupError),
             });
           }
         }
@@ -1580,42 +1482,19 @@ export class EventService implements IEventService {
         throw new ValidationError("End time must be after start time", "end");
       }
 
-      if (input.title !== undefined) {
-        if (!input.title?.trim()) {
-          throw new ValidationError(
-            "Title is required and cannot be empty",
-            "title",
-          );
-        }
-        if (input.title.trim().length > 255) {
-          throw new ValidationError(
-            "Title cannot exceed 255 characters",
-            "title",
-          );
-        }
-      }
-
-      if (
-        input.description !== undefined &&
-        input.description &&
-        input.description.length > 1000
-      ) {
+      if (input.title !== undefined && !input.title?.trim()) {
         throw new ValidationError(
-          "Description cannot exceed 1000 characters",
-          "description",
+          "Title is required and cannot be empty",
+          "title",
         );
       }
 
-      if (
-        input.location !== undefined &&
-        input.location &&
-        input.location.length > 255
-      ) {
-        throw new ValidationError(
-          "Location cannot exceed 255 characters",
-          "location",
-        );
-      }
+      const reminderValue = validateOptionalEventFields({
+        title: input.title,
+        description: input.description,
+        location: input.location,
+        reminder: input.reminder,
+      });
 
       if (input.color !== undefined && input.color) {
         if (!isValidCalendarColor(input.color)) {
@@ -1628,26 +1507,15 @@ export class EventService implements IEventService {
 
       let targetCalendar = null;
       if (input.calendarId !== undefined) {
-        targetCalendar = await this.prisma.calendar.findFirst({
-          where: {
-            id: input.calendarId,
-            userId,
-          },
-        });
-
-        if (!targetCalendar) {
-          throw new ValidationError(
-            "Invalid calendar or calendar does not belong to user",
-            "calendarId",
-          );
-        }
-
-        if (targetCalendar.kind !== "owned" || targetCalendar.isSyncOnly) {
-          throw new ValidationError(
-            "Cannot move events to a read-only calendar.",
-            "calendarId",
-          );
-        }
+        targetCalendar = await findUserCalendarOrThrow(
+          this.prisma,
+          userId,
+          input.calendarId,
+        );
+        assertCalendarWritable(
+          targetCalendar,
+          "Cannot move events to a read-only calendar.",
+        );
       }
 
       if (input.categoryId !== undefined && input.categoryId) {
@@ -1663,21 +1531,6 @@ export class EventService implements IEventService {
           throw new ValidationError(
             "Invalid category or category does not belong to user",
             "categoryId",
-          );
-        }
-      }
-
-      let reminderValue: number | null | undefined = input.reminder;
-      if (input.reminder !== undefined && input.reminder !== null) {
-        reminderValue = Number(input.reminder);
-        if (
-          isNaN(reminderValue) ||
-          reminderValue < 0 ||
-          reminderValue > MAX_REMINDER_MINUTES
-        ) {
-          throw new ValidationError(
-            `Reminder must be a number between 0 and ${MAX_REMINDER_MINUTES} minutes`,
-            "reminder",
           );
         }
       }
@@ -2547,7 +2400,7 @@ export class EventService implements IEventService {
     if (recurrenceInstanceDate) {
       const durationMs = Math.max(
         event.end.getTime() - event.start.getTime(),
-        event.allDay ? 24 * 60 * 60 * 1000 : 60 * 1000,
+        event.allDay ? MS_PER_DAY : MS_PER_MINUTE,
       );
 
       exportedEvent = {

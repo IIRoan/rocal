@@ -20,6 +20,7 @@ import type {
   RecurrenceDeleteScope,
   RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import { getErrorMessage } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
@@ -267,11 +268,10 @@ export function EventSheet({
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, createSnapshotRef.current);
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to create event";
-      Alert.alert("Couldn't create event", message);
+      Alert.alert(
+        "Couldn't create event",
+        getErrorMessage(err, "Failed to create event"),
+      );
     },
   });
 
@@ -297,11 +297,7 @@ export function EventSheet({
       dismissSheet();
     },
     onError: (err: unknown) => {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to update event";
-      setServerErrors([message]);
+      setServerErrors([getErrorMessage(err, "Failed to update event")]);
     },
   });
 
@@ -341,11 +337,10 @@ export function EventSheet({
     },
     onError: (err: unknown) => {
       rollbackFromSnapshot(queryClient, deleteSnapshotRef.current);
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : "Failed to delete event";
-      Alert.alert("Couldn't delete event", message);
+      Alert.alert(
+        "Couldn't delete event",
+        getErrorMessage(err, "Failed to delete event"),
+      );
     },
   });
 
@@ -740,8 +735,8 @@ export function EventSheet({
               {/* Errors */}
               {serverErrors.length > 0 && (
                 <View style={styles.errorContainer}>
-                  {serverErrors.map((err, idx) => (
-                    <Text key={idx} style={styles.errorText}>
+                  {serverErrors.map((err) => (
+                    <Text key={err} style={styles.errorText}>
                       {err}
                     </Text>
                   ))}

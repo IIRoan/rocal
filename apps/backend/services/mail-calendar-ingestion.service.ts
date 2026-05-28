@@ -9,6 +9,7 @@ import {
 import { EventParticipantService } from "./event-participant.service";
 import type { StalwartCalendarClientLike } from "../lib/stalwart-calendar";
 import { buildStalwartEventPayload } from "../lib/stalwart-calendar-mapping";
+import { errorString, errorMessage } from "../lib/errors";
 
 const logger = createLogger("backend:mail-calendar-ingestion");
 
@@ -444,8 +445,8 @@ export class MailCalendarIngestionService {
             } catch (cleanupError) {
               logger.error("Failed to clean up remote event after local DB create failure", {
                 remoteEventId,
-                originalError: error instanceof Error ? error.message : String(error),
-                cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                originalError: errorString(error),
+                cleanupError: errorString(cleanupError),
               });
             }
           }
@@ -608,7 +609,7 @@ export class MailCalendarIngestionService {
         summary.eventsUpdated += result.updated;
       } catch (error) {
         const detail =
-          error instanceof Error ? error.message : "Unknown ICS import error";
+          errorMessage(error, "Unknown ICS import error");
         summary.errors.push(`${payload.sourceId}: ${detail}`);
       }
     }

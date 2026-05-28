@@ -43,11 +43,11 @@ const SAFE_TEXT_EXTENSIONS = new Set([
   "yml",
 ]);
 
-export function normalizeAttachmentMimeType(type?: string | null): string {
+function normalizeAttachmentMimeType(type?: string | null): string {
   return type?.toLowerCase().split(";")[0]?.trim() ?? "";
 }
 
-export function getAttachmentExtension(name?: string | null): string {
+function getAttachmentExtension(name?: string | null): string {
   const trimmed = name?.trim();
   if (!trimmed) {
     return "";

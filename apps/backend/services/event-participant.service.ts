@@ -21,6 +21,7 @@ import {
 import { buildEventInvitationEmail, sendAuthEmail } from "../lib/auth-email";
 import { authEmailFrom, resend } from "../lib/email-client";
 import { env } from "../lib/env";
+import { errorString } from "../lib/errors";
 
 const logger = createLogger("backend:event-participants");
 
@@ -347,7 +348,7 @@ export class EventParticipantService {
           logger.warn("Failed to send event invitation", {
             eventId: input.eventId,
             inviteeEmail: invitee.email,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorString(error),
           });
         }
       }
