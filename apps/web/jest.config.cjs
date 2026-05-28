@@ -26,6 +26,8 @@ module.exports = {
       "<rootDir>/../../packages/calendar-ics/src/$1",
     "^@workspace/runtime$": "<rootDir>/../../packages/runtime/src/index.ts",
     "^@workspace/runtime/(.*)$": "<rootDir>/../../packages/runtime/src/$1",
+    "^@workspace/ui$": "<rootDir>/../../packages/ui/src/index.ts",
+    "^@workspace/ui/(.*)$": "<rootDir>/../../packages/ui/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 };
