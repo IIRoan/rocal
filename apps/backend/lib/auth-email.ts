@@ -2,6 +2,11 @@ export type AuthEmailMessage = {
   subject: string;
   text: string;
   html: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    contentType?: string;
+  }>;
 };
 
 export type AuthEmailDeliveryMode = "required" | "best-effort";
@@ -14,6 +19,11 @@ export interface AuthEmailClient {
       subject: string;
       html: string;
       text: string;
+      attachments?: Array<{
+        filename: string;
+        content: string;
+        contentType?: string;
+      }>;
     }): Promise<{
       data?: {
         id?: string | null;
@@ -46,6 +56,10 @@ function escapeHtml(value: string): string {
 /**
  * Builds a full email HTML document matching the event-reminder.html style:
  * logo at top, clean minimal layout, white button with border, footer with links.
+ *
+ * Security: `bodyHtml` and `footerHtml` MUST contain only pre-escaped HTML fragments.
+ * Every caller is responsible for running user-supplied strings through `escapeHtml`
+ * before embedding them in these arguments. Do not pass raw user input here.
  */
 function buildEmailHtml({
   title,
@@ -317,6 +331,125 @@ export function buildInviteEmail({
   };
 }
 
+function formatEventEmailDateRange(start: Date, end: Date, allDay: boolean): string {
+  const startFormatter = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: allDay ? undefined : "short",
+  });
+  const endFormatter = new Intl.DateTimeFormat("en-US", {
+    dateStyle: allDay ? undefined : "medium",
+    timeStyle: allDay ? undefined : "short",
+  });
+
+  if (allDay) {
+    return startFormatter.format(start);
+  }
+
+  return `${startFormatter.format(start)} - ${endFormatter.format(end)}`;
+}
+
+export function buildEventInvitationEmail({
+  attendeeName,
+  inviterName,
+  eventTitle,
+  eventDescription,
+  eventLocation,
+  start,
+  end,
+  allDay,
+  openUrl,
+  logoUrl = DEFAULT_LOGO_URL,
+  appUrl = DEFAULT_APP_URL,
+}: {
+  attendeeName?: string;
+  inviterName: string;
+  eventTitle: string;
+  eventDescription?: string | null;
+  eventLocation?: string | null;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  openUrl: string;
+  logoUrl?: string;
+  appUrl?: string;
+}): AuthEmailMessage {
+  const safeAttendeeName = escapeHtml(attendeeName?.trim() || "there");
+  const safeInviterName = escapeHtml(inviterName);
+  const safeEventTitle = escapeHtml(eventTitle);
+  const safeOpenUrl = escapeHtml(openUrl);
+  const eventWhen = formatEventEmailDateRange(start, end, allDay);
+  const safeEventWhen = escapeHtml(eventWhen);
+  const safeLocation = eventLocation?.trim() ? escapeHtml(eventLocation) : null;
+  const safeDescription = eventDescription?.trim()
+    ? escapeHtml(eventDescription).replaceAll("\n", "<br />")
+    : null;
+
+  const detailRows = [
+    `<p class="detail-label" style="margin:18px 0 4px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,0.4)">When</p><p class="detail-value" style="margin:0;font-size:15px;line-height:1.6;color:#1a1a1a">${safeEventWhen}</p>`,
+    safeLocation
+      ? `<p class="detail-label" style="margin:18px 0 4px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,0.4)">Location</p><p class="detail-value" style="margin:0;font-size:15px;line-height:1.6;color:#1a1a1a">${safeLocation}</p>`
+      : "",
+    safeDescription
+      ? `<p class="detail-label" style="margin:18px 0 4px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:rgba(0,0,0,0.4)">Notes</p><p class="detail-value" style="margin:0;font-size:15px;line-height:1.6;color:#1a1a1a">${safeDescription}</p>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const bodyHtml = `
+    <h1 class="email-title" style="margin:0;font-size:22px;line-height:130%;font-weight:700;letter-spacing:-0.01em;color:#000">You were invited to an event</h1>
+    <p class="email-subtitle" style="margin:6px 0 0;font-size:15px;line-height:130%;color:rgba(0,0,0,0.50)">Hi ${safeAttendeeName}</p>
+    <p class="email-body" style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#1a1a1a">
+      <strong>${safeInviterName}</strong> invited you to <strong>${safeEventTitle}</strong> on Solace.
+      Open the event for details or add the attached calendar invite to another calendar app.
+    </p>
+    ${detailRows}
+    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:fit-content;line-height:100%;padding:24px 0 0">
+      <tbody>
+        <tr>
+          <td align="center" valign="middle">
+            <a class="email-btn" href="${safeOpenUrl}" style='display:inline-block;background:#fff;color:#000;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;font-weight:500;line-height:100%;margin:0;text-decoration:none;padding:12px 20px;border:1px solid rgba(0,0,0,0.12);border-bottom:2px solid rgba(0,0,0,0.12);border-radius:12px'>Open event</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="email-footer" style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#a8a8a8">
+      If the button doesn&rsquo;t work, copy this link:
+      <a href="${safeOpenUrl}" style="color:#a8a8a8;text-decoration:underline;word-break:break-all">${safeOpenUrl}</a>
+    </p>`;
+
+  const footerHtml = `
+    <p class="email-footer" style="margin:0 0 4px;font-size:12px;line-height:1.5;color:#a8a8a8">
+      If you weren&rsquo;t expecting this invitation, you can safely ignore this email.
+    </p>`;
+
+  return {
+    subject: `${inviterName} invited you to ${eventTitle}`,
+    text: [
+      `Hi ${attendeeName?.trim() || "there"},`,
+      "",
+      `${inviterName} invited you to "${eventTitle}".`,
+      `When: ${eventWhen}`,
+      ...(eventLocation?.trim() ? [`Location: ${eventLocation.trim()}`] : []),
+      ...(eventDescription?.trim()
+        ? ["", eventDescription.trim()]
+        : []),
+      "",
+      `Open event: ${openUrl}`,
+      "",
+      "An ICS calendar invite is attached.",
+    ].join("\n"),
+    html: buildEmailHtml({
+      title: "Event invitation",
+      previewText: `${inviterName} invited you to ${eventTitle}.`,
+      logoUrl,
+      appUrl,
+      bodyHtml,
+      footerHtml,
+    }),
+  };
+}
+
 export function getPasswordChangeRecipient(response: unknown): {
   email: string;
   name: string;
@@ -409,6 +542,7 @@ export async function sendAuthEmail({
       subject: message.subject,
       html: message.html,
       text: message.text,
+      attachments: message.attachments,
     });
 
     if (result.error) {

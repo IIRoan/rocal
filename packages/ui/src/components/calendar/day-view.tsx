@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   addHours,
   areIntervalsOverlapping,
@@ -282,7 +283,15 @@ export function DayView({
                     {/* Always show the title in day view for better usability */}
                     <div className="flex items-center gap-1 min-w-0">
                       <EncryptionStatusBadge item={event} asIcon />
-                      <span className="truncate">{event.title}</span>
+                      <span
+                        className={cn(
+                          "truncate",
+                          isCancelledCalendarEvent(event) &&
+                            "line-through opacity-70",
+                        )}
+                      >
+                        {event.title}
+                      </span>
                     </div>
                   </EventItem>
                 );

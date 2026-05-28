@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  canCurrentUserEditEvent,
+  getCurrentUserInvitationStatus,
+  isCancelledCalendarEvent,
+} from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { EncryptionStatusBadge } from "@workspace/ui/components/calendar";
 import {
@@ -32,6 +37,7 @@ import { EventEditorFooter } from "./event-editor/event-editor-footer";
 import { EventEditorDesktopHeader } from "./event-editor/event-editor-header";
 import { EventEditorPopover } from "./event-editor/event-editor-popover";
 import type { EventEditorMode } from "./command-palette-context";
+import type { EventEditorInvitationResponseStatus } from "./event-editor/types";
 
 interface EventEditorProps {
   open: boolean;
@@ -101,6 +107,8 @@ export function EventEditor({
   } = eventForm;
   const [showDescription, setShowDescription] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
+  const [inviteResponsePending, setInviteResponsePending] =
+    useState<EventEditorInvitationResponseStatus | null>(null);
   const lastPreviewPayloadRef = useRef<string>("");
 
   useEffect(() => {
@@ -119,10 +127,12 @@ export function EventEditor({
     }
 
     loadEventData(eventToEdit);
+    const canEditEvent = canCurrentUserEditEvent(eventToEdit);
     if (
       eventToEdit.id &&
       initialEventViewMode === "edit" &&
-      !eventToEdit.isSynced
+      !eventToEdit.isSynced &&
+      canEditEvent
     ) {
       setEventViewMode("edit");
     }
@@ -198,14 +208,13 @@ export function EventEditor({
     updatePreviewEvent,
   ]);
 
-  const handleEventSave = useCallback(
-    () => saveEvent(calendarData),
-    [calendarData, saveEvent],
-  );
-  const handleEventDelete = useCallback(
-    () => deleteEvent(calendarData),
-    [calendarData, deleteEvent],
-  );
+  const handleEventSave = useCallback(() => {
+    if (selectedEvent && !canCurrentUserEditEvent(selectedEvent)) {
+      toast.error("Imported invitation events are read-only for attendees.");
+      return;
+    }
+    void saveEvent(calendarData);
+  }, [calendarData, saveEvent, selectedEvent]);
   const handleRecurringDeleteThis = useCallback(
     () => deleteRecurringThis(calendarData),
     [calendarData, deleteRecurringThis],
@@ -225,6 +234,42 @@ export function EventEditor({
       toast.error(error?.message || "Failed to download event as ICS file");
     }
   }, [selectedEvent]);
+  const handleInvitationResponse = useCallback(
+    async (status: EventEditorInvitationResponseStatus) => {
+      if (!selectedEvent?.id) {
+        return;
+      }
+
+      setInviteResponsePending(status);
+      try {
+        const result = await calendarApiService.respondToInvitation(
+          selectedEvent.id,
+          status,
+        );
+        void calendarData.refetchEvents();
+        if ("deleted" in result && result.deleted) {
+          // Event was declined and removed from calendar — close the modal
+          onEventSaved?.();
+          handleClose();
+          toast.success("Invitation declined and removed from your calendar.");
+        } else {
+          const updatedEvent = result as CalendarEvent;
+          loadEventData(updatedEvent);
+          onEventSaved?.();
+          toast.success(
+            status === "accepted"
+              ? "Invitation accepted."
+              : "Marked as tentative.",
+          );
+        }
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to update invitation response.");
+      } finally {
+        setInviteResponsePending(null);
+      }
+    },
+    [calendarData, handleClose, loadEventData, onEventSaved, selectedEvent],
+  );
   const handleToggleLocation = useCallback(() => {
     setShowLocation((current) => !current);
   }, []);
@@ -238,7 +283,46 @@ export function EventEditor({
     setShowNotifications(!showNotifications);
   }, [setShowNotifications, showNotifications]);
 
-  const isViewMode = eventViewMode === "view";
+  const canEditSelectedEvent = useMemo(
+    () => (selectedEvent ? canCurrentUserEditEvent(selectedEvent) : true),
+    [selectedEvent],
+  );
+  const isCancelledSelectedEvent = useMemo(
+    () => (selectedEvent ? isCancelledCalendarEvent(selectedEvent) : false),
+    [selectedEvent],
+  );
+  const canDeleteSelectedEvent = useMemo(() => {
+    if (!selectedEvent?.id || selectedEvent.isSynced) {
+      return false;
+    }
+
+    return canEditSelectedEvent || isCancelledSelectedEvent;
+  }, [canEditSelectedEvent, isCancelledSelectedEvent, selectedEvent]);
+  const handleEventDelete = useCallback(() => {
+    if (selectedEvent && !canDeleteSelectedEvent) {
+      toast.error("Imported invitation events are read-only for attendees.");
+      return;
+    }
+    void deleteEvent(calendarData);
+  }, [
+    calendarData,
+    canDeleteSelectedEvent,
+    deleteEvent,
+    selectedEvent,
+  ]);
+  const invitationStatus = useMemo(() => {
+    if (!selectedEvent || canEditSelectedEvent) {
+      return null;
+    }
+
+    const status = getCurrentUserInvitationStatus(selectedEvent);
+    return status === "accepted" ||
+      status === "declined" ||
+      status === "tentative"
+      ? status
+      : null;
+  }, [canEditSelectedEvent, selectedEvent]);
+  const isViewMode = eventViewMode === "view" || !canEditSelectedEvent;
   const isMobile = useIsMobile();
   const selectedCalendar = useMemo(
     () => calendars.find((calendar) => calendar.id === eventCalendarId),
@@ -333,11 +417,15 @@ export function EventEditor({
         desktop
       />
       <EventEditorFooter
+        canEditEvent={canEditSelectedEvent}
         isViewMode={isViewMode}
         eventForm={eventForm}
         handleEventSave={handleEventSave}
         handleEventDelete={handleEventDelete}
         handleEventDownloadIcs={handleEventDownloadIcs}
+        invitationResponsePending={inviteResponsePending}
+        invitationStatus={invitationStatus}
+        onInvitationResponse={handleInvitationResponse}
         desktop
         onClose={() => onOpenChange(false)}
       />
@@ -376,12 +464,16 @@ export function EventEditor({
               }
               footer={
                 <EventEditorFooter
+                  canEditEvent={canEditSelectedEvent}
                   isViewMode={isViewMode}
                   eventForm={eventForm}
                   onBack={onBack}
                   handleEventSave={handleEventSave}
                   handleEventDelete={handleEventDelete}
                   handleEventDownloadIcs={handleEventDownloadIcs}
+                  invitationResponsePending={inviteResponsePending}
+                  invitationStatus={invitationStatus}
+                  onInvitationResponse={handleInvitationResponse}
                 />
               }
               bodyClassName="min-h-0"
@@ -422,9 +514,13 @@ export function EventEditor({
         handleEventSave={handleEventSave}
         handleEventDelete={handleEventDelete}
         handleEventDownloadIcs={handleEventDownloadIcs}
+        canEditEvent={canEditSelectedEvent}
+        invitationResponsePending={inviteResponsePending}
+        invitationStatus={invitationStatus}
         isViewMode={isViewMode}
         leadingSlot={standardLeadingSlot}
         localSettings={localSettings}
+        onInvitationResponse={handleInvitationResponse}
         recurringModal={recurringModal}
         setShowLocation={setShowLocation}
         setShowDescription={setShowDescription}

@@ -5,6 +5,10 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { differenceInMinutes, format, getMinutes, isPast } from "date-fns";
 import { MapPinIcon } from "@phosphor-icons/react";
+import {
+  isAwaitingUserInvitationResponse,
+  isCancelledCalendarEvent,
+} from "@workspace/calendar-core";
 
 import {
   getBorderRadiusClasses,
@@ -95,6 +99,7 @@ function EventWrapper({
 
   const isEventInPast = isPast(displayEnd);
   const isPreview = !!(event as any).isPreview;
+  const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
   // Preview events get a distinct ghost/outline style
   if (isPreview) {
@@ -140,6 +145,7 @@ function EventWrapper({
         "cursor-pointer",
         "data-dragging:cursor-grabbing data-dragging:shadow-lg data-dragging:z-20",
         "data-past-event:opacity-65",
+        "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-transparent data-invitation-ghost:opacity-75",
         "hover:brightness-[1.04] hover:shadow-sm hover:ring-1 hover:ring-black/10 dark:hover:ring-white/15 hover:z-10",
         "active:brightness-[0.97]",
         "touch-manipulation",
@@ -153,6 +159,7 @@ function EventWrapper({
       style={getEventColorStyles(event.color)}
       data-dragging={isDragging || undefined}
       data-past-event={isEventInPast || undefined}
+      data-invitation-ghost={isInvitationGhost || undefined}
       onClick={onClick}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
@@ -252,7 +259,14 @@ export function EventItem({
           {children || (
             <span className="truncate flex items-center gap-1">
               <EncryptionStatusBadge item={event} asIcon />
-              <span className="truncate">{event.title}</span>
+              <span
+                className={cn(
+                  "truncate",
+                  isCancelledCalendarEvent(event) && "line-through opacity-70",
+                )}
+              >
+                {event.title}
+              </span>
             </span>
           )}
         </EventWrapper>
@@ -316,7 +330,10 @@ export function EventItem({
               <div className="flex items-center gap-1 w-full min-w-0">
                 <EncryptionStatusBadge item={event} asIcon />
                 <span
-                  className="font-semibold flex-1 min-w-0 truncate tracking-tight"
+                  className={cn(
+                    "font-semibold flex-1 min-w-0 truncate tracking-tight",
+                    isCancelledCalendarEvent(event) && "line-through opacity-70",
+                  )}
                   title={event.title}
                 >
                   {event.title}
@@ -337,6 +354,7 @@ export function EventItem({
                 className={cn(
                   "flex-1 min-w-0 truncate whitespace-nowrap tracking-tight",
                   isCompact ? "font-medium" : "font-semibold",
+                  isCancelledCalendarEvent(event) && "line-through opacity-70",
                 )}
                 title={event.title}
               >
@@ -365,6 +383,7 @@ export function EventItem({
       timezone,
     );
     const accentColor = resolveInlineColorValue(eventColor);
+    const isInvitationGhost = isAwaitingUserInvitationResponse(event);
 
     return (
       <button
@@ -373,10 +392,12 @@ export function EventItem({
           "hover:bg-muted/60 active:bg-muted/80",
           "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
           "data-past-event:opacity-55",
+          "data-invitation-ghost:border data-invitation-ghost:border-dashed data-invitation-ghost:border-current/60 data-invitation-ghost:bg-muted/20 data-invitation-ghost:opacity-75",
           className,
         )}
         style={{ ["--ev-accent" as any]: accentColor }}
         data-past-event={isPast(new Date(event.end)) || undefined}
+        data-invitation-ghost={isInvitationGhost || undefined}
         data-event-id={event.id}
         onClick={onClick}
         onMouseDown={onMouseDown}
@@ -414,7 +435,12 @@ export function EventItem({
           <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0">
             <div className="flex items-center gap-1.5 min-w-0">
               <EncryptionStatusBadge item={event} asIcon />
-              <span className="truncate text-[15px] font-semibold leading-snug text-foreground tracking-tight group-data-past-event/ev:line-through">
+              <span
+                className={cn(
+                  "truncate text-[15px] font-semibold leading-snug text-foreground tracking-tight group-data-past-event/ev:line-through",
+                  isCancelledCalendarEvent(event) && "line-through opacity-70",
+                )}
+              >
                 {event.title}
               </span>
             </div>

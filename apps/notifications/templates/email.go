@@ -10,6 +10,7 @@ import (
 
 // EmailTemplateData holds the data for email templates
 type EmailTemplateData struct {
+	EventID        string
 	EventTitle     string
 	EventDate      string
 	EventTime      string
@@ -79,6 +80,9 @@ func GeneratePlainTextEmail(data EmailTemplateData) string {
 
 	if data.Duration != "" {
 		text += fmt.Sprintf("Duration: %s\n", data.Duration)
+	}
+	if data.EventID != "" {
+		text += fmt.Sprintf("Event ID: %s\n", data.EventID)
 	}
 
 	text += fmt.Sprintf("Open event: %s\n", data.EventUrl)

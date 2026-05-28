@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { isCancelledCalendarEvent } from "@workspace/calendar-core";
 import {
   addMonths,
   eachDayOfInterval,
@@ -254,7 +255,14 @@ export function StickyMiniCalendar({
                     timezone={timezone}
                     className="text-[10px]"
                   >
-                    <div>{event.title}</div>
+                    <div
+                      className={cn(
+                        isCancelledCalendarEvent(event) &&
+                          "line-through opacity-70",
+                      )}
+                    >
+                      {event.title}
+                    </div>
                   </EventItem>
                 );
               })}
@@ -361,7 +369,14 @@ export function StickyMiniCalendar({
                                 )}
                                 aria-hidden={!shouldShowTitle}
                               >
-                                {event.title}
+                                <span
+                                  className={cn(
+                                    isCancelledCalendarEvent(event) &&
+                                      "line-through opacity-70",
+                                  )}
+                                >
+                                  {event.title}
+                                </span>
                               </div>
                             </EventItem>
                           );

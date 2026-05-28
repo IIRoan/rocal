@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -77,6 +78,12 @@ function eventToInitialValues(
     calendarId: event.calendarId,
     reminder: event.reminder ?? undefined,
     recurrence: event.recurrence ?? undefined,
+    participants: event.participants?.map((participant) => ({
+      email: participant.email,
+      displayName: participant.displayName ?? undefined,
+      role: participant.role,
+      status: participant.status,
+    })),
   };
 }
 
@@ -114,6 +121,29 @@ function IconBox({
       <Feather name={name} size={16} color={color} />
     </View>
   );
+}
+
+function formatParticipantStatus(status?: string) {
+  switch (status) {
+    case "accepted":
+      return "Accepted";
+    case "declined":
+      return "Declined";
+    case "tentative":
+      return "Tentative";
+    default:
+      return "Invited";
+  }
+}
+
+function getParticipantInitials(
+  participant: Pick<
+    NonNullable<CalendarEvent["participants"]>[number],
+    "displayName" | "email"
+  >,
+) {
+  const label = participant.displayName?.trim() || participant.email;
+  return label.replace(/@.*$/, "").slice(0, 2).toUpperCase() || "P";
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -618,6 +648,49 @@ export function EventSheet({
                     </View>
                   </>
                 ) : null}
+
+                {event.participants && event.participants.length > 0 ? (
+                  <>
+                    <View style={styles.sectionDivider} />
+                    <View style={[styles.sectionRow, styles.participantSectionRow]}>
+                      <IconBox name="users" color={iconColor} bg={iconBg} />
+                      <View style={styles.participantList}>
+                        {event.participants.map((participant) => (
+                          <View
+                            key={participant.id}
+                            style={styles.participantRow}
+                          >
+                            {participant.image ? (
+                              <Image
+                                source={{ uri: participant.image }}
+                                style={styles.participantAvatarImage}
+                              />
+                            ) : (
+                              <View style={styles.participantAvatarFallback}>
+                                <Text style={styles.participantAvatarFallbackText}>
+                                  {getParticipantInitials(participant)}
+                                </Text>
+                              </View>
+                            )}
+                            <View style={styles.participantMeta}>
+                              <Text style={styles.viewText}>
+                                {participant.displayName || participant.email}
+                              </Text>
+                              <Text style={styles.viewSubtext}>
+                                {participant.role === "organizer"
+                                  ? "Organizer"
+                                  : formatParticipantStatus(participant.status)}
+                                {participant.displayName
+                                  ? ` · ${participant.email}`
+                                  : ""}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </>
+                ) : null}
               </View>
 
               {/* Location */}
@@ -807,6 +880,9 @@ function createStyles(theme: ThemeTokens) {
       paddingHorizontal: 14,
       paddingVertical: 12,
     },
+    participantSectionRow: {
+      alignItems: "flex-start" as const,
+    },
     sectionDivider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: theme.colors.border + "60",
@@ -822,6 +898,31 @@ function createStyles(theme: ThemeTokens) {
       alignItems: "center" as const,
       justifyContent: "center" as const,
       backgroundColor: theme.colors.mutedForeground + "18",
+    },
+    participantList: {
+      flex: 1,
+      gap: 10,
+    },
+    participantRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 10,
+    },
+    participantAvatarImage: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    participantAvatarFallback: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      backgroundColor: theme.colors.muted,
+    },
+    participantMeta: {
+      flex: 1,
     },
     calendarDot: {
       width: 12,
@@ -925,6 +1026,11 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.foreground,
       lineHeight: theme.typography.fontSize.sm.lineHeight,
+    },
+    participantAvatarFallbackText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
     },
     deleteText: {
       flex: 1,

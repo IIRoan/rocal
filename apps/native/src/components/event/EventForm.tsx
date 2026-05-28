@@ -40,6 +40,7 @@ import type { ThemeTokens } from "@workspace/design-tokens";
 import type {
   Calendar,
   CreateEventRequest,
+  EventParticipantInput,
 } from "@workspace/calendar-core";
 import { RecurrencePicker } from "./RecurrencePicker";
 import {
@@ -153,6 +154,10 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     const [reminder, setReminder] = useState<number>(
       initialValues?.reminder ?? 15,
     );
+    const [participants, setParticipants] = useState<EventParticipantInput[]>(
+      initialValues?.participants ?? [],
+    );
+    const [participantDraft, setParticipantDraft] = useState("");
 
     // ── UI state ─────────────────────────────────────────────────────────────
 
@@ -282,6 +287,12 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
         categoryId: undefined,
         recurrence,
         reminder,
+        participants: participants.map((participant) => ({
+          email: participant.email.trim().toLowerCase(),
+          displayName: participant.displayName?.trim() || undefined,
+          role: participant.role,
+          status: participant.status,
+        })),
       });
 
       const { fieldErrors: newFieldErrors, generalErrors: newGeneralErrors } =
@@ -322,6 +333,54 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
     };
 
     const isEditMode = !!initialValues?.title;
+    const addParticipant = useCallback(() => {
+      const email = participantDraft.trim().replace(/^mailto:/i, "").toLowerCase();
+
+      if (!email) {
+        setFieldErrors((current) => ({
+          ...current,
+          participants: "Participant email is required",
+        }));
+        return;
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setFieldErrors((current) => ({
+          ...current,
+          participants: "Participant must use a valid email address",
+        }));
+        return;
+      }
+
+      if (participants.some((participant) => participant.email === email)) {
+        setFieldErrors((current) => ({
+          ...current,
+          participants: "That participant is already invited",
+        }));
+        return;
+      }
+
+      setParticipantDraft("");
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next.participants;
+        return next;
+      });
+      setParticipants((current) => [
+        ...current,
+        {
+          email,
+          role: "attendee",
+          status: "pending",
+        },
+      ]);
+    }, [participantDraft, participants]);
+
+    const removeParticipant = useCallback((email: string) => {
+      setParticipants((current) =>
+        current.filter((participant) => participant.email !== email),
+      );
+    }, []);
 
     // ── Render ───────────────────────────────────────────────────────────────
 
@@ -733,6 +792,88 @@ export const EventForm = forwardRef<EventFormHandle, EventFormProps>(
                   )}
                 </View>
               )}
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Participants</Text>
+                <View style={styles.participantComposer}>
+                  <TextInput
+                    style={[
+                      styles.expandableInput,
+                      styles.participantInput,
+                      fieldErrors.participants ? styles.inputError : null,
+                    ]}
+                    value={participantDraft}
+                    onChangeText={setParticipantDraft}
+                    placeholder="Add attendee by email"
+                    placeholderTextColor={theme.colors.mutedForeground}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={addParticipant}
+                    accessibilityLabel="Add attendee by email"
+                  />
+                  <Pressable
+                    style={styles.participantAddButton}
+                    onPress={addParticipant}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add attendee"
+                  >
+                    <Feather
+                      name="user-plus"
+                      size={16}
+                      color={theme.colors.foreground}
+                    />
+                  </Pressable>
+                </View>
+                {renderFieldError("participants")}
+
+                {participants.length > 0 ? (
+                  <View style={styles.participantList}>
+                    {participants.map((participant) => (
+                      <View key={participant.email} style={styles.participantRow}>
+                        <View style={styles.participantAvatar}>
+                          <Text style={styles.participantAvatarText}>
+                            {(participant.displayName?.trim() ||
+                              participant.email)
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.participantMeta}>
+                          <Text style={styles.participantName}>
+                            {participant.displayName || participant.email}
+                          </Text>
+                          <Text style={styles.participantSubtitle}>
+                            {participant.role === "organizer"
+                              ? "Organizer"
+                              : participant.email}
+                          </Text>
+                        </View>
+                        {participant.role !== "organizer" && (
+                          <Pressable
+                            style={styles.participantRemoveButton}
+                            onPress={() => removeParticipant(participant.email)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${participant.email}`}
+                          >
+                            <Feather
+                              name="x"
+                              size={16}
+                              color={theme.colors.mutedForeground}
+                            />
+                          </Pressable>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.participantHint}>
+                    Invited attendees will be shown on the event and receive an
+                    email invite.
+                  </Text>
+                )}
+              </View>
             </View>
           </ScrollView>
 
@@ -1628,6 +1769,57 @@ function createStyles(theme: ThemeTokens) {
       height: undefined as unknown as number,
       textAlignVertical: "top" as const,
     },
+    participantComposer: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+    },
+    participantInput: {
+      flex: 1,
+    },
+    participantAddButton: {
+      width: 44,
+      height: 44,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: softBorder,
+      backgroundColor: theme.colors.background,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    participantList: {
+      gap: theme.spacing["2"],
+    },
+    participantRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["3"],
+      paddingHorizontal: theme.spacing["3"],
+      paddingVertical: theme.spacing["2"],
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: softBorder,
+      backgroundColor: theme.colors.background,
+    },
+    participantAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: theme.borderRadius.full,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      backgroundColor: theme.colors.muted,
+    },
+    participantMeta: {
+      flex: 1,
+      gap: 2,
+    },
+    participantRemoveButton: {
+      width: 28,
+      height: 28,
+      borderRadius: theme.borderRadius.full,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
 
     // Reminder
     reminderSection: {
@@ -1737,6 +1929,26 @@ function createStyles(theme: ThemeTokens) {
     },
     reminderChipTextActive: {
       fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+    },
+    participantAvatarText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      fontWeight: theme.typography.fontWeight.medium as TextStyle["fontWeight"],
+      color: theme.colors.foreground,
+    },
+    participantName: {
+      fontSize: theme.typography.fontSize.sm.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.foreground,
+    },
+    participantSubtitle: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+    },
+    participantHint: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.sm.lineHeight,
+      color: theme.colors.mutedForeground,
     },
     fieldError: {
       fontSize: theme.typography.fontSize.xs.size,

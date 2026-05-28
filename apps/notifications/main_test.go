@@ -353,11 +353,14 @@ func TestGenerateEmailContentAndSubject(t *testing.T) {
 	if !strings.Contains(content.HTML, "Project Kickoff") {
 		t.Fatalf("expected HTML to contain event title, got %q", content.HTML)
 	}
-	if !strings.Contains(content.HTML, "https://app.solace.test/dashboard?eventId=evt-1") {
+	if !strings.Contains(content.HTML, "https://app.solace.test/calendar?eventId=evt-1") {
 		t.Fatalf("expected HTML to contain event url, got %q", content.HTML)
 	}
-	if !strings.Contains(content.Text, "Open event: https://app.solace.test/dashboard?eventId=evt-1") {
+	if !strings.Contains(content.Text, "Open event: https://app.solace.test/calendar?eventId=evt-1") {
 		t.Fatalf("expected text email to contain event link, got %q", content.Text)
+	}
+	if !strings.Contains(content.Text, "Event ID: evt-1") {
+		t.Fatalf("expected text email to contain event ID, got %q", content.Text)
 	}
 
 	if subject := server.generateEmailSubject(event, 30); subject != "Project Kickoff in 30 minutes" {

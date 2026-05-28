@@ -6,8 +6,51 @@ import { resolveRouteUser } from "../lib/request-user";
 import { strictObject } from "../lib/validation";
 import { prisma } from "../lib/prisma";
 import { EventService } from "../services/event.service";
+import { createStalwartCalendarClient } from "../lib/stalwart-calendar";
+import { MailCalendarIngestionService } from "../services/mail-calendar-ingestion.service";
 
-const eventService = new EventService(prisma);
+const stalwartClient = createStalwartCalendarClient();
+const eventService = new EventService(prisma, undefined, stalwartClient);
+const mailCalendarIngestionService = new MailCalendarIngestionService(
+  prisma,
+  undefined,
+  stalwartClient,
+);
+const PARTICIPANT_EMAIL_PATTERN =
+  "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$";
+
+const eventParticipantSchema = strictObject({
+  email: t.String({
+    minLength: 3,
+    maxLength: 320,
+    pattern: PARTICIPANT_EMAIL_PATTERN,
+    description: "Participant email address",
+  }),
+  displayName: t.Optional(
+    t.String({
+      maxLength: 120,
+      description: "Participant display name",
+    }),
+  ),
+  role: t.Optional(
+    t.Union([t.Literal("organizer"), t.Literal("attendee")], {
+      description: "Participant role",
+    }),
+  ),
+  status: t.Optional(
+    t.Union(
+      [
+        t.Literal("pending"),
+        t.Literal("accepted"),
+        t.Literal("declined"),
+        t.Literal("tentative"),
+      ],
+      {
+        description: "Participant status",
+      },
+    ),
+  ),
+});
 
 export const eventsRoutes = new Elysia({
   prefix: "/events",
@@ -152,6 +195,12 @@ export const eventsRoutes = new Elysia({
             encryptedContent?: string;
             blindIndexTokens?: string[];
             encryptionKeyVersion?: number;
+            participants?: Array<{
+              email: string;
+              displayName?: string;
+              role?: "organizer" | "attendee";
+              status?: "pending" | "accepted" | "declined" | "tentative";
+            }>;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -248,6 +297,11 @@ export const eventsRoutes = new Elysia({
                 description: "Client-managed encryption key version.",
               }),
             ),
+            participants: t.Optional(
+              t.Array(eventParticipantSchema, {
+                description: "Participants to keep in sync with this event",
+              }),
+            ),
           }),
           detail: {
             summary: "Create a new calendar event",
@@ -286,6 +340,112 @@ export const eventsRoutes = new Elysia({
           }),
           detail: {
             summary: "Download a single event as .ics",
+          },
+        },
+      )
+
+      .get(
+        "/invitations/by-external-id",
+        async ({
+          query,
+          authenticatedUser,
+          request,
+        }: {
+          query: { externalId: string };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          const event = await eventService.getInvitationByExternalId(
+            user.id,
+            query.externalId,
+          );
+          return { event };
+        },
+        {
+          query: strictObject({
+            externalId: t.String({
+              minLength: 1,
+              maxLength: 512,
+              description: "External iCalendar UID from a mailed invitation",
+            }),
+          }),
+          detail: {
+            summary: "Find a mailed calendar invitation by external UID",
+          },
+        },
+      )
+
+      .post(
+        "/invitations/import-ics",
+        async ({
+          body,
+          authenticatedUser,
+          request,
+        }: {
+          body: { icsContent: string };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return mailCalendarIngestionService.ingestIcsContent({
+            userId: user.id,
+            icsContent: body.icsContent,
+            sourceId: "Decrypted mail invitation",
+          });
+        },
+        {
+          body: strictObject({
+            icsContent: t.String({
+              minLength: 1,
+              description:
+                "Raw ICS content extracted from a decrypted mailed invitation.",
+            }),
+          }),
+          detail: {
+            summary: "Import a decrypted mailed calendar invitation",
+          },
+        },
+      )
+
+      .post(
+        "/:id/rsvp",
+        async ({
+          params,
+          body,
+          authenticatedUser,
+          request,
+        }: {
+          params: { id: string };
+          body: { status: "accepted" | "declined" | "tentative" };
+          authenticatedUser?: AuthenticatedUser;
+          request: Request;
+        }) => {
+          const user = await resolveRouteUser(authenticatedUser, request);
+          return eventService.respondToInvitation({
+            userId: user.id,
+            eventId: params.id,
+            status: body.status,
+          });
+        },
+        {
+          params: strictObject({
+            id: t.String({ description: "Event ID" }),
+          }),
+          body: strictObject({
+            status: t.Union(
+              [
+                t.Literal("accepted"),
+                t.Literal("declined"),
+                t.Literal("tentative"),
+              ],
+              {
+                description: "RSVP status for the authenticated attendee",
+              },
+            ),
+          }),
+          detail: {
+            summary: "Respond to a mailed calendar invitation",
           },
         },
       )
@@ -341,6 +501,12 @@ export const eventsRoutes = new Elysia({
             encryptedContent?: string;
             blindIndexTokens?: string[];
             encryptionKeyVersion?: number;
+            participants?: Array<{
+              email: string;
+              displayName?: string;
+              role?: "organizer" | "attendee";
+              status?: "pending" | "accepted" | "declined" | "tentative";
+            }>;
           };
           authenticatedUser?: AuthenticatedUser;
           request: Request;
@@ -444,6 +610,11 @@ export const eventsRoutes = new Elysia({
               t.Number({
                 minimum: 1,
                 description: "Client-managed encryption key version.",
+              }),
+            ),
+            participants: t.Optional(
+              t.Array(eventParticipantSchema, {
+                description: "Participants to keep in sync with this event",
               }),
             ),
           }),
